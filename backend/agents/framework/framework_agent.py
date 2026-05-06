@@ -5,7 +5,7 @@ Calculates compliance scores per control family and generates gap reports.
 """
 from langchain.tools import Tool
 from typing import Any, Dict, List
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 # ── NIST CSF Function → Category → Control mapping (abbreviated) ───────────────
 

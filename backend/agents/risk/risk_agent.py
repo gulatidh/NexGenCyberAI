@@ -5,7 +5,7 @@ and generates a risk register with mitigation recommendations.
 """
 from langchain.tools import Tool
 from typing import Any, Dict, List
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 def _calculate_risk_score(likelihood: int, impact: int) -> float:

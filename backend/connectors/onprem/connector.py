@@ -5,7 +5,7 @@ Also supports SSH-based configuration checks on Linux/Windows hosts.
 """
 from typing import Any, Dict, List
 import httpx
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 NESSUS_SEVERITY = {0: FindingSeverity.INFO, 1: FindingSeverity.LOW, 2: FindingSeverity.MEDIUM,
                    3: FindingSeverity.HIGH, 4: FindingSeverity.CRITICAL}

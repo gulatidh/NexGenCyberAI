@@ -5,7 +5,7 @@ Pulls AWS Security Hub findings, Config rules, Inspector2, GuardDuty.
 """
 from typing import Any, Dict, List
 import boto3
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 SEVERITY_MAP = {
     "CRITICAL": FindingSeverity.CRITICAL,

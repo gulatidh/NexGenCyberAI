@@ -3,7 +3,7 @@ NexGenCyberAI - Field-level encryption for connector credentials stored in DB.
 Uses Fernet (AES-128-CBC + HMAC-SHA256).
 """
 from cryptography.fernet import Fernet
-from .config import get_settings
+from core.config import get_settings
 import base64
 import hashlib
 

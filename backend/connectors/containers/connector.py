@@ -5,7 +5,7 @@ Supports: Docker daemon, Kubernetes API, Azure Container Registry, ECR.
 """
 from typing import Any, Dict, List
 import httpx
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 
 class ContainerConnector(BaseConnector):

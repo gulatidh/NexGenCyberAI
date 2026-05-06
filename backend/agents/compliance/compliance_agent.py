@@ -4,7 +4,7 @@ Continuously monitors for compliance drift, generates audit reports,
 and tracks control effectiveness over time.
 """
 from typing import Any, Dict, List
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 from langchain.tools import Tool
 import json
 

@@ -6,7 +6,7 @@ Identifies TTPs, threat actors, and indicators of compromise.
 from langchain.tools import Tool
 from typing import Any, Dict, List
 import httpx
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 async def _fetch_otx_pulse(indicator: str) -> str:

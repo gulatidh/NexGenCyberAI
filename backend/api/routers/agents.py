@@ -3,11 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
-from ..models.models import AgentRun, AgentType, Scan, Finding
-from ..schemas.schemas import AgentRunRequest, AgentRunResponse
-from ...db.database import get_db
-from ...core.security import get_current_user
-from ...agents.orchestrator.orchestrator import AgentOrchestrator
+from api.models.models import AgentRun, AgentType, Scan, Finding
+from api.schemas.schemas import AgentRunRequest, AgentRunResponse
+from db.database import get_db
+from core.security import get_current_user
+from agents.orchestrator.orchestrator import AgentOrchestrator
 
 router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
 _orchestrator = AgentOrchestrator()

@@ -9,8 +9,8 @@ from langchain.tools import Tool
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferWindowMemory
 from typing import Any, Dict, List, Optional
-from ..core.ai_providers import get_llm, AIProvider
-from ..core.config import get_settings
+from core.ai_providers import get_llm, AIProvider
+from core.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)

@@ -4,13 +4,13 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
 import json
-from ..models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
-from ..schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
-from ...db.database import get_db
-from ...core.security import get_current_user
-from ...core.encryption import decrypt
-from ...connectors.factory import get_connector
-from ...agents.orchestrator.orchestrator import AgentOrchestrator
+from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
+from api.schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
+from db.database import get_db
+from core.security import get_current_user
+from core.encryption import decrypt
+from connectors.factory import get_connector
+from agents.orchestrator.orchestrator import AgentOrchestrator
 
 router = APIRouter(prefix="/clients/{client_id}/scans", tags=["scans"])
 orchestrator = AgentOrchestrator()

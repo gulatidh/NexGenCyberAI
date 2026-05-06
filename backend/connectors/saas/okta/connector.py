@@ -5,7 +5,7 @@ Checks MFA enrollment, suspicious sessions, Okta admin roles.
 """
 from typing import Any, Dict, List
 import httpx
-from ...base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 
 class OktaConnector(BaseConnector):

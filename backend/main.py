@@ -8,9 +8,9 @@ from fastapi.responses import JSONResponse
 import logging
 import time
 
-from .core.config import get_settings
-from .db.database import Base, engine
-from .api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings
+from core.config import get_settings
+from db.database import Base, engine
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")

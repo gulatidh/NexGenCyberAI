@@ -8,7 +8,7 @@ from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Dict, Any
-from .config import get_settings
+from core.config import get_settings
 
 settings = get_settings()
 bearer_scheme = HTTPBearer()

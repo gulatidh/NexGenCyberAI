@@ -3,16 +3,16 @@ NexGenCyberAI - Connector Factory
 Returns the right connector class given a ConnectorType.
 """
 from typing import Any, Dict
-from ..api.models.models import ConnectorType
-from .base import BaseConnector
-from .azure.connector import AzureConnector
-from .aws.connector import AWSConnector
-from .gcp.connector import GCPConnector
-from .onprem.connector import OnPremConnector
-from .entraid.connector import EntraIDConnector
-from .containers.connector import ContainerConnector
-from .saas.servicenow.connector import ServiceNowConnector
-from .saas.okta.connector import OktaConnector
+from api.models.models import ConnectorType
+from connectors.base import BaseConnector
+from connectors.azure.connector import AzureConnector
+from connectors.aws.connector import AWSConnector
+from connectors.gcp.connector import GCPConnector
+from connectors.onprem.connector import OnPremConnector
+from connectors.entraid.connector import EntraIDConnector
+from connectors.containers.connector import ContainerConnector
+from connectors.saas.servicenow.connector import ServiceNowConnector
+from connectors.saas.okta.connector import OktaConnector
 
 
 _REGISTRY = {

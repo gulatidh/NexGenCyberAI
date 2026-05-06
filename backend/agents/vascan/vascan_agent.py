@@ -6,7 +6,7 @@ enriches with NVD CVE data, and prioritises by EPSS score.
 from langchain.tools import Tool
 from typing import Any, Dict, List
 import httpx
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 
 async def _fetch_nvd_cve(cve_id: str) -> Dict:

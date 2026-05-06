@@ -4,7 +4,7 @@ NexGenCyberAI - Pydantic v2 request/response schemas.
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from ..models.models import (
+from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
     ScanStatus, Severity, RiskLevel, AgentType
 )

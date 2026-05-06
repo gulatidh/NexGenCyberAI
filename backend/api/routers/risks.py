@@ -2,10 +2,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from ..models.models import Risk
-from ..schemas.schemas import RiskCreate, RiskResponse
-from ...db.database import get_db
-from ...core.security import get_current_user
+from api.models.models import Risk
+from api.schemas.schemas import RiskCreate, RiskResponse
+from db.database import get_db
+from core.security import get_current_user
 
 router = APIRouter(prefix="/clients/{client_id}/risks", tags=["risks"])
 

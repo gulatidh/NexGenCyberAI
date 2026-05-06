@@ -10,7 +10,7 @@ from azure.mgmt.security import SecurityCenter
 from azure.mgmt.monitor import MonitorManagementClient
 import asyncio
 
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 
 SEVERITY_MAP = {

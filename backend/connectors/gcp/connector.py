@@ -8,7 +8,7 @@ from google.cloud import securitycenter_v1, asset_v1
 from google.oauth2 import service_account
 import json
 
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 SEVERITY_MAP = {
     "CRITICAL": FindingSeverity.CRITICAL,

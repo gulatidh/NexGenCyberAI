@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import json
-from ..models.models import Connector, ConnectorStatus
-from ..schemas.schemas import ConnectorCreate, ConnectorUpdate, ConnectorResponse
-from ...db.database import get_db
-from ...core.security import get_current_user
-from ...core.encryption import encrypt, decrypt
-from ...connectors.factory import get_connector
+from api.models.models import Connector, ConnectorStatus
+from api.schemas.schemas import ConnectorCreate, ConnectorUpdate, ConnectorResponse
+from db.database import get_db
+from core.security import get_current_user
+from core.encryption import encrypt, decrypt
+from connectors.factory import get_connector
 
 router = APIRouter(prefix="/clients/{client_id}/connectors", tags=["connectors"])
 

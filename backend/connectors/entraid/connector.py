@@ -7,7 +7,7 @@ Uses Microsoft Graph API via MSAL client credentials.
 from typing import Any, Dict, List
 import httpx
 import msal
-from ..base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
