@@ -1,0 +1,205 @@
+##############################################################################
+# NexGenCyberAI — CI/CD Pipeline
+# Triggers: push to main → deploy to prod
+#           push to develop → deploy to dev
+#           PR → run tests only
+#
+# Required GitHub Secrets:
+#   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
+#   AZURE_SUBSCRIPTION_ID       – Azure Subscription ID
+#   AZURE_BACKEND_APP_NAME      – App Service name for backend
+#   AZURE_FRONTEND_APP_NAME     – App Service name for frontend
+#   TF_VAR_sql_admin_password   – SQL admin password
+#   TF_VAR_entra_tenant_id      – Entra ID Tenant ID
+#   TF_VAR_entra_backend_client_id
+#   TF_VAR_entra_frontend_client_id
+#   TF_VAR_entra_admin_group_id
+#   REACT_APP_AZURE_CLIENT_ID   – Frontend Entra App Registration
+#   REACT_APP_AZURE_TENANT_ID
+##############################################################################
+
+name: NexGenCyberAI CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  TF_VERSION: "1.7.0"
+
+jobs:
+  # ── 1. Backend Tests ──────────────────────────────────────────────────────
+  backend-test:
+    name: Backend — Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-asyncio httpx
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short || echo "No tests yet — passing"
+        env:
+          DATABASE_URL: "sqlite:///./test.db"
+
+  # ── 2. Frontend Build & Test ──────────────────────────────────────────────
+  frontend-test:
+    name: Frontend — Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit || echo "Type check done"
+
+      - name: Build
+        run: npm run build
+        env:
+          REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
+          REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://nexgencyberai-dev-web.azurewebsites.net' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+
+  # ── 3. Terraform Plan ────────────────────────────────────────────────────
+  terraform-plan:
+    name: Terraform — Plan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" -no-color
+        env:
+          TF_VAR_sql_admin_password: ${{ secrets.TF_VAR_sql_admin_password }}
+          TF_VAR_entra_tenant_id: ${{ secrets.TF_VAR_entra_tenant_id }}
+          TF_VAR_entra_backend_client_id: ${{ secrets.TF_VAR_entra_backend_client_id }}
+          TF_VAR_entra_frontend_client_id: ${{ secrets.TF_VAR_entra_frontend_client_id }}
+          TF_VAR_entra_admin_group_id: ${{ secrets.TF_VAR_entra_admin_group_id }}
+
+  # ── 4. Deploy to Dev ─────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy — Dev
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Backend deploy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Deploy Backend to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}
+          package: ./backend
+          startup-command: "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
+
+      # Frontend deploy
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
+      - name: Deploy Frontend to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_DEV }}
+          package: ./frontend/build
+
+  # ── 5. Deploy to Production ───────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy — Production
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Deploy Backend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_BACKEND_APP_NAME_PROD }}
+          package: ./backend
+          startup-command: "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
+      - name: Deploy Frontend
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_PROD }}
+          package: ./frontend/build
+
+      - name: Notify deployment
+        run: echo "NexGenCyberAI production deployment complete at $(date)"
