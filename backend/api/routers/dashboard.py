@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
+from typing import Dict
 from api.models.models import Client, Connector, Finding, Risk, Scan, ScanStatus, FrameworkAssessment
 from api.schemas.schemas import DashboardSummary
 from db.database import get_db

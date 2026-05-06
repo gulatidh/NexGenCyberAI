@@ -12,7 +12,9 @@ export const apiClient = axios.create({ baseURL: BASE_URL });
 
 // Attach Entra ID token on every request
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const account = msalInstance.getActiveAccount();
+  // Ensure MSAL has finished loading the cache (no-op if already initialized)
+  await msalInstance.initialize();
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
   if (account) {
     try {
       const tokenResponse = await msalInstance.acquireTokenSilent({

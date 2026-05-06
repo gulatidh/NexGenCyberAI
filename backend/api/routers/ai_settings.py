@@ -54,6 +54,6 @@ async def test_ai_provider(payload: AITestRequest, _=Depends(get_current_user)):
 
 @router.get("/default-provider")
 async def get_default_provider(_=Depends(get_current_user)):
-    from ...core.config import get_settings
+    from core.config import get_settings
     s = get_settings()
     return {"default_provider": s.DEFAULT_AI_PROVIDER}
