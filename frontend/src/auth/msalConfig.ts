@@ -32,7 +32,7 @@ export const loginRequest = {
     "openid",
     "profile",
     "email",
-    `api://${process.env.REACT_APP_AZURE_CLIENT_ID}/NexGenCyberAI.Read`,
+    `api://${process.env.REACT_APP_BACKEND_CLIENT_ID}/NexGenCyberAI.Read`,
   ],
 };
 
