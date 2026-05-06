@@ -5,7 +5,7 @@ import {
   CircularProgress, Alert, Accordion, AccordionSummary,
   AccordionDetails, LinearProgress,
 } from "@mui/material";
-import { ExpandMore, SmartToy, PlayArrow, CheckCircle } from "@mui/icons-material";
+import { ExpandMore, SmartToy, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, clientsApi, scansApi } from "../services/api";
 import { Client, Scan, AgentType } from "../types";

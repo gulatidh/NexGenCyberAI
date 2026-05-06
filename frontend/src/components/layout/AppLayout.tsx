@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
-  IconButton, Chip, Tooltip, useTheme,
+  IconButton, Chip, Tooltip,
 } from "@mui/material";
 import {
   Dashboard, People, Cable, BugReport, Security, Policy,
@@ -28,7 +28,6 @@ const NAV_ITEMS = [
 ];
 
 export default function AppLayout() {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { instance, accounts } = useMsal();

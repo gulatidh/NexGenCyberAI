@@ -1,10 +1,10 @@
 import React from "react";
 import {
-  Grid, Card, CardContent, Typography, Box, Chip,
+  Grid, Card, CardContent, Typography, Box,
   LinearProgress, CircularProgress,
 } from "@mui/material";
 import {
-  BugReport, Security, Warning, CheckCircle,
+  BugReport, Security, Warning,
   TrendingUp, People, Cable,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
@@ -12,12 +12,8 @@ import { dashboardApi } from "../services/api";
 import { DashboardSummary } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell,
 } from "recharts";
-
-const SEVERITY_COLORS: Record<string, string> = {
-  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#2196f3",
-};
 
 const FRAMEWORK_COLORS = ["#00e5ff", "#7c4dff", "#ff6d00", "#00e676", "#ff4081"];
 
