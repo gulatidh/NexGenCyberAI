@@ -162,6 +162,7 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_DEV }}
           package: ./frontend/build
+          startup-command: "npx --yes serve -s . -l 8080"
 
   # ── 5. Deploy to Production ───────────────────────────────────────────────
   deploy-prod:
@@ -200,6 +201,7 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_PROD }}
           package: ./frontend/build
+          startup-command: "npx --yes serve -s . -l 8080"
 
       - name: Notify deployment
         run: echo "NexGenCyberAI production deployment complete at $(date)"
