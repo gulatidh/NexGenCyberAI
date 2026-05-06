@@ -59,7 +59,6 @@ app.include_router(ai_settings.router, prefix="/api/v1")
 
 @app.get("/api/health")
 async def health():
-    from .db.database import engine
     db_status = "ok"
     try:
         with engine.connect() as conn:
