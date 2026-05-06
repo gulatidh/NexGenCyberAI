@@ -14,15 +14,15 @@
  */
 
 terraform {
-  required_version = ">= 1.5"
+  required_version = ">= 1.7"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.90"
+      version = "~> 4.0"
     }
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 2.47"
+      version = "~> 3.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -60,9 +60,16 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
+resource "random_string" "sql_suffix" {
+  length  = 4
+  special = false
+  upper   = false
+}
+
 locals {
   suffix   = random_string.suffix.result
   app_name = "nexgencyberai-${var.environment}-${local.suffix}"
+  kv_name  = "ngcai-${var.environment}-${local.suffix}"
   tags = {
     project     = "NexGenCyberAI"
     environment = var.environment
@@ -101,9 +108,9 @@ resource "azurerm_application_insights" "main" {
 # ── Azure SQL ─────────────────────────────────────────────────────────────────
 
 resource "azurerm_mssql_server" "main" {
-  name                         = "${local.app_name}-sql"
+  name                         = "ncai-${var.environment}-${random_string.sql_suffix.result}-sql"
   resource_group_name          = azurerm_resource_group.main.name
-  location                     = azurerm_resource_group.main.location
+  location                     = var.sql_location
   version                      = "12.0"
   administrator_login          = var.sql_admin_login
   administrator_login_password = var.sql_admin_password
@@ -136,29 +143,37 @@ resource "azurerm_mssql_firewall_rule" "azure_services" {
 # ── Redis Cache ───────────────────────────────────────────────────────────────
 
 resource "azurerm_redis_cache" "main" {
-  name                = "${local.app_name}-redis"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  capacity            = var.environment == "prod" ? 1 : 0
-  family              = "C"
-  sku_name            = var.environment == "prod" ? "Standard" : "Basic"
-  enable_non_ssl_port = false
-  minimum_tls_version = "1.2"
-  tags                = local.tags
+  name                          = "${local.app_name}-redis"
+  resource_group_name           = azurerm_resource_group.main.name
+  location                      = azurerm_resource_group.main.location
+  capacity                      = var.environment == "prod" ? 1 : 0
+  family                        = "C"
+  sku_name                      = var.environment == "prod" ? "Standard" : "Basic"
+  non_ssl_port_enabled          = false
+  minimum_tls_version           = "1.2"
+  public_network_access_enabled = false
+  tags                          = local.tags
 }
 
 # ── Key Vault ─────────────────────────────────────────────────────────────────
 
 resource "azurerm_key_vault" "main" {
-  name                        = "${local.app_name}-kv"
+  name                        = local.kv_name
   resource_group_name         = azurerm_resource_group.main.name
   location                    = azurerm_resource_group.main.location
   tenant_id                   = data.azurerm_client_config.current.tenant_id
   sku_name                    = "standard"
   purge_protection_enabled    = var.environment == "prod"
   soft_delete_retention_days  = 7
-  enable_rbac_authorization   = true
+  rbac_authorization_enabled  = true
   tags                        = local.tags
+}
+
+# Grant Terraform deployer access to write secrets
+resource "azurerm_role_assignment" "deployer_kv" {
+  scope                = azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
 
 # Key Vault secrets
@@ -166,13 +181,14 @@ resource "azurerm_key_vault_secret" "db_connection" {
   name         = "DatabaseUrl"
   value        = "mssql+pymssql://${var.sql_admin_login}:${var.sql_admin_password}@${azurerm_mssql_server.main.fully_qualified_domain_name}/nexgencyberai"
   key_vault_id = azurerm_key_vault.main.id
-  depends_on   = [azurerm_key_vault.main]
+  depends_on   = [azurerm_role_assignment.deployer_kv]
 }
 
 resource "azurerm_key_vault_secret" "redis_connection" {
   name         = "RedisUrl"
   value        = "rediss://:${azurerm_redis_cache.main.primary_access_key}@${azurerm_redis_cache.main.hostname}:6380"
   key_vault_id = azurerm_key_vault.main.id
+  depends_on   = [azurerm_role_assignment.deployer_kv]
 }
 
 # ── App Service Plan ──────────────────────────────────────────────────────────
@@ -182,7 +198,7 @@ resource "azurerm_service_plan" "main" {
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = var.environment == "prod" ? "P2v3" : "B2"
+  sku_name            = var.environment == "prod" ? "P2v3" : "B1"
   tags                = local.tags
 }
 
@@ -217,19 +233,22 @@ resource "azurerm_linux_web_app" "backend" {
   }
 
   app_settings = {
-    "APPINSIGHTS_INSTRUMENTATIONKEY"             = azurerm_application_insights.main.instrumentation_key
-    "APPLICATIONINSIGHTS_CONNECTION_STRING"      = azurerm_application_insights.main.connection_string
-    "SCM_DO_BUILD_DURING_DEPLOYMENT"             = "true"
-    "AZURE_TENANT_ID"                            = var.entra_tenant_id
-    "AZURE_CLIENT_ID"                            = var.entra_backend_client_id
-    "DEFAULT_AI_PROVIDER"                        = var.default_ai_provider
-    "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=DatabaseUrl)"   = ""
-    "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"      = ""
+    "APPINSIGHTS_INSTRUMENTATIONKEY"        = azurerm_application_insights.main.instrumentation_key
+    "APPLICATIONINSIGHTS_CONNECTION_STRING" = azurerm_application_insights.main.connection_string
+    "SCM_DO_BUILD_DURING_DEPLOYMENT"        = "true"
+    "AZURE_TENANT_ID"                       = var.entra_tenant_id
+    "AZURE_CLIENT_ID"                       = var.entra_backend_client_id
+    "DEFAULT_AI_PROVIDER"                   = var.default_ai_provider
+    "DatabaseUrl"                           = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=DatabaseUrl)"
+    "RedisUrl"                              = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
   }
 
   logs {
     http_logs {
-      retention_in_days = 7
+      file_system {
+        retention_in_days = 7
+        retention_in_mb   = 35
+      }
     }
     application_logs {
       file_system_level = "Information"
@@ -248,9 +267,10 @@ resource "azurerm_linux_web_app" "frontend" {
   tags                = local.tags
 
   site_config {
-    always_on     = true
-    http2_enabled = true
-    ftps_state    = "Disabled"
+    always_on           = true
+    http2_enabled       = true
+    ftps_state          = "Disabled"
+    minimum_tls_version = "1.2"
 
     application_stack {
       node_version = "20-lts"
