@@ -3,7 +3,7 @@ NexGenCyberAI - Vulnerability Assessment Scan Agent
 Orchestrates multi-source VA scanning, deduplicates findings,
 enriches with NVD CVE data, and prioritises by EPSS score.
 """
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 from typing import Any, Dict, List
 import httpx
 from agents.base_agent import BaseAgent

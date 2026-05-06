@@ -3,7 +3,7 @@ NexGenCyberAI - Risk Management Agent
 Analyses scan findings, calculates risk scores, prioritises risks,
 and generates a risk register with mitigation recommendations.
 """
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 from typing import Any, Dict, List
 from agents.base_agent import BaseAgent
 

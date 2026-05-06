@@ -5,7 +5,7 @@ and tracks control effectiveness over time.
 """
 from typing import Any, Dict, List
 from agents.base_agent import BaseAgent
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 import json
 
 

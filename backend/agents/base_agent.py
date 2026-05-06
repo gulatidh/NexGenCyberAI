@@ -1,13 +1,12 @@
 """
 NexGenCyberAI - Base AI Agent
-All agents share a provider-agnostic LangChain foundation.
+All agents share a provider-agnostic LangChain/LangGraph foundation.
 The provider (Claude / OpenAI / Gemini / Bedrock / Azure OpenAI) is
 resolved at runtime from the request or from DEFAULT_AI_PROVIDER.
 """
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.tools import Tool
-from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferWindowMemory
+from langgraph.prebuilt import create_react_agent
+from langchain_core.tools import Tool
+from langchain_core.messages import HumanMessage, SystemMessage
 from typing import Any, Dict, List, Optional
 from core.ai_providers import get_llm, AIProvider
 from core.config import get_settings
@@ -17,30 +16,13 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-REACT_PROMPT = PromptTemplate.from_template(
-    """You are {agent_name}, a cybersecurity AI agent specialised in {domain}.
-Your job: {objective}
-
-You have access to the following tools:
-{tools}
-
-Use this format strictly:
-Thought: (reason about the current situation)
-Action: (one of [{tool_names}])
-Action Input: (the input to the action)
-Observation: (result of the action)
-... (repeat Thought/Action/Observation as needed)
-Thought: I now have enough information to answer.
-Final Answer: (your comprehensive, structured response)
-
-Begin!
-
-Context provided:
-{input}
-
-{agent_scratchpad}
-"""
-)
+def _build_system_prompt(agent_name: str, domain: str, objective: str) -> str:
+    return (
+        f"You are {agent_name}, a cybersecurity AI agent specialised in {domain}.\n"
+        f"Your job: {objective}\n\n"
+        "When analysing, reason step by step. Provide a structured, comprehensive response. "
+        "Use the available tools as needed to gather information before answering."
+    )
 
 
 class BaseAgent:
@@ -57,8 +39,7 @@ class BaseAgent:
         self._provider = provider
         self._model = model
         self.tools = tools or self._default_tools()
-        self.memory = ConversationBufferWindowMemory(k=5, memory_key="chat_history")
-        self._executor: Optional[AgentExecutor] = None
+        self._agent = None
 
     def _get_llm(self):
         return get_llm(provider=self._provider, model=self._model)
@@ -66,32 +47,19 @@ class BaseAgent:
     def _default_tools(self) -> List[Tool]:
         return []
 
-    def _build_executor(self) -> AgentExecutor:
+    def _build_agent(self):
         llm = self._get_llm()
-        prompt = REACT_PROMPT.partial(
-            agent_name=self.agent_name,
-            domain=self.domain,
-            objective=self.objective,
-        )
-        agent = create_react_agent(llm, self.tools, prompt)
-        return AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            memory=self.memory,
-            verbose=True,
-            max_iterations=10,
-            handle_parsing_errors=True,
-        )
+        system_prompt = _build_system_prompt(self.agent_name, self.domain, self.objective)
+        return create_react_agent(llm, self.tools, prompt=system_prompt)
 
     def set_provider(self, provider: str, model: Optional[str] = None):
         """Switch AI provider at runtime (called per-request if client has a preference)."""
         self._provider = provider
         self._model = model
-        self._executor = None  # force rebuild with new provider
+        self._agent = None  # force rebuild with new provider
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         provider_label = self._provider or settings.DEFAULT_AI_PROVIDER
-        # Check if any AI provider is configured
         has_provider = any([
             settings.AZURE_OPENAI_API_KEY,
             settings.OPENAI_API_KEY,
@@ -102,11 +70,14 @@ class BaseAgent:
         if not has_provider:
             return await self._fallback_analysis(input_data)
         try:
-            if self._executor is None:
-                self._executor = self._build_executor()
-            result = self._executor.invoke({"input": str(input_data)})
+            if self._agent is None:
+                self._agent = self._build_agent()
+            result = self._agent.invoke({"messages": [HumanMessage(content=str(input_data))]})
+            # Extract the last AI message as output
+            messages = result.get("messages", [])
+            output = messages[-1].content if messages else ""
             return {
-                "output": result.get("output", ""),
+                "output": output,
                 "success": True,
                 "provider": provider_label,
             }

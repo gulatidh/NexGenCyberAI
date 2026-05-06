@@ -151,7 +151,7 @@ resource "azurerm_redis_cache" "main" {
   sku_name                      = var.environment == "prod" ? "Standard" : "Basic"
   non_ssl_port_enabled          = false
   minimum_tls_version           = "1.2"
-  public_network_access_enabled = false
+  public_network_access_enabled = var.environment == "prod" ? false : true
   tags                          = local.tags
 }
 
@@ -239,8 +239,9 @@ resource "azurerm_linux_web_app" "backend" {
     "AZURE_TENANT_ID"                       = var.entra_tenant_id
     "AZURE_CLIENT_ID"                       = var.entra_backend_client_id
     "DEFAULT_AI_PROVIDER"                   = var.default_ai_provider
-    "DatabaseUrl"                           = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=DatabaseUrl)"
-    "RedisUrl"                              = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
+    "DATABASE_URL"                          = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=DatabaseUrl)"
+    "REDIS_URL"                             = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
+    "CELERY_BROKER_URL"                     = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
   }
 
   logs {

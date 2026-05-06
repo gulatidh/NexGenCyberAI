@@ -3,7 +3,7 @@ NexGenCyberAI - Threat Intelligence Agent
 Queries open-source threat intelligence feeds (AlienVault OTX, MITRE ATT&CK).
 Identifies TTPs, threat actors, and indicators of compromise.
 """
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 from typing import Any, Dict, List
 import httpx
 from agents.base_agent import BaseAgent

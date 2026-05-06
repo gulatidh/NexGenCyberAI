@@ -3,7 +3,7 @@ NexGenCyberAI - Framework Compliance Agent
 Maps findings to NIST CSF, NIST 800-53, CIS v8, and GDPR controls.
 Calculates compliance scores per control family and generates gap reports.
 """
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 from typing import Any, Dict, List
 from agents.base_agent import BaseAgent
 
