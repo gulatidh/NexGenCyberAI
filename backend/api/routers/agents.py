@@ -10,7 +10,14 @@ from core.security import get_current_user
 from agents.orchestrator.orchestrator import AgentOrchestrator
 
 router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
-_orchestrator = AgentOrchestrator()
+_orchestrator: AgentOrchestrator | None = None
+
+
+def _get_orchestrator() -> AgentOrchestrator:
+    global _orchestrator
+    if _orchestrator is None:
+        _orchestrator = AgentOrchestrator()
+    return _orchestrator
 
 
 @router.post("/run/", response_model=AgentRunResponse)
@@ -37,7 +44,7 @@ async def run_agent(
             for f in raw
         ]
 
-    from ...api.models.models import Client
+    from api.models.models import Client
     client = db.query(Client).filter(Client.id == client_id).first()
     client_name = client.name if client else "Unknown"
 
@@ -53,7 +60,7 @@ async def run_agent(
     db.refresh(agent_run_db)
 
     try:
-        result = await _orchestrator.run_single_agent(
+        result = await _get_orchestrator().run_single_agent(
             payload.agent_type.value,
             findings,
             client_name,

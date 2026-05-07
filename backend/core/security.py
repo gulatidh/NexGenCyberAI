@@ -36,7 +36,11 @@ def decode_azure_token(token: str) -> Dict[str, Any]:
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=settings.AZURE_CLIENT_ID,
+            # Azure AD issues tokens with aud = CLIENT_ID (v2) or api://CLIENT_ID (v1); accept both
+            audience=[
+                settings.AZURE_CLIENT_ID,
+                f"api://{settings.AZURE_CLIENT_ID}",
+            ],
             issuer=[
                 f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}/v2.0",
                 f"https://sts.windows.net/{settings.AZURE_TENANT_ID}/",
