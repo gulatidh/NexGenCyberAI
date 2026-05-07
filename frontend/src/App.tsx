@@ -11,10 +11,13 @@ import { loginRequest } from "./auth/msalConfig";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 import Connectors from "./pages/Connectors";
 import Scans from "./pages/Scans";
 import Agents from "./pages/Agents";
 import AISettings from "./pages/AISettings";
+import Findings from "./pages/Findings";
+import Risks from "./pages/Risks";
 
 const darkTheme = createTheme({
   palette: {
@@ -72,10 +75,11 @@ export default function App() {
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/clients" element={<Clients />} />
+                  <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/connectors" element={<Connectors />} />
                   <Route path="/scans" element={<Scans />} />
-                  <Route path="/findings" element={<div style={{ color: "white", padding: 24 }}>Findings — Select a scan from the Scans page</div>} />
-                  <Route path="/risks" element={<div style={{ color: "white", padding: 24 }}>Risk Register</div>} />
+                  <Route path="/findings" element={<Findings />} />
+                  <Route path="/risks" element={<Risks />} />
                   <Route path="/frameworks" element={<div style={{ color: "white", padding: 24 }}>Frameworks</div>} />
                   <Route path="/agents" element={<Agents />} />
                   <Route path="/reports" element={<div style={{ color: "white", padding: 24 }}>Reports</div>} />

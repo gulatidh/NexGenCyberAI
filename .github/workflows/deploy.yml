@@ -82,6 +82,7 @@ jobs:
         env:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
+          REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-api.azurewebsites.net/api/v1' }}
           REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://nexgencyberai-dev-web.azurewebsites.net' }}
 
@@ -162,6 +163,7 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_DEV }}
           package: ./frontend/build
+          startup-command: "npx --yes serve -s . -l 8080"
 
   # ── 5. Deploy to Production ───────────────────────────────────────────────
   deploy-prod:
@@ -200,6 +202,7 @@ jobs:
         with:
           app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_PROD }}
           package: ./frontend/build
+          startup-command: "npx --yes serve -s . -l 8080"
 
       - name: Notify deployment
         run: echo "NexGenCyberAI production deployment complete at $(date)"

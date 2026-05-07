@@ -4,7 +4,7 @@ NexGenCyberAI - Pydantic v2 request/response schemas.
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from ..models.models import (
+from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
     ScanStatus, Severity, RiskLevel, AgentType
 )
@@ -204,3 +204,8 @@ class DashboardSummary(BaseModel):
     risks_open: int
     scans_last_30d: int
     compliance_scores: Dict[str, float]
+    posture_health: Dict[str, float] = {}
+    recent_scans: List[Dict] = []
+    recent_risks: List[Dict] = []
+    recent_findings: List[Dict] = []
+    agent_runs_total: int = 0

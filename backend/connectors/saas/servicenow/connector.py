@@ -5,7 +5,7 @@ Auth: Basic (username/password) or OAuth2 client credentials.
 """
 from typing import Any, Dict, List
 import httpx
-from ...base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
 
 PRIORITY_MAP = {
     "1": FindingSeverity.CRITICAL,

@@ -4,12 +4,12 @@ Coordinates all agents in the correct order for a full scan lifecycle.
 Uses LangGraph for stateful multi-agent orchestration.
 """
 from typing import Any, Dict, List, Optional
-from ..risk.risk_agent import RiskManagementAgent
-from ..vascan.vascan_agent import VAScanAgent
-from ..framework.framework_agent import FrameworkAgent
-from ..threat.threat_intel_agent import ThreatIntelAgent
-from ..remediation.remediation_agent import RemediationAgent
-from ..compliance.compliance_agent import ComplianceMonitorAgent
+from agents.risk.risk_agent import RiskManagementAgent
+from agents.vascan.vascan_agent import VAScanAgent
+from agents.framework.framework_agent import FrameworkAgent
+from agents.threat.threat_intel_agent import ThreatIntelAgent
+from agents.remediation.remediation_agent import RemediationAgent
+from agents.compliance.compliance_agent import ComplianceMonitorAgent
 import logging
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,8 @@ class AgentOrchestrator:
         framework: str = "nist_csf",
     ) -> Dict[str, Any]:
         """Run a single agent by type."""
+        if agent_type == "orchestrator":
+            return await self.run_full_assessment(findings, client_name, framework)
         agents = {
             "va_scanner": lambda: self.vascan.analyse_vulnerabilities(findings, client_name),
             "framework_analyst": lambda: self.framework.assess_compliance(findings, framework, client_name),

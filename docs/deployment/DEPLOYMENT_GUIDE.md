@@ -264,18 +264,26 @@ terraform output
 
 Configure secrets in Azure Key Vault or App Service settings:
 
-### Option A — Azure OpenAI (recommended for Azure deployments)
+### Option A — Azure OpenAI ✅ CONFIGURED (instance: testaiforlta)
 ```bash
-APP_NAME="nexgencyberai-dev-XXXXXX-api"  # from terraform output
+APP_NAME="nexgencyberai-dev-okxksu-api"
 
+# 1. Store API key in Key Vault
+az keyvault secret set \
+  --vault-name "ngcai-dev-okxksu" \
+  --name "AzureOpenAIApiKey" \
+  --value "<your-api-key>"
+
+# 2. Set App Service settings (Key Vault reference for key)
 az webapp config appsettings set \
   --name $APP_NAME \
   --resource-group nexgencyberai-dev-rg \
   --settings \
-    AZURE_OPENAI_API_KEY="your-azure-openai-key" \
-    AZURE_OPENAI_ENDPOINT="https://your-openai-resource.openai.azure.com" \
-    AZURE_OPENAI_DEPLOYMENT="gpt-4o" \
-    DEFAULT_AI_PROVIDER="azure_openai"
+    DEFAULT_AI_PROVIDER="azure_openai" \
+    AZURE_OPENAI_ENDPOINT="https://testaiforlta.openai.azure.com/" \
+    AZURE_OPENAI_DEPLOYMENT="gpt-4.1-mini" \
+    AZURE_OPENAI_API_VERSION="2025-04-01-preview" \
+    "AZURE_OPENAI_API_KEY=@Microsoft.KeyVault(VaultName=ngcai-dev-okxksu;SecretName=AzureOpenAIApiKey)"
 ```
 
 ### Option B — Anthropic Claude

@@ -3,10 +3,10 @@ NexGenCyberAI - Remediation Agent
 Generates step-by-step remediation playbooks for findings.
 Integrates with ServiceNow to create remediation tickets automatically.
 """
-from langchain.tools import Tool
+from langchain_core.tools import Tool
 from typing import Any, Dict, List
 import json
-from ..base_agent import BaseAgent
+from agents.base_agent import BaseAgent
 
 # Remediation KB: control → step-by-step fix
 REMEDIATION_KB: Dict[str, str] = {

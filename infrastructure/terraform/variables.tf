@@ -9,6 +9,12 @@ variable "location" {
   default     = "eastus"
 }
 
+variable "sql_location" {
+  description = "Azure region for SQL Server (override if SQL is restricted in primary region)"
+  type        = string
+  default     = "northeurope"
+}
+
 variable "environment" {
   description = "Environment: dev | staging | prod"
   type        = string

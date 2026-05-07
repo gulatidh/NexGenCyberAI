@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
-  IconButton, Chip, Tooltip, useTheme,
+  IconButton, Chip, Tooltip,
 } from "@mui/material";
 import {
   Dashboard, People, Cable, BugReport, Security, Policy,
@@ -11,6 +11,7 @@ import {
   BarChart, SettingsSuggest, Menu as MenuIcon,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
+import NotificationBell from "./NotificationBell";
 
 const DRAWER_WIDTH = 240;
 
@@ -28,7 +29,6 @@ const NAV_ITEMS = [
 ];
 
 export default function AppLayout() {
-  const theme = useTheme();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { instance, accounts } = useMsal();
@@ -130,6 +130,7 @@ export default function AppLayout() {
               size="small"
               sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
             />
+            <NotificationBell />
             <Tooltip title="Account">
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
                 <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>

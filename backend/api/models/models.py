@@ -7,13 +7,18 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from ...db.database import Base
+from db.database import Base
 import enum
 import uuid
 
 
 def _uuid():
     return str(uuid.uuid4())
+
+
+# Force SQLAlchemy to store enum VALUES (lowercase strings) instead of member names
+def _ev(e):
+    return [m.value for m in e]
 
 
 # ── Enums ──────────────────────────────────────────────────────────────────────
@@ -111,8 +116,8 @@ class Connector(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
     name = Column(String(200), nullable=False)
-    connector_type = Column(SAEnum(ConnectorType), nullable=False)
-    status = Column(SAEnum(ConnectorStatus), default=ConnectorStatus.PENDING)
+    connector_type = Column(SAEnum(ConnectorType, values_callable=_ev), nullable=False)
+    status = Column(SAEnum(ConnectorStatus, values_callable=_ev), default=ConnectorStatus.PENDING)
     credentials_enc = Column(Text)          # AES-encrypted JSON blob
     config = Column(JSON, default={})       # non-secret config (region, project_id, etc.)
     last_synced_at = Column(DateTime(timezone=True))
@@ -130,9 +135,9 @@ class Scan(Base):
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
     connector_id = Column(String(36), ForeignKey("connectors.id"))
-    scan_type = Column(SAEnum(ScanType), nullable=False)
-    status = Column(SAEnum(ScanStatus), default=ScanStatus.PENDING)
-    framework = Column(SAEnum(FrameworkType))
+    scan_type = Column(SAEnum(ScanType, values_callable=_ev), nullable=False)
+    status = Column(SAEnum(ScanStatus, values_callable=_ev), default=ScanStatus.PENDING)
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev))
     initiated_by = Column(String(200))       # user UPN from Entra ID
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
@@ -152,11 +157,11 @@ class Finding(Base):
     scan_id = Column(String(36), ForeignKey("scans.id"), nullable=False)
     title = Column(String(500), nullable=False)
     description = Column(Text)
-    severity = Column(SAEnum(Severity), nullable=False)
+    severity = Column(SAEnum(Severity, values_callable=_ev), nullable=False)
     resource_id = Column(String(500))
     resource_type = Column(String(200))
     control_id = Column(String(100))        # CIS 1.1, NIST AC-2, GDPR Art.32, etc.
-    framework = Column(SAEnum(FrameworkType))
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev))
     status = Column(String(50), default="open")   # open | accepted | remediated | false_positive
     remediation = Column(Text)
     evidence = Column(JSON, default={})
@@ -175,7 +180,7 @@ class Risk(Base):
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
     title = Column(String(500), nullable=False)
     description = Column(Text)
-    risk_level = Column(SAEnum(RiskLevel), nullable=False)
+    risk_level = Column(SAEnum(RiskLevel, values_callable=_ev), nullable=False)
     likelihood = Column(Integer, default=3)     # 1-5
     impact = Column(Integer, default=3)         # 1-5
     risk_score = Column(Float)
@@ -196,7 +201,7 @@ class FrameworkAssessment(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
-    framework = Column(SAEnum(FrameworkType), nullable=False)
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev), nullable=False)
     scan_id = Column(String(36), ForeignKey("scans.id"))
     overall_score = Column(Float)           # 0-100
     controls_total = Column(Integer, default=0)
@@ -214,7 +219,7 @@ class AgentRun(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"))
-    agent_type = Column(SAEnum(AgentType), nullable=False)
+    agent_type = Column(SAEnum(AgentType, values_callable=_ev), nullable=False)
     scan_id = Column(String(36), ForeignKey("scans.id"))
     status = Column(String(50), default="running")
     input_data = Column(JSON, default={})

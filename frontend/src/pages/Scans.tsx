@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Button, Card, CardContent, Grid, Chip,
+  Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Alert,
+  Divider,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { scansApi, connectorsApi, clientsApi } from "../services/api";
 import { Scan, Client, Connector, ScanType, FrameworkType } from "../types";
 import { toast } from "react-toastify";
@@ -20,14 +20,19 @@ const STATUS_COLOR: Record<string, string> = {
   failed: "#f44336", cancelled: "rgba(255,255,255,0.3)",
 };
 
+const SEV_COLOR: Record<string, string> = {
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b",
+  low: "#4caf50", info: "#00e5ff",
+};
+
 export default function Scans() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState("");
   const [open, setOpen] = useState(false);
   const [scanType, setScanType] = useState<ScanType>("full");
   const [connectorId, setConnectorId] = useState("");
   const [framework, setFramework] = useState<FrameworkType | "">("");
+  const [viewScan, setViewScan] = useState<Scan | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: connectors = [] } = useQuery<Connector[]>({
@@ -42,10 +47,16 @@ export default function Scans() {
     refetchInterval: (query) => (query.state.data as any[])?.some((s: any) => s.status === "running") ? 5000 : false,
   });
 
+  const { data: findings = [], isLoading: findingsLoading } = useQuery<any[]>({
+    queryKey: ["findings", selectedClientId, viewScan?.id],
+    queryFn: () => scansApi.findings(selectedClientId, viewScan!.id),
+    enabled: !!viewScan && !!selectedClientId,
+  });
+
   const startMutation = useMutation({
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); setOpen(false); toast.success("Scan started"); },
-    onError: (e: any) => toast.error(e.response?.data?.detail || "Error"),
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting scan"),
   });
 
   return (
@@ -114,7 +125,8 @@ export default function Scans() {
                     <TableCell><Typography variant="caption">{scan.started_at ? dayjs(scan.started_at).fromNow() : "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{dur}</Typography></TableCell>
                     <TableCell>
-                      <Button size="small" onClick={() => navigate(`/clients/${selectedClientId}/scans/${scan.id}`)}
+                      <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
+                        onClick={() => setViewScan(scan)}
                         sx={{ color: "#00e5ff", fontSize: 11 }}>View</Button>
                     </TableCell>
                   </TableRow>
@@ -125,6 +137,7 @@ export default function Scans() {
         </Card>
       )}
 
+      {/* Start scan dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 420 } } }}>
         <DialogTitle>Start New Scan</DialogTitle>
         <DialogContent>
@@ -176,6 +189,73 @@ export default function Scans() {
             sx={{ bgcolor: "#00e5ff", color: "#000" }}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Findings dialog */}
+      <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white" } } }}>
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography variant="h6">Scan Findings</Typography>
+            {viewScan && (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                {viewScan.scan_type} · {viewScan.framework || "No framework"} · {dayjs(viewScan.started_at).fromNow()}
+              </Typography>
+            )}
+          </Box>
+          {viewScan && (
+            <Chip label={viewScan.status} size="small"
+              sx={{ bgcolor: `${STATUS_COLOR[viewScan.status]}20`, color: STATUS_COLOR[viewScan.status] }} />
+          )}
+        </DialogTitle>
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+        <DialogContent sx={{ p: 0 }}>
+          {findingsLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+              <CircularProgress sx={{ color: "#00e5ff" }} />
+            </Box>
+          ) : findings.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center", color: "rgba(255,255,255,0.4)" }}>
+              No findings recorded for this scan.
+            </Box>
+          ) : (
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 } }}>
+                  <TableCell>Severity</TableCell>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Resource</TableCell>
+                  <TableCell>CVE</TableCell>
+                  <TableCell>CVSS</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {findings.map((f: any) => (
+                  <TableRow key={f.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", fontSize: 12 } }}>
+                    <TableCell>
+                      <Chip label={f.severity} size="small"
+                        sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18 }} />
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 300 }}>
+                      <Typography variant="caption" sx={{ display: "block", fontWeight: 600 }}>{f.title}</Typography>
+                      {f.description && (
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.3 }}>
+                          {f.description.slice(0, 120)}{f.description.length > 120 ? "…" : ""}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "#00e5ff" }}>{f.cve_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setViewScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
         </DialogActions>
       </Dialog>
     </Box>

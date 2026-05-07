@@ -17,6 +17,16 @@ msalInstance.addEventCallback((event) => {
   }
 });
 
+// Restore active account from cache on startup (e.g. after page refresh)
+msalInstance.initialize().then(() => {
+  if (!msalInstance.getActiveAccount()) {
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      msalInstance.setActiveAccount(accounts[0]);
+    }
+  }
+});
+
 interface Props { children: React.ReactNode; }
 
 export function AuthProvider({ children }: Props) {

@@ -5,7 +5,7 @@ import {
   CircularProgress, Alert, Accordion, AccordionSummary,
   AccordionDetails, LinearProgress,
 } from "@mui/material";
-import { ExpandMore, SmartToy, PlayArrow, CheckCircle } from "@mui/icons-material";
+import { ExpandMore, SmartToy, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, clientsApi, scansApi } from "../services/api";
 import { Client, Scan, AgentType } from "../types";
@@ -189,14 +189,24 @@ export default function Agents() {
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
-                    {run.output_data?.local_summary && (
-                      <Alert severity="info" sx={{ mb: 1, bgcolor: "rgba(0,229,255,0.05)", color: "rgba(255,255,255,0.8)", fontSize: 12 }}>
-                        {run.output_data.local_summary}
+                    {run.error_message && (
+                      <Alert severity="error" sx={{ mb: 1, fontSize: 12 }}>{run.error_message}</Alert>
+                    )}
+                    {run.output_data?.error && (
+                      <Alert severity="warning" sx={{ mb: 1, bgcolor: "rgba(255,152,0,0.08)", color: "#ff9800", fontSize: 12 }}>
+                        {run.output_data.error}
                       </Alert>
                     )}
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 12 }}>
-                      {run.output_data?.output || run.error_message || "No output"}
-                    </Typography>
+                    {run.output_data?.output && (
+                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 }}>
+                        {run.output_data.output}
+                      </Typography>
+                    )}
+                    {!run.output_data?.output && !run.output_data?.error && !run.error_message && (
+                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>
+                        No output recorded.
+                      </Typography>
+                    )}
                   </AccordionDetails>
                 </Accordion>
               ))

@@ -115,4 +115,9 @@ export interface DashboardSummary {
   risks_open: number;
   scans_last_30d: number;
   compliance_scores: Record<string, number>;
+  posture_health: Record<string, number>;
+  recent_scans: any[];
+  recent_risks: any[];
+  recent_findings: any[];
+  agent_runs_total: number;
 }

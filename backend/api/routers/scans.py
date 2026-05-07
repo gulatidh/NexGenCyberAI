@@ -4,22 +4,29 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
 import json
-from ..models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
-from ..schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
-from ...db.database import get_db
-from ...core.security import get_current_user
-from ...core.encryption import decrypt
-from ...connectors.factory import get_connector
-from ...agents.orchestrator.orchestrator import AgentOrchestrator
+from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
+from api.schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
+from db.database import get_db
+from core.security import get_current_user
+from core.encryption import decrypt
+from connectors.factory import get_connector
 
 router = APIRouter(prefix="/clients/{client_id}/scans", tags=["scans"])
-orchestrator = AgentOrchestrator()
+_orchestrator = None
+
+
+def _get_orchestrator():
+    global _orchestrator
+    if _orchestrator is None:
+        from agents.orchestrator.orchestrator import AgentOrchestrator
+        _orchestrator = AgentOrchestrator()
+    return _orchestrator
 
 
 async def _execute_scan(scan_id: str, db_url: str):
     """Background task: run the scan and populate findings."""
-    from ...db.database import SessionLocal
-    from ...api.models.models import Client, ScanType
+    from db.database import SessionLocal
+    from api.models.models import Client, ScanType
     db = SessionLocal()
     try:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
@@ -77,7 +84,7 @@ async def _execute_scan(scan_id: str, db_url: str):
             }
             for f in all_findings
         ]
-        agent_report = await orchestrator.run_full_assessment(
+        agent_report = await _get_orchestrator().run_full_assessment(
             findings_dicts,
             client.name if client else "Unknown",
             scan.framework or "nist_csf",
@@ -136,7 +143,7 @@ async def start_scan(
     db.add(scan)
     db.commit()
     db.refresh(scan)
-    from ...core.config import get_settings
+    from core.config import get_settings
     background_tasks.add_task(_execute_scan, scan.id, get_settings().DATABASE_URL)
     return scan
 
@@ -154,7 +161,7 @@ async def get_scan(client_id: str, scan_id: str, db: Session = Depends(get_db), 
     return scan
 
 
-@router.get("/{scan_id}/findings", response_model=List[FindingResponse])
+@router.get("/{scan_id}/findings/", response_model=List[FindingResponse])
 async def get_findings(
     client_id: str,
     scan_id: str,
