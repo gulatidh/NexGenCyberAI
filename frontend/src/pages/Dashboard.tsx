@@ -2,7 +2,7 @@ import React from "react";
 import {
   Grid, Card, CardContent, Typography, Box,
   LinearProgress, CircularProgress, Chip, Avatar,
-  Table, TableHead, TableRow, TableCell, TableBody, Button,
+  Button,
 } from "@mui/material";
 import {
   BugReport, Security, Warning,
@@ -75,8 +75,6 @@ export default function Dashboard() {
     "Data Protection": 50,
     "Threat Detection": 50,
   });
-
-  const postureColors = ["#ff9800", "#00e5ff", "#7c4dff", "#00e676"];
 
   return (
     <Box>
