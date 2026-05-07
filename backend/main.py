@@ -22,11 +22,13 @@ Base.metadata.create_all(bind=engine)
 
 
 def _provision_entraid_connector() -> None:
-    """Create/update the Entra ID connector from env vars on startup (idempotent)."""
-    import os, json, uuid
+    """Create/update the Entra ID connector from env vars on startup.
+    Uses a file lock so only one uvicorn worker runs this at a time.
+    """
+    import os, json, uuid, fcntl
     from datetime import datetime, timezone
     from sqlalchemy.orm import Session
-    from api.models.models import Connector, ConnectorStatus
+    from api.models.models import Connector, ConnectorStatus, ConnectorType
     from core.encryption import encrypt
 
     tenant_id = os.environ.get("ENTRAID_CONNECTOR_TENANT_ID")
@@ -35,38 +37,50 @@ def _provision_entraid_connector() -> None:
     db_client_id = os.environ.get("ENTRAID_CONNECTOR_DB_CLIENT_ID")
 
     if not all([tenant_id, client_id, client_secret, db_client_id]):
-        return  # env vars not set; skip
+        return  # env vars not configured; skip
 
-    creds_enc = encrypt(json.dumps({
-        "tenant_id": tenant_id,
-        "client_id": client_id,
-        "client_secret": client_secret,
-    }))
-    name = os.environ.get("ENTRAID_CONNECTOR_CLIENT_NAME", "My Organisation") + " — Entra ID"
+    # File lock prevents concurrent workers from creating duplicates
+    lock_path = "/home/.entraid_provision.lock"
+    try:
+        lf = open(lock_path, "a")
+        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        lf.close()
+        return  # another worker already running this; skip
+    try:
+        creds_enc = encrypt(json.dumps({
+            "tenant_id": tenant_id,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }))
+        name = os.environ.get("ENTRAID_CONNECTOR_CLIENT_NAME", "My Organisation") + " — Entra ID"
 
-    with Session(engine) as db:
-        existing = db.query(Connector).filter(
-            Connector.client_id == db_client_id,
-            Connector.connector_type == "entraid",
-        ).first()
-        if existing:
-            existing.credentials_enc = creds_enc
-            existing.status = ConnectorStatus.ACTIVE
-            existing.name = name
-            logger.info("Entra ID connector updated for client %s", db_client_id)
-        else:
-            db.add(Connector(
-                id=str(uuid.uuid4()),
-                client_id=db_client_id,
-                name=name,
-                connector_type="entraid",
-                status=ConnectorStatus.ACTIVE,
-                credentials_enc=creds_enc,
-                config={},
-                created_at=datetime.now(timezone.utc),
-            ))
-            logger.info("Entra ID connector created for client %s", db_client_id)
-        db.commit()
+        with Session(engine) as db:
+            existing = db.query(Connector).filter(
+                Connector.client_id == db_client_id,
+                Connector.connector_type == ConnectorType.ENTRAID,
+            ).first()
+            if existing:
+                existing.credentials_enc = creds_enc
+                existing.status = ConnectorStatus.ACTIVE
+                existing.name = name
+                logger.info("Entra ID connector updated for client %s", db_client_id)
+            else:
+                db.add(Connector(
+                    id=str(uuid.uuid4()),
+                    client_id=db_client_id,
+                    name=name,
+                    connector_type=ConnectorType.ENTRAID,
+                    status=ConnectorStatus.ACTIVE,
+                    credentials_enc=creds_enc,
+                    config={},
+                    created_at=datetime.now(timezone.utc),
+                ))
+                logger.info("Entra ID connector created for client %s", db_client_id)
+            db.commit()
+    finally:
+        fcntl.flock(lf, fcntl.LOCK_UN)
+        lf.close()
 
 
 _provision_entraid_connector()
