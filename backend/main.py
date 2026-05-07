@@ -20,6 +20,57 @@ settings = get_settings()
 # Create DB tables
 Base.metadata.create_all(bind=engine)
 
+
+def _provision_entraid_connector() -> None:
+    """Create/update the Entra ID connector from env vars on startup (idempotent)."""
+    import os, json, uuid
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import Session
+    from api.models.models import Connector, ConnectorStatus
+    from core.encryption import encrypt
+
+    tenant_id = os.environ.get("ENTRAID_CONNECTOR_TENANT_ID")
+    client_id = os.environ.get("ENTRAID_CONNECTOR_CLIENT_ID")
+    client_secret = os.environ.get("ENTRAID_CONNECTOR_CLIENT_SECRET")
+    db_client_id = os.environ.get("ENTRAID_CONNECTOR_DB_CLIENT_ID")
+
+    if not all([tenant_id, client_id, client_secret, db_client_id]):
+        return  # env vars not set; skip
+
+    creds_enc = encrypt(json.dumps({
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }))
+    name = os.environ.get("ENTRAID_CONNECTOR_CLIENT_NAME", "My Organisation") + " — Entra ID"
+
+    with Session(engine) as db:
+        existing = db.query(Connector).filter(
+            Connector.client_id == db_client_id,
+            Connector.connector_type == "entraid",
+        ).first()
+        if existing:
+            existing.credentials_enc = creds_enc
+            existing.status = ConnectorStatus.ACTIVE
+            existing.name = name
+            logger.info("Entra ID connector updated for client %s", db_client_id)
+        else:
+            db.add(Connector(
+                id=str(uuid.uuid4()),
+                client_id=db_client_id,
+                name=name,
+                connector_type="entraid",
+                status=ConnectorStatus.ACTIVE,
+                credentials_enc=creds_enc,
+                config={},
+                created_at=datetime.now(timezone.utc),
+            ))
+            logger.info("Entra ID connector created for client %s", db_client_id)
+        db.commit()
+
+
+_provision_entraid_connector()
+
 app = FastAPI(
     title="NexGenCyberAI API",
     version=settings.APP_VERSION,

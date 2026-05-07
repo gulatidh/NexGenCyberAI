@@ -123,7 +123,10 @@ def list_providers() -> list[dict]:
     }
     models = {
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
-        AIProvider.AZURE_OPENAI: ["gpt-4o", "gpt-4-turbo", "gpt-35-turbo"],
+        AIProvider.AZURE_OPENAI: sorted({
+            "gpt-4o", "gpt-4.1", "gpt-4.1-mini", "gpt-4-turbo", "gpt-35-turbo",
+            settings.AZURE_OPENAI_DEPLOYMENT,  # always include the configured deployment
+        }),
         AIProvider.ANTHROPIC: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
         AIProvider.GOOGLE_GEMINI: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
         AIProvider.AWS_BEDROCK: [
