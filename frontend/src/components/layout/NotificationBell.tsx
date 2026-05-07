@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  IconButton, Badge, Popover, Box, Typography, Chip, Button,
+  IconButton, Badge, Popover, Box, Typography, Chip,
   List, ListItem, Divider, Tooltip,
 } from "@mui/material";
 import { Notifications, NotificationsNone, Delete, CheckCircle, Error, Warning, Info } from "@mui/icons-material";

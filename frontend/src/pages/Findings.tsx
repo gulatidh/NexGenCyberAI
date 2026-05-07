@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Card, CardContent, Chip, CircularProgress,
+  Box, Typography, Card, Chip, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
-  FormControl, InputLabel, Select, MenuItem, TextField, Button,
+  FormControl, InputLabel, Select, MenuItem, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
 } from "@mui/material";
-import { BugReport, FilterList } from "@mui/icons-material";
+import { BugReport } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, findingsApi } from "../services/api";
 import { Client, Finding } from "../types";
