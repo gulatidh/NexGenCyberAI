@@ -68,7 +68,7 @@ export const risksApi = {
 };
 
 export const agentsApi = {
-  run: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/agents/run`, data).then((r) => r.data),
+  run: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/agents/run/`, data).then((r) => r.data),
   listRuns: (clientId: string) => apiClient.get(`/clients/${clientId}/agents/runs/`).then((r) => r.data),
   getRun: (clientId: string, runId: string) =>
     apiClient.get(`/clients/${clientId}/agents/runs/${runId}`).then((r) => r.data),
