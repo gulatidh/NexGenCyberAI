@@ -204,3 +204,8 @@ class DashboardSummary(BaseModel):
     risks_open: int
     scans_last_30d: int
     compliance_scores: Dict[str, float]
+    posture_health: Dict[str, float] = {}
+    recent_scans: List[Dict] = []
+    recent_risks: List[Dict] = []
+    recent_findings: List[Dict] = []
+    agent_runs_total: int = 0

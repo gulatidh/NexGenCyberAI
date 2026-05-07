@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -19,6 +19,25 @@ settings = get_settings()
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
+
+
+def _normalize_enum_case() -> None:
+    """One-time migration: lowercase all enum column values so they match the Python enum .values."""
+    from sqlalchemy import text
+    _cols = [
+        ("connectors", "connector_type"), ("connectors", "status"),
+        ("scans", "scan_type"), ("scans", "status"), ("scans", "framework"),
+        ("findings", "severity"), ("findings", "framework"),
+        ("risks", "risk_level"),
+        ("agent_runs", "agent_type"),
+        ("framework_assessments", "framework"),
+    ]
+    try:
+        with engine.begin() as conn:
+            for table, col in _cols:
+                conn.execute(text(f"UPDATE {table} SET {col} = lower({col}) WHERE {col} != lower({col})"))
+    except Exception as exc:
+        logger.warning("enum normalization skipped: %s", exc)
 
 
 def _provision_entraid_connector() -> None:
@@ -41,12 +60,14 @@ def _provision_entraid_connector() -> None:
 
     # File lock prevents concurrent workers from creating duplicates
     lock_path = "/home/.entraid_provision.lock"
+    lf = None
     try:
         lf = open(lock_path, "a")
         fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (IOError, OSError):
-        lf.close()
-        return  # another worker already running this; skip
+        if lf is not None:
+            lf.close()
+        return  # another worker holds the lock or /home not writable; skip
     try:
         creds_enc = encrypt(json.dumps({
             "tenant_id": tenant_id,
@@ -83,7 +104,73 @@ def _provision_entraid_connector() -> None:
         lf.close()
 
 
+def _provision_azure_connector() -> None:
+    """Create/update the Azure subscription connector for Greta on startup."""
+    import os, json, uuid, fcntl
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import Session
+    from api.models.models import Connector, ConnectorStatus, ConnectorType
+    from core.encryption import encrypt
+
+    tenant_id = os.environ.get("ENTRAID_CONNECTOR_TENANT_ID")
+    client_id = os.environ.get("ENTRAID_CONNECTOR_CLIENT_ID")
+    client_secret = os.environ.get("ENTRAID_CONNECTOR_CLIENT_SECRET")
+    db_client_id = os.environ.get("ENTRAID_CONNECTOR_DB_CLIENT_ID")
+    subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID", "4e6778be-a1f5-4b94-a58d-14a190484c15")
+    client_name = os.environ.get("ENTRAID_CONNECTOR_CLIENT_NAME", "Greta")
+
+    if not all([tenant_id, client_id, client_secret, db_client_id]):
+        return
+
+    lock_path = "/home/.azure_connector_provision.lock"
+    lf = None
+    try:
+        lf = open(lock_path, "a")
+        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        if lf is not None:
+            lf.close()
+        return
+    try:
+        creds_enc = encrypt(json.dumps({
+            "tenant_id": tenant_id,
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "subscription_id": subscription_id,
+        }))
+        name = f"{client_name} — Azure"
+
+        with Session(engine) as db:
+            existing = db.query(Connector).filter(
+                Connector.client_id == db_client_id,
+                Connector.connector_type == ConnectorType.AZURE,
+            ).first()
+            if existing:
+                existing.credentials_enc = creds_enc
+                existing.status = ConnectorStatus.ACTIVE
+                existing.name = name
+                logger.info("Azure connector updated for client %s", db_client_id)
+            else:
+                db.add(Connector(
+                    id=str(uuid.uuid4()),
+                    client_id=db_client_id,
+                    name=name,
+                    connector_type=ConnectorType.AZURE,
+                    status=ConnectorStatus.ACTIVE,
+                    credentials_enc=creds_enc,
+                    config={"subscription_id": subscription_id},
+                    created_at=datetime.now(timezone.utc),
+                ))
+                logger.info("Azure connector created for client %s (%s)", db_client_id, client_name)
+            db.commit()
+    finally:
+        fcntl.flock(lf, fcntl.LOCK_UN)
+        lf.close()
+
+
+_normalize_enum_case()
 _provision_entraid_connector()
+_provision_azure_connector()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -119,6 +206,7 @@ app.include_router(clients.router, prefix="/api/v1")
 app.include_router(connectors.router, prefix="/api/v1")
 app.include_router(scans.router, prefix="/api/v1")
 app.include_router(risks.router, prefix="/api/v1")
+app.include_router(findings.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 

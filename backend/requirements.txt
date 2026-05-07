@@ -10,6 +10,11 @@ azure-identity==1.25.3
 azure-mgmt-resource==25.0.0
 azure-mgmt-security==6.0.0
 azure-mgmt-monitor==7.0.0
+azure-mgmt-network==27.0.0
+azure-mgmt-storage==22.0.0
+azure-mgmt-compute==34.0.0
+azure-mgmt-authorization==4.0.0
+azure-mgmt-keyvault==10.3.0
 google-cloud-asset==4.3.0
 google-cloud-securitycenter==1.44.0
 langchain==1.2.17

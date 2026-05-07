@@ -114,6 +114,8 @@ class AgentOrchestrator:
         framework: str = "nist_csf",
     ) -> Dict[str, Any]:
         """Run a single agent by type."""
+        if agent_type == "orchestrator":
+            return await self.run_full_assessment(findings, client_name, framework)
         agents = {
             "va_scanner": lambda: self.vascan.analyse_vulnerabilities(findings, client_name),
             "framework_analyst": lambda: self.framework.assess_compliance(findings, framework, client_name),

@@ -3,19 +3,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
-from api.models.models import AgentRun, AgentType, Scan, Finding
+from api.models.models import AgentRun, AgentType, Scan, Finding, Risk, RiskLevel
 from api.schemas.schemas import AgentRunRequest, AgentRunResponse
 from db.database import get_db
 from core.security import get_current_user
-from agents.orchestrator.orchestrator import AgentOrchestrator
 
 router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
-_orchestrator: AgentOrchestrator | None = None
+_orchestrator = None
 
 
-def _get_orchestrator() -> AgentOrchestrator:
+def _get_orchestrator():
     global _orchestrator
     if _orchestrator is None:
+        from agents.orchestrator.orchestrator import AgentOrchestrator
         _orchestrator = AgentOrchestrator()
     return _orchestrator
 
@@ -67,6 +67,28 @@ async def run_agent(
         )
         agent_run_db.output_data = result
         agent_run_db.status = "completed"
+
+        # Persist structured risks to the Risk Register when risk analysis runs
+        agent_val = payload.agent_type.value
+        if agent_val in ("risk_manager", "orchestrator") and findings:
+            from agents.risk.risk_agent import map_to_risk_register_structured
+            structured = map_to_risk_register_structured(findings)
+            for r in structured:
+                risk = Risk(
+                    client_id=client_id,
+                    title=r["title"],
+                    description=r["description"] or None,
+                    risk_level=RiskLevel(r["risk_level"]),
+                    likelihood=r["likelihood"],
+                    impact=r["impact"],
+                    risk_score=r["risk_score"],
+                    category=r.get("category"),
+                    status="open",
+                    finding_ids=[],
+                )
+                db.add(risk)
+            result["risks_created"] = len(structured)
+
     except Exception as exc:
         agent_run_db.status = "failed"
         agent_run_db.error_message = str(exc)

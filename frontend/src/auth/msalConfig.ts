@@ -13,7 +13,7 @@ export const msalConfig: Configuration = {
     postLogoutRedirectUri: window.location.origin,
   },
   cache: {
-    cacheLocation: BrowserCacheLocation.SessionStorage,
+    cacheLocation: BrowserCacheLocation.LocalStorage,
   },
   system: {
     loggerOptions: {

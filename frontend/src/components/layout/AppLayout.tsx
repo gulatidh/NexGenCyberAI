@@ -11,6 +11,7 @@ import {
   BarChart, SettingsSuggest, Menu as MenuIcon,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
+import NotificationBell from "./NotificationBell";
 
 const DRAWER_WIDTH = 240;
 
@@ -129,6 +130,7 @@ export default function AppLayout() {
               size="small"
               sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
             />
+            <NotificationBell />
             <Tooltip title="Account">
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
                 <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>

@@ -46,7 +46,7 @@ def _analyse_findings_tool(findings_json: str) -> str:
 
 
 def _map_to_risk_register(findings_json: str) -> str:
-    """Convert findings into risk register entries."""
+    """Convert findings into risk register entries (string form for LLM tool)."""
     import json
     try:
         findings = json.loads(findings_json)
@@ -64,6 +64,28 @@ def _map_to_risk_register(findings_json: str) -> str:
             f"Control={f.get('control_id', 'N/A')}"
         )
     return "\n".join(risks) if risks else "No risks identified"
+
+
+def map_to_risk_register_structured(findings: list) -> list:
+    """Return findings as structured risk register dicts for DB persistence."""
+    result = []
+    for f in findings[:20]:
+        sev = f.get("severity", "low")
+        likelihood = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
+        impact = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
+        score = _calculate_risk_score(likelihood, impact)
+        result.append({
+            "title": f.get("title", "Unknown Risk"),
+            "description": f.get("description", ""),
+            "risk_level": _risk_level(score),
+            "likelihood": likelihood,
+            "impact": impact,
+            "risk_score": score,
+            "category": f.get("resource_type") or f.get("control_id") or "security",
+            "status": "open",
+            "finding_ref": f.get("title", ""),
+        })
+    return result
 
 
 class RiskManagementAgent(BaseAgent):

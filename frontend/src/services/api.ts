@@ -5,6 +5,7 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { msalInstance } from "../auth/AuthProvider";
 import { loginRequest as loginReq } from "../auth/msalConfig";
+import { addNotification } from "./notifications";
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
@@ -29,6 +30,30 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   }
   return config;
 });
+
+// Record write operations and errors in the notification log
+const OPERATION_LABELS: Record<string, string> = {
+  post: "Created", patch: "Updated", put: "Updated", delete: "Deleted",
+};
+apiClient.interceptors.response.use(
+  (response) => {
+    const method = (response.config.method || "").toLowerCase();
+    if (["post", "patch", "put", "delete"].includes(method)) {
+      const url = response.config.url || "";
+      const label = OPERATION_LABELS[method] || method.toUpperCase();
+      addNotification({ type: "success", message: `${label}: ${url}` });
+    }
+    return response;
+  },
+  (error) => {
+    const method = (error.config?.method || "").toUpperCase();
+    const url = error.config?.url || "";
+    const status = error.response?.status ?? "?";
+    const detail = error.response?.data?.detail || error.message || "Unknown error";
+    addNotification({ type: "error", message: `${method} ${url} — ${status}`, detail });
+    return Promise.reject(error);
+  },
+);
 
 // ── Typed API functions ───────────────────────────────────────────────────────
 
@@ -57,6 +82,13 @@ export const scansApi = {
   start: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/scans/`, data).then((r) => r.data),
   findings: (clientId: string, scanId: string, severity?: string) =>
     apiClient.get(`/clients/${clientId}/scans/${scanId}/findings/`, { params: { severity } }).then((r) => r.data),
+};
+
+export const findingsApi = {
+  listAll: (clientId: string, severity?: string, status?: string) =>
+    apiClient.get(`/clients/${clientId}/findings/`, { params: { severity, status } }).then((r) => r.data),
+  update: (clientId: string, findingId: string, data: any) =>
+    apiClient.patch(`/clients/${clientId}/findings/${findingId}`, data).then((r) => r.data),
 };
 
 export const risksApi = {
