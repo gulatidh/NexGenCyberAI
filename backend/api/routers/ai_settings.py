@@ -22,13 +22,13 @@ class AITestResponse(BaseModel):
     error: Optional[str] = None
 
 
-@router.get("/providers")
+@router.get("/providers/")
 async def get_providers(_=Depends(get_current_user)):
     """List all supported AI providers and their availability."""
     return {"providers": list_providers()}
 
 
-@router.post("/test", response_model=AITestResponse)
+@router.post("/test/", response_model=AITestResponse)
 async def test_ai_provider(payload: AITestRequest, _=Depends(get_current_user)):
     """Test connectivity to an AI provider with a simple prompt."""
     try:
@@ -52,7 +52,7 @@ async def test_ai_provider(payload: AITestRequest, _=Depends(get_current_user)):
         )
 
 
-@router.get("/default-provider")
+@router.get("/default-provider/")
 async def get_default_provider(_=Depends(get_current_user)):
     from core.config import get_settings
     s = get_settings()

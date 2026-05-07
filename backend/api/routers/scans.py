@@ -154,7 +154,7 @@ async def get_scan(client_id: str, scan_id: str, db: Session = Depends(get_db), 
     return scan
 
 
-@router.get("/{scan_id}/findings", response_model=List[FindingResponse])
+@router.get("/{scan_id}/findings/", response_model=List[FindingResponse])
 async def get_findings(
     client_id: str,
     scan_id: str,

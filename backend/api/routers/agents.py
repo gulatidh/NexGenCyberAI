@@ -13,7 +13,7 @@ router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
 _orchestrator = AgentOrchestrator()
 
 
-@router.post("/run", response_model=AgentRunResponse)
+@router.post("/run/", response_model=AgentRunResponse)
 async def run_agent(
     client_id: str,
     payload: AgentRunRequest,
@@ -71,7 +71,7 @@ async def run_agent(
     return agent_run_db
 
 
-@router.get("/runs", response_model=List[AgentRunResponse])
+@router.get("/runs/", response_model=List[AgentRunResponse])
 async def list_agent_runs(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
     return db.query(AgentRun).filter(AgentRun.client_id == client_id).order_by(AgentRun.started_at.desc()).limit(20).all()
 
