@@ -5,7 +5,7 @@ import {
   Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
-  FormControlLabel,
+  FormControlLabel, Checkbox,
 } from "@mui/material";
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -66,8 +66,33 @@ export default function Frameworks() {
   // Scan dialog state
   const [scanOpen, setScanOpen] = useState(false);
   const [scanConnectorId, setScanConnectorId] = useState("");
-  const [scanScope, setScanScope] = useState<"full" | "failing" | "custom">("full");
+  const [scanScope, setScanScope] = useState<"full" | "selected" | "failing" | "custom">("full");
   const [scanCustomIds, setScanCustomIds] = useState("");
+
+  // Row-multiselect state — control_ids the user has ticked
+  const [selectedControlIds, setSelectedControlIds] = useState<Set<string>>(new Set());
+
+  // Reset selection when client or framework changes
+  React.useEffect(() => { setSelectedControlIds(new Set()); }, [clientId, framework]);
+
+  const toggleControl = (controlId: string) => {
+    setSelectedControlIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(controlId)) next.delete(controlId); else next.add(controlId);
+      return next;
+    });
+  };
+
+  const toggleDomain = (items: ControlStatusEntry[], allChecked: boolean) => {
+    setSelectedControlIds((prev) => {
+      const next = new Set(prev);
+      for (const i of items) {
+        if (allChecked) next.delete(i.control.control_id);
+        else next.add(i.control.control_id);
+      }
+      return next;
+    });
+  };
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
@@ -139,6 +164,8 @@ export default function Frameworks() {
     let control_ids: string[] | undefined;
     if (scanScope === "failing") {
       control_ids = failingControlIds;
+    } else if (scanScope === "selected") {
+      control_ids = Array.from(selectedControlIds);
     } else if (scanScope === "custom") {
       control_ids = scanCustomIds
         .split(/[\s,;\n]+/)
@@ -150,6 +177,13 @@ export default function Frameworks() {
       connector_id: scanConnectorId || undefined,
       control_ids,
     });
+  };
+
+  const openScanForSelected = () => {
+    setScanScope("selected");
+    setScanConnectorId("");
+    setScanCustomIds("");
+    setScanOpen(true);
   };
 
   const grouped = useMemo(() => {
@@ -306,6 +340,24 @@ export default function Frameworks() {
                 "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
           </Box>
 
+          {/* Selection toolbar — appears when at least one row is ticked */}
+          {selectedControlIds.size > 0 && (
+            <Card sx={{ bgcolor: "rgba(0,229,255,0.08)", border: "1px solid rgba(0,229,255,0.3)", borderRadius: 2,
+              p: 1.5, mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
+              <Typography sx={{ color: "#00e5ff", fontWeight: 600 }}>
+                {selectedControlIds.size} control{selectedControlIds.size === 1 ? "" : "s"} selected
+              </Typography>
+              <Box sx={{ flex: 1 }} />
+              <Button size="small" onClick={() => setSelectedControlIds(new Set())}
+                sx={{ color: "rgba(255,255,255,0.6)" }}>Clear</Button>
+              <Button size="small" variant="contained" startIcon={<PlayArrow />}
+                onClick={openScanForSelected}
+                sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+                Scan Selected
+              </Button>
+            </Card>
+          )}
+
           {/* Grouped accordions */}
           {Array.from(grouped.entries()).length === 0 ? (
             <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
@@ -314,6 +366,9 @@ export default function Frameworks() {
           ) : (
             Array.from(grouped.entries()).map(([domain, items]) => {
               const compl = items.filter((i) => i.status === "compliant").length;
+              const domainSelectedCount = items.filter((i) => selectedControlIds.has(i.control.control_id)).length;
+              const allDomainSelected = domainSelectedCount === items.length && items.length > 0;
+              const someDomainSelected = domainSelectedCount > 0 && !allDomainSelected;
               return (
                 <Accordion key={domain} defaultExpanded
                   sx={{ bgcolor: "#161b22", color: "white", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
@@ -327,6 +382,14 @@ export default function Frameworks() {
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                          <TableCell sx={{ width: 42, p: 0, pl: 1 }}>
+                            <Checkbox size="small"
+                              checked={allDomainSelected}
+                              indeterminate={someDomainSelected}
+                              onChange={() => toggleDomain(items, allDomainSelected)}
+                              onClick={(e) => e.stopPropagation()}
+                              sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#00e5ff" }, "&.MuiCheckbox-indeterminate": { color: "#00e5ff" } }} />
+                          </TableCell>
                           <TableCell sx={{ width: 110 }}>CONTROL</TableCell>
                           <TableCell>TITLE</TableCell>
                           <TableCell sx={{ width: 130 }}>STATUS</TableCell>
@@ -334,29 +397,37 @@ export default function Frameworks() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {items.map((item) => (
-                          <TableRow key={item.control.id}
-                            sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                              "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
-                            onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
-                            <TableCell sx={{ color: "#00e5ff", fontFamily: "monospace", fontSize: 12 }}>
-                              {item.control.control_id}
-                            </TableCell>
-                            <TableCell sx={{ color: "white", fontSize: 13, maxWidth: 600 }}>
-                              <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {item.control.title}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip label={STATUS_LABEL[item.status]} size="small"
-                                sx={{ bgcolor: `${STATUS_COLOR[item.status]}20`, color: STATUS_COLOR[item.status],
-                                  fontSize: 10, height: 18 }} />
-                            </TableCell>
-                            <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                              {item.derived ? "auto" : "override"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {items.map((item) => {
+                          const checked = selectedControlIds.has(item.control.control_id);
+                          return (
+                            <TableRow key={item.control.id}
+                              sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+                                bgcolor: checked ? "rgba(0,229,255,0.06)" : "transparent",
+                                "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                              onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
+                              <TableCell sx={{ p: 0, pl: 1 }} onClick={(e) => { e.stopPropagation(); toggleControl(item.control.control_id); }}>
+                                <Checkbox size="small" checked={checked}
+                                  sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#00e5ff" } }} />
+                              </TableCell>
+                              <TableCell sx={{ color: "#00e5ff", fontFamily: "monospace", fontSize: 12 }}>
+                                {item.control.control_id}
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontSize: 13, maxWidth: 600 }}>
+                                <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {item.control.title}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={STATUS_LABEL[item.status]} size="small"
+                                  sx={{ bgcolor: `${STATUS_COLOR[item.status]}20`, color: STATUS_COLOR[item.status],
+                                    fontSize: 10, height: 18 }} />
+                              </TableCell>
+                              <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                                {item.derived ? "auto" : "override"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </AccordionDetails>
@@ -402,6 +473,11 @@ export default function Frameworks() {
           <RadioGroup value={scanScope} onChange={(e) => setScanScope(e.target.value as any)} sx={{ mb: 1 }}>
             <FormControlLabel value="full" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
               label={<span style={{ color: "white" }}>Full framework — every control in the catalog</span>} />
+            <FormControlLabel value="selected" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+              label={<span style={{ color: "white" }}>
+                Selected rows — re-scan the {selectedControlIds.size} control{selectedControlIds.size === 1 ? "" : "s"} ticked in the table
+              </span>}
+              disabled={selectedControlIds.size === 0} />
             <FormControlLabel value="failing" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
               label={<span style={{ color: "white" }}>Failing only — re-scan the {failingControlIds.length} non-compliant / partial controls</span>}
               disabled={failingControlIds.length === 0} />
@@ -431,7 +507,8 @@ export default function Frameworks() {
             variant="contained"
             disabled={!scanConnectorId || scanMutation.isPending ||
               (scanScope === "custom" && !scanCustomIds.trim()) ||
-              (scanScope === "failing" && failingControlIds.length === 0)}
+              (scanScope === "failing" && failingControlIds.length === 0) ||
+              (scanScope === "selected" && selectedControlIds.size === 0)}
             startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
             sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             Start Scan
