@@ -1,0 +1,55 @@
+{
+  "framework": "cis_ubuntu",
+  "version": "3.0.0",
+  "source": "https://www.cisecurity.org/benchmark/ubuntu_linux",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Initial Setup",
+      "title": "Initial Setup",
+      "description": "Initial Setup",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Services",
+      "title": "Services",
+      "description": "Services",
+      "weight": 0
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Network Configuration",
+      "title": "Network Configuration",
+      "description": "Network Configuration",
+      "weight": 0
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Logging and Auditing",
+      "title": "Logging and Auditing",
+      "description": "Logging and Auditing",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Access, Authentication and Authorization",
+      "title": "Access, Authentication and Authorization",
+      "description": "Access, Authentication and Authorization",
+      "weight": 0
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "System Maintenance",
+      "title": "System Maintenance",
+      "description": "System Maintenance",
+      "weight": 0
+    }
+  ]
+}

@@ -1,8 +1,15 @@
 """Framework compliance endpoints — catalog, per-client status, override, recompute."""
-from fastapi import APIRouter, Depends, HTTPException
+import csv
+import io
+import json
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 from api.models.models import (
     Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
@@ -28,6 +35,21 @@ _FRAMEWORK_NAMES = {
     "iso_27001": "ISO/IEC 27001",
     "soc2": "SOC 2",
     "pci_dss": "PCI DSS",
+    "cis_azure": "CIS Microsoft Azure Foundations 5.0.0",
+    "cis_aws": "CIS Amazon Web Services Foundations 7.0.0",
+    "cis_aws_db": "CIS AWS Database Services 2.0.0",
+    "cis_alibaba": "CIS Alibaba Cloud Foundation 2.0.0",
+    "cis_gcp": "CIS Google Cloud Platform Foundation 4.0.0",
+    "cis_gcp_workspace": "CIS Google Workspace Foundations 1.3.0",
+    "cis_m365": "CIS Microsoft 365 Foundations 6.0.1",
+    "cis_aks": "CIS Azure Kubernetes Service (AKS) 2.0.0",
+    "cis_azure_compute": "CIS Microsoft Azure Compute Services 2.0.0",
+    "cis_windows_server": "CIS Microsoft Windows Server 2025 2.0.0",
+    "cis_ubuntu": "CIS Ubuntu Linux 22.04 LTS 3.0.0",
+    "cis_esxi": "CIS VMware ESXi 8.0 1.3.0",
+    "cis_f5": "CIS F5 Networks 1.0.0",
+    "cis_palo_alto": "CIS Palo Alto Firewall 11 1.2.0",
+    "cis_mssql": "CIS Microsoft SQL Server 2025 1.0.0",
 }
 
 
@@ -340,3 +362,82 @@ async def recompute_framework(
     fw = _coerce_framework(framework)
     counts = recompute_client_framework(db, client_id, fw)
     return {"framework": fw.value, "counts": counts}
+
+
+# ── Bulk import (admin) ───────────────────────────────────────────────────────
+
+def _parse_import_file(filename: str, raw: bytes) -> List[Dict[str, Any]]:
+    """Accept either CSV or JSON. CSV columns: control_id, parent, domain, title, description, weight."""
+    name = (filename or "").lower()
+    text = raw.decode("utf-8-sig", errors="replace")
+    if name.endswith(".json"):
+        data = json.loads(text)
+        rows = data["controls"] if isinstance(data, dict) and "controls" in data else data
+        if not isinstance(rows, list):
+            raise HTTPException(status_code=400, detail="JSON must be a list of control objects or {controls: [...]}")
+        return rows
+    # CSV (default)
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames or "control_id" not in [f.lower() for f in reader.fieldnames]:
+        raise HTTPException(status_code=400, detail="CSV must have a 'control_id' column")
+    rows = []
+    for r in reader:
+        rows.append({k.lower(): (v or None) for k, v in r.items()})
+    return rows
+
+
+@router.post("/frameworks/{framework}/import/")
+async def import_controls(
+    framework: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Bulk-upsert controls into a framework catalog.
+
+    Accepts CSV (preferred) with columns: control_id, parent, domain, title, description, weight.
+    Or JSON: list of control objects (same fields).
+    Existing rows are updated by control_id; new rows are created.
+    """
+    fw = _coerce_framework(framework)
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    rows = _parse_import_file(file.filename or "", raw)
+    created = updated = 0
+    for r in rows:
+        cid = (r.get("control_id") or r.get("controlid") or "").strip()
+        if not cid:
+            continue
+        title = (r.get("title") or cid).strip()
+        parent = (r.get("parent") or r.get("parent_control_id") or "").strip() or None
+        domain = (r.get("domain") or "").strip() or None
+        description = (r.get("description") or title).strip() or None
+        weight_raw = r.get("weight")
+        try:
+            weight = int(weight_raw) if weight_raw not in (None, "") else (0 if not parent else 1)
+        except (TypeError, ValueError):
+            weight = 1
+
+        existing = (
+            db.query(FrameworkControl)
+            .filter(FrameworkControl.framework == fw, FrameworkControl.control_id == cid)
+            .first()
+        )
+        if existing:
+            existing.parent_control_id = parent
+            existing.domain = domain
+            existing.title = title
+            existing.description = description
+            existing.weight = weight
+            updated += 1
+        else:
+            db.add(FrameworkControl(
+                framework=fw, control_id=cid, parent_control_id=parent,
+                domain=domain, title=title, description=description, weight=weight,
+            ))
+            created += 1
+    db.commit()
+    logger.info("Imported %s: created=%d updated=%d", fw.value, created, updated)
+    return {"framework": fw.value, "created": created, "updated": updated, "total_uploaded": len(rows)}

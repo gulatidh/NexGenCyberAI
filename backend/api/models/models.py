@@ -49,6 +49,23 @@ class FrameworkType(str, enum.Enum):
     ISO_27001 = "iso_27001"
     SOC2 = "soc2"
     PCI_DSS = "pci_dss"
+    # CIS Benchmarks — cloud/SaaS (full catalog ships)
+    CIS_AZURE = "cis_azure"
+    CIS_AWS = "cis_aws"
+    CIS_AWS_DB = "cis_aws_db"
+    CIS_ALIBABA = "cis_alibaba"
+    CIS_GCP = "cis_gcp"
+    CIS_GCP_WORKSPACE = "cis_gcp_workspace"
+    CIS_M365 = "cis_m365"
+    CIS_AKS = "cis_aks"
+    CIS_AZURE_COMPUTE = "cis_azure_compute"
+    # CIS Benchmarks — OS/network/app (section structure ships; full controls via /import)
+    CIS_WINDOWS_SERVER = "cis_windows_server"
+    CIS_UBUNTU = "cis_ubuntu"
+    CIS_ESXI = "cis_esxi"
+    CIS_F5 = "cis_f5"
+    CIS_PALO_ALTO = "cis_palo_alto"
+    CIS_MSSQL = "cis_mssql"
 
 class ScanType(str, enum.Enum):
     VULNERABILITY = "vulnerability"

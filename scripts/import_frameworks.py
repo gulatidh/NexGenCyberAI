@@ -369,6 +369,16 @@ def main():
     (DATA_DIR / "cis_v8.json").write_text(json.dumps(cis, indent=2))
     print(f"  → {len(cis['controls'])} controls + safeguards")
 
+    # CIS Benchmarks (15 platform-specific catalogs)
+    from cis_benchmarks import ALL_BENCHMARKS, to_json_payload
+    for bm in ALL_BENCHMARKS:
+        payload = to_json_payload(bm)
+        out = DATA_DIR / f"{bm['framework']}.json"
+        out.write_text(json.dumps(payload, indent=2))
+        leaves = sum(1 for c in payload["controls"] if c["weight"] > 0)
+        sections = len(payload["controls"]) - leaves
+        print(f"  → {bm['framework']:24s} {sections:3d} sections + {leaves:4d} leaves ({bm['version']})")
+
     print(f"\nDone. Files written to {DATA_DIR}")
 
 

@@ -1,0 +1,47 @@
+{
+  "framework": "cis_f5",
+  "version": "1.0.0",
+  "source": "https://www.cisecurity.org/benchmark/f5_networks",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "User Accounts and Authentication",
+      "title": "User Accounts and Authentication",
+      "description": "User Accounts and Authentication",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Logging and Auditing",
+      "title": "Logging and Auditing",
+      "description": "Logging and Auditing",
+      "weight": 0
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Network Configuration",
+      "title": "Network Configuration",
+      "description": "Network Configuration",
+      "weight": 0
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "TLS / SSL Settings",
+      "title": "TLS / SSL Settings",
+      "description": "TLS / SSL Settings",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "iRules and Modules",
+      "title": "iRules and Modules",
+      "description": "iRules and Modules",
+      "weight": 0
+    }
+  ]
+}

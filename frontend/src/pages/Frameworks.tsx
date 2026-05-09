@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress, Button,
   FormControl, InputLabel, Select, MenuItem, Alert, TextField,
   Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
-  Table, TableHead, TableRow, TableCell, TableBody, Divider,
+  Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip,
 } from "@mui/material";
-import { ExpandMore, Refresh, Close, RestartAlt } from "@mui/icons-material";
+import { ExpandMore, Refresh, Close, RestartAlt, UploadFile } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, frameworksApi } from "../services/api";
 import {
@@ -59,6 +59,7 @@ export default function Frameworks() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ControlStatusEntry | null>(null);
   const [evidenceDraft, setEvidenceDraft] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
@@ -90,6 +91,14 @@ export default function Frameworks() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
       setSelected(null);
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: (file: File) => frameworksApi.importControls(framework, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+      qc.invalidateQueries({ queryKey: ["framework-catalog"] });
     },
   });
 
@@ -149,8 +158,36 @@ export default function Frameworks() {
             sx={{ borderColor: "#00e5ff", color: "#00e5ff" }}>
             Recompute
           </Button>
+          <Tooltip title="Upload CSV/JSON of controls (e.g. CIS XLSX export converted to CSV)">
+            <span>
+              <Button variant="outlined" startIcon={importMutation.isPending ? <CircularProgress size={14} sx={{ color: "#7c4dff" }} /> : <UploadFile />}
+                disabled={!framework || importMutation.isPending}
+                onClick={() => fileInputRef.current?.click()}
+                sx={{ borderColor: "#7c4dff", color: "#7c4dff" }}>
+                Upload Controls
+              </Button>
+            </span>
+          </Tooltip>
+          <input ref={fileInputRef} type="file" hidden accept=".csv,.json"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importMutation.mutate(f);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }} />
         </Box>
       </Box>
+
+      {importMutation.isSuccess && importMutation.data && (
+        <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "white" }}
+          onClose={() => importMutation.reset()}>
+          Imported {importMutation.data.total_uploaded} rows ({importMutation.data.created} new, {importMutation.data.updated} updated).
+        </Alert>
+      )}
+      {importMutation.isError && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => importMutation.reset()}>
+          Import failed: {(importMutation.error as any)?.response?.data?.detail || (importMutation.error as any)?.message}
+        </Alert>
+      )}
 
       {!clientId || !framework ? (
         <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>

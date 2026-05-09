@@ -4,7 +4,13 @@ export type ConnectorType = "azure" | "aws" | "gcp" | "onprem" | "servicenow" | 
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 export type ScanType = "vulnerability" | "configuration" | "compliance" | "full";
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
-export type FrameworkType = "nist_csf" | "nist_800_53" | "cis_v8" | "gdpr" | "iso_27001" | "soc2" | "pci_dss";
+export type FrameworkType =
+  | "nist_csf" | "nist_800_53" | "cis_v8"
+  | "gdpr" | "iso_27001" | "soc2" | "pci_dss"
+  | "cis_azure" | "cis_aws" | "cis_aws_db" | "cis_alibaba"
+  | "cis_gcp" | "cis_gcp_workspace" | "cis_m365" | "cis_aks" | "cis_azure_compute"
+  | "cis_windows_server" | "cis_ubuntu" | "cis_esxi"
+  | "cis_f5" | "cis_palo_alto" | "cis_mssql";
 export type AgentType = "risk_manager" | "va_scanner" | "framework_analyst" | "compliance_monitor" | "threat_intel" | "remediation" | "orchestrator";
 
 export interface Client {

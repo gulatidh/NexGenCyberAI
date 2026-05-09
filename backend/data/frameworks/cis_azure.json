@@ -1,0 +1,1159 @@
+{
+  "framework": "cis_azure",
+  "version": "5.0.0",
+  "source": "https://www.cisecurity.org/benchmark/azure",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Identity and Access Management",
+      "title": "Identity and Access Management",
+      "description": "Identity and Access Management",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1.1",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure Security Defaults is enabled on Azure Active Directory",
+      "description": "Ensure Security Defaults is enabled on Azure Active Directory",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.2",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Multi-Factor Auth Status' is 'Enabled' for all Privileged Users",
+      "description": "Ensure that 'Multi-Factor Auth Status' is 'Enabled' for all Privileged Users",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.3",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Multi-Factor Auth Status' is 'Enabled' for all Non-Privileged Users",
+      "description": "Ensure that 'Multi-Factor Auth Status' is 'Enabled' for all Non-Privileged Users",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.4",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Allow users to remember multi-factor authentication on devices they trust' is Disabled",
+      "description": "Ensure that 'Allow users to remember multi-factor authentication on devices they trust' is Disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.1",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure Trusted Locations Are Defined",
+      "description": "Ensure Trusted Locations Are Defined",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.2",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that an exclusionary Geographic Access Policy is considered",
+      "description": "Ensure that an exclusionary Geographic Access Policy is considered",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.3",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that A Multi-factor Authentication Policy Exists for All Users",
+      "description": "Ensure that A Multi-factor Authentication Policy Exists for All Users",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.4",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure Multi-factor Authentication is Required for Risky Sign-ins",
+      "description": "Ensure Multi-factor Authentication is Required for Risky Sign-ins",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.5",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure Multi-factor Authentication is Required for Azure Management",
+      "description": "Ensure Multi-factor Authentication is Required for Azure Management",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Restrict non-admin users from creating tenants' is set to 'Yes'",
+      "description": "Ensure that 'Restrict non-admin users from creating tenants' is set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure Guest Users Are Reviewed on a Regular Basis",
+      "description": "Ensure Guest Users Are Reviewed on a Regular Basis",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That 'Number of methods required to reset' is set to '2'",
+      "description": "Ensure That 'Number of methods required to reset' is set to '2'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that account 'Lockout Threshold' is less than or equal to '10'",
+      "description": "Ensure that account 'Lockout Threshold' is less than or equal to '10'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that account 'Lockout duration in seconds' is greater than or equal to '60'",
+      "description": "Ensure that account 'Lockout duration in seconds' is greater than or equal to '60'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Number of days before users are asked to re-confirm their authentication information' is not set to '0'",
+      "description": "Ensure that 'Number of days before users are asked to re-confirm their authentication information' is not set to '0'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.9",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Notify users on password resets?' is set to 'Yes'",
+      "description": "Ensure that 'Notify users on password resets?' is set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.10",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Notify all admins when other admins reset their password?' is set to 'Yes'",
+      "description": "Ensure that 'Notify all admins when other admins reset their password?' is set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.11",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure 'User consent for applications' is set to 'Do not allow user consent'",
+      "description": "Ensure 'User consent for applications' is set to 'Do not allow user consent'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.12",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure 'User consent for applications' Is Set To 'Allow for Verified Publishers'",
+      "description": "Ensure 'User consent for applications' Is Set To 'Allow for Verified Publishers'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.13",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Users can add gallery apps to My Apps' is set to 'No'",
+      "description": "Ensure that 'Users can add gallery apps to My Apps' is set to 'No'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.14",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That 'Users Can Register Applications' Is Set to 'No'",
+      "description": "Ensure That 'Users Can Register Applications' Is Set to 'No'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.15",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That 'Guest users access restrictions' is set to 'Guest user access is restricted to properties and memberships of their own directory objects'",
+      "description": "Ensure That 'Guest users access restrictions' is set to 'Guest user access is restricted to properties and memberships of their own directory objects'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.16",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Guest invite restrictions' is set to 'Only users assigned to specific admin roles can invite guest users'",
+      "description": "Ensure that 'Guest invite restrictions' is set to 'Only users assigned to specific admin roles can invite guest users'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.17",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That 'Restrict access to Microsoft Entra admin center' is Set to 'Yes'",
+      "description": "Ensure That 'Restrict access to Microsoft Entra admin center' is Set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.18",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Restrict user ability to access groups features in My Groups' is set to 'Yes'",
+      "description": "Ensure that 'Restrict user ability to access groups features in My Groups' is set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.19",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Users can create security groups in Azure portals, API or PowerShell' is set to 'No'",
+      "description": "Ensure that 'Users can create security groups in Azure portals, API or PowerShell' is set to 'No'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.20",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Owners can manage group membership requests in My Groups' is set to 'No'",
+      "description": "Ensure that 'Owners can manage group membership requests in My Groups' is set to 'No'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.21",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Users can create Microsoft 365 groups in Azure portals, API or PowerShell' is set to 'No'",
+      "description": "Ensure that 'Users can create Microsoft 365 groups in Azure portals, API or PowerShell' is set to 'No'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.22",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that 'Require Multi-Factor Authentication to register or join devices with Microsoft Entra' is set to 'Yes'",
+      "description": "Ensure that 'Require Multi-Factor Authentication to register or join devices with Microsoft Entra' is set to 'Yes'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.23",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That No Custom Subscription Administrator Roles Exist",
+      "description": "Ensure That No Custom Subscription Administrator Roles Exist",
+      "weight": 1
+    },
+    {
+      "control_id": "1.24",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure a Custom Role is Assigned Permissions for Administering Resource Locks",
+      "description": "Ensure a Custom Role is Assigned Permissions for Administering Resource Locks",
+      "weight": 1
+    },
+    {
+      "control_id": "1.25",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure That 'Subscription leaving Microsoft Entra tenant' and 'Subscription entering Microsoft Entra tenant' Is Set To 'Permit no one'",
+      "description": "Ensure That 'Subscription leaving Microsoft Entra tenant' and 'Subscription entering Microsoft Entra tenant' Is Set To 'Permit no one'",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Microsoft Defender for Cloud",
+      "description": "Microsoft Defender for Cloud",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1.1",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Servers",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Servers",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.2",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for App Service",
+      "description": "Ensure That 'Defender plan' is set to 'On' for App Service",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.3",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Databases",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Databases",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.4",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for SQL Servers on Machines",
+      "description": "Ensure That 'Defender plan' is set to 'On' for SQL Servers on Machines",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.5",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Open-Source Relational Databases",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Open-Source Relational Databases",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.6",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Storage",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Storage",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.7",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Containers",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Containers",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.8",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Key Vault",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Key Vault",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.9",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Defender plan' is set to 'On' for Resource Manager",
+      "description": "Ensure That 'Defender plan' is set to 'On' for Resource Manager",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.10",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure that Microsoft Defender for Cloud Apps integration is enabled",
+      "description": "Ensure that Microsoft Defender for Cloud Apps integration is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.11",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure that Auto provisioning of 'Log Analytics agent for Azure VMs' is Set to 'On'",
+      "description": "Ensure that Auto provisioning of 'Log Analytics agent for Azure VMs' is Set to 'On'",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.12",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure that Auto provisioning of 'Vulnerability assessment for machines' is set to 'On'",
+      "description": "Ensure that Auto provisioning of 'Vulnerability assessment for machines' is set to 'On'",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.13",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure that 'All users with the following roles' is set to 'Owner'",
+      "description": "Ensure that 'All users with the following roles' is set to 'Owner'",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.14",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure 'Additional email addresses' is configured with a security contact email",
+      "description": "Ensure 'Additional email addresses' is configured with a security contact email",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.15",
+      "parent": "2",
+      "domain": "Microsoft Defender for Cloud",
+      "title": "Ensure That 'Notify about alerts with the following severity' is Set to 'High'",
+      "description": "Ensure That 'Notify about alerts with the following severity' is Set to 'High'",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Storage Accounts",
+      "title": "Storage Accounts",
+      "description": "Storage Accounts",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure that 'Secure transfer required' is set to 'Enabled'",
+      "description": "Ensure that 'Secure transfer required' is set to 'Enabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure that 'Enable Infrastructure Encryption' for Each Storage Account in Azure Storage is Set to 'enabled'",
+      "description": "Ensure that 'Enable Infrastructure Encryption' for Each Storage Account in Azure Storage is Set to 'enabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure That Storage Account Access Keys are Periodically Regenerated",
+      "description": "Ensure That Storage Account Access Keys are Periodically Regenerated",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure that Shared Access Signature Tokens Expire Within an Hour",
+      "description": "Ensure that Shared Access Signature Tokens Expire Within an Hour",
+      "weight": 1
+    },
+    {
+      "control_id": "3.5",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure that 'Public access level' is disabled for storage accounts with blob containers",
+      "description": "Ensure that 'Public access level' is disabled for storage accounts with blob containers",
+      "weight": 1
+    },
+    {
+      "control_id": "3.6",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Default Network Access Rule for Storage Accounts is Set to Deny",
+      "description": "Ensure Default Network Access Rule for Storage Accounts is Set to Deny",
+      "weight": 1
+    },
+    {
+      "control_id": "3.7",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure 'Trusted Microsoft Services' is Enabled for Storage Account Access",
+      "description": "Ensure 'Trusted Microsoft Services' is Enabled for Storage Account Access",
+      "weight": 1
+    },
+    {
+      "control_id": "3.8",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Soft Delete is Enabled for Azure Containers and Blob Storage",
+      "description": "Ensure Soft Delete is Enabled for Azure Containers and Blob Storage",
+      "weight": 1
+    },
+    {
+      "control_id": "3.9",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Storage for Critical Data are Encrypted with Customer Managed Keys (CMK)",
+      "description": "Ensure Storage for Critical Data are Encrypted with Customer Managed Keys (CMK)",
+      "weight": 1
+    },
+    {
+      "control_id": "3.10",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Storage logging is Enabled for Queue Service for 'Read', 'Write', and 'Delete' requests",
+      "description": "Ensure Storage logging is Enabled for Queue Service for 'Read', 'Write', and 'Delete' requests",
+      "weight": 1
+    },
+    {
+      "control_id": "3.11",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Storage logging is Enabled for Blob Service for 'Read', 'Write', and 'Delete' requests",
+      "description": "Ensure Storage logging is Enabled for Blob Service for 'Read', 'Write', and 'Delete' requests",
+      "weight": 1
+    },
+    {
+      "control_id": "3.12",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Storage logging is Enabled for Table Service for 'Read', 'Write', and 'Delete' requests",
+      "description": "Ensure Storage logging is Enabled for Table Service for 'Read', 'Write', and 'Delete' requests",
+      "weight": 1
+    },
+    {
+      "control_id": "3.13",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure the 'Minimum TLS version' for storage accounts is set to 'Version 1.2'",
+      "description": "Ensure the 'Minimum TLS version' for storage accounts is set to 'Version 1.2'",
+      "weight": 1
+    },
+    {
+      "control_id": "3.14",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure 'Allow Azure services on the trusted services list to access this storage account' is Enabled",
+      "description": "Ensure 'Allow Azure services on the trusted services list to access this storage account' is Enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.15",
+      "parent": "3",
+      "domain": "Storage Accounts",
+      "title": "Ensure Private Endpoints are used to access Storage Accounts",
+      "description": "Ensure Private Endpoints are used to access Storage Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Database Services",
+      "title": "Database Services",
+      "description": "Database Services",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1.1",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that 'Auditing' is set to 'On' for SQL Servers",
+      "description": "Ensure that 'Auditing' is set to 'On' for SQL Servers",
+      "weight": 1
+    },
+    {
+      "control_id": "4.1.2",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure no SQL Databases allow ingress from 0.0.0.0/0 (ANY IP)",
+      "description": "Ensure no SQL Databases allow ingress from 0.0.0.0/0 (ANY IP)",
+      "weight": 1
+    },
+    {
+      "control_id": "4.1.3",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure SQL server's Transparent Data Encryption (TDE) protector is encrypted with Customer-managed key",
+      "description": "Ensure SQL server's Transparent Data Encryption (TDE) protector is encrypted with Customer-managed key",
+      "weight": 1
+    },
+    {
+      "control_id": "4.1.4",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that Microsoft Entra authentication is Configured for SQL Servers",
+      "description": "Ensure that Microsoft Entra authentication is Configured for SQL Servers",
+      "weight": 1
+    },
+    {
+      "control_id": "4.1.5",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that 'Data encryption' is set to 'On' on a SQL Database",
+      "description": "Ensure that 'Data encryption' is set to 'On' on a SQL Database",
+      "weight": 1
+    },
+    {
+      "control_id": "4.1.6",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that 'Auditing' Retention is 'greater than 90 days'",
+      "description": "Ensure that 'Auditing' Retention is 'greater than 90 days'",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2.1",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that Advanced Threat Protection (ATP) on a SQL server is set to 'Enabled'",
+      "description": "Ensure that Advanced Threat Protection (ATP) on a SQL server is set to 'Enabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2.2",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server",
+      "description": "Ensure that Vulnerability Assessment (VA) is enabled on a SQL server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2.3",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that VA setting Periodic Recurring Scans is enabled on a SQL server",
+      "description": "Ensure that VA setting Periodic Recurring Scans is enabled on a SQL server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2.4",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that VA setting Send scan reports to is configured for a SQL server",
+      "description": "Ensure that VA setting Send scan reports to is configured for a SQL server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2.5",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure that VA setting 'Also send email notifications to admins and subscription owners' is set for a SQL server",
+      "description": "Ensure that VA setting 'Also send email notifications to admins and subscription owners' is set for a SQL server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.1",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure 'Enforce SSL connection' is set to 'ENABLED' for PostgreSQL Database Server",
+      "description": "Ensure 'Enforce SSL connection' is set to 'ENABLED' for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.2",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure server parameter 'log_checkpoints' is set to 'ON' for PostgreSQL Database Server",
+      "description": "Ensure server parameter 'log_checkpoints' is set to 'ON' for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.3",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure server parameter 'log_connections' is set to 'ON' for PostgreSQL Database Server",
+      "description": "Ensure server parameter 'log_connections' is set to 'ON' for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.4",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure server parameter 'log_disconnections' is set to 'ON' for PostgreSQL Database Server",
+      "description": "Ensure server parameter 'log_disconnections' is set to 'ON' for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.5",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure server parameter 'connection_throttling' is set to 'ON' for PostgreSQL Database Server",
+      "description": "Ensure server parameter 'connection_throttling' is set to 'ON' for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.6",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure server parameter 'log_retention_days' is greater than 3 days for PostgreSQL Database Server",
+      "description": "Ensure server parameter 'log_retention_days' is greater than 3 days for PostgreSQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.7",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure 'Allow access to Azure services' for PostgreSQL Database Server is disabled",
+      "description": "Ensure 'Allow access to Azure services' for PostgreSQL Database Server is disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3.8",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure 'Infrastructure double encryption' for PostgreSQL Database Server is 'Enabled'",
+      "description": "Ensure 'Infrastructure double encryption' for PostgreSQL Database Server is 'Enabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4.1",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure 'Enforce SSL connection' is set to 'Enabled' for Standard MySQL Database Server",
+      "description": "Ensure 'Enforce SSL connection' is set to 'Enabled' for Standard MySQL Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4.2",
+      "parent": "4",
+      "domain": "Database Services",
+      "title": "Ensure 'TLS Version' is set to 'TLSV1.2' (or higher) for MySQL flexible Database Server",
+      "description": "Ensure 'TLS Version' is set to 'TLSV1.2' (or higher) for MySQL flexible Database Server",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Logging and Monitoring",
+      "description": "Logging and Monitoring",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1.1",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that a 'Diagnostic Setting' exists for Subscription Activity Logs",
+      "description": "Ensure that a 'Diagnostic Setting' exists for Subscription Activity Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.2",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure Diagnostic Setting captures appropriate categories",
+      "description": "Ensure Diagnostic Setting captures appropriate categories",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.3",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure the Storage Container Storing the Activity Logs is not Publicly Accessible",
+      "description": "Ensure the Storage Container Storing the Activity Logs is not Publicly Accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.4",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure the storage account containing the container with activity logs is encrypted with Customer Managed Key",
+      "description": "Ensure the storage account containing the container with activity logs is encrypted with Customer Managed Key",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.5",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that logging for Azure Key Vault is 'Enabled'",
+      "description": "Ensure that logging for Azure Key Vault is 'Enabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.1",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Create Policy Assignment",
+      "description": "Ensure that Activity Log Alert exists for Create Policy Assignment",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.2",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Delete Policy Assignment",
+      "description": "Ensure that Activity Log Alert exists for Delete Policy Assignment",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.3",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Create or Update Network Security Group",
+      "description": "Ensure that Activity Log Alert exists for Create or Update Network Security Group",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.4",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Delete Network Security Group",
+      "description": "Ensure that Activity Log Alert exists for Delete Network Security Group",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.5",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Create or Update Solution",
+      "description": "Ensure that Activity Log Alert exists for Create or Update Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.6",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Delete Solution",
+      "description": "Ensure that Activity Log Alert exists for Delete Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.7",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Create or Update SQL Server Firewall Rule",
+      "description": "Ensure that Activity Log Alert exists for Create or Update SQL Server Firewall Rule",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.8",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Delete SQL Server Firewall Rule",
+      "description": "Ensure that Activity Log Alert exists for Delete SQL Server Firewall Rule",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.9",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Create or Update Public IP Address rule",
+      "description": "Ensure that Activity Log Alert exists for Create or Update Public IP Address rule",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2.10",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Activity Log Alert exists for Delete Public IP Address rule",
+      "description": "Ensure that Activity Log Alert exists for Delete Public IP Address rule",
+      "weight": 1
+    },
+    {
+      "control_id": "5.3",
+      "parent": "5",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Diagnostic Logs Are Enabled for All Services that Support it",
+      "description": "Ensure that Diagnostic Logs Are Enabled for All Services that Support it",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Networking",
+      "title": "Networking",
+      "description": "Networking",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that RDP access from the Internet is evaluated and restricted",
+      "description": "Ensure that RDP access from the Internet is evaluated and restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that SSH access from the Internet is evaluated and restricted",
+      "description": "Ensure that SSH access from the Internet is evaluated and restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that UDP access from the Internet is evaluated and restricted",
+      "description": "Ensure that UDP access from the Internet is evaluated and restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that HTTP(S) access from the Internet is evaluated and restricted",
+      "description": "Ensure that HTTP(S) access from the Internet is evaluated and restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "6.5",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that Network Security Group Flow Log retention period is 'greater than 90 days'",
+      "description": "Ensure that Network Security Group Flow Log retention period is 'greater than 90 days'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.6",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that Network Watcher is 'Enabled' for Azure Regions that are in use",
+      "description": "Ensure that Network Watcher is 'Enabled' for Azure Regions that are in use",
+      "weight": 1
+    },
+    {
+      "control_id": "6.7",
+      "parent": "6",
+      "domain": "Networking",
+      "title": "Ensure that Public IP addresses are Evaluated on a Periodic Basis",
+      "description": "Ensure that Public IP addresses are Evaluated on a Periodic Basis",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Virtual Machines",
+      "title": "Virtual Machines",
+      "description": "Virtual Machines",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure an Azure Bastion Host Exists",
+      "description": "Ensure an Azure Bastion Host Exists",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure Virtual Machines are utilizing Managed Disks",
+      "description": "Ensure Virtual Machines are utilizing Managed Disks",
+      "weight": 1
+    },
+    {
+      "control_id": "7.3",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure that 'OS and Data' disks are encrypted with Customer Managed Key (CMK)",
+      "description": "Ensure that 'OS and Data' disks are encrypted with Customer Managed Key (CMK)",
+      "weight": 1
+    },
+    {
+      "control_id": "7.4",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure that 'Unattached disks' are encrypted with 'Customer Managed Key' (CMK)",
+      "description": "Ensure that 'Unattached disks' are encrypted with 'Customer Managed Key' (CMK)",
+      "weight": 1
+    },
+    {
+      "control_id": "7.5",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure that Only Approved Extensions Are Installed",
+      "description": "Ensure that Only Approved Extensions Are Installed",
+      "weight": 1
+    },
+    {
+      "control_id": "7.6",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure that Endpoint Protection for all Virtual Machines is installed",
+      "description": "Ensure that Endpoint Protection for all Virtual Machines is installed",
+      "weight": 1
+    },
+    {
+      "control_id": "7.7",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure that VHDs are Encrypted",
+      "description": "Ensure that VHDs are Encrypted",
+      "weight": 1
+    },
+    {
+      "control_id": "7.8",
+      "parent": "7",
+      "domain": "Virtual Machines",
+      "title": "Ensure trusted launch is enabled on Virtual Machines",
+      "description": "Ensure trusted launch is enabled on Virtual Machines",
+      "weight": 1
+    },
+    {
+      "control_id": "8",
+      "parent": null,
+      "domain": "Key Vault",
+      "title": "Key Vault",
+      "description": "Key Vault",
+      "weight": 0
+    },
+    {
+      "control_id": "8.1",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure that the Expiration Date is set for all Keys in RBAC Key Vaults",
+      "description": "Ensure that the Expiration Date is set for all Keys in RBAC Key Vaults",
+      "weight": 1
+    },
+    {
+      "control_id": "8.2",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults",
+      "description": "Ensure that the Expiration Date is set for all Keys in Non-RBAC Key Vaults",
+      "weight": 1
+    },
+    {
+      "control_id": "8.3",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure that the Expiration Date is set for all Secrets in RBAC Key Vaults",
+      "description": "Ensure that the Expiration Date is set for all Secrets in RBAC Key Vaults",
+      "weight": 1
+    },
+    {
+      "control_id": "8.4",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure that the Expiration Date is set for all Secrets in Non-RBAC Key Vaults",
+      "description": "Ensure that the Expiration Date is set for all Secrets in Non-RBAC Key Vaults",
+      "weight": 1
+    },
+    {
+      "control_id": "8.5",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure the Key Vault is Recoverable (Soft Delete + Purge Protection)",
+      "description": "Ensure the Key Vault is Recoverable (Soft Delete + Purge Protection)",
+      "weight": 1
+    },
+    {
+      "control_id": "8.6",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Enable Role Based Access Control for Azure Key Vault",
+      "description": "Enable Role Based Access Control for Azure Key Vault",
+      "weight": 1
+    },
+    {
+      "control_id": "8.7",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure that Private Endpoints are Used for Azure Key Vault",
+      "description": "Ensure that Private Endpoints are Used for Azure Key Vault",
+      "weight": 1
+    },
+    {
+      "control_id": "8.8",
+      "parent": "8",
+      "domain": "Key Vault",
+      "title": "Ensure Automatic Key Rotation is Enabled Within Azure Key Vault for the Supported Services",
+      "description": "Ensure Automatic Key Rotation is Enabled Within Azure Key Vault for the Supported Services",
+      "weight": 1
+    },
+    {
+      "control_id": "9",
+      "parent": null,
+      "domain": "App Service",
+      "title": "App Service",
+      "description": "App Service",
+      "weight": 0
+    },
+    {
+      "control_id": "9.1",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure 'HTTPS Only' is set to 'On'",
+      "description": "Ensure 'HTTPS Only' is set to 'On'",
+      "weight": 1
+    },
+    {
+      "control_id": "9.2",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure App Service Authentication is set up for apps in Azure App Service",
+      "description": "Ensure App Service Authentication is set up for apps in Azure App Service",
+      "weight": 1
+    },
+    {
+      "control_id": "9.3",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure 'FTP State' is set to 'FTPS Only' or 'Disabled'",
+      "description": "Ensure 'FTP State' is set to 'FTPS Only' or 'Disabled'",
+      "weight": 1
+    },
+    {
+      "control_id": "9.4",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure Web App is using the latest version of TLS encryption",
+      "description": "Ensure Web App is using the latest version of TLS encryption",
+      "weight": 1
+    },
+    {
+      "control_id": "9.5",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure that Register with Microsoft Entra is enabled on App Service",
+      "description": "Ensure that Register with Microsoft Entra is enabled on App Service",
+      "weight": 1
+    },
+    {
+      "control_id": "9.6",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure That 'PHP version' is the Latest, If Used to Run the Web App",
+      "description": "Ensure That 'PHP version' is the Latest, If Used to Run the Web App",
+      "weight": 1
+    },
+    {
+      "control_id": "9.7",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure That 'Python version' is the Latest Stable Version, If Used to Run the Web App",
+      "description": "Ensure That 'Python version' is the Latest Stable Version, If Used to Run the Web App",
+      "weight": 1
+    },
+    {
+      "control_id": "9.8",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure That 'Java version' is the Latest, If Used to Run the Web App",
+      "description": "Ensure That 'Java version' is the Latest, If Used to Run the Web App",
+      "weight": 1
+    },
+    {
+      "control_id": "9.9",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure That 'HTTP Version' is the Latest, If Used to Run the Web App",
+      "description": "Ensure That 'HTTP Version' is the Latest, If Used to Run the Web App",
+      "weight": 1
+    },
+    {
+      "control_id": "9.10",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure FTP deployments are Disabled",
+      "description": "Ensure FTP deployments are Disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "9.11",
+      "parent": "9",
+      "domain": "App Service",
+      "title": "Ensure Azure Key Vaults are Used to Store Secrets",
+      "description": "Ensure Azure Key Vaults are Used to Store Secrets",
+      "weight": 1
+    },
+    {
+      "control_id": "10",
+      "parent": null,
+      "domain": "Miscellaneous",
+      "title": "Miscellaneous",
+      "description": "Miscellaneous",
+      "weight": 0
+    },
+    {
+      "control_id": "10.1",
+      "parent": "10",
+      "domain": "Miscellaneous",
+      "title": "Ensure that Resource Locks are set for Mission-Critical Azure Resources",
+      "description": "Ensure that Resource Locks are set for Mission-Critical Azure Resources",
+      "weight": 1
+    }
+  ]
+}

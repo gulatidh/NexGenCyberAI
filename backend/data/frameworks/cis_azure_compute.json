@@ -1,0 +1,311 @@
+{
+  "framework": "cis_azure_compute",
+  "version": "2.0.0",
+  "source": "https://www.cisecurity.org/benchmark/azure",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Virtual Machines",
+      "title": "Virtual Machines",
+      "description": "Virtual Machines",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure VM disk encryption is enabled (OS disk)",
+      "description": "Ensure VM disk encryption is enabled (OS disk)",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure VM disk encryption is enabled (data disks)",
+      "description": "Ensure VM disk encryption is enabled (data disks)",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure unattached managed disks are encrypted with CMK",
+      "description": "Ensure unattached managed disks are encrypted with CMK",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure 'Endpoint protection' is installed on VMs",
+      "description": "Ensure 'Endpoint protection' is installed on VMs",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure Trusted Launch is enabled on supported VMs",
+      "description": "Ensure Trusted Launch is enabled on supported VMs",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure 'Secure boot' is enabled on supported VMs",
+      "description": "Ensure 'Secure boot' is enabled on supported VMs",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure 'vTPM' is enabled on supported VMs",
+      "description": "Ensure 'vTPM' is enabled on supported VMs",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure VMs use Managed Identities (System or User assigned)",
+      "description": "Ensure VMs use Managed Identities (System or User assigned)",
+      "weight": 1
+    },
+    {
+      "control_id": "1.9",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure only approved VM extensions are installed",
+      "description": "Ensure only approved VM extensions are installed",
+      "weight": 1
+    },
+    {
+      "control_id": "1.10",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure VMs are part of a Backup vault with retention >= 30 days",
+      "description": "Ensure VMs are part of a Backup vault with retention >= 30 days",
+      "weight": 1
+    },
+    {
+      "control_id": "1.11",
+      "parent": "1",
+      "domain": "Virtual Machines",
+      "title": "Ensure VM update management is configured",
+      "description": "Ensure VM update management is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Virtual Machine Scale Sets",
+      "title": "Virtual Machine Scale Sets",
+      "description": "Virtual Machine Scale Sets",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1",
+      "parent": "2",
+      "domain": "Virtual Machine Scale Sets",
+      "title": "Ensure VMSS automatic OS upgrades are enabled",
+      "description": "Ensure VMSS automatic OS upgrades are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.2",
+      "parent": "2",
+      "domain": "Virtual Machine Scale Sets",
+      "title": "Ensure VMSS use ephemeral or encrypted OS disks",
+      "description": "Ensure VMSS use ephemeral or encrypted OS disks",
+      "weight": 1
+    },
+    {
+      "control_id": "2.3",
+      "parent": "2",
+      "domain": "Virtual Machine Scale Sets",
+      "title": "Ensure VMSS instance view diagnostics are enabled",
+      "description": "Ensure VMSS instance view diagnostics are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "App Service / Functions",
+      "title": "App Service / Functions",
+      "description": "App Service / Functions",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service uses HTTPS-only",
+      "description": "Ensure App Service uses HTTPS-only",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service minimum TLS version is 1.2",
+      "description": "Ensure App Service minimum TLS version is 1.2",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service uses Managed Identity (no inline secrets)",
+      "description": "Ensure App Service uses Managed Identity (no inline secrets)",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service authentication is enabled",
+      "description": "Ensure App Service authentication is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.5",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service FTP/FTPS is disabled or set to FTPS-only",
+      "description": "Ensure App Service FTP/FTPS is disabled or set to FTPS-only",
+      "weight": 1
+    },
+    {
+      "control_id": "3.6",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure remote debugging is disabled in production",
+      "description": "Ensure remote debugging is disabled in production",
+      "weight": 1
+    },
+    {
+      "control_id": "3.7",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service Stack runtime version is current",
+      "description": "Ensure App Service Stack runtime version is current",
+      "weight": 1
+    },
+    {
+      "control_id": "3.8",
+      "parent": "3",
+      "domain": "App Service / Functions",
+      "title": "Ensure App Service uses Private Endpoints / VNet integration",
+      "description": "Ensure App Service uses Private Endpoints / VNet integration",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Container Instances / Container Apps",
+      "title": "Container Instances / Container Apps",
+      "description": "Container Instances / Container Apps",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Container Instances / Container Apps",
+      "title": "Ensure ACI uses Managed Identity for image pull",
+      "description": "Ensure ACI uses Managed Identity for image pull",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Container Instances / Container Apps",
+      "title": "Ensure ACI/Container Apps run with read-only root filesystem where possible",
+      "description": "Ensure ACI/Container Apps run with read-only root filesystem where possible",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Container Instances / Container Apps",
+      "title": "Ensure ACI/Container Apps drop all unnecessary capabilities",
+      "description": "Ensure ACI/Container Apps drop all unnecessary capabilities",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Container Instances / Container Apps",
+      "title": "Ensure container images are pulled from approved ACR registries",
+      "description": "Ensure container images are pulled from approved ACR registries",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Service Fabric",
+      "title": "Service Fabric",
+      "description": "Service Fabric",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1",
+      "parent": "5",
+      "domain": "Service Fabric",
+      "title": "Ensure Service Fabric cluster uses certificate-based authentication",
+      "description": "Ensure Service Fabric cluster uses certificate-based authentication",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2",
+      "parent": "5",
+      "domain": "Service Fabric",
+      "title": "Ensure Service Fabric clientCertificateThumbprints are configured",
+      "description": "Ensure Service Fabric clientCertificateThumbprints are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.3",
+      "parent": "5",
+      "domain": "Service Fabric",
+      "title": "Ensure Service Fabric reverse proxy enforces HTTPS",
+      "description": "Ensure Service Fabric reverse proxy enforces HTTPS",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Batch",
+      "title": "Batch",
+      "description": "Batch",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Batch",
+      "title": "Ensure Batch pools use VNet-integrated subnets",
+      "description": "Ensure Batch pools use VNet-integrated subnets",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Batch",
+      "title": "Ensure Batch account uses customer-managed keys for encryption",
+      "description": "Ensure Batch account uses customer-managed keys for encryption",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Batch",
+      "title": "Ensure Batch account public network access is disabled",
+      "description": "Ensure Batch account public network access is disabled",
+      "weight": 1
+    }
+  ]
+}

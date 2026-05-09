@@ -1,0 +1,479 @@
+{
+  "framework": "cis_m365",
+  "version": "6.0.1",
+  "source": "https://www.cisecurity.org/benchmark/microsoft_365",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Account / Authentication Policies",
+      "title": "Account / Authentication Policies",
+      "description": "Account / Authentication Policies",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1.1",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure Security Defaults is enabled or Conditional Access policies are configured",
+      "description": "Ensure Security Defaults is enabled or Conditional Access policies are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.2",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure that an exclusionary Geographic Access Policy is considered",
+      "description": "Ensure that an exclusionary Geographic Access Policy is considered",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.3",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure A Multi-factor Authentication Policy Exists for All Users",
+      "description": "Ensure A Multi-factor Authentication Policy Exists for All Users",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.4",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure Multi-factor Authentication is Required for Risky Sign-ins",
+      "description": "Ensure Multi-factor Authentication is Required for Risky Sign-ins",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.5",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure modern authentication for SharePoint applications is required",
+      "description": "Ensure modern authentication for SharePoint applications is required",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.6",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure Sign-in frequency is enabled and browser sessions are not persistent",
+      "description": "Ensure Sign-in frequency is enabled and browser sessions are not persistent",
+      "weight": 1
+    },
+    {
+      "control_id": "1.1.7",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure 'LinkedIn account connections' is disabled",
+      "description": "Ensure 'LinkedIn account connections' is disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.1",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure modern authentication for Exchange Online is enabled",
+      "description": "Ensure modern authentication for Exchange Online is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2.2",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure modern authentication for Skype for Business Online is enabled",
+      "description": "Ensure modern authentication for Skype for Business Online is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3.1",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure 'User consent for applications' is set to 'Do not allow user consent'",
+      "description": "Ensure 'User consent for applications' is set to 'Do not allow user consent'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3.2",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure 'User consent for applications' is set to 'Allow for Verified Publishers'",
+      "description": "Ensure 'User consent for applications' is set to 'Allow for Verified Publishers'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4.1",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure 'Self-service password reset enabled' is set to 'All'",
+      "description": "Ensure 'Self-service password reset enabled' is set to 'All'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4.2",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure 'Number of methods required to reset' is set to '2'",
+      "description": "Ensure 'Number of methods required to reset' is set to '2'",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Account / Authentication Policies",
+      "title": "Ensure that account 'Lockout Threshold' is less than or equal to 10",
+      "description": "Ensure that account 'Lockout Threshold' is less than or equal to 10",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Application Permissions",
+      "title": "Application Permissions",
+      "description": "Application Permissions",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1.1",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure Microsoft Defender for Office 365 Safe Links policies are configured",
+      "description": "Ensure Microsoft Defender for Office 365 Safe Links policies are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.2",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure Microsoft Defender for Office 365 Safe Attachments policies are configured",
+      "description": "Ensure Microsoft Defender for Office 365 Safe Attachments policies are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.3",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure Anti-Phishing Policy is configured",
+      "description": "Ensure Anti-Phishing Policy is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.4",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure DKIM is enabled for all Exchange Online Domains",
+      "description": "Ensure DKIM is enabled for all Exchange Online Domains",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.5",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure SPF records are published for all Exchange Domains",
+      "description": "Ensure SPF records are published for all Exchange Domains",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.6",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure DMARC Records for all Exchange Online domains are published",
+      "description": "Ensure DMARC Records for all Exchange Online domains are published",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.7",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure that an anti-malware policy is enabled",
+      "description": "Ensure that an anti-malware policy is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.8",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure Common Attachment Types Filter is enabled",
+      "description": "Ensure Common Attachment Types Filter is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.9",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure Outbound Spam policy notifications are enabled",
+      "description": "Ensure Outbound Spam policy notifications are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.1.10",
+      "parent": "2",
+      "domain": "Application Permissions",
+      "title": "Ensure auditing of Connection Filter Policy is enabled",
+      "description": "Ensure auditing of Connection Filter Policy is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Data Management",
+      "title": "Data Management",
+      "description": "Data Management",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1.1",
+      "parent": "3",
+      "domain": "Data Management",
+      "title": "Ensure Microsoft 365 audit log search is Enabled",
+      "description": "Ensure Microsoft 365 audit log search is Enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.1.2",
+      "parent": "3",
+      "domain": "Data Management",
+      "title": "Ensure mailbox auditing is Enabled for all user mailboxes",
+      "description": "Ensure mailbox auditing is Enabled for all user mailboxes",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2.1",
+      "parent": "3",
+      "domain": "Data Management",
+      "title": "Ensure DLP policies are enabled for Exchange Online",
+      "description": "Ensure DLP policies are enabled for Exchange Online",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2.2",
+      "parent": "3",
+      "domain": "Data Management",
+      "title": "Ensure DLP policies are enabled for SharePoint Online and OneDrive",
+      "description": "Ensure DLP policies are enabled for SharePoint Online and OneDrive",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Data Management",
+      "title": "Ensure SharePoint Online Information Protection policies are set up and used",
+      "description": "Ensure SharePoint Online Information Protection policies are set up and used",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Email Security / Exchange Online",
+      "title": "Email Security / Exchange Online",
+      "description": "Email Security / Exchange Online",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure 'External In Outlook' setting is Enabled",
+      "description": "Ensure 'External In Outlook' setting is Enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure Mail Forwarding rules to external domains are restricted",
+      "description": "Ensure Mail Forwarding rules to external domains are restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure mail transport rules do not whitelist specific domains",
+      "description": "Ensure mail transport rules do not whitelist specific domains",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure mail transport rules do not forward email to external domains",
+      "description": "Ensure mail transport rules do not forward email to external domains",
+      "weight": 1
+    },
+    {
+      "control_id": "4.5",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure the 'Spoofed senders' policy is enabled",
+      "description": "Ensure the 'Spoofed senders' policy is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.6",
+      "parent": "4",
+      "domain": "Email Security / Exchange Online",
+      "title": "Ensure no mailboxes have Auto-Forward enabled",
+      "description": "Ensure no mailboxes have Auto-Forward enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Auditing / Logging",
+      "title": "Auditing / Logging",
+      "description": "Auditing / Logging",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1.1",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure Azure AD Sign-In log alerts are configured",
+      "description": "Ensure Azure AD Sign-In log alerts are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.2",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure 'Privileged role assignment' alert is configured",
+      "description": "Ensure 'Privileged role assignment' alert is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.3",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure 'Risky sign-in' alerts are configured",
+      "description": "Ensure 'Risky sign-in' alerts are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.4",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure 'User risk' alerts are configured",
+      "description": "Ensure 'User risk' alerts are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.5",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure unified audit log retention policy is configured",
+      "description": "Ensure unified audit log retention policy is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "5.1.6",
+      "parent": "5",
+      "domain": "Auditing / Logging",
+      "title": "Ensure that auditing is enabled for Microsoft 365 services",
+      "description": "Ensure that auditing is enabled for Microsoft 365 services",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Storage / SharePoint Online",
+      "title": "Storage / SharePoint Online",
+      "description": "Storage / SharePoint Online",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure external file sharing is restricted in SharePoint Online",
+      "description": "Ensure external file sharing is restricted in SharePoint Online",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure Anonymous links expire within X days",
+      "description": "Ensure Anonymous links expire within X days",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure 'Allow members to share' setting matches policy",
+      "description": "Ensure 'Allow members to share' setting matches policy",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure default link permission is 'View'",
+      "description": "Ensure default link permission is 'View'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.5",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure OneDrive sync is restricted to Domain-joined devices",
+      "description": "Ensure OneDrive sync is restricted to Domain-joined devices",
+      "weight": 1
+    },
+    {
+      "control_id": "6.6",
+      "parent": "6",
+      "domain": "Storage / SharePoint Online",
+      "title": "Ensure files are blocked from being downloaded to non-managed devices",
+      "description": "Ensure files are blocked from being downloaded to non-managed devices",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Microsoft Teams",
+      "title": "Microsoft Teams",
+      "description": "Microsoft Teams",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "Microsoft Teams",
+      "title": "Ensure external access is restricted to allowed domains",
+      "description": "Ensure external access is restricted to allowed domains",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "Microsoft Teams",
+      "title": "Ensure guest access is configured per policy",
+      "description": "Ensure guest access is configured per policy",
+      "weight": 1
+    },
+    {
+      "control_id": "7.3",
+      "parent": "7",
+      "domain": "Microsoft Teams",
+      "title": "Ensure communication settings are configured per policy",
+      "description": "Ensure communication settings are configured per policy",
+      "weight": 1
+    },
+    {
+      "control_id": "7.4",
+      "parent": "7",
+      "domain": "Microsoft Teams",
+      "title": "Ensure file storage settings are configured per policy",
+      "description": "Ensure file storage settings are configured per policy",
+      "weight": 1
+    },
+    {
+      "control_id": "7.5",
+      "parent": "7",
+      "domain": "Microsoft Teams",
+      "title": "Ensure third-party app installation is restricted",
+      "description": "Ensure third-party app installation is restricted",
+      "weight": 1
+    }
+  ]
+}

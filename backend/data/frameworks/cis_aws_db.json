@@ -1,0 +1,359 @@
+{
+  "framework": "cis_aws_db",
+  "version": "2.0.0",
+  "source": "https://www.cisecurity.org/benchmark/amazon_web_services",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Amazon Aurora / RDS",
+      "title": "Amazon Aurora / RDS",
+      "description": "Amazon Aurora / RDS",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS encryption-at-rest is enabled",
+      "description": "Ensure RDS encryption-at-rest is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS instances are not publicly accessible",
+      "description": "Ensure RDS instances are not publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS automated backups are enabled",
+      "description": "Ensure RDS automated backups are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS backup retention is 7+ days",
+      "description": "Ensure RDS backup retention is 7+ days",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS minor version auto-upgrade is enabled",
+      "description": "Ensure RDS minor version auto-upgrade is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS Multi-AZ is enabled for production workloads",
+      "description": "Ensure RDS Multi-AZ is enabled for production workloads",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS deletion protection is enabled",
+      "description": "Ensure RDS deletion protection is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS Performance Insights is enabled",
+      "description": "Ensure RDS Performance Insights is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.9",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure IAM database authentication is enabled where supported",
+      "description": "Ensure IAM database authentication is enabled where supported",
+      "weight": 1
+    },
+    {
+      "control_id": "1.10",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS Audit Logs are exported to CloudWatch",
+      "description": "Ensure RDS Audit Logs are exported to CloudWatch",
+      "weight": 1
+    },
+    {
+      "control_id": "1.11",
+      "parent": "1",
+      "domain": "Amazon Aurora / RDS",
+      "title": "Ensure RDS instances use KMS CMKs (not AWS-managed default keys) for encryption",
+      "description": "Ensure RDS instances use KMS CMKs (not AWS-managed default keys) for encryption",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Amazon DynamoDB",
+      "title": "Amazon DynamoDB",
+      "description": "Amazon DynamoDB",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1",
+      "parent": "2",
+      "domain": "Amazon DynamoDB",
+      "title": "Ensure DynamoDB encryption-at-rest is enabled with KMS CMK",
+      "description": "Ensure DynamoDB encryption-at-rest is enabled with KMS CMK",
+      "weight": 1
+    },
+    {
+      "control_id": "2.2",
+      "parent": "2",
+      "domain": "Amazon DynamoDB",
+      "title": "Ensure DynamoDB Point-in-Time Recovery is enabled",
+      "description": "Ensure DynamoDB Point-in-Time Recovery is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2.3",
+      "parent": "2",
+      "domain": "Amazon DynamoDB",
+      "title": "Ensure DynamoDB tables are not publicly accessible via VPC endpoint policy",
+      "description": "Ensure DynamoDB tables are not publicly accessible via VPC endpoint policy",
+      "weight": 1
+    },
+    {
+      "control_id": "2.4",
+      "parent": "2",
+      "domain": "Amazon DynamoDB",
+      "title": "Ensure DynamoDB streams are encrypted",
+      "description": "Ensure DynamoDB streams are encrypted",
+      "weight": 1
+    },
+    {
+      "control_id": "2.5",
+      "parent": "2",
+      "domain": "Amazon DynamoDB",
+      "title": "Ensure DynamoDB Continuous Backups are enabled",
+      "description": "Ensure DynamoDB Continuous Backups are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Amazon DocumentDB",
+      "title": "Amazon DocumentDB",
+      "description": "Amazon DocumentDB",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "Amazon DocumentDB",
+      "title": "Ensure DocumentDB encryption-at-rest is enabled",
+      "description": "Ensure DocumentDB encryption-at-rest is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "Amazon DocumentDB",
+      "title": "Ensure DocumentDB audit logging is enabled",
+      "description": "Ensure DocumentDB audit logging is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Amazon DocumentDB",
+      "title": "Ensure DocumentDB cluster is not publicly accessible",
+      "description": "Ensure DocumentDB cluster is not publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "Amazon DocumentDB",
+      "title": "Ensure DocumentDB has automated snapshots enabled",
+      "description": "Ensure DocumentDB has automated snapshots enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Amazon Redshift",
+      "title": "Amazon Redshift",
+      "description": "Amazon Redshift",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift cluster encryption is enabled",
+      "description": "Ensure Redshift cluster encryption is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift cluster is not publicly accessible",
+      "description": "Ensure Redshift cluster is not publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift audit logging is enabled",
+      "description": "Ensure Redshift audit logging is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift automated snapshots are enabled with retention >= 7 days",
+      "description": "Ensure Redshift automated snapshots are enabled with retention >= 7 days",
+      "weight": 1
+    },
+    {
+      "control_id": "4.5",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift requires SSL connections",
+      "description": "Ensure Redshift requires SSL connections",
+      "weight": 1
+    },
+    {
+      "control_id": "4.6",
+      "parent": "4",
+      "domain": "Amazon Redshift",
+      "title": "Ensure Redshift uses VPC enhanced routing",
+      "description": "Ensure Redshift uses VPC enhanced routing",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Amazon ElastiCache",
+      "title": "Amazon ElastiCache",
+      "description": "Amazon ElastiCache",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1",
+      "parent": "5",
+      "domain": "Amazon ElastiCache",
+      "title": "Ensure ElastiCache for Redis encryption-at-rest is enabled",
+      "description": "Ensure ElastiCache for Redis encryption-at-rest is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2",
+      "parent": "5",
+      "domain": "Amazon ElastiCache",
+      "title": "Ensure ElastiCache for Redis encryption-in-transit is enabled",
+      "description": "Ensure ElastiCache for Redis encryption-in-transit is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5.3",
+      "parent": "5",
+      "domain": "Amazon ElastiCache",
+      "title": "Ensure ElastiCache for Redis AUTH token is set",
+      "description": "Ensure ElastiCache for Redis AUTH token is set",
+      "weight": 1
+    },
+    {
+      "control_id": "5.4",
+      "parent": "5",
+      "domain": "Amazon ElastiCache",
+      "title": "Ensure ElastiCache automatic failover is enabled",
+      "description": "Ensure ElastiCache automatic failover is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5.5",
+      "parent": "5",
+      "domain": "Amazon ElastiCache",
+      "title": "Ensure ElastiCache automatic backups are enabled",
+      "description": "Ensure ElastiCache automatic backups are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Amazon Neptune",
+      "title": "Amazon Neptune",
+      "description": "Amazon Neptune",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Amazon Neptune",
+      "title": "Ensure Neptune encryption-at-rest is enabled",
+      "description": "Ensure Neptune encryption-at-rest is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Amazon Neptune",
+      "title": "Ensure Neptune cluster is not publicly accessible",
+      "description": "Ensure Neptune cluster is not publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Amazon Neptune",
+      "title": "Ensure Neptune IAM authentication is enabled",
+      "description": "Ensure Neptune IAM authentication is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Amazon Neptune",
+      "title": "Ensure Neptune audit logging is exported to CloudWatch",
+      "description": "Ensure Neptune audit logging is exported to CloudWatch",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Amazon Timestream",
+      "title": "Amazon Timestream",
+      "description": "Amazon Timestream",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "Amazon Timestream",
+      "title": "Ensure Timestream tables use customer-managed KMS keys",
+      "description": "Ensure Timestream tables use customer-managed KMS keys",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "Amazon Timestream",
+      "title": "Ensure Timestream magnetic store writes are configured with appropriate retention",
+      "description": "Ensure Timestream magnetic store writes are configured with appropriate retention",
+      "weight": 1
+    }
+  ]
+}

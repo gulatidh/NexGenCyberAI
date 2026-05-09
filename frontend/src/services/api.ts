@@ -132,6 +132,13 @@ export const frameworksApi = {
     apiClient.delete(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}/override`),
   recompute: (clientId: string, framework: string) =>
     apiClient.post(`/clients/${clientId}/frameworks/${framework}/recompute/`).then((r) => r.data),
+  importControls: (framework: string, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return apiClient
+      .post(`/frameworks/${framework}/import/`, fd, { headers: { "Content-Type": "multipart/form-data" } })
+      .then((r) => r.data);
+  },
 };
 
 export const assetsApi = {
