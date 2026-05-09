@@ -8,7 +8,7 @@ import {
 import {
   Dashboard, People, Cable, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
-  BarChart, SettingsSuggest, Menu as MenuIcon,
+  BarChart, SettingsSuggest, Menu as MenuIcon, Storage,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import NotificationBell from "./NotificationBell";
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Scans", icon: <BugReport />, path: "/scans" },
   { label: "Findings", icon: <Security />, path: "/findings" },
   { label: "Risk Register", icon: <Assessment />, path: "/risks" },
+  { label: "Asset Inventory", icon: <Storage />, path: "/assets" },
   { label: "Frameworks", icon: <Policy />, path: "/frameworks" },
   { label: "AI Agents", icon: <SmartToy />, path: "/agents" },
   { label: "Reports", icon: <BarChart />, path: "/reports" },

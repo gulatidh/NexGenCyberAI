@@ -115,3 +115,18 @@ export const aiApi = {
 export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
 };
+
+export const assetsApi = {
+  list: (clientId: string, params?: Record<string, any>) =>
+    apiClient.get(`/clients/${clientId}/assets/`, { params }).then((r) => r.data),
+  facets: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/assets/facets`).then((r) => r.data),
+  get: (clientId: string, assetId: string) =>
+    apiClient.get(`/clients/${clientId}/assets/${assetId}`).then((r) => r.data),
+  sync: (clientId: string, connectorId?: string) =>
+    apiClient
+      .post(`/clients/${clientId}/assets/sync/`, null, { params: connectorId ? { connector_id: connectorId } : {} })
+      .then((r) => r.data),
+  scan: (clientId: string, assetId: string) =>
+    apiClient.post(`/clients/${clientId}/assets/${assetId}/scan/`).then((r) => r.data),
+};

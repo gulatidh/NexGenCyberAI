@@ -1,5 +1,5 @@
 """Connector management endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import json
@@ -9,6 +9,7 @@ from db.database import get_db
 from core.security import get_current_user
 from core.encryption import encrypt, decrypt
 from connectors.factory import get_connector
+from connectors.sync import sync_connector_assets_bg
 
 router = APIRouter(prefix="/clients/{client_id}/connectors", tags=["connectors"])
 
@@ -22,6 +23,7 @@ async def list_connectors(client_id: str, db: Session = Depends(get_db), _=Depen
 async def create_connector(
     client_id: str,
     payload: ConnectorCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -36,6 +38,7 @@ async def create_connector(
     db.add(connector)
     db.commit()
     db.refresh(connector)
+    background_tasks.add_task(sync_connector_assets_bg, connector.id)
     return connector
 
 
@@ -51,6 +54,7 @@ async def get_connector_detail(client_id: str, connector_id: str, db: Session = 
 async def test_connector(
     client_id: str,
     connector_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -64,6 +68,8 @@ async def test_connector(
     c.status = ConnectorStatus.ACTIVE if result.success else ConnectorStatus.ERROR
     c.error_message = None if result.success else result.message
     db.commit()
+    if result.success:
+        background_tasks.add_task(sync_connector_assets_bg, c.id)
     return {"success": result.success, "message": result.message, "details": result.details}
 
 

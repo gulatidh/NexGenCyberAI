@@ -3,7 +3,7 @@ NexGenCyberAI - SQLAlchemy ORM models (all tables).
 """
 from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, Text, ForeignKey,
-    Enum as SAEnum, JSON, Float
+    Enum as SAEnum, JSON, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -85,6 +85,11 @@ class AgentType(str, enum.Enum):
     REMEDIATION = "remediation"
     ORCHESTRATOR = "orchestrator"
 
+class AssetStatus(str, enum.Enum):
+    ACTIVE = "active"
+    STALE = "stale"
+    DELETED = "deleted"
+
 
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
@@ -127,6 +132,7 @@ class Connector(Base):
 
     client = relationship("Client", back_populates="connectors")
     scans = relationship("Scan", back_populates="connector")
+    assets = relationship("Asset", back_populates="connector", cascade="all, delete-orphan")
 
 
 class Scan(Base):
@@ -212,6 +218,33 @@ class FrameworkAssessment(Base):
     assessed_at = Column(DateTime(timezone=True), server_default=func.now())
 
     client = relationship("Client", back_populates="framework_assessments")
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+    __table_args__ = (
+        UniqueConstraint("connector_id", "external_id", name="uq_asset_connector_external"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    connector_id = Column(String(36), ForeignKey("connectors.id"), nullable=False, index=True)
+    external_id = Column(String(512), nullable=False)
+    name = Column(String(255), nullable=False)
+    asset_type = Column(String(128))             # provider-native (e.g. Microsoft.Compute/virtualMachines)
+    asset_class = Column(String(64), index=True) # vm | storage | network | database | identity | keyvault | other
+    region = Column(String(64))
+    subscription_id = Column(String(64))         # Azure
+    resource_group = Column(String(128))         # Azure
+    account_id = Column(String(64))              # AWS
+    project_id = Column(String(64))              # GCP
+    tags = Column(JSON, default={})
+    provider_metadata = Column(JSON, default={})
+    status = Column(SAEnum(AssetStatus, values_callable=_ev), default=AssetStatus.ACTIVE)
+    first_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_synced_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    connector = relationship("Connector", back_populates="assets")
 
 
 class AgentRun(Base):

@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
-    ScanStatus, Severity, RiskLevel, AgentType
+    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus
 )
 
 
@@ -187,6 +187,39 @@ class AgentRunResponse(BaseModel):
     completed_at: Optional[datetime]
     error_message: Optional[str]
     model_config = {"from_attributes": True}
+
+
+# ── Asset Inventory ────────────────────────────────────────────────────────────
+
+class AssetResponse(BaseModel):
+    id: str
+    client_id: str
+    connector_id: str
+    external_id: str
+    name: str
+    asset_type: Optional[str]
+    asset_class: Optional[str]
+    region: Optional[str]
+    subscription_id: Optional[str]
+    resource_group: Optional[str]
+    account_id: Optional[str]
+    project_id: Optional[str]
+    tags: Optional[Dict[str, Any]] = {}
+    status: AssetStatus
+    first_seen_at: Optional[datetime]
+    last_synced_at: Optional[datetime]
+    open_findings_count: int = 0
+    risks_count: int = 0
+    model_config = {"from_attributes": True}
+
+class AssetDetailResponse(AssetResponse):
+    provider_metadata: Optional[Dict[str, Any]] = {}
+    findings: List[FindingResponse] = []
+    risks: List[RiskResponse] = []
+
+class AssetSyncResponse(BaseModel):
+    queued_connector_ids: List[str]
+    message: str
 
 
 # ── Misc ───────────────────────────────────────────────────────────────────────

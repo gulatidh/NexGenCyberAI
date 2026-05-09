@@ -107,6 +107,36 @@ export interface AIProvider {
   models: string[];
 }
 
+export type AssetStatus = "active" | "stale" | "deleted";
+export type AssetClass = "vm" | "storage" | "network" | "database" | "identity" | "keyvault" | "other";
+
+export interface Asset {
+  id: string;
+  client_id: string;
+  connector_id: string;
+  external_id: string;
+  name: string;
+  asset_type?: string;
+  asset_class?: AssetClass | string;
+  region?: string;
+  subscription_id?: string;
+  resource_group?: string;
+  account_id?: string;
+  project_id?: string;
+  tags?: Record<string, string>;
+  status: AssetStatus;
+  first_seen_at?: string;
+  last_synced_at?: string;
+  open_findings_count: number;
+  risks_count: number;
+}
+
+export interface AssetDetail extends Asset {
+  provider_metadata?: Record<string, any>;
+  findings: Finding[];
+  risks: Risk[];
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;

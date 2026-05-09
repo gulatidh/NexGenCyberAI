@@ -1,7 +1,7 @@
 """Scan management and execution endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 import json
 from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
@@ -10,6 +10,7 @@ from db.database import get_db
 from core.security import get_current_user
 from core.encryption import decrypt
 from connectors.factory import get_connector
+from connectors.sync import sync_connector_assets
 
 router = APIRouter(prefix="/clients/{client_id}/scans", tags=["scans"])
 _orchestrator = None
@@ -23,8 +24,12 @@ def _get_orchestrator():
     return _orchestrator
 
 
-async def _execute_scan(scan_id: str, db_url: str):
-    """Background task: run the scan and populate findings."""
+async def _execute_scan(scan_id: str, db_url: str, asset_external_id: Optional[str] = None):
+    """Background task: run the scan and populate findings.
+
+    If `asset_external_id` is set, refresh inventory then post-filter the connector's
+    findings to those whose resource_id matches that asset (case-insensitive).
+    """
     from db.database import SessionLocal
     from api.models.models import Client, ScanType
     db = SessionLocal()
@@ -41,6 +46,14 @@ async def _execute_scan(scan_id: str, db_url: str):
         if scan.connector_id:
             connector_db = db.query(Connector).filter(Connector.id == scan.connector_id).first()
             if connector_db:
+                # Refresh asset inventory before the scan so findings join to fresh assets.
+                try:
+                    await sync_connector_assets(db, connector_db)
+                except Exception as exc:
+                    logger_msg = f"Pre-scan asset sync failed for connector {connector_db.id}: {exc}"
+                    import logging as _lg
+                    _lg.getLogger(__name__).warning(logger_msg)
+
                 creds = json.loads(decrypt(connector_db.credentials_enc))
                 connector = get_connector(connector_db.connector_type, creds, connector_db.config or {})
                 if scan.scan_type in ("vulnerability", "full"):
@@ -49,6 +62,14 @@ async def _execute_scan(scan_id: str, db_url: str):
                 if scan.scan_type in ("configuration", "compliance", "full"):
                     config_findings = await connector.run_configuration_review()
                     all_findings.extend(config_findings)
+
+        if asset_external_id:
+            target = asset_external_id.lower()
+            all_findings = [
+                f for f in all_findings
+                if (f.resource_id or "").lower() == target
+                or target in (f.resource_id or "").lower()
+            ]
 
         # Persist raw findings
         for f in all_findings:
