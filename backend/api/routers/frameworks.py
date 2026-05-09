@@ -360,7 +360,11 @@ async def recompute_framework(
     _=Depends(get_current_user),
 ):
     fw = _coerce_framework(framework)
-    counts = recompute_client_framework(db, client_id, fw)
+    try:
+        counts = recompute_client_framework(db, client_id, fw)
+    except Exception as exc:
+        logger.exception("Recompute failed for client=%s framework=%s", client_id, fw.value)
+        raise HTTPException(status_code=500, detail=f"Recompute failed: {type(exc).__name__}: {exc}")
     return {"framework": fw.value, "counts": counts}
 
 
