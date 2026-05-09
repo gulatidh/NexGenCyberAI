@@ -79,6 +79,10 @@ class ScanCreate(BaseModel):
     connector_id: Optional[str] = None
     scan_type: ScanType
     framework: Optional[FrameworkType] = None
+    # Optional list of catalog control_ids to scope the scan to. When set, the
+    # connector still runs full discovery but persisted findings are filtered to
+    # those whose control_mappings[framework] (or normalized control_id) intersects.
+    control_ids: Optional[List[str]] = None
 
 class ScanResponse(BaseModel):
     id: str

@@ -4,12 +4,14 @@ import {
   FormControl, InputLabel, Select, MenuItem, Alert, TextField,
   Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
+  FormControlLabel,
 } from "@mui/material";
-import { ExpandMore, Refresh, Close, RestartAlt, UploadFile } from "@mui/icons-material";
+import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, frameworksApi } from "../services/api";
+import { clientsApi, connectorsApi, frameworksApi, scansApi } from "../services/api";
 import {
-  Client, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
+  Client, Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
   FrameworkDetail,
 } from "../types";
 import dayjs from "dayjs";
@@ -61,6 +63,12 @@ export default function Frameworks() {
   const [evidenceDraft, setEvidenceDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Scan dialog state
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanConnectorId, setScanConnectorId] = useState("");
+  const [scanScope, setScanScope] = useState<"full" | "failing" | "custom">("full");
+  const [scanCustomIds, setScanCustomIds] = useState("");
+
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
     queryKey: ["framework-catalog"],
@@ -101,6 +109,48 @@ export default function Frameworks() {
       qc.invalidateQueries({ queryKey: ["framework-catalog"] });
     },
   });
+
+  const { data: connectors = [] } = useQuery<Connector[]>({
+    queryKey: ["connectors", clientId],
+    queryFn: () => connectorsApi.list(clientId),
+    enabled: !!clientId,
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: (body: { connector_id?: string; framework: string; control_ids?: string[] }) =>
+      scansApi.startFrameworkScan(clientId, body),
+    onSuccess: () => {
+      // Compliance recompute fires once the scan finishes; refetch a few times.
+      [4000, 12000, 30000].forEach((ms) =>
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] }), ms),
+      );
+      setScanOpen(false);
+    },
+  });
+
+  const failingControlIds = useMemo(() => {
+    if (!detail) return [];
+    return detail.controls
+      .filter((c) => c.control.weight > 0 && (c.status === "non_compliant" || c.status === "partial"))
+      .map((c) => c.control.control_id);
+  }, [detail]);
+
+  const submitScan = () => {
+    let control_ids: string[] | undefined;
+    if (scanScope === "failing") {
+      control_ids = failingControlIds;
+    } else if (scanScope === "custom") {
+      control_ids = scanCustomIds
+        .split(/[\s,;\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    scanMutation.mutate({
+      framework,
+      connector_id: scanConnectorId || undefined,
+      control_ids,
+    });
+  };
 
   const grouped = useMemo(() => {
     if (!detail) return new Map<string, ControlStatusEntry[]>();
@@ -152,6 +202,12 @@ export default function Frameworks() {
               ))}
             </Select>
           </FormControl>
+          <Button variant="contained" startIcon={<PlayArrow />}
+            disabled={!clientId || !framework || scanMutation.isPending}
+            onClick={() => { setScanOpen(true); setScanConnectorId(""); setScanScope("full"); setScanCustomIds(""); }}
+            sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            Scan
+          </Button>
           <Button variant="outlined" startIcon={<Refresh />}
             disabled={!clientId || !framework || recomputeMutation.isPending}
             onClick={() => recomputeMutation.mutate()}
@@ -310,6 +366,78 @@ export default function Frameworks() {
           )}
         </>
       ) : null}
+
+      {scanMutation.isSuccess && (
+        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(0,229,255,0.1)", color: "white" }}
+          onClose={() => scanMutation.reset()}>
+          Scan started. Compliance status will refresh automatically when it completes.
+        </Alert>
+      )}
+
+      {/* Scan dialog */}
+      <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          Scan against framework
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+            Run a connector scan and update compliance for {framework ? framework.replace(/_/g, " ").toUpperCase() : ""}.
+          </Typography>
+
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+            <Select value={scanConnectorId} onChange={(e) => setScanConnectorId(e.target.value)} label="Connector"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              {connectors.length === 0 && <MenuItem value="" disabled>No connectors configured</MenuItem>}
+              {connectors.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name} ({c.connector_type})</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+            Scope
+          </Typography>
+          <RadioGroup value={scanScope} onChange={(e) => setScanScope(e.target.value as any)} sx={{ mb: 1 }}>
+            <FormControlLabel value="full" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+              label={<span style={{ color: "white" }}>Full framework — every control in the catalog</span>} />
+            <FormControlLabel value="failing" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+              label={<span style={{ color: "white" }}>Failing only — re-scan the {failingControlIds.length} non-compliant / partial controls</span>}
+              disabled={failingControlIds.length === 0} />
+            <FormControlLabel value="custom" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+              label={<span style={{ color: "white" }}>Custom — specific control IDs</span>} />
+          </RadioGroup>
+
+          {scanScope === "custom" && (
+            <TextField multiline rows={3} fullWidth value={scanCustomIds}
+              onChange={(e) => setScanCustomIds(e.target.value)}
+              placeholder="e.g. 1.1.1, 3.5, 6.2  (comma, space, or newline separated)"
+              sx={{
+                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
+                "& textarea::placeholder": { color: "rgba(255,255,255,0.4)" },
+              }} />
+          )}
+
+          {scanMutation.isError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {(scanMutation.error as any)?.response?.data?.detail || (scanMutation.error as any)?.message || "Scan failed to start"}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+          <Button onClick={() => setScanOpen(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>Cancel</Button>
+          <Button onClick={submitScan}
+            variant="contained"
+            disabled={!scanConnectorId || scanMutation.isPending ||
+              (scanScope === "custom" && !scanCustomIds.trim()) ||
+              (scanScope === "failing" && failingControlIds.length === 0)}
+            startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
+            sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            Start Scan
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Detail drawer */}
       <Drawer anchor="right" open={!!selected} onClose={() => setSelected(null)}

@@ -25,11 +25,18 @@ def _get_orchestrator():
     return _orchestrator
 
 
-async def _execute_scan(scan_id: str, db_url: str, asset_external_id: Optional[str] = None):
+async def _execute_scan(
+    scan_id: str,
+    db_url: str,
+    asset_external_id: Optional[str] = None,
+    control_id_filter: Optional[List[str]] = None,
+):
     """Background task: run the scan and populate findings.
 
-    If `asset_external_id` is set, refresh inventory then post-filter the connector's
-    findings to those whose resource_id matches that asset (case-insensitive).
+    Optional filters (all additive — a finding must pass every filter that's set):
+      - asset_external_id: keep only findings whose resource_id matches the asset
+      - control_id_filter: keep only findings whose control_mappings[scan.framework]
+        or normalized control_id intersects this list (used by framework-scoped scans)
     """
     from db.database import SessionLocal
     from api.models.models import Client, ScanType
@@ -71,6 +78,25 @@ async def _execute_scan(scan_id: str, db_url: str, asset_external_id: Optional[s
                 if (f.resource_id or "").lower() == target
                 or target in (f.resource_id or "").lower()
             ]
+
+        if control_id_filter:
+            from services.compliance import _normalize as _norm_ctrl
+            wanted = {_norm_ctrl(c) for c in control_id_filter if c}
+            fw_value = scan.framework.value if hasattr(scan.framework, "value") else (scan.framework or "")
+
+            def _matches(f) -> bool:
+                # Direct control_id match (after normalize)
+                if f.control_id and _norm_ctrl(f.control_id) in wanted:
+                    return True
+                # Cross-framework mapping
+                mappings = getattr(f, "control_mappings", {}) or {}
+                if fw_value and isinstance(mappings, dict):
+                    for cid in mappings.get(fw_value, []) or []:
+                        if cid and _norm_ctrl(cid) in wanted:
+                            return True
+                return False
+
+            all_findings = [f for f in all_findings if _matches(f)]
 
         # Persist raw findings
         for f in all_findings:
@@ -179,7 +205,9 @@ async def start_scan(
     db.commit()
     db.refresh(scan)
     from core.config import get_settings
-    background_tasks.add_task(_execute_scan, scan.id, get_settings().DATABASE_URL)
+    background_tasks.add_task(
+        _execute_scan, scan.id, get_settings().DATABASE_URL, None, payload.control_ids,
+    )
     return scan
 
 
