@@ -90,6 +90,12 @@ class AssetStatus(str, enum.Enum):
     STALE = "stale"
     DELETED = "deleted"
 
+class ControlStatus(str, enum.Enum):
+    COMPLIANT = "compliant"
+    NON_COMPLIANT = "non_compliant"
+    PARTIAL = "partial"
+    NOT_APPLICABLE = "not_applicable"
+
 
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
@@ -113,6 +119,7 @@ class Client(Base):
     scans = relationship("Scan", back_populates="client", cascade="all, delete-orphan")
     risks = relationship("Risk", back_populates="client", cascade="all, delete-orphan")
     framework_assessments = relationship("FrameworkAssessment", back_populates="client")
+    control_statuses = relationship("ClientControlStatus", back_populates="client", cascade="all, delete-orphan")
 
 
 class Connector(Base):
@@ -245,6 +252,48 @@ class Asset(Base):
     last_synced_at = Column(DateTime(timezone=True), server_default=func.now())
 
     connector = relationship("Connector", back_populates="assets")
+
+
+class FrameworkControl(Base):
+    __tablename__ = "framework_controls"
+    __table_args__ = (
+        UniqueConstraint("framework", "control_id", name="uq_framework_control"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev), nullable=False, index=True)
+    control_id = Column(String(64), nullable=False, index=True)
+    parent_control_id = Column(String(64))
+    domain = Column(String(128))
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    weight = Column(Integer, default=1)
+    metadata_ = Column("metadata", JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    statuses = relationship("ClientControlStatus", back_populates="control", cascade="all, delete-orphan")
+
+
+class ClientControlStatus(Base):
+    __tablename__ = "client_control_statuses"
+    __table_args__ = (
+        UniqueConstraint("client_id", "framework_control_id", name="uq_client_control"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    framework_control_id = Column(String(36), ForeignKey("framework_controls.id"), nullable=False, index=True)
+    status = Column(SAEnum(ControlStatus, values_callable=_ev), default=ControlStatus.NOT_APPLICABLE)
+    derived = Column(Boolean, default=True)
+    evidence = Column(Text)
+    derived_finding_ids = Column(JSON, default=[])
+    last_evaluated_at = Column(DateTime(timezone=True), server_default=func.now())
+    overridden_by = Column(String(200))
+    overridden_at = Column(DateTime(timezone=True))
+
+    client = relationship("Client", back_populates="control_statuses")
+    control = relationship("FrameworkControl", back_populates="statuses")
 
 
 class AgentRun(Base):

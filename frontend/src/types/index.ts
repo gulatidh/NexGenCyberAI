@@ -107,6 +107,62 @@ export interface AIProvider {
   models: string[];
 }
 
+export type ControlStatus = "compliant" | "non_compliant" | "partial" | "not_applicable";
+
+export interface FrameworkControl {
+  id: string;
+  framework: FrameworkType;
+  control_id: string;
+  parent_control_id?: string;
+  domain?: string;
+  title: string;
+  description?: string;
+  weight: number;
+}
+
+export interface ControlStatusEntry {
+  control: FrameworkControl;
+  status: ControlStatus;
+  derived: boolean;
+  evidence?: string;
+  last_evaluated_at?: string;
+  overridden_by?: string;
+  overridden_at?: string;
+  finding_ids: string[];
+}
+
+export interface FrameworkSummary {
+  framework: FrameworkType;
+  total: number;
+  compliant: number;
+  non_compliant: number;
+  partial: number;
+  not_applicable: number;
+  score: number;
+  last_evaluated_at?: string;
+}
+
+export interface FrameworkCatalogEntry {
+  framework: FrameworkType;
+  name: string;
+  version?: string;
+  total_controls: number;
+}
+
+export interface FrameworkDetail {
+  framework: FrameworkType;
+  summary: {
+    total: number;
+    compliant: number;
+    non_compliant: number;
+    partial: number;
+    not_applicable: number;
+    score: number;
+    last_evaluated_at?: string;
+  };
+  controls: ControlStatusEntry[];
+}
+
 export type AssetStatus = "active" | "stale" | "deleted";
 export type AssetClass = "vm" | "storage" | "network" | "database" | "identity" | "keyvault" | "other";
 

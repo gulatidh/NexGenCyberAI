@@ -20,6 +20,7 @@ import Findings from "./pages/Findings";
 import Risks from "./pages/Risks";
 import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
+import Frameworks from "./pages/Frameworks";
 
 const darkTheme = createTheme({
   palette: {
@@ -84,7 +85,7 @@ export default function App() {
                   <Route path="/risks" element={<Risks />} />
                   <Route path="/assets" element={<Assets />} />
                   <Route path="/assets/:assetId" element={<AssetDetail />} />
-                  <Route path="/frameworks" element={<div style={{ color: "white", padding: 24 }}>Frameworks</div>} />
+                  <Route path="/frameworks" element={<Frameworks />} />
                   <Route path="/agents" element={<Agents />} />
                   <Route path="/reports" element={<div style={{ color: "white", padding: 24 }}>Reports</div>} />
                   <Route path="/ai-settings" element={<AISettings />} />

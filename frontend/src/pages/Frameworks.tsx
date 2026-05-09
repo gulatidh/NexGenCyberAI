@@ -1,0 +1,365 @@
+import React, { useMemo, useState } from "react";
+import {
+  Box, Typography, Card, Chip, CircularProgress, Button,
+  FormControl, InputLabel, Select, MenuItem, Alert, TextField,
+  Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
+  Table, TableHead, TableRow, TableCell, TableBody, Divider,
+} from "@mui/material";
+import { ExpandMore, Refresh, Close, RestartAlt } from "@mui/icons-material";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { clientsApi, frameworksApi } from "../services/api";
+import {
+  Client, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
+  FrameworkDetail,
+} from "../types";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
+
+const STATUS_COLOR: Record<ControlStatus, string> = {
+  compliant: "#00e676",
+  non_compliant: "#f44336",
+  partial: "#ff9800",
+  not_applicable: "rgba(255,255,255,0.4)",
+};
+const STATUS_LABEL: Record<ControlStatus, string> = {
+  compliant: "Compliant",
+  non_compliant: "Non-compliant",
+  partial: "Partial",
+  not_applicable: "N/A",
+};
+const STATUS_ORDER: ControlStatus[] = ["compliant", "non_compliant", "partial", "not_applicable"];
+
+function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
+  const r = (size - 12) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c - (score / 100) * c;
+  const color = score >= 80 ? "#00e676" : score >= 50 ? "#ff9800" : "#f44336";
+  return (
+    <Box sx={{ position: "relative", width: size, height: size }}>
+      <svg width={size} height={size}>
+        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={10} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={10} fill="none"
+          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
+        <Typography sx={{ color: "white", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{score.toFixed(0)}</Typography>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>SCORE</Typography>
+      </Box>
+    </Box>
+  );
+}
+
+export default function Frameworks() {
+  const qc = useQueryClient();
+  const [clientId, setClientId] = useState("");
+  const [framework, setFramework] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ControlStatus | "">("");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<ControlStatusEntry | null>(null);
+  const [evidenceDraft, setEvidenceDraft] = useState("");
+
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
+    queryKey: ["framework-catalog"],
+    queryFn: frameworksApi.catalog,
+  });
+  const { data: detail, isLoading } = useQuery<FrameworkDetail>({
+    queryKey: ["framework-detail", clientId, framework],
+    queryFn: () => frameworksApi.forClient(clientId, framework),
+    enabled: !!clientId && !!framework,
+  });
+
+  const recomputeMutation = useMutation({
+    mutationFn: () => frameworksApi.recompute(clientId, framework),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] }),
+  });
+
+  const overrideMutation = useMutation({
+    mutationFn: ({ controlId, body }: { controlId: string; body: any }) =>
+      frameworksApi.override(clientId, framework, controlId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+      setSelected(null);
+    },
+  });
+
+  const resetOverrideMutation = useMutation({
+    mutationFn: (controlId: string) => frameworksApi.resetOverride(clientId, framework, controlId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+      setSelected(null);
+    },
+  });
+
+  const grouped = useMemo(() => {
+    if (!detail) return new Map<string, ControlStatusEntry[]>();
+    const out = new Map<string, ControlStatusEntry[]>();
+    for (const item of detail.controls) {
+      // Skip top-level (functions/families/control 1-18) headers in the table — they're the group keys
+      if (item.control.weight === 0) continue;
+      // Filter
+      if (statusFilter && item.status !== statusFilter) continue;
+      if (search) {
+        const s = search.toLowerCase();
+        const hay = `${item.control.control_id} ${item.control.title} ${item.control.description || ""}`.toLowerCase();
+        if (!hay.includes(s)) continue;
+      }
+      const domain = item.control.domain || "Other";
+      if (!out.has(domain)) out.set(domain, []);
+      out.get(domain)!.push(item);
+    }
+    return out;
+  }, [detail, statusFilter, search]);
+
+  const summary = detail?.summary;
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Frameworks</Typography>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+            Compliance posture against industry frameworks
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 240 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+            <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              {catalog.map((f) => (
+                <MenuItem key={f.framework} value={f.framework}>
+                  {f.name} ({f.total_controls})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant="outlined" startIcon={<Refresh />}
+            disabled={!clientId || !framework || recomputeMutation.isPending}
+            onClick={() => recomputeMutation.mutate()}
+            sx={{ borderColor: "#00e5ff", color: "#00e5ff" }}>
+            Recompute
+          </Button>
+        </Box>
+      </Box>
+
+      {!clientId || !framework ? (
+        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>
+          Select a client and a framework to view the control catalog and compliance status.
+        </Alert>
+      ) : isLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#00e5ff" }} /></Box>
+      ) : summary ? (
+        <>
+          {/* Summary banner */}
+          <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
+            display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
+            <ScoreDonut score={summary.score} />
+            <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+              {STATUS_ORDER.map((s) => (
+                <Box key={s}>
+                  <Typography variant="caption" sx={{ color: STATUS_COLOR[s], fontSize: 11, fontWeight: 600 }}>
+                    {STATUS_LABEL[s].toUpperCase()}
+                  </Typography>
+                  <Typography sx={{ color: "white", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
+                    {summary[s as keyof typeof summary] as number}
+                  </Typography>
+                </Box>
+              ))}
+              <Box>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }}>
+                  TOTAL
+                </Typography>
+                <Typography sx={{ color: "white", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
+                  {summary.total}
+                </Typography>
+              </Box>
+            </Box>
+            {summary.last_evaluated_at && (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", ml: "auto" }}>
+                Last evaluated {dayjs(summary.last_evaluated_at).fromNow()}
+              </Typography>
+            )}
+          </Card>
+
+          {/* Filters */}
+          <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+            <Chip label={`All`} size="small" clickable
+              onClick={() => setStatusFilter("")}
+              sx={{ bgcolor: !statusFilter ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
+                color: "white", border: !statusFilter ? "1px solid #00e5ff" : "none" }} />
+            {STATUS_ORDER.map((s) => (
+              <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
+                onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
+                sx={{
+                  bgcolor: `${STATUS_COLOR[s]}${statusFilter === s ? "40" : "20"}`,
+                  color: STATUS_COLOR[s],
+                  border: statusFilter === s ? `1px solid ${STATUS_COLOR[s]}` : "none",
+                }} />
+            ))}
+            <TextField size="small" placeholder="Search controls…" value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ minWidth: 220, ml: "auto",
+                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
+                "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+          </Box>
+
+          {/* Grouped accordions */}
+          {Array.from(grouped.entries()).length === 0 ? (
+            <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No controls match the current filters.</Typography>
+            </Card>
+          ) : (
+            Array.from(grouped.entries()).map(([domain, items]) => {
+              const compl = items.filter((i) => i.status === "compliant").length;
+              return (
+                <Accordion key={domain} defaultExpanded
+                  sx={{ bgcolor: "#161b22", color: "white", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
+                  <AccordionSummary expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}>
+                    <Typography sx={{ flexGrow: 1, fontWeight: 600 }}>{domain}</Typography>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mr: 2 }}>
+                      {compl}/{items.length} compliant
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ p: 0 }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                          <TableCell sx={{ width: 110 }}>CONTROL</TableCell>
+                          <TableCell>TITLE</TableCell>
+                          <TableCell sx={{ width: 130 }}>STATUS</TableCell>
+                          <TableCell sx={{ width: 90 }}>SOURCE</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {items.map((item) => (
+                          <TableRow key={item.control.id}
+                            sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+                              "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                            onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
+                            <TableCell sx={{ color: "#00e5ff", fontFamily: "monospace", fontSize: 12 }}>
+                              {item.control.control_id}
+                            </TableCell>
+                            <TableCell sx={{ color: "white", fontSize: 13, maxWidth: 600 }}>
+                              <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {item.control.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={STATUS_LABEL[item.status]} size="small"
+                                sx={{ bgcolor: `${STATUS_COLOR[item.status]}20`, color: STATUS_COLOR[item.status],
+                                  fontSize: 10, height: 18 }} />
+                            </TableCell>
+                            <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                              {item.derived ? "auto" : "override"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })
+          )}
+        </>
+      ) : null}
+
+      {/* Detail drawer */}
+      <Drawer anchor="right" open={!!selected} onClose={() => setSelected(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#0f1117", color: "white", width: { xs: "100%", sm: 480 }, p: 3 } } }}>
+        {selected && (
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography variant="caption" sx={{ color: "#00e5ff", fontFamily: "monospace" }}>
+                {selected.control.control_id}
+              </Typography>
+              <IconButton onClick={() => setSelected(null)} size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <Close />
+              </IconButton>
+            </Box>
+            <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 1 }}>
+              {selected.control.title}
+            </Typography>
+            <Chip label={selected.control.domain || "—"} size="small"
+              sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#7c4dff", mb: 2 }} />
+
+            {selected.control.description && (
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 3, whiteSpace: "pre-wrap" }}>
+                {selected.control.description}
+              </Typography>
+            )}
+
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+              Status {selected.derived ? "(auto-derived)" : "(manual override)"}
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+              {STATUS_ORDER.map((s) => (
+                <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
+                  onClick={() => overrideMutation.mutate({
+                    controlId: selected.control.control_id,
+                    body: { status: s, evidence: evidenceDraft },
+                  })}
+                  sx={{
+                    bgcolor: selected.status === s ? `${STATUS_COLOR[s]}40` : `${STATUS_COLOR[s]}15`,
+                    color: STATUS_COLOR[s],
+                    border: selected.status === s ? `1px solid ${STATUS_COLOR[s]}` : "none",
+                  }} />
+              ))}
+            </Box>
+
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+              Evidence / notes
+            </Typography>
+            <TextField multiline rows={4} fullWidth value={evidenceDraft}
+              onChange={(e) => setEvidenceDraft(e.target.value)}
+              placeholder="Link to runbook, ticket #, audit evidence, last attestation date, etc."
+              sx={{ mb: 2,
+                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
+                "& textarea::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+
+            {!selected.derived && (
+              <Button startIcon={<RestartAlt />} size="small"
+                onClick={() => resetOverrideMutation.mutate(selected.control.control_id)}
+                sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>
+                Reset to auto-derived
+              </Button>
+            )}
+
+            {selected.overridden_by && (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mb: 2 }}>
+                Overridden by {selected.overridden_by}
+                {selected.overridden_at ? ` ${dayjs(selected.overridden_at).fromNow()}` : ""}
+              </Typography>
+            )}
+
+            {selected.finding_ids?.length ? (
+              <Box>
+                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+                  Linked findings ({selected.finding_ids.length})
+                </Typography>
+                {selected.finding_ids.slice(0, 8).map((fid) => (
+                  <Typography key={fid} variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 11 }}>
+                    {fid.slice(0, 8)}…
+                  </Typography>
+                ))}
+              </Box>
+            ) : null}
+          </Box>
+        )}
+      </Drawer>
+    </Box>
+  );
+}

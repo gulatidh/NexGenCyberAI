@@ -1,0 +1,1375 @@
+{
+  "framework": "cis_v8",
+  "version": "8.1",
+  "source": "https://www.cisecurity.org/controls/v8",
+  "controls": [
+    {
+      "control_id": "CIS-1",
+      "parent": null,
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Inventory and Control of Enterprise Assets",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-1.1",
+      "parent": "CIS-1",
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Establish and Maintain Detailed Enterprise Asset Inventory",
+      "description": "Establish and Maintain Detailed Enterprise Asset Inventory",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-1.2",
+      "parent": "CIS-1",
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Address Unauthorized Assets",
+      "description": "Address Unauthorized Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-1.3",
+      "parent": "CIS-1",
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Utilize an Active Discovery Tool",
+      "description": "Utilize an Active Discovery Tool",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-1.4",
+      "parent": "CIS-1",
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Use Dynamic Host Configuration Protocol (DHCP) Logging to Update Enterprise Asset Inventory",
+      "description": "Use Dynamic Host Configuration Protocol (DHCP) Logging to Update Enterprise Asset Inventory",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-1.5",
+      "parent": "CIS-1",
+      "domain": "Inventory and Control of Enterprise Assets",
+      "title": "Use a Passive Asset Discovery Tool",
+      "description": "Use a Passive Asset Discovery Tool",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2",
+      "parent": null,
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Inventory and Control of Software Assets",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-2.1",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Establish and Maintain a Software Inventory",
+      "description": "Establish and Maintain a Software Inventory",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.2",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Ensure Authorized Software is Currently Supported",
+      "description": "Ensure Authorized Software is Currently Supported",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.3",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Address Unauthorized Software",
+      "description": "Address Unauthorized Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.4",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Utilize Automated Software Inventory Tools",
+      "description": "Utilize Automated Software Inventory Tools",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.5",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Allowlist Authorized Software",
+      "description": "Allowlist Authorized Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.6",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Allowlist Authorized Libraries",
+      "description": "Allowlist Authorized Libraries",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-2.7",
+      "parent": "CIS-2",
+      "domain": "Inventory and Control of Software Assets",
+      "title": "Allowlist Authorized Scripts",
+      "description": "Allowlist Authorized Scripts",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Data Protection",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-3.1",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Establish and Maintain a Data Management Process",
+      "description": "Establish and Maintain a Data Management Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.2",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Establish and Maintain a Data Inventory",
+      "description": "Establish and Maintain a Data Inventory",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.3",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Configure Data Access Control Lists",
+      "description": "Configure Data Access Control Lists",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.4",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Enforce Data Retention",
+      "description": "Enforce Data Retention",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.5",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Securely Dispose of Data",
+      "description": "Securely Dispose of Data",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.6",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Encrypt Data on End-User Devices",
+      "description": "Encrypt Data on End-User Devices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.7",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Establish and Maintain a Data Classification Scheme",
+      "description": "Establish and Maintain a Data Classification Scheme",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.8",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Document Data Flows",
+      "description": "Document Data Flows",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.9",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Encrypt Data on Removable Media",
+      "description": "Encrypt Data on Removable Media",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.10",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Encrypt Sensitive Data in Transit",
+      "description": "Encrypt Sensitive Data in Transit",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.11",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Encrypt Sensitive Data at Rest",
+      "description": "Encrypt Sensitive Data at Rest",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.12",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Segment Data Processing and Storage Based on Sensitivity",
+      "description": "Segment Data Processing and Storage Based on Sensitivity",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.13",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Deploy a Data Loss Prevention Solution",
+      "description": "Deploy a Data Loss Prevention Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-3.14",
+      "parent": "CIS-3",
+      "domain": "Data Protection",
+      "title": "Log Sensitive Data Access",
+      "description": "Log Sensitive Data Access",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4",
+      "parent": null,
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Secure Configuration of Enterprise Assets and Software",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-4.1",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Establish and Maintain a Secure Configuration Process",
+      "description": "Establish and Maintain a Secure Configuration Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.2",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Establish and Maintain a Secure Configuration Process for Network Infrastructure",
+      "description": "Establish and Maintain a Secure Configuration Process for Network Infrastructure",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.3",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Configure Automatic Session Locking on Enterprise Assets",
+      "description": "Configure Automatic Session Locking on Enterprise Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.4",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Implement and Manage a Firewall on Servers",
+      "description": "Implement and Manage a Firewall on Servers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.5",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Implement and Manage a Firewall on End-User Devices",
+      "description": "Implement and Manage a Firewall on End-User Devices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.6",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Securely Manage Enterprise Assets and Software",
+      "description": "Securely Manage Enterprise Assets and Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.7",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Manage Default Accounts on Enterprise Assets and Software",
+      "description": "Manage Default Accounts on Enterprise Assets and Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.8",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Uninstall or Disable Unnecessary Services on Enterprise Assets and Software",
+      "description": "Uninstall or Disable Unnecessary Services on Enterprise Assets and Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.9",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Configure Trusted DNS Servers on Enterprise Assets",
+      "description": "Configure Trusted DNS Servers on Enterprise Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.10",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Enforce Automatic Device Lockout on Portable End-User Devices",
+      "description": "Enforce Automatic Device Lockout on Portable End-User Devices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.11",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Enforce Remote Wipe Capability on Portable End-User Devices",
+      "description": "Enforce Remote Wipe Capability on Portable End-User Devices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-4.12",
+      "parent": "CIS-4",
+      "domain": "Secure Configuration of Enterprise Assets and Software",
+      "title": "Separate Enterprise Workspaces on Mobile End-User Devices",
+      "description": "Separate Enterprise Workspaces on Mobile End-User Devices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5",
+      "parent": null,
+      "domain": "Account Management",
+      "title": "Account Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-5.1",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Establish and Maintain an Inventory of Accounts",
+      "description": "Establish and Maintain an Inventory of Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5.2",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Use Unique Passwords",
+      "description": "Use Unique Passwords",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5.3",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Disable Dormant Accounts",
+      "description": "Disable Dormant Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5.4",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Restrict Administrator Privileges to Dedicated Administrator Accounts",
+      "description": "Restrict Administrator Privileges to Dedicated Administrator Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5.5",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Establish and Maintain an Inventory of Service Accounts",
+      "description": "Establish and Maintain an Inventory of Service Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-5.6",
+      "parent": "CIS-5",
+      "domain": "Account Management",
+      "title": "Centralize Account Management",
+      "description": "Centralize Account Management",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6",
+      "parent": null,
+      "domain": "Access Control Management",
+      "title": "Access Control Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-6.1",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Establish an Access Granting Process",
+      "description": "Establish an Access Granting Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.2",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Establish an Access Revoking Process",
+      "description": "Establish an Access Revoking Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.3",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Require MFA for Externally-Exposed Applications",
+      "description": "Require MFA for Externally-Exposed Applications",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.4",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Require MFA for Remote Network Access",
+      "description": "Require MFA for Remote Network Access",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.5",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Require MFA for Administrative Access",
+      "description": "Require MFA for Administrative Access",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.6",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Establish and Maintain an Inventory of Authentication and Authorization Systems",
+      "description": "Establish and Maintain an Inventory of Authentication and Authorization Systems",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.7",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Centralize Access Control",
+      "description": "Centralize Access Control",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-6.8",
+      "parent": "CIS-6",
+      "domain": "Access Control Management",
+      "title": "Define and Maintain Role-Based Access Control",
+      "description": "Define and Maintain Role-Based Access Control",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7",
+      "parent": null,
+      "domain": "Continuous Vulnerability Management",
+      "title": "Continuous Vulnerability Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-7.1",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Establish and Maintain a Vulnerability Management Process",
+      "description": "Establish and Maintain a Vulnerability Management Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.2",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Establish and Maintain a Remediation Process",
+      "description": "Establish and Maintain a Remediation Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.3",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Perform Automated Operating System Patch Management",
+      "description": "Perform Automated Operating System Patch Management",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.4",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Perform Automated Application Patch Management",
+      "description": "Perform Automated Application Patch Management",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.5",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Perform Automated Vulnerability Scans of Internal Enterprise Assets",
+      "description": "Perform Automated Vulnerability Scans of Internal Enterprise Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.6",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Perform Automated Vulnerability Scans of Externally-Exposed Enterprise Assets",
+      "description": "Perform Automated Vulnerability Scans of Externally-Exposed Enterprise Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-7.7",
+      "parent": "CIS-7",
+      "domain": "Continuous Vulnerability Management",
+      "title": "Remediate Detected Vulnerabilities",
+      "description": "Remediate Detected Vulnerabilities",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8",
+      "parent": null,
+      "domain": "Audit Log Management",
+      "title": "Audit Log Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-8.1",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Establish and Maintain an Audit Log Management Process",
+      "description": "Establish and Maintain an Audit Log Management Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.2",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect Audit Logs",
+      "description": "Collect Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.3",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Ensure Adequate Audit Log Storage",
+      "description": "Ensure Adequate Audit Log Storage",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.4",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Standardize Time Synchronization",
+      "description": "Standardize Time Synchronization",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.5",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect Detailed Audit Logs",
+      "description": "Collect Detailed Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.6",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect DNS Query Audit Logs",
+      "description": "Collect DNS Query Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.7",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect URL Request Audit Logs",
+      "description": "Collect URL Request Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.8",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect Command-Line Audit Logs",
+      "description": "Collect Command-Line Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.9",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Centralize Audit Logs",
+      "description": "Centralize Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.10",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Retain Audit Logs",
+      "description": "Retain Audit Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.11",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Conduct Audit Log Reviews",
+      "description": "Conduct Audit Log Reviews",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-8.12",
+      "parent": "CIS-8",
+      "domain": "Audit Log Management",
+      "title": "Collect Service Provider Logs",
+      "description": "Collect Service Provider Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9",
+      "parent": null,
+      "domain": "Email and Web Browser Protections",
+      "title": "Email and Web Browser Protections",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-9.1",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Ensure Use of Only Fully Supported Browsers and Email Clients",
+      "description": "Ensure Use of Only Fully Supported Browsers and Email Clients",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.2",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Use DNS Filtering Services",
+      "description": "Use DNS Filtering Services",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.3",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Maintain and Enforce Network-Based URL Filters",
+      "description": "Maintain and Enforce Network-Based URL Filters",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.4",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Restrict Unnecessary or Unauthorized Browser and Email Client Extensions",
+      "description": "Restrict Unnecessary or Unauthorized Browser and Email Client Extensions",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.5",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Implement DMARC",
+      "description": "Implement DMARC",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.6",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Block Unnecessary File Types",
+      "description": "Block Unnecessary File Types",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-9.7",
+      "parent": "CIS-9",
+      "domain": "Email and Web Browser Protections",
+      "title": "Deploy and Maintain Email Server Anti-Malware Protections",
+      "description": "Deploy and Maintain Email Server Anti-Malware Protections",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10",
+      "parent": null,
+      "domain": "Malware Defenses",
+      "title": "Malware Defenses",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-10.1",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Deploy and Maintain Anti-Malware Software",
+      "description": "Deploy and Maintain Anti-Malware Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.2",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Configure Automatic Anti-Malware Signature Updates",
+      "description": "Configure Automatic Anti-Malware Signature Updates",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.3",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Disable Autorun and Autoplay for Removable Media",
+      "description": "Disable Autorun and Autoplay for Removable Media",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.4",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Configure Automatic Anti-Malware Scanning of Removable Media",
+      "description": "Configure Automatic Anti-Malware Scanning of Removable Media",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.5",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Enable Anti-Exploitation Features",
+      "description": "Enable Anti-Exploitation Features",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.6",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Centrally Manage Anti-Malware Software",
+      "description": "Centrally Manage Anti-Malware Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-10.7",
+      "parent": "CIS-10",
+      "domain": "Malware Defenses",
+      "title": "Use Behavior-Based Anti-Malware Software",
+      "description": "Use Behavior-Based Anti-Malware Software",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-11",
+      "parent": null,
+      "domain": "Data Recovery",
+      "title": "Data Recovery",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-11.1",
+      "parent": "CIS-11",
+      "domain": "Data Recovery",
+      "title": "Establish and Maintain a Data Recovery Process",
+      "description": "Establish and Maintain a Data Recovery Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-11.2",
+      "parent": "CIS-11",
+      "domain": "Data Recovery",
+      "title": "Perform Automated Backups",
+      "description": "Perform Automated Backups",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-11.3",
+      "parent": "CIS-11",
+      "domain": "Data Recovery",
+      "title": "Protect Recovery Data",
+      "description": "Protect Recovery Data",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-11.4",
+      "parent": "CIS-11",
+      "domain": "Data Recovery",
+      "title": "Establish and Maintain an Isolated Instance of Recovery Data",
+      "description": "Establish and Maintain an Isolated Instance of Recovery Data",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-11.5",
+      "parent": "CIS-11",
+      "domain": "Data Recovery",
+      "title": "Test Data Recovery",
+      "description": "Test Data Recovery",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12",
+      "parent": null,
+      "domain": "Network Infrastructure Management",
+      "title": "Network Infrastructure Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-12.1",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Ensure Network Infrastructure is Up-to-Date",
+      "description": "Ensure Network Infrastructure is Up-to-Date",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.2",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Establish and Maintain a Secure Network Architecture",
+      "description": "Establish and Maintain a Secure Network Architecture",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.3",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Securely Manage Network Infrastructure",
+      "description": "Securely Manage Network Infrastructure",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.4",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Establish and Maintain Architecture Diagrams",
+      "description": "Establish and Maintain Architecture Diagrams",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.5",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Centralize Network Authentication, Authorization, and Auditing (AAA)",
+      "description": "Centralize Network Authentication, Authorization, and Auditing (AAA)",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.6",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Use of Secure Network Management and Communication Protocols",
+      "description": "Use of Secure Network Management and Communication Protocols",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.7",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Ensure Remote Devices Utilize a VPN and are Connecting to an Enterprise's AAA Infrastructure",
+      "description": "Ensure Remote Devices Utilize a VPN and are Connecting to an Enterprise's AAA Infrastructure",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-12.8",
+      "parent": "CIS-12",
+      "domain": "Network Infrastructure Management",
+      "title": "Establish and Maintain Dedicated Computing Resources for All Administrative Work",
+      "description": "Establish and Maintain Dedicated Computing Resources for All Administrative Work",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13",
+      "parent": null,
+      "domain": "Network Monitoring and Defense",
+      "title": "Network Monitoring and Defense",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-13.1",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Centralize Security Event Alerting",
+      "description": "Centralize Security Event Alerting",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.2",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Deploy a Host-Based Intrusion Detection Solution",
+      "description": "Deploy a Host-Based Intrusion Detection Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.3",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Deploy a Network Intrusion Detection Solution",
+      "description": "Deploy a Network Intrusion Detection Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.4",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Perform Traffic Filtering Between Network Segments",
+      "description": "Perform Traffic Filtering Between Network Segments",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.5",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Manage Access Control for Remote Assets",
+      "description": "Manage Access Control for Remote Assets",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.6",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Collect Network Traffic Flow Logs",
+      "description": "Collect Network Traffic Flow Logs",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.7",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Deploy a Host-Based Intrusion Prevention Solution",
+      "description": "Deploy a Host-Based Intrusion Prevention Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.8",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Deploy a Network Intrusion Prevention Solution",
+      "description": "Deploy a Network Intrusion Prevention Solution",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.9",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Deploy Port-Level Access Control",
+      "description": "Deploy Port-Level Access Control",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.10",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Perform Application Layer Filtering",
+      "description": "Perform Application Layer Filtering",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-13.11",
+      "parent": "CIS-13",
+      "domain": "Network Monitoring and Defense",
+      "title": "Tune Security Event Alerting Thresholds",
+      "description": "Tune Security Event Alerting Thresholds",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14",
+      "parent": null,
+      "domain": "Security Awareness and Skills Training",
+      "title": "Security Awareness and Skills Training",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-14.1",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Establish and Maintain a Security Awareness Program",
+      "description": "Establish and Maintain a Security Awareness Program",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.2",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce Members to Recognize Social Engineering Attacks",
+      "description": "Train Workforce Members to Recognize Social Engineering Attacks",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.3",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce Members on Authentication Best Practices",
+      "description": "Train Workforce Members on Authentication Best Practices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.4",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce on Data Handling Best Practices",
+      "description": "Train Workforce on Data Handling Best Practices",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.5",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce Members on Causes of Unintentional Data Exposure",
+      "description": "Train Workforce Members on Causes of Unintentional Data Exposure",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.6",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce Members on Recognizing and Reporting Security Incidents",
+      "description": "Train Workforce Members on Recognizing and Reporting Security Incidents",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.7",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce on How to Identify and Report if Their Enterprise Assets are Missing Security Updates",
+      "description": "Train Workforce on How to Identify and Report if Their Enterprise Assets are Missing Security Updates",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.8",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Train Workforce on the Dangers of Connecting to and Transmitting Enterprise Data Over Insecure Networks",
+      "description": "Train Workforce on the Dangers of Connecting to and Transmitting Enterprise Data Over Insecure Networks",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-14.9",
+      "parent": "CIS-14",
+      "domain": "Security Awareness and Skills Training",
+      "title": "Conduct Role-Specific Security Awareness and Skills Training",
+      "description": "Conduct Role-Specific Security Awareness and Skills Training",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15",
+      "parent": null,
+      "domain": "Service Provider Management",
+      "title": "Service Provider Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-15.1",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Establish and Maintain an Inventory of Service Providers",
+      "description": "Establish and Maintain an Inventory of Service Providers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.2",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Establish and Maintain a Service Provider Management Policy",
+      "description": "Establish and Maintain a Service Provider Management Policy",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.3",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Classify Service Providers",
+      "description": "Classify Service Providers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.4",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Ensure Service Provider Contracts Include Security Requirements",
+      "description": "Ensure Service Provider Contracts Include Security Requirements",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.5",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Assess Service Providers",
+      "description": "Assess Service Providers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.6",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Monitor Service Providers",
+      "description": "Monitor Service Providers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-15.7",
+      "parent": "CIS-15",
+      "domain": "Service Provider Management",
+      "title": "Securely Decommission Service Providers",
+      "description": "Securely Decommission Service Providers",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16",
+      "parent": null,
+      "domain": "Application Software Security",
+      "title": "Application Software Security",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-16.1",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Establish and Maintain a Secure Application Development Process",
+      "description": "Establish and Maintain a Secure Application Development Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.2",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Establish and Maintain a Process to Accept and Address Software Vulnerabilities",
+      "description": "Establish and Maintain a Process to Accept and Address Software Vulnerabilities",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.3",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Perform Root Cause Analysis on Security Vulnerabilities",
+      "description": "Perform Root Cause Analysis on Security Vulnerabilities",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.4",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Establish and Manage an Inventory of Third-Party Software Components",
+      "description": "Establish and Manage an Inventory of Third-Party Software Components",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.5",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Use Up-to-Date and Trusted Third-Party Software Components",
+      "description": "Use Up-to-Date and Trusted Third-Party Software Components",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.6",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Establish and Maintain a Severity Rating System and Process for Application Vulnerabilities",
+      "description": "Establish and Maintain a Severity Rating System and Process for Application Vulnerabilities",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.7",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Use Standard Hardening Configuration Templates for Application Infrastructure",
+      "description": "Use Standard Hardening Configuration Templates for Application Infrastructure",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.8",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Separate Production and Non-Production Systems",
+      "description": "Separate Production and Non-Production Systems",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.9",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Train Developers in Application Security Concepts and Secure Coding",
+      "description": "Train Developers in Application Security Concepts and Secure Coding",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.10",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Apply Secure Design Principles in Application Architectures",
+      "description": "Apply Secure Design Principles in Application Architectures",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.11",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Leverage Vetted Modules or Services for Application Security Components",
+      "description": "Leverage Vetted Modules or Services for Application Security Components",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.12",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Implement Code-Level Security Checks",
+      "description": "Implement Code-Level Security Checks",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.13",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Conduct Application Penetration Testing",
+      "description": "Conduct Application Penetration Testing",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-16.14",
+      "parent": "CIS-16",
+      "domain": "Application Software Security",
+      "title": "Conduct Threat Modeling",
+      "description": "Conduct Threat Modeling",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17",
+      "parent": null,
+      "domain": "Incident Response Management",
+      "title": "Incident Response Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-17.1",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Designate Personnel to Manage Incident Handling",
+      "description": "Designate Personnel to Manage Incident Handling",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.2",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Establish and Maintain Contact Information for Reporting Security Incidents",
+      "description": "Establish and Maintain Contact Information for Reporting Security Incidents",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.3",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Establish and Maintain an Enterprise Process for Reporting Incidents",
+      "description": "Establish and Maintain an Enterprise Process for Reporting Incidents",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.4",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Establish and Maintain an Incident Response Process",
+      "description": "Establish and Maintain an Incident Response Process",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.5",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Assign Key Roles and Responsibilities",
+      "description": "Assign Key Roles and Responsibilities",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.6",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Define Mechanisms for Communicating During Incident Response",
+      "description": "Define Mechanisms for Communicating During Incident Response",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.7",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Conduct Routine Incident Response Exercises",
+      "description": "Conduct Routine Incident Response Exercises",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.8",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Conduct Post-Incident Reviews",
+      "description": "Conduct Post-Incident Reviews",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-17.9",
+      "parent": "CIS-17",
+      "domain": "Incident Response Management",
+      "title": "Establish and Maintain Security Incident Thresholds",
+      "description": "Establish and Maintain Security Incident Thresholds",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-18",
+      "parent": null,
+      "domain": "Penetration Testing",
+      "title": "Penetration Testing",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CIS-18.1",
+      "parent": "CIS-18",
+      "domain": "Penetration Testing",
+      "title": "Establish and Maintain a Penetration Testing Program",
+      "description": "Establish and Maintain a Penetration Testing Program",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-18.2",
+      "parent": "CIS-18",
+      "domain": "Penetration Testing",
+      "title": "Perform Periodic External Penetration Tests",
+      "description": "Perform Periodic External Penetration Tests",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-18.3",
+      "parent": "CIS-18",
+      "domain": "Penetration Testing",
+      "title": "Remediate Penetration Test Findings",
+      "description": "Remediate Penetration Test Findings",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-18.4",
+      "parent": "CIS-18",
+      "domain": "Penetration Testing",
+      "title": "Validate Security Measures",
+      "description": "Validate Security Measures",
+      "weight": 1
+    },
+    {
+      "control_id": "CIS-18.5",
+      "parent": "CIS-18",
+      "domain": "Penetration Testing",
+      "title": "Perform Periodic Internal Penetration Tests",
+      "description": "Perform Periodic Internal Penetration Tests",
+      "weight": 1
+    }
+  ]
+}

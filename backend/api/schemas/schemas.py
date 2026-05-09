@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
-    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus
+    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus, ControlStatus
 )
 
 
@@ -220,6 +220,50 @@ class AssetDetailResponse(AssetResponse):
 class AssetSyncResponse(BaseModel):
     queued_connector_ids: List[str]
     message: str
+
+
+# ── Framework Compliance ───────────────────────────────────────────────────────
+
+class FrameworkControlResponse(BaseModel):
+    id: str
+    framework: FrameworkType
+    control_id: str
+    parent_control_id: Optional[str]
+    domain: Optional[str]
+    title: str
+    description: Optional[str]
+    weight: int = 1
+    model_config = {"from_attributes": True}
+
+class ControlStatusResponse(BaseModel):
+    control: FrameworkControlResponse
+    status: ControlStatus
+    derived: bool
+    evidence: Optional[str]
+    last_evaluated_at: Optional[datetime]
+    overridden_by: Optional[str]
+    overridden_at: Optional[datetime]
+    finding_ids: List[str] = []
+
+class ControlStatusUpdate(BaseModel):
+    status: ControlStatus
+    evidence: Optional[str] = None
+
+class FrameworkSummaryResponse(BaseModel):
+    framework: FrameworkType
+    total: int
+    compliant: int
+    non_compliant: int
+    partial: int
+    not_applicable: int
+    score: float
+    last_evaluated_at: Optional[datetime] = None
+
+class FrameworkCatalogEntry(BaseModel):
+    framework: FrameworkType
+    name: str
+    version: Optional[str] = None
+    total_controls: int
 
 
 # ── Misc ───────────────────────────────────────────────────────────────────────

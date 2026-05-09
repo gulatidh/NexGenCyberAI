@@ -1,0 +1,2759 @@
+{
+  "framework": "nist_800_53",
+  "version": "Rev 5.1.1",
+  "source": "https://raw.githubusercontent.com/usnistgov/oscal-content/main/nist.gov/SP800-53/rev5/json/NIST_SP-800-53_rev5_catalog.json",
+  "controls": [
+    {
+      "control_id": "AC",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Access Control",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "AC-1",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ac-1_prm_1 }}:\nb. Designate an {{ insert: param, ac-01_odp.04 }} to manage the development, documentation, and dissemination of the access control policy and procedures; and\nc. Review and update the current access control:",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-2",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Account Management",
+      "description": "a. Define and document the types of accounts allowed and specifically prohibited for use within the system;\nb. Assign account managers;\nc. Require {{ insert: param, ac-02_odp.01 }} for group and role membership;\nd. Specify:\ne. Require approvals by {{ insert: param, ac-02_odp.03 }} for requests to create accounts;\nf. Create, enable, modify, disable, and remove accounts in accordance with {{ insert: param, ac-02_odp.04 }};\ng. Monitor the use of accounts;\nh. Notify account managers and {{ insert: param, ac-02_odp.05 }} within:\ni. Authorize access to the system based on:\nj. Review accounts for compliance with account management requirements {{ insert: param, ac-02_odp.10 }};\nk. Establish and implement a process for changing shared or group account authenticators (if deployed) when individuals are removed from the group; and\nl. Align account management processes with personnel termination and transfer processes.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-3",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Access Enforcement",
+      "description": "Enforce approved authorizations for logical access to information and system resources in accordance with applicable access control policies.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-4",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Information Flow Enforcement",
+      "description": "Enforce approved authorizations for controlling the flow of information within the system and between connected systems based on {{ insert: param, ac-04_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-5",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Separation of Duties",
+      "description": "a. Identify and document {{ insert: param, ac-05_odp }} ; and\nb. Define system access authorizations to support separation of duties.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-6",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Least Privilege",
+      "description": "Employ the principle of least privilege, allowing only authorized accesses for users (or processes acting on behalf of users) that are necessary to accomplish assigned organizational tasks.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-7",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Unsuccessful Logon Attempts",
+      "description": "a. Enforce a limit of {{ insert: param, ac-07_odp.01 }} consecutive invalid logon attempts by a user during a {{ insert: param, ac-07_odp.02 }} ; and\nb. Automatically {{ insert: param, ac-07_odp.03 }} when the maximum number of unsuccessful attempts is exceeded.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-8",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "System Use Notification",
+      "description": "a. Display {{ insert: param, ac-08_odp.01 }} to users before granting access to the system that provides privacy and security notices consistent with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines and state that:\nb. Retain the notification message or banner on the screen until users acknowledge the usage conditions and take explicit actions to log on to or further access the system; and\nc. For publicly accessible systems:",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-9",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Previous Logon Notification",
+      "description": "Notify the user, upon successful logon to the system, of the date and time of the last logon.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-10",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Concurrent Session Control",
+      "description": "Limit the number of concurrent sessions for each {{ insert: param, ac-10_odp.01 }} to {{ insert: param, ac-10_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-11",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Device Lock",
+      "description": "a. Prevent further access to the system by {{ insert: param, ac-11_odp.01 }} ; and\nb. Retain the device lock until the user reestablishes access using established identification and authentication procedures.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-12",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Session Termination",
+      "description": "Automatically terminate a user session after {{ insert: param, ac-12_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-13",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Supervision and Review \u2014 Access Control",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-14",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Permitted Actions Without Identification or Authentication",
+      "description": "a. Identify {{ insert: param, ac-14_odp }} that can be performed on the system without identification or authentication consistent with organizational mission and business functions; and\nb. Document and provide supporting rationale in the security plan for the system, user actions not requiring identification or authentication.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-15",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Automated Marking",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-16",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Security and Privacy Attributes",
+      "description": "a. Provide the means to associate {{ insert: param, ac-16_prm_1 }} with {{ insert: param, ac-16_prm_2 }} for information in storage, in process, and/or in transmission;\nb. Ensure that the attribute associations are made and retained with the information;\nc. Establish the following permitted security and privacy attributes from the attributes defined in [AC-16a](#ac-16_smt.a) for {{ insert: param, ac-16_prm_3 }}: {{ insert: param, ac-16_prm_4 }};\nd. Determine the following permitted attribute values or ranges for each of the established attributes: {{ insert: param, ac-16_odp.09 }};\ne. Audit changes to attributes; and\nf. Review {{ insert: param, ac-16_prm_6 }} for applicability {{ insert: param, ac-16_prm_7 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-17",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Remote Access",
+      "description": "a. Establish and document usage restrictions, configuration/connection requirements, and implementation guidance for each type of remote access allowed; and\nb. Authorize each type of remote access to the system prior to allowing such connections.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-18",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Wireless Access",
+      "description": "a. Establish configuration requirements, connection requirements, and implementation guidance for each type of wireless access; and\nb. Authorize each type of wireless access to the system prior to allowing such connections.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-19",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Access Control for Mobile Devices",
+      "description": "a. Establish configuration requirements, connection requirements, and implementation guidance for organization-controlled mobile devices, to include when such devices are outside of controlled areas; and\nb. Authorize the connection of mobile devices to organizational systems.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-20",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Use of External Systems",
+      "description": "a. {{ insert: param, ac-20_odp.01 }} , consistent with the trust relationships established with other organizations owning, operating, and/or maintaining external systems, allowing authorized individuals to:\nb. Prohibit the use of {{ insert: param, ac-20_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-21",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Information Sharing",
+      "description": "a. Enable authorized users to determine whether access authorizations assigned to a sharing partner match the information\u2019s access and use restrictions for {{ insert: param, ac-21_odp.01 }} ; and\nb. Employ {{ insert: param, ac-21_odp.02 }} to assist users in making information sharing and collaboration decisions.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-22",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Publicly Accessible Content",
+      "description": "a. Designate individuals authorized to make information publicly accessible;\nb. Train authorized individuals to ensure that publicly accessible information does not contain nonpublic information;\nc. Review the proposed content of information prior to posting onto the publicly accessible system to ensure that nonpublic information is not included; and\nd. Review the content on the publicly accessible system for nonpublic information {{ insert: param, ac-22_odp }} and remove such information, if discovered.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-23",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Data Mining Protection",
+      "description": "Employ {{ insert: param, ac-23_odp.01 }} for {{ insert: param, ac-23_odp.02 }} to detect and protect against unauthorized data mining.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-24",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Access Control Decisions",
+      "description": "{{ insert: param, ac-24_odp.01 }} to ensure {{ insert: param, ac-24_odp.02 }} are applied to each access request prior to access enforcement.",
+      "weight": 1
+    },
+    {
+      "control_id": "AC-25",
+      "parent": "AC",
+      "domain": "Access Control",
+      "title": "Reference Monitor",
+      "description": "Implement a reference monitor for {{ insert: param, ac-25_odp }} that is tamperproof, always invoked, and small enough to be subject to analysis and testing, the completeness of which can be assured.",
+      "weight": 1
+    },
+    {
+      "control_id": "AT",
+      "parent": null,
+      "domain": "Awareness and Training",
+      "title": "Awareness and Training",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "AT-1",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, at-1_prm_1 }}:\nb. Designate an {{ insert: param, at-01_odp.04 }} to manage the development, documentation, and dissemination of the awareness and training policy and procedures; and\nc. Review and update the current awareness and training:",
+      "weight": 1
+    },
+    {
+      "control_id": "AT-2",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Literacy Training and Awareness",
+      "description": "a. Provide security and privacy literacy training to system users (including managers, senior executives, and contractors):\nb. Employ the following techniques to increase the security and privacy awareness of system users {{ insert: param, at-02_odp.05 }};\nc. Update literacy training and awareness content {{ insert: param, at-02_odp.06 }} and following {{ insert: param, at-02_odp.07 }} ; and\nd. Incorporate lessons learned from internal or external security incidents or breaches into literacy training and awareness techniques.",
+      "weight": 1
+    },
+    {
+      "control_id": "AT-3",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Role-based Training",
+      "description": "a. Provide role-based security and privacy training to personnel with the following roles and responsibilities: {{ insert: param, at-3_prm_1 }}:\nb. Update role-based training content {{ insert: param, at-03_odp.04 }} and following {{ insert: param, at-03_odp.05 }} ; and\nc. Incorporate lessons learned from internal or external security incidents or breaches into role-based training.",
+      "weight": 1
+    },
+    {
+      "control_id": "AT-4",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Training Records",
+      "description": "a. Document and monitor information security and privacy training activities, including security and privacy awareness training and specific role-based security and privacy training; and\nb. Retain individual training records for {{ insert: param, at-04_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AT-5",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Contacts with Security Groups and Associations",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "AT-6",
+      "parent": "AT",
+      "domain": "Awareness and Training",
+      "title": "Training Feedback",
+      "description": "Provide feedback on organizational training results to the following personnel {{ insert: param, at-06_odp.01 }}: {{ insert: param, at-06_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU",
+      "parent": null,
+      "domain": "Audit and Accountability",
+      "title": "Audit and Accountability",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "AU-1",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, au-1_prm_1 }}:\nb. Designate an {{ insert: param, au-01_odp.04 }} to manage the development, documentation, and dissemination of the audit and accountability policy and procedures; and\nc. Review and update the current audit and accountability:",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-2",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Event Logging",
+      "description": "a. Identify the types of events that the system is capable of logging in support of the audit function: {{ insert: param, au-02_odp.01 }};\nb. Coordinate the event logging function with other organizational entities requiring audit-related information to guide and inform the selection criteria for events to be logged;\nc. Specify the following event types for logging within the system: {{ insert: param, au-2_prm_2 }};\nd. Provide a rationale for why the event types selected for logging are deemed to be adequate to support after-the-fact investigations of incidents; and\ne. Review and update the event types selected for logging {{ insert: param, au-02_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-3",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Content of Audit Records",
+      "description": "Ensure that audit records contain information that establishes the following:\na. What type of event occurred;\nb. When the event occurred;\nc. Where the event occurred;\nd. Source of the event;\ne. Outcome of the event; and\nf. Identity of any individuals, subjects, or objects/entities associated with the event.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-4",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Audit Log Storage Capacity",
+      "description": "Allocate audit log storage capacity to accommodate {{ insert: param, au-04_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-5",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Response to Audit Logging Process Failures",
+      "description": "a. Alert {{ insert: param, au-05_odp.01 }} within {{ insert: param, au-05_odp.02 }} in the event of an audit logging process failure; and\nb. Take the following additional actions: {{ insert: param, au-05_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-6",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Audit Record Review, Analysis, and Reporting",
+      "description": "a. Review and analyze system audit records {{ insert: param, au-06_odp.01 }} for indications of {{ insert: param, au-06_odp.02 }} and the potential impact of the inappropriate or unusual activity;\nb. Report findings to {{ insert: param, au-06_odp.03 }} ; and\nc. Adjust the level of audit record review, analysis, and reporting within the system when there is a change in risk based on law enforcement information, intelligence information, or other credible sources of information.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-7",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Audit Record Reduction and Report Generation",
+      "description": "Provide and implement an audit record reduction and report generation capability that:\na. Supports on-demand audit record review, analysis, and reporting requirements and after-the-fact investigations of incidents; and\nb. Does not alter the original content or time ordering of audit records.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-8",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Time Stamps",
+      "description": "a. Use internal system clocks to generate time stamps for audit records; and\nb. Record time stamps for audit records that meet {{ insert: param, au-08_odp }} and that use Coordinated Universal Time, have a fixed local time offset from Coordinated Universal Time, or that include the local time offset as part of the time stamp.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-9",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Protection of Audit Information",
+      "description": "a. Protect audit information and audit logging tools from unauthorized access, modification, and deletion; and\nb. Alert {{ insert: param, au-09_odp }} upon detection of unauthorized access, modification, or deletion of audit information.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-10",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Non-repudiation",
+      "description": "Provide irrefutable evidence that an individual (or process acting on behalf of an individual) has performed {{ insert: param, au-10_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-11",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Audit Record Retention",
+      "description": "Retain audit records for {{ insert: param, au-11_odp }} to provide support for after-the-fact investigations of incidents and to meet regulatory and organizational information retention requirements.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-12",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Audit Record Generation",
+      "description": "a. Provide audit record generation capability for the event types the system is capable of auditing as defined in [AU-2a](#au-2_smt.a) on {{ insert: param, au-12_odp.01 }};\nb. Allow {{ insert: param, au-12_odp.02 }} to select the event types that are to be logged by specific components of the system; and\nc. Generate audit records for the event types defined in [AU-2c](#au-2_smt.c) that include the audit record content defined in [AU-3](#au-3).",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-13",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Monitoring for Information Disclosure",
+      "description": "a. Monitor {{ insert: param, au-13_odp.01 }} {{ insert: param, au-13_odp.02 }} for evidence of unauthorized disclosure of organizational information; and\nb. If an information disclosure is discovered:",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-14",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Session Audit",
+      "description": "a. Provide and implement the capability for {{ insert: param, au-14_odp.01 }} to {{ insert: param, au-14_odp.02 }} the content of a user session under {{ insert: param, au-14_odp.03 }} ; and\nb. Develop, integrate, and use session auditing activities in consultation with legal counsel and in accordance with applicable laws, executive orders, directives, regulations, policies, standards, and guidelines.",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-15",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Alternate Audit Logging Capability",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "AU-16",
+      "parent": "AU",
+      "domain": "Audit and Accountability",
+      "title": "Cross-organizational Audit Logging",
+      "description": "Employ {{ insert: param, au-16_odp.01 }} for coordinating {{ insert: param, au-16_odp.02 }} among external organizations when audit information is transmitted across organizational boundaries.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA",
+      "parent": null,
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Assessment, Authorization, and Monitoring",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CA-1",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ca-1_prm_1 }}:\nb. Designate an {{ insert: param, ca-01_odp.04 }} to manage the development, documentation, and dissemination of the assessment, authorization, and monitoring policy and procedures; and\nc. Review and update the current assessment, authorization, and monitoring:",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-2",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Control Assessments",
+      "description": "a. Select the appropriate assessor or assessment team for the type of assessment to be conducted;\nb. Develop a control assessment plan that describes the scope of the assessment including:\nc. Ensure the control assessment plan is reviewed and approved by the authorizing official or designated representative prior to conducting the assessment;\nd. Assess the controls in the system and its environment of operation {{ insert: param, ca-02_odp.01 }} to determine the extent to which the controls are implemented correctly, operating as intended, and producing the desired outcome with respect to meeting established security and privacy requirements;\ne. Produce a control assessment report that document the results of the assessment; and\nf. Provide the results of the control assessment to {{ insert: param, ca-02_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-3",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Information Exchange",
+      "description": "a. Approve and manage the exchange of information between the system and other systems using {{ insert: param, ca-03_odp.01 }};\nb. Document, as part of each exchange agreement, the interface characteristics, security and privacy requirements, controls, and responsibilities for each system, and the impact level of the information communicated; and\nc. Review and update the agreements {{ insert: param, ca-03_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-4",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Security Certification",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-5",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Plan of Action and Milestones",
+      "description": "a. Develop a plan of action and milestones for the system to document the planned remediation actions of the organization to correct weaknesses or deficiencies noted during the assessment of the controls and to reduce or eliminate known vulnerabilities in the system; and\nb. Update existing plan of action and milestones {{ insert: param, ca-05_odp }} based on the findings from control assessments, independent audits or reviews, and continuous monitoring activities.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-6",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Authorization",
+      "description": "a. Assign a senior official as the authorizing official for the system;\nb. Assign a senior official as the authorizing official for common controls available for inheritance by organizational systems;\nc. Ensure that the authorizing official for the system, before commencing operations:\nd. Ensure that the authorizing official for common controls authorizes the use of those controls for inheritance by organizational systems;\ne. Update the authorizations {{ insert: param, ca-06_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-7",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Continuous Monitoring",
+      "description": "Develop a system-level continuous monitoring strategy and implement continuous monitoring in accordance with the organization-level continuous monitoring strategy that includes:\na. Establishing the following system-level metrics to be monitored: {{ insert: param, ca-07_odp.01 }};\nb. Establishing {{ insert: param, ca-07_odp.02 }} for monitoring and {{ insert: param, ca-07_odp.03 }} for assessment of control effectiveness;\nc. Ongoing control assessments in accordance with the continuous monitoring strategy;\nd. Ongoing monitoring of system and organization-defined metrics in accordance with the continuous monitoring strategy;\ne. Correlation and analysis of information generated by control assessments and monitoring;\nf. Response actions to address results of the analysis of control assessment and monitoring information; and\ng. Reporting the security and privacy status of the system to {{ insert: param, ca-7_prm_4 }} {{ insert: param, ca-7_prm_5 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-8",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Penetration Testing",
+      "description": "Conduct penetration testing {{ insert: param, ca-08_odp.01 }} on {{ insert: param, ca-08_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CA-9",
+      "parent": "CA",
+      "domain": "Assessment, Authorization, and Monitoring",
+      "title": "Internal System Connections",
+      "description": "a. Authorize internal connections of {{ insert: param, ca-09_odp.01 }} to the system;\nb. Document, for each internal connection, the interface characteristics, security and privacy requirements, and the nature of the information communicated;\nc. Terminate internal system connections after {{ insert: param, ca-09_odp.02 }} ; and\nd. Review {{ insert: param, ca-09_odp.03 }} the continued need for each internal connection.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM",
+      "parent": null,
+      "domain": "Configuration Management",
+      "title": "Configuration Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CM-1",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, cm-1_prm_1 }}:\nb. Designate an {{ insert: param, cm-01_odp.04 }} to manage the development, documentation, and dissemination of the configuration management policy and procedures; and\nc. Review and update the current configuration management:",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-2",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Baseline Configuration",
+      "description": "a. Develop, document, and maintain under configuration control, a current baseline configuration of the system; and\nb. Review and update the baseline configuration of the system:",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-3",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Configuration Change Control",
+      "description": "a. Determine and document the types of changes to the system that are configuration-controlled;\nb. Review proposed configuration-controlled changes to the system and approve or disapprove such changes with explicit consideration for security and privacy impact analyses;\nc. Document configuration change decisions associated with the system;\nd. Implement approved configuration-controlled changes to the system;\ne. Retain records of configuration-controlled changes to the system for {{ insert: param, cm-03_odp.01 }};\nf. Monitor and review activities associated with configuration-controlled changes to the system; and\ng. Coordinate and provide oversight for configuration change control activities through {{ insert: param, cm-03_odp.02 }} that convenes {{ insert: param, cm-03_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-4",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Impact Analyses",
+      "description": "Analyze changes to the system to determine potential security and privacy impacts prior to change implementation.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-5",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Access Restrictions for Change",
+      "description": "Define, document, approve, and enforce physical and logical access restrictions associated with changes to the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-6",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Configuration Settings",
+      "description": "a. Establish and document configuration settings for components employed within the system that reflect the most restrictive mode consistent with operational requirements using {{ insert: param, cm-06_odp.01 }};\nb. Implement the configuration settings;\nc. Identify, document, and approve any deviations from established configuration settings for {{ insert: param, cm-06_odp.02 }} based on {{ insert: param, cm-06_odp.03 }} ; and\nd. Monitor and control changes to the configuration settings in accordance with organizational policies and procedures.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-7",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Least Functionality",
+      "description": "a. Configure the system to provide only {{ insert: param, cm-07_odp.01 }} ; and\nb. Prohibit or restrict the use of the following functions, ports, protocols, software, and/or services: {{ insert: param, cm-7_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-8",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "System Component Inventory",
+      "description": "a. Develop and document an inventory of system components that:\nb. Review and update the system component inventory {{ insert: param, cm-08_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-9",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Configuration Management Plan",
+      "description": "Develop, document, and implement a configuration management plan for the system that:\na. Addresses roles, responsibilities, and configuration management processes and procedures;\nb. Establishes a process for identifying configuration items throughout the system development life cycle and for managing the configuration of the configuration items;\nc. Defines the configuration items for the system and places the configuration items under configuration management;\nd. Is reviewed and approved by {{ insert: param, cm-09_odp }} ; and\ne. Protects the configuration management plan from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-10",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Software Usage Restrictions",
+      "description": "a. Use software and associated documentation in accordance with contract agreements and copyright laws;\nb. Track the use of software and associated documentation protected by quantity licenses to control copying and distribution; and\nc. Control and document the use of peer-to-peer file sharing technology to ensure that this capability is not used for the unauthorized distribution, display, performance, or reproduction of copyrighted work.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-11",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "User-installed Software",
+      "description": "a. Establish {{ insert: param, cm-11_odp.01 }} governing the installation of software by users;\nb. Enforce software installation policies through the following methods: {{ insert: param, cm-11_odp.02 }} ; and\nc. Monitor policy compliance {{ insert: param, cm-11_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-12",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Information Location",
+      "description": "a. Identify and document the location of {{ insert: param, cm-12_odp }} and the specific system components on which the information is processed and stored;\nb. Identify and document the users who have access to the system and system components where the information is processed and stored; and\nc. Document changes to the location (i.e., system or system components) where the information is processed and stored.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-13",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Data Action Mapping",
+      "description": "Develop and document a map of system data actions.",
+      "weight": 1
+    },
+    {
+      "control_id": "CM-14",
+      "parent": "CM",
+      "domain": "Configuration Management",
+      "title": "Signed Components",
+      "description": "Prevent the installation of {{ insert: param, cm-14_prm_1 }} without verification that the component has been digitally signed using a certificate that is recognized and approved by the organization.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP",
+      "parent": null,
+      "domain": "Contingency Planning",
+      "title": "Contingency Planning",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "CP-1",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, cp-1_prm_1 }}:\nb. Designate an {{ insert: param, cp-01_odp.04 }} to manage the development, documentation, and dissemination of the contingency planning policy and procedures; and\nc. Review and update the current contingency planning:",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-2",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Contingency Plan",
+      "description": "a. Develop a contingency plan for the system that:\nb. Distribute copies of the contingency plan to {{ insert: param, cp-2_prm_2 }};\nc. Coordinate contingency planning activities with incident handling activities;\nd. Review the contingency plan for the system {{ insert: param, cp-02_odp.05 }};\ne. Update the contingency plan to address changes to the organization, system, or environment of operation and problems encountered during contingency plan implementation, execution, or testing;\nf. Communicate contingency plan changes to {{ insert: param, cp-2_prm_4 }};\ng. Incorporate lessons learned from contingency plan testing, training, or actual contingency activities into contingency testing and training; and\nh. Protect the contingency plan from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-3",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Contingency Training",
+      "description": "a. Provide contingency training to system users consistent with assigned roles and responsibilities:\nb. Review and update contingency training content {{ insert: param, cp-03_odp.03 }} and following {{ insert: param, cp-03_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-4",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Contingency Plan Testing",
+      "description": "a. Test the contingency plan for the system {{ insert: param, cp-04_odp.01 }} using the following tests to determine the effectiveness of the plan and the readiness to execute the plan: {{ insert: param, cp-4_prm_2 }}.\nb. Review the contingency plan test results; and\nc. Initiate corrective actions, if needed.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-5",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Contingency Plan Update",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-6",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Alternate Storage Site",
+      "description": "a. Establish an alternate storage site, including necessary agreements to permit the storage and retrieval of system backup information; and\nb. Ensure that the alternate storage site provides controls equivalent to that of the primary site.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-7",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Alternate Processing Site",
+      "description": "a. Establish an alternate processing site, including necessary agreements to permit the transfer and resumption of {{ insert: param, cp-07_odp.01 }} for essential mission and business functions within {{ insert: param, cp-07_odp.02 }} when the primary processing capabilities are unavailable;\nb. Make available at the alternate processing site, the equipment and supplies required to transfer and resume operations or put contracts in place to support delivery to the site within the organization-defined time period for transfer and resumption; and\nc. Provide controls at the alternate processing site that are equivalent to those at the primary site.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-8",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Telecommunications Services",
+      "description": "Establish alternate telecommunications services, including necessary agreements to permit the resumption of {{ insert: param, cp-08_odp.01 }} for essential mission and business functions within {{ insert: param, cp-08_odp.02 }} when the primary telecommunications capabilities are unavailable at either the primary or alternate processing or storage sites.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-9",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "System Backup",
+      "description": "a. Conduct backups of user-level information contained in {{ insert: param, cp-09_odp.01 }} {{ insert: param, cp-09_odp.02 }};\nb. Conduct backups of system-level information contained in the system {{ insert: param, cp-09_odp.03 }};\nc. Conduct backups of system documentation, including security- and privacy-related documentation {{ insert: param, cp-09_odp.04 }} ; and\nd. Protect the confidentiality, integrity, and availability of backup information.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-10",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "System Recovery and Reconstitution",
+      "description": "Provide for the recovery and reconstitution of the system to a known state within {{ insert: param, cp-10_prm_1 }} after a disruption, compromise, or failure.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-11",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Alternate Communications Protocols",
+      "description": "Provide the capability to employ {{ insert: param, cp-11_odp }} in support of maintaining continuity of operations.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-12",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Safe Mode",
+      "description": "When {{ insert: param, cp-12_odp.02 }} are detected, enter a safe mode of operation with {{ insert: param, cp-12_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "CP-13",
+      "parent": "CP",
+      "domain": "Contingency Planning",
+      "title": "Alternative Security Mechanisms",
+      "description": "Employ {{ insert: param, cp-13_odp.01 }} for satisfying {{ insert: param, cp-13_odp.02 }} when the primary means of implementing the security function is unavailable or compromised.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA",
+      "parent": null,
+      "domain": "Identification and Authentication",
+      "title": "Identification and Authentication",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "IA-1",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ia-1_prm_1 }}:\nb. Designate an {{ insert: param, ia-01_odp.04 }} to manage the development, documentation, and dissemination of the identification and authentication policy and procedures; and\nc. Review and update the current identification and authentication:",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-2",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Identification and Authentication (Organizational Users)",
+      "description": "Uniquely identify and authenticate organizational users and associate that unique identification with processes acting on behalf of those users.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-3",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Device Identification and Authentication",
+      "description": "Uniquely identify and authenticate {{ insert: param, ia-03_odp.01 }} before establishing a {{ insert: param, ia-03_odp.02 }} connection.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-4",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Identifier Management",
+      "description": "Manage system identifiers by:\na. Receiving authorization from {{ insert: param, ia-04_odp.01 }} to assign an individual, group, role, service, or device identifier;\nb. Selecting an identifier that identifies an individual, group, role, service, or device;\nc. Assigning the identifier to the intended individual, group, role, service, or device; and\nd. Preventing reuse of identifiers for {{ insert: param, ia-04_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-5",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Authenticator Management",
+      "description": "Manage system authenticators by:\na. Verifying, as part of the initial authenticator distribution, the identity of the individual, group, role, service, or device receiving the authenticator;\nb. Establishing initial authenticator content for any authenticators issued by the organization;\nc. Ensuring that authenticators have sufficient strength of mechanism for their intended use;\nd. Establishing and implementing administrative procedures for initial authenticator distribution, for lost or compromised or damaged authenticators, and for revoking authenticators;\ne. Changing default authenticators prior to first use;\nf. Changing or refreshing authenticators {{ insert: param, ia-05_odp.01 }} or when {{ insert: param, ia-05_odp.02 }} occur;\ng. Protecting authenticator content from unauthorized disclosure and modification;\nh. Requiring individuals to take, and having devices implement, specific controls to protect authenticators; and\ni. Changing authenticators for group or role accounts when membership to those accounts changes.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-6",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Authentication Feedback",
+      "description": "Obscure feedback of authentication information during the authentication process to protect the information from possible exploitation and use by unauthorized individuals.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-7",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Cryptographic Module Authentication",
+      "description": "Implement mechanisms for authentication to a cryptographic module that meet the requirements of applicable laws, executive orders, directives, policies, regulations, standards, and guidelines for such authentication.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-8",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Identification and Authentication (Non-organizational Users)",
+      "description": "Uniquely identify and authenticate non-organizational users or processes acting on behalf of non-organizational users.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-9",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Service Identification and Authentication",
+      "description": "Uniquely identify and authenticate {{ insert: param, ia-09_odp }} before establishing communications with devices, users, or other services or applications.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-10",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Adaptive Authentication",
+      "description": "Require individuals accessing the system to employ {{ insert: param, ia-10_odp.01 }} under specific {{ insert: param, ia-10_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-11",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Re-authentication",
+      "description": "Require users to re-authenticate when {{ insert: param, ia-11_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-12",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Identity Proofing",
+      "description": "a. Identity proof users that require accounts for logical access to systems based on appropriate identity assurance level requirements as specified in applicable standards and guidelines;\nb. Resolve user identities to a unique individual; and\nc. Collect, validate, and verify identity evidence.",
+      "weight": 1
+    },
+    {
+      "control_id": "IA-13",
+      "parent": "IA",
+      "domain": "Identification and Authentication",
+      "title": "Identity Providers and Authorization Servers",
+      "description": "Employ identity providers and authorization servers to manage user, device, and non-person entity (NPE) identities, attributes, and access rights supporting authentication and authorization decisions in accordance with {{ insert: param, ia-13_odp.01 }} using {{ insert: param, ia-13_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR",
+      "parent": null,
+      "domain": "Incident Response",
+      "title": "Incident Response",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "IR-1",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ir-1_prm_1 }}:\nb. Designate an {{ insert: param, ir-01_odp.04 }} to manage the development, documentation, and dissemination of the incident response policy and procedures; and\nc. Review and update the current incident response:",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-2",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Response Training",
+      "description": "a. Provide incident response training to system users consistent with assigned roles and responsibilities:\nb. Review and update incident response training content {{ insert: param, ir-02_odp.03 }} and following {{ insert: param, ir-02_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-3",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Response Testing",
+      "description": "Test the effectiveness of the incident response capability for the system {{ insert: param, ir-03_odp.01 }} using the following tests: {{ insert: param, ir-03_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-4",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Handling",
+      "description": "a. Implement an incident handling capability for incidents that is consistent with the incident response plan and includes preparation, detection and analysis, containment, eradication, and recovery;\nb. Coordinate incident handling activities with contingency planning activities;\nc. Incorporate lessons learned from ongoing incident handling activities into incident response procedures, training, and testing, and implement the resulting changes accordingly; and\nd. Ensure the rigor, intensity, scope, and results of incident handling activities are comparable and predictable across the organization.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-5",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Monitoring",
+      "description": "Track and document incidents.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-6",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Reporting",
+      "description": "a. Require personnel to report suspected incidents to the organizational incident response capability within {{ insert: param, ir-06_odp.01 }} ; and\nb. Report incident information to {{ insert: param, ir-06_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-7",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Response Assistance",
+      "description": "Provide an incident response support resource, integral to the organizational incident response capability, that offers advice and assistance to users of the system for the handling and reporting of incidents.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-8",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Incident Response Plan",
+      "description": "a. Develop an incident response plan that:\nb. Distribute copies of the incident response plan to {{ insert: param, ir-08_odp.04 }};\nc. Update the incident response plan to address system and organizational changes or problems encountered during plan implementation, execution, or testing;\nd. Communicate incident response plan changes to {{ insert: param, ir-8_prm_5 }} ; and\ne. Protect the incident response plan from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-9",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Information Spillage Response",
+      "description": "Respond to information spills by:\na. Assigning {{ insert: param, ir-09_odp.01 }} with responsibility for responding to information spills;\nb. Identifying the specific information involved in the system contamination;\nc. Alerting {{ insert: param, ir-09_odp.02 }} of the information spill using a method of communication not associated with the spill;\nd. Isolating the contaminated system or system component;\ne. Eradicating the information from the contaminated system or component;\nf. Identifying other systems or system components that may have been subsequently contaminated; and\ng. Performing the following additional actions: {{ insert: param, ir-09_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "IR-10",
+      "parent": "IR",
+      "domain": "Incident Response",
+      "title": "Integrated Information Security Analysis Team",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "MA",
+      "parent": null,
+      "domain": "Maintenance",
+      "title": "Maintenance",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "MA-1",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ma-1_prm_1 }}:\nb. Designate an {{ insert: param, ma-01_odp.04 }} to manage the development, documentation, and dissemination of the maintenance policy and procedures; and\nc. Review and update the current maintenance:",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-2",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Controlled Maintenance",
+      "description": "a. Schedule, document, and review records of maintenance, repair, and replacement on system components in accordance with manufacturer or vendor specifications and/or organizational requirements;\nb. Approve and monitor all maintenance activities, whether performed on site or remotely and whether the system or system components are serviced on site or removed to another location;\nc. Require that {{ insert: param, ma-02_odp.01 }} explicitly approve the removal of the system or system components from organizational facilities for off-site maintenance, repair, or replacement;\nd. Sanitize equipment to remove the following information from associated media prior to removal from organizational facilities for off-site maintenance, repair, or replacement: {{ insert: param, ma-02_odp.02 }};\ne. Check all potentially impacted controls to verify that the controls are still functioning properly following maintenance, repair, or replacement actions; and\nf. Include the following information in organizational maintenance records: {{ insert: param, ma-02_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-3",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Maintenance Tools",
+      "description": "a. Approve, control, and monitor the use of system maintenance tools; and\nb. Review previously approved system maintenance tools {{ insert: param, ma-03_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-4",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Nonlocal Maintenance",
+      "description": "a. Approve and monitor nonlocal maintenance and diagnostic activities;\nb. Allow the use of nonlocal maintenance and diagnostic tools only as consistent with organizational policy and documented in the security plan for the system;\nc. Employ strong authentication in the establishment of nonlocal maintenance and diagnostic sessions;\nd. Maintain records for nonlocal maintenance and diagnostic activities; and\ne. Terminate session and network connections when nonlocal maintenance is completed.",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-5",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Maintenance Personnel",
+      "description": "a. Establish a process for maintenance personnel authorization and maintain a list of authorized maintenance organizations or personnel;\nb. Verify that non-escorted personnel performing maintenance on the system possess the required access authorizations; and\nc. Designate organizational personnel with required access authorizations and technical competence to supervise the maintenance activities of personnel who do not possess the required access authorizations.",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-6",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Timely Maintenance",
+      "description": "Obtain maintenance support and/or spare parts for {{ insert: param, ma-06_odp.01 }} within {{ insert: param, ma-06_odp.02 }} of failure.",
+      "weight": 1
+    },
+    {
+      "control_id": "MA-7",
+      "parent": "MA",
+      "domain": "Maintenance",
+      "title": "Field Maintenance",
+      "description": "Restrict or prohibit field maintenance on {{ insert: param, ma-07_odp.01 }} to {{ insert: param, ma-07_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP",
+      "parent": null,
+      "domain": "Media Protection",
+      "title": "Media Protection",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "MP-1",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, mp-1_prm_1 }}:\nb. Designate an {{ insert: param, mp-01_odp.04 }} to manage the development, documentation, and dissemination of the media protection policy and procedures; and\nc. Review and update the current media protection:",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-2",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Access",
+      "description": "Restrict access to {{ insert: param, mp-2_prm_1 }} to {{ insert: param, mp-2_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-3",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Marking",
+      "description": "a. Mark system media indicating the distribution limitations, handling caveats, and applicable security markings (if any) of the information; and\nb. Exempt {{ insert: param, mp-03_odp.01 }} from marking if the media remain within {{ insert: param, mp-03_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-4",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Storage",
+      "description": "a. Physically control and securely store {{ insert: param, mp-4_prm_1 }} within {{ insert: param, mp-4_prm_2 }} ; and\nb. Protect system media types defined in MP-4a until the media are destroyed or sanitized using approved equipment, techniques, and procedures.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-5",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Transport",
+      "description": "a. Protect and control {{ insert: param, mp-05_odp.01 }} during transport outside of controlled areas using {{ insert: param, mp-5_prm_2 }};\nb. Maintain accountability for system media during transport outside of controlled areas;\nc. Document activities associated with the transport of system media; and\nd. Restrict the activities associated with the transport of system media to authorized personnel.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-6",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Sanitization",
+      "description": "a. Sanitize {{ insert: param, mp-6_prm_1 }} prior to disposal, release out of organizational control, or release for reuse using {{ insert: param, mp-6_prm_2 }} ; and\nb. Employ sanitization mechanisms with the strength and integrity commensurate with the security category or classification of the information.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-7",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Use",
+      "description": "a. {{ insert: param, mp-07_odp.02 }} the use of {{ insert: param, mp-07_odp.01 }} on {{ insert: param, mp-07_odp.03 }} using {{ insert: param, mp-07_odp.04 }} ; and\nb. Prohibit the use of portable storage devices in organizational systems when such devices have no identifiable owner.",
+      "weight": 1
+    },
+    {
+      "control_id": "MP-8",
+      "parent": "MP",
+      "domain": "Media Protection",
+      "title": "Media Downgrading",
+      "description": "a. Establish {{ insert: param, mp-08_odp.01 }} that includes employing downgrading mechanisms with strength and integrity commensurate with the security category or classification of the information;\nb. Verify that the system media downgrading process is commensurate with the security category and/or classification level of the information to be removed and the access authorizations of the potential recipients of the downgraded information;\nc. Identify {{ insert: param, mp-08_odp.02 }} ; and\nd. Downgrade the identified system media using the established process.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE",
+      "parent": null,
+      "domain": "Physical and Environmental Protection",
+      "title": "Physical and Environmental Protection",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "PE-1",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, pe-1_prm_1 }}:\nb. Designate an {{ insert: param, pe-01_odp.04 }} to manage the development, documentation, and dissemination of the physical and environmental protection policy and procedures; and\nc. Review and update the current physical and environmental protection:",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-2",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Physical Access Authorizations",
+      "description": "a. Develop, approve, and maintain a list of individuals with authorized access to the facility where the system resides;\nb. Issue authorization credentials for facility access;\nc. Review the access list detailing authorized facility access by individuals {{ insert: param, pe-02_odp }} ; and\nd. Remove individuals from the facility access list when access is no longer required.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-3",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Physical Access Control",
+      "description": "a. Enforce physical access authorizations at {{ insert: param, pe-03_odp.01 }} by:\nb. Maintain physical access audit logs for {{ insert: param, pe-03_odp.04 }};\nc. Control access to areas within the facility designated as publicly accessible by implementing the following controls: {{ insert: param, pe-03_odp.05 }};\nd. Escort visitors and control visitor activity {{ insert: param, pe-03_odp.06 }};\ne. Secure keys, combinations, and other physical access devices;\nf. Inventory {{ insert: param, pe-03_odp.07 }} every {{ insert: param, pe-03_odp.08 }} ; and\ng. Change combinations and keys {{ insert: param, pe-3_prm_9 }} and/or when keys are lost, combinations are compromised, or when individuals possessing the keys or combinations are transferred or terminated.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-4",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Access Control for Transmission",
+      "description": "Control physical access to {{ insert: param, pe-04_odp.01 }} within organizational facilities using {{ insert: param, pe-04_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-5",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Access Control for Output Devices",
+      "description": "Control physical access to output from {{ insert: param, pe-05_odp }} to prevent unauthorized individuals from obtaining the output.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-6",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Monitoring Physical Access",
+      "description": "a. Monitor physical access to the facility where the system resides to detect and respond to physical security incidents;\nb. Review physical access logs {{ insert: param, pe-06_odp.01 }} and upon occurrence of {{ insert: param, pe-06_odp.02 }} ; and\nc. Coordinate results of reviews and investigations with the organizational incident response capability.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-7",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Visitor Control",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-8",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Visitor Access Records",
+      "description": "a. Maintain visitor access records to the facility where the system resides for {{ insert: param, pe-08_odp.01 }};\nb. Review visitor access records {{ insert: param, pe-08_odp.02 }} ; and\nc. Report anomalies in visitor access records to {{ insert: param, pe-08_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-9",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Power Equipment and Cabling",
+      "description": "Protect power equipment and power cabling for the system from damage and destruction.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-10",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Emergency Shutoff",
+      "description": "a. Provide the capability of shutting off power to {{ insert: param, pe-10_odp.01 }} in emergency situations;\nb. Place emergency shutoff switches or devices in {{ insert: param, pe-10_odp.02 }} to facilitate access for authorized personnel; and\nc. Protect emergency power shutoff capability from unauthorized activation.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-11",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Emergency Power",
+      "description": "Provide an uninterruptible power supply to facilitate {{ insert: param, pe-11_odp }} in the event of a primary power source loss.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-12",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Emergency Lighting",
+      "description": "Employ and maintain automatic emergency lighting for the system that activates in the event of a power outage or disruption and that covers emergency exits and evacuation routes within the facility.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-13",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Fire Protection",
+      "description": "Employ and maintain fire detection and suppression systems that are supported by an independent energy source.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-14",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Environmental Controls",
+      "description": "a. Maintain {{ insert: param, pe-14_odp.01 }} levels within the facility where the system resides at {{ insert: param, pe-14_odp.03 }} ; and\nb. Monitor environmental control levels {{ insert: param, pe-14_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-15",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Water Damage Protection",
+      "description": "Protect the system from damage resulting from water leakage by providing master shutoff or isolation valves that are accessible, working properly, and known to key personnel.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-16",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Delivery and Removal",
+      "description": "a. Authorize and control {{ insert: param, pe-16_prm_1 }} entering and exiting the facility; and\nb. Maintain records of the system components.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-17",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Alternate Work Site",
+      "description": "a. Determine and document the {{ insert: param, pe-17_odp.01 }} allowed for use by employees;\nb. Employ the following controls at alternate work sites: {{ insert: param, pe-17_odp.02 }};\nc. Assess the effectiveness of controls at alternate work sites; and\nd. Provide a means for employees to communicate with information security and privacy personnel in case of incidents.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-18",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Location of System Components",
+      "description": "Position system components within the facility to minimize potential damage from {{ insert: param, pe-18_odp }} and to minimize the opportunity for unauthorized access.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-19",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Information Leakage",
+      "description": "Protect the system from information leakage due to electromagnetic signals emanations.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-20",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Asset Monitoring and Tracking",
+      "description": "Employ {{ insert: param, pe-20_odp.01 }} to track and monitor the location and movement of {{ insert: param, pe-20_odp.02 }} within {{ insert: param, pe-20_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-21",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Electromagnetic Pulse Protection",
+      "description": "Employ {{ insert: param, pe-21_odp.01 }} against electromagnetic pulse damage for {{ insert: param, pe-21_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-22",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Component Marking",
+      "description": "Mark {{ insert: param, pe-22_odp }} indicating the impact level or classification level of the information permitted to be processed, stored, or transmitted by the hardware component.",
+      "weight": 1
+    },
+    {
+      "control_id": "PE-23",
+      "parent": "PE",
+      "domain": "Physical and Environmental Protection",
+      "title": "Facility Location",
+      "description": "a. Plan the location or site of the facility where the system resides considering physical and environmental hazards; and\nb. For existing facilities, consider the physical and environmental hazards in the organizational risk management strategy.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL",
+      "parent": null,
+      "domain": "Planning",
+      "title": "Planning",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "PL-1",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, pl-1_prm_1 }}:\nb. Designate an {{ insert: param, pl-01_odp.04 }} to manage the development, documentation, and dissemination of the planning policy and procedures; and\nc. Review and update the current planning:",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-2",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "System Security and Privacy Plans",
+      "description": "a. Develop security and privacy plans for the system that:\nb. Distribute copies of the plans and communicate subsequent changes to the plans to {{ insert: param, pl-02_odp.02 }};\nc. Review the plans {{ insert: param, pl-02_odp.03 }};\nd. Update the plans to address changes to the system and environment of operation or problems identified during plan implementation or control assessments; and\ne. Protect the plans from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-3",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "System Security Plan Update",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-4",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Rules of Behavior",
+      "description": "a. Establish and provide to individuals requiring access to the system, the rules that describe their responsibilities and expected behavior for information and system usage, security, and privacy;\nb. Receive a documented acknowledgment from such individuals, indicating that they have read, understand, and agree to abide by the rules of behavior, before authorizing access to information and the system;\nc. Review and update the rules of behavior {{ insert: param, pl-04_odp.01 }} ; and\nd. Require individuals who have acknowledged a previous version of the rules of behavior to read and re-acknowledge {{ insert: param, pl-04_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-5",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Privacy Impact Assessment",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-6",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Security-related Activity Planning",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-7",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Concept of Operations",
+      "description": "a. Develop a Concept of Operations (CONOPS) for the system describing how the organization intends to operate the system from the perspective of information security and privacy; and\nb. Review and update the CONOPS {{ insert: param, pl-07_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-8",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Security and Privacy Architectures",
+      "description": "a. Develop security and privacy architectures for the system that:\nb. Review and update the architectures {{ insert: param, pl-08_odp }} to reflect changes in the enterprise architecture; and\nc. Reflect planned architecture changes in security and privacy plans, Concept of Operations (CONOPS), criticality analysis, organizational procedures, and procurements and acquisitions.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-9",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Central Management",
+      "description": "Centrally manage {{ insert: param, pl-09_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-10",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Baseline Selection",
+      "description": "Select a control baseline for the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "PL-11",
+      "parent": "PL",
+      "domain": "Planning",
+      "title": "Baseline Tailoring",
+      "description": "Tailor the selected control baseline by applying specified tailoring actions.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM",
+      "parent": null,
+      "domain": "Program Management",
+      "title": "Program Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "PM-1",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Information Security Program Plan",
+      "description": "a. Develop and disseminate an organization-wide information security program plan that:\nb. Review and update the organization-wide information security program plan {{ insert: param, pm-01_odp.01 }} and following {{ insert: param, pm-01_odp.02 }} ; and\nc. Protect the information security program plan from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-2",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Information Security Program Leadership Role",
+      "description": "Appoint a senior agency information security officer with the mission and resources to coordinate, develop, implement, and maintain an organization-wide information security program.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-3",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Information Security and Privacy Resources",
+      "description": "a. Include the resources needed to implement the information security and privacy programs in capital planning and investment requests and document all exceptions to this requirement;\nb. Prepare documentation required for addressing information security and privacy programs in capital planning and investment requests in accordance with applicable laws, executive orders, directives, policies, regulations, standards; and\nc. Make available for expenditure, the planned information security and privacy resources.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-4",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Plan of Action and Milestones Process",
+      "description": "a. Implement a process to ensure that plans of action and milestones for the information security, privacy, and supply chain risk management programs and associated organizational systems:\nb. Review plans of action and milestones for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-5",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "System Inventory",
+      "description": "Develop and update {{ insert: param, pm-05_odp }} an inventory of organizational systems.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-6",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Measures of Performance",
+      "description": "Develop, monitor, and report on the results of information security and privacy measures of performance.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-7",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Enterprise Architecture",
+      "description": "Develop and maintain an enterprise architecture with consideration for information security, privacy, and the resulting risk to organizational operations and assets, individuals, other organizations, and the Nation.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-8",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Critical Infrastructure Plan",
+      "description": "Address information security and privacy issues in the development, documentation, and updating of a critical infrastructure and key resources protection plan.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-9",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Risk Management Strategy",
+      "description": "a. Develops a comprehensive strategy to manage:\nb. Implement the risk management strategy consistently across the organization; and\nc. Review and update the risk management strategy {{ insert: param, pm-09_odp }} or as required, to address organizational changes.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-10",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Authorization Process",
+      "description": "a. Manage the security and privacy state of organizational systems and the environments in which those systems operate through authorization processes;\nb. Designate individuals to fulfill specific roles and responsibilities within the organizational risk management process; and\nc. Integrate the authorization processes into an organization-wide risk management program.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-11",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Mission and Business Process Definition",
+      "description": "a. Define organizational mission and business processes with consideration for information security and privacy and the resulting risk to organizational operations, organizational assets, individuals, other organizations, and the Nation; and\nb. Determine information protection and personally identifiable information processing needs arising from the defined mission and business processes; and\nc. Review and revise the mission and business processes {{ insert: param, pm-11_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-12",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Insider Threat Program",
+      "description": "Implement an insider threat program that includes a cross-discipline insider threat incident handling team.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-13",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Security and Privacy Workforce",
+      "description": "Establish a security and privacy workforce development and improvement program.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-14",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Testing, Training, and Monitoring",
+      "description": "a. Implement a process for ensuring that organizational plans for conducting security and privacy testing, training, and monitoring activities associated with organizational systems:\nb. Review testing, training, and monitoring plans for consistency with the organizational risk management strategy and organization-wide priorities for risk response actions.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-15",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Security and Privacy Groups and Associations",
+      "description": "Establish and institutionalize contact with selected groups and associations within the security and privacy communities:\na. To facilitate ongoing security and privacy education and training for organizational personnel;\nb. To maintain currency with recommended security and privacy practices, techniques, and technologies; and\nc. To share current security and privacy information, including threats, vulnerabilities, and incidents.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-16",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Threat Awareness Program",
+      "description": "Implement a threat awareness program that includes a cross-organization information-sharing capability for threat intelligence.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-17",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Protecting Controlled Unclassified Information on External Systems",
+      "description": "a. Establish policy and procedures to ensure that requirements for the protection of controlled unclassified information that is processed, stored or transmitted on external systems, are implemented in accordance with applicable laws, executive orders, directives, policies, regulations, and standards; and\nb. Review and update the policy and procedures {{ insert: param, pm-17_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-18",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Privacy Program Plan",
+      "description": "a. Develop and disseminate an organization-wide privacy program plan that provides an overview of the agency\u2019s privacy program, and:\nb. Update the plan {{ insert: param, pm-18_odp }} and to address changes in federal privacy laws and policy and organizational changes and problems identified during plan implementation or privacy control assessments.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-19",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Privacy Program Leadership Role",
+      "description": "Appoint a senior agency official for privacy with the authority, mission, accountability, and resources to coordinate, develop, and implement, applicable privacy requirements and manage privacy risks through the organization-wide privacy program.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-20",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Dissemination of Privacy Program Information",
+      "description": "Maintain a central resource webpage on the organization\u2019s principal public website that serves as a central source of information about the organization\u2019s privacy program and that:\na. Ensures that the public has access to information about organizational privacy activities and can communicate with its senior agency official for privacy;\nb. Ensures that organizational privacy practices and reports are publicly available; and\nc. Employs publicly facing email addresses and/or phone lines to enable the public to provide feedback and/or direct questions to privacy offices regarding privacy practices.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-21",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Accounting of Disclosures",
+      "description": "a. Develop and maintain an accurate accounting of disclosures of personally identifiable information, including:\nb. Retain the accounting of disclosures for the length of the time the personally identifiable information is maintained or five years after the disclosure is made, whichever is longer; and\nc. Make the accounting of disclosures available to the individual to whom the personally identifiable information relates upon request.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-22",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Personally Identifiable Information Quality Management",
+      "description": "Develop and document organization-wide policies and procedures for:\na. Reviewing for the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle;\nb. Correcting or deleting inaccurate or outdated personally identifiable information;\nc. Disseminating notice of corrected or deleted personally identifiable information to individuals or other appropriate entities; and\nd. Appeals of adverse decisions on correction or deletion requests.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-23",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Data Governance Body",
+      "description": "Establish a Data Governance Body consisting of {{ insert: param, pm-23_odp.01 }} with {{ insert: param, pm-23_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-24",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Data Integrity Board",
+      "description": "Establish a Data Integrity Board to:\na. Review proposals to conduct or participate in a matching program; and\nb. Conduct an annual review of all matching programs in which the agency has participated.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-25",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Minimization of Personally Identifiable Information Used in Testing, Training, and Research",
+      "description": "a. Develop, document, and implement policies and procedures that address the use of personally identifiable information for internal testing, training, and research;\nb. Limit or minimize the amount of personally identifiable information used for internal testing, training, and research purposes;\nc. Authorize the use of personally identifiable information when such information is required for internal testing, training, and research; and\nd. Review and update policies and procedures {{ insert: param, pm-25_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-26",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Complaint Management",
+      "description": "Implement a process for receiving and responding to complaints, concerns, or questions from individuals about the organizational security and privacy practices that includes:\na. Mechanisms that are easy to use and readily accessible by the public;\nb. All information necessary for successfully filing complaints;\nc. Tracking mechanisms to ensure all complaints received are reviewed and addressed within {{ insert: param, pm-26_prm_1 }};\nd. Acknowledgement of receipt of complaints, concerns, or questions from individuals within {{ insert: param, pm-26_odp.03 }} ; and\ne. Response to complaints, concerns, or questions from individuals within {{ insert: param, pm-26_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-27",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Privacy Reporting",
+      "description": "a. Develop {{ insert: param, pm-27_odp.01 }} and disseminate to:\nb. Review and update privacy reports {{ insert: param, pm-27_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-28",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Risk Framing",
+      "description": "a. Identify and document:\nb. Distribute the results of risk framing activities to {{ insert: param, pm-28_odp.01 }} ; and\nc. Review and update risk framing considerations {{ insert: param, pm-28_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-29",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Risk Management Program Leadership Roles",
+      "description": "a. Appoint a Senior Accountable Official for Risk Management to align organizational information security and privacy management processes with strategic, operational, and budgetary planning processes; and\nb. Establish a Risk Executive (function) to view and analyze risk from an organization-wide perspective and ensure management of risk is consistent across the organization.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-30",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Supply Chain Risk Management Strategy",
+      "description": "a. Develop an organization-wide strategy for managing supply chain risks associated with the development, acquisition, maintenance, and disposal of systems, system components, and system services;\nb. Implement the supply chain risk management strategy consistently across the organization; and\nc. Review and update the supply chain risk management strategy on {{ insert: param, pm-30_odp }} or as required, to address organizational changes.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-31",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Continuous Monitoring Strategy",
+      "description": "Develop an organization-wide continuous monitoring strategy and implement continuous monitoring programs that include:\na. Establishing the following organization-wide metrics to be monitored: {{ insert: param, pm-31_odp.01 }};\nb. Establishing {{ insert: param, pm-31_odp.02 }} and {{ insert: param, pm-31_odp.03 }} for control effectiveness;\nc. Ongoing monitoring of organizationally-defined metrics in accordance with the continuous monitoring strategy;\nd. Correlation and analysis of information generated by control assessments and monitoring;\ne. Response actions to address results of the analysis of control assessment and monitoring information; and\nf. Reporting the security and privacy status of organizational systems to {{ insert: param, pm-31_prm_4 }} {{ insert: param, pm-31_prm_5 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-32",
+      "parent": "PM",
+      "domain": "Program Management",
+      "title": "Purposing",
+      "description": "Analyze {{ insert: param, pm-32_odp }} supporting mission essential services or functions to ensure that the information resources are being used consistent with their intended purpose.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS",
+      "parent": null,
+      "domain": "Personnel Security",
+      "title": "Personnel Security",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "PS-1",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ps-1_prm_1 }}:\nb. Designate an {{ insert: param, ps-01_odp.04 }} to manage the development, documentation, and dissemination of the personnel security policy and procedures; and\nc. Review and update the current personnel security:",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-2",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Position Risk Designation",
+      "description": "a. Assign a risk designation to all organizational positions;\nb. Establish screening criteria for individuals filling those positions; and\nc. Review and update position risk designations {{ insert: param, ps-02_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-3",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Personnel Screening",
+      "description": "a. Screen individuals prior to authorizing access to the system; and\nb. Rescreen individuals in accordance with {{ insert: param, ps-3_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-4",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Personnel Termination",
+      "description": "Upon termination of individual employment:\na. Disable system access within {{ insert: param, ps-04_odp.01 }};\nb. Terminate or revoke any authenticators and credentials associated with the individual;\nc. Conduct exit interviews that include a discussion of {{ insert: param, ps-04_odp.02 }};\nd. Retrieve all security-related organizational system-related property; and\ne. Retain access to organizational information and systems formerly controlled by terminated individual.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-5",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Personnel Transfer",
+      "description": "a. Review and confirm ongoing operational need for current logical and physical access authorizations to systems and facilities when individuals are reassigned or transferred to other positions within the organization;\nb. Initiate {{ insert: param, ps-05_odp.01 }} within {{ insert: param, ps-05_odp.02 }};\nc. Modify access authorization as needed to correspond with any changes in operational need due to reassignment or transfer; and\nd. Notify {{ insert: param, ps-05_odp.03 }} within {{ insert: param, ps-05_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-6",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Access Agreements",
+      "description": "a. Develop and document access agreements for organizational systems;\nb. Review and update the access agreements {{ insert: param, ps-06_odp.01 }} ; and\nc. Verify that individuals requiring access to organizational information and systems:",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-7",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "External Personnel Security",
+      "description": "a. Establish personnel security requirements, including security roles and responsibilities for external providers;\nb. Require external providers to comply with personnel security policies and procedures established by the organization;\nc. Document personnel security requirements;\nd. Require external providers to notify {{ insert: param, ps-07_odp.01 }} of any personnel transfers or terminations of external personnel who possess organizational credentials and/or badges, or who have system privileges within {{ insert: param, ps-07_odp.02 }} ; and\ne. Monitor provider compliance with personnel security requirements.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-8",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Personnel Sanctions",
+      "description": "a. Employ a formal sanctions process for individuals failing to comply with established information security and privacy policies and procedures; and\nb. Notify {{ insert: param, ps-08_odp.01 }} within {{ insert: param, ps-08_odp.02 }} when a formal employee sanctions process is initiated, identifying the individual sanctioned and the reason for the sanction.",
+      "weight": 1
+    },
+    {
+      "control_id": "PS-9",
+      "parent": "PS",
+      "domain": "Personnel Security",
+      "title": "Position Descriptions",
+      "description": "Incorporate security and privacy roles and responsibilities into organizational position descriptions.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT",
+      "parent": null,
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Personally Identifiable Information Processing and Transparency",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "PT-1",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, pt-1_prm_1 }}:\nb. Designate an {{ insert: param, pt-01_odp.04 }} to manage the development, documentation, and dissemination of the personally identifiable information processing and transparency policy and procedures; and\nc. Review and update the current personally identifiable information processing and transparency:",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-2",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Authority to Process Personally Identifiable Information",
+      "description": "a. Determine and document the {{ insert: param, pt-02_odp.01 }} that permits the {{ insert: param, pt-02_odp.02 }} of personally identifiable information; and\nb. Restrict the {{ insert: param, pt-02_odp.03 }} of personally identifiable information to only that which is authorized.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-3",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Personally Identifiable Information Processing Purposes",
+      "description": "a. Identify and document the {{ insert: param, pt-03_odp.01 }} for processing personally identifiable information;\nb. Describe the purpose(s) in the public privacy notices and policies of the organization;\nc. Restrict the {{ insert: param, pt-03_odp.02 }} of personally identifiable information to only that which is compatible with the identified purpose(s); and\nd. Monitor changes in processing personally identifiable information and implement {{ insert: param, pt-03_odp.03 }} to ensure that any changes are made in accordance with {{ insert: param, pt-03_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-4",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Consent",
+      "description": "Implement {{ insert: param, pt-04_odp }} for individuals to consent to the processing of their personally identifiable information prior to its collection that facilitate individuals\u2019 informed decision-making.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-5",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Privacy Notice",
+      "description": "Provide notice to individuals about the processing of personally identifiable information that:\na. Is available to individuals upon first interacting with an organization, and subsequently at {{ insert: param, pt-05_odp.01 }};\nb. Is clear and easy-to-understand, expressing information about personally identifiable information processing in plain language;\nc. Identifies the authority that authorizes the processing of personally identifiable information;\nd. Identifies the purposes for which personally identifiable information is to be processed; and\ne. Includes {{ insert: param, pt-05_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-6",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "System of Records Notice",
+      "description": "For systems that process information that will be maintained in a Privacy Act system of records:\na. Draft system of records notices in accordance with OMB guidance and submit new and significantly modified system of records notices to the OMB and appropriate congressional committees for advance review;\nb. Publish system of records notices in the Federal Register; and\nc. Keep system of records notices accurate, up-to-date, and scoped in accordance with policy.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-7",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Specific Categories of Personally Identifiable Information",
+      "description": "Apply {{ insert: param, pt-07_odp }} for specific categories of personally identifiable information.",
+      "weight": 1
+    },
+    {
+      "control_id": "PT-8",
+      "parent": "PT",
+      "domain": "Personally Identifiable Information Processing and Transparency",
+      "title": "Computer Matching Requirements",
+      "description": "When a system or organization processes information for the purpose of conducting a matching program:\na. Obtain approval from the Data Integrity Board to conduct the matching program;\nb. Develop and enter into a computer matching agreement;\nc. Publish a matching notice in the Federal Register;\nd. Independently verify the information produced by the matching program before taking adverse action against an individual, if required; and\ne. Provide individuals with notice and an opportunity to contest the findings before taking adverse action against an individual.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA",
+      "parent": null,
+      "domain": "Risk Assessment",
+      "title": "Risk Assessment",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "RA-1",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, ra-1_prm_1 }}:\nb. Designate an {{ insert: param, ra-01_odp.04 }} to manage the development, documentation, and dissemination of the risk assessment policy and procedures; and\nc. Review and update the current risk assessment:",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-2",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Security Categorization",
+      "description": "a. Categorize the system and information it processes, stores, and transmits;\nb. Document the security categorization results, including supporting rationale, in the security plan for the system; and\nc. Verify that the authorizing official or authorizing official designated representative reviews and approves the security categorization decision.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-3",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Risk Assessment",
+      "description": "a. Conduct a risk assessment, including:\nb. Integrate risk assessment results and risk management decisions from the organization and mission or business process perspectives with system-level risk assessments;\nc. Document risk assessment results in {{ insert: param, ra-03_odp.01 }};\nd. Review risk assessment results {{ insert: param, ra-03_odp.03 }};\ne. Disseminate risk assessment results to {{ insert: param, ra-03_odp.04 }} ; and\nf. Update the risk assessment {{ insert: param, ra-03_odp.05 }} or when there are significant changes to the system, its environment of operation, or other conditions that may impact the security or privacy state of the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-4",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Risk Assessment Update",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-5",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Vulnerability Monitoring and Scanning",
+      "description": "a. Monitor and scan for vulnerabilities in the system and hosted applications {{ insert: param, ra-5_prm_1 }} and when new vulnerabilities potentially affecting the system are identified and reported;\nb. Employ vulnerability monitoring tools and techniques that facilitate interoperability among tools and automate parts of the vulnerability management process by using standards for:\nc. Analyze vulnerability scan reports and results from vulnerability monitoring;\nd. Remediate legitimate vulnerabilities {{ insert: param, ra-05_odp.03 }} in accordance with an organizational assessment of risk;\ne. Share information obtained from the vulnerability monitoring process and control assessments with {{ insert: param, ra-05_odp.04 }} to help eliminate similar vulnerabilities in other systems; and\nf. Employ vulnerability monitoring tools that include the capability to readily update the vulnerabilities to be scanned.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-6",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Technical Surveillance Countermeasures Survey",
+      "description": "Employ a technical surveillance countermeasures survey at {{ insert: param, ra-06_odp.01 }} {{ insert: param, ra-06_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-7",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Risk Response",
+      "description": "Respond to findings from security and privacy assessments, monitoring, and audits in accordance with organizational risk tolerance.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-8",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Privacy Impact Assessments",
+      "description": "Conduct privacy impact assessments for systems, programs, or other activities before:\na. Developing or procuring information technology that processes personally identifiable information; and\nb. Initiating a new collection of personally identifiable information that:",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-9",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Criticality Analysis",
+      "description": "Identify critical system components and functions by performing a criticality analysis for {{ insert: param, ra-09_odp.01 }} at {{ insert: param, ra-09_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "RA-10",
+      "parent": "RA",
+      "domain": "Risk Assessment",
+      "title": "Threat Hunting",
+      "description": "a. Establish and maintain a cyber threat hunting capability to:\nb. Employ the threat hunting capability {{ insert: param, ra-10_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA",
+      "parent": null,
+      "domain": "System and Services Acquisition",
+      "title": "System and Services Acquisition",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "SA-1",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, sa-1_prm_1 }}:\nb. Designate an {{ insert: param, sa-01_odp.04 }} to manage the development, documentation, and dissemination of the system and services acquisition policy and procedures; and\nc. Review and update the current system and services acquisition:",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-2",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Allocation of Resources",
+      "description": "a. Determine the high-level information security and privacy requirements for the system or system service in mission and business process planning;\nb. Determine, document, and allocate the resources required to protect the system or system service as part of the organizational capital planning and investment control process; and\nc. Establish a discrete line item for information security and privacy in organizational programming and budgeting documentation.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-3",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "System Development Life Cycle",
+      "description": "a. Acquire, develop, and manage the system using {{ insert: param, sa-03_odp }} that incorporates information security and privacy considerations;\nb. Define and document information security and privacy roles and responsibilities throughout the system development life cycle;\nc. Identify individuals having information security and privacy roles and responsibilities; and\nd. Integrate the organizational information security and privacy risk management process into system development life cycle activities.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-4",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Acquisition Process",
+      "description": "Include the following requirements, descriptions, and criteria, explicitly or by reference, using {{ insert: param, sa-04_odp.01 }} in the acquisition contract for the system, system component, or system service:\na. Security and privacy functional requirements;\nb. Strength of mechanism requirements;\nc. Security and privacy assurance requirements;\nd. Controls needed to satisfy the security and privacy requirements.\ne. Security and privacy documentation requirements;\nf. Requirements for protecting security and privacy documentation;\ng. Description of the system development environment and environment in which the system is intended to operate;\nh. Allocation of responsibility or identification of parties responsible for information security, privacy, and supply chain risk management; and\ni. Acceptance criteria.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-5",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "System Documentation",
+      "description": "a. Obtain or develop administrator documentation for the system, system component, or system service that describes:\nb. Obtain or develop user documentation for the system, system component, or system service that describes:\nc. Document attempts to obtain system, system component, or system service documentation when such documentation is either unavailable or nonexistent and take {{ insert: param, sa-05_odp.01 }} in response; and\nd. Distribute documentation to {{ insert: param, sa-05_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-6",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Software Usage Restrictions",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-7",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "User-installed Software",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-8",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Security and Privacy Engineering Principles",
+      "description": "Apply the following systems security and privacy engineering principles in the specification, design, development, implementation, and modification of the system and system components: {{ insert: param, sa-8_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-9",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "External System Services",
+      "description": "a. Require that providers of external system services comply with organizational security and privacy requirements and employ the following controls: {{ insert: param, sa-09_odp.01 }};\nb. Define and document organizational oversight and user roles and responsibilities with regard to external system services; and\nc. Employ the following processes, methods, and techniques to monitor control compliance by external service providers on an ongoing basis: {{ insert: param, sa-09_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-10",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Developer Configuration Management",
+      "description": "Require the developer of the system, system component, or system service to:\na. Perform configuration management during system, component, or service {{ insert: param, sa-10_odp.01 }};\nb. Document, manage, and control the integrity of changes to {{ insert: param, sa-10_odp.02 }};\nc. Implement only organization-approved changes to the system, component, or service;\nd. Document approved changes to the system, component, or service and the potential security and privacy impacts of such changes; and\ne. Track security flaws and flaw resolution within the system, component, or service and report findings to {{ insert: param, sa-10_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-11",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Developer Testing and Evaluation",
+      "description": "Require the developer of the system, system component, or system service, at all post-design stages of the system development life cycle, to:\na. Develop and implement a plan for ongoing security and privacy control assessments;\nb. Perform {{ insert: param, sa-11_odp.01 }} testing/evaluation {{ insert: param, sa-11_odp.02 }} at {{ insert: param, sa-11_odp.03 }};\nc. Produce evidence of the execution of the assessment plan and the results of the testing and evaluation;\nd. Implement a verifiable flaw remediation process; and\ne. Correct flaws identified during testing and evaluation.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-12",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Supply Chain Protection",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-13",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Trustworthiness",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-14",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Criticality Analysis",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-15",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Development Process, Standards, and Tools",
+      "description": "a. Require the developer of the system, system component, or system service to follow a documented development process that:\nb. Review the development process, standards, tools, tool options, and tool configurations {{ insert: param, sa-15_odp.01 }} to determine if the process, standards, tools, tool options and tool configurations selected and employed can satisfy the following security and privacy requirements: {{ insert: param, sa-15_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-16",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Developer-provided Training",
+      "description": "Require the developer of the system, system component, or system service to provide the following training on the correct use and operation of the implemented security and privacy functions, controls, and/or mechanisms: {{ insert: param, sa-16_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-17",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Developer Security and Privacy Architecture and Design",
+      "description": "Require the developer of the system, system component, or system service to produce a design specification and security and privacy architecture that:\na. Is consistent with the organization\u2019s security and privacy architecture that is an integral part the organization\u2019s enterprise architecture;\nb. Accurately and completely describes the required security and privacy functionality, and the allocation of controls among physical and logical components; and\nc. Expresses how individual security and privacy functions, mechanisms, and services work together to provide required security and privacy capabilities and a unified approach to protection.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-18",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Tamper Resistance and Detection",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-19",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Component Authenticity",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-20",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Customized Development of Critical Components",
+      "description": "Reimplement or custom develop the following critical system components: {{ insert: param, sa-20_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-21",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Developer Screening",
+      "description": "Require that the developer of {{ insert: param, sa-21_odp.01 }}:\na. Has appropriate access authorizations as determined by assigned {{ insert: param, sa-21_odp.02 }} ; and\nb. Satisfies the following additional personnel screening criteria: {{ insert: param, sa-21_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-22",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Unsupported System Components",
+      "description": "a. Replace system components when support for the components is no longer available from the developer, vendor, or manufacturer; or\nb. Provide the following options for alternative sources for continued support for unsupported components {{ insert: param, sa-22_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-23",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Specialization",
+      "description": "Employ {{ insert: param, sa-23_odp.01 }} on {{ insert: param, sa-23_odp.02 }} supporting mission essential services or functions to increase the trustworthiness in those systems or components.",
+      "weight": 1
+    },
+    {
+      "control_id": "SA-24",
+      "parent": "SA",
+      "domain": "System and Services Acquisition",
+      "title": "Design For Cyber Resiliency",
+      "description": "a. Design organizational systems, system components, or system services to achieve cyber resiliency by:\nb. Implement the selected cyber resiliency goals, objectives, techniques, implementation approaches, and design principles as part of an organizational risk management process or systems security engineering process.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC",
+      "parent": null,
+      "domain": "System and Communications Protection",
+      "title": "System and Communications Protection",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "SC-1",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, sc-1_prm_1 }}:\nb. Designate an {{ insert: param, sc-01_odp.04 }} to manage the development, documentation, and dissemination of the system and communications protection policy and procedures; and\nc. Review and update the current system and communications protection:",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-2",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Separation of System and User Functionality",
+      "description": "Separate user functionality, including user interface services, from system management functionality.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-3",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Security Function Isolation",
+      "description": "Isolate security functions from nonsecurity functions.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-4",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Information in Shared System Resources",
+      "description": "Prevent unauthorized and unintended information transfer via shared system resources.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-5",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Denial-of-service Protection",
+      "description": "a. {{ insert: param, sc-05_odp.02 }} the effects of the following types of denial-of-service events: {{ insert: param, sc-05_odp.01 }} ; and\nb. Employ the following controls to achieve the denial-of-service objective: {{ insert: param, sc-05_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-6",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Resource Availability",
+      "description": "Protect the availability of resources by allocating {{ insert: param, sc-06_odp.01 }} by {{ insert: param, sc-06_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-7",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Boundary Protection",
+      "description": "a. Monitor and control communications at the external managed interfaces to the system and at key internal managed interfaces within the system;\nb. Implement subnetworks for publicly accessible system components that are {{ insert: param, sc-07_odp }} separated from internal organizational networks; and\nc. Connect to external networks or systems only through managed interfaces consisting of boundary protection devices arranged in accordance with an organizational security and privacy architecture.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-8",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Transmission Confidentiality and Integrity",
+      "description": "Protect the {{ insert: param, sc-08_odp }} of transmitted information.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-9",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Transmission Confidentiality",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-10",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Network Disconnect",
+      "description": "Terminate the network connection associated with a communications session at the end of the session or after {{ insert: param, sc-10_odp }} of inactivity.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-11",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Trusted Path",
+      "description": "a. Provide a {{ insert: param, sc-11_odp.01 }} isolated trusted communications path for communications between the user and the trusted components of the system; and\nb. Permit users to invoke the trusted communications path for communications between the user and the following security functions of the system, including at a minimum, authentication and re-authentication: {{ insert: param, sc-11_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-12",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Cryptographic Key Establishment and Management",
+      "description": "Establish and manage cryptographic keys when cryptography is employed within the system in accordance with the following key management requirements: {{ insert: param, sc-12_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-13",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Cryptographic Protection",
+      "description": "a. Determine the {{ insert: param, sc-13_odp.01 }} ; and\nb. Implement the following types of cryptography required for each specified cryptographic use: {{ insert: param, sc-13_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-14",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Public Access Protections",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-15",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Collaborative Computing Devices and Applications",
+      "description": "a. Prohibit remote activation of collaborative computing devices and applications with the following exceptions: {{ insert: param, sc-15_odp }} ; and\nb. Provide an explicit indication of use to users physically present at the devices.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-16",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Transmission of Security and Privacy Attributes",
+      "description": "Associate {{ insert: param, sc-16_prm_1 }} with information exchanged between systems and between system components.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-17",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Public Key Infrastructure Certificates",
+      "description": "a. Issue public key certificates under an {{ insert: param, sc-17_odp }} or obtain public key certificates from an approved service provider; and\nb. Include only approved trust anchors in trust stores or certificate stores managed by the organization.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-18",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Mobile Code",
+      "description": "a. Define acceptable and unacceptable mobile code and mobile code technologies; and\nb. Authorize, monitor, and control the use of mobile code within the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-19",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Voice Over Internet Protocol",
+      "description": "Technology-specific; addressed as any other technology or protocol.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-20",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Secure Name/Address Resolution Service (Authoritative Source)",
+      "description": "a. Provide additional data origin authentication and integrity verification artifacts along with the authoritative name resolution data the system returns in response to external name/address resolution queries; and\nb. Provide the means to indicate the security status of child zones and (if the child supports secure resolution services) to enable verification of a chain of trust among parent and child domains, when operating as part of a distributed, hierarchical namespace.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-21",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Secure Name/Address Resolution Service (Recursive or Caching Resolver)",
+      "description": "Request and perform data origin authentication and data integrity verification on the name/address resolution responses the system receives from authoritative sources.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-22",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Architecture and Provisioning for Name/Address Resolution Service",
+      "description": "Ensure the systems that collectively provide name/address resolution service for an organization are fault-tolerant and implement internal and external role separation.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-23",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Session Authenticity",
+      "description": "Protect the authenticity of communications sessions.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-24",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Fail in Known State",
+      "description": "Fail to a {{ insert: param, sc-24_odp.02 }} for the following failures on the indicated components while preserving {{ insert: param, sc-24_odp.03 }} in failure: {{ insert: param, sc-24_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-25",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Thin Nodes",
+      "description": "Employ minimal functionality and information storage on the following system components: {{ insert: param, sc-25_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-26",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Decoys",
+      "description": "Include components within organizational systems specifically designed to be the target of malicious attacks for detecting, deflecting, and analyzing such attacks.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-27",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Platform-independent Applications",
+      "description": "Include within organizational systems the following platform independent applications: {{ insert: param, sc-27_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-28",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Protection of Information at Rest",
+      "description": "Protect the {{ insert: param, sc-28_odp.01 }} of the following information at rest: {{ insert: param, sc-28_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-29",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Heterogeneity",
+      "description": "Employ a diverse set of information technologies for the following system components in the implementation of the system: {{ insert: param, sc-29_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-30",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Concealment and Misdirection",
+      "description": "Employ the following concealment and misdirection techniques for {{ insert: param, sc-30_odp.02 }} at {{ insert: param, sc-30_odp.03 }} to confuse and mislead adversaries: {{ insert: param, sc-30_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-31",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Covert Channel Analysis",
+      "description": "a. Perform a covert channel analysis to identify those aspects of communications within the system that are potential avenues for covert {{ insert: param, sc-31_odp }} channels; and\nb. Estimate the maximum bandwidth of those channels.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-32",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "System Partitioning",
+      "description": "Partition the system into {{ insert: param, sc-32_odp.01 }} residing in separate {{ insert: param, sc-32_odp.02 }} domains or environments based on {{ insert: param, sc-32_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-33",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Transmission Preparation Integrity",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-34",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Non-modifiable Executable Programs",
+      "description": "For {{ insert: param, sc-34_odp.01 }} , load and execute:\na. The operating environment from hardware-enforced, read-only media; and\nb. The following applications from hardware-enforced, read-only media: {{ insert: param, sc-34_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-35",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "External Malicious Code Identification",
+      "description": "Include system components that proactively seek to identify network-based malicious code or malicious websites.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-36",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Distributed Processing and Storage",
+      "description": "Distribute the following processing and storage components across multiple {{ insert: param, sc-36_prm_1 }}: {{ insert: param, sc-36_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-37",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Out-of-band Channels",
+      "description": "Employ the following out-of-band channels for the physical delivery or electronic transmission of {{ insert: param, sc-37_odp.02 }} to {{ insert: param, sc-37_odp.03 }}: {{ insert: param, sc-37_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-38",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Operations Security",
+      "description": "Employ the following operations security controls to protect key organizational information throughout the system development life cycle: {{ insert: param, sc-38_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-39",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Process Isolation",
+      "description": "Maintain a separate execution domain for each executing system process.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-40",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Wireless Link Protection",
+      "description": "Protect external and internal {{ insert: param, sc-40_prm_1 }} from the following signal parameter attacks: {{ insert: param, sc-40_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-41",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Port and I/O Device Access",
+      "description": "{{ insert: param, sc-41_odp.02 }} disable or remove {{ insert: param, sc-41_odp.01 }} on the following systems or system components: {{ insert: param, sc-41_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-42",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Sensor Capability and Data",
+      "description": "a. Prohibit {{ insert: param, sc-42_odp.01 }} ; and\nb. Provide an explicit indication of sensor use to {{ insert: param, sc-42_odp.05 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-43",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Usage Restrictions",
+      "description": "a. Establish usage restrictions and implementation guidelines for the following system components: {{ insert: param, sc-43_odp }} ; and\nb. Authorize, monitor, and control the use of such components within the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-44",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Detonation Chambers",
+      "description": "Employ a detonation chamber capability within {{ insert: param, sc-44_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-45",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "System Time Synchronization",
+      "description": "Synchronize system clocks within and between systems and system components.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-46",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Cross Domain Policy Enforcement",
+      "description": "Implement a policy enforcement mechanism {{ insert: param, sc-46_odp }} between the physical and/or network interfaces for the connecting security domains.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-47",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Alternate Communications Paths",
+      "description": "Establish {{ insert: param, sc-47_odp }} for system operations organizational command and control.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-48",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Sensor Relocation",
+      "description": "Relocate {{ insert: param, sc-48_odp.01 }} to {{ insert: param, sc-48_odp.02 }} under the following conditions or circumstances: {{ insert: param, sc-48_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-49",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Hardware-enforced Separation and Policy Enforcement",
+      "description": "Implement hardware-enforced separation and policy enforcement mechanisms between {{ insert: param, sc-49_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-50",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Software-enforced Separation and Policy Enforcement",
+      "description": "Implement software-enforced separation and policy enforcement mechanisms between {{ insert: param, sc-50_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SC-51",
+      "parent": "SC",
+      "domain": "System and Communications Protection",
+      "title": "Hardware-based Protection",
+      "description": "a. Employ hardware-based, write-protect for {{ insert: param, sc-51_odp.01 }} ; and\nb. Implement specific procedures for {{ insert: param, sc-51_odp.02 }} to manually disable hardware write-protect for firmware modifications and re-enable the write-protect prior to returning to operational mode.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI",
+      "parent": null,
+      "domain": "System and Information Integrity",
+      "title": "System and Information Integrity",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "SI-1",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, si-1_prm_1 }}:\nb. Designate an {{ insert: param, si-01_odp.04 }} to manage the development, documentation, and dissemination of the system and information integrity policy and procedures; and\nc. Review and update the current system and information integrity:",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-2",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Flaw Remediation",
+      "description": "a. Identify, report, and correct system flaws;\nb. Test software and firmware updates related to flaw remediation for effectiveness and potential side effects before installation;\nc. Install security-relevant software and firmware updates within {{ insert: param, si-02_odp }} of the release of the updates; and\nd. Incorporate flaw remediation into the organizational configuration management process.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-3",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Malicious Code Protection",
+      "description": "a. Implement {{ insert: param, si-03_odp.01 }} malicious code protection mechanisms at system entry and exit points to detect and eradicate malicious code;\nb. Automatically update malicious code protection mechanisms as new releases are available in accordance with organizational configuration management policy and procedures;\nc. Configure malicious code protection mechanisms to:\nd. Address the receipt of false positives during malicious code detection and eradication and the resulting potential impact on the availability of the system.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-4",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "System Monitoring",
+      "description": "a. Monitor the system to detect:\nb. Identify unauthorized use of the system through the following techniques and methods: {{ insert: param, si-04_odp.02 }};\nc. Invoke internal monitoring capabilities or deploy monitoring devices:\nd. Analyze detected events and anomalies;\ne. Adjust the level of system monitoring activity when there is a change in risk to organizational operations and assets, individuals, other organizations, or the Nation;\nf. Obtain legal opinion regarding system monitoring activities; and\ng. Provide {{ insert: param, si-04_odp.03 }} to {{ insert: param, si-04_odp.04 }} {{ insert: param, si-04_odp.05 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-5",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Security Alerts, Advisories, and Directives",
+      "description": "a. Receive system security alerts, advisories, and directives from {{ insert: param, si-05_odp.01 }} on an ongoing basis;\nb. Generate internal security alerts, advisories, and directives as deemed necessary;\nc. Disseminate security alerts, advisories, and directives to: {{ insert: param, si-05_odp.02 }} ; and\nd. Implement security directives in accordance with established time frames, or notify the issuing organization of the degree of noncompliance.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-6",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Security and Privacy Function Verification",
+      "description": "a. Verify the correct operation of {{ insert: param, si-6_prm_1 }};\nb. Perform the verification of the functions specified in SI-6a {{ insert: param, si-06_odp.03 }};\nc. Alert {{ insert: param, si-06_odp.06 }} to failed security and privacy verification tests; and\nd. {{ insert: param, si-06_odp.07 }} when anomalies are discovered.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-7",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Software, Firmware, and Information Integrity",
+      "description": "a. Employ integrity verification tools to detect unauthorized changes to the following software, firmware, and information: {{ insert: param, si-7_prm_1 }} ; and\nb. Take the following actions when unauthorized changes to the software, firmware, and information are detected: {{ insert: param, si-7_prm_2 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-8",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Spam Protection",
+      "description": "a. Employ spam protection mechanisms at system entry and exit points to detect and act on unsolicited messages; and\nb. Update spam protection mechanisms when new releases are available in accordance with organizational configuration management policy and procedures.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-9",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Input Restrictions",
+      "description": "",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-10",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Input Validation",
+      "description": "Check the validity of the following information inputs: {{ insert: param, si-10_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-11",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Error Handling",
+      "description": "a. Generate error messages that provide information necessary for corrective actions without revealing information that could be exploited; and\nb. Reveal error messages only to {{ insert: param, si-11_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-12",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Management and Retention",
+      "description": "Manage and retain information within the system and information output from the system in accordance with applicable laws, executive orders, directives, regulations, policies, standards, guidelines and operational requirements.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-13",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Predictable Failure Prevention",
+      "description": "a. Determine mean time to failure (MTTF) for the following system components in specific environments of operation: {{ insert: param, si-13_odp.01 }} ; and\nb. Provide substitute system components and a means to exchange active and standby components in accordance with the following criteria: {{ insert: param, si-13_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-14",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Non-persistence",
+      "description": "Implement non-persistent {{ insert: param, si-14_odp.01 }} that are initiated in a known state and terminated {{ insert: param, si-14_odp.02 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-15",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Output Filtering",
+      "description": "Validate information output from the following software programs and/or applications to ensure that the information is consistent with the expected content: {{ insert: param, si-15_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-16",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Memory Protection",
+      "description": "Implement the following controls to protect the system memory from unauthorized code execution: {{ insert: param, si-16_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-17",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Fail-safe Procedures",
+      "description": "Implement the indicated fail-safe procedures when the indicated failures occur: {{ insert: param, si-17_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-18",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Personally Identifiable Information Quality Operations",
+      "description": "a. Check the accuracy, relevance, timeliness, and completeness of personally identifiable information across the information life cycle {{ insert: param, si-18_prm_1 }} ; and\nb. Correct or delete inaccurate or outdated personally identifiable information.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-19",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "De-identification",
+      "description": "a. Remove the following elements of personally identifiable information from datasets: {{ insert: param, si-19_odp.01 }} ; and\nb. Evaluate {{ insert: param, si-19_odp.02 }} for effectiveness of de-identification.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-20",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Tainting",
+      "description": "Embed data or capabilities in the following systems or system components to determine if organizational data has been exfiltrated or improperly removed from the organization: {{ insert: param, si-20_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-21",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Refresh",
+      "description": "Refresh {{ insert: param, si-21_odp.01 }} at {{ insert: param, si-21_odp.02 }} or generate the information on demand and delete the information when no longer needed.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-22",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Diversity",
+      "description": "a. Identify the following alternative sources of information for {{ insert: param, si-22_odp.02 }}: {{ insert: param, si-22_odp.01 }} ; and\nb. Use an alternative information source for the execution of essential functions or services on {{ insert: param, si-22_odp.03 }} when the primary source of information is corrupted or unavailable.",
+      "weight": 1
+    },
+    {
+      "control_id": "SI-23",
+      "parent": "SI",
+      "domain": "System and Information Integrity",
+      "title": "Information Fragmentation",
+      "description": "Based on {{ insert: param, si-23_odp.01 }}:\na. Fragment the following information: {{ insert: param, si-23_odp.02 }} ; and\nb. Distribute the fragmented information across the following systems or system components: {{ insert: param, si-23_odp.03 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR",
+      "parent": null,
+      "domain": "Supply Chain Risk Management",
+      "title": "Supply Chain Risk Management",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "SR-1",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Policy and Procedures",
+      "description": "a. Develop, document, and disseminate to {{ insert: param, sr-1_prm_1 }}:\nb. Designate an {{ insert: param, sr-01_odp.04 }} to manage the development, documentation, and dissemination of the supply chain risk management policy and procedures; and\nc. Review and update the current supply chain risk management:",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-2",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Supply Chain Risk Management Plan",
+      "description": "a. Develop a plan for managing supply chain risks associated with the research and development, design, manufacturing, acquisition, delivery, integration, operations and maintenance, and disposal of the following systems, system components or system services: {{ insert: param, sr-02_odp.01 }};\nb. Review and update the supply chain risk management plan {{ insert: param, sr-02_odp.02 }} or as required, to address threat, organizational or environmental changes; and\nc. Protect the supply chain risk management plan from unauthorized disclosure and modification.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-3",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Supply Chain Controls and Processes",
+      "description": "a. Establish a process or processes to identify and address weaknesses or deficiencies in the supply chain elements and processes of {{ insert: param, sr-03_odp.01 }} in coordination with {{ insert: param, sr-03_odp.02 }};\nb. Employ the following controls to protect against supply chain risks to the system, system component, or system service and to limit the harm or consequences from supply chain-related events: {{ insert: param, sr-03_odp.03 }} ; and\nc. Document the selected and implemented supply chain processes and controls in {{ insert: param, sr-03_odp.04 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-4",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Provenance",
+      "description": "Document, monitor, and maintain valid provenance of the following systems, system components, and associated data: {{ insert: param, sr-04_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-5",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Acquisition Strategies, Tools, and Methods",
+      "description": "Employ the following acquisition strategies, contract tools, and procurement methods to protect against, identify, and mitigate supply chain risks: {{ insert: param, sr-05_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-6",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Supplier Assessments and Reviews",
+      "description": "Assess and review the supply chain-related risks associated with suppliers or contractors and the system, system component, or system service they provide {{ insert: param, sr-06_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-7",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Supply Chain Operations Security",
+      "description": "Employ the following Operations Security (OPSEC) controls to protect supply chain-related information for the system, system component, or system service: {{ insert: param, sr-07_odp }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-8",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Notification Agreements",
+      "description": "Establish agreements and procedures with entities involved in the supply chain for the system, system component, or system service for the {{ insert: param, sr-08_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-9",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Tamper Resistance and Detection",
+      "description": "Implement a tamper protection program for the system, system component, or system service.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-10",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Inspection of Systems or Components",
+      "description": "Inspect the following systems or system components {{ insert: param, sr-10_odp.02 }} to detect tampering: {{ insert: param, sr-10_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-11",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Component Authenticity",
+      "description": "a. Develop and implement anti-counterfeit policy and procedures that include the means to detect and prevent counterfeit components from entering the system; and\nb. Report counterfeit system components to {{ insert: param, sr-11_odp.01 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "SR-12",
+      "parent": "SR",
+      "domain": "Supply Chain Risk Management",
+      "title": "Component Disposal",
+      "description": "Dispose of {{ insert: param, sr-12_odp.01 }} using the following techniques and methods: {{ insert: param, sr-12_odp.02 }}.",
+      "weight": 1
+    }
+  ]
+}

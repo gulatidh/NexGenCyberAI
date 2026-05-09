@@ -11,6 +11,7 @@ from core.security import get_current_user
 from core.encryption import decrypt
 from connectors.factory import get_connector
 from connectors.sync import sync_connector_assets
+from services.compliance import recompute_all_frameworks_for_client, recompute_client_framework
 
 router = APIRouter(prefix="/clients/{client_id}/scans", tags=["scans"])
 _orchestrator = None
@@ -132,6 +133,18 @@ async def _execute_scan(scan_id: str, db_url: str, asset_external_id: Optional[s
         scan.completed_at = datetime.now(timezone.utc)
         db.commit()
 
+        # Re-derive framework compliance from the new findings
+        try:
+            from api.models.models import FrameworkType
+            if scan.framework:
+                fw_value = scan.framework.value if hasattr(scan.framework, "value") else str(scan.framework)
+                recompute_client_framework(db, scan.client_id, FrameworkType(fw_value))
+            else:
+                recompute_all_frameworks_for_client(db, scan.client_id)
+        except Exception as exc:
+            import logging as _lg
+            _lg.getLogger(__name__).warning("Post-scan compliance recompute failed: %s", exc)
+
     except Exception as exc:
         db = SessionLocal()
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
@@ -210,4 +223,11 @@ async def update_finding(
         setattr(f, k, v)
     db.commit()
     db.refresh(f)
+    if f.framework:
+        from api.models.models import FrameworkType as _FT
+        try:
+            fv = f.framework.value if hasattr(f.framework, "value") else str(f.framework)
+            recompute_client_framework(db, client_id, _FT(fv))
+        except Exception:
+            pass
     return f

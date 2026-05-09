@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -168,9 +168,80 @@ def _provision_azure_connector() -> None:
         lf.close()
 
 
+def _seed_framework_controls() -> None:
+    """Idempotent: load JSON files in data/frameworks/, upsert FrameworkControl rows."""
+    import os, glob, json, fcntl
+    from sqlalchemy.orm import Session
+    from api.models.models import FrameworkControl, FrameworkType
+
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "frameworks")
+    files = sorted(glob.glob(os.path.join(data_dir, "*.json")))
+    if not files:
+        return
+
+    lock_path = "/home/.frameworks_seed.lock"
+    lf = None
+    try:
+        lf = open(lock_path, "a")
+        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        if lf is not None:
+            lf.close()
+        return
+    try:
+        with Session(engine) as db:
+            for fp in files:
+                payload = json.loads(open(fp, "r", encoding="utf-8").read())
+                fw_value = payload["framework"]
+                try:
+                    fw_enum = FrameworkType(fw_value)
+                except ValueError:
+                    logger.warning("Unknown framework in %s: %s", fp, fw_value)
+                    continue
+                seen_ids = set()
+                for c in payload.get("controls", []):
+                    cid = c["control_id"]
+                    seen_ids.add(cid)
+                    existing = (
+                        db.query(FrameworkControl)
+                        .filter(FrameworkControl.framework == fw_enum, FrameworkControl.control_id == cid)
+                        .first()
+                    )
+                    if existing:
+                        existing.parent_control_id = c.get("parent")
+                        existing.domain = c.get("domain")
+                        existing.title = c.get("title") or cid
+                        existing.description = c.get("description")
+                        existing.weight = c.get("weight", 1)
+                    else:
+                        db.add(FrameworkControl(
+                            framework=fw_enum,
+                            control_id=cid,
+                            parent_control_id=c.get("parent"),
+                            domain=c.get("domain"),
+                            title=c.get("title") or cid,
+                            description=c.get("description"),
+                            weight=c.get("weight", 1),
+                        ))
+                # Remove rows that vanished from the source JSON
+                stale = (
+                    db.query(FrameworkControl)
+                    .filter(FrameworkControl.framework == fw_enum, ~FrameworkControl.control_id.in_(seen_ids))
+                    .all()
+                )
+                for s in stale:
+                    db.delete(s)
+                db.commit()
+                logger.info("Seeded %s: %d controls", fw_value, len(seen_ids))
+    finally:
+        fcntl.flock(lf, fcntl.LOCK_UN)
+        lf.close()
+
+
 _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
+_seed_framework_controls()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -208,6 +279,7 @@ app.include_router(scans.router, prefix="/api/v1")
 app.include_router(risks.router, prefix="/api/v1")
 app.include_router(findings.router, prefix="/api/v1")
 app.include_router(assets.router, prefix="/api/v1")
+app.include_router(frameworks.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 

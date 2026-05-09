@@ -116,6 +116,24 @@ export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
 };
 
+export const frameworksApi = {
+  catalog: () => apiClient.get("/frameworks/").then((r) => r.data),
+  controls: (framework: string) => apiClient.get(`/frameworks/${framework}/controls/`).then((r) => r.data),
+  summary: (clientId: string) => apiClient.get(`/clients/${clientId}/frameworks/`).then((r) => r.data),
+  forClient: (clientId: string, framework: string) =>
+    apiClient.get(`/clients/${clientId}/frameworks/${framework}/`).then((r) => r.data),
+  controlDetail: (clientId: string, framework: string, controlId: string) =>
+    apiClient.get(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}`).then((r) => r.data),
+  override: (clientId: string, framework: string, controlId: string, body: any) =>
+    apiClient
+      .patch(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}`, body)
+      .then((r) => r.data),
+  resetOverride: (clientId: string, framework: string, controlId: string) =>
+    apiClient.delete(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}/override`),
+  recompute: (clientId: string, framework: string) =>
+    apiClient.post(`/clients/${clientId}/frameworks/${framework}/recompute/`).then((r) => r.data),
+};
+
 export const assetsApi = {
   list: (clientId: string, params?: Record<string, any>) =>
     apiClient.get(`/clients/${clientId}/assets/`, { params }).then((r) => r.data),

@@ -3,11 +3,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
-from api.models.models import Finding, Scan
+from api.models.models import Finding, Scan, FrameworkType
 from api.schemas.schemas import FindingResponse, FindingUpdate
 from db.database import get_db
 from core.security import get_current_user
 from fastapi import HTTPException
+from services.compliance import recompute_client_framework
 
 router = APIRouter(prefix="/clients/{client_id}/findings", tags=["findings"])
 
@@ -52,4 +53,10 @@ async def update_finding_status(
         setattr(f, k, v)
     db.commit()
     db.refresh(f)
+    if f.framework:
+        try:
+            fv = f.framework.value if hasattr(f.framework, "value") else str(f.framework)
+            recompute_client_framework(db, client_id, FrameworkType(fv))
+        except Exception:
+            pass
     return f
