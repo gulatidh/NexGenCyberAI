@@ -25,33 +25,33 @@ def _ensure_added_columns() -> None:
     """Idempotent: ALTER TABLE for new columns added to existing tables.
 
     SQLAlchemy's create_all() only creates missing TABLES — it does not add
-    new columns to existing tables. Any time we add a column to an existing
-    model, we have to add an ALTER here so prod (Azure SQL) picks it up.
-
-    Strategy: attempt the ALTER unconditionally; swallow only "column already
-    exists" errors. More robust than introspection because some Azure SQL
-    accounts have schema-name quirks that hide columns from get_columns.
+    new columns to existing tables. Introspect first; only ALTER if missing
+    (avoids running expensive DDL on every worker startup, which has caused
+    boot hangs on Azure SQL).
     """
-    from sqlalchemy import text
-    dialect = engine.dialect.name  # 'mssql' | 'sqlite' | 'postgresql' | ...
-
-    if dialect == "mssql":
-        ddl = "ALTER TABLE findings ADD control_mappings NVARCHAR(MAX) NULL"
-        already_markers = ("column names in each table must be unique", "already")
-    else:
-        ddl = "ALTER TABLE findings ADD COLUMN control_mappings TEXT"
-        already_markers = ("duplicate column", "already exists")
-
+    from sqlalchemy import inspect, text
     try:
-        with engine.begin() as conn:
-            conn.execute(text(ddl))
-        logger.info("Added findings.control_mappings column (%s dialect)", dialect)
+        inspector = inspect(engine)
+        dialect = engine.dialect.name  # 'mssql' | 'sqlite' | 'postgresql' | ...
+        try:
+            existing_cols = {c["name"] for c in inspector.get_columns("findings")}
+        except Exception as exc:
+            logger.warning("Could not inspect findings columns: %s", exc)
+            return
+
+        if "control_mappings" not in existing_cols:
+            if dialect == "mssql":
+                ddl = "ALTER TABLE findings ADD control_mappings NVARCHAR(MAX) NULL"
+            else:
+                ddl = "ALTER TABLE findings ADD COLUMN control_mappings TEXT"
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added findings.control_mappings column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("findings.control_mappings ALTER failed (likely already added by another worker): %s", exc)
     except Exception as exc:
-        msg = str(exc).lower()
-        if any(m in msg for m in already_markers):
-            logger.info("findings.control_mappings already present (skipped ALTER)")
-        else:
-            logger.error("findings.control_mappings ALTER failed: %s", exc)
+        logger.warning("_ensure_added_columns failed: %s", exc)
 
 
 def _normalize_enum_case() -> None:
