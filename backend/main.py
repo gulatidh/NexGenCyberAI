@@ -21,6 +21,35 @@ settings = get_settings()
 Base.metadata.create_all(bind=engine)
 
 
+def _ensure_added_columns() -> None:
+    """Idempotent: ALTER TABLE for new columns added to existing tables.
+
+    SQLAlchemy's create_all() only creates missing TABLES — it does not add
+    new columns to existing tables. Any time we add a column to an existing
+    model, we have to add an ALTER here so prod (Azure SQL) picks it up.
+    """
+    from sqlalchemy import inspect, text
+    try:
+        inspector = inspect(engine)
+        dialect = engine.dialect.name  # 'mssql' | 'sqlite' | 'postgresql' | ...
+
+        # findings.control_mappings (added with the cross-framework mapping fix)
+        try:
+            existing_cols = {c["name"] for c in inspector.get_columns("findings")}
+            if "control_mappings" not in existing_cols:
+                if dialect == "mssql":
+                    ddl = "ALTER TABLE findings ADD control_mappings NVARCHAR(MAX) NULL"
+                else:  # sqlite, postgresql, etc.
+                    ddl = "ALTER TABLE findings ADD COLUMN control_mappings TEXT"
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added findings.control_mappings column")
+        except Exception as exc:
+            logger.warning("findings.control_mappings ALTER skipped: %s", exc)
+    except Exception as exc:
+        logger.warning("_ensure_added_columns inspection failed: %s", exc)
+
+
 def _normalize_enum_case() -> None:
     """One-time migration: lowercase all enum column values so they match the Python enum .values."""
     from sqlalchemy import text
@@ -238,6 +267,7 @@ def _seed_framework_controls() -> None:
         lf.close()
 
 
+_ensure_added_columns()
 _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
