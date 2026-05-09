@@ -29,6 +29,9 @@ class ConnectorFinding:
     evidence: Dict[str, Any] = field(default_factory=dict)
     cve_id: str = ""
     cvss_score: float = 0.0
+    # Cross-framework mapping: {framework_value: [control_ids]}
+    # e.g. {"cis_azure": ["3.1"], "nist_800_53": ["SC-8"], "cis_v8": ["CIS-3.10"]}
+    control_mappings: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass

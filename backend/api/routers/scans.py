@@ -87,6 +87,7 @@ async def _execute_scan(scan_id: str, db_url: str, asset_external_id: Optional[s
                 evidence=f.evidence,
                 cve_id=f.cve_id,
                 cvss_score=f.cvss_score or None,
+                control_mappings=getattr(f, "control_mappings", {}) or {},
             )
             db.add(finding)
         db.commit()

@@ -14,9 +14,22 @@ from api.models.models import (
 logger = logging.getLogger(__name__)
 
 
+_PREFIX_NOISE = ("nist ", "nist-", "nist_", "csf ", "csf-", "cis ", "cis-")
+
+
 def _normalize(s: str) -> str:
-    """Lowercase + strip whitespace for control_id matching across casing variants."""
-    return (s or "").strip().lower()
+    """Lowercase, strip, drop leading framework-prefix noise like 'NIST '.
+
+    'NIST SC-8' → 'sc-8', 'CIS-3.10' → '3.10', 'PR.AA-04' → 'pr.aa-04'.
+    Lets us match Finding.control_id against catalog control_id even when
+    connectors emit prefixed forms.
+    """
+    out = (s or "").strip().lower()
+    for noise in _PREFIX_NOISE:
+        if out.startswith(noise):
+            out = out[len(noise):]
+            break
+    return out
 
 
 def derive_status_for_control(
@@ -47,22 +60,40 @@ def recompute_client_framework(
     """
     fw_value = framework.value if hasattr(framework, "value") else str(framework)
 
-    # 1. Pull all findings for this client + framework, grouped by control_id
+    # 1. Pull every client finding (any framework). Two ways a finding can map to
+    #    a control in this framework:
+    #      (a) Finding.framework == fw_value AND normalized Finding.control_id == catalog id
+    #      (b) Finding.control_mappings[fw_value] contains the catalog id
+    #    (b) lets one Azure check satisfy CIS Azure + NIST 800-53 + CIS v8 simultaneously.
     finding_rows = (
-        db.query(Finding.control_id, Finding.id, Finding.status)
+        db.query(Finding.control_id, Finding.id, Finding.status, Finding.framework, Finding.control_mappings)
         .join(Scan, Finding.scan_id == Scan.id)
-        .filter(Scan.client_id == client_id, Finding.framework == fw_value)
+        .filter(Scan.client_id == client_id)
         .all()
     )
     open_by_ctrl: Dict[str, List[str]] = {}
     hist_by_ctrl: Dict[str, List[str]] = {}
-    for ctrl_id, finding_id, status in finding_rows:
-        key = _normalize(ctrl_id)
-        if not key:
-            continue
-        hist_by_ctrl.setdefault(key, []).append(finding_id)
-        if (status or "open") == "open":
-            open_by_ctrl.setdefault(key, []).append(finding_id)
+    for ctrl_id, finding_id, status, finding_framework, mappings in finding_rows:
+        is_open = (status or "open") == "open"
+        keys: set = set()
+
+        # Path (a): same framework, literal control_id match (after normalize)
+        finding_fw_value = finding_framework.value if hasattr(finding_framework, "value") else (finding_framework or "")
+        if finding_fw_value == fw_value and ctrl_id:
+            keys.add(_normalize(ctrl_id))
+
+        # Path (b): cross-framework mapping populated by the connector
+        if mappings and isinstance(mappings, dict):
+            for cid in mappings.get(fw_value, []) or []:
+                if cid:
+                    keys.add(_normalize(cid))
+
+        for key in keys:
+            if not key:
+                continue
+            hist_by_ctrl.setdefault(key, []).append(finding_id)
+            if is_open:
+                open_by_ctrl.setdefault(key, []).append(finding_id)
 
     # 2. Walk the catalog
     controls = (

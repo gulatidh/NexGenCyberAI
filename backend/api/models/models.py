@@ -197,6 +197,7 @@ class Finding(Base):
     evidence = Column(JSON, default={})
     cve_id = Column(String(50))
     cvss_score = Column(Float)
+    control_mappings = Column(JSON, default={})  # {framework_value: [control_ids]} — fans this finding out across frameworks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
