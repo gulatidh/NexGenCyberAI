@@ -152,6 +152,11 @@ class FindingResponse(BaseModel):
     cve_id: Optional[str]
     cvss_score: Optional[float]
     created_at: Optional[datetime]
+    # Dedupe metadata: when the same (resource_id, title) appears in multiple
+    # scans, the listing collapses them to a single row. seen_count = number
+    # of scans that flagged it; first_seen_at = earliest detection.
+    seen_count: Optional[int] = 1
+    first_seen_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class FindingUpdate(BaseModel):

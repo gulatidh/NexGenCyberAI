@@ -36,19 +36,42 @@ async def list_findings(
         q = q.filter(Finding.status == status)
     if project_id:
         q = q.filter(Scan.project_id == project_id)
-    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(500).all()
-    # Section/category filters happen in Python because they're heuristic-driven
+    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(2000).all()
+
+    # Section/category filters happen in Python (heuristic-driven)
     if section or category:
-        out = []
-        for f in rows:
-            s, c = classify(f)
-            if section and s != section:
-                continue
-            if category and c != category:
-                continue
-            out.append(f)
-        return out[:200]
-    return rows[:200]
+        rows = [f for f in rows if (
+            (not section or classify(f)[0] == section)
+            and (not category or classify(f)[1] == category)
+        )]
+
+    # Dedupe by (resource_id, title) — pick the latest detection as the
+    # representative, set first_seen_at to the earliest, and seen_count to
+    # the number of scans that flagged it. Same-issue duplicates from
+    # multiple scans collapse to one row.
+    def _key(f: Finding) -> tuple:
+        return ((f.resource_id or "").strip().lower(), (f.title or "").strip().lower())
+
+    grouped: Dict[tuple, List[Finding]] = defaultdict(list)
+    for f in rows:
+        grouped[_key(f)].append(f)
+
+    deduped: List[Finding] = []
+    for group in grouped.values():
+        # Latest first by created_at (already sorted from query)
+        latest = max(group, key=lambda x: x.created_at or 0)
+        earliest = min(
+            (g for g in group if g.created_at is not None),
+            key=lambda x: x.created_at,
+            default=latest,
+        )
+        # Set extra attrs that FindingResponse picks up via from_attributes
+        latest.seen_count = len(group)
+        latest.first_seen_at = earliest.created_at
+        deduped.append(latest)
+
+    deduped.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)
+    return deduped[:300]
 
 
 @router.get("/categories")

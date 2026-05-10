@@ -96,6 +96,8 @@ export interface Finding {
   cve_id?: string;
   cvss_score?: number;
   created_at?: string;
+  seen_count?: number;
+  first_seen_at?: string;
 }
 
 export interface Risk {

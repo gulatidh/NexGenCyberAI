@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
-  Dialog, DialogTitle, DialogContent, DialogActions, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip,
 } from "@mui/material";
 import { BugReport } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
@@ -120,7 +120,7 @@ export default function Findings() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["findings-all"] }); setSelected(null); },
   });
 
-  const [sortKey, setSortKey] = React.useState<string>("created_at");
+  const [sortKey, setSortKey] = React.useState<string>("first_seen_at");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
   const sortedFindings = React.useMemo(() => {
     const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -131,6 +131,10 @@ export default function Findings() {
       if (sortKey === "severity") {
         av = SEV_RANK[(typeof a.severity === "object" ? (a.severity as any).value : a.severity) || "info"] ?? 99;
         bv = SEV_RANK[(typeof b.severity === "object" ? (b.severity as any).value : b.severity) || "info"] ?? 99;
+      }
+      if (sortKey === "first_seen_at") {
+        av = a.first_seen_at || a.created_at;
+        bv = b.first_seen_at || b.created_at;
       }
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
       return String(av || "").localeCompare(String(bv || "")) * dir;
@@ -283,7 +287,7 @@ export default function Findings() {
                   <TableCell>RESOURCE</TableCell>
                   <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
-                  <TableCell><TableSortLabel active={sortKey === "created_at"} direction={sortDir} onClick={() => setSort("created_at")}
+                  <TableCell><TableSortLabel active={sortKey === "first_seen_at"} direction={sortDir} onClick={() => setSort("first_seen_at")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
                 </TableRow>
               </TableHead>
@@ -300,9 +304,17 @@ export default function Findings() {
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "white", maxWidth: 300 }}>
-                        <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {f.title}
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.title}
+                          </Typography>
+                          {(f.seen_count ?? 1) > 1 && (
+                            <Tooltip title={`Detected in ${f.seen_count} scans`}>
+                              <Chip label={`×${f.seen_count}`} size="small"
+                                sx={{ bgcolor: "rgba(0,229,255,0.12)", color: "#00e5ff", fontSize: 10, height: 16, flexShrink: 0 }} />
+                            </Tooltip>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ color: f.cve_id ? "#00e5ff" : "rgba(255,255,255,0.3)", fontSize: 12 }}>
                         {f.cve_id || "—"}
@@ -321,7 +333,10 @@ export default function Findings() {
                             color: STATUS_COLOR[f.status || "open"] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                        {f.created_at ? dayjs(f.created_at).fromNow() : "—"}
+                        {(() => {
+                          const ts = f.first_seen_at || f.created_at;
+                          return ts ? dayjs(ts).fromNow() : "—";
+                        })()}
                       </TableCell>
                     </TableRow>
                   );
