@@ -172,14 +172,22 @@ jobs:
             echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
           fi
           echo "Upload accepted. Polling Oryx build..."
+          # Tolerate transient timeouts on the poll itself — Kudu can be slow
+          # while it's busy building. Up to 60 polls × 30s = 30 min budget.
           for i in $(seq 1 60); do
-            RESP=$(curl -sS -m 15 -u "$USER:$PW" "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1")
-            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))")
-            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])")
+            RESP=$(curl -sS -m 60 --retry 3 --retry-delay 5 -u "$USER:$PW" \
+              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
+            if [ -z "$RESP" ]; then
+              echo "[$i] poll request failed (transient); continuing"
+              sleep 20
+              continue
+            fi
+            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])" 2>/dev/null || echo "")
             echo "[$i] status=$ST progress=$PR"
             if [ "$ST" = "4" ]; then echo "Build & deploy succeeded"; exit 0; fi
             if [ "$ST" = "3" ]; then echo "Build & deploy failed"; exit 1; fi
-            sleep 15
+            sleep 20
           done
           echo "Timed out waiting for build to finish"; exit 1
 
@@ -243,14 +251,22 @@ jobs:
             echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
           fi
           echo "Upload accepted. Polling Oryx build..."
+          # Tolerate transient timeouts on the poll itself — Kudu can be slow
+          # while it's busy building. Up to 60 polls × 30s = 30 min budget.
           for i in $(seq 1 60); do
-            RESP=$(curl -sS -m 15 -u "$USER:$PW" "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1")
-            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))")
-            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])")
+            RESP=$(curl -sS -m 60 --retry 3 --retry-delay 5 -u "$USER:$PW" \
+              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
+            if [ -z "$RESP" ]; then
+              echo "[$i] poll request failed (transient); continuing"
+              sleep 20
+              continue
+            fi
+            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])" 2>/dev/null || echo "")
             echo "[$i] status=$ST progress=$PR"
             if [ "$ST" = "4" ]; then echo "Build & deploy succeeded"; exit 0; fi
             if [ "$ST" = "3" ]; then echo "Build & deploy failed"; exit 1; fi
-            sleep 15
+            sleep 20
           done
           echo "Timed out waiting for build to finish"; exit 1
 
