@@ -24,6 +24,7 @@ import Frameworks from "./pages/Frameworks";
 import RiskOverviewPage from "./pages/RiskOverview";
 import Projects from "./pages/Projects";
 import Technologies from "./pages/Technologies";
+import Admin from "./pages/Admin";
 
 const darkTheme = createTheme({
   palette: {
@@ -95,6 +96,7 @@ export default function App() {
                   <Route path="/agents" element={<Agents />} />
                   <Route path="/reports" element={<div style={{ color: "white", padding: 24 }}>Reports</div>} />
                   <Route path="/ai-settings" element={<AISettings />} />
+                  <Route path="/admin" element={<Admin />} />
                 </Route>
               </Routes>
             </BrowserRouter>

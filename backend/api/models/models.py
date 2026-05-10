@@ -107,6 +107,16 @@ class AssetStatus(str, enum.Enum):
     STALE = "stale"
     DELETED = "deleted"
 
+class AccessRole(str, enum.Enum):
+    READER = "reader"
+    EDITOR = "editor"
+    ADMIN = "admin"
+
+class AccessScope(str, enum.Enum):
+    GLOBAL = "global"
+    CLIENT = "client"
+    PROJECT = "project"
+
 class ControlStatus(str, enum.Enum):
     COMPLIANT = "compliant"
     NON_COMPLIANT = "non_compliant"
@@ -345,6 +355,27 @@ class ClientControlStatus(Base):
 
     client = relationship("Client", back_populates="control_statuses")
     control = relationship("FrameworkControl", back_populates="statuses")
+
+
+class UserAccess(Base):
+    """RBAC grant: a user's role at a particular scope.
+
+    A user (identified by Entra ID UPN / email, lowercased) can hold multiple
+    grants. Effective role for a resource = max(role) across all grants whose
+    scope covers the resource (project scope ⊆ client scope ⊆ global).
+    """
+    __tablename__ = "user_access"
+    __table_args__ = (
+        UniqueConstraint("email", "role", "scope_type", "scope_id", name="uq_user_access_grant"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    email = Column(String(254), nullable=False, index=True)        # case-normalized to lowercase on write
+    role = Column(SAEnum(AccessRole, values_callable=_ev), nullable=False, index=True)
+    scope_type = Column(SAEnum(AccessScope, values_callable=_ev), nullable=False)
+    scope_id = Column(String(36))                                  # NULL for global; clients.id or projects.id otherwise
+    granted_by = Column(String(254))                                # UPN of the admin who granted this
+    granted_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class AgentRun(Base):

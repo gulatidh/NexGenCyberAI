@@ -446,6 +446,35 @@ export interface FindingCategoriesResponse {
   grand_total: number;
 }
 
+// ── RBAC ───────────────────────────────────────────────────────────────────
+
+export type AccessRole = "reader" | "editor" | "admin";
+export type AccessScope = "global" | "client" | "project";
+
+export interface AccessGrant {
+  id: string;
+  email: string;
+  role: AccessRole;
+  scope_type: AccessScope;
+  scope_id?: string | null;
+  scope_label?: string | null;
+  granted_by?: string | null;
+  granted_at?: string;
+}
+
+export interface UserAccessSummary {
+  email: string;
+  grants: AccessGrant[];
+  effective_global_role?: AccessRole | null;
+}
+
+export interface MyAccess {
+  email: string;
+  grants: AccessGrant[];
+  is_admin: boolean;
+  is_editor_anywhere: boolean;
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;

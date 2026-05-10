@@ -156,6 +156,13 @@ export const riskOverviewApi = {
     apiClient.get(`/clients/${clientId}/risk-overview/`, { params: { days } }).then((r) => r.data),
 };
 
+export const adminApi = {
+  me: () => apiClient.get("/admin/me").then((r) => r.data),
+  listUsers: () => apiClient.get("/admin/users").then((r) => r.data),
+  createGrant: (data: any) => apiClient.post("/admin/grants", data).then((r) => r.data),
+  deleteGrant: (grantId: string) => apiClient.delete(`/admin/grants/${grantId}`),
+};
+
 export const technologiesApi = {
   inventory: (clientId: string, params?: Record<string, any>) =>
     apiClient.get(`/clients/${clientId}/technologies/`, { params }).then((r) => r.data),

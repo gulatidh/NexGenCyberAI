@@ -9,13 +9,17 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
+  AdminPanelSettings,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
+import { useQuery } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
+import { adminApi } from "../../services/api";
+import { MyAccess } from "../../types";
 
 const DRAWER_WIDTH = 240;
 
-type NavItem = { label: string; icon: React.ReactNode; path: string };
+type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean };
 type NavGroup = { section?: string; items: NavItem[] };
 
 // Top-level pages group "main workflow"; Settings group at the bottom holds
@@ -40,7 +44,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Settings",
     items: [
-      { label: "AI Settings",    icon: <SettingsSuggest />, path: "/ai-settings" },
+      { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
+      { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
     ],
   },
 ];
@@ -51,6 +56,13 @@ export default function AppLayout() {
   const { instance, accounts } = useMsal();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const { data: me } = useQuery<MyAccess>({
+    queryKey: ["my-access"],
+    queryFn: adminApi.me,
+    retry: 0,
+    staleTime: 60_000,
+  });
 
   const account = accounts[0];
   const userName = account?.name || account?.username || "User";
@@ -74,7 +86,10 @@ export default function AppLayout() {
         </Box>
       </Box>
       <List sx={{ pt: 1 }}>
-        {NAV_GROUPS.map((group, gi) => (
+        {NAV_GROUPS.map((group, gi) => {
+          const items = group.items.filter((i) => !i.adminOnly || me?.is_admin);
+          if (items.length === 0) return null;
+          return (
           <React.Fragment key={gi}>
             {group.section && (
               <Typography
@@ -88,7 +103,7 @@ export default function AppLayout() {
                 {group.section}
               </Typography>
             )}
-            {group.items.map((item) => {
+            {items.map((item) => {
               // Exact-match for /assets to avoid /assets/technologies highlighting both
               const active = item.path === "/assets"
                 ? pathname === "/assets" || /^\/assets\/[^/]+$/.test(pathname)  // /assets and /assets/:id
@@ -122,7 +137,8 @@ export default function AppLayout() {
               );
             })}
           </React.Fragment>
-        ))}
+          );
+        })}
       </List>
     </Box>
   );

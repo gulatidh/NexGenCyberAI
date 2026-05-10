@@ -6,7 +6,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
-    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus, ControlStatus
+    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus, ControlStatus,
+    AccessRole, AccessScope,
 )
 
 
@@ -303,6 +304,37 @@ class FrameworkCatalogEntry(BaseModel):
     name: str
     version: Optional[str] = None
     total_controls: int
+
+
+# ── RBAC ───────────────────────────────────────────────────────────────────────
+
+class GrantCreate(BaseModel):
+    email: str
+    role: AccessRole
+    scope_type: AccessScope
+    scope_id: Optional[str] = None      # required when scope_type != global
+
+class GrantResponse(BaseModel):
+    id: str
+    email: str
+    role: AccessRole
+    scope_type: AccessScope
+    scope_id: Optional[str]
+    scope_label: Optional[str] = None    # human-friendly: "Greta — Production" etc.
+    granted_by: Optional[str]
+    granted_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+class UserAccessSummary(BaseModel):
+    email: str
+    grants: List[GrantResponse] = []
+    effective_global_role: Optional[AccessRole] = None
+
+class MyAccessResponse(BaseModel):
+    email: str
+    grants: List[GrantResponse] = []
+    is_admin: bool
+    is_editor_anywhere: bool
 
 
 # ── Misc ───────────────────────────────────────────────────────────────────────

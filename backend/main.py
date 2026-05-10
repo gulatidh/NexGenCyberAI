@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -343,12 +343,45 @@ def _seed_framework_controls() -> None:
         lf.close()
 
 
+def _bootstrap_initial_admin() -> None:
+    """If no global admin grants exist and INITIAL_ADMIN_UPN is configured,
+    create the first admin grant. Idempotent — runs every startup but only
+    inserts when the table is empty of admins."""
+    import os
+    from sqlalchemy.orm import Session
+    from api.models.models import AccessRole, AccessScope, UserAccess
+
+    upn = (os.environ.get("INITIAL_ADMIN_UPN") or "").strip().lower()
+    if not upn:
+        return
+    try:
+        with Session(engine) as db:
+            existing_admin = db.query(UserAccess).filter(
+                UserAccess.role == AccessRole.ADMIN,
+                UserAccess.scope_type == AccessScope.GLOBAL,
+            ).first()
+            if existing_admin:
+                return
+            db.add(UserAccess(
+                email=upn,
+                role=AccessRole.ADMIN,
+                scope_type=AccessScope.GLOBAL,
+                scope_id=None,
+                granted_by="bootstrap",
+            ))
+            db.commit()
+            logger.info("Bootstrapped initial global admin: %s", upn)
+    except Exception as exc:
+        logger.warning("Initial admin bootstrap failed: %s", exc)
+
+
 _ensure_added_columns()
 _ensure_projects_schema()
 _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
 _seed_framework_controls()
+_bootstrap_initial_admin()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -390,6 +423,7 @@ app.include_router(frameworks.router, prefix="/api/v1")
 app.include_router(risk_overview.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(technologies.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 
