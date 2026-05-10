@@ -149,6 +149,13 @@ export const riskOverviewApi = {
     apiClient.get(`/clients/${clientId}/risk-overview/`, { params: { days } }).then((r) => r.data),
 };
 
+export const technologiesApi = {
+  inventory: (clientId: string, params?: Record<string, any>) =>
+    apiClient.get(`/clients/${clientId}/technologies/`, { params }).then((r) => r.data),
+  detail: (clientId: string, name: string) =>
+    apiClient.get(`/clients/${clientId}/technologies/${encodeURIComponent(name)}/detail`).then((r) => r.data),
+};
+
 export const frameworksApi = {
   catalog: () => apiClient.get("/frameworks/").then((r) => r.data),
   controls: (framework: string) => apiClient.get(`/frameworks/${framework}/controls/`).then((r) => r.data),

@@ -333,6 +333,98 @@ export interface RiskOverview {
   as_of: string;
 }
 
+// ── Technology Inventory ───────────────────────────────────────────────────
+
+export type TechStatus = "healthy" | "warning" | "critical" | "ignored";
+export type RiskLevelLow = "critical" | "high" | "medium" | "low";
+
+export interface TechnologyRow {
+  id: string;
+  name: string;
+  resources_count: number;
+  type: string;
+  category: string;
+  category_icon: string;
+  category_color: string;
+  subcategory: string;
+  subcategory_icon: string;
+  organization_usage_pct: number;
+  status: TechStatus;
+  risk_level: RiskLevelLow;
+  open_findings: number;
+  cve_count: number;
+  versions_detected: number;
+  owner: string;
+  environments: string[];
+  last_seen?: string;
+  regions: string[];
+  subscriptions: string[];
+}
+
+export interface CategoryBreakdown {
+  name: string;
+  icon: string;
+  color: string;
+  count: number;
+}
+
+export interface SubcategoryBreakdown {
+  name: string;
+  icon: string;
+  count: number;
+}
+
+export interface TypeBreakdown {
+  name: string;
+  count: number;
+}
+
+export interface TechnologyFilters {
+  categories: string[];
+  types: string[];
+  environments: string[];
+  regions: string[];
+  subscriptions: string[];
+  owners: string[];
+  statuses: string[];
+  cloud_providers: string[];
+}
+
+export interface TechnologyInventory {
+  summary: {
+    total: number;
+    by_status: Record<TechStatus, number>;
+  };
+  categories: CategoryBreakdown[];
+  subcategories: SubcategoryBreakdown[];
+  types: TypeBreakdown[];
+  technologies: TechnologyRow[];
+  filter_options: TechnologyFilters;
+  as_of: string;
+}
+
+export interface TechnologyDetail {
+  name: string;
+  category: string;
+  subcategory: string;
+  type: string;
+  resources_count: number;
+  versions_detected: { version: string; asset_count: number }[];
+  regions: string[];
+  subscriptions: string[];
+  open_findings: {
+    id: string; title: string; severity: Severity; status: string;
+    resource_id?: string; cve_id?: string; cvss_score?: number;
+  }[];
+  assets: {
+    id: string; name: string; external_id: string; region?: string;
+    subscription_id?: string; resource_group?: string; status: string;
+  }[];
+  owner: string;
+  exposure_level: string;
+  policies: { name: string; framework: string; control_id: string; status: string }[];
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;
