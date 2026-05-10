@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, TextField, Alert, Tooltip,
 } from "@mui/material";
 import { Storage, Refresh, PlayArrow } from "@mui/icons-material";
@@ -104,6 +104,22 @@ export default function Assets() {
 
   const accountColumn = (a: Asset) => a.subscription_id || a.account_id || a.project_id || "—";
   const groupColumn = (a: Asset) => a.resource_group || a.region || "—";
+
+  const [sortKey, setSortKey] = React.useState<string>("name");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
+  const sortedAssets = React.useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...assets].sort((a, b) => {
+      const av: any = (a as any)[sortKey] ?? "";
+      const bv: any = (b as any)[sortKey] ?? "";
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }, [assets, sortKey, sortDir]);
+  const setSort = (k: string) => {
+    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("asc"); }
+  };
 
   return (
     <Box>
@@ -227,20 +243,29 @@ export default function Assets() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
-                  <TableCell>NAME</TableCell>
-                  <TableCell>TYPE</TableCell>
-                  <TableCell>CLASS</TableCell>
-                  <TableCell>SUBSCRIPTION / ACCOUNT</TableCell>
-                  <TableCell>RESOURCE GROUP / REGION</TableCell>
-                  <TableCell align="right">OPEN FINDINGS</TableCell>
-                  <TableCell align="right">RISKS</TableCell>
-                  <TableCell>STATUS</TableCell>
-                  <TableCell>SYNCED</TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>NAME</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "asset_type"} direction={sortDir} onClick={() => setSort("asset_type")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>TYPE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "asset_class"} direction={sortDir} onClick={() => setSort("asset_class")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CLASS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "subscription_id"} direction={sortDir} onClick={() => setSort("subscription_id")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SUBSCRIPTION / ACCOUNT</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "resource_group"} direction={sortDir} onClick={() => setSort("resource_group")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>RESOURCE GROUP / REGION</TableSortLabel></TableCell>
+                  <TableCell align="right"><TableSortLabel active={sortKey === "open_findings_count"} direction={sortDir} onClick={() => setSort("open_findings_count")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>OPEN FINDINGS</TableSortLabel></TableCell>
+                  <TableCell align="right"><TableSortLabel active={sortKey === "risks_count"} direction={sortDir} onClick={() => setSort("risks_count")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>RISKS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "last_synced_at"} direction={sortDir} onClick={() => setSort("last_synced_at")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SYNCED</TableSortLabel></TableCell>
                   <TableCell align="right">ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {assets.map((a) => {
+                {sortedAssets.map((a) => {
                   const klass = a.asset_class || "other";
                   const findingColor = a.open_findings_count > 0 ? "#f44336" : "rgba(255,255,255,0.3)";
                   const riskColor = a.risks_count > 0 ? "#ff9800" : "rgba(255,255,255,0.3)";

@@ -99,14 +99,17 @@ export const scansApi = {
   findings: (clientId: string, scanId: string, severity?: string) =>
     apiClient.get(`/clients/${clientId}/scans/${scanId}/findings/`, { params: { severity } }).then((r) => r.data),
   startFrameworkScan: (clientId: string, body: {
-    connector_id?: string; framework: string; scan_type?: string; control_ids?: string[];
+    connector_id?: string; framework: string; scan_type?: string; control_ids?: string[]; name?: string;
   }) =>
     apiClient.post(`/clients/${clientId}/scans/`, {
       scan_type: body.scan_type || "full",
       framework: body.framework,
       connector_id: body.connector_id,
       control_ids: body.control_ids,
+      name: body.name,
     }).then((r) => r.data),
+  delete: (clientId: string, scanId: string) =>
+    apiClient.delete(`/clients/${clientId}/scans/${scanId}`),
 };
 
 export const findingsApi = {

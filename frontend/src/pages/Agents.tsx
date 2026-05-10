@@ -124,7 +124,9 @@ export default function Agents() {
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               <MenuItem value="">No specific scan</MenuItem>
               {scans.filter((s) => s.status === "completed").map((s) => (
-                <MenuItem key={s.id} value={s.id}>{s.scan_type} — {new Date(s.created_at!).toLocaleDateString()}</MenuItem>
+                <MenuItem key={s.id} value={s.id}>
+                  {s.name || `${s.scan_type} scan`}{s.framework ? ` · ${s.framework}` : ""} — {new Date(s.created_at!).toLocaleDateString()}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>

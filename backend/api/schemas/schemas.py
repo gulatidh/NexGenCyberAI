@@ -108,6 +108,7 @@ class ConnectorResponse(BaseModel):
 class ScanCreate(BaseModel):
     connector_id: Optional[str] = None
     project_id: Optional[str] = None     # inferred from connector if omitted
+    name: Optional[str] = None            # human-friendly label
     scan_type: ScanType
     framework: Optional[FrameworkType] = None
     # Optional list of catalog control_ids to scope the scan to. When set, the
@@ -120,6 +121,7 @@ class ScanResponse(BaseModel):
     client_id: str
     project_id: Optional[str]
     connector_id: Optional[str]
+    name: Optional[str]
     scan_type: ScanType
     status: ScanStatus
     framework: Optional[FrameworkType]

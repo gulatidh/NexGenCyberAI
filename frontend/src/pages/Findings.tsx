@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
 } from "@mui/material";
@@ -44,6 +44,27 @@ export default function Findings() {
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["findings-all"] }); setSelected(null); },
   });
+
+  const [sortKey, setSortKey] = React.useState<string>("created_at");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
+  const sortedFindings = React.useMemo(() => {
+    const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...findings].sort((a, b) => {
+      let av: any = (a as any)[sortKey];
+      let bv: any = (b as any)[sortKey];
+      if (sortKey === "severity") {
+        av = SEV_RANK[(typeof a.severity === "object" ? (a.severity as any).value : a.severity) || "info"] ?? 99;
+        bv = SEV_RANK[(typeof b.severity === "object" ? (b.severity as any).value : b.severity) || "info"] ?? 99;
+      }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av || "").localeCompare(String(bv || "")) * dir;
+    });
+  }, [findings, sortKey, sortDir]);
+  const setSort = (k: string) => {
+    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("desc"); }
+  };
 
   const sevCounts = findings.reduce((acc: Record<string, number>, f) => {
     const s = typeof f.severity === "object" ? (f.severity as any).value ?? f.severity : f.severity;
@@ -131,17 +152,23 @@ export default function Findings() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
-                  <TableCell>SEVERITY</TableCell>
-                  <TableCell>TITLE</TableCell>
-                  <TableCell>CVE</TableCell>
-                  <TableCell>CVSS</TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>SEVERITY</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "title"} direction={sortDir} onClick={() => setSort("title")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>TITLE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "cve_id"} direction={sortDir} onClick={() => setSort("cve_id")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "cvss_score"} direction={sortDir} onClick={() => setSort("cvss_score")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVSS</TableSortLabel></TableCell>
                   <TableCell>RESOURCE</TableCell>
-                  <TableCell>STATUS</TableCell>
-                  <TableCell>FOUND</TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "created_at"} direction={sortDir} onClick={() => setSort("created_at")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {findings.map((f) => {
+                {sortedFindings.map((f) => {
                   const sev = typeof f.severity === "object" ? (f.severity as any).value ?? f.severity : f.severity;
                   return (
                     <TableRow key={f.id}

@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Button, Card, CardContent, Grid, Chip,
+  Box, Typography, Button, Card, CardContent, Grid, Chip, IconButton, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
   CircularProgress, Alert,
 } from "@mui/material";
-import { Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable } from "@mui/icons-material";
+import { Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable, Edit, Delete } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { connectorsApi, clientsApi, projectsApi } from "../services/api";
 import { Connector, ConnectorType, Client, Project } from "../types";
@@ -98,11 +98,37 @@ export default function Connectors() {
     enabled: !!selectedClientId,
   });
 
+  const [editing, setEditing] = useState<Connector | null>(null);
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => connectorsApi.create(selectedClientId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["connectors"] }); setOpen(false); toast.success("Connector added"); },
+    mutationFn: (data: any) => editing
+      ? connectorsApi.update(selectedClientId, editing.id, data)
+      : connectorsApi.create(selectedClientId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connectors"] });
+      setOpen(false);
+      setEditing(null);
+      setConnName("");
+      setCredentials({});
+      toast.success(editing ? "Connector updated" : "Connector added");
+    },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error"),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => connectorsApi.delete(selectedClientId, id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["connectors"] }); toast.success("Connector deleted"); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Error"),
+  });
+
+  const openEdit = (c: Connector) => {
+    setEditing(c);
+    setConnName(c.name);
+    setConnectorType(c.connector_type);
+    setConnProjectId(c.project_id || "");
+    setCredentials({});  // don't pre-fill credentials; user enters new ones if rotating
+    setOpen(true);
+  };
 
   const testMutation = useMutation({
     mutationFn: ({ clientId, connId }: any) => connectorsApi.test(clientId, connId),
@@ -175,12 +201,32 @@ export default function Connectors() {
                     {tr && (
                       <Alert severity={tr.success ? "success" : "error"} sx={{ py: 0, mb: 1, fontSize: 11 }}>{tr.message}</Alert>
                     )}
-                    <Button size="small" variant="outlined" startIcon={<PlayArrow />}
-                      onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
-                      disabled={testMutation.isPending}
-                      sx={{ borderColor: "#00e5ff", color: "#00e5ff", fontSize: 11 }}>
-                      Test Connection
-                    </Button>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                      <Button size="small" variant="outlined" startIcon={<PlayArrow />}
+                        onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
+                        disabled={testMutation.isPending}
+                        sx={{ borderColor: "#00e5ff", color: "#00e5ff", fontSize: 11 }}>
+                        Test
+                      </Button>
+                      <Box sx={{ flex: 1 }} />
+                      <Tooltip title="Edit connector">
+                        <IconButton size="small" onClick={() => openEdit(conn)}
+                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#00e5ff" } }}>
+                          <Edit sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete connector">
+                        <IconButton size="small"
+                          onClick={() => {
+                            if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
+                              deleteMutation.mutate(conn.id);
+                            }
+                          }}
+                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#f44336" } }}>
+                          <Delete sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>
@@ -190,8 +236,8 @@ export default function Connectors() {
       )}
 
       {/* Add Connector Dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 520 } } }}>
-        <DialogTitle>Add Connector</DialogTitle>
+      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 520 } } }}>
+        <DialogTitle>{editing ? `Edit Connector — ${editing.name}` : "Add Connector"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12, sm: 6 }}>
@@ -230,7 +276,9 @@ export default function Connectors() {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
           <Button variant="contained" disabled={!connName || !connProjectId || createMutation.isPending}
-            onClick={() => createMutation.mutate({ name: connName, connector_type: connectorType, project_id: connProjectId, credentials })}
+            onClick={() => createMutation.mutate(editing
+              ? { name: connName, project_id: connProjectId, ...(Object.keys(credentials).length ? { credentials } : {}) }
+              : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials })}
             sx={{ bgcolor: "#00e5ff", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
           </Button>

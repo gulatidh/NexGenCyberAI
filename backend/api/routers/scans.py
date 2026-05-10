@@ -231,6 +231,7 @@ async def start_scan(
         client_id=client_id,
         project_id=proj_id,
         connector_id=payload.connector_id,
+        name=(payload.name or "").strip() or None,
         scan_type=payload.scan_type,
         framework=payload.framework,
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
@@ -279,6 +280,20 @@ async def get_findings(
     if severity:
         q = q.filter(Finding.severity == severity)
     return q.order_by(Finding.cvss_score.desc()).all()
+
+
+@router.delete("/{scan_id}", status_code=204)
+async def delete_scan(
+    client_id: str,
+    scan_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    db.delete(scan)  # cascade removes findings
+    db.commit()
 
 
 @router.patch("/{scan_id}/findings/{finding_id}", response_model=FindingResponse)

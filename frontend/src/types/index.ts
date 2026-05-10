@@ -60,7 +60,9 @@ export interface Connector {
 export interface Scan {
   id: string;
   client_id: string;
+  project_id?: string;
   connector_id?: string;
+  name?: string;
   scan_type: ScanType;
   status: ScanStatus;
   framework?: FrameworkType;

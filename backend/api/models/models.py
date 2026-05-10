@@ -194,6 +194,7 @@ class Scan(Base):
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
     project_id = Column(String(36), ForeignKey("projects.id"), index=True)
     connector_id = Column(String(36), ForeignKey("connectors.id"))
+    name = Column(String(200))                 # human-friendly label so AI agents and users can target a specific scan
     scan_type = Column(SAEnum(ScanType, values_callable=_ev), nullable=False)
     status = Column(SAEnum(ScanStatus, values_callable=_ev), default=ScanStatus.PENDING)
     framework = Column(SAEnum(FrameworkType, values_callable=_ev))

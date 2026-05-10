@@ -61,6 +61,8 @@ def _ensure_projects_schema() -> None:
         # Renamed GCP column on assets (was 'project_id' string before; now
         # 'project_id' holds the internal FK and 'cloud_project_id' holds GCP)
         _alter_add("assets", "cloud_project_id", sql_type="NVARCHAR(64) NULL")
+        # Scan.name added for human-friendly scan labels
+        _alter_add("scans", "name", sql_type="NVARCHAR(200) NULL")
 
         # Backfill: create Default project per client + reassign orphans
         from api.models.models import Client, Project, Connector, Scan, Asset
