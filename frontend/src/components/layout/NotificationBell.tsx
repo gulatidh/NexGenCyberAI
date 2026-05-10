@@ -8,9 +8,7 @@ import {
   getNotifications, subscribeNotifications, markAllRead, clearNotifications,
   unreadCount, AppNotification,
 } from "../../services/notifications";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../../utils/datetime";
 
 const TYPE_ICON: Record<string, React.ReactNode> = {
   success: <CheckCircle sx={{ fontSize: 16, color: "#00e676" }} />,
@@ -106,7 +104,7 @@ export default function NotificationBell() {
                       </Typography>
                     )}
                     <Typography sx={{ color: "rgba(255,255,255,0.3)", fontSize: 10, mt: 0.3 }}>
-                      {dayjs(n.timestamp).fromNow()}
+                      {fromNow(n.timestamp)}
                     </Typography>
                   </Box>
                   <Chip label={n.type} size="small"

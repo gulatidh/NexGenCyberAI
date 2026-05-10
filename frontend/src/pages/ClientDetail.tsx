@@ -12,9 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { clientsApi, connectorsApi, scansApi, projectsApi, assetsApi } from "../services/api";
 import { Client, Connector, Scan, Project, ProjectSummary, Asset } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const CONNECTOR_COLOR: Record<string, string> = {
   entraid: "#00e5ff", azure: "#0078d4", aws: "#ff9900", gcp: "#4285f4",
@@ -283,7 +281,7 @@ export default function ClientDetail() {
                           <TableCell><Chip label={s.status} size="small"
                             sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>
                           <TableCell>{s.summary?.total ?? "—"}</TableCell>
-                          <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{s.started_at ? dayjs(s.started_at).fromNow() : "—"}</Typography></TableCell>
+                          <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{fromNow(s.started_at)}</Typography></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -362,7 +360,7 @@ export default function ClientDetail() {
                       )}
                       {c.last_synced_at && (
                         <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mt: 1, fontSize: 10 }}>
-                          Last synced {dayjs(c.last_synced_at).fromNow()}
+                          Last synced {fromNow(c.last_synced_at)}
                         </Typography>
                       )}
                     </CardContent>
@@ -484,7 +482,7 @@ export default function ClientDetail() {
                           sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>
                         <TableCell>{s.summary?.total ?? "—"}</TableCell>
                         <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
-                          {s.started_at ? dayjs(s.started_at).fromNow() : "—"}
+                          {fromNow(s.started_at)}
                         </Typography></TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{dur}</TableCell>
                       </TableRow>

@@ -11,9 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, projectsApi } from "../services/api";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
 import { toast } from "react-toastify";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "#ff9800", running: "#00e5ff", completed: "#00e676",
@@ -182,7 +180,7 @@ export default function Scans() {
                         </Box>
                       ) : "—"}
                     </TableCell>
-                    <TableCell><Typography variant="caption">{scan.started_at ? dayjs(scan.started_at).fromNow() : "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption">{fromNow(scan.started_at)}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{dur}</Typography></TableCell>
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
@@ -274,7 +272,7 @@ export default function Scans() {
             <Typography variant="h6">Scan Findings</Typography>
             {viewScan && (
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
-                {viewScan.scan_type} · {viewScan.framework || "No framework"} · {dayjs(viewScan.started_at).fromNow()}
+                {viewScan.scan_type} · {viewScan.framework || "No framework"} · {fromNow(viewScan.started_at)}
               </Typography>
             )}
           </Box>

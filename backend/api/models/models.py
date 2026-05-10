@@ -34,6 +34,7 @@ class ConnectorType(str, enum.Enum):
     CONTAINERS = "containers"
     GITHUB = "github"
     JIRA = "jira"
+    WEB = "web"  # OWASP ZAP target — auth or unauth web/API scanning
 
 class ConnectorStatus(str, enum.Enum):
     ACTIVE = "active"

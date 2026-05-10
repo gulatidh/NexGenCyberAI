@@ -16,9 +16,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#00e5ff",
@@ -213,7 +211,7 @@ export default function Dashboard() {
                       <Box>
                         <Typography variant="caption" sx={{ color: "white", display: "block" }}>{s.scan_type}</Typography>
                         <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
-                          {s.created_at ? dayjs(s.created_at).fromNow() : ""}
+                          {fromNow(s.created_at)}
                         </Typography>
                       </Box>
                       <Chip label={s.status} size="small"

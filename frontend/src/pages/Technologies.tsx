@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem, Alert, Button, CircularProgress } from "@mui/material";
 import { Refresh } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import { fmt } from "../utils/datetime";
 
 import { clientsApi, projectsApi, technologiesApi } from "../services/api";
 import { Client, Project, TechnologyInventory, TechnologyRow } from "../types";
@@ -88,7 +88,7 @@ export default function Technologies() {
           </FormControl>
           {inventory?.as_of && (
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
-              as of {dayjs(inventory.as_of).format("MMM D, HH:mm")}
+              as of {fmt(inventory.as_of, "MMM D, HH:mm")}
             </Typography>
           )}
           <Button size="small" startIcon={isFetching ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}

@@ -10,9 +10,7 @@ import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, findingsApi, projectsApi } from "../services/api";
 import { Client, Finding, Project, FindingCategoriesResponse } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#00e5ff",
@@ -335,7 +333,7 @@ export default function Findings() {
                       <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
                         {(() => {
                           const ts = f.first_seen_at || f.created_at;
-                          return ts ? dayjs(ts).fromNow() : "—";
+                          return fromNow(ts);
                         })()}
                       </TableCell>
                     </TableRow>
