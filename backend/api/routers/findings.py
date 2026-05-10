@@ -18,6 +18,7 @@ async def list_findings(
     client_id: str,
     severity: Optional[str] = None,
     status: Optional[str] = None,
+    project_id: Optional[str] = None,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -30,6 +31,8 @@ async def list_findings(
         q = q.filter(Finding.severity == severity)
     if status:
         q = q.filter(Finding.status == status)
+    if project_id:
+        q = q.filter(Scan.project_id == project_id)
     return q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(200).all()
 
 

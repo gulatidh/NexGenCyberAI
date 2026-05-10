@@ -8,8 +8,8 @@ import {
 } from "@mui/material";
 import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi, frameworksApi } from "../services/api";
-import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, projectsApi } from "../services/api";
+import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -28,6 +28,7 @@ const SEV_COLOR: Record<string, string> = {
 export default function Scans() {
   const qc = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   const [scanType, setScanType] = useState<ScanType>("full");
   const [connectorId, setConnectorId] = useState("");
@@ -35,18 +36,23 @@ export default function Scans() {
   const [viewScan, setViewScan] = useState<Scan | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", selectedClientId],
+    queryFn: () => projectsApi.list(selectedClientId),
+    enabled: !!selectedClientId,
+  });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
     queryKey: ["framework-catalog"],
     queryFn: frameworksApi.catalog,
   });
   const { data: connectors = [] } = useQuery<Connector[]>({
-    queryKey: ["connectors", selectedClientId],
-    queryFn: () => connectorsApi.list(selectedClientId),
+    queryKey: ["connectors", selectedClientId, selectedProjectId],
+    queryFn: () => connectorsApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
   });
   const { data: scans = [], isLoading, refetch } = useQuery<Scan[]>({
-    queryKey: ["scans", selectedClientId],
-    queryFn: () => scansApi.list(selectedClientId),
+    queryKey: ["scans", selectedClientId, selectedProjectId],
+    queryFn: () => scansApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
     refetchInterval: (query) => (query.state.data as any[])?.some((s: any) => s.status === "running") ? 5000 : false,
   });
@@ -73,9 +79,17 @@ export default function Scans() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Client"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!selectedClientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>

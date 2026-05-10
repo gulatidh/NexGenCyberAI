@@ -7,8 +7,8 @@ import {
 } from "@mui/material";
 import { BugReport } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, findingsApi } from "../services/api";
-import { Client, Finding } from "../types";
+import { clientsApi, findingsApi, projectsApi } from "../services/api";
+import { Client, Finding, Project } from "../types";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -23,14 +23,20 @@ const STATUS_COLOR: Record<string, string> = {
 export default function Findings() {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", clientId],
+    queryFn: () => projectsApi.list(clientId),
+    enabled: !!clientId,
+  });
   const { data: findings = [], isLoading } = useQuery<Finding[]>({
-    queryKey: ["findings-all", clientId, sevFilter, statusFilter],
-    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined),
+    queryKey: ["findings-all", clientId, projectId, sevFilter, statusFilter],
+    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined),
     enabled: !!clientId,
   });
 
@@ -57,9 +63,17 @@ export default function Findings() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>

@@ -92,7 +92,8 @@ export const projectsApi = {
 };
 
 export const scansApi = {
-  list: (clientId: string) => apiClient.get(`/clients/${clientId}/scans/`).then((r) => r.data),
+  list: (clientId: string, projectId?: string) =>
+    apiClient.get(`/clients/${clientId}/scans/`, { params: projectId ? { project_id: projectId } : {} }).then((r) => r.data),
   get: (clientId: string, scanId: string) => apiClient.get(`/clients/${clientId}/scans/${scanId}`).then((r) => r.data),
   start: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/scans/`, data).then((r) => r.data),
   findings: (clientId: string, scanId: string, severity?: string) =>
@@ -109,14 +110,17 @@ export const scansApi = {
 };
 
 export const findingsApi = {
-  listAll: (clientId: string, severity?: string, status?: string) =>
-    apiClient.get(`/clients/${clientId}/findings/`, { params: { severity, status } }).then((r) => r.data),
+  listAll: (clientId: string, severity?: string, status?: string, projectId?: string) =>
+    apiClient.get(`/clients/${clientId}/findings/`, {
+      params: { severity, status, project_id: projectId || undefined },
+    }).then((r) => r.data),
   update: (clientId: string, findingId: string, data: any) =>
     apiClient.patch(`/clients/${clientId}/findings/${findingId}`, data).then((r) => r.data),
 };
 
 export const risksApi = {
-  list: (clientId: string) => apiClient.get(`/clients/${clientId}/risks/`).then((r) => r.data),
+  list: (clientId: string, projectId?: string) =>
+    apiClient.get(`/clients/${clientId}/risks/`, { params: projectId ? { project_id: projectId } : {} }).then((r) => r.data),
   create: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/risks/`, data).then((r) => r.data),
   update: (clientId: string, riskId: string, data: any) =>
     apiClient.patch(`/clients/${clientId}/risks/${riskId}`, data).then((r) => r.data),
