@@ -7,8 +7,8 @@ import {
 import { Storage, Refresh, PlayArrow } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, connectorsApi, assetsApi } from "../services/api";
-import { Client, Connector, Asset } from "../types";
+import { clientsApi, connectorsApi, assetsApi, projectsApi } from "../services/api";
+import { Client, Connector, Asset, Project } from "../types";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -36,6 +36,7 @@ export default function Assets() {
   const navigate = useNavigate();
 
   const [clientId, setClientId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [connectorId, setConnectorId] = useState("");
   const [assetClass, setAssetClass] = useState("");
   const [resourceGroup, setResourceGroup] = useState("");
@@ -44,20 +45,31 @@ export default function Assets() {
   const [search, setSearch] = useState("");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
-  const { data: connectors = [] } = useQuery<Connector[]>({
-    queryKey: ["connectors", clientId],
-    queryFn: () => connectorsApi.list(clientId),
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", clientId],
+    queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
+  const { data: connectors = [] } = useQuery<Connector[]>({
+    queryKey: ["connectors", clientId, projectId],
+    queryFn: () => connectorsApi.list(clientId, projectId || undefined),
+    enabled: !!clientId,
+  });
+
+  // Reset connector + class filters when project changes so we don't show stale picks
+  React.useEffect(() => {
+    setConnectorId("");
+  }, [projectId]);
   const { data: facets = {} as any } = useQuery<any>({
     queryKey: ["asset-facets", clientId],
     queryFn: () => assetsApi.facets(clientId),
     enabled: !!clientId,
   });
   const { data: assets = [], isLoading } = useQuery<Asset[]>({
-    queryKey: ["assets", clientId, connectorId, assetClass, resourceGroup, region, statusFilter, search],
+    queryKey: ["assets", clientId, projectId, connectorId, assetClass, resourceGroup, region, statusFilter, search],
     queryFn: () =>
       assetsApi.list(clientId, {
+        project_id: projectId || undefined,
         connector_id: connectorId || undefined,
         asset_class: assetClass || undefined,
         resource_group: resourceGroup || undefined,
@@ -105,9 +117,19 @@ export default function Assets() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
