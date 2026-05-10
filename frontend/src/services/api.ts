@@ -66,7 +66,8 @@ export const clientsApi = {
 };
 
 export const connectorsApi = {
-  list: (clientId: string) => apiClient.get(`/clients/${clientId}/connectors/`).then((r) => r.data),
+  list: (clientId: string, projectId?: string) =>
+    apiClient.get(`/clients/${clientId}/connectors/`, { params: projectId ? { project_id: projectId } : {} }).then((r) => r.data),
   create: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/connectors/`, data).then((r) => r.data),
   test: (clientId: string, connectorId: string) =>
     apiClient.post(`/clients/${clientId}/connectors/${connectorId}/test`).then((r) => r.data),
@@ -74,6 +75,20 @@ export const connectorsApi = {
     apiClient.patch(`/clients/${clientId}/connectors/${connectorId}`, data).then((r) => r.data),
   delete: (clientId: string, connectorId: string) =>
     apiClient.delete(`/clients/${clientId}/connectors/${connectorId}`),
+};
+
+export const projectsApi = {
+  list: (clientId: string) => apiClient.get(`/clients/${clientId}/projects/`).then((r) => r.data),
+  get: (clientId: string, projectId: string) =>
+    apiClient.get(`/clients/${clientId}/projects/${projectId}`).then((r) => r.data),
+  create: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/projects/`, data).then((r) => r.data),
+  update: (clientId: string, projectId: string, data: any) =>
+    apiClient.patch(`/clients/${clientId}/projects/${projectId}`, data).then((r) => r.data),
+  delete: (clientId: string, projectId: string) =>
+    apiClient.delete(`/clients/${clientId}/projects/${projectId}`),
+  summary: (clientId: string, projectId: string) =>
+    apiClient.get(`/clients/${clientId}/projects/${projectId}/summary`).then((r) => r.data),
 };
 
 export const scansApi = {

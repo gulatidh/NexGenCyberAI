@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import json
-from api.models.models import Connector, ConnectorStatus
+from api.models.models import Connector, ConnectorStatus, Project
 from api.schemas.schemas import ConnectorCreate, ConnectorUpdate, ConnectorResponse
 from db.database import get_db
 from core.security import get_current_user
@@ -15,8 +15,16 @@ router = APIRouter(prefix="/clients/{client_id}/connectors", tags=["connectors"]
 
 
 @router.get("/", response_model=List[ConnectorResponse])
-async def list_connectors(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(Connector).filter(Connector.client_id == client_id).all()
+async def list_connectors(
+    client_id: str,
+    project_id: str = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    q = db.query(Connector).filter(Connector.client_id == client_id)
+    if project_id:
+        q = q.filter(Connector.project_id == project_id)
+    return q.all()
 
 
 @router.post("/", response_model=ConnectorResponse, status_code=201)
@@ -27,9 +35,13 @@ async def create_connector(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
+    project = db.query(Project).filter(Project.id == payload.project_id, Project.client_id == client_id).first()
+    if not project:
+        raise HTTPException(status_code=400, detail="project_id is required and must belong to this client")
     enc = encrypt(json.dumps(payload.credentials))
     connector = Connector(
         client_id=client_id,
+        project_id=payload.project_id,
         name=payload.name,
         connector_type=payload.connector_type,
         credentials_enc=enc,
@@ -86,6 +98,11 @@ async def update_connector(
         raise HTTPException(status_code=404, detail="Connector not found")
     if payload.name:
         c.name = payload.name
+    if payload.project_id:
+        project = db.query(Project).filter(Project.id == payload.project_id, Project.client_id == client_id).first()
+        if not project:
+            raise HTTPException(status_code=400, detail="project_id must belong to this client")
+        c.project_id = payload.project_id
     if payload.credentials:
         c.credentials_enc = encrypt(json.dumps(payload.credentials))
     if payload.config:

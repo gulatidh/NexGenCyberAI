@@ -26,9 +26,28 @@ export interface Client {
   created_at?: string;
 }
 
+export interface Project {
+  id: string;
+  client_id: string;
+  name: string;
+  description?: string;
+  environment?: string;
+  cloud_provider?: string;
+  created_at?: string;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  connector_count: number;
+  asset_count: number;
+  scan_count: number;
+}
+
 export interface Connector {
   id: string;
   client_id: string;
+  project_id?: string;
   name: string;
   connector_type: ConnectorType;
   status: ConnectorStatus;

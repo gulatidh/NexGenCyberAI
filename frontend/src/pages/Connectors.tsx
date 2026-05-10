@@ -7,8 +7,8 @@ import {
 } from "@mui/material";
 import { Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { connectorsApi, clientsApi } from "../services/api";
-import { Connector, ConnectorType, Client } from "../types";
+import { connectorsApi, clientsApi, projectsApi } from "../services/api";
+import { Connector, ConnectorType, Client, Project } from "../types";
 import { toast } from "react-toastify";
 
 const CONNECTOR_ICONS: Record<ConnectorType, string> = {
@@ -78,16 +78,23 @@ const STATUS_PROPS: Record<string, any> = {
 export default function Connectors() {
   const qc = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   const [connectorType, setConnectorType] = useState<ConnectorType>("azure");
   const [connName, setConnName] = useState("");
+  const [connProjectId, setConnProjectId] = useState("");
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [testResults, setTestResults] = useState<Record<string, any>>({});
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", selectedClientId],
+    queryFn: () => projectsApi.list(selectedClientId),
+    enabled: !!selectedClientId,
+  });
   const { data: connectors = [], isLoading } = useQuery<Connector[]>({
-    queryKey: ["connectors", selectedClientId],
-    queryFn: () => connectorsApi.list(selectedClientId),
+    queryKey: ["connectors", selectedClientId, selectedProjectId],
+    queryFn: () => connectorsApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
   });
 
@@ -120,7 +127,16 @@ export default function Connectors() {
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
-          <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}
+          <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId || projects.length === 0}
+            onClick={() => { setConnProjectId(selectedProjectId || projects[0]?.id || ""); setOpen(true); }}
             sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Add Connector
           </Button>
@@ -192,6 +208,15 @@ export default function Connectors() {
                 slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
             </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormControl fullWidth size="small" required>
+                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+                <Select value={connProjectId} onChange={(e) => setConnProjectId(e.target.value)} label="Project"
+                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
             {credFields.map(({ key, label, secret }) => (
               <Grid size={{ xs: 12 }} key={key}>
                 <TextField fullWidth size="small" label={label} type={secret ? "password" : "text"}
@@ -204,8 +229,8 @@ export default function Connectors() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
-          <Button variant="contained" disabled={!connName || createMutation.isPending}
-            onClick={() => createMutation.mutate({ name: connName, connector_type: connectorType, credentials })}
+          <Button variant="contained" disabled={!connName || !connProjectId || createMutation.isPending}
+            onClick={() => createMutation.mutate({ name: connName, connector_type: connectorType, project_id: connProjectId, credentials })}
             sx={{ bgcolor: "#00e5ff", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
           </Button>

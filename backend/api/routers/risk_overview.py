@@ -207,43 +207,46 @@ def _issues_flow(db: Session, client_id: str, days: int) -> List[Dict[str, Any]]
 
 
 def _projects(db: Session, client_id: str) -> List[Dict[str, Any]]:
-    """Project breakdown — uses Asset.subscription_id / project_id / account_id as the
-    'project' grouping. When none of those are set, falls back to mock data so the
-    table still renders in dev.
-    """
-    rows = (
-        db.query(Asset.subscription_id, Asset.project_id, Asset.account_id, func.count(Asset.id))
-        .filter(Asset.client_id == client_id)
-        .group_by(Asset.subscription_id, Asset.project_id, Asset.account_id)
+    """Project breakdown — groups by the real Project FK on Asset. Falls back
+    to subscription/account/cloud_project labels for assets without a project_id
+    (shouldn't happen post-migration but defensive)."""
+    from api.models.models import Project as _Project
+    project_rows = (
+        db.query(_Project.id, _Project.name, _Project.environment, func.count(Asset.id))
+        .outerjoin(Asset, Asset.project_id == _Project.id)
+        .filter(_Project.client_id == client_id)
+        .group_by(_Project.id, _Project.name, _Project.environment)
         .all()
     )
     out: List[Dict[str, Any]] = []
     seen = set()
-    for sub, proj, acc, n_assets in rows:
-        name = sub or proj or acc
-        if not name or name in seen:
+    for pid, name, env, n_assets in project_rows:
+        if name in seen:
             continue
         seen.add(name)
-        # Approximate issue count per "project" as the number of findings whose
-        # resource_id starts with the subscription/project/account string.
-        like = f"%{name}%"
+        # Findings count for the project — joined via Scan.project_id when set,
+        # otherwise via the asset_external_id ↔ Finding.resource_id linkage.
         sev_counts = dict(
             db.query(Finding.severity, func.count(Finding.id))
             .join(Scan, Finding.scan_id == Scan.id)
-            .filter(Scan.client_id == client_id, Finding.status == "open", Finding.resource_id.ilike(like))
+            .filter(
+                Scan.client_id == client_id,
+                Scan.project_id == pid,
+                Finding.status == "open",
+            )
             .group_by(Finding.severity)
             .all()
         )
         sev_counts = {(k.value if hasattr(k, "value") else str(k)): int(v) for k, v in sev_counts.items()}
         out.append({
             "name": name,
-            "asset_count": int(n_assets),
+            "asset_count": int(n_assets or 0),
             "issues": sum(sev_counts.values()),
             "critical": sev_counts.get("critical", 0),
             "high": sev_counts.get("high", 0),
             "medium": sev_counts.get("medium", 0),
             "low": sev_counts.get("low", 0),
-            "environment": "production" if "prod" in (name or "").lower() else "non-production",
+            "environment": env or ("production" if "prod" in (name or "").lower() else "non-production"),
         })
     out.sort(key=lambda x: -x["issues"])
     return out[:10]
@@ -302,9 +305,8 @@ def _services(db: Session, client_id: str) -> List[Dict[str, Any]]:
 
 
 def _filter_options(db: Session, client_id: str) -> Dict[str, List[str]]:
-    projects = [r[0] for r in db.query(Asset.subscription_id).filter(Asset.client_id == client_id).distinct().all() if r[0]]
-    projects += [r[0] for r in db.query(Asset.project_id).filter(Asset.client_id == client_id).distinct().all() if r[0]]
-    projects += [r[0] for r in db.query(Asset.account_id).filter(Asset.client_id == client_id).distinct().all() if r[0]]
+    from api.models.models import Project as _Project
+    projects = [r[0] for r in db.query(_Project.name).filter(_Project.client_id == client_id).distinct().all() if r[0]]
     cloud = []
     for r in db.query(Asset.asset_type).filter(Asset.client_id == client_id).distinct().limit(20).all():
         v = (r[0] or "").lower()

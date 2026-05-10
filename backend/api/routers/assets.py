@@ -62,6 +62,7 @@ def _serialize_asset_row(
         "subscription_id": asset.subscription_id,
         "resource_group": asset.resource_group,
         "account_id": asset.account_id,
+        "cloud_project_id": asset.cloud_project_id,
         "project_id": asset.project_id,
         "tags": asset.tags or {},
         "status": asset.status,
@@ -78,6 +79,7 @@ def _serialize_asset_row(
 async def list_assets(
     client_id: str,
     connector_id: Optional[str] = None,
+    project_id: Optional[str] = None,
     asset_class: Optional[str] = None,
     subscription_id: Optional[str] = None,
     resource_group: Optional[str] = None,
@@ -90,6 +92,8 @@ async def list_assets(
     query = db.query(Asset).filter(Asset.client_id == client_id)
     if connector_id:
         query = query.filter(Asset.connector_id == connector_id)
+    if project_id:
+        query = query.filter(Asset.project_id == project_id)
     if asset_class:
         query = query.filter(Asset.asset_class == asset_class)
     if subscription_id:
@@ -150,6 +154,7 @@ async def get_facets(
         "subscription_id": [r[0] for r in base.with_entities(distinct(Asset.subscription_id)).all() if r[0]],
         "resource_group": [r[0] for r in base.with_entities(distinct(Asset.resource_group)).all() if r[0]],
         "account_id": [r[0] for r in base.with_entities(distinct(Asset.account_id)).all() if r[0]],
+        "cloud_project_id": [r[0] for r in base.with_entities(distinct(Asset.cloud_project_id)).all() if r[0]],
         "project_id": [r[0] for r in base.with_entities(distinct(Asset.project_id)).all() if r[0]],
         "connector_id": [r[0] for r in base.with_entities(distinct(Asset.connector_id)).all() if r[0]],
     }
@@ -182,6 +187,7 @@ async def get_asset_detail(
         "subscription_id": asset.subscription_id,
         "resource_group": asset.resource_group,
         "account_id": asset.account_id,
+        "cloud_project_id": asset.cloud_project_id,
         "project_id": asset.project_id,
         "tags": asset.tags or {},
         "status": asset.status,

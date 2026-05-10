@@ -46,16 +46,45 @@ class ClientResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Project ────────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    cloud_provider: Optional[str] = None
+    metadata_: Optional[Dict[str, Any]] = {}
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    cloud_provider: Optional[str] = None
+    metadata_: Optional[Dict[str, Any]] = None
+
+class ProjectResponse(BaseModel):
+    id: str
+    client_id: str
+    name: str
+    description: Optional[str]
+    environment: Optional[str]
+    cloud_provider: Optional[str]
+    created_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+
 # ── Connector ──────────────────────────────────────────────────────────────────
 
 class ConnectorCreate(BaseModel):
     name: str
     connector_type: ConnectorType
+    project_id: str                 # required — connectors must belong to a project
     credentials: Dict[str, Any]     # plaintext; encrypted server-side
     config: Optional[Dict[str, Any]] = {}
 
 class ConnectorUpdate(BaseModel):
     name: Optional[str] = None
+    project_id: Optional[str] = None
     credentials: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
     status: Optional[ConnectorStatus] = None
@@ -63,6 +92,7 @@ class ConnectorUpdate(BaseModel):
 class ConnectorResponse(BaseModel):
     id: str
     client_id: str
+    project_id: Optional[str]
     name: str
     connector_type: ConnectorType
     status: ConnectorStatus
@@ -77,6 +107,7 @@ class ConnectorResponse(BaseModel):
 
 class ScanCreate(BaseModel):
     connector_id: Optional[str] = None
+    project_id: Optional[str] = None     # inferred from connector if omitted
     scan_type: ScanType
     framework: Optional[FrameworkType] = None
     # Optional list of catalog control_ids to scope the scan to. When set, the
@@ -87,6 +118,7 @@ class ScanCreate(BaseModel):
 class ScanResponse(BaseModel):
     id: str
     client_id: str
+    project_id: Optional[str]
     connector_id: Optional[str]
     scan_type: ScanType
     status: ScanStatus
@@ -198,6 +230,7 @@ class AgentRunResponse(BaseModel):
 class AssetResponse(BaseModel):
     id: str
     client_id: str
+    project_id: Optional[str]
     connector_id: str
     external_id: str
     name: str

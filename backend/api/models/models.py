@@ -137,6 +137,32 @@ class Client(Base):
     risks = relationship("Risk", back_populates="client", cascade="all, delete-orphan")
     framework_assessments = relationship("FrameworkAssessment", back_populates="client")
     control_statuses = relationship("ClientControlStatus", back_populates="client", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="client", cascade="all, delete-orphan")
+
+
+class Project(Base):
+    """A logical grouping under a Client. Connectors, Scans, and Assets all
+    belong to a Project. Existing entities pre-Projects are migrated to a
+    "Default" project per client by main.py::_ensure_projects_schema."""
+    __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("client_id", "name", name="uq_project_client_name"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text)
+    environment = Column(String(64))            # production | staging | development | dr | other
+    cloud_provider = Column(String(32))         # azure | aws | gcp | multi | other
+    metadata_ = Column("metadata", JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    client = relationship("Client", back_populates="projects")
+    connectors = relationship("Connector", back_populates="project")
+    scans = relationship("Scan", back_populates="project")
+    assets = relationship("Asset", back_populates="project")
 
 
 class Connector(Base):
@@ -144,6 +170,7 @@ class Connector(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)  # populated by migration; required for new rows
     name = Column(String(200), nullable=False)
     connector_type = Column(SAEnum(ConnectorType, values_callable=_ev), nullable=False)
     status = Column(SAEnum(ConnectorStatus, values_callable=_ev), default=ConnectorStatus.PENDING)
@@ -155,6 +182,7 @@ class Connector(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     client = relationship("Client", back_populates="connectors")
+    project = relationship("Project", back_populates="connectors")
     scans = relationship("Scan", back_populates="connector")
     assets = relationship("Asset", back_populates="connector", cascade="all, delete-orphan")
 
@@ -164,6 +192,7 @@ class Scan(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)
     connector_id = Column(String(36), ForeignKey("connectors.id"))
     scan_type = Column(SAEnum(ScanType, values_callable=_ev), nullable=False)
     status = Column(SAEnum(ScanStatus, values_callable=_ev), default=ScanStatus.PENDING)
@@ -176,6 +205,7 @@ class Scan(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     client = relationship("Client", back_populates="scans")
+    project = relationship("Project", back_populates="scans")
     connector = relationship("Connector", back_populates="scans")
     findings = relationship("Finding", back_populates="scan", cascade="all, delete-orphan")
 
@@ -253,6 +283,7 @@ class Asset(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)
     connector_id = Column(String(36), ForeignKey("connectors.id"), nullable=False, index=True)
     external_id = Column(String(512), nullable=False)
     name = Column(String(255), nullable=False)
@@ -262,7 +293,7 @@ class Asset(Base):
     subscription_id = Column(String(64))         # Azure
     resource_group = Column(String(128))         # Azure
     account_id = Column(String(64))              # AWS
-    project_id = Column(String(64))              # GCP
+    cloud_project_id = Column(String(64))        # GCP cloud project ID (renamed from project_id when internal Project FK was introduced)
     tags = Column(JSON, default={})
     provider_metadata = Column(JSON, default={})
     status = Column(SAEnum(AssetStatus, values_callable=_ev), default=AssetStatus.ACTIVE)
@@ -270,6 +301,7 @@ class Asset(Base):
     last_synced_at = Column(DateTime(timezone=True), server_default=func.now())
 
     connector = relationship("Connector", back_populates="assets")
+    project = relationship("Project", back_populates="assets")
 
 
 class FrameworkControl(Base):

@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -19,6 +19,72 @@ settings = get_settings()
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_projects_schema() -> None:
+    """One-shot migration to introduce the Project hierarchy.
+
+    1. ALTER TABLE on connectors / scans / assets to add a nullable project_id
+       column if it doesn't already exist.
+    2. For each client, create a "Default" project if none exist.
+    3. Assign every NULL project_id row to that client's Default project.
+
+    The columns are declared nullable here (and nullable=True in the model) so
+    existing prod rows can be migrated without violating constraints. New rows
+    are required to set project_id at the API layer.
+    """
+    from sqlalchemy import inspect, text
+    from sqlalchemy.orm import Session
+    try:
+        inspector = inspect(engine)
+        dialect = engine.dialect.name
+
+        def _alter(table: str) -> None:
+            try:
+                cols = {c["name"] for c in inspector.get_columns(table)}
+            except Exception:
+                return
+            if "project_id" in cols:
+                return
+            ddl = f"ALTER TABLE {table} ADD project_id NVARCHAR(36) NULL" if dialect == "mssql" \
+                  else f"ALTER TABLE {table} ADD COLUMN project_id VARCHAR(36)"
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added %s.project_id column", table)
+            except Exception as exc:
+                logger.warning("ALTER %s.project_id skipped: %s", table, exc)
+
+        for t in ("connectors", "scans", "assets"):
+            _alter(t)
+
+        # Backfill: create Default project per client + reassign orphans
+        from api.models.models import Client, Project, Connector, Scan, Asset
+        with Session(engine) as db:
+            for client in db.query(Client).all():
+                default = db.query(Project).filter(
+                    Project.client_id == client.id, Project.name == "Default"
+                ).first()
+                if not default:
+                    default = Project(
+                        client_id=client.id,
+                        name="Default",
+                        description="Auto-created when projects were introduced. "
+                                    "Move existing connectors/assets/scans into specific projects as needed.",
+                        environment="production",
+                    )
+                    db.add(default)
+                    db.flush()
+                    logger.info("Created Default project for client %s", client.id)
+
+                for cls in (Connector, Scan, Asset):
+                    db.query(cls).filter(
+                        cls.client_id == client.id,
+                        cls.project_id.is_(None),
+                    ).update({"project_id": default.id}, synchronize_session=False)
+            db.commit()
+    except Exception as exc:
+        logger.warning("_ensure_projects_schema failed: %s", exc)
 
 
 def _ensure_added_columns() -> None:
@@ -272,6 +338,7 @@ def _seed_framework_controls() -> None:
 
 
 _ensure_added_columns()
+_ensure_projects_schema()
 _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
@@ -315,6 +382,7 @@ app.include_router(findings.router, prefix="/api/v1")
 app.include_router(assets.router, prefix="/api/v1")
 app.include_router(frameworks.router, prefix="/api/v1")
 app.include_router(risk_overview.router, prefix="/api/v1")
+app.include_router(projects.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 

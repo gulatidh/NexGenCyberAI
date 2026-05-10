@@ -22,6 +22,7 @@ import Assets from "./pages/Assets";
 import AssetDetail from "./pages/AssetDetail";
 import Frameworks from "./pages/Frameworks";
 import RiskOverviewPage from "./pages/RiskOverview";
+import Projects from "./pages/Projects";
 
 const darkTheme = createTheme({
   palette: {
@@ -81,6 +82,7 @@ export default function App() {
                   <Route path="/risk-overview" element={<RiskOverviewPage />} />
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
+                  <Route path="/projects" element={<Projects />} />
                   <Route path="/connectors" element={<Connectors />} />
                   <Route path="/scans" element={<Scans />} />
                   <Route path="/findings" element={<Findings />} />

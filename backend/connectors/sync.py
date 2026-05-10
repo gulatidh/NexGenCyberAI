@@ -194,6 +194,7 @@ async def sync_connector_assets(db: Session, connector_db: Connector) -> Tuple[i
         if existing_row is None:
             asset = Asset(
                 client_id=connector_db.client_id,
+                project_id=connector_db.project_id,
                 connector_id=connector_db.id,
                 external_id=ext,
                 name=parsed.get("name") or ext,
@@ -203,7 +204,7 @@ async def sync_connector_assets(db: Session, connector_db: Connector) -> Tuple[i
                 subscription_id=parsed.get("subscription_id"),
                 resource_group=parsed.get("resource_group"),
                 account_id=parsed.get("account_id"),
-                project_id=parsed.get("project_id"),
+                cloud_project_id=parsed.get("project_id"),
                 tags=parsed.get("tags") or {},
                 provider_metadata=raw,
                 status=AssetStatus.ACTIVE,
@@ -220,7 +221,7 @@ async def sync_connector_assets(db: Session, connector_db: Connector) -> Tuple[i
             existing_row.subscription_id = parsed.get("subscription_id") or existing_row.subscription_id
             existing_row.resource_group = parsed.get("resource_group") or existing_row.resource_group
             existing_row.account_id = parsed.get("account_id") or existing_row.account_id
-            existing_row.project_id = parsed.get("project_id") or existing_row.project_id
+            existing_row.cloud_project_id = parsed.get("project_id") or existing_row.cloud_project_id
             existing_row.tags = parsed.get("tags") or {}
             existing_row.provider_metadata = raw
             existing_row.status = AssetStatus.ACTIVE

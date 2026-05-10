@@ -221,8 +221,15 @@ async def start_scan(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    # Infer project_id from connector if not explicitly provided
+    proj_id = payload.project_id
+    if not proj_id and payload.connector_id:
+        c = db.query(Connector).filter(Connector.id == payload.connector_id).first()
+        if c:
+            proj_id = c.project_id
     scan = Scan(
         client_id=client_id,
+        project_id=proj_id,
         connector_id=payload.connector_id,
         scan_type=payload.scan_type,
         framework=payload.framework,
@@ -240,8 +247,16 @@ async def start_scan(
 
 
 @router.get("/", response_model=List[ScanResponse])
-async def list_scans(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(Scan).filter(Scan.client_id == client_id).order_by(Scan.created_at.desc()).limit(50).all()
+async def list_scans(
+    client_id: str,
+    project_id: str = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    q = db.query(Scan).filter(Scan.client_id == client_id)
+    if project_id:
+        q = q.filter(Scan.project_id == project_id)
+    return q.order_by(Scan.created_at.desc()).limit(50).all()
 
 
 @router.get("/{scan_id}", response_model=ScanResponse)
