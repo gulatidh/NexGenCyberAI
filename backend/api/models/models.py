@@ -392,3 +392,29 @@ class AgentRun(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
     error_message = Column(Text)
+
+
+class AISettings(Base):
+    """Single-row table holding tenant-wide AI provider configuration. Lets
+    admins override env-var keys/endpoints from the UI. API keys are stored
+    encrypted via core.encryption.encrypt."""
+    __tablename__ = "ai_settings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    default_provider = Column(String(64))
+    default_model = Column(String(128))
+    default_temperature = Column(Float, default=0.1)
+
+    openai_api_key_enc = Column(Text)
+    azure_openai_api_key_enc = Column(Text)
+    azure_openai_endpoint = Column(String(512))
+    azure_openai_deployment = Column(String(128))
+    azure_openai_api_version = Column(String(64))
+    anthropic_api_key_enc = Column(Text)
+    google_api_key_enc = Column(Text)
+    aws_bedrock_region = Column(String(64))
+    aws_bedrock_access_key_enc = Column(Text)
+    aws_bedrock_secret_key_enc = Column(Text)
+
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String(255))

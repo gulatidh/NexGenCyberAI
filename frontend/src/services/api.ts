@@ -145,6 +145,9 @@ export const aiApi = {
   listProviders: () => apiClient.get("/ai/providers/").then((r) => r.data),
   testProvider: (data: any) => apiClient.post("/ai/test/", data).then((r) => r.data),
   getDefault: () => apiClient.get("/ai/default-provider/").then((r) => r.data),
+  getConfig: () => apiClient.get("/ai/config/").then((r) => r.data),
+  updateConfig: (data: Record<string, any>) =>
+    apiClient.patch("/ai/config/", data).then((r) => r.data),
 };
 
 export const dashboardApi = {
