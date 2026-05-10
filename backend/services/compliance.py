@@ -35,8 +35,14 @@ def _normalize(s: str) -> str:
 def derive_status_for_control(
     open_finding_ids: List[str],
     historical_finding_ids: List[str],
+    is_covered_by_scan: bool = False,
 ) -> ControlStatus:
-    """Pure function: classify a control given the findings that map to it."""
+    """Pure function: classify a control given the findings that map to it.
+
+    `is_covered_by_scan` says the connector ran a check that *would have*
+    produced findings for this control if it failed. Absent findings on a
+    covered control means it passed → COMPLIANT.
+    """
     if open_finding_ids:
         # Open findings exist: non-compliant. If some are remediated/accepted too, partial.
         if len(historical_finding_ids) > len(open_finding_ids):
@@ -45,7 +51,10 @@ def derive_status_for_control(
     if historical_finding_ids:
         # All findings cleared (remediated/accepted/false_positive)
         return ControlStatus.COMPLIANT
-    # Never had a finding — default to N/A; user can flip to compliant manually
+    if is_covered_by_scan:
+        # Connector ran a check covering this control and emitted no failure → pass
+        return ControlStatus.COMPLIANT
+    # Never had a finding and not exercised by any scan — default to N/A
     return ControlStatus.NOT_APPLICABLE
 
 
@@ -59,6 +68,25 @@ def recompute_client_framework(
     `overridden`, `total`.
     """
     fw_value = framework.value if hasattr(framework, "value") else str(framework)
+
+    # Has the client run any successful scan? Used to decide whether checks
+    # without findings should be treated as "passed" (compliant) or "untested" (N/A).
+    has_completed_scan = db.query(Scan).filter(
+        Scan.client_id == client_id,
+        Scan.status == "completed",
+    ).first() is not None
+
+    # Build the universe of controls the connectors are *capable* of testing
+    # for this framework. Controls in this set with no open findings are
+    # COMPLIANT (the check ran and passed); controls outside it remain N/A
+    # because we have no signal either way.
+    covered_set: set = set()
+    if has_completed_scan:
+        try:
+            from connectors.azure.control_mappings import all_covered_controls
+            covered_set = {_normalize(c) for c in all_covered_controls(fw_value)}
+        except Exception as exc:
+            logger.warning("all_covered_controls failed for %s: %s", fw_value, exc)
 
     # 1. Pull every client finding (any framework). Two ways a finding can map to
     #    a control in this framework:
@@ -114,7 +142,7 @@ def recompute_client_framework(
         key = _normalize(ctrl.control_id)
         opens = open_by_ctrl.get(key, [])
         hists = hist_by_ctrl.get(key, [])
-        derived_status = derive_status_for_control(opens, hists)
+        derived_status = derive_status_for_control(opens, hists, is_covered_by_scan=key in covered_set)
 
         existing_row = existing.get(ctrl.id)
         if existing_row and not existing_row.derived:

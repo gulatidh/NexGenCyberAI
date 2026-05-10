@@ -153,3 +153,20 @@ def defender_mappings(title: str) -> Dict[str, List[str]]:
     """Map a Defender-for-Cloud assessment title to control_mappings."""
     check = _DEFENDER_TITLE_TO_CHECK.get(title)
     return mappings_for(check) if check else {}
+
+
+def all_covered_controls(framework_value: str) -> List[str]:
+    """All control_ids the Azure connector knows how to evaluate for the
+    given framework. Used by compliance recompute to mark covered controls
+    as COMPLIANT when no findings were emitted (= the check passed)."""
+    out: set = set()
+    for mappings in _CHECK_MAP.values():
+        for cid in mappings.get(framework_value, []) or []:
+            if cid:
+                out.add(cid)
+    # Also include the parametric NSG-port mapping covers
+    for mappings_for_port in _PORT_TO_CIS_AZURE.values():
+        for cid in mappings_for_port:
+            if framework_value == "cis_azure":
+                out.add(cid)
+    return sorted(out)
