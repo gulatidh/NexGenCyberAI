@@ -169,39 +169,59 @@ def _top_issues(db: Session, client_id: str, limit: int = 10) -> List[Dict[str, 
 
 
 def _issues_flow(db: Session, client_id: str, days: int) -> List[Dict[str, Any]]:
-    """Opened vs resolved per day."""
+    """Opened vs resolved per day. Bucket in Python (database-agnostic)."""
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=days - 1)
+    start_dt = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc)
 
-    opens = dict(
-        db.query(func.cast(Finding.created_at, type_=__import__("sqlalchemy").Date), func.count(Finding.id))
+    open_rows = (
+        db.query(Finding.created_at)
         .join(Scan, Finding.scan_id == Scan.id)
-        .filter(Scan.client_id == client_id, Finding.created_at >= start)
-        .group_by(func.cast(Finding.created_at, type_=__import__("sqlalchemy").Date))
+        .filter(Scan.client_id == client_id, Finding.created_at >= start_dt)
         .all()
     )
-    resolved = dict(
-        db.query(func.cast(Finding.updated_at, type_=__import__("sqlalchemy").Date), func.count(Finding.id))
+    resolved_rows = (
+        db.query(Finding.updated_at)
         .join(Scan, Finding.scan_id == Scan.id)
         .filter(
             Scan.client_id == client_id,
-            Finding.updated_at >= start,
+            Finding.updated_at >= start_dt,
             Finding.status.in_(("remediated", "accepted", "false_positive")),
         )
-        .group_by(func.cast(Finding.updated_at, type_=__import__("sqlalchemy").Date))
         .all()
     )
 
-    def _key(d):
-        return d.isoformat() if hasattr(d, "isoformat") else str(d)
+    def _to_date(v):
+        if v is None:
+            return None
+        if hasattr(v, "date"):
+            return v.date()
+        if isinstance(v, str):
+            try:
+                return datetime.fromisoformat(v.replace("Z", "+00:00")).date()
+            except Exception:
+                return None
+        return None
+
+    opens_by_date: Dict[Any, int] = defaultdict(int)
+    for (ts,) in open_rows:
+        d = _to_date(ts)
+        if d is not None:
+            opens_by_date[d] += 1
+
+    resolved_by_date: Dict[Any, int] = defaultdict(int)
+    for (ts,) in resolved_rows:
+        d = _to_date(ts)
+        if d is not None:
+            resolved_by_date[d] += 1
 
     out = []
     for i in range(days):
         d = start + timedelta(days=i)
         out.append({
             "date": d.isoformat(),
-            "opened": int(opens.get(d, opens.get(_key(d), 0))),
-            "resolved": int(resolved.get(d, resolved.get(_key(d), 0))),
+            "opened": int(opens_by_date.get(d, 0)),
+            "resolved": int(resolved_by_date.get(d, 0)),
         })
     return out
 
