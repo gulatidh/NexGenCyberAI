@@ -42,7 +42,7 @@ export default function Admin() {
     scope_client_id: string;
     scope_project_id: string;
   }>({
-    email: "", role: "reader", scope_type: "global",
+    email: "", role: "reader", scope_type: "client",
     scope_client_id: "", scope_project_id: "",
   });
 
@@ -51,23 +51,38 @@ export default function Admin() {
     queryFn: adminApi.me,
   });
 
+  const canAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
+  const isGlobalAdmin = !!me?.is_admin;
+  const manageable = me?.manageable_scopes;
+
   const { data: users = [], isLoading } = useQuery<UserAccessSummary[]>({
     queryKey: ["admin-users"],
     queryFn: adminApi.listUsers,
-    enabled: !!me?.is_admin,
+    enabled: canAdmin,
   });
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: allClients = [] } = useQuery<Client[]>({
     queryKey: ["clients"],
     queryFn: clientsApi.list,
-    enabled: !!me?.is_admin,
+    enabled: canAdmin,
   });
+
+  // Scoped admins only pick from clients they can manage (or whose projects they manage).
+  const clients = isGlobalAdmin ? allClients : allClients.filter((c) =>
+    manageable?.client_ids.includes(c.id)
+    // Also include clients that have a manageable project under them
+    // (resolved below by also showing the client when its projects appear)
+  );
 
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", form.scope_client_id],
     queryFn: () => projectsApi.list(form.scope_client_id),
     enabled: !!form.scope_client_id && form.scope_type === "project",
   });
+  // Filter projects for non-global admins to only the ones they manage.
+  const visibleProjects = isGlobalAdmin
+    ? projects
+    : projects.filter((p) => manageable?.project_ids.includes(p.id));
 
   const grantMutation = useMutation({
     mutationFn: (data: any) => adminApi.createGrant(data),
@@ -75,7 +90,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       qc.invalidateQueries({ queryKey: ["my-access"] });
       setOpen(false);
-      setForm({ email: "", role: "reader", scope_type: "global", scope_client_id: "", scope_project_id: "" });
+      setForm({ email: "", role: "reader", scope_type: "client", scope_client_id: "", scope_project_id: "" });
     },
   });
 
@@ -98,14 +113,14 @@ export default function Admin() {
     return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#00e5ff" }} /></Box>;
   }
 
-  if (!me?.is_admin) {
+  if (!canAdmin) {
     return (
       <Box sx={{ maxWidth: 640, mx: "auto", mt: 6 }}>
         <Alert severity="warning" icon={<AdminPanelSettings />}
           sx={{ bgcolor: "rgba(255,152,0,0.08)", color: "white", border: "1px solid rgba(255,152,0,0.3)" }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Admin access required</Typography>
-          You're signed in as <b>{me?.email || "unknown"}</b>. Ask a global admin to grant
-          you the <b>admin</b> role.
+          You're signed in as <b>{me?.email || "unknown"}</b>. Ask a global or scoped admin
+          to grant you the <b>admin</b> role.
         </Alert>
       </Box>
     );
@@ -223,9 +238,15 @@ export default function Admin() {
               <Select label="Scope" value={form.scope_type}
                 onChange={(e) => setForm({ ...form, scope_type: e.target.value as AccessScope, scope_client_id: "", scope_project_id: "" })}
                 sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                <MenuItem value="global">Global — applies everywhere</MenuItem>
-                <MenuItem value="client">Specific client</MenuItem>
-                <MenuItem value="project">Specific project</MenuItem>
+                <MenuItem value="global" disabled={!isGlobalAdmin}>
+                  Global — applies everywhere {!isGlobalAdmin && "(global admin only)"}
+                </MenuItem>
+                <MenuItem value="client" disabled={!isGlobalAdmin && (manageable?.client_ids.length ?? 0) === 0}>
+                  Specific client
+                </MenuItem>
+                <MenuItem value="project" disabled={!isGlobalAdmin && (manageable?.project_ids.length ?? 0) === 0}>
+                  Specific project
+                </MenuItem>
               </Select>
             </FormControl>
             {(form.scope_type === "client" || form.scope_type === "project") && (
@@ -244,7 +265,7 @@ export default function Admin() {
                 <Select label="Project" value={form.scope_project_id}
                   onChange={(e) => setForm({ ...form, scope_project_id: e.target.value })}
                   sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+                  {visibleProjects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                 </Select>
               </FormControl>
             )}

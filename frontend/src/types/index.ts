@@ -470,11 +470,19 @@ export interface UserAccessSummary {
   effective_global_role?: AccessRole | null;
 }
 
+export interface ManageableScopes {
+  global: boolean;
+  client_ids: string[];
+  project_ids: string[];
+}
+
 export interface MyAccess {
   email: string;
   grants: AccessGrant[];
-  is_admin: boolean;
+  is_admin: boolean;                 // global admin
+  is_admin_anywhere?: boolean;       // admin at any scope (gates Admin nav)
   is_editor_anywhere: boolean;
+  manageable_scopes?: ManageableScopes;
 }
 
 export interface DashboardSummary {

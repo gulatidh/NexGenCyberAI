@@ -87,7 +87,7 @@ export default function AppLayout() {
       </Box>
       <List sx={{ pt: 1 }}>
         {NAV_GROUPS.map((group, gi) => {
-          const items = group.items.filter((i) => !i.adminOnly || me?.is_admin);
+          const items = group.items.filter((i) => !i.adminOnly || me?.is_admin || me?.is_admin_anywhere);
           if (items.length === 0) return null;
           return (
           <React.Fragment key={gi}>

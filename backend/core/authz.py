@@ -125,3 +125,53 @@ def require_scoped_role(min_role: AccessRole, scope_type: AccessScope, scope_id:
     grants = get_user_grants(db, email)
     if not has_role(grants, min_role, scope_type=scope_type, scope_id=scope_id, db=db):
         raise HTTPException(status_code=403, detail=f"{min_role.value} required at {scope_type.value} scope")
+
+
+def is_admin_anywhere(grants: Iterable[UserAccess]) -> bool:
+    """True if the caller holds admin role at any scope — used to gate the
+    Admin nav and access management endpoints for scoped admins."""
+    return any(g.role == AccessRole.ADMIN for g in grants)
+
+
+def can_manage_scope(
+    grants: Iterable[UserAccess],
+    target_scope_type: AccessScope,
+    target_scope_id: Optional[str],
+    db: Session,
+) -> bool:
+    """True if the caller can grant/revoke roles at the target scope.
+
+    Rule: caller needs admin at a scope that *covers* the target.
+      - Target GLOBAL          → caller needs GLOBAL admin
+      - Target CLIENT X        → caller needs GLOBAL admin OR admin at CLIENT X
+      - Target PROJECT P (in X)→ caller needs GLOBAL admin, admin at CLIENT X, or admin at PROJECT P
+    """
+    return has_role(grants, AccessRole.ADMIN,
+                    scope_type=target_scope_type, scope_id=target_scope_id, db=db)
+
+
+def manageable_scope_ids(grants: Iterable[UserAccess], db: Session) -> dict:
+    """Return the scopes a caller can manage grants on. Used by the SPA to
+    constrain the Grant dialog dropdowns to only what the caller can act on.
+
+    Returns: {"global": bool, "client_ids": [str], "project_ids": [str]}
+    """
+    out = {"global": False, "client_ids": set(), "project_ids": set()}
+    if any(g.role == AccessRole.ADMIN and g.scope_type == AccessScope.GLOBAL for g in grants):
+        out["global"] = True
+    for g in grants:
+        if g.role != AccessRole.ADMIN:
+            continue
+        if g.scope_type == AccessScope.CLIENT and g.scope_id:
+            out["client_ids"].add(g.scope_id)
+        elif g.scope_type == AccessScope.PROJECT and g.scope_id:
+            out["project_ids"].add(g.scope_id)
+    # Client admins implicitly manage every project under their client.
+    if out["client_ids"]:
+        for p in db.query(Project).filter(Project.client_id.in_(list(out["client_ids"]))).all():
+            out["project_ids"].add(p.id)
+    return {
+        "global": out["global"],
+        "client_ids": sorted(out["client_ids"]),
+        "project_ids": sorted(out["project_ids"]),
+    }

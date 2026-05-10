@@ -15,6 +15,7 @@ from db.database import get_db
 from core.security import get_current_user
 from core.authz import (
     _normalize_email, _user_email, effective_role, get_user_grants, require_role,
+    is_admin_anywhere, can_manage_scope, manageable_scope_ids,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -61,16 +62,43 @@ async def get_my_access(
         email=email,
         grants=[_grant_response(g, db) for g in grants],
         is_admin=is_admin,
+        is_admin_anywhere=is_admin_anywhere(grants),
         is_editor_anywhere=is_editor_anywhere,
+        manageable_scopes=manageable_scope_ids(grants, db),
     )
+
+
+def _require_admin_anywhere(user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    """Allow any user holding admin role at *any* scope — used to gate access
+    management endpoints that scoped admins also need (with per-target checks
+    inside the handler)."""
+    email = _user_email(user)
+    if not email:
+        raise HTTPException(status_code=401, detail="Could not identify user")
+    grants = get_user_grants(db, email)
+    if not is_admin_anywhere(grants):
+        raise HTTPException(status_code=403, detail="admin role required (at any scope)")
+    return user
 
 
 @router.get("/users", response_model=List[UserAccessSummary])
 async def list_users_with_grants(
     db: Session = Depends(get_db),
-    _=Depends(require_role(AccessRole.ADMIN)),
+    user: dict = Depends(_require_admin_anywhere),
 ):
+    """List users + grants. Global admins see everyone; scoped admins only see
+    grants at scopes they can manage."""
+    caller_email = _user_email(user)
+    caller_grants = get_user_grants(db, caller_email)
+    is_global = any(
+        g.role == AccessRole.ADMIN and g.scope_type == AccessScope.GLOBAL for g in caller_grants
+    )
+
     rows = db.query(UserAccess).order_by(UserAccess.email.asc(), UserAccess.granted_at.desc()).all()
+    if not is_global:
+        # Scoped admin → only return grants at scopes they can manage.
+        rows = [g for g in rows if can_manage_scope(caller_grants, g.scope_type, g.scope_id, db)]
+
     by_email: Dict[str, List[UserAccess]] = defaultdict(list)
     for g in rows:
         by_email[g.email].append(g)
@@ -88,7 +116,7 @@ async def list_users_with_grants(
 async def create_grant(
     payload: GrantCreate,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_role(AccessRole.ADMIN)),
+    user: dict = Depends(_require_admin_anywhere),
 ):
     email = _normalize_email(payload.email)
     if not email or "@" not in email:
@@ -106,6 +134,14 @@ async def create_grant(
         elif payload.scope_type == AccessScope.PROJECT:
             if not db.query(Project).filter(Project.id == payload.scope_id).first():
                 raise HTTPException(status_code=404, detail="Project not found")
+
+    # Caller must hold admin at a scope that *covers* the target.
+    caller_grants = get_user_grants(db, _user_email(user))
+    if not can_manage_scope(caller_grants, payload.scope_type, payload.scope_id, db):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Admin role at {payload.scope_type.value} scope (or higher) required to grant here.",
+        )
 
     grant = UserAccess(
         email=email,
@@ -129,14 +165,22 @@ async def create_grant(
 async def delete_grant(
     grant_id: str,
     db: Session = Depends(get_db),
-    user: dict = Depends(require_role(AccessRole.ADMIN)),
+    user: dict = Depends(_require_admin_anywhere),
 ):
     g = db.query(UserAccess).filter(UserAccess.id == grant_id).first()
     if not g:
         raise HTTPException(status_code=404, detail="Grant not found")
 
-    # Safety: never let the last global admin revoke themselves.
+    # Caller must hold admin at a scope that covers the grant being revoked.
     caller_email = _user_email(user)
+    caller_grants = get_user_grants(db, caller_email)
+    if not can_manage_scope(caller_grants, g.scope_type, g.scope_id, db):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Admin role at {g.scope_type.value} scope (or higher) required to revoke here.",
+        )
+
+    # Safety: never let the last global admin revoke themselves.
     if (
         g.email == caller_email
         and g.role == AccessRole.ADMIN

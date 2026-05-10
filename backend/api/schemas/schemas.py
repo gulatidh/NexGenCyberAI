@@ -338,8 +338,10 @@ class UserAccessSummary(BaseModel):
 class MyAccessResponse(BaseModel):
     email: str
     grants: List[GrantResponse] = []
-    is_admin: bool
+    is_admin: bool                          # global admin
+    is_admin_anywhere: bool = False         # admin at any scope (for nav gating)
     is_editor_anywhere: bool
+    manageable_scopes: Dict[str, Any] = {}  # {global, client_ids[], project_ids[]}
 
 
 # ── Misc ───────────────────────────────────────────────────────────────────────
