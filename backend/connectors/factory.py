@@ -13,6 +13,7 @@ from connectors.entraid.connector import EntraIDConnector
 from connectors.containers.connector import ContainerConnector
 from connectors.saas.servicenow.connector import ServiceNowConnector
 from connectors.saas.okta.connector import OktaConnector
+from connectors.web.connector import WebConnector
 
 
 _REGISTRY = {
@@ -24,6 +25,7 @@ _REGISTRY = {
     ConnectorType.CONTAINERS: ContainerConnector,
     ConnectorType.SERVICENOW: ServiceNowConnector,
     ConnectorType.OKTA: OktaConnector,
+    ConnectorType.WEB: WebConnector,
 }
 
 

@@ -54,6 +54,33 @@ async def _execute_scan(
         if scan.connector_id:
             connector_db = db.query(Connector).filter(Connector.id == scan.connector_id).first()
             if connector_db:
+                # Web (ZAP) connector: dispatch a GitHub workflow and exit
+                # early — findings come back later via /scans/ingest/.
+                from api.models.models import ConnectorType as _CT
+                ctype = connector_db.connector_type
+                ctype_value = ctype.value if hasattr(ctype, "value") else str(ctype)
+                if ctype_value == _CT.WEB.value:
+                    from connectors.web.connector import trigger_zap_scan
+                    creds = json.loads(decrypt(connector_db.credentials_enc))
+                    cfg = connector_db.config or {}
+                    profile = (scan.summary or {}).get("requested_profile") or cfg.get("default_profile") or "baseline"
+                    target_url = cfg.get("target_url", "")
+                    auth = creds.get("auth", {"method": "none"})
+                    result = trigger_zap_scan(
+                        scan_id=scan.id,
+                        target_url=target_url,
+                        auth=auth,
+                        profile=profile,
+                        exclude_paths=cfg.get("exclude_paths") or [],
+                    )
+                    if not result.get("ok"):
+                        scan.status = ScanStatus.FAILED
+                        scan.error_message = f"Workflow dispatch failed: {result.get('error')}"
+                        scan.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+                    # Stay in RUNNING — workflow will mark COMPLETED via ingest.
+                    return
+
                 # Refresh asset inventory before the scan so findings join to fresh assets.
                 try:
                     await sync_connector_assets(db, connector_db)

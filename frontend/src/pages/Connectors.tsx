@@ -16,6 +16,7 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   onprem: "🖥️ On-Premises", servicenow: "🟣 ServiceNow",
   okta: "🔑 Okta", entraid: "🆔 Entra ID",
   containers: "🐳 Containers", github: "🐙 GitHub", jira: "📋 Jira",
+  web: "🌐 Web App (ZAP)",
 };
 
 const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: string; secret?: boolean }>> = {
@@ -66,6 +67,9 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: strin
     { key: "email", label: "Email" },
     { key: "api_token", label: "API Token", secret: true },
   ],
+  // Web connector handles its own form (target URL + auth method picker
+  // with conditional fields), so no static credential fields here.
+  web: [],
 };
 
 const STATUS_PROPS: Record<string, any> = {
@@ -85,6 +89,14 @@ export default function Connectors() {
   const [connProjectId, setConnProjectId] = useState("");
   const [credentials, setCredentials] = useState<Record<string, string>>({});
   const [testResults, setTestResults] = useState<Record<string, any>>({});
+  // Web (ZAP) connector — kept separate because its shape doesn't fit the
+  // flat credentials map: target_url + default_profile go in `config`, and
+  // auth lives under `credentials.auth = { method, ...method-specific }`.
+  const [webTargetUrl, setWebTargetUrl] = useState("");
+  const [webProfile, setWebProfile] = useState<"baseline" | "active">("baseline");
+  const [webAuthMethod, setWebAuthMethod] = useState<"none" | "bearer" | "cookie" | "form" | "oauth_client_credentials">("none");
+  const [webAuth, setWebAuth] = useState<Record<string, string>>({});
+  const [webExcludes, setWebExcludes] = useState("");  // newline-separated
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
@@ -243,7 +255,11 @@ export default function Connectors() {
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small">
                 <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Type</InputLabel>
-                <Select value={connectorType} onChange={(e) => { setConnectorType(e.target.value as ConnectorType); setCredentials({}); }}
+                <Select value={connectorType} onChange={(e) => {
+                    setConnectorType(e.target.value as ConnectorType);
+                    setCredentials({});
+                    setWebTargetUrl(""); setWebAuthMethod("none"); setWebAuth({}); setWebExcludes("");
+                  }}
                   label="Type" sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
                   {Object.entries(CONNECTOR_ICONS).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
                 </Select>
@@ -263,7 +279,7 @@ export default function Connectors() {
                 </Select>
               </FormControl>
             </Grid>
-            {credFields.map(({ key, label, secret }) => (
+            {connectorType !== "web" && credFields.map(({ key, label, secret }) => (
               <Grid size={{ xs: 12 }} key={key}>
                 <TextField fullWidth size="small" label={label} type={secret ? "password" : "text"}
                   value={credentials[key] || ""} onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
@@ -271,14 +287,168 @@ export default function Connectors() {
                   sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
               </Grid>
             ))}
+
+            {connectorType === "web" && (
+              <>
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small" label="Target URL"
+                    placeholder="https://app.example.com"
+                    value={webTargetUrl} onChange={(e) => setWebTargetUrl(e.target.value)}
+                    slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Default scan profile</InputLabel>
+                    <Select value={webProfile} label="Default scan profile"
+                      onChange={(e) => setWebProfile(e.target.value as "baseline" | "active")}
+                      sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                      <MenuItem value="baseline">Baseline — passive crawl (~5 min, safe)</MenuItem>
+                      <MenuItem value="active">Active — attack scan (~30 min, intrusive)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Authentication</InputLabel>
+                    <Select value={webAuthMethod} label="Authentication"
+                      onChange={(e) => { setWebAuthMethod(e.target.value as any); setWebAuth({}); }}
+                      sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                      <MenuItem value="none">None — unauthenticated scan</MenuItem>
+                      <MenuItem value="bearer">Bearer token (API)</MenuItem>
+                      <MenuItem value="cookie">Cookie</MenuItem>
+                      <MenuItem value="form">Form login</MenuItem>
+                      <MenuItem value="oauth_client_credentials">OAuth (client_credentials)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+
+                {webAuthMethod === "bearer" && (
+                  <Grid size={{ xs: 12 }}>
+                    <TextField fullWidth size="small" type="password" label="Bearer token"
+                      value={webAuth.token || ""} onChange={(e) => setWebAuth({ ...webAuth, token: e.target.value })}
+                      slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                  </Grid>
+                )}
+
+                {webAuthMethod === "cookie" && (
+                  <>
+                    <Grid size={{ xs: 12, sm: 5 }}>
+                      <TextField fullWidth size="small" label="Cookie name" placeholder="sessionid"
+                        value={webAuth.cookie_name || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_name: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 7 }}>
+                      <TextField fullWidth size="small" type="password" label="Cookie value"
+                        value={webAuth.cookie_value || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_value: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                  </>
+                )}
+
+                {webAuthMethod === "form" && (
+                  <>
+                    <Grid size={{ xs: 12 }}>
+                      <TextField fullWidth size="small" label="Login URL" placeholder="https://app.example.com/login"
+                        value={webAuth.login_url || ""} onChange={(e) => setWebAuth({ ...webAuth, login_url: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" label="Username"
+                        value={webAuth.username || ""} onChange={(e) => setWebAuth({ ...webAuth, username: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" type="password" label="Password"
+                        value={webAuth.password || ""} onChange={(e) => setWebAuth({ ...webAuth, password: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" label="Username field name" placeholder="username"
+                        value={webAuth.username_field || ""} onChange={(e) => setWebAuth({ ...webAuth, username_field: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" label="Password field name" placeholder="password"
+                        value={webAuth.password_field || ""} onChange={(e) => setWebAuth({ ...webAuth, password_field: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                  </>
+                )}
+
+                {webAuthMethod === "oauth_client_credentials" && (
+                  <>
+                    <Grid size={{ xs: 12 }}>
+                      <TextField fullWidth size="small" label="Token endpoint URL"
+                        placeholder="https://login.example.com/oauth/token"
+                        value={webAuth.token_url || ""} onChange={(e) => setWebAuth({ ...webAuth, token_url: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" label="Client ID"
+                        value={webAuth.client_id || ""} onChange={(e) => setWebAuth({ ...webAuth, client_id: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <TextField fullWidth size="small" type="password" label="Client secret"
+                        value={webAuth.client_secret || ""} onChange={(e) => setWebAuth({ ...webAuth, client_secret: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                    <Grid size={{ xs: 12 }}>
+                      <TextField fullWidth size="small" label="Scope (optional)" placeholder="api:read"
+                        value={webAuth.scope || ""} onChange={(e) => setWebAuth({ ...webAuth, scope: e.target.value })}
+                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    </Grid>
+                  </>
+                )}
+
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small" multiline minRows={2}
+                    label="Exclude paths (one per line, optional)"
+                    placeholder={"/logout\n/payment"}
+                    value={webExcludes} onChange={(e) => setWebExcludes(e.target.value)}
+                    slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                </Grid>
+              </>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
-          <Button variant="contained" disabled={!connName || !connProjectId || createMutation.isPending}
-            onClick={() => createMutation.mutate(editing
-              ? { name: connName, project_id: connProjectId, ...(Object.keys(credentials).length ? { credentials } : {}) }
-              : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials })}
+          <Button variant="contained"
+            disabled={!connName || !connProjectId || createMutation.isPending
+              || (connectorType === "web" && !webTargetUrl.trim())}
+            onClick={() => {
+              if (connectorType === "web") {
+                const exclude_paths = webExcludes.split("\n").map((s) => s.trim()).filter(Boolean);
+                const config = {
+                  target_url: webTargetUrl.trim(),
+                  default_profile: webProfile,
+                  ...(exclude_paths.length ? { exclude_paths } : {}),
+                };
+                const creds = { auth: { method: webAuthMethod, ...webAuth } };
+                createMutation.mutate(editing
+                  ? { name: connName, project_id: connProjectId, credentials: creds, config }
+                  : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials: creds, config });
+              } else {
+                createMutation.mutate(editing
+                  ? { name: connName, project_id: connProjectId, ...(Object.keys(credentials).length ? { credentials } : {}) }
+                  : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials });
+              }
+            }}
             sx={{ bgcolor: "#00e5ff", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
           </Button>

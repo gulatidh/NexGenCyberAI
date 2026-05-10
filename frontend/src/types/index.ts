@@ -1,6 +1,6 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type RiskLevel = "critical" | "high" | "medium" | "low";
-export type ConnectorType = "azure" | "aws" | "gcp" | "onprem" | "servicenow" | "okta" | "entraid" | "containers" | "github" | "jira";
+export type ConnectorType = "azure" | "aws" | "gcp" | "onprem" | "servicenow" | "okta" | "entraid" | "containers" | "github" | "jira" | "web";
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 export type ScanType = "vulnerability" | "configuration" | "compliance" | "full";
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";

@@ -1,0 +1,166 @@
+name: ZAP Web Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). The runner
+# fetches scan config (target URL, prepared auth headers) from the API
+# using a per-scan HMAC token, runs OWASP ZAP, then posts findings back.
+#
+# Inputs are visible in the run UI — secrets stay in the API. The
+# scan_token only authenticates this single scan and expires after 6h.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL, e.g. https://nexgencyberai-dev-okxksu-api.azurewebsites.net"
+        required: true
+      target_url:
+        description: "Target site to scan"
+        required: true
+      profile:
+        description: "baseline | active"
+        required: false
+        default: "baseline"
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: Run OWASP ZAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          # Pull prepared auth headers + excludes from the API. Secrets only
+          # exist in this job's memory — never echoed to logs.
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          # Build a ZAP header-replacer config string from auth_headers.
+          python3 - <<'PY'
+          import json, os, pathlib
+          cfg = json.load(open("cfg.json"))
+          headers = cfg.get("auth_headers", {}) or {}
+          excludes = cfg.get("exclude_paths", []) or []
+          # ZAP "Replacer" rules: each header is one rule.
+          parts = []
+          for i, (k, v) in enumerate(headers.items()):
+              parts += [
+                  f"-config replacer.full_list({i}).description=auth{i}",
+                  f"-config replacer.full_list({i}).enabled=true",
+                  f"-config replacer.full_list({i}).matchtype=REQ_HEADER",
+                  f"-config replacer.full_list({i}).matchstr={k}",
+                  f"-config replacer.full_list({i}).regex=false",
+                  f"-config replacer.full_list({i}).replacement={v}",
+              ]
+          replacer = " ".join(parts)
+          pathlib.Path(".zap-options.txt").write_text(replacer)
+          # Optional excludes (one per line for ZAP context)
+          pathlib.Path(".zap-excludes.txt").write_text("\n".join(excludes))
+          # Stash the safe-to-log fields for later steps.
+          out = pathlib.Path(os.environ["GITHUB_OUTPUT"])
+          with out.open("a") as f:
+              f.write(f"target_url={cfg.get('target_url','')}\n")
+              f.write(f"profile={cfg.get('profile','baseline')}\n")
+              f.write(f"auth_headers_count={len(headers)}\n")
+          PY
+
+      - name: ZAP Baseline Scan
+        if: steps.cfg.outputs.profile != 'active'
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ steps.cfg.outputs.target_url }}
+          cmd_options: "-J report.json $(cat .zap-options.txt)"
+          fail_action: false
+          allow_issue_writing: false
+
+      - name: ZAP Full (Active) Scan
+        if: steps.cfg.outputs.profile == 'active'
+        uses: zaproxy/action-full-scan@v0.10.0
+        with:
+          target: ${{ steps.cfg.outputs.target_url }}
+          cmd_options: "-J report.json $(cat .zap-options.txt)"
+          fail_action: false
+          allow_issue_writing: false
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          # Find the report — ZAP actions drop it relative to workspace.
+          REPORT=$(find . -maxdepth 4 -name 'report.json' -print -quit || true)
+          python3 - <<PY
+          import json, os, pathlib, urllib.request, urllib.error
+
+          report_path = "${REPORT}".strip() or None
+          findings = []
+          err = None
+          if report_path and os.path.exists(report_path):
+              try:
+                  data = json.load(open(report_path))
+                  # ZAP report shape: {site:[{alerts:[{name,desc,riskcode,...,instances:[{uri}]}]}]}
+                  RISK = {"3":"high","2":"medium","1":"low","0":"info"}
+                  CONF = {"3":"high","2":"medium","1":"low"}
+                  for site in data.get("site", []):
+                      for alert in site.get("alerts", []):
+                          sev = RISK.get(str(alert.get("riskcode","0")), "info")
+                          # ZAP 'high' isn't always 'critical' — keep mapping conservative.
+                          if int(alert.get("riskcode","0")) >= 3 and (alert.get("cweid") in {"79","89","78","94"}):
+                              sev = "critical"
+                          uris = [i.get("uri") for i in alert.get("instances", []) if i.get("uri")]
+                          resource = uris[0] if uris else site.get("@name", "")
+                          cwe = alert.get("cweid")
+                          findings.append({
+                              "title": alert.get("name") or "ZAP alert",
+                              "description": (alert.get("desc") or "")[:4000],
+                              "severity": sev,
+                              "resource_id": resource,
+                              "resource_type": "web/endpoint",
+                              "control_id": f"CWE-{cwe}" if cwe else None,
+                              "remediation": (alert.get("solution") or "")[:4000],
+                              "evidence": {"reference": alert.get("reference"),
+                                           "instances": uris[:10]},
+                              "control_mappings": {},
+                          })
+              except Exception as e:
+                  err = f"Failed to parse ZAP report: {e}"
+          else:
+              err = "ZAP report not found — scan may have failed"
+
+          payload = {"scan_id": os.environ["SCAN_ID"],
+                     "scan_token": os.environ["SCAN_TOKEN"],
+                     "findings": findings,
+                     "error": err if not findings and err else None}
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY
