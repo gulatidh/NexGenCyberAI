@@ -162,12 +162,40 @@ async def _execute_scan(
 
         # Re-derive framework compliance from the new findings
         try:
-            from api.models.models import FrameworkType
+            from api.models.models import FrameworkType, ConnectorType
+            from services.compliance import apply_defender_evaluations
+            scan_fw = None
             if scan.framework:
                 fw_value = scan.framework.value if hasattr(scan.framework, "value") else str(scan.framework)
-                recompute_client_framework(db, scan.client_id, FrameworkType(fw_value))
-            else:
-                recompute_all_frameworks_for_client(db, scan.client_id)
+                scan_fw = FrameworkType(fw_value)
+
+            # Try Defender for Cloud regulatoryCompliance pull first — it gives
+            # us the entire benchmark (every control evaluated by Microsoft) in
+            # one shot. Falls back to per-finding recompute if unavailable.
+            defender_used = False
+            if scan_fw and scan.connector_id:
+                connector_db_d = db.query(Connector).filter(Connector.id == scan.connector_id).first()
+                if connector_db_d and (
+                    connector_db_d.connector_type.value
+                    if hasattr(connector_db_d.connector_type, "value")
+                    else connector_db_d.connector_type
+                ) == "azure":
+                    try:
+                        from connectors.azure.defender_compliance import get_regulatory_compliance
+                        creds_d = json.loads(decrypt(connector_db_d.credentials_enc))
+                        evaluations = await get_regulatory_compliance(creds_d, scan_fw.value)
+                        if evaluations:
+                            apply_defender_evaluations(db, scan.client_id, scan_fw, evaluations)
+                            defender_used = True
+                    except Exception as exc:
+                        import logging as _lg
+                        _lg.getLogger(__name__).warning("Defender pull failed: %s", exc)
+
+            if not defender_used:
+                if scan_fw:
+                    recompute_client_framework(db, scan.client_id, scan_fw)
+                else:
+                    recompute_all_frameworks_for_client(db, scan.client_id)
         except Exception as exc:
             import logging as _lg
             _lg.getLogger(__name__).warning("Post-scan compliance recompute failed: %s", exc)

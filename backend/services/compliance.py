@@ -196,3 +196,102 @@ def recompute_all_frameworks_for_client(db: Session, client_id: str) -> Dict[str
         except Exception as exc:
             logger.exception("Recompute failed for %s / %s: %s", client_id, fw, exc)
     return out
+
+
+# ── Defender for Cloud direct-write path ────────────────────────────────────
+
+_DEFENDER_STATE_TO_STATUS = {
+    "Passed": ControlStatus.COMPLIANT,
+    "Failed": ControlStatus.NON_COMPLIANT,
+    "Skipped": ControlStatus.NOT_APPLICABLE,
+    "Unsupported": ControlStatus.NOT_APPLICABLE,
+}
+
+
+def apply_defender_evaluations(
+    db: Session,
+    client_id: str,
+    framework: FrameworkType,
+    evaluations: list,
+) -> Dict[str, int]:
+    """Upsert ClientControlStatus rows directly from Defender results.
+
+    Bypasses the finding-based recompute because Defender is already
+    authoritative — every control in the framework has a Passed/Failed/Skipped
+    state from Microsoft's own evaluation.
+
+    Respects user overrides (rows with derived=False are not touched).
+
+    Returns counts: {compliant, non_compliant, partial, not_applicable, total, overridden, unmatched}.
+    """
+    from datetime import datetime, timezone
+    fw_value = framework.value if hasattr(framework, "value") else str(framework)
+    now = datetime.now(timezone.utc)
+
+    catalog = {
+        c.control_id: c
+        for c in db.query(FrameworkControl).filter(FrameworkControl.framework == fw_value).all()
+    }
+    existing = {
+        s.framework_control_id: s
+        for s in db.query(ClientControlStatus)
+        .join(FrameworkControl, ClientControlStatus.framework_control_id == FrameworkControl.id)
+        .filter(ClientControlStatus.client_id == client_id, FrameworkControl.framework == fw_value)
+        .all()
+    }
+
+    counts = {"compliant": 0, "non_compliant": 0, "partial": 0, "not_applicable": 0,
+              "total": 0, "overridden": 0, "unmatched": 0}
+    seen_control_ids: set = set()
+
+    for ev in evaluations:
+        norm = _normalize(ev.control_id)
+        ctrl = None
+        for cid, c in catalog.items():
+            if _normalize(cid) == norm:
+                ctrl = c
+                break
+        if not ctrl:
+            counts["unmatched"] += 1
+            continue
+        seen_control_ids.add(ctrl.id)
+
+        new_status = _DEFENDER_STATE_TO_STATUS.get(ev.state, ControlStatus.NOT_APPLICABLE)
+        evidence = f"Verified by Microsoft Defender for Cloud (state={ev.state}, standard={ev.standard_name})"
+        if ev.failing_resources:
+            evidence += f"\nFailing resources ({len(ev.failing_resources)}): " + ", ".join(
+                (r.get("name") or r.get("id", "")[:80]) for r in ev.failing_resources[:5]
+            )
+
+        st = existing.get(ctrl.id)
+        if st and not st.derived:
+            counts["overridden"] += 1
+            continue
+        if st is None:
+            st = ClientControlStatus(
+                client_id=client_id,
+                framework_control_id=ctrl.id,
+                status=new_status,
+                derived=True,
+                evidence=evidence,
+                derived_finding_ids=[],
+                last_evaluated_at=now,
+            )
+            db.add(st)
+        else:
+            st.status = new_status
+            st.evidence = evidence
+            st.derived = True
+            st.derived_finding_ids = []
+            st.last_evaluated_at = now
+
+        counts["total"] += 1
+        if ctrl.weight > 0:
+            counts[new_status.value] = counts.get(new_status.value, 0) + 1
+
+    db.commit()
+    logger.info(
+        "Defender apply for %s / client %s: %s",
+        fw_value, client_id, counts,
+    )
+    return counts

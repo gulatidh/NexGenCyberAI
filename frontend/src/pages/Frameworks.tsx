@@ -549,8 +549,14 @@ export default function Frameworks() {
             <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
-              Status {selected.derived ? "(auto-derived)" : "(manual override)"}
+              Status {selected.derived ? (
+                selected.evidence?.startsWith("Verified by Microsoft Defender") ? "(Microsoft Defender for Cloud)" : "(auto-derived)"
+              ) : "(manual override)"}
             </Typography>
+            {selected.evidence?.startsWith("Verified by Microsoft Defender") && (
+              <Chip label="Defender for Cloud" size="small"
+                sx={{ bgcolor: "rgba(0,120,212,0.2)", color: "#0078d4", fontSize: 10, height: 18, mb: 1 }} />
+            )}
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
               {STATUS_ORDER.map((s) => (
                 <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
