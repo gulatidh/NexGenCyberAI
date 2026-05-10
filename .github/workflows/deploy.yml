@@ -139,17 +139,49 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Backend deploy
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+      # Backend deploy — uses Kudu zipdeploy with buildAndDeployment=true to
+      # force Oryx build (which installs requirements.txt into antenv).
+      # The default azure/webapps-deploy@v3 action sometimes skips Oryx and
+      # leaves the venv missing, causing 'uvicorn: not found' / exit 127.
+      - name: Set startup command
+        run: |
+          az webapp config set \
+            --name "${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}" \
+            --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}'].resourceGroup" -o tsv)" \
+            --startup-file "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
 
-      - name: Deploy Backend to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}
-          package: ./backend
-          startup-command: "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
+      - name: Package backend
+        run: |
+          cd backend
+          zip -qr ../backend.zip . -x "*.pyc" "__pycache__/*" "*/__pycache__/*" "nexgencyberai.db" ".env"
+
+      - name: Deploy Backend (Kudu zipdeploy + Oryx build)
+        env:
+          APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}
+        run: |
+          set -euo pipefail
+          RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
+          USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
+          PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
+          echo "Uploading zip and triggering Oryx build..."
+          CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
+            -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
+            -H "Content-Type: application/zip" \
+            --data-binary @backend.zip)
+          if [ "$CODE" != "202" ] && [ "$CODE" != "200" ]; then
+            echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
+          fi
+          echo "Upload accepted. Polling Oryx build..."
+          for i in $(seq 1 60); do
+            RESP=$(curl -sS -m 15 -u "$USER:$PW" "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1")
+            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))")
+            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])")
+            echo "[$i] status=$ST progress=$PR"
+            if [ "$ST" = "4" ]; then echo "Build & deploy succeeded"; exit 0; fi
+            if [ "$ST" = "3" ]; then echo "Build & deploy failed"; exit 1; fi
+            sleep 15
+          done
+          echo "Timed out waiting for build to finish"; exit 1
 
       # Frontend deploy
       - name: Download frontend build
@@ -180,16 +212,47 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+      # Backend deploy — Kudu zipdeploy with buildAndDeployment=true forces
+      # Oryx to build (install requirements.txt into antenv). See dev job.
+      - name: Set startup command
+        run: |
+          az webapp config set \
+            --name "${{ secrets.AZURE_BACKEND_APP_NAME_PROD }}" \
+            --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME_PROD }}'].resourceGroup" -o tsv)" \
+            --startup-file "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
 
-      - name: Deploy Backend
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ secrets.AZURE_BACKEND_APP_NAME_PROD }}
-          package: ./backend
-          startup-command: "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
+      - name: Package backend
+        run: |
+          cd backend
+          zip -qr ../backend.zip . -x "*.pyc" "__pycache__/*" "*/__pycache__/*" "nexgencyberai.db" ".env"
+
+      - name: Deploy Backend (Kudu zipdeploy + Oryx build)
+        env:
+          APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME_PROD }}
+        run: |
+          set -euo pipefail
+          RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
+          USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
+          PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
+          echo "Uploading zip and triggering Oryx build..."
+          CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
+            -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
+            -H "Content-Type: application/zip" \
+            --data-binary @backend.zip)
+          if [ "$CODE" != "202" ] && [ "$CODE" != "200" ]; then
+            echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
+          fi
+          echo "Upload accepted. Polling Oryx build..."
+          for i in $(seq 1 60); do
+            RESP=$(curl -sS -m 15 -u "$USER:$PW" "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1")
+            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))")
+            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])")
+            echo "[$i] status=$ST progress=$PR"
+            if [ "$ST" = "4" ]; then echo "Build & deploy succeeded"; exit 0; fi
+            if [ "$ST" = "3" ]; then echo "Build & deploy failed"; exit 1; fi
+            sleep 15
+          done
+          echo "Timed out waiting for build to finish"; exit 1
 
       - name: Download frontend build
         uses: actions/download-artifact@v4
