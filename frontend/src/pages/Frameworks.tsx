@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { clientsApi, connectorsApi, frameworksApi, scansApi } from "../services/api";
 import {
   Client, Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
@@ -23,6 +24,9 @@ const STATUS_COLOR: Record<ControlStatus, string> = {
   non_compliant: "#f44336",
   partial: "#ff9800",
   not_applicable: "rgba(255,255,255,0.4)",
+};
+const SEV_COLOR: Record<string, string> = {
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#00e5ff",
 };
 const STATUS_LABEL: Record<ControlStatus, string> = {
   compliant: "Compliant",
@@ -55,6 +59,7 @@ function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
 
 export default function Frameworks() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [clientId, setClientId] = useState("");
   const [framework, setFramework] = useState("");
   const [statusFilter, setStatusFilter] = useState<ControlStatus | "">("");
@@ -586,17 +591,52 @@ export default function Frameworks() {
               </Typography>
             )}
 
-            {selected.finding_ids?.length ? (
+            {((selected.findings && selected.findings.length) || selected.finding_ids?.length) ? (
               <Box>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
                 <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
-                  Linked findings ({selected.finding_ids.length})
+                  Linked findings ({(selected.findings || selected.finding_ids || []).length})
                 </Typography>
-                {selected.finding_ids.slice(0, 8).map((fid) => (
-                  <Typography key={fid} variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 11 }}>
-                    {fid.slice(0, 8)}…
-                  </Typography>
-                ))}
+                {selected.findings && selected.findings.length > 0 ? (
+                  selected.findings.slice(0, 12).map((f) => {
+                    const sev = (typeof f.severity === "object" ? (f.severity as any).value : f.severity) || "info";
+                    return (
+                      <Box key={f.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1, p: 1,
+                        bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1 }}>
+                        <Chip label={sev} size="small"
+                          sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888",
+                            fontSize: 9, height: 16, flexShrink: 0, mt: "2px" }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ color: "white", fontSize: 12, lineHeight: 1.3,
+                            overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box",
+                            WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            {f.title}
+                          </Typography>
+                          {f.asset_id ? (
+                            <Typography variant="caption" component="span"
+                              onClick={() => navigate(`/assets/${f.asset_id}`)}
+                              sx={{ color: "#00e5ff", fontSize: 11, cursor: "pointer",
+                                "&:hover": { textDecoration: "underline" } }}>
+                              {f.asset_name || f.resource_id} →
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11,
+                              fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis",
+                              whiteSpace: "nowrap", display: "block" }}>
+                              {f.resource_id || "—"}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })
+                ) : (
+                  (selected.finding_ids || []).slice(0, 8).map((fid) => (
+                    <Typography key={fid} variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 11 }}>
+                      {fid.slice(0, 8)}…
+                    </Typography>
+                  ))
+                )}
               </Box>
             ) : null}
           </Box>

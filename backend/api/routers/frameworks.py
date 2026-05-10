@@ -12,7 +12,7 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 from api.models.models import (
-    Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
+    Asset, Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
 )
 from api.schemas.schemas import (
     ControlStatusResponse, ControlStatusUpdate, FrameworkCatalogEntry,
@@ -64,20 +64,27 @@ def _coerce_framework(framework: str) -> FrameworkType:
 
 @router.get("/frameworks/", response_model=List[FrameworkCatalogEntry])
 async def list_frameworks(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    out: List[FrameworkCatalogEntry] = []
-    # Group counts by framework value
-    rows = db.query(FrameworkControl.framework, FrameworkControl.id).all()
-    by_fw: Dict[str, int] = {}
-    for fw, _id in rows:
-        v = fw.value if hasattr(fw, "value") else str(fw)
-        by_fw[v] = by_fw.get(v, 0) + 1
-    for fw_value, count in sorted(by_fw.items()):
-        out.append(FrameworkCatalogEntry(
-            framework=FrameworkType(fw_value),
-            name=_FRAMEWORK_NAMES.get(fw_value, fw_value),
-            total_controls=count,
-        ))
-    return out
+    try:
+        out: List[FrameworkCatalogEntry] = []
+        rows = db.query(FrameworkControl.framework, FrameworkControl.id).all()
+        by_fw: Dict[str, int] = {}
+        for fw, _id in rows:
+            v = fw.value if hasattr(fw, "value") else str(fw)
+            by_fw[v] = by_fw.get(v, 0) + 1
+        valid_values = {m.value for m in FrameworkType}
+        for fw_value, count in sorted(by_fw.items()):
+            if fw_value not in valid_values:
+                logger.warning("Skipping unknown framework value in DB: %r", fw_value)
+                continue
+            out.append(FrameworkCatalogEntry(
+                framework=FrameworkType(fw_value),
+                name=_FRAMEWORK_NAMES.get(fw_value, fw_value),
+                total_controls=count,
+            ))
+        return out
+    except Exception as exc:
+        logger.exception("list_frameworks failed")
+        raise HTTPException(status_code=500, detail=f"list_frameworks failed: {type(exc).__name__}: {exc}")
 
 
 @router.get("/frameworks/{framework}/controls/", response_model=List[FrameworkControlResponse])
@@ -104,26 +111,37 @@ async def client_framework_summary(
     _=Depends(get_current_user),
 ):
     """Compliance summary for every framework — powers the dashboard tile."""
-    client = db.query(Client).filter(Client.id == client_id).first()
-    if not client:
-        raise HTTPException(status_code=404, detail="Client not found")
-    out: List[FrameworkSummaryResponse] = []
-    available = (
-        db.query(FrameworkControl.framework).distinct().all()
-    )
-    for (fw,) in available:
-        counts = compute_summary(db, client_id, fw)
-        out.append(FrameworkSummaryResponse(
-            framework=fw,
-            total=counts["total"],
-            compliant=counts["compliant"],
-            non_compliant=counts["non_compliant"],
-            partial=counts["partial"],
-            not_applicable=counts["not_applicable"],
-            score=counts["score"],
-            last_evaluated_at=counts["last_evaluated_at"],
-        ))
-    return out
+    try:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+        out: List[FrameworkSummaryResponse] = []
+        valid_values = {m.value for m in FrameworkType}
+        available = (
+            db.query(FrameworkControl.framework).distinct().all()
+        )
+        for (fw,) in available:
+            v = fw.value if hasattr(fw, "value") else str(fw)
+            if v not in valid_values:
+                logger.warning("Skipping unknown framework in client_framework_summary: %r", v)
+                continue
+            counts = compute_summary(db, client_id, fw)
+            out.append(FrameworkSummaryResponse(
+                framework=fw,
+                total=counts["total"],
+                compliant=counts["compliant"],
+                non_compliant=counts["non_compliant"],
+                partial=counts["partial"],
+                not_applicable=counts["not_applicable"],
+                score=counts["score"],
+                last_evaluated_at=counts["last_evaluated_at"],
+            ))
+        return out
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("client_framework_summary failed")
+        raise HTTPException(status_code=500, detail=f"client_framework_summary failed: {type(exc).__name__}: {exc}")
 
 
 @router.get("/clients/{client_id}/frameworks/{framework}/", response_model=Dict[str, Any])
@@ -153,9 +171,50 @@ async def client_framework_detail(
         .all()
     }
 
+    # Pre-load all referenced findings in one query so the drawer can show
+    # title + resource_id + severity instead of just truncated IDs.
+    all_finding_ids: set = set()
+    for s in statuses.values():
+        for fid in (s.derived_finding_ids or []):
+            if fid:
+                all_finding_ids.add(fid)
+    findings_by_id: Dict[str, Any] = {}
+    if all_finding_ids:
+        for f in db.query(Finding).filter(Finding.id.in_(all_finding_ids)).all():
+            findings_by_id[f.id] = f
+
+    # Map resource_id (Asset.external_id) → asset row so the drawer can deep-link
+    # each finding to its asset detail page in the SPA.
+    referenced_resource_ids = {f.resource_id for f in findings_by_id.values() if f.resource_id}
+    asset_by_ext_id: Dict[str, Any] = {}
+    if referenced_resource_ids:
+        for a in (
+            db.query(Asset)
+            .filter(Asset.client_id == client_id, Asset.external_id.in_(referenced_resource_ids))
+            .all()
+        ):
+            asset_by_ext_id[a.external_id] = a
+
+    def _slim(f) -> Dict[str, Any]:
+        sev = f.severity.value if hasattr(f.severity, "value") else f.severity
+        asset = asset_by_ext_id.get(f.resource_id) if f.resource_id else None
+        return {
+            "id": f.id,
+            "title": f.title,
+            "resource_id": f.resource_id,
+            "resource_type": f.resource_type,
+            "severity": sev,
+            "status": f.status,
+            "scan_id": f.scan_id,
+            "asset_id": asset.id if asset else None,
+            "asset_name": asset.name if asset else None,
+        }
+
     items: List[Dict[str, Any]] = []
     for c in controls:
         st = statuses.get(c.id)
+        finding_ids = (st.derived_finding_ids if st and st.derived_finding_ids else []) or []
+        rich_findings = [_slim(findings_by_id[fid]) for fid in finding_ids if fid in findings_by_id]
         items.append({
             "control": {
                 "id": c.id,
@@ -173,7 +232,8 @@ async def client_framework_detail(
             "last_evaluated_at": st.last_evaluated_at if st else None,
             "overridden_by": st.overridden_by if st else None,
             "overridden_at": st.overridden_at if st else None,
-            "finding_ids": (st.derived_finding_ids if st and st.derived_finding_ids else []),
+            "finding_ids": finding_ids,
+            "findings": rich_findings,
         })
 
     summary = compute_summary(db, client_id, fw)

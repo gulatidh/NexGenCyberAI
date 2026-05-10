@@ -126,6 +126,18 @@ export interface FrameworkControl {
   weight: number;
 }
 
+export interface LinkedFinding {
+  id: string;
+  title: string;
+  resource_id?: string;
+  resource_type?: string;
+  severity: Severity;
+  status: string;
+  scan_id?: string;
+  asset_id?: string | null;
+  asset_name?: string | null;
+}
+
 export interface ControlStatusEntry {
   control: FrameworkControl;
   status: ControlStatus;
@@ -135,6 +147,7 @@ export interface ControlStatusEntry {
   overridden_by?: string;
   overridden_at?: string;
   finding_ids: string[];
+  findings?: LinkedFinding[];
 }
 
 export interface FrameworkSummary {
