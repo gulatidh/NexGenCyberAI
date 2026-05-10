@@ -39,6 +39,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Make workspace ZAP-writable
+        # zaproxy container runs as uid 1000; GitHub workspace is owned by
+        # uid 1001:123, causing "Permission denied" when ZAP tries to write
+        # /zap/wrk/zap.yaml. World-write here is fine — the runner is
+        # ephemeral and gets torn down after the job.
+        run: sudo chmod -R a+rwx "${{ github.workspace }}"
+
       - name: Fetch scan config from API
         id: cfg
         env:
@@ -86,18 +93,24 @@ jobs:
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: ${{ steps.cfg.outputs.target_url }}
-          cmd_options: "-J report.json $(cat .zap-options.txt)"
+          # Action already writes report_json.json/report_md.md/report_html.html
+          # by default; we just append our header-replacer config.
+          cmd_options: "$(cat .zap-options.txt)"
           fail_action: false
           allow_issue_writing: false
+          # Per-run unique name avoids artifact-name collisions across runs
+          # (the default "zap_scan" can clash when re-running).
+          artifact_name: zap-baseline-${{ inputs.scan_id }}
 
       - name: ZAP Full (Active) Scan
         if: steps.cfg.outputs.profile == 'active'
         uses: zaproxy/action-full-scan@v0.10.0
         with:
           target: ${{ steps.cfg.outputs.target_url }}
-          cmd_options: "-J report.json $(cat .zap-options.txt)"
+          cmd_options: "$(cat .zap-options.txt)"
           fail_action: false
           allow_issue_writing: false
+          artifact_name: zap-full-${{ inputs.scan_id }}
 
       - name: Post findings to API
         if: always()
@@ -107,8 +120,9 @@ jobs:
           SCAN_TOKEN: ${{ inputs.scan_token }}
         run: |
           set -euo pipefail
-          # Find the report — ZAP actions drop it relative to workspace.
-          REPORT=$(find . -maxdepth 4 -name 'report.json' -print -quit || true)
+          # ZAP action writes report_json.json by default; older configs
+          # produced report.json. Match either.
+          REPORT=$(find . -maxdepth 4 \( -name 'report_json.json' -o -name 'report.json' \) -print -quit || true)
           python3 - <<PY
           import json, os, pathlib, urllib.request, urllib.error
 
