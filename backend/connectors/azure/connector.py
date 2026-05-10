@@ -12,6 +12,9 @@ from azure.mgmt.security import SecurityCenter
 from azure.mgmt.monitor import MonitorManagementClient
 
 from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+from connectors.azure.control_mappings import (
+    defender_mappings, mappings_for, nsg_port_mappings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +146,7 @@ class AzureConnector(BaseConnector):
                     control_id=NIST_CONTROL_MAP.get(title, ""),
                     remediation=getattr(a, "remediation_description", ""),
                     framework="azure_security_benchmark",
+                    control_mappings=defender_mappings(title),
                 ))
         except Exception as exc:
             logger.info("Defender for Cloud assessments unavailable (not enabled?): %s", exc)
@@ -212,6 +216,7 @@ class AzureConnector(BaseConnector):
                                     f"Limit the source address prefix to known IP ranges or use Just-In-Time VM access."
                                 ),
                                 framework="nist",
+                                control_mappings=nsg_port_mappings(port),
                             ))
         except ImportError:
             logger.warning("azure-mgmt-network not installed; skipping NSG checks")
@@ -240,6 +245,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST SC-8",
                         remediation="Enable 'Secure transfer required' (enable_https_traffic_only) on the storage account.",
                         framework="nist",
+                        control_mappings=mappings_for("storage-https-only"),
                     ))
 
                 if getattr(sa, "allow_blob_public_access", False):
@@ -251,6 +257,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST AC-3",
                         remediation="Set 'Allow Blob Public Access' to Disabled on the storage account.",
                         framework="nist",
+                        control_mappings=mappings_for("storage-public-blob"),
                     ))
 
                 min_tls = str(getattr(sa, "minimum_tls_version", "") or "")
@@ -263,6 +270,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST SC-8",
                         remediation="Set minimum TLS version to TLS 1.2 on the storage account.",
                         framework="nist",
+                        control_mappings=mappings_for("storage-tls-version"),
                     ))
         except ImportError:
             logger.warning("azure-mgmt-storage not installed; skipping storage account checks")
@@ -293,6 +301,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST CP-9",
                         remediation="Enable soft delete on the Key Vault to allow recovery of accidentally deleted objects.",
                         framework="nist",
+                        control_mappings=mappings_for("keyvault-soft-delete"),
                     ))
                 if not getattr(props, "enable_purge_protection", False):
                     findings.append(ConnectorFinding(
@@ -303,6 +312,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST CP-9",
                         remediation="Enable purge protection on the Key Vault.",
                         framework="nist",
+                        control_mappings=mappings_for("keyvault-purge-protection"),
                     ))
         except ImportError:
             logger.warning("azure-mgmt-keyvault not installed; skipping Key Vault checks")
@@ -336,6 +346,7 @@ class AzureConnector(BaseConnector):
                     control_id="NIST AC-6",
                     remediation="Review and reduce Owner role assignments. Use least-privilege roles (Reader, Contributor) where full Owner access is not required.",
                     framework="nist",
+                    control_mappings=mappings_for("rbac-excess-owners"),
                 ))
         except ImportError:
             logger.warning("azure-mgmt-authorization not installed; skipping RBAC checks")
@@ -365,6 +376,7 @@ class AzureConnector(BaseConnector):
                     control_id="NIST AU-2",
                     remediation="Add a diagnostic setting to export the Activity Log to Log Analytics Workspace, Event Hub, or a Storage Account.",
                     framework="nist",
+                    control_mappings=mappings_for("activity-log-no-diag-settings"),
                 ))
         except Exception as exc:
             logger.debug("Activity log diagnostic check failed: %s", exc)
@@ -396,6 +408,7 @@ class AzureConnector(BaseConnector):
                         control_id="NIST SC-28",
                         remediation="Enable Azure Disk Encryption on the VM using the AzureDiskEncryption extension.",
                         framework="nist",
+                        control_mappings=mappings_for("vm-os-disk-not-encrypted"),
                     ))
 
                 # Check for endpoint protection extension
@@ -419,6 +432,7 @@ class AzureConnector(BaseConnector):
                                 control_id="NIST SI-3",
                                 remediation="Install Microsoft Defender for Endpoint (MDE) or an equivalent endpoint protection solution.",
                                 framework="nist",
+                                control_mappings=mappings_for("vm-no-endpoint-protection"),
                             ))
                     except Exception:
                         pass

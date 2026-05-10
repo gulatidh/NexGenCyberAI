@@ -1,0 +1,71 @@
+{
+  "framework": "cis_esxi",
+  "version": "1.3.0",
+  "source": "https://www.cisecurity.org/benchmark/vmware",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Install",
+      "title": "Install",
+      "description": "Install",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Communication",
+      "title": "Communication",
+      "description": "Communication",
+      "weight": 0
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Logging",
+      "title": "Logging",
+      "description": "Logging",
+      "weight": 0
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Access",
+      "title": "Access",
+      "description": "Access",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Console",
+      "title": "Console",
+      "description": "Console",
+      "weight": 0
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Storage",
+      "title": "Storage",
+      "description": "Storage",
+      "weight": 0
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Network",
+      "title": "Network",
+      "description": "Network",
+      "weight": 0
+    },
+    {
+      "control_id": "8",
+      "parent": null,
+      "domain": "Virtual Machines",
+      "title": "Virtual Machines",
+      "description": "Virtual Machines",
+      "weight": 0
+    }
+  ]
+}

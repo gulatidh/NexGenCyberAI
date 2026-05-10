@@ -6,26 +6,48 @@ import {
   IconButton, Chip, Tooltip,
 } from "@mui/material";
 import {
-  Dashboard, People, Cable, BugReport, Security, Policy,
+  Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
-  BarChart, SettingsSuggest, Menu as MenuIcon,
+  BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
+  AdminPanelSettings,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
+import { useQuery } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
+import { adminApi } from "../../services/api";
+import { MyAccess } from "../../types";
 
 const DRAWER_WIDTH = 240;
 
-const NAV_ITEMS = [
-  { label: "Dashboard", icon: <Dashboard />, path: "/dashboard" },
-  { label: "Clients", icon: <People />, path: "/clients" },
-  { label: "Connectors", icon: <Cable />, path: "/connectors" },
-  { label: "Scans", icon: <BugReport />, path: "/scans" },
-  { label: "Findings", icon: <Security />, path: "/findings" },
-  { label: "Risk Register", icon: <Assessment />, path: "/risks" },
-  { label: "Frameworks", icon: <Policy />, path: "/frameworks" },
-  { label: "AI Agents", icon: <SmartToy />, path: "/agents" },
-  { label: "Reports", icon: <BarChart />, path: "/reports" },
-  { label: "AI Settings", icon: <SettingsSuggest />, path: "/ai-settings" },
+type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean };
+type NavGroup = { section?: string; items: NavItem[] };
+
+// Top-level pages group "main workflow"; Settings group at the bottom holds
+// admin/config items. Connectors + Projects no longer appear in main nav —
+// they live as tabs inside the Client Detail page.
+const NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      { label: "Dashboard",      icon: <Dashboard />,  path: "/dashboard" },
+      { label: "Risk Overview",  icon: <Insights />,   path: "/risk-overview" },
+      { label: "Clients",        icon: <People />,     path: "/clients" },
+      { label: "Scans",          icon: <BugReport />,  path: "/scans" },
+      { label: "Findings",       icon: <Security />,   path: "/findings" },
+      { label: "Risk Register",  icon: <Assessment />, path: "/risks" },
+      { label: "Asset Inventory", icon: <Storage />,   path: "/assets" },
+      { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
+      { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
+      { label: "AI Agents",      icon: <SmartToy />,   path: "/agents" },
+      { label: "Reports",        icon: <BarChart />,   path: "/reports" },
+    ],
+  },
+  {
+    section: "Settings",
+    items: [
+      { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
+      { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
+    ],
+  },
 ];
 
 export default function AppLayout() {
@@ -34,6 +56,13 @@ export default function AppLayout() {
   const { instance, accounts } = useMsal();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const { data: me } = useQuery<MyAccess>({
+    queryKey: ["my-access"],
+    queryFn: adminApi.me,
+    retry: 0,
+    staleTime: 60_000,
+  });
 
   const account = accounts[0];
   const userName = account?.name || account?.username || "User";
@@ -57,34 +86,57 @@ export default function AppLayout() {
         </Box>
       </Box>
       <List sx={{ pt: 1 }}>
-        {NAV_ITEMS.map((item) => {
-          const active = pathname.startsWith(item.path);
+        {NAV_GROUPS.map((group, gi) => {
+          const items = group.items.filter((i) => !i.adminOnly || me?.is_admin || me?.is_admin_anywhere);
+          if (items.length === 0) return null;
           return (
-            <ListItemButton
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              sx={{
-                mx: 1, my: 0.3, borderRadius: 1,
-                bgcolor: active ? "rgba(0,229,255,0.15)" : "transparent",
-                "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
-              }}
-            >
-              <ListItemIcon sx={{ color: active ? "#00e5ff" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                slotProps={{
-                  primary: {
-                    style: {
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 400,
-                      color: active ? "#00e5ff" : "rgba(255,255,255,0.8)",
-                    },
-                  },
+          <React.Fragment key={gi}>
+            {group.section && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10,
+                  fontWeight: 700, letterSpacing: 1, mt: 1.5, mb: 0.5, mx: 2.5,
+                  textTransform: "uppercase",
                 }}
-              />
-            </ListItemButton>
+              >
+                {group.section}
+              </Typography>
+            )}
+            {items.map((item) => {
+              // Exact-match for /assets to avoid /assets/technologies highlighting both
+              const active = item.path === "/assets"
+                ? pathname === "/assets" || /^\/assets\/[^/]+$/.test(pathname)  // /assets and /assets/:id
+                : pathname.startsWith(item.path);
+              return (
+                <ListItemButton
+                  key={item.path}
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    mx: 1, my: 0.3, borderRadius: 1,
+                    bgcolor: active ? "rgba(0,229,255,0.15)" : "transparent",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                  }}
+                >
+                  <ListItemIcon sx={{ color: active ? "#00e5ff" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.label}
+                    slotProps={{
+                      primary: {
+                        style: {
+                          fontSize: 13,
+                          fontWeight: active ? 600 : 400,
+                          color: active ? "#00e5ff" : "rgba(255,255,255,0.8)",
+                        },
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              );
+            })}
+          </React.Fragment>
           );
         })}
       </List>

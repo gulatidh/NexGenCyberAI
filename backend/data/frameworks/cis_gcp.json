@@ -1,0 +1,575 @@
+{
+  "framework": "cis_gcp",
+  "version": "4.0.0",
+  "source": "https://www.cisecurity.org/benchmark/google_cloud_computing_platform",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Identity and Access Management",
+      "title": "Identity and Access Management",
+      "description": "Identity and Access Management",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Corporate Login Credentials are Used",
+      "description": "Ensure that Corporate Login Credentials are Used",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Multi-Factor Authentication is Enabled for All Non-Service Accounts",
+      "description": "Ensure that Multi-Factor Authentication is Enabled for All Non-Service Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Security Key Enforcement is Enabled for All Admin Accounts",
+      "description": "Ensure that Security Key Enforcement is Enabled for All Admin Accounts",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that there are only GCP-managed service account keys for each service account",
+      "description": "Ensure that there are only GCP-managed service account keys for each service account",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Service Account has no Admin privileges",
+      "description": "Ensure that Service Account has no Admin privileges",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that IAM users are not assigned the Service Account User or Service Account Token Creator roles at project level",
+      "description": "Ensure that IAM users are not assigned the Service Account User or Service Account Token Creator roles at project level",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure user-managed/external keys for service accounts are rotated every 90 days or less",
+      "description": "Ensure user-managed/external keys for service accounts are rotated every 90 days or less",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Separation of Duties is Enforced While Assigning Service Account Related Roles",
+      "description": "Ensure that Separation of Duties is Enforced While Assigning Service Account Related Roles",
+      "weight": 1
+    },
+    {
+      "control_id": "1.9",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Cloud KMS cryptokeys are not anonymously or publicly accessible",
+      "description": "Ensure that Cloud KMS cryptokeys are not anonymously or publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "1.10",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure KMS encryption keys are rotated within a period of 90 days",
+      "description": "Ensure KMS encryption keys are rotated within a period of 90 days",
+      "weight": 1
+    },
+    {
+      "control_id": "1.11",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure that Separation of Duties is Enforced While Assigning KMS Related Roles",
+      "description": "Ensure that Separation of Duties is Enforced While Assigning KMS Related Roles",
+      "weight": 1
+    },
+    {
+      "control_id": "1.12",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure API keys are not created for a project",
+      "description": "Ensure API keys are not created for a project",
+      "weight": 1
+    },
+    {
+      "control_id": "1.13",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure API keys are restricted to use by only specified Hosts and Apps",
+      "description": "Ensure API keys are restricted to use by only specified Hosts and Apps",
+      "weight": 1
+    },
+    {
+      "control_id": "1.14",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure API keys are restricted to only APIs that application needs access",
+      "description": "Ensure API keys are restricted to only APIs that application needs access",
+      "weight": 1
+    },
+    {
+      "control_id": "1.15",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure API keys are rotated every 90 days",
+      "description": "Ensure API keys are rotated every 90 days",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Logging and Monitoring",
+      "description": "Logging and Monitoring",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that Cloud Audit Logging is configured properly across all services and all users from a project",
+      "description": "Ensure that Cloud Audit Logging is configured properly across all services and all users from a project",
+      "weight": 1
+    },
+    {
+      "control_id": "2.2",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that sinks are configured for all log entries",
+      "description": "Ensure that sinks are configured for all log entries",
+      "weight": 1
+    },
+    {
+      "control_id": "2.3",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure that retention policies on log buckets are configured using Bucket Lock",
+      "description": "Ensure that retention policies on log buckets are configured using Bucket Lock",
+      "weight": 1
+    },
+    {
+      "control_id": "2.4",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for project ownership assignments/changes",
+      "description": "Ensure log metric filter and alerts exist for project ownership assignments/changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.5",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for Audit Configuration changes",
+      "description": "Ensure log metric filter and alerts exist for Audit Configuration changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.6",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for Custom Role changes",
+      "description": "Ensure log metric filter and alerts exist for Custom Role changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.7",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for VPC Network Firewall rule changes",
+      "description": "Ensure log metric filter and alerts exist for VPC Network Firewall rule changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.8",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for VPC network route changes",
+      "description": "Ensure log metric filter and alerts exist for VPC network route changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.9",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for VPC network changes",
+      "description": "Ensure log metric filter and alerts exist for VPC network changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.10",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for Cloud Storage IAM permission changes",
+      "description": "Ensure log metric filter and alerts exist for Cloud Storage IAM permission changes",
+      "weight": 1
+    },
+    {
+      "control_id": "2.11",
+      "parent": "2",
+      "domain": "Logging and Monitoring",
+      "title": "Ensure log metric filter and alerts exist for SQL instance configuration changes",
+      "description": "Ensure log metric filter and alerts exist for SQL instance configuration changes",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Networking",
+      "title": "Networking",
+      "description": "Networking",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure the default network does not exist in a project",
+      "description": "Ensure the default network does not exist in a project",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure legacy networks do not exist for a project",
+      "description": "Ensure legacy networks do not exist for a project",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure that DNSSEC is enabled for Cloud DNS",
+      "description": "Ensure that DNSSEC is enabled for Cloud DNS",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure that RSASHA1 is not used for the key-signing key in Cloud DNS DNSSEC",
+      "description": "Ensure that RSASHA1 is not used for the key-signing key in Cloud DNS DNSSEC",
+      "weight": 1
+    },
+    {
+      "control_id": "3.5",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure that RSASHA1 is not used for the zone-signing key in Cloud DNS DNSSEC",
+      "description": "Ensure that RSASHA1 is not used for the zone-signing key in Cloud DNS DNSSEC",
+      "weight": 1
+    },
+    {
+      "control_id": "3.6",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure that SSH access is restricted from the internet",
+      "description": "Ensure that SSH access is restricted from the internet",
+      "weight": 1
+    },
+    {
+      "control_id": "3.7",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure that RDP access is restricted from the internet",
+      "description": "Ensure that RDP access is restricted from the internet",
+      "weight": 1
+    },
+    {
+      "control_id": "3.8",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure VPC Flow Logs is enabled for every subnet in a VPC Network",
+      "description": "Ensure VPC Flow Logs is enabled for every subnet in a VPC Network",
+      "weight": 1
+    },
+    {
+      "control_id": "3.9",
+      "parent": "3",
+      "domain": "Networking",
+      "title": "Ensure no HTTPS or SSL proxy load balancers permit SSL policies with weak cipher suites",
+      "description": "Ensure no HTTPS or SSL proxy load balancers permit SSL policies with weak cipher suites",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Virtual Machines",
+      "title": "Virtual Machines",
+      "description": "Virtual Machines",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure that instances are not configured to use the default service account",
+      "description": "Ensure that instances are not configured to use the default service account",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure that instances are not configured to use the default service account with full access to all Cloud APIs",
+      "description": "Ensure that instances are not configured to use the default service account with full access to all Cloud APIs",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure 'Block Project-wide SSH keys' is enabled for VM instances",
+      "description": "Ensure 'Block Project-wide SSH keys' is enabled for VM instances",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure Oslogin is enabled for a Project",
+      "description": "Ensure Oslogin is enabled for a Project",
+      "weight": 1
+    },
+    {
+      "control_id": "4.5",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure 'Enable connecting to serial ports' is not enabled for VM Instance",
+      "description": "Ensure 'Enable connecting to serial ports' is not enabled for VM Instance",
+      "weight": 1
+    },
+    {
+      "control_id": "4.6",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure that IP forwarding is not enabled on Instances",
+      "description": "Ensure that IP forwarding is not enabled on Instances",
+      "weight": 1
+    },
+    {
+      "control_id": "4.7",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure VM disks for critical VMs are encrypted with Customer-Supplied Encryption Keys",
+      "description": "Ensure VM disks for critical VMs are encrypted with Customer-Supplied Encryption Keys",
+      "weight": 1
+    },
+    {
+      "control_id": "4.8",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure Compute instances are launched with Shielded VM enabled",
+      "description": "Ensure Compute instances are launched with Shielded VM enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.9",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure that Compute instances do not have public IP addresses",
+      "description": "Ensure that Compute instances do not have public IP addresses",
+      "weight": 1
+    },
+    {
+      "control_id": "4.10",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure App Engine applications enforce HTTPS connections",
+      "description": "Ensure App Engine applications enforce HTTPS connections",
+      "weight": 1
+    },
+    {
+      "control_id": "4.11",
+      "parent": "4",
+      "domain": "Virtual Machines",
+      "title": "Ensure Confidential Computing is enabled on compute instances",
+      "description": "Ensure Confidential Computing is enabled on compute instances",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Storage",
+      "title": "Storage",
+      "description": "Storage",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure that Cloud Storage bucket is not anonymously or publicly accessible",
+      "description": "Ensure that Cloud Storage bucket is not anonymously or publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure that Cloud Storage buckets have uniform bucket-level access enabled",
+      "description": "Ensure that Cloud Storage buckets have uniform bucket-level access enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Cloud SQL Database Services",
+      "title": "Cloud SQL Database Services",
+      "description": "Cloud SQL Database Services",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1.1",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure that a MySQL database instance does not allow anyone to connect with administrative privileges",
+      "description": "Ensure that a MySQL database instance does not allow anyone to connect with administrative privileges",
+      "weight": 1
+    },
+    {
+      "control_id": "6.1.2",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'skip_show_database' database flag for Cloud SQL MySQL instance is set to 'on'",
+      "description": "Ensure 'skip_show_database' database flag for Cloud SQL MySQL instance is set to 'on'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.1.3",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'local_infile' database flag for Cloud SQL MySQL instance is set to 'off'",
+      "description": "Ensure 'local_infile' database flag for Cloud SQL MySQL instance is set to 'off'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2.1",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'log_checkpoints' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "description": "Ensure 'log_checkpoints' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2.2",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'log_connections' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "description": "Ensure 'log_connections' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2.3",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'log_disconnections' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "description": "Ensure 'log_disconnections' database flag for Cloud SQL PostgreSQL is set to 'on'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2.4",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'log_error_verbosity' database flag for Cloud SQL PostgreSQL is set to 'DEFAULT' or stricter",
+      "description": "Ensure 'log_error_verbosity' database flag for Cloud SQL PostgreSQL is set to 'DEFAULT' or stricter",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2.5",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'log_min_messages' database flag for Cloud SQL PostgreSQL is set to 'WARNING' or stricter",
+      "description": "Ensure 'log_min_messages' database flag for Cloud SQL PostgreSQL is set to 'WARNING' or stricter",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3.1",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure 'external scripts enabled' database flag for Cloud SQL SQL Server is set to 'off'",
+      "description": "Ensure 'external scripts enabled' database flag for Cloud SQL SQL Server is set to 'off'",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure that the 'Cloud SQL database instance' requires all incoming connections to use SSL",
+      "description": "Ensure that the 'Cloud SQL database instance' requires all incoming connections to use SSL",
+      "weight": 1
+    },
+    {
+      "control_id": "6.5",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure that Cloud SQL database instances are not open to the world",
+      "description": "Ensure that Cloud SQL database instances are not open to the world",
+      "weight": 1
+    },
+    {
+      "control_id": "6.6",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure that Cloud SQL database instances do not have public IPs",
+      "description": "Ensure that Cloud SQL database instances do not have public IPs",
+      "weight": 1
+    },
+    {
+      "control_id": "6.7",
+      "parent": "6",
+      "domain": "Cloud SQL Database Services",
+      "title": "Ensure that Cloud SQL database instances are configured with automated backups",
+      "description": "Ensure that Cloud SQL database instances are configured with automated backups",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "BigQuery",
+      "title": "BigQuery",
+      "description": "BigQuery",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "BigQuery",
+      "title": "Ensure that BigQuery datasets are not anonymously or publicly accessible",
+      "description": "Ensure that BigQuery datasets are not anonymously or publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "BigQuery",
+      "title": "Ensure that all BigQuery Tables are encrypted with Customer-managed encryption key (CMEK)",
+      "description": "Ensure that all BigQuery Tables are encrypted with Customer-managed encryption key (CMEK)",
+      "weight": 1
+    },
+    {
+      "control_id": "7.3",
+      "parent": "7",
+      "domain": "BigQuery",
+      "title": "Ensure that a Default Customer-managed encryption key (CMEK) is specified for all BigQuery Data Sets",
+      "description": "Ensure that a Default Customer-managed encryption key (CMEK) is specified for all BigQuery Data Sets",
+      "weight": 1
+    }
+  ]
+}

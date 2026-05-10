@@ -18,6 +18,14 @@ import Agents from "./pages/Agents";
 import AISettings from "./pages/AISettings";
 import Findings from "./pages/Findings";
 import Risks from "./pages/Risks";
+import Assets from "./pages/Assets";
+import AssetDetail from "./pages/AssetDetail";
+import Frameworks from "./pages/Frameworks";
+import RiskOverviewPage from "./pages/RiskOverview";
+import Projects from "./pages/Projects";
+import Technologies from "./pages/Technologies";
+import Admin from "./pages/Admin";
+import Reports from "./pages/Reports";
 
 const darkTheme = createTheme({
   palette: {
@@ -74,16 +82,22 @@ export default function App() {
                 <Route element={<AppLayout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/risk-overview" element={<RiskOverviewPage />} />
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
+                  <Route path="/projects" element={<Projects />} />
                   <Route path="/connectors" element={<Connectors />} />
                   <Route path="/scans" element={<Scans />} />
                   <Route path="/findings" element={<Findings />} />
                   <Route path="/risks" element={<Risks />} />
-                  <Route path="/frameworks" element={<div style={{ color: "white", padding: 24 }}>Frameworks</div>} />
+                  <Route path="/assets" element={<Assets />} />
+                  <Route path="/assets/technologies" element={<Technologies />} />
+                  <Route path="/assets/:assetId" element={<AssetDetail />} />
+                  <Route path="/frameworks" element={<Frameworks />} />
                   <Route path="/agents" element={<Agents />} />
-                  <Route path="/reports" element={<div style={{ color: "white", padding: 24 }}>Reports</div>} />
+                  <Route path="/reports" element={<Reports />} />
                   <Route path="/ai-settings" element={<AISettings />} />
+                  <Route path="/admin" element={<Admin />} />
                 </Route>
               </Routes>
             </BrowserRouter>

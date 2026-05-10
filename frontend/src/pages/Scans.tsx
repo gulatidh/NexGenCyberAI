@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Button, Card, Grid, Chip,
-  Dialog, DialogTitle, DialogContent, DialogActions,
+  Box, Typography, Button, Card, Grid, Chip, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Alert,
-  Divider,
+  Divider, TableSortLabel,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility, Delete } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi } from "../services/api";
-import { Scan, Client, Connector, ScanType, FrameworkType } from "../types";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, projectsApi } from "../services/api";
+import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -28,21 +28,34 @@ const SEV_COLOR: Record<string, string> = {
 export default function Scans() {
   const qc = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   const [scanType, setScanType] = useState<ScanType>("full");
   const [connectorId, setConnectorId] = useState("");
   const [framework, setFramework] = useState<FrameworkType | "">("");
+  const [scanName, setScanName] = useState("");
   const [viewScan, setViewScan] = useState<Scan | null>(null);
+  const [sortKey, setSortKey] = useState<string>("started_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", selectedClientId],
+    queryFn: () => projectsApi.list(selectedClientId),
+    enabled: !!selectedClientId,
+  });
+  const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
+    queryKey: ["framework-catalog"],
+    queryFn: frameworksApi.catalog,
+  });
   const { data: connectors = [] } = useQuery<Connector[]>({
-    queryKey: ["connectors", selectedClientId],
-    queryFn: () => connectorsApi.list(selectedClientId),
+    queryKey: ["connectors", selectedClientId, selectedProjectId],
+    queryFn: () => connectorsApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
   });
   const { data: scans = [], isLoading, refetch } = useQuery<Scan[]>({
-    queryKey: ["scans", selectedClientId],
-    queryFn: () => scansApi.list(selectedClientId),
+    queryKey: ["scans", selectedClientId, selectedProjectId],
+    queryFn: () => scansApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
     refetchInterval: (query) => (query.state.data as any[])?.some((s: any) => s.status === "running") ? 5000 : false,
   });
@@ -55,9 +68,29 @@ export default function Scans() {
 
   const startMutation = useMutation({
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); setOpen(false); toast.success("Scan started"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); setOpen(false); setScanName(""); toast.success("Scan started"); },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting scan"),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (scanId: string) => scansApi.delete(selectedClientId, scanId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); toast.success("Scan deleted"); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Error deleting scan"),
+  });
+
+  const sortedScans = React.useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...scans].sort((a, b) => {
+      const av: any = (a as any)[sortKey] ?? "";
+      const bv: any = (b as any)[sortKey] ?? "";
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }, [scans, sortKey, sortDir]);
+
+  const setSort = (k: string) => {
+    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("desc"); }
+  };
 
   return (
     <Box>
@@ -69,9 +102,17 @@ export default function Scans() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Client"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!selectedClientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
@@ -89,24 +130,43 @@ export default function Scans() {
           <Table>
             <TableHead>
               <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600 } }}>
-                <TableCell>Type</TableCell>
-                <TableCell>Framework</TableCell>
-                <TableCell>Status</TableCell>
+                <TableCell>
+                  <TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>
+                    Name
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel active={sortKey === "scan_type"} direction={sortDir} onClick={() => setSort("scan_type")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Type</TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel active={sortKey === "framework"} direction={sortDir} onClick={() => setSort("framework")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Framework</TableSortLabel>
+                </TableCell>
+                <TableCell>
+                  <TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Status</TableSortLabel>
+                </TableCell>
                 <TableCell>Findings</TableCell>
-                <TableCell>Started</TableCell>
+                <TableCell>
+                  <TableSortLabel active={sortKey === "started_at"} direction={sortDir} onClick={() => setSort("started_at")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Started</TableSortLabel>
+                </TableCell>
                 <TableCell>Duration</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {scans.length === 0 ? (
-                <TableRow><TableCell colSpan={7} sx={{ textAlign: "center", color: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.08)" }}>No scans yet</TableCell></TableRow>
-              ) : scans.map((scan) => {
+              {sortedScans.length === 0 ? (
+                <TableRow><TableCell colSpan={8} sx={{ textAlign: "center", color: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.08)" }}>No scans yet</TableCell></TableRow>
+              ) : sortedScans.map((scan) => {
                 const dur = scan.started_at && scan.completed_at
                   ? `${Math.round((new Date(scan.completed_at).getTime() - new Date(scan.started_at).getTime()) / 1000)}s`
                   : scan.status === "running" ? "Running..." : "-";
                 return (
                   <TableRow key={scan.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white" } }}>
+                    <TableCell><Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>{scan.name || `Scan ${scan.id.slice(0, 8)}`}</Typography></TableCell>
                     <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 11 }} /></TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{scan.framework || "—"}</Typography></TableCell>
                     <TableCell>
@@ -124,10 +184,19 @@ export default function Scans() {
                     </TableCell>
                     <TableCell><Typography variant="caption">{scan.started_at ? dayjs(scan.started_at).fromNow() : "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{dur}</Typography></TableCell>
-                    <TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
                       <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
                         onClick={() => setViewScan(scan)}
-                        sx={{ color: "#00e5ff", fontSize: 11 }}>View</Button>
+                        sx={{ color: "#00e5ff", fontSize: 11, minWidth: 0 }}>View</Button>
+                      <IconButton size="small"
+                        onClick={() => {
+                          if (window.confirm(`Delete scan "${scan.name || scan.id.slice(0, 8)}"? Findings will also be removed.`)) {
+                            deleteMutation.mutate(scan.id);
+                          }
+                        }}
+                        sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#f44336" } }}>
+                        <Delete sx={{ fontSize: 16 }} />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 );
@@ -142,6 +211,13 @@ export default function Scans() {
         <DialogTitle>Start New Scan</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="Scan name (optional)"
+                value={scanName} onChange={(e) => setScanName(e.target.value)}
+                placeholder='e.g. "Weekly Azure prod compliance"'
+                slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+            </Grid>
             <Grid size={{ xs: 12 }}>
               <FormControl fullWidth size="small">
                 <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
@@ -170,13 +246,11 @@ export default function Scans() {
                 <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
                   sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
                   <MenuItem value="">None</MenuItem>
-                  <MenuItem value="nist_csf">NIST CSF</MenuItem>
-                  <MenuItem value="nist_800_53">NIST 800-53</MenuItem>
-                  <MenuItem value="cis_v8">CIS Controls v8</MenuItem>
-                  <MenuItem value="gdpr">GDPR</MenuItem>
-                  <MenuItem value="iso_27001">ISO 27001</MenuItem>
-                  <MenuItem value="soc2">SOC 2</MenuItem>
-                  <MenuItem value="pci_dss">PCI DSS</MenuItem>
+                  {frameworkCatalog.map((f) => (
+                    <MenuItem key={f.framework} value={f.framework}>
+                      {f.name} ({f.total_controls})
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -185,7 +259,7 @@ export default function Scans() {
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
           <Button variant="contained" startIcon={<PlayArrow />} disabled={startMutation.isPending}
-            onClick={() => startMutation.mutate({ scan_type: scanType, connector_id: connectorId || undefined, framework: framework || undefined })}
+            onClick={() => startMutation.mutate({ scan_type: scanType, connector_id: connectorId || undefined, framework: framework || undefined, name: scanName || undefined })}
             sx={{ bgcolor: "#00e5ff", color: "#000" }}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>

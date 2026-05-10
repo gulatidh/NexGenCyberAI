@@ -6,7 +6,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from api.models.models import (
     ConnectorType, ConnectorStatus, FrameworkType, ScanType,
-    ScanStatus, Severity, RiskLevel, AgentType
+    ScanStatus, Severity, RiskLevel, AgentType, AssetStatus, ControlStatus,
+    AccessRole, AccessScope,
 )
 
 
@@ -46,16 +47,45 @@ class ClientResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Project ────────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    cloud_provider: Optional[str] = None
+    metadata_: Optional[Dict[str, Any]] = {}
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    environment: Optional[str] = None
+    cloud_provider: Optional[str] = None
+    metadata_: Optional[Dict[str, Any]] = None
+
+class ProjectResponse(BaseModel):
+    id: str
+    client_id: str
+    name: str
+    description: Optional[str]
+    environment: Optional[str]
+    cloud_provider: Optional[str]
+    created_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+
 # ── Connector ──────────────────────────────────────────────────────────────────
 
 class ConnectorCreate(BaseModel):
     name: str
     connector_type: ConnectorType
+    project_id: str                 # required — connectors must belong to a project
     credentials: Dict[str, Any]     # plaintext; encrypted server-side
     config: Optional[Dict[str, Any]] = {}
 
 class ConnectorUpdate(BaseModel):
     name: Optional[str] = None
+    project_id: Optional[str] = None
     credentials: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
     status: Optional[ConnectorStatus] = None
@@ -63,6 +93,7 @@ class ConnectorUpdate(BaseModel):
 class ConnectorResponse(BaseModel):
     id: str
     client_id: str
+    project_id: Optional[str]
     name: str
     connector_type: ConnectorType
     status: ConnectorStatus
@@ -77,13 +108,21 @@ class ConnectorResponse(BaseModel):
 
 class ScanCreate(BaseModel):
     connector_id: Optional[str] = None
+    project_id: Optional[str] = None     # inferred from connector if omitted
+    name: Optional[str] = None            # human-friendly label
     scan_type: ScanType
     framework: Optional[FrameworkType] = None
+    # Optional list of catalog control_ids to scope the scan to. When set, the
+    # connector still runs full discovery but persisted findings are filtered to
+    # those whose control_mappings[framework] (or normalized control_id) intersects.
+    control_ids: Optional[List[str]] = None
 
 class ScanResponse(BaseModel):
     id: str
     client_id: str
+    project_id: Optional[str]
     connector_id: Optional[str]
+    name: Optional[str]
     scan_type: ScanType
     status: ScanStatus
     framework: Optional[FrameworkType]
@@ -113,6 +152,11 @@ class FindingResponse(BaseModel):
     cve_id: Optional[str]
     cvss_score: Optional[float]
     created_at: Optional[datetime]
+    # Dedupe metadata: when the same (resource_id, title) appears in multiple
+    # scans, the listing collapses them to a single row. seen_count = number
+    # of scans that flagged it; first_seen_at = earliest detection.
+    seen_count: Optional[int] = 1
+    first_seen_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class FindingUpdate(BaseModel):
@@ -187,6 +231,117 @@ class AgentRunResponse(BaseModel):
     completed_at: Optional[datetime]
     error_message: Optional[str]
     model_config = {"from_attributes": True}
+
+
+# ── Asset Inventory ────────────────────────────────────────────────────────────
+
+class AssetResponse(BaseModel):
+    id: str
+    client_id: str
+    project_id: Optional[str]
+    connector_id: str
+    external_id: str
+    name: str
+    asset_type: Optional[str]
+    asset_class: Optional[str]
+    region: Optional[str]
+    subscription_id: Optional[str]
+    resource_group: Optional[str]
+    account_id: Optional[str]
+    project_id: Optional[str]
+    tags: Optional[Dict[str, Any]] = {}
+    status: AssetStatus
+    first_seen_at: Optional[datetime]
+    last_synced_at: Optional[datetime]
+    open_findings_count: int = 0
+    risks_count: int = 0
+    model_config = {"from_attributes": True}
+
+class AssetDetailResponse(AssetResponse):
+    provider_metadata: Optional[Dict[str, Any]] = {}
+    findings: List[FindingResponse] = []
+    risks: List[RiskResponse] = []
+
+class AssetSyncResponse(BaseModel):
+    queued_connector_ids: List[str]
+    message: str
+
+
+# ── Framework Compliance ───────────────────────────────────────────────────────
+
+class FrameworkControlResponse(BaseModel):
+    id: str
+    framework: FrameworkType
+    control_id: str
+    parent_control_id: Optional[str]
+    domain: Optional[str]
+    title: str
+    description: Optional[str]
+    weight: int = 1
+    model_config = {"from_attributes": True}
+
+class ControlStatusResponse(BaseModel):
+    control: FrameworkControlResponse
+    status: ControlStatus
+    derived: bool
+    evidence: Optional[str]
+    last_evaluated_at: Optional[datetime]
+    overridden_by: Optional[str]
+    overridden_at: Optional[datetime]
+    finding_ids: List[str] = []
+
+class ControlStatusUpdate(BaseModel):
+    status: ControlStatus
+    evidence: Optional[str] = None
+
+class FrameworkSummaryResponse(BaseModel):
+    framework: FrameworkType
+    total: int
+    compliant: int
+    non_compliant: int
+    partial: int
+    not_applicable: int
+    score: float
+    last_evaluated_at: Optional[datetime] = None
+
+class FrameworkCatalogEntry(BaseModel):
+    framework: FrameworkType
+    name: str
+    version: Optional[str] = None
+    total_controls: int
+
+
+# ── RBAC ───────────────────────────────────────────────────────────────────────
+
+class GrantCreate(BaseModel):
+    email: str
+    role: AccessRole
+    scope_type: AccessScope
+    scope_id: Optional[str] = None      # required when scope_type != global
+
+class GrantResponse(BaseModel):
+    id: str
+    email: str
+    role: AccessRole
+    scope_type: AccessScope
+    scope_id: Optional[str]
+    scope_label: Optional[str] = None    # human-friendly: "Greta — Production" etc.
+    granted_by: Optional[str]
+    granted_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+class UserAccessSummary(BaseModel):
+    email: str
+    grants: List[GrantResponse] = []
+    effective_global_role: Optional[AccessRole] = None
+
+class MyAccessResponse(BaseModel):
+    email: str
+    grants: List[GrantResponse] = []
+    is_admin: bool                          # global admin
+    is_admin_anywhere: bool = False         # admin at any scope (for nav gating)
+    is_editor_anywhere: bool
+    manageable_scopes: Dict[str, Any] = {}  # {global, client_ids[], project_ids[]}
 
 
 # ── Misc ───────────────────────────────────────────────────────────────────────

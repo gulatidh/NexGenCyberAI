@@ -7,8 +7,8 @@ import {
 } from "@mui/material";
 import { Warning } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, risksApi } from "../services/api";
-import { Client, Risk } from "../types";
+import { clientsApi, risksApi, projectsApi } from "../services/api";
+import { Client, Risk, Project } from "../types";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -23,13 +23,19 @@ const STATUS_COLOR: Record<string, string> = {
 export default function Risks() {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [selected, setSelected] = useState<Risk | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", clientId],
+    queryFn: () => projectsApi.list(clientId),
+    enabled: !!clientId,
+  });
   const { data: risks = [], isLoading } = useQuery<Risk[]>({
-    queryKey: ["risks", clientId],
-    queryFn: () => risksApi.list(clientId),
+    queryKey: ["risks", clientId, projectId],
+    queryFn: () => risksApi.list(clientId, projectId || undefined),
     enabled: !!clientId,
   });
 
@@ -58,13 +64,23 @@ export default function Risks() {
             Prioritised risks with mitigation tracking
           </Typography>
         </Box>
-        <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-          <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
-            sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-            {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
       {clientId && !isLoading && risks.length > 0 && (

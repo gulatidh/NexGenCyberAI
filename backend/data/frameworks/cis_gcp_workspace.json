@@ -1,0 +1,335 @@
+{
+  "framework": "cis_gcp_workspace",
+  "version": "1.3.0",
+  "source": "https://www.cisecurity.org/benchmark/google_workspace",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Account Security",
+      "title": "Account Security",
+      "description": "Account Security",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure 2-Step Verification (2SV) is enforced for all users",
+      "description": "Ensure 2-Step Verification (2SV) is enforced for all users",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure Login Challenges for Risk-based Logins are enabled",
+      "description": "Ensure Login Challenges for Risk-based Logins are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure password length is set to at least 12 characters",
+      "description": "Ensure password length is set to at least 12 characters",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure password reuse prevention is enabled",
+      "description": "Ensure password reuse prevention is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure password expiration policies are enforced",
+      "description": "Ensure password expiration policies are enforced",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure Less Secure App access is disabled",
+      "description": "Ensure Less Secure App access is disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure session length is configured for low-trust environments",
+      "description": "Ensure session length is configured for low-trust environments",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Account Security",
+      "title": "Ensure suspicious login alerts are enabled",
+      "description": "Ensure suspicious login alerts are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Authentication & SSO",
+      "title": "Authentication & SSO",
+      "description": "Authentication & SSO",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1",
+      "parent": "2",
+      "domain": "Authentication & SSO",
+      "title": "Ensure SAML SSO is configured for third-party IdP if used",
+      "description": "Ensure SAML SSO is configured for third-party IdP if used",
+      "weight": 1
+    },
+    {
+      "control_id": "2.2",
+      "parent": "2",
+      "domain": "Authentication & SSO",
+      "title": "Ensure context-aware access policies are enforced",
+      "description": "Ensure context-aware access policies are enforced",
+      "weight": 1
+    },
+    {
+      "control_id": "2.3",
+      "parent": "2",
+      "domain": "Authentication & SSO",
+      "title": "Ensure Security Key enforcement for super admins",
+      "description": "Ensure Security Key enforcement for super admins",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Gmail Security",
+      "title": "Gmail Security",
+      "description": "Gmail Security",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure inbound email scanning (Spam, Phishing, Malware) is enabled",
+      "description": "Ensure inbound email scanning (Spam, Phishing, Malware) is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure DMARC quarantine/reject policy is enforced",
+      "description": "Ensure DMARC quarantine/reject policy is enforced",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure DKIM signing is enabled for outbound mail",
+      "description": "Ensure DKIM signing is enabled for outbound mail",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure SPF records are published",
+      "description": "Ensure SPF records are published",
+      "weight": 1
+    },
+    {
+      "control_id": "3.5",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure compliance footer / disclaimer is configured (if required)",
+      "description": "Ensure compliance footer / disclaimer is configured (if required)",
+      "weight": 1
+    },
+    {
+      "control_id": "3.6",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure encrypted message (S/MIME) is enabled where required",
+      "description": "Ensure encrypted message (S/MIME) is enabled where required",
+      "weight": 1
+    },
+    {
+      "control_id": "3.7",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure attachment compliance scanning is configured",
+      "description": "Ensure attachment compliance scanning is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "3.8",
+      "parent": "3",
+      "domain": "Gmail Security",
+      "title": "Ensure pre-delivery message scanning is enabled",
+      "description": "Ensure pre-delivery message scanning is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Drive & Docs",
+      "title": "Drive & Docs",
+      "description": "Drive & Docs",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure file sharing outside the organization is restricted by default",
+      "description": "Ensure file sharing outside the organization is restricted by default",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure shared drive sharing is restricted to organization",
+      "description": "Ensure shared drive sharing is restricted to organization",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure Drive content access by Google support is disabled",
+      "description": "Ensure Drive content access by Google support is disabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure DLP rules are configured for sensitive content",
+      "description": "Ensure DLP rules are configured for sensitive content",
+      "weight": 1
+    },
+    {
+      "control_id": "4.5",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure transferring of ownership when users are removed is configured",
+      "description": "Ensure transferring of ownership when users are removed is configured",
+      "weight": 1
+    },
+    {
+      "control_id": "4.6",
+      "parent": "4",
+      "domain": "Drive & Docs",
+      "title": "Ensure offline access policies are restricted",
+      "description": "Ensure offline access policies are restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Calendar",
+      "title": "Calendar",
+      "description": "Calendar",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1",
+      "parent": "5",
+      "domain": "Calendar",
+      "title": "Ensure external Calendar sharing is restricted to free/busy",
+      "description": "Ensure external Calendar sharing is restricted to free/busy",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2",
+      "parent": "5",
+      "domain": "Calendar",
+      "title": "Ensure calendar interop with non-Google calendars uses HTTPS",
+      "description": "Ensure calendar interop with non-Google calendars uses HTTPS",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Mobile Device Management",
+      "title": "Mobile Device Management",
+      "description": "Mobile Device Management",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Mobile Device Management",
+      "title": "Ensure advanced Mobile Management (AMM) is enabled",
+      "description": "Ensure advanced Mobile Management (AMM) is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Mobile Device Management",
+      "title": "Ensure device password policy is enforced",
+      "description": "Ensure device password policy is enforced",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Mobile Device Management",
+      "title": "Ensure work profile is required on Android",
+      "description": "Ensure work profile is required on Android",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Mobile Device Management",
+      "title": "Ensure rooted/jailbroken devices are blocked",
+      "description": "Ensure rooted/jailbroken devices are blocked",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Logging & Auditing",
+      "title": "Logging & Auditing",
+      "description": "Logging & Auditing",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "Logging & Auditing",
+      "title": "Ensure audit logs are exported to BigQuery / SIEM",
+      "description": "Ensure audit logs are exported to BigQuery / SIEM",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "Logging & Auditing",
+      "title": "Ensure alert center alerts are reviewed regularly",
+      "description": "Ensure alert center alerts are reviewed regularly",
+      "weight": 1
+    },
+    {
+      "control_id": "7.3",
+      "parent": "7",
+      "domain": "Logging & Auditing",
+      "title": "Ensure data residency policies are configured if needed",
+      "description": "Ensure data residency policies are configured if needed",
+      "weight": 1
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "framework": "cis_windows_server",
+  "version": "2.0.0",
+  "source": "https://www.cisecurity.org/benchmark/microsoft_windows_server",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Account Policies",
+      "title": "Account Policies",
+      "description": "Account Policies",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Local Policies",
+      "title": "Local Policies",
+      "description": "Local Policies",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "System Services",
+      "title": "System Services",
+      "description": "System Services",
+      "weight": 0
+    },
+    {
+      "control_id": "9",
+      "parent": null,
+      "domain": "Windows Defender Firewall with Advanced Security",
+      "title": "Windows Defender Firewall with Advanced Security",
+      "description": "Windows Defender Firewall with Advanced Security",
+      "weight": 0
+    },
+    {
+      "control_id": "17",
+      "parent": null,
+      "domain": "Advanced Audit Policy Configuration",
+      "title": "Advanced Audit Policy Configuration",
+      "description": "Advanced Audit Policy Configuration",
+      "weight": 0
+    },
+    {
+      "control_id": "18",
+      "parent": null,
+      "domain": "Administrative Templates (Computer)",
+      "title": "Administrative Templates (Computer)",
+      "description": "Administrative Templates (Computer)",
+      "weight": 0
+    },
+    {
+      "control_id": "19",
+      "parent": null,
+      "domain": "Administrative Templates (User)",
+      "title": "Administrative Templates (User)",
+      "description": "Administrative Templates (User)",
+      "weight": 0
+    },
+    {
+      "control_id": "L1",
+      "parent": null,
+      "domain": "Level 1 \u2014 Member Server",
+      "title": "Level 1 \u2014 Member Server",
+      "description": "Level 1 \u2014 Member Server",
+      "weight": 0
+    },
+    {
+      "control_id": "L2",
+      "parent": null,
+      "domain": "Level 2 \u2014 Member Server",
+      "title": "Level 2 \u2014 Member Server",
+      "description": "Level 2 \u2014 Member Server",
+      "weight": 0
+    },
+    {
+      "control_id": "L1-DC",
+      "parent": null,
+      "domain": "Level 1 \u2014 Domain Controller",
+      "title": "Level 1 \u2014 Domain Controller",
+      "description": "Level 1 \u2014 Domain Controller",
+      "weight": 0
+    },
+    {
+      "control_id": "L2-DC",
+      "parent": null,
+      "domain": "Level 2 \u2014 Domain Controller",
+      "title": "Level 2 \u2014 Domain Controller",
+      "description": "Level 2 \u2014 Domain Controller",
+      "weight": 0
+    }
+  ]
+}

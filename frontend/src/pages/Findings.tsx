@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Card, Chip, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
-  FormControl, InputLabel, Select, MenuItem, Button,
-  Dialog, DialogTitle, DialogContent, DialogActions, Alert,
+  Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
+  FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip,
 } from "@mui/material";
 import { BugReport } from "@mui/icons-material";
+import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, findingsApi } from "../services/api";
-import { Client, Finding } from "../types";
+import { clientsApi, findingsApi, projectsApi } from "../services/api";
+import { Client, Finding, Project, FindingCategoriesResponse } from "../types";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -20,24 +21,129 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#ff9800", remediated: "#00e676", accepted: "#7c4dff", false_positive: "rgba(255,255,255,0.4)",
 };
 
+function CatIcon({ name, sx }: { name: string; sx?: any }) {
+  const C = (Icons as any)[name] || Icons.Apps;
+  return <C sx={sx || { fontSize: 14 }} />;
+}
+
+// Per-category accent colors — keeps each tile distinct in the grid.
+const CAT_COLOR: Record<string, string> = {
+  vulnerability:       "#f44336",
+  cloud_configuration: "#00e5ff",
+  host_configuration:  "#7c4dff",
+  attack_surface:      "#ff6d00",
+  data:                "#ff9800",
+  secret:              "#ffd54f",
+  end_of_life:         "#9e9e9e",
+  sast:                "#00e676",
+  network_exposure:    "#03a9f4",
+  excessive_access:    "#ff5252",
+  identity_access:     "#f06292",
+  ai_security:         "#ba68c8",
+  detections:          "#ff4081",
+  code_build_scans:    "#26c6da",
+  kubernetes_admission:"#9ccc65",
+};
+
+function CategoryTile({ cat, active, onClick }: {
+  cat: { key: string; label: string; icon: string; count: number };
+  active: boolean;
+  onClick: () => void;
+}) {
+  const color = CAT_COLOR[cat.key] || "#00e5ff";
+  const empty = cat.count === 0;
+  return (
+    <Card onClick={onClick}
+      sx={{
+        bgcolor: active ? `${color}15` : "#161b22",
+        border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 2, cursor: "pointer", height: "100%",
+        transition: "transform .12s, border-color .12s, background-color .12s",
+        opacity: empty && !active ? 0.6 : 1,
+        "&:hover": {
+          borderColor: color,
+          bgcolor: active ? `${color}20` : `${color}08`,
+          transform: "translateY(-1px)",
+        },
+      }}>
+      <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+          <Box sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: `${color}20`,
+            display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CatIcon name={cat.icon} sx={{ fontSize: 18, color }} />
+          </Box>
+          <Typography sx={{ color: empty ? "rgba(255,255,255,0.5)" : "white",
+            fontSize: 26, fontWeight: 700, lineHeight: 1, ml: "auto" }}>
+            {cat.count}
+          </Typography>
+        </Box>
+        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)",
+          fontSize: 12, fontWeight: 500, lineHeight: 1.25 }}>
+          {cat.label}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Findings() {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [section, setSection] = useState("security_posture");
+  const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
-  const { data: findings = [], isLoading } = useQuery<Finding[]>({
-    queryKey: ["findings-all", clientId, sevFilter, statusFilter],
-    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined),
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects", clientId],
+    queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
+  const { data: catData } = useQuery<FindingCategoriesResponse>({
+    queryKey: ["findings-categories", clientId, projectId, statusFilter],
+    queryFn: () => findingsApi.categories(clientId, projectId || undefined, statusFilter || "open"),
+    enabled: !!clientId,
+  });
+  const { data: findings = [], isLoading } = useQuery<Finding[]>({
+    queryKey: ["findings-all", clientId, projectId, sevFilter, statusFilter, section, category],
+    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined, section, category || undefined),
+    enabled: !!clientId,
+  });
+
+  const sectionData = (catData?.sections || []).find((s) => s.key === section);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["findings-all"] }); setSelected(null); },
   });
+
+  const [sortKey, setSortKey] = React.useState<string>("first_seen_at");
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
+  const sortedFindings = React.useMemo(() => {
+    const SEV_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...findings].sort((a, b) => {
+      let av: any = (a as any)[sortKey];
+      let bv: any = (b as any)[sortKey];
+      if (sortKey === "severity") {
+        av = SEV_RANK[(typeof a.severity === "object" ? (a.severity as any).value : a.severity) || "info"] ?? 99;
+        bv = SEV_RANK[(typeof b.severity === "object" ? (b.severity as any).value : b.severity) || "info"] ?? 99;
+      }
+      if (sortKey === "first_seen_at") {
+        av = a.first_seen_at || a.created_at;
+        bv = b.first_seen_at || b.created_at;
+      }
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av || "").localeCompare(String(bv || "")) * dir;
+    });
+  }, [findings, sortKey, sortDir]);
+  const setSort = (k: string) => {
+    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("desc"); }
+  };
 
   const sevCounts = findings.reduce((acc: Record<string, number>, f) => {
     const s = typeof f.severity === "object" ? (f.severity as any).value ?? f.severity : f.severity;
@@ -57,9 +163,17 @@ export default function Findings() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -86,18 +200,63 @@ export default function Findings() {
         </Box>
       </Box>
 
-      {clientId && !isLoading && findings.length > 0 && (
-        <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
-          {["critical","high","medium","low","info"].filter((s) => sevCounts[s]).map((s) => (
-            <Chip key={s} label={`${s.charAt(0).toUpperCase() + s.slice(1)}: ${sevCounts[s]}`} size="small"
-              onClick={() => setSevFilter(sevFilter === s ? "" : s)}
-              sx={{ bgcolor: `${SEV_COLOR[s]}${sevFilter === s ? "40" : "20"}`, color: SEV_COLOR[s],
-                border: sevFilter === s ? `1px solid ${SEV_COLOR[s]}` : "none", cursor: "pointer" }} />
-          ))}
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
-            {findings.length} total
-          </Typography>
-        </Box>
+      {clientId && (
+        <>
+          {/* Section tabs */}
+          <Tabs value={section} onChange={(_, v) => { setSection(v); setCategory(""); }}
+            sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 1.5,
+              "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
+              "& .Mui-selected": { color: "#00e5ff" }, "& .MuiTabs-indicator": { backgroundColor: "#00e5ff" } }}>
+            {(catData?.sections || []).map((s) => (
+              <Tab key={s.key} value={s.key} label={`${s.label} (${s.total})`} />
+            ))}
+          </Tabs>
+
+          {/* Category tile grid */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
+              CATEGORIES — CLICK TO FILTER
+            </Typography>
+            {category && (
+              <Button size="small" onClick={() => setCategory("")}
+                sx={{ color: "#00e5ff", fontSize: 11 }}>
+                Clear category
+              </Button>
+            )}
+          </Box>
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            {!catData ? (
+              [0, 1, 2, 3, 4, 5].map((i) => (
+                <Grid key={i} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+                  <Skeleton variant="rectangular" height={88}
+                    sx={{ borderRadius: 2, bgcolor: "rgba(255,255,255,0.04)" }} />
+                </Grid>
+              ))
+            ) : (
+              (sectionData?.categories || []).map((c) => (
+                <Grid key={c.key} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+                  <CategoryTile cat={c}
+                    active={category === c.key}
+                    onClick={() => setCategory(category === c.key ? "" : c.key)} />
+                </Grid>
+              ))
+            )}
+          </Grid>
+
+          {findings.length > 0 && (
+            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+              {["critical","high","medium","low","info"].filter((s) => sevCounts[s]).map((s) => (
+                <Chip key={s} label={`${s.charAt(0).toUpperCase() + s.slice(1)}: ${sevCounts[s]}`} size="small"
+                  onClick={() => setSevFilter(sevFilter === s ? "" : s)}
+                  sx={{ bgcolor: `${SEV_COLOR[s]}${sevFilter === s ? "40" : "20"}`, color: SEV_COLOR[s],
+                    border: sevFilter === s ? `1px solid ${SEV_COLOR[s]}` : "none", cursor: "pointer" }} />
+              ))}
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
+                {findings.length} matching
+              </Typography>
+            </Box>
+          )}
+        </>
       )}
 
       {!clientId ? (
@@ -117,17 +276,23 @@ export default function Findings() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
-                  <TableCell>SEVERITY</TableCell>
-                  <TableCell>TITLE</TableCell>
-                  <TableCell>CVE</TableCell>
-                  <TableCell>CVSS</TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>SEVERITY</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "title"} direction={sortDir} onClick={() => setSort("title")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>TITLE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "cve_id"} direction={sortDir} onClick={() => setSort("cve_id")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "cvss_score"} direction={sortDir} onClick={() => setSort("cvss_score")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVSS</TableSortLabel></TableCell>
                   <TableCell>RESOURCE</TableCell>
-                  <TableCell>STATUS</TableCell>
-                  <TableCell>FOUND</TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "first_seen_at"} direction={sortDir} onClick={() => setSort("first_seen_at")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {findings.map((f) => {
+                {sortedFindings.map((f) => {
                   const sev = typeof f.severity === "object" ? (f.severity as any).value ?? f.severity : f.severity;
                   return (
                     <TableRow key={f.id}
@@ -139,9 +304,17 @@ export default function Findings() {
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "white", maxWidth: 300 }}>
-                        <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {f.title}
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f.title}
+                          </Typography>
+                          {(f.seen_count ?? 1) > 1 && (
+                            <Tooltip title={`Detected in ${f.seen_count} scans`}>
+                              <Chip label={`×${f.seen_count}`} size="small"
+                                sx={{ bgcolor: "rgba(0,229,255,0.12)", color: "#00e5ff", fontSize: 10, height: 16, flexShrink: 0 }} />
+                            </Tooltip>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ color: f.cve_id ? "#00e5ff" : "rgba(255,255,255,0.3)", fontSize: 12 }}>
                         {f.cve_id || "—"}
@@ -160,7 +333,10 @@ export default function Findings() {
                             color: STATUS_COLOR[f.status || "open"] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                        {f.created_at ? dayjs(f.created_at).fromNow() : "—"}
+                        {(() => {
+                          const ts = f.first_seen_at || f.created_at;
+                          return ts ? dayjs(ts).fromNow() : "—";
+                        })()}
                       </TableCell>
                     </TableRow>
                   );

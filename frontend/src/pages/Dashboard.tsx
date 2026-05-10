@@ -111,7 +111,11 @@ export default function Dashboard() {
         <Grid size={{ xs: 12, md: 7 }}>
           <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Framework Compliance Scores</Typography>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Typography variant="h6" sx={{ color: "white" }}>Framework Compliance Scores</Typography>
+                <Button size="small" endIcon={<ArrowForward sx={{ fontSize: 12 }} />} onClick={() => navigate("/frameworks")}
+                  sx={{ color: "#00e5ff", fontSize: 11 }}>Browse controls</Button>
+              </Box>
               {complianceData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={complianceData} barSize={36}>

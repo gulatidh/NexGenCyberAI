@@ -1,0 +1,71 @@
+{
+  "framework": "cis_mssql",
+  "version": "1.0.0",
+  "source": "https://www.cisecurity.org/benchmark/microsoft_sql_server",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Installation, Updates and Patches",
+      "title": "Installation, Updates and Patches",
+      "description": "Installation, Updates and Patches",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Surface Area Reduction",
+      "title": "Surface Area Reduction",
+      "description": "Surface Area Reduction",
+      "weight": 0
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Authentication and Authorization",
+      "title": "Authentication and Authorization",
+      "description": "Authentication and Authorization",
+      "weight": 0
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Password Policies",
+      "title": "Password Policies",
+      "description": "Password Policies",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Auditing and Logging",
+      "title": "Auditing and Logging",
+      "description": "Auditing and Logging",
+      "weight": 0
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Application Development",
+      "title": "Application Development",
+      "description": "Application Development",
+      "weight": 0
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Encryption",
+      "title": "Encryption",
+      "description": "Encryption",
+      "weight": 0
+    },
+    {
+      "control_id": "8",
+      "parent": null,
+      "domain": "Appendix",
+      "title": "Appendix",
+      "description": "Appendix",
+      "weight": 0
+    }
+  ]
+}

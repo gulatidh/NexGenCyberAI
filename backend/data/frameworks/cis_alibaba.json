@@ -1,0 +1,367 @@
+{
+  "framework": "cis_alibaba",
+  "version": "2.0.0",
+  "source": "https://www.cisecurity.org/benchmark/alibaba_cloud",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Identity and Access Management",
+      "title": "Identity and Access Management",
+      "description": "Identity and Access Management",
+      "weight": 0
+    },
+    {
+      "control_id": "1.1",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure RAM password policy requires minimum length of 14 or greater",
+      "description": "Ensure RAM password policy requires minimum length of 14 or greater",
+      "weight": 1
+    },
+    {
+      "control_id": "1.2",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure RAM password policy prevents password reuse",
+      "description": "Ensure RAM password policy prevents password reuse",
+      "weight": 1
+    },
+    {
+      "control_id": "1.3",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure RAM password policy expires passwords within 90 days or less",
+      "description": "Ensure RAM password policy expires passwords within 90 days or less",
+      "weight": 1
+    },
+    {
+      "control_id": "1.4",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure no root account access keys exist",
+      "description": "Ensure no root account access keys exist",
+      "weight": 1
+    },
+    {
+      "control_id": "1.5",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure MFA is enabled for the root account",
+      "description": "Ensure MFA is enabled for the root account",
+      "weight": 1
+    },
+    {
+      "control_id": "1.6",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure MFA is enabled for all RAM users with console access",
+      "description": "Ensure MFA is enabled for all RAM users with console access",
+      "weight": 1
+    },
+    {
+      "control_id": "1.7",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure RAM access keys are rotated every 90 days or less",
+      "description": "Ensure RAM access keys are rotated every 90 days or less",
+      "weight": 1
+    },
+    {
+      "control_id": "1.8",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure unused RAM credentials are disabled after 45 days",
+      "description": "Ensure unused RAM credentials are disabled after 45 days",
+      "weight": 1
+    },
+    {
+      "control_id": "1.9",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure RAM users receive permissions only through groups",
+      "description": "Ensure RAM users receive permissions only through groups",
+      "weight": 1
+    },
+    {
+      "control_id": "1.10",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure no inline RAM policies attach administrator privileges",
+      "description": "Ensure no inline RAM policies attach administrator privileges",
+      "weight": 1
+    },
+    {
+      "control_id": "1.11",
+      "parent": "1",
+      "domain": "Identity and Access Management",
+      "title": "Ensure a support role has been created",
+      "description": "Ensure a support role has been created",
+      "weight": 1
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Logging",
+      "title": "Logging",
+      "description": "Logging",
+      "weight": 0
+    },
+    {
+      "control_id": "2.1",
+      "parent": "2",
+      "domain": "Logging",
+      "title": "Ensure ActionTrail is enabled for all regions",
+      "description": "Ensure ActionTrail is enabled for all regions",
+      "weight": 1
+    },
+    {
+      "control_id": "2.2",
+      "parent": "2",
+      "domain": "Logging",
+      "title": "Ensure ActionTrail logs are written to an OSS bucket with versioning + lifecycle",
+      "description": "Ensure ActionTrail logs are written to an OSS bucket with versioning + lifecycle",
+      "weight": 1
+    },
+    {
+      "control_id": "2.3",
+      "parent": "2",
+      "domain": "Logging",
+      "title": "Ensure ActionTrail integrates with Log Service",
+      "description": "Ensure ActionTrail integrates with Log Service",
+      "weight": 1
+    },
+    {
+      "control_id": "2.4",
+      "parent": "2",
+      "domain": "Logging",
+      "title": "Ensure ActionTrail OSS bucket access logging is enabled",
+      "description": "Ensure ActionTrail OSS bucket access logging is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "Monitoring",
+      "title": "Monitoring",
+      "description": "Monitoring",
+      "weight": 0
+    },
+    {
+      "control_id": "3.1",
+      "parent": "3",
+      "domain": "Monitoring",
+      "title": "Ensure CloudMonitor alerts on RAM policy changes",
+      "description": "Ensure CloudMonitor alerts on RAM policy changes",
+      "weight": 1
+    },
+    {
+      "control_id": "3.2",
+      "parent": "3",
+      "domain": "Monitoring",
+      "title": "Ensure CloudMonitor alerts on Security Group changes",
+      "description": "Ensure CloudMonitor alerts on Security Group changes",
+      "weight": 1
+    },
+    {
+      "control_id": "3.3",
+      "parent": "3",
+      "domain": "Monitoring",
+      "title": "Ensure CloudMonitor alerts on Network ACL changes",
+      "description": "Ensure CloudMonitor alerts on Network ACL changes",
+      "weight": 1
+    },
+    {
+      "control_id": "3.4",
+      "parent": "3",
+      "domain": "Monitoring",
+      "title": "Ensure CloudMonitor alerts on root account console sign-ins",
+      "description": "Ensure CloudMonitor alerts on root account console sign-ins",
+      "weight": 1
+    },
+    {
+      "control_id": "3.5",
+      "parent": "3",
+      "domain": "Monitoring",
+      "title": "Ensure Cloud Security Center (Yundun) is enabled",
+      "description": "Ensure Cloud Security Center (Yundun) is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Networking",
+      "title": "Networking",
+      "description": "Networking",
+      "weight": 0
+    },
+    {
+      "control_id": "4.1",
+      "parent": "4",
+      "domain": "Networking",
+      "title": "Ensure no Security Group allows ingress 0.0.0.0/0 on port 22",
+      "description": "Ensure no Security Group allows ingress 0.0.0.0/0 on port 22",
+      "weight": 1
+    },
+    {
+      "control_id": "4.2",
+      "parent": "4",
+      "domain": "Networking",
+      "title": "Ensure no Security Group allows ingress 0.0.0.0/0 on port 3389",
+      "description": "Ensure no Security Group allows ingress 0.0.0.0/0 on port 3389",
+      "weight": 1
+    },
+    {
+      "control_id": "4.3",
+      "parent": "4",
+      "domain": "Networking",
+      "title": "Ensure VPC Flow Logs are enabled",
+      "description": "Ensure VPC Flow Logs are enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "4.4",
+      "parent": "4",
+      "domain": "Networking",
+      "title": "Ensure default Security Groups are restricted",
+      "description": "Ensure default Security Groups are restricted",
+      "weight": 1
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Storage",
+      "title": "Storage",
+      "description": "Storage",
+      "weight": 0
+    },
+    {
+      "control_id": "5.1",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure OSS bucket policy denies HTTP requests",
+      "description": "Ensure OSS bucket policy denies HTTP requests",
+      "weight": 1
+    },
+    {
+      "control_id": "5.2",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure OSS bucket has no public-read or public-read-write ACL",
+      "description": "Ensure OSS bucket has no public-read or public-read-write ACL",
+      "weight": 1
+    },
+    {
+      "control_id": "5.3",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure OSS server-side encryption is enabled",
+      "description": "Ensure OSS server-side encryption is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5.4",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure OSS bucket logging is enabled",
+      "description": "Ensure OSS bucket logging is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "5.5",
+      "parent": "5",
+      "domain": "Storage",
+      "title": "Ensure OSS bucket versioning is enabled",
+      "description": "Ensure OSS bucket versioning is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Database",
+      "title": "Database",
+      "description": "Database",
+      "weight": 0
+    },
+    {
+      "control_id": "6.1",
+      "parent": "6",
+      "domain": "Database",
+      "title": "Ensure ApsaraDB RDS encryption is enabled",
+      "description": "Ensure ApsaraDB RDS encryption is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6.2",
+      "parent": "6",
+      "domain": "Database",
+      "title": "Ensure ApsaraDB RDS instances are not publicly accessible",
+      "description": "Ensure ApsaraDB RDS instances are not publicly accessible",
+      "weight": 1
+    },
+    {
+      "control_id": "6.3",
+      "parent": "6",
+      "domain": "Database",
+      "title": "Ensure ApsaraDB RDS audit logging is enabled",
+      "description": "Ensure ApsaraDB RDS audit logging is enabled",
+      "weight": 1
+    },
+    {
+      "control_id": "6.4",
+      "parent": "6",
+      "domain": "Database",
+      "title": "Ensure ApsaraDB RDS automated backups are configured",
+      "description": "Ensure ApsaraDB RDS automated backups are configured",
+      "weight": 1
+    },
+    {
+      "control_id": "6.5",
+      "parent": "6",
+      "domain": "Database",
+      "title": "Ensure ApsaraDB RDS SSL is required for connections",
+      "description": "Ensure ApsaraDB RDS SSL is required for connections",
+      "weight": 1
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Compute",
+      "title": "Compute",
+      "description": "Compute",
+      "weight": 0
+    },
+    {
+      "control_id": "7.1",
+      "parent": "7",
+      "domain": "Compute",
+      "title": "Ensure ECS instance metadata uses hardened mode (token-required)",
+      "description": "Ensure ECS instance metadata uses hardened mode (token-required)",
+      "weight": 1
+    },
+    {
+      "control_id": "7.2",
+      "parent": "7",
+      "domain": "Compute",
+      "title": "Ensure ECS disks are encrypted",
+      "description": "Ensure ECS disks are encrypted",
+      "weight": 1
+    },
+    {
+      "control_id": "7.3",
+      "parent": "7",
+      "domain": "Compute",
+      "title": "Ensure ECS instances are part of a Security Group",
+      "description": "Ensure ECS instances are part of a Security Group",
+      "weight": 1
+    },
+    {
+      "control_id": "7.4",
+      "parent": "7",
+      "domain": "Compute",
+      "title": "Ensure ECS public IPs are evaluated periodically",
+      "description": "Ensure ECS public IPs are evaluated periodically",
+      "weight": 1
+    }
+  ]
+}

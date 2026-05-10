@@ -1,0 +1,63 @@
+{
+  "framework": "cis_palo_alto",
+  "version": "1.2.0",
+  "source": "https://www.cisecurity.org/benchmark/palo_alto",
+  "controls": [
+    {
+      "control_id": "1",
+      "parent": null,
+      "domain": "Device Setup",
+      "title": "Device Setup",
+      "description": "Device Setup",
+      "weight": 0
+    },
+    {
+      "control_id": "2",
+      "parent": null,
+      "domain": "Authentication, Authorization & Logging",
+      "title": "Authentication, Authorization & Logging",
+      "description": "Authentication, Authorization & Logging",
+      "weight": 0
+    },
+    {
+      "control_id": "3",
+      "parent": null,
+      "domain": "High Availability",
+      "title": "High Availability",
+      "description": "High Availability",
+      "weight": 0
+    },
+    {
+      "control_id": "4",
+      "parent": null,
+      "domain": "Network Settings",
+      "title": "Network Settings",
+      "description": "Network Settings",
+      "weight": 0
+    },
+    {
+      "control_id": "5",
+      "parent": null,
+      "domain": "Security Policies",
+      "title": "Security Policies",
+      "description": "Security Policies",
+      "weight": 0
+    },
+    {
+      "control_id": "6",
+      "parent": null,
+      "domain": "Threat Prevention Profiles",
+      "title": "Threat Prevention Profiles",
+      "description": "Threat Prevention Profiles",
+      "weight": 0
+    },
+    {
+      "control_id": "7",
+      "parent": null,
+      "domain": "Decryption",
+      "title": "Decryption",
+      "description": "Decryption",
+      "weight": 0
+    }
+  ]
+}

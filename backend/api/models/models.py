@@ -3,7 +3,7 @@ NexGenCyberAI - SQLAlchemy ORM models (all tables).
 """
 from sqlalchemy import (
     Column, String, Integer, Boolean, DateTime, Text, ForeignKey,
-    Enum as SAEnum, JSON, Float
+    Enum as SAEnum, JSON, Float, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -49,6 +49,23 @@ class FrameworkType(str, enum.Enum):
     ISO_27001 = "iso_27001"
     SOC2 = "soc2"
     PCI_DSS = "pci_dss"
+    # CIS Benchmarks — cloud/SaaS (full catalog ships)
+    CIS_AZURE = "cis_azure"
+    CIS_AWS = "cis_aws"
+    CIS_AWS_DB = "cis_aws_db"
+    CIS_ALIBABA = "cis_alibaba"
+    CIS_GCP = "cis_gcp"
+    CIS_GCP_WORKSPACE = "cis_gcp_workspace"
+    CIS_M365 = "cis_m365"
+    CIS_AKS = "cis_aks"
+    CIS_AZURE_COMPUTE = "cis_azure_compute"
+    # CIS Benchmarks — OS/network/app (section structure ships; full controls via /import)
+    CIS_WINDOWS_SERVER = "cis_windows_server"
+    CIS_UBUNTU = "cis_ubuntu"
+    CIS_ESXI = "cis_esxi"
+    CIS_F5 = "cis_f5"
+    CIS_PALO_ALTO = "cis_palo_alto"
+    CIS_MSSQL = "cis_mssql"
 
 class ScanType(str, enum.Enum):
     VULNERABILITY = "vulnerability"
@@ -85,6 +102,27 @@ class AgentType(str, enum.Enum):
     REMEDIATION = "remediation"
     ORCHESTRATOR = "orchestrator"
 
+class AssetStatus(str, enum.Enum):
+    ACTIVE = "active"
+    STALE = "stale"
+    DELETED = "deleted"
+
+class AccessRole(str, enum.Enum):
+    READER = "reader"
+    EDITOR = "editor"
+    ADMIN = "admin"
+
+class AccessScope(str, enum.Enum):
+    GLOBAL = "global"
+    CLIENT = "client"
+    PROJECT = "project"
+
+class ControlStatus(str, enum.Enum):
+    COMPLIANT = "compliant"
+    NON_COMPLIANT = "non_compliant"
+    PARTIAL = "partial"
+    NOT_APPLICABLE = "not_applicable"
+
 
 # ── Tables ─────────────────────────────────────────────────────────────────────
 
@@ -108,6 +146,33 @@ class Client(Base):
     scans = relationship("Scan", back_populates="client", cascade="all, delete-orphan")
     risks = relationship("Risk", back_populates="client", cascade="all, delete-orphan")
     framework_assessments = relationship("FrameworkAssessment", back_populates="client")
+    control_statuses = relationship("ClientControlStatus", back_populates="client", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="client", cascade="all, delete-orphan")
+
+
+class Project(Base):
+    """A logical grouping under a Client. Connectors, Scans, and Assets all
+    belong to a Project. Existing entities pre-Projects are migrated to a
+    "Default" project per client by main.py::_ensure_projects_schema."""
+    __tablename__ = "projects"
+    __table_args__ = (
+        UniqueConstraint("client_id", "name", name="uq_project_client_name"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text)
+    environment = Column(String(64))            # production | staging | development | dr | other
+    cloud_provider = Column(String(32))         # azure | aws | gcp | multi | other
+    metadata_ = Column("metadata", JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    client = relationship("Client", back_populates="projects")
+    connectors = relationship("Connector", back_populates="project")
+    scans = relationship("Scan", back_populates="project")
+    assets = relationship("Asset", back_populates="project")
 
 
 class Connector(Base):
@@ -115,6 +180,7 @@ class Connector(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)  # populated by migration; required for new rows
     name = Column(String(200), nullable=False)
     connector_type = Column(SAEnum(ConnectorType, values_callable=_ev), nullable=False)
     status = Column(SAEnum(ConnectorStatus, values_callable=_ev), default=ConnectorStatus.PENDING)
@@ -126,7 +192,9 @@ class Connector(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     client = relationship("Client", back_populates="connectors")
+    project = relationship("Project", back_populates="connectors")
     scans = relationship("Scan", back_populates="connector")
+    assets = relationship("Asset", back_populates="connector", cascade="all, delete-orphan")
 
 
 class Scan(Base):
@@ -134,7 +202,9 @@ class Scan(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)
     connector_id = Column(String(36), ForeignKey("connectors.id"))
+    name = Column(String(200))                 # human-friendly label so AI agents and users can target a specific scan
     scan_type = Column(SAEnum(ScanType, values_callable=_ev), nullable=False)
     status = Column(SAEnum(ScanStatus, values_callable=_ev), default=ScanStatus.PENDING)
     framework = Column(SAEnum(FrameworkType, values_callable=_ev))
@@ -146,6 +216,7 @@ class Scan(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     client = relationship("Client", back_populates="scans")
+    project = relationship("Project", back_populates="scans")
     connector = relationship("Connector", back_populates="scans")
     findings = relationship("Finding", back_populates="scan", cascade="all, delete-orphan")
 
@@ -167,6 +238,7 @@ class Finding(Base):
     evidence = Column(JSON, default={})
     cve_id = Column(String(50))
     cvss_score = Column(Float)
+    control_mappings = Column(JSON, default={})  # {framework_value: [control_ids]} — fans this finding out across frameworks
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -214,6 +286,98 @@ class FrameworkAssessment(Base):
     client = relationship("Client", back_populates="framework_assessments")
 
 
+class Asset(Base):
+    __tablename__ = "assets"
+    __table_args__ = (
+        UniqueConstraint("connector_id", "external_id", name="uq_asset_connector_external"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)
+    connector_id = Column(String(36), ForeignKey("connectors.id"), nullable=False, index=True)
+    external_id = Column(String(512), nullable=False)
+    name = Column(String(255), nullable=False)
+    asset_type = Column(String(128))             # provider-native (e.g. Microsoft.Compute/virtualMachines)
+    asset_class = Column(String(64), index=True) # vm | storage | network | database | identity | keyvault | other
+    region = Column(String(64))
+    subscription_id = Column(String(64))         # Azure
+    resource_group = Column(String(128))         # Azure
+    account_id = Column(String(64))              # AWS
+    cloud_project_id = Column(String(64))        # GCP cloud project ID (renamed from project_id when internal Project FK was introduced)
+    tags = Column(JSON, default={})
+    provider_metadata = Column(JSON, default={})
+    status = Column(SAEnum(AssetStatus, values_callable=_ev), default=AssetStatus.ACTIVE)
+    first_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_synced_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    connector = relationship("Connector", back_populates="assets")
+    project = relationship("Project", back_populates="assets")
+
+
+class FrameworkControl(Base):
+    __tablename__ = "framework_controls"
+    __table_args__ = (
+        UniqueConstraint("framework", "control_id", name="uq_framework_control"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev), nullable=False, index=True)
+    control_id = Column(String(64), nullable=False, index=True)
+    parent_control_id = Column(String(64))
+    domain = Column(String(128))
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    weight = Column(Integer, default=1)
+    metadata_ = Column("metadata", JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    statuses = relationship("ClientControlStatus", back_populates="control", cascade="all, delete-orphan")
+
+
+class ClientControlStatus(Base):
+    __tablename__ = "client_control_statuses"
+    __table_args__ = (
+        UniqueConstraint("client_id", "framework_control_id", name="uq_client_control"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    framework_control_id = Column(String(36), ForeignKey("framework_controls.id"), nullable=False, index=True)
+    status = Column(SAEnum(ControlStatus, values_callable=_ev), default=ControlStatus.NOT_APPLICABLE)
+    derived = Column(Boolean, default=True)
+    evidence = Column(Text)
+    derived_finding_ids = Column(JSON, default=[])
+    last_evaluated_at = Column(DateTime(timezone=True), server_default=func.now())
+    overridden_by = Column(String(200))
+    overridden_at = Column(DateTime(timezone=True))
+
+    client = relationship("Client", back_populates="control_statuses")
+    control = relationship("FrameworkControl", back_populates="statuses")
+
+
+class UserAccess(Base):
+    """RBAC grant: a user's role at a particular scope.
+
+    A user (identified by Entra ID UPN / email, lowercased) can hold multiple
+    grants. Effective role for a resource = max(role) across all grants whose
+    scope covers the resource (project scope ⊆ client scope ⊆ global).
+    """
+    __tablename__ = "user_access"
+    __table_args__ = (
+        UniqueConstraint("email", "role", "scope_type", "scope_id", name="uq_user_access_grant"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    email = Column(String(254), nullable=False, index=True)        # case-normalized to lowercase on write
+    role = Column(SAEnum(AccessRole, values_callable=_ev), nullable=False, index=True)
+    scope_type = Column(SAEnum(AccessScope, values_callable=_ev), nullable=False)
+    scope_id = Column(String(36))                                  # NULL for global; clients.id or projects.id otherwise
+    granted_by = Column(String(254))                                # UPN of the admin who granted this
+    granted_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class AgentRun(Base):
     __tablename__ = "agent_runs"
 
@@ -228,3 +392,29 @@ class AgentRun(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
     error_message = Column(Text)
+
+
+class AISettings(Base):
+    """Single-row table holding tenant-wide AI provider configuration. Lets
+    admins override env-var keys/endpoints from the UI. API keys are stored
+    encrypted via core.encryption.encrypt."""
+    __tablename__ = "ai_settings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    default_provider = Column(String(64))
+    default_model = Column(String(128))
+    default_temperature = Column(Float, default=0.1)
+
+    openai_api_key_enc = Column(Text)
+    azure_openai_api_key_enc = Column(Text)
+    azure_openai_endpoint = Column(String(512))
+    azure_openai_deployment = Column(String(128))
+    azure_openai_api_version = Column(String(64))
+    anthropic_api_key_enc = Column(Text)
+    google_api_key_enc = Column(Text)
+    aws_bedrock_region = Column(String(64))
+    aws_bedrock_access_key_enc = Column(Text)
+    aws_bedrock_secret_key_enc = Column(Text)
+
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String(255))
