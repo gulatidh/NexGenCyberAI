@@ -170,26 +170,30 @@ jobs:
           RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
           USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
           PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
-          # Wait for any in-progress Kudu deploy to clear before uploading.
-          # A previous CI run whose polling step timed out can leave Kudu mid-
-          # deploy; uploading on top of that returns 409.
-          echo "Checking for in-progress Kudu deploy..."
-          for i in $(seq 1 60); do
-            RESP=$(curl -sS -m 60 --retry 3 --retry-delay 5 -u "$USER:$PW" \
-              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
-            BUSY=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(1 if d and d[0].get('status') in (0, 1) else 0)" 2>/dev/null || echo "0")
-            if [ "$BUSY" != "1" ]; then break; fi
-            echo "[wait $i] Kudu still busy, sleeping 30s"
+          # Upload with retry on 409 — Kudu only allows one active deploy at a
+          # time, and a previous CI run whose polling timed out can leave the
+          # service mid-deploy. Retry with backoff up to ~25 min total.
+          echo "Uploading zip and triggering Oryx build..."
+          CODE=""
+          for attempt in $(seq 1 30); do
+            CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
+              -H "Content-Type: application/zip" \
+              --data-binary @backend.zip || echo "000")
+            if [ "$CODE" = "202" ] || [ "$CODE" = "200" ]; then
+              echo "Upload accepted on attempt $attempt"
+              break
+            fi
+            if [ "$CODE" = "409" ]; then
+              echo "[$attempt] HTTP 409 — Kudu busy with another deploy, sleeping 50s"
+              sleep 50
+              continue
+            fi
+            echo "[$attempt] Upload failed with HTTP $CODE: $(cat /tmp/deploy.out)"
             sleep 30
           done
-
-          echo "Uploading zip and triggering Oryx build..."
-          CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
-            -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
-            -H "Content-Type: application/zip" \
-            --data-binary @backend.zip)
           if [ "$CODE" != "202" ] && [ "$CODE" != "200" ]; then
-            echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
+            echo "Upload failed after retries with last HTTP $CODE"; cat /tmp/deploy.out; exit 1
           fi
           echo "Upload accepted. Polling Oryx build..."
           # Tolerate transient timeouts on the poll itself — Kudu can be slow
@@ -262,26 +266,30 @@ jobs:
           RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
           USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
           PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
-          # Wait for any in-progress Kudu deploy to clear before uploading.
-          # A previous CI run whose polling step timed out can leave Kudu mid-
-          # deploy; uploading on top of that returns 409.
-          echo "Checking for in-progress Kudu deploy..."
-          for i in $(seq 1 60); do
-            RESP=$(curl -sS -m 60 --retry 3 --retry-delay 5 -u "$USER:$PW" \
-              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
-            BUSY=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(1 if d and d[0].get('status') in (0, 1) else 0)" 2>/dev/null || echo "0")
-            if [ "$BUSY" != "1" ]; then break; fi
-            echo "[wait $i] Kudu still busy, sleeping 30s"
+          # Upload with retry on 409 — Kudu only allows one active deploy at a
+          # time, and a previous CI run whose polling timed out can leave the
+          # service mid-deploy. Retry with backoff up to ~25 min total.
+          echo "Uploading zip and triggering Oryx build..."
+          CODE=""
+          for attempt in $(seq 1 30); do
+            CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
+              -H "Content-Type: application/zip" \
+              --data-binary @backend.zip || echo "000")
+            if [ "$CODE" = "202" ] || [ "$CODE" = "200" ]; then
+              echo "Upload accepted on attempt $attempt"
+              break
+            fi
+            if [ "$CODE" = "409" ]; then
+              echo "[$attempt] HTTP 409 — Kudu busy with another deploy, sleeping 50s"
+              sleep 50
+              continue
+            fi
+            echo "[$attempt] Upload failed with HTTP $CODE: $(cat /tmp/deploy.out)"
             sleep 30
           done
-
-          echo "Uploading zip and triggering Oryx build..."
-          CODE=$(curl -sS -m 90 -u "$USER:$PW" -o /tmp/deploy.out -w "%{http_code}" \
-            -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=true" \
-            -H "Content-Type: application/zip" \
-            --data-binary @backend.zip)
           if [ "$CODE" != "202" ] && [ "$CODE" != "200" ]; then
-            echo "Initial upload failed with HTTP $CODE"; cat /tmp/deploy.out; exit 1
+            echo "Upload failed after retries with last HTTP $CODE"; cat /tmp/deploy.out; exit 1
           fi
           echo "Upload accepted. Polling Oryx build..."
           # Tolerate transient timeouts on the poll itself — Kudu can be slow
