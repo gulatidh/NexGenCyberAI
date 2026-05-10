@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Box, FormControl, InputLabel, Select, MenuItem, Chip, Stack, Typography,
+  Box, FormControl, InputLabel, Select, MenuItem, Chip, Stack,
 } from "@mui/material";
 import { Client, RiskOverviewFilters } from "../../types";
 import { FRAMEWORK_LABEL } from "./tokens";

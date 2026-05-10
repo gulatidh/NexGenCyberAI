@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Card, CardContent, Typography, Table, TableHead, TableRow, TableCell, TableBody,
-  TableContainer, Chip, Box, Skeleton, TableSortLabel,
+  TableContainer, Chip, Skeleton, TableSortLabel,
 } from "@mui/material";
 import { RiskProjectRow } from "../../types";
 import { cardSx, SEV_COLOR } from "./tokens";
