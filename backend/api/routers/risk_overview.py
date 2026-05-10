@@ -336,6 +336,17 @@ async def get_risk_overview(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
+    try:
+        return _build_risk_overview(db, client_id, days)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("risk_overview failed")
+        raise HTTPException(status_code=500, detail=f"risk_overview failed: {type(exc).__name__}: {exc}")
+
+
+def _build_risk_overview(db: Session, client_id: str, days: int) -> Dict[str, Any]:
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
