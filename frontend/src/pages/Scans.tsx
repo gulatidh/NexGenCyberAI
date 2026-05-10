@@ -8,8 +8,8 @@ import {
 } from "@mui/material";
 import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi } from "../services/api";
-import { Scan, Client, Connector, ScanType, FrameworkType } from "../types";
+import { scansApi, connectorsApi, clientsApi, frameworksApi } from "../services/api";
+import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -35,6 +35,10 @@ export default function Scans() {
   const [viewScan, setViewScan] = useState<Scan | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
+    queryKey: ["framework-catalog"],
+    queryFn: frameworksApi.catalog,
+  });
   const { data: connectors = [] } = useQuery<Connector[]>({
     queryKey: ["connectors", selectedClientId],
     queryFn: () => connectorsApi.list(selectedClientId),
@@ -170,13 +174,11 @@ export default function Scans() {
                 <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
                   sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
                   <MenuItem value="">None</MenuItem>
-                  <MenuItem value="nist_csf">NIST CSF</MenuItem>
-                  <MenuItem value="nist_800_53">NIST 800-53</MenuItem>
-                  <MenuItem value="cis_v8">CIS Controls v8</MenuItem>
-                  <MenuItem value="gdpr">GDPR</MenuItem>
-                  <MenuItem value="iso_27001">ISO 27001</MenuItem>
-                  <MenuItem value="soc2">SOC 2</MenuItem>
-                  <MenuItem value="pci_dss">PCI DSS</MenuItem>
+                  {frameworkCatalog.map((f) => (
+                    <MenuItem key={f.framework} value={f.framework}>
+                      {f.name} ({f.total_controls})
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
