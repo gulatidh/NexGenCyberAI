@@ -9,9 +9,7 @@ import { Warning } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, risksApi, projectsApi } from "../services/api";
 import { Client, Risk, Project } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const LEVEL_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50",
@@ -164,7 +162,7 @@ export default function Risks() {
                             color: STATUS_COLOR[r.status || "open"] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                        {r.created_at ? dayjs(r.created_at).fromNow() : "—"}
+                        {fromNow(r.created_at)}
                       </TableCell>
                     </TableRow>
                   );

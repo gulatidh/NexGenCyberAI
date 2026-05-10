@@ -3,7 +3,7 @@ import { Box, Typography, Grid, Alert, Button, CircularProgress } from "@mui/mat
 import { Refresh } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import dayjs from "dayjs";
+import { fmt } from "../utils/datetime";
 
 import { clientsApi, riskOverviewApi } from "../services/api";
 import { Client, RiskOverview } from "../types";
@@ -93,7 +93,7 @@ export default function RiskOverviewPage() {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           {filtered?.as_of && (
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
-              as of {dayjs(filtered.as_of).format("MMM D, HH:mm")}
+              as of {fmt(filtered.as_of, "MMM D, HH:mm")}
             </Typography>
           )}
           <Button size="small" startIcon={isFetching ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}

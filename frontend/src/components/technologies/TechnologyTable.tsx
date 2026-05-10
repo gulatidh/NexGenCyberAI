@@ -6,6 +6,7 @@ import {
 } from "@mui/material";
 import { CheckCircle, Warning, Error, BlockOutlined, ViewColumn, Download } from "@mui/icons-material";
 import dayjs from "dayjs";
+import { fromNow } from "../../utils/datetime";
 import type { TechnologyRow, TechStatus } from "../../types";
 import { cardSx, STATUS_COLOR, RISK_COLOR } from "./tokens";
 
@@ -118,7 +119,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
       case "cve_count":
         return <Typography variant="caption" sx={{ color: row.cve_count > 0 ? STATUS_COLOR.critical : "rgba(255,255,255,0.4)", fontWeight: 600 }}>{row.cve_count}</Typography>;
       case "last_seen":
-        return <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{row.last_seen ? dayjs(row.last_seen).fromNow() : "—"}</Typography>;
+        return <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{fromNow(row.last_seen)}</Typography>;
       case "environments":
         return (
           <Box sx={{ display: "flex", gap: 0.25, flexWrap: "wrap" }}>

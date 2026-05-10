@@ -9,9 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, assetsApi, connectorsApi } from "../services/api";
 import { Client, Connector, AssetDetail, Finding, Risk } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fmt, fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#00e5ff",
@@ -98,8 +96,8 @@ export default function AssetDetailPage() {
     { label: "Resource Group", value: asset.resource_group || "—" },
     { label: "Account", value: asset.account_id || "—" },
     { label: "Project", value: asset.project_id || "—" },
-    { label: "First Seen", value: asset.first_seen_at ? dayjs(asset.first_seen_at).format("YYYY-MM-DD HH:mm") : "—" },
-    { label: "Last Synced", value: asset.last_synced_at ? dayjs(asset.last_synced_at).fromNow() : "—" },
+    { label: "First Seen", value: fmt(asset.first_seen_at) },
+    { label: "Last Synced", value: fromNow(asset.last_synced_at) },
   ];
 
   return (
@@ -257,7 +255,7 @@ export default function AssetDetailPage() {
                         </TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{f.status || "open"}</TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                          {f.created_at ? dayjs(f.created_at).fromNow() : "—"}
+                          {fromNow(f.created_at)}
                         </TableCell>
                       </TableRow>
                     );

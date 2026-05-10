@@ -15,9 +15,7 @@ import {
   Client, Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
   FrameworkDetail, Project,
 } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<ControlStatus, string> = {
   compliant: "#00e676",
@@ -332,7 +330,7 @@ export default function Frameworks() {
             </Box>
             {summary.last_evaluated_at && (
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", ml: "auto" }}>
-                Last evaluated {dayjs(summary.last_evaluated_at).fromNow()}
+                Last evaluated {fromNow(summary.last_evaluated_at)}
               </Typography>
             )}
           </Card>
@@ -607,7 +605,7 @@ export default function Frameworks() {
             {selected.overridden_by && (
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mb: 2 }}>
                 Overridden by {selected.overridden_by}
-                {selected.overridden_at ? ` ${dayjs(selected.overridden_at).fromNow()}` : ""}
+                {selected.overridden_at ? ` ${fromNow(selected.overridden_at)}` : ""}
               </Typography>
             )}
 

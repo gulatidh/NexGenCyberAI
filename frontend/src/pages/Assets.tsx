@@ -9,9 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, connectorsApi, assetsApi, projectsApi } from "../services/api";
 import { Client, Connector, Asset, Project } from "../types";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-dayjs.extend(relativeTime);
+import { fromNow } from "../utils/datetime";
 
 const CLASS_COLOR: Record<string, string> = {
   vm: "#00e5ff",
@@ -307,7 +305,7 @@ export default function Assets() {
                           sx={{ bgcolor: `${STATUS_COLOR[a.status] || "#888"}20`, color: STATUS_COLOR[a.status] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
                       <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
-                        {a.last_synced_at ? dayjs(a.last_synced_at).fromNow() : "—"}
+                        {fromNow(a.last_synced_at)}
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="Run on-demand scan against this asset">

@@ -27,6 +27,7 @@ import {
   FrameworkDetail, ControlStatusEntry, RiskOverview, FrameworkCatalogEntry,
 } from "../types";
 import dayjs from "dayjs";
+import { fmt, fmtDate } from "../utils/datetime";
 
 type ReportType = "executive" | "compliance" | "findings" | "risks" | "assets";
 
@@ -318,7 +319,7 @@ export default function Reports() {
               <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>{reportTitle}</Typography>
             </Box>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
-              {client?.name} {project ? `· ${project.name}` : ""} · Generated {dayjs().format("YYYY-MM-DD HH:mm")}
+              {client?.name} {project ? `· ${project.name}` : ""} · Generated {fmt(new Date().toISOString())}
             </Typography>
             <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
 
@@ -525,7 +526,7 @@ function FindingsBlock({ rows }: { rows: Finding[] }) {
                     </span>
                   </TableCell>
                   <TableCell sx={{ fontSize: 11 }}>{f.status}</TableCell>
-                  <TableCell sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{ts ? dayjs(ts).format("YYYY-MM-DD") : "—"}</TableCell>
+                  <TableCell sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{fmtDate(ts)}</TableCell>
                 </TableRow>
               );
             })}
@@ -559,7 +560,7 @@ function RisksBlock({ rows }: { rows: Risk[] }) {
               <TableCell sx={{ fontSize: 11 }}>{r.owner || "—"}</TableCell>
               <TableCell align="right">{r.risk_score ?? "—"}</TableCell>
               <TableCell sx={{ fontSize: 11 }}>{r.status}</TableCell>
-              <TableCell sx={{ fontSize: 11 }}>{r.due_date ? dayjs(r.due_date).format("YYYY-MM-DD") : "—"}</TableCell>
+              <TableCell sx={{ fontSize: 11 }}>{fmtDate(r.due_date)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

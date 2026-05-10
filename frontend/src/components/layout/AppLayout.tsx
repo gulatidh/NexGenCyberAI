@@ -195,6 +195,10 @@ export default function AppLayout() {
                 <AccountCircle sx={{ mr: 1 }} /> {userName}
               </MenuItem>
               <Divider />
+              <MenuItem onClick={() => { setAnchorEl(null); navigate("/account"); }}>
+                <AccountCircle sx={{ mr: 1 }} fontSize="small" /> Account &amp; preferences
+              </MenuItem>
+              <Divider />
               <MenuItem onClick={handleLogout}>
                 <Logout sx={{ mr: 1 }} fontSize="small" /> Logout
               </MenuItem>
