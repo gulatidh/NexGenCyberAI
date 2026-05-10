@@ -26,12 +26,10 @@ def _ensure_projects_schema() -> None:
 
     1. ALTER TABLE on connectors / scans / assets to add a nullable project_id
        column if it doesn't already exist.
-    2. For each client, create a "Default" project if none exist.
-    3. Assign every NULL project_id row to that client's Default project.
-
-    The columns are declared nullable here (and nullable=True in the model) so
-    existing prod rows can be migrated without violating constraints. New rows
-    are required to set project_id at the API layer.
+    2. For Asset, add the renamed cloud_project_id column (was 'project_id'
+       holding GCP cloud project strings before Projects shipped).
+    3. For each client, create a "Default" project if none exist.
+    4. Assign every NULL project_id row to that client's Default project.
     """
     from sqlalchemy import inspect, text
     from sqlalchemy.orm import Session
@@ -39,24 +37,30 @@ def _ensure_projects_schema() -> None:
         inspector = inspect(engine)
         dialect = engine.dialect.name
 
-        def _alter(table: str) -> None:
+        def _alter_add(table: str, column: str, sql_type: str = "NVARCHAR(36) NULL") -> None:
             try:
                 cols = {c["name"] for c in inspector.get_columns(table)}
             except Exception:
                 return
-            if "project_id" in cols:
+            if column in cols:
                 return
-            ddl = f"ALTER TABLE {table} ADD project_id NVARCHAR(36) NULL" if dialect == "mssql" \
-                  else f"ALTER TABLE {table} ADD COLUMN project_id VARCHAR(36)"
+            if dialect == "mssql":
+                ddl = f"ALTER TABLE {table} ADD {column} {sql_type}"
+            else:
+                ddl = f"ALTER TABLE {table} ADD COLUMN {column} VARCHAR(64)"
             try:
                 with engine.begin() as conn:
                     conn.execute(text(ddl))
-                logger.info("Added %s.project_id column", table)
+                logger.info("Added %s.%s column", table, column)
             except Exception as exc:
-                logger.warning("ALTER %s.project_id skipped: %s", table, exc)
+                logger.warning("ALTER %s.%s skipped: %s", table, column, exc)
 
+        # Project FK columns
         for t in ("connectors", "scans", "assets"):
-            _alter(t)
+            _alter_add(t, "project_id")
+        # Renamed GCP column on assets (was 'project_id' string before; now
+        # 'project_id' holds the internal FK and 'cloud_project_id' holds GCP)
+        _alter_add("assets", "cloud_project_id", sql_type="NVARCHAR(64) NULL")
 
         # Backfill: create Default project per client + reassign orphans
         from api.models.models import Client, Project, Connector, Scan, Asset
