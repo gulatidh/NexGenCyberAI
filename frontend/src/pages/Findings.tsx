@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Card, Chip, CircularProgress,
+  Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
-  FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab,
+  FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
 } from "@mui/material";
 import { BugReport } from "@mui/icons-material";
@@ -21,9 +21,69 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#ff9800", remediated: "#00e676", accepted: "#7c4dff", false_positive: "rgba(255,255,255,0.4)",
 };
 
-function CatIcon({ name }: { name: string }) {
+function CatIcon({ name, sx }: { name: string; sx?: any }) {
   const C = (Icons as any)[name] || Icons.Apps;
-  return <C sx={{ fontSize: 14 }} />;
+  return <C sx={sx || { fontSize: 14 }} />;
+}
+
+// Per-category accent colors — keeps each tile distinct in the grid.
+const CAT_COLOR: Record<string, string> = {
+  vulnerability:       "#f44336",
+  cloud_configuration: "#00e5ff",
+  host_configuration:  "#7c4dff",
+  attack_surface:      "#ff6d00",
+  data:                "#ff9800",
+  secret:              "#ffd54f",
+  end_of_life:         "#9e9e9e",
+  sast:                "#00e676",
+  network_exposure:    "#03a9f4",
+  excessive_access:    "#ff5252",
+  identity_access:     "#f06292",
+  ai_security:         "#ba68c8",
+  detections:          "#ff4081",
+  code_build_scans:    "#26c6da",
+  kubernetes_admission:"#9ccc65",
+};
+
+function CategoryTile({ cat, active, onClick }: {
+  cat: { key: string; label: string; icon: string; count: number };
+  active: boolean;
+  onClick: () => void;
+}) {
+  const color = CAT_COLOR[cat.key] || "#00e5ff";
+  const empty = cat.count === 0;
+  return (
+    <Card onClick={onClick}
+      sx={{
+        bgcolor: active ? `${color}15` : "#161b22",
+        border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 2, cursor: "pointer", height: "100%",
+        transition: "transform .12s, border-color .12s, background-color .12s",
+        opacity: empty && !active ? 0.6 : 1,
+        "&:hover": {
+          borderColor: color,
+          bgcolor: active ? `${color}20` : `${color}08`,
+          transform: "translateY(-1px)",
+        },
+      }}>
+      <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+          <Box sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: `${color}20`,
+            display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CatIcon name={cat.icon} sx={{ fontSize: 18, color }} />
+          </Box>
+          <Typography sx={{ color: empty ? "rgba(255,255,255,0.5)" : "white",
+            fontSize: 26, fontWeight: 700, lineHeight: 1, ml: "auto" }}>
+            {cat.count}
+          </Typography>
+        </Box>
+        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)",
+          fontSize: 12, fontWeight: 500, lineHeight: 1.25 }}>
+          {cat.label}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function Findings() {
@@ -148,29 +208,36 @@ export default function Findings() {
             ))}
           </Tabs>
 
-          {/* Category chip strip */}
-          <Box sx={{ display: "flex", gap: 0.75, mb: 2, flexWrap: "wrap" }}>
-            <Chip label={`All ${sectionData?.label || ""} (${sectionData?.total ?? 0})`} size="small" clickable
-              onClick={() => setCategory("")}
-              sx={{ bgcolor: !category ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
-                color: !category ? "#00e5ff" : "rgba(255,255,255,0.7)",
-                border: !category ? "1px solid #00e5ff" : "none", fontWeight: 600 }} />
-            {(sectionData?.categories || []).map((c) => {
-              const active = category === c.key;
-              const empty = c.count === 0;
-              return (
-                <Chip key={c.key} icon={<CatIcon name={c.icon} />}
-                  label={`${c.label} ${c.count}`} size="small" clickable
-                  onClick={() => setCategory(active ? "" : c.key)}
-                  sx={{
-                    bgcolor: active ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
-                    color: active ? "#00e5ff" : (empty ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.8)"),
-                    border: active ? "1px solid #00e5ff" : "none",
-                    "& .MuiChip-icon": { color: active ? "#00e5ff" : (empty ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.6)") },
-                  }} />
-              );
-            })}
+          {/* Category tile grid */}
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
+              CATEGORIES — CLICK TO FILTER
+            </Typography>
+            {category && (
+              <Button size="small" onClick={() => setCategory("")}
+                sx={{ color: "#00e5ff", fontSize: 11 }}>
+                Clear category
+              </Button>
+            )}
           </Box>
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            {!catData ? (
+              [0, 1, 2, 3, 4, 5].map((i) => (
+                <Grid key={i} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+                  <Skeleton variant="rectangular" height={88}
+                    sx={{ borderRadius: 2, bgcolor: "rgba(255,255,255,0.04)" }} />
+                </Grid>
+              ))
+            ) : (
+              (sectionData?.categories || []).map((c) => (
+                <Grid key={c.key} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+                  <CategoryTile cat={c}
+                    active={category === c.key}
+                    onClick={() => setCategory(category === c.key ? "" : c.key)} />
+                </Grid>
+              ))
+            )}
+          </Grid>
 
           {findings.length > 0 && (
             <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
