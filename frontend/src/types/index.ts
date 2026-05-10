@@ -212,6 +212,108 @@ export interface AssetDetail extends Asset {
   risks: Risk[];
 }
 
+// ── Risk Overview ──────────────────────────────────────────────────────────
+
+export interface RiskOverviewCompliance {
+  framework: string;
+  score: number;
+  total: number;
+  compliant: number;
+  non_compliant: number;
+  partial: number;
+  not_applicable: number;
+}
+
+export interface RiskOverviewOpenIssues {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  deltas: { critical: number; high: number; medium: number; low: number };
+}
+
+export interface RiskSeverityTrendPoint {
+  date: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+}
+
+export interface RiskAvgAge {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  sla: { critical: number; high: number; medium: number; low: number };
+}
+
+export interface RiskSecurityScore {
+  current: number;
+  prev_7d: number;
+  delta: number;
+  history: { date: string; score: number }[];
+}
+
+export interface RiskTopIssue {
+  title: string;
+  severity: Severity;
+  framework?: string | null;
+  count: number;
+  affected_resources: number;
+}
+
+export interface RiskIssuesFlowPoint {
+  date: string;
+  opened: number;
+  resolved: number;
+}
+
+export interface RiskProjectRow {
+  name: string;
+  asset_count: number;
+  issues: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  environment: string;
+}
+
+export interface RiskServiceRow {
+  name: string;
+  owner: string;
+  asset_count: number;
+  issues: number;
+  critical: number;
+  high: number;
+  risk_level: "critical" | "high" | "medium" | "low";
+}
+
+export interface RiskOverviewFilters {
+  projects: string[];
+  environments: string[];
+  cloud_providers: string[];
+  frameworks: string[];
+  statuses: string[];
+}
+
+export interface RiskOverview {
+  compliance: RiskOverviewCompliance[];
+  open_issues: RiskOverviewOpenIssues;
+  severity_trend: RiskSeverityTrendPoint[];
+  avg_age: RiskAvgAge;
+  security_score: RiskSecurityScore;
+  top_issues: RiskTopIssue[];
+  issues_flow: RiskIssuesFlowPoint[];
+  projects: RiskProjectRow[];
+  services: RiskServiceRow[];
+  filter_options: RiskOverviewFilters;
+  as_of: string;
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;

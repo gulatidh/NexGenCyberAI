@@ -125,6 +125,11 @@ export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
 };
 
+export const riskOverviewApi = {
+  get: (clientId: string, days: number = 30) =>
+    apiClient.get(`/clients/${clientId}/risk-overview/`, { params: { days } }).then((r) => r.data),
+};
+
 export const frameworksApi = {
   catalog: () => apiClient.get("/frameworks/").then((r) => r.data),
   controls: (framework: string) => apiClient.get(`/frameworks/${framework}/controls/`).then((r) => r.data),

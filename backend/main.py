@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks
+from api.routers import clients, connectors, scans, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -314,6 +314,7 @@ app.include_router(risks.router, prefix="/api/v1")
 app.include_router(findings.router, prefix="/api/v1")
 app.include_router(assets.router, prefix="/api/v1")
 app.include_router(frameworks.router, prefix="/api/v1")
+app.include_router(risk_overview.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 
