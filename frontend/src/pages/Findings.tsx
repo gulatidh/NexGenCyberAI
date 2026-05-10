@@ -2,13 +2,14 @@ import React, { useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
-  FormControl, InputLabel, Select, MenuItem, Button,
+  FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert,
 } from "@mui/material";
 import { BugReport } from "@mui/icons-material";
+import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, findingsApi, projectsApi } from "../services/api";
-import { Client, Finding, Project } from "../types";
+import { Client, Finding, Project, FindingCategoriesResponse } from "../types";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 dayjs.extend(relativeTime);
@@ -20,12 +21,19 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#ff9800", remediated: "#00e676", accepted: "#7c4dff", false_positive: "rgba(255,255,255,0.4)",
 };
 
+function CatIcon({ name }: { name: string }) {
+  const C = (Icons as any)[name] || Icons.Apps;
+  return <C sx={{ fontSize: 14 }} />;
+}
+
 export default function Findings() {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [section, setSection] = useState("security_posture");
+  const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
@@ -34,11 +42,18 @@ export default function Findings() {
     queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
-  const { data: findings = [], isLoading } = useQuery<Finding[]>({
-    queryKey: ["findings-all", clientId, projectId, sevFilter, statusFilter],
-    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined),
+  const { data: catData } = useQuery<FindingCategoriesResponse>({
+    queryKey: ["findings-categories", clientId, projectId, statusFilter],
+    queryFn: () => findingsApi.categories(clientId, projectId || undefined, statusFilter || "open"),
     enabled: !!clientId,
   });
+  const { data: findings = [], isLoading } = useQuery<Finding[]>({
+    queryKey: ["findings-all", clientId, projectId, sevFilter, statusFilter, section, category],
+    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined, section, category || undefined),
+    enabled: !!clientId,
+  });
+
+  const sectionData = (catData?.sections || []).find((s) => s.key === section);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
@@ -121,18 +136,56 @@ export default function Findings() {
         </Box>
       </Box>
 
-      {clientId && !isLoading && findings.length > 0 && (
-        <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
-          {["critical","high","medium","low","info"].filter((s) => sevCounts[s]).map((s) => (
-            <Chip key={s} label={`${s.charAt(0).toUpperCase() + s.slice(1)}: ${sevCounts[s]}`} size="small"
-              onClick={() => setSevFilter(sevFilter === s ? "" : s)}
-              sx={{ bgcolor: `${SEV_COLOR[s]}${sevFilter === s ? "40" : "20"}`, color: SEV_COLOR[s],
-                border: sevFilter === s ? `1px solid ${SEV_COLOR[s]}` : "none", cursor: "pointer" }} />
-          ))}
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
-            {findings.length} total
-          </Typography>
-        </Box>
+      {clientId && (
+        <>
+          {/* Section tabs */}
+          <Tabs value={section} onChange={(_, v) => { setSection(v); setCategory(""); }}
+            sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 1.5,
+              "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
+              "& .Mui-selected": { color: "#00e5ff" }, "& .MuiTabs-indicator": { backgroundColor: "#00e5ff" } }}>
+            {(catData?.sections || []).map((s) => (
+              <Tab key={s.key} value={s.key} label={`${s.label} (${s.total})`} />
+            ))}
+          </Tabs>
+
+          {/* Category chip strip */}
+          <Box sx={{ display: "flex", gap: 0.75, mb: 2, flexWrap: "wrap" }}>
+            <Chip label={`All ${sectionData?.label || ""} (${sectionData?.total ?? 0})`} size="small" clickable
+              onClick={() => setCategory("")}
+              sx={{ bgcolor: !category ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
+                color: !category ? "#00e5ff" : "rgba(255,255,255,0.7)",
+                border: !category ? "1px solid #00e5ff" : "none", fontWeight: 600 }} />
+            {(sectionData?.categories || []).map((c) => {
+              const active = category === c.key;
+              const empty = c.count === 0;
+              return (
+                <Chip key={c.key} icon={<CatIcon name={c.icon} />}
+                  label={`${c.label} ${c.count}`} size="small" clickable
+                  onClick={() => setCategory(active ? "" : c.key)}
+                  sx={{
+                    bgcolor: active ? "rgba(0,229,255,0.2)" : "rgba(255,255,255,0.05)",
+                    color: active ? "#00e5ff" : (empty ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.8)"),
+                    border: active ? "1px solid #00e5ff" : "none",
+                    "& .MuiChip-icon": { color: active ? "#00e5ff" : (empty ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.6)") },
+                  }} />
+              );
+            })}
+          </Box>
+
+          {findings.length > 0 && (
+            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+              {["critical","high","medium","low","info"].filter((s) => sevCounts[s]).map((s) => (
+                <Chip key={s} label={`${s.charAt(0).toUpperCase() + s.slice(1)}: ${sevCounts[s]}`} size="small"
+                  onClick={() => setSevFilter(sevFilter === s ? "" : s)}
+                  sx={{ bgcolor: `${SEV_COLOR[s]}${sevFilter === s ? "40" : "20"}`, color: SEV_COLOR[s],
+                    border: sevFilter === s ? `1px solid ${SEV_COLOR[s]}` : "none", cursor: "pointer" }} />
+              ))}
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
+                {findings.length} matching
+              </Typography>
+            </Box>
+          )}
+        </>
       )}
 
       {!clientId ? (

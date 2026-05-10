@@ -427,6 +427,25 @@ export interface TechnologyDetail {
   policies: { name: string; framework: string; control_id: string; status: string }[];
 }
 
+export interface FindingCategory {
+  key: string;
+  label: string;
+  icon: string;
+  count: number;
+}
+
+export interface FindingSection {
+  key: string;
+  label: string;
+  total: number;
+  categories: FindingCategory[];
+}
+
+export interface FindingCategoriesResponse {
+  sections: FindingSection[];
+  grand_total: number;
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;

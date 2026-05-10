@@ -113,9 +113,13 @@ export const scansApi = {
 };
 
 export const findingsApi = {
-  listAll: (clientId: string, severity?: string, status?: string, projectId?: string) =>
+  listAll: (clientId: string, severity?: string, status?: string, projectId?: string, section?: string, category?: string) =>
     apiClient.get(`/clients/${clientId}/findings/`, {
-      params: { severity, status, project_id: projectId || undefined },
+      params: { severity, status, project_id: projectId || undefined, section: section || undefined, category: category || undefined },
+    }).then((r) => r.data),
+  categories: (clientId: string, projectId?: string, status?: string) =>
+    apiClient.get(`/clients/${clientId}/findings/categories`, {
+      params: { project_id: projectId || undefined, status: status || undefined },
     }).then((r) => r.data),
   update: (clientId: string, findingId: string, data: any) =>
     apiClient.patch(`/clients/${clientId}/findings/${findingId}`, data).then((r) => r.data),

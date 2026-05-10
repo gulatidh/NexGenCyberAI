@@ -1,14 +1,15 @@
 """Global findings endpoints (across all scans for a client)."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from collections import defaultdict
 from api.models.models import Finding, Scan, FrameworkType
 from api.schemas.schemas import FindingResponse, FindingUpdate
 from db.database import get_db
 from core.security import get_current_user
-from fastapi import HTTPException
 from services.compliance import recompute_client_framework
+from services.finding_classifier import classify, SECTIONS, CATEGORY_TO_SECTION
 
 router = APIRouter(prefix="/clients/{client_id}/findings", tags=["findings"])
 
@@ -19,6 +20,8 @@ async def list_findings(
     severity: Optional[str] = None,
     status: Optional[str] = None,
     project_id: Optional[str] = None,
+    section: Optional[str] = None,
+    category: Optional[str] = None,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -33,7 +36,61 @@ async def list_findings(
         q = q.filter(Finding.status == status)
     if project_id:
         q = q.filter(Scan.project_id == project_id)
-    return q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(200).all()
+    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(500).all()
+    # Section/category filters happen in Python because they're heuristic-driven
+    if section or category:
+        out = []
+        for f in rows:
+            s, c = classify(f)
+            if section and s != section:
+                continue
+            if category and c != category:
+                continue
+            out.append(f)
+        return out[:200]
+    return rows[:200]
+
+
+@router.get("/categories")
+async def get_finding_categories(
+    client_id: str,
+    project_id: Optional[str] = None,
+    status: Optional[str] = "open",
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return finding counts grouped by (section, category). Powers the
+    sub-navigation on the Findings page."""
+    q = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id)
+    )
+    if status:
+        q = q.filter(Finding.status == status)
+    if project_id:
+        q = q.filter(Scan.project_id == project_id)
+
+    counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for f in q.all():
+        s, c = classify(f)
+        counts[s][c] += 1
+
+    sections_out = []
+    for section_key, cats in SECTIONS.items():
+        category_rows = []
+        section_total = 0
+        for cat_key, label, icon in cats:
+            n = counts[section_key].get(cat_key, 0)
+            section_total += n
+            category_rows.append({"key": cat_key, "label": label, "icon": icon, "count": n})
+        sections_out.append({
+            "key": section_key,
+            "label": section_key.replace("_", " ").title(),
+            "total": section_total,
+            "categories": category_rows,
+        })
+    return {"sections": sections_out, "grand_total": sum(s["total"] for s in sections_out)}
 
 
 @router.patch("/{finding_id}", response_model=FindingResponse)
