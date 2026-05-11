@@ -10,7 +10,8 @@ export type FrameworkType =
   | "cis_azure" | "cis_aws" | "cis_aws_db" | "cis_alibaba"
   | "cis_gcp" | "cis_gcp_workspace" | "cis_m365" | "cis_aks" | "cis_azure_compute"
   | "cis_windows_server" | "cis_ubuntu" | "cis_esxi"
-  | "cis_f5" | "cis_palo_alto" | "cis_mssql";
+  | "cis_f5" | "cis_palo_alto" | "cis_mssql"
+  | "zap_unauth_passive" | "zap_auth_active";
 export type AgentType = "risk_manager" | "va_scanner" | "framework_analyst" | "compliance_monitor" | "threat_intel" | "remediation" | "orchestrator";
 
 export interface Client {

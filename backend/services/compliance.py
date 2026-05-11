@@ -88,6 +88,23 @@ def recompute_client_framework(
         except Exception as exc:
             logger.warning("all_covered_controls failed for %s: %s", fw_value, exc)
 
+    # ZAP frameworks: each completed scan of that framework type exercises
+    # the entire catalog (every rule runs). So coverage = all catalog
+    # control_ids when at least one completed scan exists for this framework.
+    if fw_value in ("zap_unauth_passive", "zap_auth_active"):
+        has_zap_scan = db.query(Scan).filter(
+            Scan.client_id == client_id,
+            Scan.framework == fw_value,
+            Scan.status == "completed",
+        ).first() is not None
+        if has_zap_scan:
+            zap_ctrls = (
+                db.query(FrameworkControl.control_id)
+                .filter(FrameworkControl.framework == fw_value)
+                .all()
+            )
+            covered_set = {_normalize(c[0]) for c in zap_ctrls}
+
     # 1. Pull every client finding (any framework). Two ways a finding can map to
     #    a control in this framework:
     #      (a) Finding.framework == fw_value AND normalized Finding.control_id == catalog id

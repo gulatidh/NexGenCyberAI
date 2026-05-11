@@ -67,6 +67,9 @@ class FrameworkType(str, enum.Enum):
     CIS_F5 = "cis_f5"
     CIS_PALO_ALTO = "cis_palo_alto"
     CIS_MSSQL = "cis_mssql"
+    # ZAP — DAST baselines. Each control == one ZAP plugin rule (control_id "ZAP-<pluginId>").
+    ZAP_UNAUTH_PASSIVE = "zap_unauth_passive"   # baseline profile, no auth
+    ZAP_AUTH_ACTIVE = "zap_auth_active"         # active profile, with auth
 
 class ScanType(str, enum.Enum):
     VULNERABILITY = "vulnerability"

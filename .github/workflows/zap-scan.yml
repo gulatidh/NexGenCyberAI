@@ -39,6 +39,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Make workspace ZAP-writable
+        # zaproxy container runs as uid 1000; GitHub workspace is owned by
+        # uid 1001:123, causing "Permission denied" when ZAP tries to write
+        # /zap/wrk/zap.yaml. World-write here is fine — the runner is
+        # ephemeral and gets torn down after the job.
+        run: sudo chmod -R a+rwx "${{ github.workspace }}"
+
       - name: Fetch scan config from API
         id: cfg
         env:
@@ -81,23 +88,44 @@ jobs:
               f.write(f"auth_headers_count={len(headers)}\n")
           PY
 
-      - name: ZAP Baseline Scan
+      # Run ZAP via docker directly instead of zaproxy/action-baseline.
+      # The action's bundled upload-artifact step hits a deprecated v3 API
+      # and fails on current GitHub-hosted runners; we don't need the
+      # artifact upload anyway (findings are ingested via our /scans/ingest/).
+      # Exit code 2 = WARN-NEW alerts found, treated as success here.
+      - name: ZAP Baseline Scan (passive)
         if: steps.cfg.outputs.profile != 'active'
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: ${{ steps.cfg.outputs.target_url }}
-          cmd_options: "-J report.json $(cat .zap-options.txt)"
-          fail_action: false
-          allow_issue_writing: false
+        run: |
+          set -e
+          OPTS=$(cat .zap-options.txt)
+          docker run --rm \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            --network=host \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${{ steps.cfg.outputs.target_url }}" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              $OPTS \
+            || true
 
-      - name: ZAP Full (Active) Scan
+      - name: ZAP Active Scan
         if: steps.cfg.outputs.profile == 'active'
-        uses: zaproxy/action-full-scan@v0.10.0
-        with:
-          target: ${{ steps.cfg.outputs.target_url }}
-          cmd_options: "-J report.json $(cat .zap-options.txt)"
-          fail_action: false
-          allow_issue_writing: false
+        run: |
+          set -e
+          OPTS=$(cat .zap-options.txt)
+          docker run --rm \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            --network=host \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py \
+              -t "${{ steps.cfg.outputs.target_url }}" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              $OPTS \
+            || true
 
       - name: Post findings to API
         if: always()
@@ -107,8 +135,9 @@ jobs:
           SCAN_TOKEN: ${{ inputs.scan_token }}
         run: |
           set -euo pipefail
-          # Find the report — ZAP actions drop it relative to workspace.
-          REPORT=$(find . -maxdepth 4 -name 'report.json' -print -quit || true)
+          # ZAP action writes report_json.json by default; older configs
+          # produced report.json. Match either.
+          REPORT=$(find . -maxdepth 4 \( -name 'report_json.json' -o -name 'report.json' \) -print -quit || true)
           python3 - <<PY
           import json, os, pathlib, urllib.request, urllib.error
 
@@ -130,16 +159,21 @@ jobs:
                           uris = [i.get("uri") for i in alert.get("instances", []) if i.get("uri")]
                           resource = uris[0] if uris else site.get("@name", "")
                           cwe = alert.get("cweid")
+                          plugin = str(alert.get("pluginid") or alert.get("alertRef") or "").split("-")[0]
+                          # control_id == ZAP-<pluginId> so it lines up with the
+                          # ZAP framework catalogs (zap_unauth_passive / zap_auth_active).
+                          control_id = f"ZAP-{plugin}" if plugin else (f"CWE-{cwe}" if cwe else None)
                           findings.append({
                               "title": alert.get("name") or "ZAP alert",
                               "description": (alert.get("desc") or "")[:4000],
                               "severity": sev,
                               "resource_id": resource,
                               "resource_type": "web/endpoint",
-                              "control_id": f"CWE-{cwe}" if cwe else None,
+                              "control_id": control_id,
                               "remediation": (alert.get("solution") or "")[:4000],
                               "evidence": {"reference": alert.get("reference"),
-                                           "instances": uris[:10]},
+                                           "instances": uris[:10],
+                                           "cwe_id": cwe},
                               "control_mappings": {},
                           })
               except Exception as e:

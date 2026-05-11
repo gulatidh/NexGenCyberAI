@@ -61,11 +61,22 @@ async def _execute_scan(
                 ctype_value = ctype.value if hasattr(ctype, "value") else str(ctype)
                 if ctype_value == _CT.WEB.value:
                     from connectors.web.connector import trigger_zap_scan
+                    from api.models.models import FrameworkType
                     creds = json.loads(decrypt(connector_db.credentials_enc))
                     cfg = connector_db.config or {}
                     profile = (scan.summary or {}).get("requested_profile") or cfg.get("default_profile") or "baseline"
                     target_url = cfg.get("target_url", "")
                     auth = creds.get("auth", {"method": "none"})
+                    # Auto-tag the scan's framework based on profile + auth so
+                    # ZAP findings land in the right compliance catalog.
+                    if not scan.framework:
+                        auth_method = (auth or {}).get("method", "none")
+                        if profile == "active":
+                            scan.framework = FrameworkType.ZAP_AUTH_ACTIVE
+                        else:
+                            # baseline (passive) — auth or unauth both land here
+                            scan.framework = FrameworkType.ZAP_UNAUTH_PASSIVE
+                        db.commit()
                     result = trigger_zap_scan(
                         scan_id=scan.id,
                         target_url=target_url,
