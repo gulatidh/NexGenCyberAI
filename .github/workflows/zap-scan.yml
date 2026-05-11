@@ -144,16 +144,21 @@ jobs:
                           uris = [i.get("uri") for i in alert.get("instances", []) if i.get("uri")]
                           resource = uris[0] if uris else site.get("@name", "")
                           cwe = alert.get("cweid")
+                          plugin = str(alert.get("pluginid") or alert.get("alertRef") or "").split("-")[0]
+                          # control_id == ZAP-<pluginId> so it lines up with the
+                          # ZAP framework catalogs (zap_unauth_passive / zap_auth_active).
+                          control_id = f"ZAP-{plugin}" if plugin else (f"CWE-{cwe}" if cwe else None)
                           findings.append({
                               "title": alert.get("name") or "ZAP alert",
                               "description": (alert.get("desc") or "")[:4000],
                               "severity": sev,
                               "resource_id": resource,
                               "resource_type": "web/endpoint",
-                              "control_id": f"CWE-{cwe}" if cwe else None,
+                              "control_id": control_id,
                               "remediation": (alert.get("solution") or "")[:4000],
                               "evidence": {"reference": alert.get("reference"),
-                                           "instances": uris[:10]},
+                                           "instances": uris[:10],
+                                           "cwe_id": cwe},
                               "control_mappings": {},
                           })
               except Exception as e:
