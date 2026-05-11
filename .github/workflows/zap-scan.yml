@@ -88,29 +88,44 @@ jobs:
               f.write(f"auth_headers_count={len(headers)}\n")
           PY
 
-      - name: ZAP Baseline Scan
+      # Run ZAP via docker directly instead of zaproxy/action-baseline.
+      # The action's bundled upload-artifact step hits a deprecated v3 API
+      # and fails on current GitHub-hosted runners; we don't need the
+      # artifact upload anyway (findings are ingested via our /scans/ingest/).
+      # Exit code 2 = WARN-NEW alerts found, treated as success here.
+      - name: ZAP Baseline Scan (passive)
         if: steps.cfg.outputs.profile != 'active'
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: ${{ steps.cfg.outputs.target_url }}
-          # Action already writes report_json.json/report_md.md/report_html.html
-          # by default; we just append our header-replacer config.
-          cmd_options: "$(cat .zap-options.txt)"
-          fail_action: false
-          allow_issue_writing: false
-          # Per-run unique name avoids artifact-name collisions across runs
-          # (the default "zap_scan" can clash when re-running).
-          artifact_name: zap-baseline-${{ inputs.scan_id }}
+        run: |
+          set -e
+          OPTS=$(cat .zap-options.txt)
+          docker run --rm \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            --network=host \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${{ steps.cfg.outputs.target_url }}" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              $OPTS \
+            || true
 
-      - name: ZAP Full (Active) Scan
+      - name: ZAP Active Scan
         if: steps.cfg.outputs.profile == 'active'
-        uses: zaproxy/action-full-scan@v0.10.0
-        with:
-          target: ${{ steps.cfg.outputs.target_url }}
-          cmd_options: "$(cat .zap-options.txt)"
-          fail_action: false
-          allow_issue_writing: false
-          artifact_name: zap-full-${{ inputs.scan_id }}
+        run: |
+          set -e
+          OPTS=$(cat .zap-options.txt)
+          docker run --rm \
+            -v "${{ github.workspace }}:/zap/wrk/:rw" \
+            --network=host \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-full-scan.py \
+              -t "${{ steps.cfg.outputs.target_url }}" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              $OPTS \
+            || true
 
       - name: Post findings to API
         if: always()
