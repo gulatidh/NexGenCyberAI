@@ -17,7 +17,7 @@ const AGENT_DEFINITIONS = [
     title: "Full Assessment Orchestrator",
     description: "Runs all agents in sequence: VA → Framework → Threat Intel → Risk → Remediation → Compliance",
     icon: "🤖",
-    color: "#00e5ff",
+    color: "#A100FF",
   },
   {
     type: "va_scanner" as AgentType,
@@ -31,7 +31,7 @@ const AGENT_DEFINITIONS = [
     title: "Framework Compliance Agent",
     description: "Maps findings to NIST CSF, NIST 800-53, CIS v8, GDPR, ISO 27001 controls",
     icon: "📋",
-    color: "#7c4dff",
+    color: "#7500C0",
   },
   {
     type: "threat_intel" as AgentType,
@@ -97,7 +97,7 @@ export default function Agents() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <SmartToy sx={{ color: "#00e5ff", fontSize: 32 }} />
+        <SmartToy sx={{ color: "#A100FF", fontSize: 32 }} />
         <Box>
           <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Security Agents</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -140,7 +140,7 @@ export default function Agents() {
           return (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.type}>
               <Card sx={{
-                bgcolor: "#161b22",
+                bgcolor: "#1A1A1A",
                 border: `1px solid ${isRunning ? agent.color : "rgba(255,255,255,0.08)"}`,
                 borderRadius: 2,
                 transition: "border-color 0.2s",
@@ -171,7 +171,7 @@ export default function Agents() {
 
       {/* Agent Run History */}
       {selectedClientId && (
-        <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Recent Agent Runs</Typography>
             {(runs as any[]).length === 0 ? (
@@ -181,7 +181,7 @@ export default function Agents() {
                 <Accordion key={run.id} sx={{ bgcolor: "#1e232c", mb: 1, border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px !important" }}>
                   <AccordionSummary expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
-                      <Chip label={run.agent_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 11 }} />
+                      <Chip label={run.agent_type} size="small" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "#A100FF", fontSize: 11 }} />
                       <Chip label={run.status} size="small"
                         sx={{ bgcolor: run.status === "completed" ? "rgba(0,230,118,0.15)" : "rgba(244,67,54,0.15)",
                           color: run.status === "completed" ? "#00e676" : "#f44336" }} />

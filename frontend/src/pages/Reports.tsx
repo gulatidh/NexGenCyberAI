@@ -241,18 +241,18 @@ export default function Reports() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button variant="outlined" startIcon={<Download />} disabled={exportDisabled}
             onClick={handleExportCSV}
-            sx={{ color: "#00e5ff", borderColor: "rgba(0,229,255,0.5)" }}>
+            sx={{ color: "#A100FF", borderColor: "rgba(161,0,255,0.5)" }}>
             Export CSV
           </Button>
           <Button variant="contained" startIcon={<Print />} disabled={!clientId}
             onClick={handlePrint}
-            sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+            sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Print / PDF
           </Button>
         </Box>
       </Box>
 
-      <Card className="no-print" sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+      <Card className="no-print" sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
         <CardContent>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
@@ -307,15 +307,15 @@ export default function Reports() {
       </Card>
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>
           Pick a client to generate a report.
         </Alert>
       ) : (
         <Card className="print-area" ref={printRef as any}
-          sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Description sx={{ color: "#00e5ff" }} />
+              <Description sx={{ color: "#A100FF" }} />
               <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>{reportTitle}</Typography>
             </Box>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
@@ -324,29 +324,29 @@ export default function Reports() {
             <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
 
             {reportType === "executive" && (
-              overviewLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              overviewLoading ? <CircularProgress sx={{ color: "#A100FF" }} /> :
               !overview ? <Alert severity="warning">No data yet — run a scan first.</Alert> :
               <ExecutiveBlock overview={overview} fwSummaries={fwSummaries} />
             )}
 
             {reportType === "compliance" && (
-              fwLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              fwLoading ? <CircularProgress sx={{ color: "#A100FF" }} /> :
               !fwDetail ? <Alert severity="warning">No control data — recompute on the Frameworks page.</Alert> :
               <ComplianceBlock detail={fwDetail} />
             )}
 
             {reportType === "findings" && (
-              findingsLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              findingsLoading ? <CircularProgress sx={{ color: "#A100FF" }} /> :
               <FindingsBlock rows={findings} />
             )}
 
             {reportType === "risks" && (
-              risksLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              risksLoading ? <CircularProgress sx={{ color: "#A100FF" }} /> :
               <RisksBlock rows={risks} />
             )}
 
             {reportType === "assets" && (
-              assetsLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              assetsLoading ? <CircularProgress sx={{ color: "#A100FF" }} /> :
               <AssetsBlock rows={assets} />
             )}
           </CardContent>
@@ -358,7 +358,7 @@ export default function Reports() {
 
 // ── Report sections ──────────────────────────────────────────────────────────
 
-function StatTile({ label, value, color = "#00e5ff" }: { label: string; value: string | number; color?: string }) {
+function StatTile({ label, value, color = "#A100FF" }: { label: string; value: string | number; color?: string }) {
   return (
     <Card sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
@@ -519,7 +519,7 @@ function FindingsBlock({ rows }: { rows: Finding[] }) {
                 <TableRow key={f.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
                   <TableCell><Chip label={sev} size="small" sx={{ bgcolor: `${SEV_COLOR[sev]}20`, color: SEV_COLOR[sev], height: 18, fontSize: 10 }} /></TableCell>
                   <TableCell sx={{ maxWidth: 320, fontSize: 12 }}>{f.title}</TableCell>
-                  <TableCell sx={{ color: "#00e5ff", fontSize: 11 }}>{f.cve_id || "—"}</TableCell>
+                  <TableCell sx={{ color: "#A100FF", fontSize: 11 }}>{f.cve_id || "—"}</TableCell>
                   <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, maxWidth: 200 }}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                       {f.resource_id || "—"}

@@ -1,6 +1,6 @@
 {
   "short_name": "NexGenCyberAI",
-  "name": "NexGenCyberAI — Cybersecurity Posture Management",
+  "name": "NexGenCyberAI — by Accenture",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#A100FF",
+  "background_color": "#0A0A0A"
 }

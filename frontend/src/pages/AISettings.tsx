@@ -169,7 +169,7 @@ export default function AISettings() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <Psychology sx={{ color: "#00e5ff", fontSize: 32 }} />
+        <Psychology sx={{ color: "#A100FF", fontSize: 32 }} />
         <Box>
           <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Provider Settings</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -179,7 +179,7 @@ export default function AISettings() {
       </Box>
 
       {isLoading ? (
-        <CircularProgress sx={{ color: "#00e5ff" }} />
+        <CircularProgress sx={{ color: "#A100FF" }} />
       ) : (
         <Grid container spacing={2}>
           {/* Provider Cards */}
@@ -187,12 +187,12 @@ export default function AISettings() {
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.provider}>
               <Card
                 sx={{
-                  bgcolor: provider.available ? "rgba(0,229,255,0.05)" : "#161b22",
-                  border: `1px solid ${provider.available ? "rgba(0,229,255,0.3)" : "rgba(255,255,255,0.08)"}`,
+                  bgcolor: provider.available ? "rgba(161,0,255,0.05)" : "#1A1A1A",
+                  border: `1px solid ${provider.available ? "rgba(161,0,255,0.3)" : "rgba(255,255,255,0.08)"}`,
                   borderRadius: 2,
                   cursor: "pointer",
                   transition: "all 0.2s",
-                  "&:hover": { borderColor: "#00e5ff" },
+                  "&:hover": { borderColor: "#A100FF" },
                 }}
                 onClick={() => { setSelectedProvider(provider.provider); setSelectedModel(""); }}
               >
@@ -229,7 +229,7 @@ export default function AISettings() {
 
           {/* Configuration */}
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
                   <Typography variant="h6" sx={{ color: "white" }}>Provider Configuration</Typography>
@@ -239,7 +239,7 @@ export default function AISettings() {
                         variant="contained" startIcon={<Save />}
                         disabled={!isAdmin || !dirty || saveMutation.isPending}
                         onClick={handleSave}
-                        sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+                        sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
                         {saveMutation.isPending ? "Saving..." : "Save Changes"}
                       </Button>
                     </span>
@@ -249,7 +249,7 @@ export default function AISettings() {
                   Stored values override the deployment env vars. API keys are encrypted at rest. Secrets are never echoed back — leave blank to keep the current value.
                 </Typography>
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   DEFAULTS
                 </Typography>
                 <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
@@ -282,7 +282,7 @@ export default function AISettings() {
                 </Grid>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   AZURE OPENAI
                 </Typography>
                 <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
@@ -293,25 +293,25 @@ export default function AISettings() {
                 </Grid>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   OPENAI
                 </Typography>
                 <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("openai_api_key", "OpenAI API Key")}</Box>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   ANTHROPIC CLAUDE
                 </Typography>
                 <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("anthropic_api_key", "Anthropic API Key")}</Box>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   GOOGLE GEMINI
                 </Typography>
                 <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("google_api_key", "Google API Key")}</Box>
                 <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
 
-                <Typography variant="caption" sx={{ color: "#00e5ff", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                <Typography variant="caption" sx={{ color: "#A100FF", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   AWS BEDROCK
                 </Typography>
                 <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -321,7 +321,7 @@ export default function AISettings() {
                 </Grid>
 
                 {!isAdmin && (
-                  <Alert severity="info" sx={{ mt: 2, bgcolor: "rgba(0,229,255,0.08)", color: "white" }}>
+                  <Alert severity="info" sx={{ mt: 2, bgcolor: "rgba(161,0,255,0.08)", color: "white" }}>
                     Read-only — admin role required to edit AI provider configuration.
                   </Alert>
                 )}
@@ -331,7 +331,7 @@ export default function AISettings() {
 
           {/* Test Console */}
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Provider Test Console</Typography>
                 <Grid container spacing={2} sx={{ alignItems: "flex-end" }}>
@@ -386,7 +386,7 @@ export default function AISettings() {
                       onClick={handleTest}
                       disabled={!selectedProvider || testMutation.isPending}
                       startIcon={testMutation.isPending ? <CircularProgress size={16} /> : <PlayArrow />}
-                      sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}
+                      sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}
                     >
                       Test
                     </Button>

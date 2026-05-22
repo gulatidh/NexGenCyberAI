@@ -175,18 +175,18 @@ export default function Connectors() {
           </FormControl>
           <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId || projects.length === 0}
             onClick={() => { setConnProjectId(selectedProjectId || projects[0]?.id || ""); setOpen(true); }}
-            sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+            sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Add Connector
           </Button>
         </Box>
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>Select a client to view and manage its connectors.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view and manage its connectors.</Alert>
       ) : isLoading ? (
-        <CircularProgress sx={{ color: "#00e5ff" }} />
+        <CircularProgress sx={{ color: "#A100FF" }} />
       ) : connectors.length === 0 ? (
-        <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
           <Cable sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No connectors. Add one to start scanning.</Typography>
         </Card>
@@ -197,7 +197,7 @@ export default function Connectors() {
             const tr = testResults[conn.id];
             return (
               <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
-                <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
                   <CardContent>
                     <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                       <Typography sx={{ color: "white", fontWeight: 600 }}>{conn.name}</Typography>
@@ -217,13 +217,13 @@ export default function Connectors() {
                       <Button size="small" variant="outlined" startIcon={<PlayArrow />}
                         onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
                         disabled={testMutation.isPending}
-                        sx={{ borderColor: "#00e5ff", color: "#00e5ff", fontSize: 11 }}>
+                        sx={{ borderColor: "#A100FF", color: "#A100FF", fontSize: 11 }}>
                         Test
                       </Button>
                       <Box sx={{ flex: 1 }} />
                       <Tooltip title="Edit connector">
                         <IconButton size="small" onClick={() => openEdit(conn)}
-                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#00e5ff" } }}>
+                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#A100FF" } }}>
                           <Edit sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
@@ -248,7 +248,7 @@ export default function Connectors() {
       )}
 
       {/* Add Connector Dialog */}
-      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 520 } } }}>
+      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white", minWidth: 520 } } }}>
         <DialogTitle>{editing ? `Edit Connector — ${editing.name}` : "Add Connector"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -449,7 +449,7 @@ export default function Connectors() {
                   : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials });
               }
             }}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>
+            sx={{ bgcolor: "#A100FF", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
           </Button>
         </DialogActions>

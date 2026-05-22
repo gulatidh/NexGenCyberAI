@@ -17,7 +17,7 @@ import { adminApi, clientsApi, projectsApi } from "../services/api";
 
 const ROLE_COLOR: Record<AccessRole, string> = {
   admin: "#f06292",
-  editor: "#00e5ff",
+  editor: "#A100FF",
   reader: "rgba(255,255,255,0.6)",
 };
 const ROLE_ICON: Record<AccessRole, React.ReactNode> = {
@@ -110,7 +110,7 @@ export default function Admin() {
   };
 
   if (meLoading) {
-    return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#00e5ff" }} /></Box>;
+    return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#A100FF" }} /></Box>;
   }
 
   if (!canAdmin) {
@@ -136,18 +136,18 @@ export default function Admin() {
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-          sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+          sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
           Grant access
         </Button>
       </Box>
 
-      <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
         <CardContent sx={{ "&:last-child": { pb: 2 } }}>
           <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
             Users with access ({users.length})
           </Typography>
           {isLoading ? (
-            <CircularProgress sx={{ color: "#00e5ff" }} />
+            <CircularProgress sx={{ color: "#A100FF" }} />
           ) : users.length === 0 ? (
             <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
               No grants yet. Click "Grant access" to add the first user.
@@ -214,7 +214,7 @@ export default function Admin() {
 
       {/* Grant dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
         <DialogTitle>Grant access</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -283,14 +283,14 @@ export default function Admin() {
             || (form.scope_type === "client" && !form.scope_client_id)
             || (form.scope_type === "project" && !form.scope_project_id)}
             onClick={submitGrant}
-            sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             {grantMutation.isPending ? <CircularProgress size={18} /> : "Grant"}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Box sx={{ mt: 3 }}>
-        <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.7)", mb: 1 }}>
               Your effective access

@@ -75,13 +75,13 @@ export default function AppLayout() {
   const drawer = (
     <Box sx={{ height: "100%", bgcolor: "grey.900", color: "white" }}>
       <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <Shield sx={{ color: "#00e5ff", fontSize: 32 }} />
+        <Shield sx={{ color: "#A100FF", fontSize: 32 }} />
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#00e5ff", lineHeight: 1.1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#A100FF", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
             NexGen
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>
-            CyberAI Platform
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+            An Accenture Product
           </Typography>
         </Box>
       </Box>
@@ -114,11 +114,11 @@ export default function AppLayout() {
                   onClick={() => navigate(item.path)}
                   sx={{
                     mx: 1, my: 0.3, borderRadius: 1,
-                    bgcolor: active ? "rgba(0,229,255,0.15)" : "transparent",
+                    bgcolor: active ? "rgba(161,0,255,0.15)" : "transparent",
                     "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
                   }}
                 >
-                  <ListItemIcon sx={{ color: active ? "#00e5ff" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
+                  <ListItemIcon sx={{ color: active ? "#A100FF" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
@@ -128,7 +128,7 @@ export default function AppLayout() {
                         style: {
                           fontSize: 13,
                           fontWeight: active ? 600 : 400,
-                          color: active ? "#00e5ff" : "rgba(255,255,255,0.8)",
+                          color: active ? "#A100FF" : "rgba(255,255,255,0.8)",
                         },
                       },
                     }}
@@ -144,7 +144,7 @@ export default function AppLayout() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0f1117" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0A0A0A" }}>
       {/* Sidebar */}
       <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: 0 }}>
         <Drawer
@@ -170,22 +170,35 @@ export default function AppLayout() {
         <AppBar
           position="sticky"
           elevation={0}
-          sx={{ bgcolor: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          sx={{ bgcolor: "#1A1A1A", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
         >
           <Toolbar>
             <IconButton color="inherit" onClick={() => setMobileOpen(true)} sx={{ mr: 1, display: { md: "none" } }}>
               <MenuIcon />
             </IconButton>
             <Box sx={{ flexGrow: 1 }} />
+            <Typography
+              sx={{
+                color: "rgba(255,255,255,0.7)",
+                fontFamily: '"Inter", sans-serif',
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.01em",
+                mr: 2,
+                display: { xs: "none", sm: "block" },
+              }}
+            >
+              <Box component="span" sx={{ color: "#A100FF", fontWeight: 700 }}>&gt;</Box> accenture
+            </Typography>
             <Chip
               label="LIVE"
               size="small"
-              sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
+              sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "#A100FF", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
             />
             <NotificationBell />
             <Tooltip title="Account">
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-                <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>
+                <Avatar sx={{ bgcolor: "#A100FF", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>
                   {userInitial}
                 </Avatar>
               </IconButton>

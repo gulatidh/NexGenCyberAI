@@ -14,13 +14,13 @@ import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#ff9800", running: "#00e5ff", completed: "#00e676",
+  pending: "#ff9800", running: "#A100FF", completed: "#00e676",
   failed: "#f44336", cancelled: "rgba(255,255,255,0.3)",
 };
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b",
-  low: "#4caf50", info: "#00e5ff",
+  low: "#4caf50", info: "#A100FF",
 };
 
 export default function Scans() {
@@ -115,16 +115,16 @@ export default function Scans() {
           </FormControl>
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
           <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>New Scan</Button>
+            sx={{ bgcolor: "#A100FF", color: "#000" }}>New Scan</Button>
         </Box>
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>Select a client to view scans.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view scans.</Alert>
       ) : isLoading ? (
-        <CircularProgress sx={{ color: "#00e5ff" }} />
+        <CircularProgress sx={{ color: "#A100FF" }} />
       ) : (
-        <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
           <Table>
             <TableHead>
               <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600 } }}>
@@ -165,7 +165,7 @@ export default function Scans() {
                 return (
                   <TableRow key={scan.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white" } }}>
                     <TableCell><Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>{scan.name || `Scan ${scan.id.slice(0, 8)}`}</Typography></TableCell>
-                    <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 11 }} /></TableCell>
+                    <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "#A100FF", fontSize: 11 }} /></TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{scan.framework || "—"}</Typography></TableCell>
                     <TableCell>
                       <Chip label={scan.status} size="small"
@@ -185,7 +185,7 @@ export default function Scans() {
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
                         onClick={() => setViewScan(scan)}
-                        sx={{ color: "#00e5ff", fontSize: 11, minWidth: 0 }}>View</Button>
+                        sx={{ color: "#A100FF", fontSize: 11, minWidth: 0 }}>View</Button>
                       <IconButton size="small"
                         onClick={() => {
                           if (window.confirm(`Delete scan "${scan.name || scan.id.slice(0, 8)}"? Findings will also be removed.`)) {
@@ -205,7 +205,7 @@ export default function Scans() {
       )}
 
       {/* Start scan dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 420 } } }}>
+      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white", minWidth: 420 } } }}>
         <DialogTitle>Start New Scan</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -258,7 +258,7 @@ export default function Scans() {
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
           <Button variant="contained" startIcon={<PlayArrow />} disabled={startMutation.isPending}
             onClick={() => startMutation.mutate({ scan_type: scanType, connector_id: connectorId || undefined, framework: framework || undefined, name: scanName || undefined })}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>
+            sx={{ bgcolor: "#A100FF", color: "#000" }}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
         </DialogActions>
@@ -266,7 +266,7 @@ export default function Scans() {
 
       {/* Findings dialog */}
       <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
             <Typography variant="h6">Scan Findings</Typography>
@@ -285,7 +285,7 @@ export default function Scans() {
         <DialogContent sx={{ p: 0 }}>
           {findingsLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-              <CircularProgress sx={{ color: "#00e5ff" }} />
+              <CircularProgress sx={{ color: "#A100FF" }} />
             </Box>
           ) : findings.length === 0 ? (
             <Box sx={{ p: 4, textAlign: "center", color: "rgba(255,255,255,0.4)" }}>
@@ -318,7 +318,7 @@ export default function Scans() {
                       )}
                     </TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
-                    <TableCell><Typography variant="caption" sx={{ color: "#00e5ff" }}>{f.cve_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "#A100FF" }}>{f.cve_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
                   </TableRow>
                 ))}

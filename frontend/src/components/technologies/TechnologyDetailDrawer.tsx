@@ -15,7 +15,7 @@ interface Props {
 }
 
 const SEV_COLOR: Record<string, string> = {
-  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#00e5ff",
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#A100FF",
 };
 
 export default function TechnologyDetailDrawer({ clientId, technologyName, onClose }: Props) {
@@ -30,7 +30,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
 
   return (
     <Drawer anchor="right" open={!!technologyName} onClose={onClose}
-      slotProps={{ paper: { sx: { bgcolor: "#0f1117", color: "white", width: { xs: "100%", sm: 560 }, p: 0 } } }}>
+      slotProps={{ paper: { sx: { bgcolor: "#0A0A0A", color: "white", width: { xs: "100%", sm: 560 }, p: 0 } } }}>
       {!technologyName ? null : (
         <Box>
           <Box sx={{ p: 2.5, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -49,8 +49,8 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
             </Box>
             {data && (
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
-                <Chip label={data.category} size="small" sx={{ bgcolor: "rgba(0,229,255,0.15)", color: "#00e5ff", fontSize: 10 }} />
-                <Chip label={data.subcategory} size="small" sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#7c4dff", fontSize: 10 }} />
+                <Chip label={data.category} size="small" sx={{ bgcolor: "rgba(161,0,255,0.15)", color: "#A100FF", fontSize: 10 }} />
+                <Chip label={data.subcategory} size="small" sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#7500C0", fontSize: 10 }} />
                 <Chip label={data.type} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10 }} />
               </Box>
             )}
@@ -58,7 +58,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
 
           {isLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-              <CircularProgress sx={{ color: "#00e5ff" }} />
+              <CircularProgress sx={{ color: "#A100FF" }} />
             </Box>
           ) : !data ? (
             <Box sx={{ p: 3 }}>
@@ -89,7 +89,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
               <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth"
                 sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)",
                   "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontSize: 12 },
-                  "& .Mui-selected": { color: "#00e5ff" }, "& .MuiTabs-indicator": { backgroundColor: "#00e5ff" } }}>
+                  "& .Mui-selected": { color: "#A100FF" }, "& .MuiTabs-indicator": { backgroundColor: "#A100FF" } }}>
                 <Tab label="Overview" />
                 <Tab label="Findings" />
                 <Tab label="Assets" />
@@ -148,7 +148,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                             <Typography variant="body2" sx={{ color: "white", fontSize: 12.5 }}>{f.title}</Typography>
                           </Box>
                           {f.cve_id && (
-                            <Typography variant="caption" sx={{ color: "#00e5ff", fontFamily: "monospace", fontSize: 11, ml: 1, mt: 0.5, display: "block" }}>
+                            <Typography variant="caption" sx={{ color: "#A100FF", fontFamily: "monospace", fontSize: 11, ml: 1, mt: 0.5, display: "block" }}>
                               {f.cve_id}{f.cvss_score ? ` · CVSS ${f.cvss_score.toFixed(1)}` : ""}
                             </Typography>
                           )}

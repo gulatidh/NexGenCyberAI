@@ -17,16 +17,16 @@ function ClientCard({ client, onEdit, onDelete }: { client: Client; onEdit: () =
   return (
     <Card
       sx={{
-        bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
+        bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
         cursor: "pointer", transition: "border-color 0.2s",
-        "&:hover": { borderColor: "#00e5ff" },
+        "&:hover": { borderColor: "#A100FF" },
       }}
       onClick={() => navigate(`/clients/${client.id}`)}
     >
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", fontWeight: 700 }}>
+            <Avatar sx={{ bgcolor: "#A100FF", color: "#000", fontWeight: 700 }}>
               {client.name.charAt(0)}
             </Avatar>
             <Box>
@@ -78,7 +78,7 @@ export default function Clients() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error"),
   });
 
-  if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#00e5ff" }} /></Box>;
+  if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#A100FF" }} /></Box>;
 
   return (
     <Box>
@@ -88,13 +88,13 @@ export default function Clients() {
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>Manage client profiles and their security posture</Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => setOpen(true)}
-          sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+          sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
           Add Client
         </Button>
       </Box>
 
       {clients.length === 0 ? (
-        <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
           <Business sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No clients yet. Add your first client to get started.</Typography>
         </Card>
@@ -108,7 +108,7 @@ export default function Clients() {
         </Grid>
       )}
 
-      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 480 } } }}>
+      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white", minWidth: 480 } } }}>
         <DialogTitle>Add New Client</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -134,7 +134,7 @@ export default function Clients() {
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
           <Button variant="contained" onClick={() => createMutation.mutate(form)}
             disabled={!form.name || !form.slug || createMutation.isPending}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>
+            sx={{ bgcolor: "#A100FF", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Create"}
           </Button>
         </DialogActions>
