@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog
+from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -430,6 +430,7 @@ app.include_router(ai_settings.router, prefix="/api/v1")
 app.include_router(missions.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(agent_catalog.router, prefix="/api/v1")
+app.include_router(risk_portfolio.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

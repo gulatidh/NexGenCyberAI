@@ -236,6 +236,11 @@ export const knowledgeApi = {
   get: (fileId: string) => apiClient.get(`/knowledge/${fileId}`).then((r) => r.data),
 };
 
+export const riskPortfolioApi = {
+  get: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/risk-portfolio/`).then((r) => r.data),
+};
+
 export const agentCatalogApi = {
   list: () => apiClient.get(`/agents/catalog/`).then((r) => r.data),
   get: (agentId: string) => apiClient.get(`/agents/catalog/${agentId}`).then((r) => r.data),
