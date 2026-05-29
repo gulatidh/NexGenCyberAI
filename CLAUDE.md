@@ -1,6 +1,6 @@
 # NexGenCyberAI — Claude Code Context
 
-AI-Powered Cybersecurity Posture Management Platform. Multi-tenant SaaS connecting to Azure, AWS, GCP, Entra ID, Okta and running AI security agents (Claude / OpenAI / Gemini / Bedrock).
+AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). Multi-tenant SaaS connecting to Azure, AWS, GCP, Entra ID, Okta and running AI security agents (Azure OpenAI / Claude / OpenAI / Gemini / Bedrock). Frontend uses a Google-vibrant dark theme (primary `#4285F4`, secondary `#34A853`, accent `#FBBC04`, danger `#EA4335`, surface `#1E1E1E`).
 
 ---
 
@@ -9,48 +9,95 @@ AI-Powered Cybersecurity Posture Management Platform. Multi-tenant SaaS connecti
 ```
 /opt/NexGenCyberAI/
 ├── backend/                  FastAPI Python 3.12 API
-│   ├── main.py               App entry point, startup provisioning, router registration
-│   ├── requirements.txt      Python dependencies
+│   ├── main.py               App entry, startup provisioning, router registration,
+│   │                         on-disk column migrations (ai_verdict, report, etc.)
+│   ├── requirements.txt
+│   ├── data/                 Local caches — threat_intel_cache.json,
+│   │                         nvd_cve_cache.json, sync_feed_stats.json (gitignored)
 │   ├── api/
-│   │   ├── models/models.py  SQLAlchemy ORM — all DB tables and enums
+│   │   ├── models/models.py  SQLAlchemy ORM — all tables + enums.
+│   │   │                     Notable: ConnectorType, ScannerCategory,
+│   │   │                     CONNECTOR_CATEGORY dict, MissionType,
+│   │   │                     ScheduledMission, ScheduledMissionRun (with `report` JSON),
+│   │   │                     KnowledgeFile, AIAgent, Scan.ai_verdict (JSON).
 │   │   ├── schemas/schemas.py Pydantic request/response schemas
-│   │   └── routers/          One file per resource (clients, scans, findings, risks, agents, etc.)
-│   ├── connectors/           Cloud connector implementations
+│   │   └── routers/          One file per resource:
+│   │                          clients, scans, scans_overview, scans_runner,
+│   │                          findings, risks, risk_portfolio, agents,
+│   │                          agent_catalog, frameworks, missions, knowledge,
+│   │                          admin, ai_settings, technologies, …
+│   ├── connectors/           Cloud + scanner connectors
 │   │   ├── base.py           BaseConnector, ConnectorFinding, FindingSeverity
-│   │   ├── azure/connector.py  Direct ARM scanning (NSG, storage, Key Vault, RBAC, VMs)
-│   │   ├── aws/connector.py
-│   │   ├── gcp/connector.py
-│   │   └── entraid/connector.py
+│   │   ├── factory.py        get_connector(type, creds, config) dispatcher
+│   │   ├── sync.py           sync_connector_assets — refresh inventory pre-scan
+│   │   ├── web/              ZAP (DAST). connector.py + auth.py + trigger_zap_scan
+│   │   ├── scanners/         GitHub-Actions-driven scanners (WorkflowConnector)
+│   │   │     ├── base.py     WorkflowConnector — shared base
+│   │   │     ├── nmap.py, openvas.py, trivy.py
+│   │   │     ├── semgrep.py, codeql.py, sonarqube.py
+│   │   │     ├── owasp_dc.py, gitleaks.py, trufflehog.py
+│   │   ├── azure/connector.py  Direct ARM scanning (NSG, Storage, Key Vault, RBAC, VMs)
+│   │   ├── aws/, gcp/, entraid/, containers/, onprem/, …
 │   ├── agents/               AI agent implementations (LangChain ReAct)
-│   │   ├── base_agent.py     BaseAgent — provider-agnostic LLM wrapper
+│   │   ├── base_agent.py     Provider-agnostic LLM wrapper
 │   │   ├── orchestrator/     Runs all agents in sequence
-│   │   ├── risk/             Risk scoring (NIST SP 800-30)
+│   │   ├── risk/             Risk scoring (NIST SP 800-30) — structured prompt
 │   │   ├── framework/        NIST CSF / CIS v8 / GDPR mapping
 │   │   ├── vascan/           Vulnerability analysis
 │   │   ├── threat/           MITRE ATT&CK correlation
 │   │   ├── remediation/      Playbook generation
 │   │   └── compliance/       Audit report generation
+│   ├── services/             Business logic that's not a router handler
+│   │   ├── verdict.py        Per-scan structured AI verdict (the Assessments
+│   │   │                     detail page model) + compute_rps()
+│   │   ├── threat_intel.py   EPSS + CISA KEV cache (in-memory + on-disk)
+│   │   ├── reachability.py   Wiz GraphQL / CrowdStrike Spotlight live lookups
+│   │   ├── sync_feeds.py     Registry of on-demand external feeds — surfaces
+│   │   │                     to /admin/sync/feeds endpoints + Sync page
+│   │   ├── scan_runtime.py   Per-scan transient state (auth headers, target)
+│   │   ├── mission_scheduler.py APScheduler in-process cron for workflows
+│   │   ├── mission_executor.py Dispatches a ScheduledMission to its handler
+│   │   ├── mission_reports.py  Standardised AI report (7 fixed sections) per run
+│   │   ├── compliance.py     Per-framework recompute
+│   │   └── …
 │   └── core/
 │       ├── config.py         Settings from env vars (pydantic-settings)
 │       ├── ai_providers.py   Multi-provider LLM factory (get_llm())
-│       └── encryption.py     Credential encryption for connectors
+│       ├── encryption.py     Fernet credential encryption
+│       ├── scan_tokens.py    Per-scan HMAC mint/verify for workflow callbacks
+│       ├── github_dispatch.py POST /actions/workflows/{file}/dispatches
+│       ├── security.py       Entra ID JWT validation, get_current_user
+│       └── authz.py          RBAC grants — admin/editor/reader × global/client/project
 ├── frontend/                 React 18 + TypeScript + MUI v6
 │   └── src/
-│       ├── pages/            One file per route (Dashboard, Clients, Findings, Risks, etc.)
-│       ├── services/api.ts   Axios client — all API calls, auto-attaches Entra ID bearer token
+│       ├── pages/            Dashboard, RiskOverview, Clients, Scans (Assessments),
+│       │                     ScanDetail, Findings, Risks (Risk Register), Assets,
+│       │                     Technologies, AssetDetail, Frameworks, Agents,
+│       │                     Missions (Workflows), KnowledgeBase, Reports,
+│       │                     AISettings, Admin, Sync, Account, …
+│       ├── services/api.ts   Axios client — all API calls, auto-attaches Entra ID JWT
 │       ├── types/index.ts    TypeScript interfaces matching backend schemas
 │       ├── auth/             MSAL Azure Entra ID authentication
-│       └── components/layout/ AppLayout, NotificationBell
+│       └── components/
+│           ├── layout/        AppLayout, NotificationBell
+│           ├── RichOutput.tsx Markdown renderer for agent output (dark theme +
+│           │                  conversational-tail stripping + risk_register table)
+│           ├── AgentInsightCard.tsx Tile-style expandable agent run card
+│           ├── technologies/, risk-overview/  Tokens + presentational pieces
 └── infrastructure/terraform/ Azure infrastructure as code
-    ├── main.tf               All Azure resources
-    ├── variables.tf          Input variable definitions
-    ├── terraform.tfvars      Secret values — NOT in Git, keep safe locally
-    └── outputs.tf            Resource URLs and connection strings
+    ├── main.tf, variables.tf, outputs.tf
+    └── terraform.tfvars      Secret values — NOT in Git
+.github/workflows/            CI/CD + scanner runners
+    deploy.yml                Single-env deploy to *-dev App Services on push to main
+    zap-scan.yml, trivy-scan.yml, gitleaks-scan.yml, trufflehog-scan.yml,
+    semgrep-scan.yml, nmap-scan.yml      Workflow-driven scanners
 ```
 
 ---
 
 ## Live Azure Environment
+
+Single environment (cost-optimised — prod App Services are provisioned on demand per customer; no separate prod gate today).
 
 | Resource | URL |
 |---|---|
@@ -67,45 +114,74 @@ AI-Powered Cybersecurity Posture Management Platform. Multi-tenant SaaS connecti
 ## Git & CI/CD
 
 - **Repo**: github.com/gulatidh/NexGenCyberAI (private)
-- **Branches**: `develop` (active dev) → `main` (stable, production-ready)
-- **CI/CD**: GitHub Actions triggers on push to `develop` or `main`
-  - Backend: pip install + pytest + deploy to Azure App Service
-  - Frontend: npm ci + tsc + react-scripts build + deploy to Azure App Service
-  - Terraform: plan (apply is manual)
-- **Deploy rule**: Always `git push origin develop` — CI/CD handles deployment automatically. Never deploy manually via Kudu unless Git is also updated immediately after.
-- **Merge to main**: Via PR only (`gh pr create` → `gh pr merge`)
+- **Branch**: single `main` — no `develop`. Push directly or via PR.
+- **CI/CD**: `.github/workflows/deploy.yml` triggers on push to `main`.
+  - Backend: `pip install -r requirements.txt` + deploy zip to Azure App Service via OIDC
+  - Frontend: `npm ci` + `react-scripts build` (CI=true) + deploy zip
+  - Terraform: plan only (apply is manual)
+- **Scanner workflows** (zap-, trivy-, gitleaks-, trufflehog-, semgrep-, nmap-) are NOT auto-triggered — they fire on `workflow_dispatch` from the backend when a scan starts, authenticated via per-scan HMAC token.
+- **Deploy rule**: Always `git push origin main` — CI/CD handles deployment automatically. Never deploy manually via Kudu unless Git is also updated immediately after.
 
 ---
 
 ## Database
 
 - **Dev**: SQLite (`backend/nexgencyberai.db`) — file-based, no setup needed
-- **Prod**: Azure SQL Server (mssql) via `pymssql`
+- **Prod (Azure)**: Azure SQL Server (mssql) via `pymssql`
 - **ORM**: SQLAlchemy 2.0
-- **Critical**: All `SAEnum` columns use `values_callable=_ev` (see `models.py`) so SQLAlchemy stores lowercase enum values. Never remove this or DB reads will break with `KeyError`.
-- **Startup**: `main.py` runs `_normalize_enum_case()` + `_provision_entraid_connector()` + `_provision_azure_connector()` on every startup
+- **Critical**: All `SAEnum` columns use `values_callable=_ev` (see `models.py`) so SQLAlchemy stores lowercase enum values. Never remove this or DB reads break with `KeyError`.
+- **Startup migrations**: `main.py::_ensure_added_columns()` runs idempotent `ALTER TABLE ... ADD COLUMN` for new JSON columns (`ai_verdict`, `ai_verdict_generated_at`, `scheduled_mission_runs.report`). Safe on SQLite + MSSQL.
+- **Other startup work**: `_normalize_enum_case()`, `_provision_entraid_connector()`, `_provision_azure_connector()`, agent + knowledge base seeding, threat-intel cache warm.
 
 ---
 
-## Authentication
+## Authentication & Authorization
 
 - **Provider**: Microsoft Entra ID (Azure AD) via MSAL
 - **Frontend**: `@azure/msal-react` — `MsalAuthenticationTemplate` wraps entire app, auto-redirects to Entra ID login
 - **Backend**: JWT bearer token validation — every API endpoint requires `Depends(get_current_user)`
 - **Token flow**: Frontend acquires token silently → attaches as `Authorization: Bearer <token>` → backend validates against JWKS URI
+- **RBAC** (`core/authz.py`): three roles (`reader`/`editor`/`admin`) × three scopes (`global`/`client`/`project`). Admin-only pages (Sync, Administration) gated client-side via `useQuery(adminApi.me)`.
+- **Workflow runners** authenticate to `/scans/config/` and `/scans/ingest/` using a per-scan HMAC token minted by `core/scan_tokens.py` — NOT a user JWT.
+
+---
+
+## Frontend Pages & Navigation
+
+`AppLayout.tsx` defines two nav groups:
+
+**Main workflow**: Dashboard · Risk Overview · Clients · Assessments (Scans) · Findings · Risk Register (Risks) · Asset Inventory · Technologies · Frameworks · AI Agents · Workflows (Missions) · Knowledge Base · Reports
+
+**Settings** (some admin-only): AI Settings · Sync · Administration
+
+Routes live in `App.tsx`. Connectors and Projects no longer have top-level nav — they're tabs inside the Client Detail page.
+
+### Key pages and what they do
+
+- **Assessments** (`/scans`) — tile grid of every scan across all clients (access-filtered). Each tile has a top-right delete icon, status chip, category dot, "Category · Client" header. Click → ScanDetail.
+- **ScanDetail** (`/scans/:scanId`) — top tabs: Verdict / Findings / one per agent run. Verdict tab renders the structured AI verdict (The Verdict, What We Found, Why It Matters, Executive Summary, Capability Gaps, Signal Coverage, Attack Paths, Vendor Scorecard, RPS factor breakdown with evidenced/estimated/unknown tags, Data Completeness, Automation Opportunities). Per-finding delete in the Findings table. Print/PDF button at top expands every tab + applies print stylesheet.
+- **Findings** (`/findings`) — section tabs + category tiles + sortable table. Per-row delete + "Delete blank findings" toolbar button.
+- **Risk Register** (`/risks`) — KPI strip + severity donut + Top 5 + slicer chips + table + **AI Agent Risk Analysis** tile grid. Each agent run is a tile with heading/status/summary; click to expand; only one open at a time.
+- **Risk Overview** (`/risk-overview`) — Risk Portfolio dashboard. FAIR-lite ALE: Total/Net Exposure, Open Critical/High, 30-Day Breach Probability. Risk-by-domain bar chart, full risk table with ALE range, Remediation status, Source link.
+- **Workflows** (`/missions`) — scheduled missions (cron picker + presets). History drawer per row; "View Report" opens the standardised PDF-ready report dialog (KPI strip + 7 fixed sections).
+- **Knowledge Base** (`/knowledge`) — pre-seeded files in categories, expandable cards, search, stats endpoint.
+- **AI Agents** (`/agents`) — Catalog of ~43 advisory agents in 7 groups + admin-only CRUD with current config shown.
+- **Sync** (`/sync`, admin-only) — manual on-demand sync of external feeds (EPSS, CISA KEV, NVD recent CVEs, framework recompute). Per-tile sync button + "Sync all".
 
 ---
 
 ## Adding a New Page (Frontend Pattern)
 
 Follow `frontend/src/pages/Findings.tsx` as the template:
-1. Create `frontend/src/pages/NewPage.tsx` with client selector + table + detail dialog
+1. Create `frontend/src/pages/NewPage.tsx`
 2. Add API function to `frontend/src/services/api.ts`
 3. Add TypeScript interface to `frontend/src/types/index.ts`
 4. Register route in `frontend/src/App.tsx`
 5. Add nav item in `frontend/src/components/layout/AppLayout.tsx`
 
 **ESLint rule**: CI runs with `CI=true` which promotes unused import warnings to errors. Always remove unused imports before committing.
+
+**Icon names**: MUI v6 exports the `*Outlined` form (`DeleteOutlined`, `CheckCircleOutlined`, `ErrorOutlined`) — NOT `*Outline`. The `replace_all` Edit option will chain through related strings — avoid `replace_all "Outline" → "Outlined"` because it'll then re-edit the same names. Targeted import-line edits only.
 
 ---
 
@@ -116,17 +192,29 @@ Follow `backend/api/routers/findings.py` as the template:
 2. Add Pydantic schemas to `backend/api/schemas/schemas.py`
 3. Add SQLAlchemy model to `backend/api/models/models.py` if new table needed
 4. Register router in `backend/main.py`: `app.include_router(newresource.router, prefix="/api/v1")`
+5. Trailing slash matters — FastAPI runs with `redirect_slashes=False`
 
 ---
 
 ## Adding a New Connector
 
-Follow `backend/connectors/azure/connector.py` as the template:
+### Direct (in-process) connectors (Azure, AWS, GCP, Entra ID, …)
+
+Follow `backend/connectors/azure/connector.py`:
 1. Create `backend/connectors/newcloud/connector.py` extending `BaseConnector`
-2. Implement: `test_connection()`, `get_resources()`, `run_configuration_review()`, `run_vulnerability_scan()`, `get_compliance_status()`
-3. Return `ConnectorFinding` objects with `title`, `description`, `severity`, `resource_id`, `control_id`, `remediation`
+2. Implement `test_connection`, `get_resources`, `run_configuration_review`, `run_vulnerability_scan`, `get_compliance_status`
+3. Return `ConnectorFinding` objects
 4. Register in `backend/connectors/factory.py`
-5. Add `ConnectorType.NEWCLOUD` enum value in `models.py`
+5. Add `ConnectorType.NEWCLOUD` enum + `CONNECTOR_CATEGORY` entry in `models.py`
+
+### Workflow-driven scanners (Nmap, Trivy, Gitleaks, Semgrep, …)
+
+These defer execution to GitHub Actions. Backend just stores config + mints the HMAC scan token + fires `workflow_dispatch`.
+
+1. Create `backend/connectors/scanners/newscanner.py` extending `WorkflowConnector` — set `WORKFLOW_FILE`, `REQUIRED_CONFIG`, `RESOURCE_TYPE`, `DEFAULT_DISPLAY_NAME`
+2. Create `.github/workflows/newscanner-scan.yml` with inputs `scan_id`, `scan_token`, `api_base`. Fetch config via `GET /api/v1/scans/config/`, run the scanner, POST findings to `POST /api/v1/scans/ingest/`
+3. `scans.py` already has a generic `WorkflowConnector` dispatch path — any new scanner inherits it automatically
+4. The `_get(key)` helper on `WorkflowConnector` reads from both `config` and `credentials` because the Connectors UI saves everything under `credentials`
 
 ---
 
@@ -134,10 +222,64 @@ Follow `backend/connectors/azure/connector.py` as the template:
 
 - All agents extend `BaseAgent` in `backend/agents/base_agent.py`
 - Uses LangChain ReAct (`create_react_agent`) with provider-agnostic `get_llm()`
-- **Fallback**: If no AI API key is configured, returns rule-based analysis only
+- **Fallback**: If no AI API key is configured, returns rule-based analysis only — every consumer should expect both shapes
 - **Lazy imports**: `AgentOrchestrator` is imported lazily inside `_get_orchestrator()` in routers — never import at module level (crashes workers at startup)
 - Supported providers: `azure_openai`, `openai`, `anthropic`, `google_gemini`, `aws_bedrock`
-- Configure via AI Settings page or `DEFAULT_AI_PROVIDER` env var
+- Configure via the AI Settings page or `DEFAULT_AI_PROVIDER` env var
+- **Conversational tails**: System prompts ask for executive tone and no closing offers; `RichOutput.tsx` also scrubs them on render (`"If you want, I can also..."`, `"Would you like me to..."`, `"Shall I..."`)
+
+### Standardised workflow reports (`services/mission_reports.py`)
+
+Every `ScheduledMissionRun` (scheduled or manual) auto-generates a JSON report with a **fixed 7-section schema** (Executive Summary, Scope & Inputs, Key Findings, Risk Picture, Recommendations, Next Steps, Data Completeness). `_normalise_sections()` enforces this even if the LLM hallucinates extra sections or skips one. A deterministic skeleton renders when no LLM is configured.
+
+### Per-scan AI verdict (`services/verdict.py`)
+
+Auto-generated on scan completion via the `BackgroundTasks` queue in `/scans/ingest/`. Falls back to deterministic text if no LLM is available. Persisted to `Scan.ai_verdict` (JSON column) and rendered by ScanDetail.
+
+---
+
+## Risk Priority Score (RPS)
+
+`services/verdict.py::compute_rps()` returns multi-factor scoring per finding:
+
+```
+RPS = CVSS × EPSS × KEV_multiplier × reachability × exploitability
+      × asset_criticality × business_context
+```
+
+Every factor has a `source` tag — `evidenced` / `estimated` / `unknown`. Unknown factors are **dropped** from the multiplication so missing data integrations don't penalise scores.
+
+| Factor | Evidenced source | Estimated fallback |
+|---|---|---|
+| CVSS | scanner / NVD | severity-mapped |
+| EPSS | `services/threat_intel.py` cache (FIRST.org) | severity-mapped |
+| KEV multiplier | `services/threat_intel.py` cache (CISA KEV) — 2× normal, 3× ransomware | 1.0 |
+| Reachability | `services/reachability.py` — Wiz GraphQL or CrowdStrike Spotlight when configured | 1.0 (unknown) |
+| Exploitability | CVSS bucket proxy | — |
+| Asset criticality | crown-jewel ontology (not wired) | 5.0 |
+| Business context | mission inputs (not wired) | 1.0 |
+
+When the threat-intel cache is empty (never synced), EPSS/KEV report `unknown` rather than falsely claiming `evidenced not-found`.
+
+---
+
+## External Feeds (Sync page)
+
+Admin-triggered, **manual on-demand only** — there is no automatic schedule. Feed registry lives in `backend/services/sync_feeds.py`; admin endpoints under `/admin/sync/feeds/...`.
+
+| Feed | Source | What it does |
+|---|---|---|
+| EPSS | https://epss.cyentia.com/epss_scores-current.csv.gz | Per-CVE exploit probability |
+| CISA KEV | https://www.cisa.gov/.../known_exploited_vulnerabilities.json | CVEs confirmed exploited in the wild |
+| NVD Recent | https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz | 8-day rolling window — CVSS v3, CWE list, descriptions for finding enrichment |
+| Frameworks | bundled (no network) | Recompute compliance for every client using bundled catalogs |
+
+Caches persist to `backend/data/`:
+- `threat_intel_cache.json` — EPSS + KEV combined
+- `nvd_cve_cache.json`
+- `sync_feed_stats.json` — per-feed last-sync timestamps for non-threat-intel feeds
+
+`main.py` only warms the in-memory cache from disk at startup. No network calls happen until an admin clicks Sync.
 
 ---
 
@@ -149,16 +291,16 @@ Follow `backend/connectors/azure/connector.py` as the template:
 | `AZURE_TENANT_ID` | Entra ID tenant for JWT validation |
 | `AZURE_CLIENT_ID` | Backend app registration client ID |
 | `DEFAULT_AI_PROVIDER` | `azure_openai` \| `openai` \| `anthropic` \| `google_gemini` \| `aws_bedrock` |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `AZURE_OPENAI_API_KEY` | Azure OpenAI key |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `AZURE_OPENAI_API_KEY` | Provider keys |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
 | `ENCRYPTION_KEY` | Fernet key for connector credential encryption |
-| `ENTRAID_CONNECTOR_TENANT_ID` | Auto-provision Entra ID connector on startup |
-| `ENTRAID_CONNECTOR_CLIENT_ID` | Auto-provision Entra ID connector on startup |
-| `ENTRAID_CONNECTOR_CLIENT_SECRET` | Auto-provision Entra ID connector on startup |
-| `ENTRAID_CONNECTOR_DB_CLIENT_ID` | Client UUID to attach provisioned connector to |
-| `AZURE_SUBSCRIPTION_ID` | Auto-provision Azure ARM connector on startup |
+| `ENTRAID_CONNECTOR_TENANT_ID` / `_CLIENT_ID` / `_CLIENT_SECRET` / `_DB_CLIENT_ID` | Auto-provision Entra ID connector |
+| `AZURE_SUBSCRIPTION_ID` | Auto-provision Azure ARM connector |
+| `PUBLIC_API_BASE` | Public URL the workflow runners call back to (for `/scans/config/` + `/scans/ingest/`) |
+| `GITHUB_DISPATCH_TOKEN` | PAT or App token with `actions:write` on the repo |
+| `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` / `GITHUB_WORKFLOW_REF` | Where to fire workflow_dispatch (default ref: `main`) |
+| `WIZ_API_TOKEN` / `WIZ_TENANT_URL` | (Optional) enable Wiz reachability — GraphQL endpoint |
+| `FALCON_CLIENT_ID` / `FALCON_CLIENT_SECRET` / `FALCON_BASE_URL` | (Optional) enable CrowdStrike Spotlight reachability |
 
 ---
 
@@ -166,16 +308,23 @@ Follow `backend/connectors/azure/connector.py` as the template:
 
 - **State**: Local (`terraform.tfstate`) — not remote backend yet
 - **tfvars**: `/opt/NexGenCyberAI/infrastructure/terraform/terraform.tfvars` — **NOT in Git**, store securely
-- **Node version**: `22-lts` (updated from 20)
+- **Node version**: `22-lts`
 - **Python version**: `3.12`
 - **To apply**: `cd infrastructure/terraform && terraform apply`
-- **Drift warning**: Any direct Azure CLI / Portal config changes must be reflected in `main.tf` to avoid being reverted on next `terraform apply`
+- **Drift warning**: Direct Azure CLI / Portal config changes must be reflected in `main.tf` to avoid being reverted on next `terraform apply`
 
 ---
 
 ## Known Issues / Historical Fixes
 
-- **SAEnum KeyError**: Always use `values_callable=_ev` on every `SAEnum()` — without it SQLAlchemy uses uppercase member names but DB stores lowercase values
-- **Agent import crash**: Never import `AgentOrchestrator` at module level — LangGraph chain crashes uvicorn workers at startup
-- **Trailing slash 404**: FastAPI has `redirect_slashes=False` — all POST endpoints and frontend API calls must include trailing slash
-- **CI ESLint failures**: `CI=true` makes unused imports hard errors — always clean imports before committing
+- **SAEnum KeyError** — Always use `values_callable=_ev` on every `SAEnum()`; without it SQLAlchemy uses uppercase member names but the DB stores lowercase
+- **Agent import crash** — Never import `AgentOrchestrator` at module level; LangGraph chain crashes uvicorn workers at startup. Use the lazy `_get_orchestrator()` pattern
+- **Trailing slash 404** — FastAPI has `redirect_slashes=False`; all POST endpoints and frontend API calls must include trailing slash
+- **CI ESLint failures** — `CI=true` makes unused imports hard errors. Always clean imports before committing
+- **MUI v6 icon names** — Use `DeleteOutlined`, `CheckCircleOutlined`, `ErrorOutlined` (with the `d`). The `Outline` variants don't exist
+- **`replace_all` chaining** — When renaming a token where the new name is a superset of the old one (e.g. `Outline` → `Outlined`), `replace_all` will re-apply on the same line in a follow-up call. Use targeted edits on the import line only
+- **Workflow scanner dispatch** — Used to be ZAP-only. Now `scans.py` has a generic `WorkflowConnector` branch that any scanner with `WORKFLOW_FILE` set inherits. Bad config (missing `target` / `repo_url` / `image`) marks the scan `FAILED` with a clear message instead of completing silently with 0 findings
+- **Private repo cloning** — Workflow YAMLs construct an authenticated clone URL by injecting `git_username:git_token` into the `https://` URL. The `_get(key)` helper on `WorkflowConnector` reads from both `config` and `credentials` because the UI saves everything under `credentials`
+- **MissionRunResponse datetime fields** — Use `Optional[datetime]`, not `Optional[str]`, so Pydantic v2 auto-serialises. Wrong type caused 500s on `/missions/{id}/run`
+- **Connector PATCH 404 after "Add"** — The Add button must reset `editing` state + form fields, otherwise the save fires PATCH against a stale ID
+- **Conversational AI output** — Filter conversational tails server-side via prompt engineering AND client-side in `RichOutput.tsx`. Belt-and-braces — the LLM ignores prompt instructions occasionally
