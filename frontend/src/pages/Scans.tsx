@@ -3,12 +3,12 @@ import {
   Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
-  Tabs, Tab, Stack, Tooltip, Divider,
+  Tabs, Tab, Stack, Tooltip, Divider, IconButton,
   Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi } from "../services/api";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
@@ -130,6 +130,18 @@ export default function Scans() {
     queryKey: ["findings", selectedClientId, viewScan?.id],
     queryFn: () => scansApi.findings(selectedClientId, viewScan!.id),
     enabled: !!viewScan && !!selectedClientId,
+  });
+
+  const [pendingDeleteFinding, setPendingDeleteFinding] = useState<any | null>(null);
+  const deleteFindingMutation = useMutation({
+    mutationFn: (findingId: string) => findingsApi.delete(selectedClientId, findingId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings", selectedClientId, viewScan?.id] });
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      setPendingDeleteFinding(null);
+      toast.success("Finding deleted");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete finding"),
   });
 
   const startMutation = useMutation({
@@ -507,6 +519,7 @@ export default function Scans() {
                   <TableCell>Resource</TableCell>
                   <TableCell>CVE</TableCell>
                   <TableCell>CVSS</TableCell>
+                  <TableCell align="right" sx={{ width: 44 }} />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -527,6 +540,20 @@ export default function Scans() {
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
+                    <TableCell align="right" sx={{ width: 44 }}>
+                      <Tooltip title="Delete finding">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); setPendingDeleteFinding(f); }}
+                          sx={{
+                            color: "rgba(255,255,255,0.4)",
+                            "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                          }}
+                        >
+                          <DeleteOutlined sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -535,6 +562,36 @@ export default function Scans() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setViewScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm finding delete */}
+      <Dialog open={!!pendingDeleteFinding} onClose={() => setPendingDeleteFinding(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+            This permanently removes the finding. If the same issue is detected on the next scan it will be re-created.
+          </Typography>
+          {pendingDeleteFinding && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDeleteFinding.title || "(no title)"}</Typography>
+              {pendingDeleteFinding.resource_id && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDeleteFinding.resource_id}</Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDeleteFinding(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={deleteFindingMutation.isPending}
+            onClick={() => pendingDeleteFinding && deleteFindingMutation.mutate(pendingDeleteFinding.id)}
+            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

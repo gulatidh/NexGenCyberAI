@@ -143,3 +143,49 @@ async def update_finding_status(
         except Exception:
             pass
     return f
+
+
+@router.delete("/{finding_id}")
+async def delete_finding(
+    client_id: str,
+    finding_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    f = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Finding.id == finding_id, Scan.client_id == client_id)
+        .first()
+    )
+    if not f:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    db.delete(f)
+    db.commit()
+    return {"deleted": True}
+
+
+@router.post("/cleanup-blank")
+async def delete_blank_findings(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Delete findings that have no meaningful content (empty/whitespace title
+    AND no description AND no resource_id). Useful for tidying up after a
+    scanner that returned partial rows."""
+    q = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id)
+    )
+    blanks = [
+        f for f in q.all()
+        if not (f.title or "").strip()
+        and not (f.description or "").strip()
+        and not (f.resource_id or "").strip()
+    ]
+    for f in blanks:
+        db.delete(f)
+    db.commit()
+    return {"deleted": len(blanks)}

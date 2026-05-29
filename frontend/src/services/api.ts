@@ -123,6 +123,10 @@ export const findingsApi = {
     }).then((r) => r.data),
   update: (clientId: string, findingId: string, data: any) =>
     apiClient.patch(`/clients/${clientId}/findings/${findingId}`, data).then((r) => r.data),
+  delete: (clientId: string, findingId: string) =>
+    apiClient.delete(`/clients/${clientId}/findings/${findingId}`).then((r) => r.data),
+  cleanupBlank: (clientId: string) =>
+    apiClient.post(`/clients/${clientId}/findings/cleanup-blank`).then((r) => r.data),
 };
 
 export const risksApi = {

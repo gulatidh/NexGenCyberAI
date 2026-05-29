@@ -118,10 +118,23 @@ class RiskManagementAgent(BaseAgent):
             "client": client_name,
             "findings": findings,
             "instructions": (
-                "1. Calculate overall risk score. "
-                "2. Build a risk register with top 10 items. "
-                "3. Identify systemic weaknesses. "
-                "4. Recommend top 3 immediate mitigations."
+                "Produce a professional risk analysis using EXACTLY these "
+                "section headers (markdown level-3), in this order:\n"
+                "  ### Overall Risk Score\n"
+                "  ### Top Risks\n"
+                "  ### Systemic Weaknesses\n"
+                "  ### Immediate Mitigations\n\n"
+                "Rules:\n"
+                "- Write in third-person, executive-report tone — no greetings, "
+                "no 'I will', no 'we can', no questions to the user.\n"
+                "- Do NOT end with offers like 'If you want, I can also...' or "
+                "'Would you like me to...'. Stop after Immediate Mitigations.\n"
+                "- Under each header, use concise bulleted lines.\n"
+                "- For Overall Risk Score: one sentence with score and "
+                "qualitative band.\n"
+                "- For Top Risks: 5-10 prioritised bullets, each with risk ID, "
+                "title, severity and control mapping in brackets.\n"
+                "- For Immediate Mitigations: 3-5 actions, ordered by impact."
             ),
         }
         result = await self.run({"input": json.dumps(input_data)})

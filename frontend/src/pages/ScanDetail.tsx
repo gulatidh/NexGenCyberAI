@@ -3,15 +3,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Chip, Button, CircularProgress, Tabs, Tab,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Alert, Grid,
-  Divider, LinearProgress, Tooltip, Collapse, IconButton,
+  Divider, LinearProgress, Tooltip, Collapse, IconButton, Dialog, DialogTitle,
+  DialogContent, DialogActions,
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
-  CheckCircle, Error as ErrorIcon, Help, Print,
+  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { assessmentsApi } from "../services/api";
+import { assessmentsApi, findingsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "../components/RichOutput";
 
@@ -372,7 +373,7 @@ function RpsFactorTable({ findings }: { findings: Finding[] }) {
   );
 }
 
-function FindingsTable({ findings }: { findings: Finding[] }) {
+function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?: (f: Finding) => void }) {
   if (findings.length === 0) return <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>No findings recorded for this scan.</Typography>;
   return (
     <TableContainer>
@@ -384,6 +385,7 @@ function FindingsTable({ findings }: { findings: Finding[] }) {
             <TableCell>RESOURCE</TableCell>
             <TableCell>CVE</TableCell>
             <TableCell align="right">CVSS</TableCell>
+            {onDelete && <TableCell align="right" sx={{ width: 44 }} />}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -406,6 +408,22 @@ function FindingsTable({ findings }: { findings: Finding[] }) {
               <TableCell align="right" sx={{ color: f.cvss_score && f.cvss_score >= 7 ? "#EA4335" : "white", fontSize: 12 }}>
                 {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
               </TableCell>
+              {onDelete && (
+                <TableCell align="right" sx={{ width: 44 }}>
+                  <Tooltip title="Delete finding">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); onDelete(f); }}
+                      sx={{
+                        color: "rgba(255,255,255,0.4)",
+                        "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                      }}
+                    >
+                      <DeleteOutlined sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Tooltip>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -454,6 +472,18 @@ export default function ScanDetail() {
       setTimeout(() => qc.invalidateQueries({ queryKey: ["scan-detail", scanId] }), 8000);
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to queue verdict"),
+  });
+
+  const [pendingDelete, setPendingDelete] = React.useState<Finding | null>(null);
+  const deleteFinding = useMutation({
+    mutationFn: ({ clientId, findingId }: { clientId: string; findingId: string }) =>
+      findingsApi.delete(clientId, findingId),
+    onSuccess: () => {
+      toast.success("Finding deleted");
+      setPendingDelete(null);
+      qc.invalidateQueries({ queryKey: ["scan-detail", scanId] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete finding"),
   });
 
   const verdict = data?.ai_verdict;
@@ -618,7 +648,12 @@ export default function ScanDetail() {
       {/* Findings tab */}
       {(tab === "findings" || printing) && (
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-          <CardContent><FindingsTable findings={data.findings} /></CardContent>
+          <CardContent>
+            <FindingsTable
+              findings={data.findings}
+              onDelete={printing ? undefined : (f) => setPendingDelete(f)}
+            />
+          </CardContent>
         </Card>
       )}
 
@@ -649,6 +684,36 @@ export default function ScanDetail() {
           </CardContent>
         </Card>
       ))}
+
+      {/* Confirm delete dialog */}
+      <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+            This permanently removes the finding. If the same issue is detected on the next scan it will be re-created.
+          </Typography>
+          {pendingDelete && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
+              {pendingDelete.resource_id && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDelete.resource_id}</Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={deleteFinding.isPending}
+            onClick={() => pendingDelete && deleteFinding.mutate({ clientId: data.client_id, findingId: pendingDelete.id })}
+            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

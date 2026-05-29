@@ -3,9 +3,10 @@ import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
-  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip,
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip, IconButton,
+  Snackbar,
 } from "@mui/material";
-import { BugReport } from "@mui/icons-material";
+import { BugReport, DeleteOutlined, CleaningServices } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, findingsApi, projectsApi } from "../services/api";
@@ -117,6 +118,29 @@ export default function Findings() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["findings-all"] }); setSelected(null); },
+  });
+
+  const [pendingDelete, setPendingDelete] = React.useState<Finding | null>(null);
+  const [snack, setSnack] = React.useState<string>("");
+
+  const deleteMutation = useMutation({
+    mutationFn: (findingId: string) => findingsApi.delete(clientId, findingId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings-all"] });
+      qc.invalidateQueries({ queryKey: ["findings-categories"] });
+      setPendingDelete(null);
+      setSelected(null);
+      setSnack("Finding deleted");
+    },
+  });
+
+  const cleanupBlankMutation = useMutation({
+    mutationFn: () => findingsApi.cleanupBlank(clientId),
+    onSuccess: (resp: any) => {
+      qc.invalidateQueries({ queryKey: ["findings-all"] });
+      qc.invalidateQueries({ queryKey: ["findings-categories"] });
+      setSnack(`Deleted ${resp?.deleted ?? 0} blank finding(s)`);
+    },
   });
 
   const [sortKey, setSortKey] = React.useState<string>("first_seen_at");
@@ -243,7 +267,7 @@ export default function Findings() {
           </Grid>
 
           {findings.length > 0 && (
-            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
               {["critical","high","medium","low","info"].filter((s) => sevCounts[s]).map((s) => (
                 <Chip key={s} label={`${s.charAt(0).toUpperCase() + s.slice(1)}: ${sevCounts[s]}`} size="small"
                   onClick={() => setSevFilter(sevFilter === s ? "" : s)}
@@ -253,6 +277,26 @@ export default function Findings() {
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
                 {findings.length} matching
               </Typography>
+              <Box sx={{ flex: 1 }} />
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<CleaningServices sx={{ fontSize: 16 }} />}
+                disabled={cleanupBlankMutation.isPending}
+                onClick={() => {
+                  if (window.confirm("Delete all findings that have no title, description, or resource? This is used to tidy up empty rows after a scanner returned partial data.")) {
+                    cleanupBlankMutation.mutate();
+                  }
+                }}
+                sx={{
+                  color: "rgba(255,255,255,0.7)",
+                  borderColor: "rgba(255,255,255,0.15)",
+                  textTransform: "none",
+                  "&:hover": { borderColor: "#EA4335", color: "#EA4335", bgcolor: "rgba(234,67,53,0.05)" },
+                }}
+              >
+                Delete blank findings
+              </Button>
             </Box>
           )}
         </>
@@ -288,6 +332,7 @@ export default function Findings() {
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "first_seen_at"} direction={sortDir} onClick={() => setSort("first_seen_at")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
+                  <TableCell align="right" sx={{ width: 44 }} />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -336,6 +381,20 @@ export default function Findings() {
                           const ts = f.first_seen_at || f.created_at;
                           return fromNow(ts);
                         })()}
+                      </TableCell>
+                      <TableCell align="right" sx={{ width: 44 }}>
+                        <Tooltip title="Delete finding">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setPendingDelete(f); }}
+                            sx={{
+                              color: "rgba(255,255,255,0.4)",
+                              "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                            }}
+                          >
+                            <DeleteOutlined sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );
@@ -393,12 +452,62 @@ export default function Findings() {
                 </Box>
               </DialogContent>
               <DialogActions sx={{ p: 2 }}>
+                <Button
+                  startIcon={<DeleteOutlined />}
+                  onClick={() => setPendingDelete(selected)}
+                  sx={{
+                    color: "#EA4335", textTransform: "none",
+                    "&:hover": { bgcolor: "rgba(234,67,53,0.08)" },
+                  }}
+                >
+                  Delete
+                </Button>
+                <Box sx={{ flex: 1 }} />
                 <Button onClick={() => setSelected(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
               </DialogActions>
             </>
           );
         })()}
       </Dialog>
+
+      {/* Confirm delete */}
+      <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+            This permanently removes the finding from the database. If the same issue is detected again on the next scan it will be re-created.
+          </Typography>
+          {pendingDelete && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
+              {pendingDelete.resource_id && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDelete.resource_id}</Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteMutation.isPending}
+            onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
+            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={3000}
+        onClose={() => setSnack("")}
+        message={snack}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      />
     </Box>
   );
 }

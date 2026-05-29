@@ -4,14 +4,13 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   FormControl, InputLabel, Select, MenuItem, Button, Alert, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
-  Collapse, IconButton,
 } from "@mui/material";
-import { Warning, SmartToy, ExpandMore, ExpandLess } from "@mui/icons-material";
+import { Warning, SmartToy } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, risksApi, projectsApi, agentsApi } from "../services/api";
 import { Client, Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
-import RichOutput from "../components/RichOutput";
+import AgentInsightCard from "../components/AgentInsightCard";
 
 const LEVEL_COLOR: Record<string, string> = {
   critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853",
@@ -88,7 +87,8 @@ export default function Risks() {
   const [levelFilters, setLevelFilters] = useState<Set<string>>(new Set());
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
-  const [insightsOpen, setInsightsOpen] = useState(true);
+  // Only ONE agent insight tile is expanded at a time. null = all collapsed.
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
 
   const toggle = (s: Set<string>, setter: (s: Set<string>) => void, v: string) => {
     const next = new Set(s);
@@ -385,59 +385,47 @@ export default function Risks() {
             </TableContainer>
           </Card>
 
-          {/* AI Agent Risk Insights — filtered to risk-related agents only */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
-                onClick={() => setInsightsOpen((v) => !v)}>
-                <SmartToy sx={{ color: "#4285F4", fontSize: 18 }} />
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
-                  AI Agent Risk Insights
-                </Typography>
-                <Chip label={riskRuns.length} size="small"
-                  sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
-                <Box sx={{ flex: 1 }} />
-                <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
-                  {insightsOpen ? <ExpandLess /> : <ExpandMore />}
-                </IconButton>
-              </Box>
-              <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.4)", mb: 1 }}>
-                Outputs from risk-focused agents only (Risk Manager, Threat Intel, Remediation) — other agent reports are hidden here.
+          {/* AI Agent Risk Analysis — one tile per run, only one expanded at a time */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, mt: 1 }}>
+            <SmartToy sx={{ color: "#4285F4", fontSize: 18 }} />
+            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
+              AI Agent Risk Analysis
+            </Typography>
+            <Chip label={riskRuns.length} size="small"
+              sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
+            <Box sx={{ flex: 1 }} />
+            {expandedRunId && (
+              <Button size="small" onClick={() => setExpandedRunId(null)}
+                sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, textTransform: "none" }}>
+                Collapse all
+              </Button>
+            )}
+          </Box>
+          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.4)", mb: 1.5 }}>
+            Risk-focused agents only (Risk Manager, Threat Intel, Remediation). Click any tile to read the full analysis.
+          </Typography>
+          {riskRuns.length === 0 ? (
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 3, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                No risk-related agent runs yet. Run Risk Manager / Threat Intel / Remediation from the Agents page.
               </Typography>
-              <Collapse in={insightsOpen}>
-                {riskRuns.length === 0 ? (
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
-                    No risk-related agent runs yet. Run Risk Manager / Threat Intel / Remediation from the Agents page.
-                  </Typography>
-                ) : (
-                  riskRuns.slice(0, 10).map((run: any) => (
-                    <Box key={run.id} sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                        <Chip label={run.agent_type.replace(/_/g, " ")} size="small"
-                          sx={{ height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", textTransform: "capitalize" }} />
-                        <Chip label={run.status} size="small"
-                          sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                            bgcolor: run.status === "completed" ? "rgba(52,168,83,0.15)" : run.status === "failed" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
-                            color: run.status === "completed" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
-                        <Box sx={{ flex: 1 }} />
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
-                          {run.started_at ? fromNow(run.started_at) : ""}
-                        </Typography>
-                      </Box>
-                      {run.output_data && (
-                        <RichOutput value={run.output_data} maxHeight={300} />
-                      )}
-                      {run.error_message && (
-                        <Typography variant="caption" sx={{ color: "#EA4335", display: "block" }}>
-                          Error: {run.error_message}
-                        </Typography>
-                      )}
-                    </Box>
-                  ))
-                )}
-              </Collapse>
-            </CardContent>
-          </Card>
+            </Card>
+          ) : (
+            <Grid container spacing={1.5}>
+              {riskRuns.slice(0, 12).map((run: any) => {
+                const isExpanded = expandedRunId === run.id;
+                return (
+                  <Grid key={run.id} size={{ xs: 12, md: isExpanded ? 12 : 6 }}>
+                    <AgentInsightCard
+                      run={run}
+                      expanded={isExpanded}
+                      onToggle={() => setExpandedRunId(isExpanded ? null : run.id)}
+                    />
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
         </>
       )}
 
