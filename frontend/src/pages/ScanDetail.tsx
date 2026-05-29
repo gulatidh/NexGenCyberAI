@@ -7,12 +7,13 @@ import {
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
-  CheckCircle, Error as ErrorIcon, Help,
+  CheckCircle, Error as ErrorIcon, Help, Print,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { assessmentsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
+import RichOutput from "../components/RichOutput";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -117,11 +118,7 @@ function VerdictHeadline({ verdict }: { verdict: Verdict }) {
 }
 
 function NarrativeBlock({ text }: { text: string }) {
-  return (
-    <Typography sx={{ color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
-      {text}
-    </Typography>
-  );
+  return <RichOutput value={text} />;
 }
 
 function CapabilityGaps({ gaps }: { gaps: Verdict["capability_gaps"] }) {
@@ -424,6 +421,19 @@ export default function ScanDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("verdict");
+  // When the browser triggers print (button or Ctrl+P), expand every tab
+  // section so the whole assessment renders as a single document.
+  const [printing, setPrinting] = useState<boolean>(false);
+  React.useEffect(() => {
+    const onBefore = () => setPrinting(true);
+    const onAfter = () => setPrinting(false);
+    window.addEventListener("beforeprint", onBefore);
+    window.addEventListener("afterprint", onAfter);
+    return () => {
+      window.removeEventListener("beforeprint", onBefore);
+      window.removeEventListener("afterprint", onAfter);
+    };
+  }, []);
 
   const { data, isLoading, error, refetch } = useQuery<ScanDetailData>({
     queryKey: ["scan-detail", scanId],
@@ -457,8 +467,39 @@ export default function ScanDetail() {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+    <Box className="scan-detail-print-area">
+      {/* Print stylesheet — flatten tabs into a single document, swap dark
+          chrome for paper-friendly contrast, hide nav/buttons. Triggered
+          by either the Print/PDF button or Ctrl+P. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 12mm; }
+          body { background: white !important; color: black !important; }
+          .MuiDrawer-root, .MuiAppBar-root, .no-print { display: none !important; }
+          .scan-detail-print-area { padding: 0 !important; max-width: 100% !important; }
+          .scan-detail-print-area, .scan-detail-print-area * {
+            color: #1a1a1a !important;
+            background: white !important;
+            border-color: rgba(0,0,0,0.15) !important;
+            box-shadow: none !important;
+          }
+          .scan-detail-print-area .MuiCard-root,
+          .scan-detail-print-area .MuiCardContent-root { background: white !important; }
+          .scan-detail-print-area .MuiChip-root {
+            background: rgba(0,0,0,0.05) !important;
+            color: #1a1a1a !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+          }
+          /* Keep severity / status chip colours legible on paper */
+          .scan-detail-print-area .MuiLinearProgress-bar { background: #1a73e8 !important; }
+          .scan-detail-print-area h6, .scan-detail-print-area .MuiTypography-h5 {
+            page-break-after: avoid;
+          }
+          .scan-detail-print-area .MuiCard-root { page-break-inside: avoid; }
+        }
+      `}</style>
+
+      <Box className="no-print" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
         <Button startIcon={<ArrowBack />} size="small"
           onClick={() => navigate("/scans")}
           sx={{ color: "rgba(255,255,255,0.6)" }}>
@@ -481,11 +522,19 @@ export default function ScanDetail() {
             textTransform: "uppercase", fontSize: 11, height: 24,
           }} />
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()}
+            className="no-print"
             sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>
             Refresh
           </Button>
+          <Button variant="outlined" startIcon={<Print />} onClick={() => window.print()}
+            className="no-print"
+            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)",
+              "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
+            Print / PDF
+          </Button>
           <Button variant="contained" startIcon={<AutoAwesome />}
             disabled={generateMutation.isPending}
+            className="no-print"
             onClick={() => generateMutation.mutate()}>
             {verdict ? "Regenerate Verdict" : "Generate Verdict"}
           </Button>
@@ -494,6 +543,7 @@ export default function ScanDetail() {
 
       {/* Top-level tabs: Verdict | Findings | one tab per agent run */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
+        className="no-print"
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
           "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
           "& .Mui-selected": { color: "#4285F4" },
@@ -508,7 +558,7 @@ export default function ScanDetail() {
       </Tabs>
 
       {/* AI Verdict tab */}
-      {tab === "verdict" && (
+      {(tab === "verdict" || printing) && (
         verdict ? (
           <Box>
             <VerdictHeadline verdict={verdict} />
@@ -566,14 +616,14 @@ export default function ScanDetail() {
       )}
 
       {/* Findings tab */}
-      {tab === "findings" && (
+      {(tab === "findings" || printing) && (
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent><FindingsTable findings={data.findings} /></CardContent>
         </Card>
       )}
 
       {/* Per-agent run tabs */}
-      {data.agent_runs.map((ar) => tab === `agent-${ar.id}` && (
+      {data.agent_runs.map((ar) => (tab === `agent-${ar.id}` || printing) && (
         <Card key={ar.id} sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
@@ -595,13 +645,7 @@ export default function ScanDetail() {
             {ar.error_message && (
               <Alert severity="error" sx={{ mb: 1.5 }}>{ar.error_message}</Alert>
             )}
-            <Typography component="pre" sx={{
-              color: "rgba(255,255,255,0.85)", fontSize: 13, whiteSpace: "pre-wrap",
-              wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.55,
-            }}>
-              {typeof ar.output_data === "string" ? ar.output_data
-                : JSON.stringify(ar.output_data, null, 2)}
-            </Typography>
+            <RichOutput value={ar.output_data} />
           </CardContent>
         </Card>
       ))}

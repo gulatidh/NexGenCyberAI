@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, clientsApi, scansApi, agentCatalogApi, adminApi } from "../services/api";
 import { Client, Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
+import RichOutput from "../components/RichOutput";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -493,12 +494,7 @@ export default function Agents() {
                     <Chip size="small" label={`${briefingOutput.duration_ms} ms`}
                       sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
                   </Box>
-                  <Typography component="pre" sx={{
-                    color: "rgba(255,255,255,0.9)", fontSize: 13, whiteSpace: "pre-wrap",
-                    wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.5, m: 0,
-                  }}>
-                    {briefingOutput.output}
-                  </Typography>
+                  <RichOutput value={briefingOutput.output} />
                 </>
               )}
               {!briefingMutation.isPending && !briefingOutput && !briefingError && (

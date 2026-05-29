@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, risksApi, projectsApi, agentsApi } from "../services/api";
 import { Client, Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
+import RichOutput from "../components/RichOutput";
 
 const LEVEL_COLOR: Record<string, string> = {
   critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853",
@@ -424,12 +425,7 @@ export default function Risks() {
                         </Typography>
                       </Box>
                       {run.output_data && (
-                        <Typography component="pre" sx={{
-                          color: "rgba(255,255,255,0.8)", fontSize: 12, whiteSpace: "pre-wrap",
-                          wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.4, maxHeight: 200, overflow: "auto",
-                        }}>
-                          {typeof run.output_data === "string" ? run.output_data : JSON.stringify(run.output_data, null, 2)}
-                        </Typography>
+                        <RichOutput value={run.output_data} maxHeight={300} />
                       )}
                       {run.error_message && (
                         <Typography variant="caption" sx={{ color: "#EA4335", display: "block" }}>
