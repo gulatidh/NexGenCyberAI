@@ -92,6 +92,60 @@ async def _execute_scan(
                     # Stay in RUNNING — workflow will mark COMPLETED via ingest.
                     return
 
+                # Generic WorkflowConnector path — any scanner that defers
+                # execution to a GitHub Actions workflow (NMAP, Trivy,
+                # Gitleaks, TruffleHog, Semgrep, ...). Dispatch the
+                # workflow, persist its runtime target, and stay in
+                # RUNNING until /scans/ingest/ is called by the runner.
+                try:
+                    from connectors.scanners.base import WorkflowConnector
+                    creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                    conn_obj = get_connector(connector_db.connector_type, creds, connector_db.config or {})
+                except Exception:
+                    conn_obj = None
+
+                if isinstance(conn_obj, WorkflowConnector) and conn_obj.WORKFLOW_FILE:
+                    from core.scan_tokens import mint_scan_token
+                    from core.github_dispatch import dispatch_workflow
+                    from services.scan_runtime import set_runtime
+                    import os as _os
+
+                    target = conn_obj._primary_target()
+                    if not target:
+                        scan.status = ScanStatus.FAILED
+                        scan.error_message = (
+                            f"Cannot start {connector_db.connector_type} scan — missing "
+                            f"required config (need one of: {', '.join(conn_obj.REQUIRED_CONFIG)})"
+                        )
+                        scan.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+                        return
+
+                    scan_token = mint_scan_token(scan.id)
+                    set_runtime(scan.id, {
+                        # Surface every key the workflow runner might read via
+                        # /scans/config/. Workflows ignore fields they don't use.
+                        "target": target,
+                        "repo_url": conn_obj._get("repo_url") or None,
+                        "image": conn_obj._get("image") or None,
+                        "git_username": conn_obj._get("git_username") or None,
+                        "git_token": conn_obj._get("git_token") or None,
+                    })
+
+                    inputs = {
+                        "scan_id": scan.id,
+                        "scan_token": scan_token,
+                        "api_base": (_os.environ.get("PUBLIC_API_BASE") or "").rstrip("/"),
+                    }
+                    result = dispatch_workflow(conn_obj.WORKFLOW_FILE, inputs)
+                    if not result.get("ok"):
+                        scan.status = ScanStatus.FAILED
+                        scan.error_message = f"Workflow dispatch failed: {result.get('error')}"
+                        scan.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+                    # Else: stay in RUNNING — workflow will mark COMPLETED via ingest.
+                    return
+
                 # Refresh asset inventory before the scan so findings join to fresh assets.
                 try:
                     await sync_connector_assets(db, connector_db)

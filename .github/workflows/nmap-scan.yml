@@ -1,0 +1,319 @@
+name: Nmap Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Reads the
+# target host / IP / CIDR from /api/v1/scans/config/, runs nmap with
+# service + version + safe vuln NSE scripts, then POSTs structured
+# findings to /api/v1/scans/ingest/.
+#
+# Scan profile chosen for cloud workloads (skip host discovery, top
+# 1000 ports, service/version detection, safe NSE). Fast enough to
+# finish inside the 30-minute job timeout for a typical /24.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  nmap:
+    name: Run Nmap
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re
+          c = json.load(open("cfg.json"))
+          target = (c.get("target") or "").strip()
+          # Validate: must be a hostname, IPv4, IPv4/CIDR or comma-separated
+          # list of those. Reject anything with shell-special characters.
+          if not target or not re.fullmatch(r"[A-Za-z0-9_.\-:/, ]+", target):
+              print("target=")
+          else:
+              print(f"target={target}")
+          PY
+
+      - name: Install Nmap
+        if: steps.cfg.outputs.target != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nmap
+
+      - name: Run Nmap
+        if: steps.cfg.outputs.target != ''
+        env:
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -uo pipefail
+          # -Pn   skip host discovery (cloud hosts often don't ICMP)
+          # -sS   SYN scan (fast, requires root — runners have it via sudo)
+          # -sV   service/version detection
+          # --top-ports 1000  covers ~95% of real-world services
+          # --script=default,safe,vuln  bundled NSE — no exploit scripts
+          # --script-timeout 60s + host-timeout to bound long scans
+          sudo nmap \
+            -Pn -sS -sV \
+            --top-ports 1000 \
+            --script="default,safe,vuln" \
+            --script-timeout 60s \
+            --host-timeout 5m \
+            --max-retries 1 \
+            -oX results.xml \
+            $TARGET \
+            || true
+          # If we got no XML at all, nmap probably segfaulted — leave the
+          # ingest step to handle that case.
+          ls -la results.xml || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.request, urllib.error
+          import xml.etree.ElementTree as ET
+
+          findings = []
+          err = None
+          target = os.environ.get("TARGET", "")
+
+          # Ports we treat as high-risk if they're exposed at all. The host
+          # being on the internet vs. an internal segment can't be inferred
+          # from here, so we let the operator make that call on the finding.
+          HIGH_RISK_PORTS = {
+              21:   ("FTP",       "Plain-text credentials over the wire — replace with SFTP/FTPS"),
+              23:   ("Telnet",    "Plain-text protocol — replace with SSH"),
+              25:   ("SMTP",      "Open mail relay risk if no auth — restrict and require TLS"),
+              69:   ("TFTP",      "Unauthenticated file transfer — should not be reachable"),
+              135:  ("MS-RPC",    "Internal-only — block at the edge"),
+              137:  ("NetBIOS",   "Legacy — block at the edge"),
+              139:  ("SMB",       "Restrict to trusted networks; require SMBv3 + signing"),
+              445:  ("SMB",       "Restrict to trusted networks; require SMBv3 + signing"),
+              512:  ("rexec",     "Legacy r-services — remove"),
+              513:  ("rlogin",    "Legacy r-services — remove"),
+              514:  ("rsh",       "Legacy r-services — remove"),
+              1433: ("MSSQL",     "Database should not be exposed directly — front with VPN / private endpoint"),
+              1521: ("Oracle",    "Database should not be exposed directly"),
+              2049: ("NFS",       "Shouldn't be public — restrict to trusted subnets"),
+              3306: ("MySQL",     "Database should not be exposed directly"),
+              3389: ("RDP",       "Restrict to trusted IPs / require Just-In-Time access"),
+              5432: ("PostgreSQL","Database should not be exposed directly"),
+              5984: ("CouchDB",   "Database should not be exposed directly"),
+              6379: ("Redis",     "Database should not be exposed directly — Redis has no auth by default"),
+              8086: ("InfluxDB",  "Database should not be exposed directly"),
+              9200: ("Elasticsearch", "Database should not be exposed directly"),
+              11211:("Memcached", "No auth — must not be reachable from untrusted networks"),
+              27017:("MongoDB",   "Database should not be exposed directly"),
+          }
+          MEDIUM_PORTS = {22: "SSH", 161: "SNMP", 389: "LDAP", 636: "LDAPS",
+                          5900: "VNC", 1099: "RMI Registry"}
+
+          # CWE / NIST control mappings, used to tag findings for the right
+          # framework dashboards.
+          NET_CONTROLS = {"nist_800_53": ["SC-7", "AC-17"], "cis_v8": ["4.1", "4.4"]}
+
+          def sev_for_script_id(sid: str) -> str:
+              s = (sid or "").lower()
+              if any(x in s for x in ("vuln", "exploit", "smb-vuln", "ms17", "heartbleed", "shellshock")):
+                  return "high"
+              if "cve" in s or "csrf" in s or "xss" in s:
+                  return "high"
+              return "medium"
+
+          if os.path.exists("results.xml") and os.path.getsize("results.xml") > 0:
+              try:
+                  tree = ET.parse("results.xml")
+                  root = tree.getroot()
+                  for host in root.findall("host"):
+                      addr_el = host.find("address[@addrtype='ipv4']") or host.find("address")
+                      ip = addr_el.get("addr") if addr_el is not None else ""
+                      hostname = ""
+                      hn = host.find("hostnames/hostname")
+                      if hn is not None:
+                          hostname = hn.get("name", "")
+                      resource = hostname or ip or target
+
+                      # OS detection
+                      osmatch = host.find("os/osmatch")
+                      os_name = osmatch.get("name") if osmatch is not None else None
+
+                      # Iterate every reported port (open + closed; we filter)
+                      for port in host.findall("ports/port"):
+                          state_el = port.find("state")
+                          if state_el is None or state_el.get("state") != "open":
+                              continue
+                          pnum = int(port.get("portid", "0"))
+                          proto = port.get("protocol", "tcp")
+                          svc_el = port.find("service")
+                          svc_name = (svc_el.get("name") if svc_el is not None else "") or "unknown"
+                          product = svc_el.get("product", "") if svc_el is not None else ""
+                          version = svc_el.get("version", "") if svc_el is not None else ""
+                          banner = " ".join(x for x in (product, version) if x).strip()
+
+                          # Severity bucket
+                          if pnum in HIGH_RISK_PORTS:
+                              sev = "high"
+                              label, rem = HIGH_RISK_PORTS[pnum]
+                          elif pnum in MEDIUM_PORTS:
+                              sev = "medium"
+                              label = MEDIUM_PORTS[pnum]
+                              rem = f"Restrict {label} ({pnum}/{proto}) to trusted networks; require MFA or jump host."
+                          else:
+                              sev = "low"
+                              label = svc_name.upper() or "Service"
+                              rem = "Confirm this service is required to be reachable; otherwise close the port."
+
+                          title = f"{label} exposed on {pnum}/{proto}"
+                          if banner:
+                              title += f" ({banner})"
+                          findings.append({
+                              "title": title[:255],
+                              "description": (
+                                  f"Nmap detected {svc_name} listening on {resource}:{pnum}/{proto}"
+                                  + (f" — {banner}" if banner else "")
+                                  + (f". Detected OS: {os_name}." if os_name else "")
+                              )[:4000],
+                              "severity": sev,
+                              "resource_id": f"{resource}:{pnum}/{proto}",
+                              "resource_type": "network/host",
+                              "control_id": "NIST AC-17" if pnum in (22, 3389) else "NIST SC-7",
+                              "remediation": rem,
+                              "evidence": {
+                                  "ip": ip,
+                                  "hostname": hostname,
+                                  "port": pnum,
+                                  "protocol": proto,
+                                  "service": svc_name,
+                                  "product": product,
+                                  "version": version,
+                                  "os": os_name,
+                              },
+                              "cve_id": "",
+                              "cvss_score": 0,
+                              "control_mappings": NET_CONTROLS,
+                          })
+
+                          # NSE script hits on this port — promote each one as
+                          # its own finding when the script ID looks like a
+                          # vuln check.
+                          for script in port.findall("script"):
+                              sid = script.get("id", "")
+                              raw = script.get("output", "") or ""
+                              if not sid or not raw.strip():
+                                  continue
+                              # Skip purely informational scripts (banner echo)
+                              if sid in ("banner", "fingerprint-strings", "http-server-header", "http-title", "ssl-cert", "ssh-hostkey"):
+                                  continue
+                              # Extract a CVE if the script output references one
+                              cves = re.findall(r"CVE-\d{4}-\d{4,7}", raw)
+                              ssev = sev_for_script_id(sid)
+                              findings.append({
+                                  "title": f"Nmap NSE {sid} on {resource}:{pnum}/{proto}"[:255],
+                                  "description": raw[:4000],
+                                  "severity": ssev,
+                                  "resource_id": f"{resource}:{pnum}/{proto}",
+                                  "resource_type": "network/host",
+                                  "control_id": cves[0] if cves else sid,
+                                  "remediation": "Review the NSE script finding above and patch / mitigate per the referenced vendor advisory.",
+                                  "evidence": {
+                                      "script": sid,
+                                      "port": pnum,
+                                      "protocol": proto,
+                                      "cves": cves,
+                                  },
+                                  "cve_id": cves[0] if cves else "",
+                                  "cvss_score": 0,
+                                  "control_mappings": NET_CONTROLS,
+                              })
+
+                      # Host-level NSE scripts (e.g. smb-os-discovery)
+                      for hs in host.findall("hostscript/script"):
+                          sid = hs.get("id", "")
+                          raw = hs.get("output", "") or ""
+                          if not sid or not raw.strip():
+                              continue
+                          if sid in ("smb-os-discovery", "smb2-time"):
+                              continue
+                          cves = re.findall(r"CVE-\d{4}-\d{4,7}", raw)
+                          ssev = sev_for_script_id(sid)
+                          findings.append({
+                              "title": f"Nmap NSE {sid} on {resource}"[:255],
+                              "description": raw[:4000],
+                              "severity": ssev,
+                              "resource_id": resource,
+                              "resource_type": "network/host",
+                              "control_id": cves[0] if cves else sid,
+                              "remediation": "Review the NSE script finding above and patch / mitigate.",
+                              "evidence": {"script": sid, "cves": cves},
+                              "cve_id": cves[0] if cves else "",
+                              "cvss_score": 0,
+                              "control_mappings": NET_CONTROLS,
+                          })
+
+                  if not findings:
+                      # Scan ran but found nothing open → useful signal, not an error.
+                      findings.append({
+                          "title": f"No open services detected on {target}",
+                          "description": "Nmap completed without finding any open ports on the supplied target(s). This is the desired state for hosts that don't expose any service.",
+                          "severity": "info",
+                          "resource_id": target,
+                          "resource_type": "network/host",
+                          "control_id": "NIST SC-7",
+                          "remediation": "",
+                          "evidence": {},
+                          "cve_id": "",
+                          "cvss_score": 0,
+                          "control_mappings": NET_CONTROLS,
+                      })
+              except Exception as e:
+                  err = f"Failed to parse Nmap XML: {e}"
+          else:
+              err = "Nmap report not produced — scan may have failed or target was rejected"
+
+          payload = {
+              "scan_id": os.environ["SCAN_ID"],
+              "scan_token": os.environ["SCAN_TOKEN"],
+              "findings": findings,
+              "error": err if (not findings and err) else None,
+          }
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY
