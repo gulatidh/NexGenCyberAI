@@ -554,6 +554,49 @@ class KnowledgeFile(Base):
                             cascade="all, delete-orphan", order_by="KnowledgeFileSection.position")
 
 
+class AIAgent(Base):
+    """A configurable AI specialist agent in the catalog.
+
+    Each row defines an agent's identity, group, and LLM configuration.
+    Built-in agents (`is_builtin=True`) are seeded on startup and cannot
+    be deleted by non-admins. Custom agents are added via the admin UI.
+
+    Note: legacy operational agents from `AgentType` enum (risk_manager,
+    va_scanner, etc.) also live in this table with `key` matching the
+    enum value, so the Agents page can render one unified grouped list.
+    Their `legacy_orchestrator=True` flag tells the UI to use the
+    existing `/clients/{client_id}/agents/run/` execution path.
+    """
+    __tablename__ = "ai_agents"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    key = Column(String(128), nullable=False, unique=True, index=True)  # slug
+    name = Column(String(255), nullable=False)
+    group_key = Column(String(64), nullable=False, index=True)
+    group_label = Column(String(128), nullable=False)
+    description = Column(Text)
+    objective = Column(Text)
+    domain = Column(String(255))
+    system_prompt = Column(Text)
+    # LLM overrides — null means inherit from AISettings/env defaults
+    provider = Column(String(64))
+    model = Column(String(128))
+    temperature = Column(Float, default=0.1)
+    max_tokens = Column(Integer, default=4096)
+    # JSON list of tool identifiers + knowledge file IDs
+    tools_enabled = Column(JSON, default=list)
+    knowledge_file_ids = Column(JSON, default=list)
+    # Flags
+    is_builtin = Column(Boolean, default=False, nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    legacy_orchestrator = Column(Boolean, default=False, nullable=False)
+    # Audit
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_by = Column(String(255))
+    updated_by = Column(String(255))
+
+
 class KnowledgeFileSection(Base):
     """One section inside a KnowledgeFile.
 

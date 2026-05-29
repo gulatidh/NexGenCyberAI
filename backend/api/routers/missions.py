@@ -7,6 +7,7 @@ require admin or editor scope.
 """
 from __future__ import annotations
 import asyncio
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -68,8 +69,8 @@ class MissionRunResponse(BaseModel):
     mission_id: str
     status: MissionRunStatus
     triggered_by: str
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     output: Optional[str] = None
     error: Optional[str] = None
 
@@ -194,10 +195,22 @@ async def run_now(
     m = db.query(ScheduledMission).filter(ScheduledMission.id == mission_id).first()
     if not m:
         raise HTTPException(status_code=404, detail="Mission not found")
-    run = await execute_mission(db, m, triggered_by="manual")
-    db.commit()
-    db.refresh(run)
-    return run
+    try:
+        run = await execute_mission(db, m, triggered_by="manual")
+        db.commit()
+        db.refresh(run)
+        return run
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # Surface root cause so the UI shows something useful instead of a
+        # bare 500. execute_mission catches handler exceptions internally
+        # and writes them to run.error, so this branch is mostly for
+        # session/commit failures.
+        db.rollback()
+        import logging
+        logging.getLogger(__name__).exception("run_now failed for mission %s", mission_id)
+        raise HTTPException(status_code=500, detail=f"Mission run failed: {type(exc).__name__}: {exc}")
 
 
 @router.get("/{mission_id}/runs", response_model=List[MissionRunResponse])

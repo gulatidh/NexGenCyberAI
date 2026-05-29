@@ -233,3 +233,12 @@ export const knowledgeApi = {
   stats: () => apiClient.get(`/knowledge/stats`).then((r) => r.data),
   get: (fileId: string) => apiClient.get(`/knowledge/${fileId}`).then((r) => r.data),
 };
+
+export const agentCatalogApi = {
+  list: () => apiClient.get(`/agents/catalog/`).then((r) => r.data),
+  get: (agentId: string) => apiClient.get(`/agents/catalog/${agentId}`).then((r) => r.data),
+  create: (data: any) => apiClient.post(`/agents/catalog/`, data).then((r) => r.data),
+  update: (agentId: string, data: any) =>
+    apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
+  delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
+};

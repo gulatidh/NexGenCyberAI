@@ -1,221 +1,421 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Box, Typography, Button, Card, CardContent, Grid,
-  Chip, Select, MenuItem, FormControl, InputLabel,
-  CircularProgress, Alert, Accordion, AccordionSummary,
-  AccordionDetails, LinearProgress,
+  Box, Typography, Button, Card, CardContent, Grid, Chip,
+  Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  Switch, IconButton, Tooltip,
 } from "@mui/material";
-import { ExpandMore, SmartToy, PlayArrow } from "@mui/icons-material";
+import {
+  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
+} from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { agentsApi, clientsApi, scansApi } from "../services/api";
-import { Client, Scan, AgentType } from "../types";
+import { agentsApi, clientsApi, scansApi, agentCatalogApi, adminApi } from "../services/api";
+import { Client, Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 
-const AGENT_DEFINITIONS = [
-  {
-    type: "orchestrator" as AgentType,
-    title: "Full Assessment Orchestrator",
-    description: "Runs all agents in sequence: VA → Framework → Threat Intel → Risk → Remediation → Compliance",
-    icon: "🤖",
-    color: "#4285F4",
-  },
-  {
-    type: "va_scanner" as AgentType,
-    title: "Vulnerability Assessment Agent",
-    description: "Analyses vulnerabilities, enriches with NVD CVE data, and prioritises by CVSS score",
-    icon: "🔍",
-    color: "#ff9800",
-  },
-  {
-    type: "framework_analyst" as AgentType,
-    title: "Framework Compliance Agent",
-    description: "Maps findings to NIST CSF, NIST 800-53, CIS v8, GDPR, ISO 27001 controls",
-    icon: "📋",
-    color: "#34A853",
-  },
-  {
-    type: "threat_intel" as AgentType,
-    title: "Threat Intelligence Agent",
-    description: "Correlates findings with MITRE ATT&CK TTPs and threat actor campaigns",
-    icon: "🎯",
-    color: "#f44336",
-  },
-  {
-    type: "risk_manager" as AgentType,
-    title: "Risk Management Agent",
-    description: "Calculates risk scores using NIST SP 800-30, builds risk register with mitigations",
-    icon: "⚠️",
-    color: "#ffeb3b",
-  },
-  {
-    type: "remediation" as AgentType,
-    title: "Remediation Agent",
-    description: "Generates step-by-step playbooks and ServiceNow ticket payloads for all findings",
-    icon: "🔧",
-    color: "#00e676",
-  },
-  {
-    type: "compliance_monitor" as AgentType,
-    title: "Compliance Monitor Agent",
-    description: "Continuous compliance drift detection, audit reports, and maturity assessment",
-    icon: "✅",
-    color: "#ff6d00",
-  },
-];
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface Agent {
+  id: string;
+  key: string;
+  name: string;
+  group_key: string;
+  group_label: string;
+  description?: string;
+  objective?: string;
+  domain?: string;
+  system_prompt?: string;
+  provider?: string;
+  model?: string;
+  temperature: number;
+  max_tokens: number;
+  tools_enabled: string[];
+  knowledge_file_ids: string[];
+  is_builtin: boolean;
+  is_enabled: boolean;
+  legacy_orchestrator: boolean;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+interface AgentGroup { key: string; label: string; agents: Agent[]; }
+
+// Per-group accent (Google palette)
+const GROUP_COLOR: Record<string, string> = {
+  core_advisory: "#4285F4",
+  architecture_engineering: "#34A853",
+  threat_incident_response: "#EA4335",
+  risk_compliance_governance: "#FBBC04",
+  vulnerability_management: "#FF7043",
+  agentic_ai_security: "#9C27B0",
+  business_reporting: "#00ACC1",
+  specialized_readiness: "#7CB342",
+  operational: "#4285F4",
+};
+
+// ── Configuration dialog ─────────────────────────────────────────────────────
+
+function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
+  open: boolean; agent: Agent | null; onClose: () => void;
+  onSave: (patch: any) => void; isAdmin: boolean;
+}) {
+  const [form, setForm] = useState<Partial<Agent>>({});
+  React.useEffect(() => { setForm(agent || {}); }, [agent]);
+
+  if (!agent) return null;
+  const set = <K extends keyof Agent>(k: K, v: Agent[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const readOnly = !isAdmin;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
+      slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+      <DialogTitle>
+        {readOnly ? "Agent Configuration" : "Edit Agent Configuration"}
+        <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+          {agent.name} · {agent.group_label}{agent.is_builtin && " · Built-in"}
+        </Typography>
+      </DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Name" disabled={readOnly}
+              value={form.name || ""} onChange={(e) => set("name", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Domain" disabled={readOnly}
+              value={form.domain || ""} onChange={(e) => set("domain", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth size="small" label="Description" disabled={readOnly}
+              value={form.description || ""} onChange={(e) => set("description", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth size="small" label="Objective" disabled={readOnly}
+              value={form.objective || ""} onChange={(e) => set("objective", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth size="small" label="System Prompt" multiline minRows={6} disabled={readOnly}
+              value={form.system_prompt || ""} onChange={(e) => set("system_prompt", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace", fontSize: 12 } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <TextField fullWidth size="small" label="Provider" disabled={readOnly}
+              placeholder="inherit"
+              value={form.provider || ""} onChange={(e) => set("provider", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <TextField fullWidth size="small" label="Model" disabled={readOnly}
+              placeholder="inherit"
+              value={form.model || ""} onChange={(e) => set("model", e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <TextField fullWidth size="small" type="number" label="Temperature" disabled={readOnly}
+              value={form.temperature ?? 0.1} onChange={(e) => set("temperature", parseFloat(e.target.value))}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { step: 0.1, min: 0, max: 2, style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 6, sm: 3 }}>
+            <TextField fullWidth size="small" type="number" label="Max Tokens" disabled={readOnly}
+              value={form.max_tokens ?? 4096} onChange={(e) => set("max_tokens", parseInt(e.target.value, 10))}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Switch checked={!!form.is_enabled} disabled={readOnly}
+                onChange={(e) => set("is_enabled", e.target.checked)} />
+              <Typography variant="body2">Enabled — agent appears in active pickers and orchestration</Typography>
+            </Box>
+          </Grid>
+          {readOnly && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "white" }}>
+                Read-only view. Only administrators can edit the agent catalog.
+              </Alert>
+            </Grid>
+          )}
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+        {!readOnly && (
+          <Button variant="contained" onClick={() => onSave(form)}>Save</Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── New Agent dialog ────────────────────────────────────────────────────────
+
+function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
+  open: boolean; onClose: () => void; onCreate: (data: any) => void;
+  existingGroups: { key: string; label: string }[];
+}) {
+  const [data, setData] = useState<any>({
+    key: "", name: "", group_key: existingGroups[0]?.key || "core_advisory",
+    group_label: existingGroups[0]?.label || "Core Advisory",
+    description: "", system_prompt: "", temperature: 0.1, max_tokens: 4096, is_enabled: true,
+  });
+  React.useEffect(() => {
+    if (open) setData({
+      key: "", name: "", group_key: existingGroups[0]?.key || "core_advisory",
+      group_label: existingGroups[0]?.label || "Core Advisory",
+      description: "", system_prompt: "", temperature: 0.1, max_tokens: 4096, is_enabled: true,
+    });
+  }, [open, existingGroups]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+      <DialogTitle>New Agent</DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Key (slug, unique)" required
+              value={data.key} onChange={(e) => setData({ ...data, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Display Name" required
+              value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Group</InputLabel>
+              <Select value={data.group_key} label="Group"
+                onChange={(e) => {
+                  const g = existingGroups.find((x) => x.key === e.target.value);
+                  setData({ ...data, group_key: e.target.value, group_label: g?.label || e.target.value });
+                }}
+                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                {existingGroups.map((g) => <MenuItem key={g.key} value={g.key}>{g.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth size="small" label="Description"
+              value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField fullWidth size="small" label="System Prompt" multiline minRows={4}
+              value={data.system_prompt} onChange={(e) => setData({ ...data, system_prompt: e.target.value })}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace", fontSize: 12 } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+        <Button variant="contained" disabled={!data.key || !data.name}
+          onClick={() => onCreate(data)}>Create</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Agents() {
   const qc = useQueryClient();
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedScanId, setSelectedScanId] = useState("");
-  const [runningAgent, setRunningAgent] = useState<AgentType | null>(null);
+  const [configuring, setConfiguring] = useState<Agent | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+
+  const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
+  const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: scans = [] } = useQuery<Scan[]>({
-    queryKey: ["scans", selectedClientId],
+    queryKey: ["scans-for-agents", selectedClientId],
     queryFn: () => scansApi.list(selectedClientId),
     enabled: !!selectedClientId,
   });
-  const { data: runs = [] } = useQuery({
-    queryKey: ["agent-runs", selectedClientId],
-    queryFn: () => agentsApi.listRuns(selectedClientId),
-    enabled: !!selectedClientId,
-    refetchInterval: 10_000,
+
+  const { data: catalogData, isLoading } = useQuery<{ groups: AgentGroup[] }>({
+    queryKey: ["agent-catalog"], queryFn: agentCatalogApi.list,
   });
+
+  const groups = useMemo(() => catalogData?.groups || [], [catalogData]);
+  const groupOptions = useMemo(() => groups.map((g) => ({ key: g.key, label: g.label })), [groups]);
 
   const runMutation = useMutation({
-    mutationFn: (data: any) => agentsApi.run(selectedClientId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-runs"] }); setRunningAgent(null); toast.success("Agent run complete"); },
-    onError: (e: any) => { setRunningAgent(null); toast.error(e.response?.data?.detail || "Agent error"); },
+    mutationFn: (agentType: AgentType) =>
+      agentsApi.run(selectedClientId, { agent_type: agentType, scan_id: selectedScanId || undefined }),
+    onSuccess: (_, agentType) => { qc.invalidateQueries({ queryKey: ["agent-runs"] }); toast.success(`${agentType} started`); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Agent run failed"),
   });
 
-  const handleRunAgent = (agentType: AgentType) => {
-    if (!selectedClientId) { toast.error("Select a client first"); return; }
-    setRunningAgent(agentType);
-    runMutation.mutate({ agent_type: agentType, scan_id: selectedScanId || undefined });
-  };
+  const updateMutation = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: any }) => agentCatalogApi.update(id, patch),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-catalog"] }); toast.success("Agent updated"); setConfiguring(null); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Update failed"),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => agentCatalogApi.create(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-catalog"] }); toast.success("Agent created"); setNewOpen(false); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Create failed"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => agentCatalogApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-catalog"] }); toast.success("Agent deleted"); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
+  });
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <SmartToy sx={{ color: "#4285F4", fontSize: 32 }} />
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Security Agents</Typography>
+          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Agents</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
-            AI-powered analysis agents using your configured provider (Claude / OpenAI / Gemini / Bedrock)
+            {groups.length > 0
+              ? `${groups.reduce((s, g) => s + g.agents.length, 0)} specialist agents across ${groups.length} groups${isAdmin ? "" : " — admin role required to modify"}`
+              : "Loading…"}
           </Typography>
         </Box>
-      </Box>
-
-      {/* Context selectors */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Client"
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client (for run)</InputLabel>
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedScanId(""); }} label="Client (for run)"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">None</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <FormControl fullWidth size="small">
+          <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan (optional)</InputLabel>
-            <Select value={selectedScanId} onChange={(e) => setSelectedScanId(e.target.value)} label="Scan" disabled={!selectedClientId}
+            <Select value={selectedScanId} onChange={(e) => setSelectedScanId(e.target.value)} label="Scan (optional)"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-              <MenuItem value="">No specific scan</MenuItem>
-              {scans.filter((s) => s.status === "completed").map((s) => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.name || `${s.scan_type} scan`}{s.framework ? ` · ${s.framework}` : ""} — {new Date(s.created_at!).toLocaleDateString()}
-                </MenuItem>
-              ))}
+              <MenuItem value="">No scan</MenuItem>
+              {scans.map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
             </Select>
           </FormControl>
-        </Grid>
-      </Grid>
+          {isAdmin && (
+            <Button variant="contained" startIcon={<Add />} onClick={() => setNewOpen(true)}>
+              New Agent
+            </Button>
+          )}
+        </Box>
+      </Box>
 
-      {/* Agent Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {AGENT_DEFINITIONS.map((agent) => {
-          const isRunning = runningAgent === agent.type;
+      {isLoading ? (
+        <CircularProgress sx={{ color: "#4285F4" }} />
+      ) : (
+        groups.map((group) => {
+          const color = GROUP_COLOR[group.key] || "#4285F4";
           return (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.type}>
-              <Card sx={{
-                bgcolor: "#1E1E1E",
-                border: `1px solid ${isRunning ? agent.color : "rgba(255,255,255,0.08)"}`,
-                borderRadius: 2,
-                transition: "border-color 0.2s",
-              }}>
-                {isRunning && <LinearProgress sx={{ bgcolor: "rgba(255,255,255,0.1)", "& .MuiLinearProgress-bar": { bgcolor: agent.color } }} />}
-                <CardContent>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-                    <Typography sx={{ fontSize: 28 }}>{agent.icon}</Typography>
-                    <Chip label={agent.type.replace("_", " ")} size="small"
-                      sx={{ bgcolor: `${agent.color}20`, color: agent.color, fontSize: 10, fontWeight: 600 }} />
-                  </Box>
-                  <Typography sx={{ color: "white", fontWeight: 600, mb: 0.5, fontSize: 14 }}>{agent.title}</Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
-                    {agent.description}
-                  </Typography>
-                  <Button fullWidth variant="contained" size="small" startIcon={isRunning ? <CircularProgress size={14} /> : <PlayArrow />}
-                    onClick={() => handleRunAgent(agent.type)}
-                    disabled={!selectedClientId || isRunning || !!runningAgent}
-                    sx={{ bgcolor: agent.color, color: agent.color === "#ffeb3b" ? "#000" : "#000", fontSize: 12, fontWeight: 600 }}>
-                    {isRunning ? "Running..." : "Run Agent"}
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
+            <Box key={group.key} sx={{ mb: 4 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                <Box sx={{ width: 4, height: 18, bgcolor: color, borderRadius: 1 }} />
+                <Typography sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5 }}>
+                  {group.label}
+                </Typography>
+                <Chip label={group.agents.length} size="small"
+                  sx={{ height: 20, bgcolor: `${color}1F`, color, fontSize: 11, fontWeight: 700 }} />
+                <Box sx={{ flex: 1, height: 1, bgcolor: "rgba(255,255,255,0.08)" }} />
+              </Box>
+              <Grid container spacing={2}>
+                {group.agents.map((agent) => (
+                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.id}>
+                    <Card sx={{
+                      bgcolor: "#1E1E1E",
+                      border: `1px solid ${agent.is_enabled ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)"}`,
+                      borderRadius: 2, opacity: agent.is_enabled ? 1 : 0.5, height: "100%",
+                    }}>
+                      <CardContent>
+                        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1 }}>
+                          <Box sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: `${color}1F`,
+                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <SmartToy sx={{ color, fontSize: 18 }} />
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>
+                              {agent.name}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                              {agent.domain || agent.group_label}
+                            </Typography>
+                          </Box>
+                          {agent.is_builtin && (
+                            <Chip label="Built-in" size="small"
+                              sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }} />
+                          )}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block", mb: 1.5, minHeight: 36 }}>
+                          {agent.description}
+                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                          {agent.legacy_orchestrator && (
+                            <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
+                              disabled={!selectedClientId || runMutation.isPending}
+                              onClick={() => runMutation.mutate(agent.key as AgentType)}
+                              sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
+                              Run
+                            </Button>
+                          )}
+                          <Box sx={{ flex: 1 }} />
+                          <Tooltip title={isAdmin ? "Configure" : "View configuration"}>
+                            <IconButton size="small" onClick={() => setConfiguring(agent)}
+                              sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color } }}>
+                              {isAdmin ? <Edit sx={{ fontSize: 16 }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
+                            </IconButton>
+                          </Tooltip>
+                          {isAdmin && !agent.is_builtin && (
+                            <Tooltip title="Delete">
+                              <IconButton size="small"
+                                onClick={() => {
+                                  if (window.confirm(`Delete agent "${agent.name}"?`)) deleteMutation.mutate(agent.id);
+                                }}
+                                sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#EA4335" } }}>
+                                <Delete sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
           );
-        })}
-      </Grid>
-
-      {/* Agent Run History */}
-      {selectedClientId && (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Recent Agent Runs</Typography>
-            {(runs as any[]).length === 0 ? (
-              <Typography sx={{ color: "rgba(255,255,255,0.3)", textAlign: "center", py: 2 }}>No agent runs yet</Typography>
-            ) : (
-              (runs as any[]).slice(0, 5).map((run: any) => (
-                <Accordion key={run.id} sx={{ bgcolor: "#1e232c", mb: 1, border: "1px solid rgba(255,255,255,0.06)", borderRadius: "8px !important" }}>
-                  <AccordionSummary expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
-                      <Chip label={run.agent_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 11 }} />
-                      <Chip label={run.status} size="small"
-                        sx={{ bgcolor: run.status === "completed" ? "rgba(0,230,118,0.15)" : "rgba(244,67,54,0.15)",
-                          color: run.status === "completed" ? "#00e676" : "#f44336" }} />
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", ml: "auto" }}>
-                        {run.started_at ? new Date(run.started_at).toLocaleString() : ""}
-                      </Typography>
-                    </Box>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    {run.error_message && (
-                      <Alert severity="error" sx={{ mb: 1, fontSize: 12 }}>{run.error_message}</Alert>
-                    )}
-                    {run.output_data?.error && (
-                      <Alert severity="warning" sx={{ mb: 1, bgcolor: "rgba(255,152,0,0.08)", color: "#ff9800", fontSize: 12 }}>
-                        {run.output_data.error}
-                      </Alert>
-                    )}
-                    {run.output_data?.output && (
-                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6 }}>
-                        {run.output_data.output}
-                      </Typography>
-                    )}
-                    {!run.output_data?.output && !run.output_data?.error && !run.error_message && (
-                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>
-                        No output recorded.
-                      </Typography>
-                    )}
-                  </AccordionDetails>
-                </Accordion>
-              ))
-            )}
-          </CardContent>
-        </Card>
+        })
       )}
+
+      <ConfigureDialog
+        open={!!configuring}
+        agent={configuring}
+        onClose={() => setConfiguring(null)}
+        onSave={(patch) => updateMutation.mutate({ id: configuring!.id, patch })}
+        isAdmin={isAdmin}
+      />
+      <NewAgentDialog
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onCreate={(data) => createMutation.mutate(data)}
+        existingGroups={groupOptions}
+      />
     </Box>
   );
 }

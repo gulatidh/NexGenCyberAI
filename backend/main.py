@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge
+from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -429,6 +429,7 @@ app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
 app.include_router(missions.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
+app.include_router(agent_catalog.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
@@ -465,7 +466,17 @@ def _seed_knowledge_base() -> None:
         logging.getLogger(__name__).exception("Knowledge base seed failed")
 
 
+def _seed_agents() -> None:
+    try:
+        from services.agent_seed import seed_agent_catalog
+        seed_agent_catalog()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Agent catalog seed failed")
+
+
 _seed_knowledge_base()
+_seed_agents()
 
 
 @app.get("/api/health")
