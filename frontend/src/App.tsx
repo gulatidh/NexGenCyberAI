@@ -25,6 +25,7 @@ import RiskOverviewPage from "./pages/RiskOverview";
 import Projects from "./pages/Projects";
 import Technologies from "./pages/Technologies";
 import Admin from "./pages/Admin";
+import SyncPage from "./pages/Sync";
 import Reports from "./pages/Reports";
 import Account from "./pages/Account";
 import Missions from "./pages/Missions";
@@ -155,6 +156,7 @@ export default function App() {
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/ai-settings" element={<AISettings />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/sync" element={<SyncPage />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/missions" element={<Missions />} />
                   <Route path="/knowledge" element={<KnowledgeBase />} />

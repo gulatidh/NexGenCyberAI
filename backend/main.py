@@ -492,34 +492,20 @@ async def _start_mission_scheduler() -> None:
 
 
 @app.on_event("startup")
-async def _start_threat_intel_refresh() -> None:
-    """Daily refresh of EPSS (FIRST.org) and CISA KEV feeds.
+async def _warm_threat_intel_cache() -> None:
+    """Load whatever threat-intel snapshot exists on disk from a prior sync.
 
-    Runs once at boot (so a freshly deployed instance has data within a
-    minute) and then every 24h. Best-effort — failures only log; RPS will
-    fall back to the cached snapshot or to severity-mapped estimates.
+    Sync is manual (admin-triggered via POST /admin/threat-intel/refresh)
+    — there's no daily auto-refresh. We just warm the in-memory cache
+    from the persisted JSON so RPS scoring has data available
+    immediately after boot if a previous sync ran.
     """
-    import asyncio
-    import logging
-    log = logging.getLogger(__name__)
-
-    async def _periodic() -> None:
-        # Defer the first refresh a few seconds so the rest of startup
-        # finishes before we hit the network.
-        await asyncio.sleep(15)
-        from services.threat_intel import refresh_all
-        while True:
-            try:
-                result = await asyncio.to_thread(refresh_all, False)
-                log.info("Threat intel refresh: %s", result)
-            except Exception:
-                log.exception("Threat intel refresh failed")
-            await asyncio.sleep(24 * 3600)
-
     try:
-        asyncio.create_task(_periodic())
+        from services import threat_intel as _ti
+        _ti._ensure_loaded()
     except Exception:
-        log.exception("Failed to schedule threat-intel refresh")
+        import logging
+        logging.getLogger(__name__).exception("Failed to warm threat-intel cache")
 
 
 @app.on_event("shutdown")

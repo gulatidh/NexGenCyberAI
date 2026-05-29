@@ -1,0 +1,323 @@
+"""Unified sync registry for admin-triggered, on-demand external feeds.
+
+Single place to add a new feed:
+    REGISTRY["feed_id"] = SyncFeed(
+        id="feed_id",
+        name="Display Name",
+        category="threat_intel | cve | framework",
+        description="One-sentence summary surfaced in the Sync page tile.",
+        source_url="https://...",
+        sync_fn=lambda: ...,    # callable returning dict with count + extras
+        stats_fn=lambda: ...,    # callable returning dict with last_synced_at + count
+    )
+
+The public API the router uses:
+    list_feeds() -> [{...feed metadata + stats}, ...]
+    sync_feed(feed_id) -> {...result, errors: [...]}
+
+Each feed persists its own last-sync timestamp + count via the underlying
+service (threat_intel for EPSS/KEV, json files for NVD/frameworks etc.),
+so a process restart doesn't lose state.
+"""
+from __future__ import annotations
+import json
+import logging
+import os
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+_CACHE_DIR = Path(__file__).resolve().parent.parent / "data"
+_GENERIC_STATS_FILE = _CACHE_DIR / "sync_feed_stats.json"
+
+
+# ── Generic per-feed state (NVD, frameworks etc.) ────────────────────────────
+
+
+def _read_generic_stats() -> Dict[str, Any]:
+    if not _GENERIC_STATS_FILE.exists():
+        return {}
+    try:
+        return json.loads(_GENERIC_STATS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _write_generic_stats(stats: Dict[str, Any]) -> None:
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        _GENERIC_STATS_FILE.write_text(json.dumps(stats, default=str))
+    except Exception:
+        logger.exception("Failed to persist generic sync stats")
+
+
+def _record_generic(feed_id: str, count: int, extra: Optional[Dict[str, Any]] = None) -> None:
+    stats = _read_generic_stats()
+    stats[feed_id] = {
+        "count": count,
+        "last_synced_at": datetime.now(timezone.utc).isoformat(),
+        **(extra or {}),
+    }
+    _write_generic_stats(stats)
+
+
+def _generic_stats(feed_id: str) -> Dict[str, Any]:
+    rec = _read_generic_stats().get(feed_id) or {}
+    return {
+        "count": rec.get("count", 0),
+        "last_synced_at": rec.get("last_synced_at"),
+        **{k: v for k, v in rec.items() if k not in ("count", "last_synced_at")},
+    }
+
+
+# ── Feed implementations ─────────────────────────────────────────────────────
+
+
+def _sync_epss() -> Dict[str, Any]:
+    from services.threat_intel import _refresh_epss, _persist_to_disk
+    count = _refresh_epss()
+    _persist_to_disk()
+    return {"count": count}
+
+
+def _stats_epss() -> Dict[str, Any]:
+    from services.threat_intel import stats as ti_stats
+    s = ti_stats()
+    return {"count": s.get("epss_count", 0), "last_synced_at": s.get("epss_fetched_at")}
+
+
+def _sync_kev() -> Dict[str, Any]:
+    from services.threat_intel import _refresh_kev, _persist_to_disk
+    count = _refresh_kev()
+    _persist_to_disk()
+    return {"count": count}
+
+
+def _stats_kev() -> Dict[str, Any]:
+    from services.threat_intel import stats as ti_stats
+    s = ti_stats()
+    return {"count": s.get("kev_count", 0), "last_synced_at": s.get("kev_fetched_at")}
+
+
+def _sync_nvd_recent() -> Dict[str, Any]:
+    """Download NVD's 'modified' CVE feed — recent CVE additions and updates
+    from the last 8 days. Small (~1MB compressed), good for keeping the CVE
+    description / CVSS / CWE cache fresh. We don't store full payloads
+    (would balloon the repo); just the CVE IDs + key metadata used to
+    enrich findings on render."""
+    import gzip
+    import io
+    import httpx
+
+    url = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz"
+    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+    with gzip.GzipFile(fileobj=io.BytesIO(resp.content)) as gz:
+        data = json.loads(gz.read().decode("utf-8", errors="replace"))
+
+    items = data.get("CVE_Items", []) or []
+    cves: Dict[str, Dict[str, Any]] = {}
+    for it in items:
+        cve_meta = ((it.get("cve") or {}).get("CVE_data_meta") or {})
+        cve_id = (cve_meta.get("ID") or "").upper()
+        if not cve_id:
+            continue
+        # CVSS v3 base
+        cvss = None
+        impact = it.get("impact") or {}
+        bm3 = ((impact.get("baseMetricV3") or {}).get("cvssV3") or {})
+        if bm3:
+            cvss = bm3.get("baseScore")
+        # CWE list
+        cwes = []
+        for p in ((it.get("cve") or {}).get("problemtype") or {}).get("problemtype_data", []) or []:
+            for d in p.get("description") or []:
+                v = d.get("value")
+                if v and v.startswith("CWE-"):
+                    cwes.append(v)
+        # Description (English)
+        desc = ""
+        for d in ((it.get("cve") or {}).get("description") or {}).get("description_data", []) or []:
+            if d.get("lang") == "en":
+                desc = d.get("value") or ""
+                break
+        cves[cve_id] = {
+            "cvss_v3": cvss,
+            "cwes": cwes,
+            "description": desc[:500],
+            "published": it.get("publishedDate"),
+            "last_modified": it.get("lastModifiedDate"),
+        }
+
+    # Persist alongside the threat-intel cache so RPS enrichers can find it.
+    cache_path = _CACHE_DIR / "nvd_cve_cache.json"
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        existing: Dict[str, Any] = {}
+        if cache_path.exists():
+            existing = json.loads(cache_path.read_text())
+        existing.update(cves)
+        cache_path.write_text(json.dumps(existing))
+    except Exception:
+        logger.exception("Failed to persist NVD cache")
+
+    _record_generic("nvd_recent", len(cves), {"total_in_cache": len(existing) if cache_path.exists() else len(cves)})
+    return {"count": len(cves)}
+
+
+def _stats_nvd_recent() -> Dict[str, Any]:
+    s = _generic_stats("nvd_recent")
+    cache_path = _CACHE_DIR / "nvd_cve_cache.json"
+    if cache_path.exists():
+        try:
+            data = json.loads(cache_path.read_text())
+            s["count"] = len(data)
+        except Exception:
+            pass
+    return s
+
+
+def _sync_frameworks() -> Dict[str, Any]:
+    """Re-run framework compliance recompute across every client.
+
+    Framework catalog definitions (NIST CSF, NIST 800-53, CIS v8, OWASP
+    Top 10, GDPR, ISO 27001, SOC 2, PCI DSS) are bundled with the app —
+    there's no external feed to download. What this sync does is force a
+    fresh recompute of every client's compliance assessment using the
+    current catalog and finding data. Useful after bulk finding edits or
+    when a new control mapping is added.
+    """
+    from db.database import SessionLocal
+    from api.models.models import Client
+    from services.compliance import recompute_all_frameworks_for_client
+
+    db = SessionLocal()
+    client_count = 0
+    try:
+        for c in db.query(Client.id).all():
+            try:
+                recompute_all_frameworks_for_client(db, c.id)
+                client_count += 1
+            except Exception:
+                logger.exception("Framework recompute failed for client %s", c.id)
+    finally:
+        db.close()
+
+    _record_generic("frameworks", client_count, {"clients_recomputed": client_count})
+    return {"count": client_count}
+
+
+def _stats_frameworks() -> Dict[str, Any]:
+    s = _generic_stats("frameworks")
+    return s
+
+
+# ── Registry ─────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class SyncFeed:
+    id: str
+    name: str
+    category: str
+    description: str
+    source_url: str
+    sync_fn: Callable[[], Dict[str, Any]]
+    stats_fn: Callable[[], Dict[str, Any]]
+    item_label: str = "entries"
+
+
+REGISTRY: Dict[str, SyncFeed] = {
+    "epss": SyncFeed(
+        id="epss",
+        name="EPSS — Exploit Prediction Scoring",
+        category="threat_intel",
+        description=(
+            "FIRST.org's exploit probability score for every CVE. Drives the EPSS factor in "
+            "the Risk Priority Score so we don't treat every CVSS 9 the same way."
+        ),
+        source_url="https://www.first.org/epss/",
+        sync_fn=_sync_epss,
+        stats_fn=_stats_epss,
+        item_label="CVE scores",
+    ),
+    "kev": SyncFeed(
+        id="kev",
+        name="CISA KEV — Known Exploited Vulnerabilities",
+        category="threat_intel",
+        description=(
+            "CISA's authoritative list of CVEs confirmed exploited in the wild. KEV-listed "
+            "CVEs multiply RPS by 2× (3× when flagged ransomware)."
+        ),
+        source_url="https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+        sync_fn=_sync_kev,
+        stats_fn=_stats_kev,
+        item_label="catalog entries",
+    ),
+    "nvd_recent": SyncFeed(
+        id="nvd_recent",
+        name="NVD — Recent CVEs (8-day modified feed)",
+        category="cve",
+        description=(
+            "NIST National Vulnerability Database modified feed — recent CVE additions and "
+            "updates. Used to enrich findings with CVSS v3, CWE list, and a short description."
+        ),
+        source_url="https://nvd.nist.gov/vuln/data-feeds",
+        sync_fn=_sync_nvd_recent,
+        stats_fn=_stats_nvd_recent,
+        item_label="CVE entries cached",
+    ),
+    "frameworks": SyncFeed(
+        id="frameworks",
+        name="Frameworks & Standards — recompute compliance",
+        category="framework",
+        description=(
+            "Re-runs the compliance recompute for every client using the bundled catalog "
+            "(NIST CSF, NIST 800-53, CIS v8, OWASP Top 10, GDPR, ISO 27001, SOC 2, PCI DSS). "
+            "Use after bulk finding edits or new control mappings."
+        ),
+        source_url="https://github.com/gulatidh/NexGenCyberAI/tree/main/backend",
+        sync_fn=_sync_frameworks,
+        stats_fn=_stats_frameworks,
+        item_label="clients recomputed",
+    ),
+}
+
+
+def list_feeds() -> List[Dict[str, Any]]:
+    """Return every registered feed with its current stats merged in."""
+    out: List[Dict[str, Any]] = []
+    for feed in REGISTRY.values():
+        try:
+            stats = feed.stats_fn() or {}
+        except Exception as exc:
+            logger.exception("Stats lookup failed for feed %s", feed.id)
+            stats = {"error": str(exc)}
+        out.append({
+            "id": feed.id,
+            "name": feed.name,
+            "category": feed.category,
+            "description": feed.description,
+            "source_url": feed.source_url,
+            "item_label": feed.item_label,
+            "count": stats.get("count", 0),
+            "last_synced_at": stats.get("last_synced_at"),
+            "extra": {k: v for k, v in stats.items() if k not in ("count", "last_synced_at")},
+        })
+    return out
+
+
+def sync_feed(feed_id: str) -> Dict[str, Any]:
+    feed = REGISTRY.get(feed_id)
+    if not feed:
+        return {"ok": False, "error": f"Unknown feed: {feed_id}"}
+    try:
+        result = feed.sync_fn() or {}
+        return {"ok": True, "id": feed_id, **result}
+    except Exception as exc:
+        logger.exception("Sync failed for feed %s", feed_id)
+        return {"ok": False, "id": feed_id, "error": str(exc)}

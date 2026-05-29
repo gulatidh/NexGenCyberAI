@@ -168,6 +168,11 @@ export const adminApi = {
   listUsers: () => apiClient.get("/admin/users").then((r) => r.data),
   createGrant: (data: any) => apiClient.post("/admin/grants", data).then((r) => r.data),
   deleteGrant: (grantId: string) => apiClient.delete(`/admin/grants/${grantId}`),
+  listSyncFeeds: () => apiClient.get("/admin/sync/feeds").then((r) => r.data),
+  refreshSyncFeed: (feedId: string) =>
+    apiClient.post(`/admin/sync/feeds/${feedId}/refresh`).then((r) => r.data),
+  refreshAllSyncFeeds: () =>
+    apiClient.post("/admin/sync/feeds/refresh-all").then((r) => r.data),
 };
 
 export const technologiesApi = {

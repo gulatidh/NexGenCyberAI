@@ -9,7 +9,7 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings, Schedule, AutoStories,
+  AdminPanelSettings, Schedule, AutoStories, GppMaybe,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -47,6 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Settings",
     items: [
       { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
+      { label: "Sync",           icon: <GppMaybe />,           path: "/sync", adminOnly: true },
       { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
     ],
   },

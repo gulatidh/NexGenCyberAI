@@ -21,20 +21,40 @@ from core.authz import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.get("/sync/feeds")
+async def list_sync_feeds(_=Depends(get_current_user)):
+    """Every registered external feed with last-sync timestamp + count.
+    Powers the Sync page tile grid."""
+    from services.sync_feeds import list_feeds
+    return list_feeds()
+
+
+@router.post("/sync/feeds/{feed_id}/refresh")
+async def refresh_sync_feed(feed_id: str, _=Depends(get_current_user)):
+    """Manually sync one feed (EPSS / KEV / NVD / Frameworks)."""
+    from services.sync_feeds import sync_feed
+    return sync_feed(feed_id)
+
+
+@router.post("/sync/feeds/refresh-all")
+async def refresh_all_sync_feeds(_=Depends(get_current_user)):
+    """Sync every feed sequentially. Returns per-feed results."""
+    from services.sync_feeds import REGISTRY, sync_feed
+    results = []
+    for fid in REGISTRY.keys():
+        results.append(sync_feed(fid))
+    return {"results": results}
+
+
+# Back-compat aliases for the older endpoint names (used by earlier UI builds).
 @router.get("/threat-intel/stats")
 async def threat_intel_stats(_=Depends(get_current_user)):
-    """Inspect the EPSS / KEV cache state — count of cached CVEs and last
-    fetched timestamp per feed. Surfaces in the admin UI so we can see at
-    a glance whether the daily refresh is healthy."""
     from services.threat_intel import stats
     return stats()
 
 
 @router.post("/threat-intel/refresh")
 async def threat_intel_refresh(force: bool = True, _=Depends(get_current_user)):
-    """Trigger an immediate refresh of EPSS + KEV. The scheduler also runs
-    this once every 24h on its own; this endpoint is for after-deploy
-    warm-ups and one-off troubleshooting."""
     from services.threat_intel import refresh_all
     return refresh_all(force=force)
 
