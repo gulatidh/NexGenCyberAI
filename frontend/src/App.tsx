@@ -27,6 +27,8 @@ import Technologies from "./pages/Technologies";
 import Admin from "./pages/Admin";
 import Reports from "./pages/Reports";
 import Account from "./pages/Account";
+import Missions from "./pages/Missions";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 const darkTheme = createTheme({
   palette: {
@@ -152,6 +154,8 @@ export default function App() {
                   <Route path="/ai-settings" element={<AISettings />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/account" element={<Account />} />
+                  <Route path="/missions" element={<Missions />} />
+                  <Route path="/knowledge" element={<KnowledgeBase />} />
                 </Route>
               </Routes>
             </BrowserRouter>

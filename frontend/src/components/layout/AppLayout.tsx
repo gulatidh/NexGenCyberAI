@@ -9,7 +9,7 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings,
+  AdminPanelSettings, Schedule, AutoStories,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -38,6 +38,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
       { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
       { label: "AI Agents",      icon: <SmartToy />,   path: "/agents" },
+      { label: "Missions",       icon: <Schedule />,   path: "/missions" },
+      { label: "Knowledge Base", icon: <AutoStories />, path: "/knowledge" },
       { label: "Reports",        icon: <BarChart />,   path: "/reports" },
     ],
   },

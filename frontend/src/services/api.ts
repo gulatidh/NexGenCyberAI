@@ -212,3 +212,24 @@ export const assetsApi = {
   scan: (clientId: string, assetId: string) =>
     apiClient.post(`/clients/${clientId}/assets/${assetId}/scan/`).then((r) => r.data),
 };
+
+export const missionsApi = {
+  list: (clientId?: string) =>
+    apiClient.get(`/missions/`, { params: clientId ? { client_id: clientId } : {} }).then((r) => r.data),
+  create: (data: any) => apiClient.post(`/missions/`, data).then((r) => r.data),
+  update: (missionId: string, data: any) =>
+    apiClient.patch(`/missions/${missionId}`, data).then((r) => r.data),
+  delete: (missionId: string) =>
+    apiClient.delete(`/missions/${missionId}`).then((r) => r.data),
+  runNow: (missionId: string) =>
+    apiClient.post(`/missions/${missionId}/run`).then((r) => r.data),
+  runs: (missionId: string) =>
+    apiClient.get(`/missions/${missionId}/runs`).then((r) => r.data),
+};
+
+export const knowledgeApi = {
+  list: () => apiClient.get(`/knowledge/`).then((r) => r.data),
+  search: (q: string) => apiClient.get(`/knowledge/search`, { params: { q } }).then((r) => r.data),
+  stats: () => apiClient.get(`/knowledge/stats`).then((r) => r.data),
+  get: (fileId: string) => apiClient.get(`/knowledge/${fileId}`).then((r) => r.data),
+};

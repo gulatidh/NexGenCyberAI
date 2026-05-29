@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin
+from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -427,6 +427,45 @@ app.include_router(technologies.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
+app.include_router(missions.router, prefix="/api/v1")
+app.include_router(knowledge.router, prefix="/api/v1")
+
+
+# ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
+
+@app.on_event("startup")
+async def _start_mission_scheduler() -> None:
+    # Lazy import so the app still boots even if APScheduler isn't installed
+    # (development without `pip install -r requirements.txt`).
+    try:
+        from services.mission_scheduler import start_scheduler
+        start_scheduler()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to start mission scheduler")
+
+
+@app.on_event("shutdown")
+async def _stop_mission_scheduler() -> None:
+    try:
+        from services.mission_scheduler import shutdown_scheduler
+        shutdown_scheduler()
+    except Exception:
+        pass
+
+
+# ── Knowledge base seeding ───────────────────────────────────────────────────
+
+def _seed_knowledge_base() -> None:
+    try:
+        from services.knowledge_seed import seed_knowledge_base
+        seed_knowledge_base()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Knowledge base seed failed")
+
+
+_seed_knowledge_base()
 
 
 @app.get("/api/health")
