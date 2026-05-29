@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -122,6 +122,33 @@ def _ensure_added_columns() -> None:
                 logger.info("Added findings.control_mappings column (%s)", dialect)
             except Exception as exc:
                 logger.warning("findings.control_mappings ALTER failed (likely already added by another worker): %s", exc)
+
+        # Add scans.ai_verdict + scans.ai_verdict_generated_at — structured
+        # LLM verdict produced when a scan completes.
+        try:
+            scan_cols = {c["name"] for c in inspector.get_columns("scans")}
+        except Exception:
+            scan_cols = set()
+        if "ai_verdict" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD ai_verdict NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN ai_verdict TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.ai_verdict column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.ai_verdict ALTER failed: %s", exc)
+        if "ai_verdict_generated_at" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD ai_verdict_generated_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN ai_verdict_generated_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.ai_verdict_generated_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.ai_verdict_generated_at ALTER failed: %s", exc)
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
@@ -431,6 +458,7 @@ app.include_router(missions.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(agent_catalog.router, prefix="/api/v1")
 app.include_router(risk_portfolio.router, prefix="/api/v1")
+app.include_router(scans_overview.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

@@ -241,6 +241,13 @@ export const riskPortfolioApi = {
     apiClient.get(`/clients/${clientId}/risk-portfolio/`).then((r) => r.data),
 };
 
+export const assessmentsApi = {
+  listAll: () => apiClient.get(`/scans/all`).then((r) => r.data),
+  detail: (scanId: string) => apiClient.get(`/scans/${scanId}/detail`).then((r) => r.data),
+  generateVerdict: (scanId: string) =>
+    apiClient.post(`/scans/${scanId}/generate-verdict`).then((r) => r.data),
+};
+
 export const agentCatalogApi = {
   list: () => apiClient.get(`/agents/catalog/`).then((r) => r.data),
   get: (agentId: string) => apiClient.get(`/agents/catalog/${agentId}`).then((r) => r.data),

@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi import Depends
@@ -112,7 +112,7 @@ _VALID_SEV = {"critical", "high", "medium", "low", "info"}
 
 
 @router.post("/scans/ingest/")
-async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = Depends(get_db)):
+async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = Depends(get_db), background_tasks: BackgroundTasks = None):  # type: ignore[assignment]
     """Workflow posts findings here when it finishes (or on error)."""
     if verify_scan_token(payload.scan_token, expected_scan_id=payload.scan_id) is None:
         raise HTTPException(status_code=401, detail="Invalid or expired scan token")
@@ -164,5 +164,16 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
         recompute_all_frameworks_for_client(db, scan.client_id)
     except Exception as exc:
         logger.warning("Post-ingest recompute failed: %s", exc)
+
+    # Auto-generate the structured AI verdict on scan completion. Best-effort
+    # background task — Verdict generator never raises out to the request,
+    # and if no LLM provider is configured it falls back to deterministic text
+    # so the UI always has something to render.
+    if background_tasks is not None:
+        try:
+            from services.verdict import generate_verdict_bg
+            background_tasks.add_task(generate_verdict_bg, scan.id)
+        except Exception:
+            logger.exception("Failed to enqueue verdict generation for scan %s", scan.id)
 
     return {"ok": True, "status": "completed", "ingested": len(payload.findings)}

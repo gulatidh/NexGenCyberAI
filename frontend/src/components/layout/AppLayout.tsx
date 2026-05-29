@@ -31,7 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard",      icon: <Dashboard />,  path: "/dashboard" },
       { label: "Risk Overview",  icon: <Insights />,   path: "/risk-overview" },
       { label: "Clients",        icon: <People />,     path: "/clients" },
-      { label: "Scans",          icon: <BugReport />,  path: "/scans" },
+      { label: "Assessments",    icon: <BugReport />,  path: "/scans" },
       { label: "Findings",       icon: <Security />,   path: "/findings" },
       { label: "Risk Register",  icon: <Assessment />, path: "/risks" },
       { label: "Asset Inventory", icon: <Storage />,   path: "/assets" },

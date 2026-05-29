@@ -29,6 +29,7 @@ import Reports from "./pages/Reports";
 import Account from "./pages/Account";
 import Missions from "./pages/Missions";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import ScanDetail from "./pages/ScanDetail";
 
 const darkTheme = createTheme({
   palette: {
@@ -143,6 +144,7 @@ export default function App() {
                   <Route path="/projects" element={<Projects />} />
                   <Route path="/connectors" element={<Connectors />} />
                   <Route path="/scans" element={<Scans />} />
+                  <Route path="/scans/:scanId" element={<ScanDetail />} />
                   <Route path="/findings" element={<Findings />} />
                   <Route path="/risks" element={<Risks />} />
                   <Route path="/assets" element={<Assets />} />

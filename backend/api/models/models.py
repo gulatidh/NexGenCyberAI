@@ -255,6 +255,11 @@ class Scan(Base):
     summary = Column(JSON, default={})       # {total, critical, high, medium, low, passed, failed}
     error_message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Structured AI verdict — see services/verdict.py for shape.
+    # Generated automatically when a scan flips to COMPLETED, can be
+    # regenerated via POST /scans/{id}/generate-verdict.
+    ai_verdict = Column(JSON)
+    ai_verdict_generated_at = Column(DateTime(timezone=True))
 
     client = relationship("Client", back_populates="scans")
     project = relationship("Project", back_populates="scans")
