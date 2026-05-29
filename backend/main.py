@@ -149,6 +149,22 @@ def _ensure_added_columns() -> None:
                 logger.info("Added scans.ai_verdict_generated_at column (%s)", dialect)
             except Exception as exc:
                 logger.warning("scans.ai_verdict_generated_at ALTER failed: %s", exc)
+
+        # Add scheduled_mission_runs.report — structured LLM report per run.
+        try:
+            run_cols = {c["name"] for c in inspector.get_columns("scheduled_mission_runs")}
+        except Exception:
+            run_cols = set()
+        if run_cols and "report" not in run_cols:
+            ddl = ("ALTER TABLE scheduled_mission_runs ADD report NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scheduled_mission_runs ADD COLUMN report TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scheduled_mission_runs.report column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scheduled_mission_runs.report ALTER failed: %s", exc)
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

@@ -73,6 +73,7 @@ class MissionRunResponse(BaseModel):
     completed_at: Optional[datetime] = None
     output: Optional[str] = None
     error: Optional[str] = None
+    report: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

@@ -7,12 +7,13 @@ import {
   ToggleButton, ToggleButtonGroup, FormControlLabel, Checkbox, Grid,
   Drawer, Divider,
 } from "@mui/material";
-import { Add, PlayArrow, Edit, Delete, Schedule, History } from "@mui/icons-material";
+import { Add, PlayArrow, Edit, Delete, Schedule, History, Print, Article, Close as CloseIcon } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { missionsApi, clientsApi } from "../services/api";
 import { Client } from "../types";
 import { fromNow } from "../utils/datetime";
+import RichOutput from "../components/RichOutput";
 
 // ── Mission types (mirrors backend MissionType enum) ─────────────────────────
 const MISSION_TYPES: { value: string; label: string }[] = [
@@ -79,6 +80,7 @@ export default function Missions() {
   const [editing, setEditing] = useState<Mission | null>(null);
 
   const [historyMission, setHistoryMission] = useState<Mission | null>(null);
+  const [reportRun, setReportRun] = useState<any | null>(null);
 
   // Form state
   const [name, setName] = useState("New Scheduled Mission");
@@ -397,21 +399,35 @@ export default function Missions() {
                           color: run.status === "success" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
                       <Chip label={run.triggered_by} size="small"
                         sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)" }} />
+                      {run.report && (
+                        <Chip label="Report" size="small" icon={<Article sx={{ fontSize: 14 }} />}
+                          sx={{ height: 20, fontSize: 10, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700,
+                            "& .MuiChip-icon": { color: "#4285F4" } }} />
+                      )}
                       <Box sx={{ flex: 1 }} />
                       <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
                         {run.started_at ? fromNow(run.started_at) : ""}
                       </Typography>
                     </Box>
                     {run.output && (
-                      <Typography component="pre" sx={{
-                        color: "rgba(255,255,255,0.85)", fontSize: 12, whiteSpace: "pre-wrap",
-                        wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.45,
+                      <Typography variant="caption" sx={{
+                        color: "rgba(255,255,255,0.65)", fontSize: 11.5, display: "block", lineHeight: 1.5,
                       }}>
                         {run.output}
                       </Typography>
                     )}
                     {run.error && (
                       <Alert severity="error" sx={{ mt: 1, fontSize: 11 }}>{run.error}</Alert>
+                    )}
+                    {run.report && (
+                      <Box sx={{ mt: 1.25, display: "flex", justifyContent: "flex-end" }}>
+                        <Button size="small" variant="outlined" startIcon={<Article sx={{ fontSize: 14 }} />}
+                          onClick={() => setReportRun(run)}
+                          sx={{ borderColor: "rgba(66,133,244,0.4)", color: "#4285F4", fontSize: 11,
+                            "&:hover": { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" } }}>
+                          View Report
+                        </Button>
+                      </Box>
                     )}
                   </Card>
                 ))
@@ -420,6 +436,172 @@ export default function Missions() {
           </Box>
         )}
       </Drawer>
+
+      {/* Standardised workflow report viewer — opens for any run with a
+          generated report. Same theme + layout every time so PDF exports
+          look identical across mission types and runs. */}
+      <MissionReportDialog run={reportRun} mission={historyMission} onClose={() => setReportRun(null)} />
     </Box>
+  );
+}
+
+// ── Mission report viewer ─────────────────────────────────────────────────────
+
+interface ReportMetric { label: string; value: string; tone?: string; }
+interface ReportSection { id: string; title: string; body: string; }
+interface MissionReport {
+  generated_at: string;
+  model: string;
+  mission_type_label: string;
+  client_name: string;
+  title: string;
+  subtitle?: string;
+  metrics: ReportMetric[];
+  sections: ReportSection[];
+}
+
+const METRIC_TONE_COLOR: Record<string, string> = {
+  good: "#34A853", warn: "#FBBC04", bad: "#EA4335", neutral: "#4285F4",
+};
+
+function MissionReportDialog({ run, mission, onClose }: {
+  run: any | null; mission: Mission | null; onClose: () => void;
+}) {
+  const open = !!run && !!run.report;
+  if (!open) return null;
+  const report = run.report as MissionReport;
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth
+      slotProps={{ paper: { sx: { bgcolor: "#0F0F0F", color: "white" } } }}>
+      {/* Print stylesheet — flatten to a paper-friendly single document.
+          Same template every time so every PDF reads the same. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 14mm; }
+          body { background: white !important; color: black !important; }
+          .MuiDialog-root, .MuiDialog-container, .MuiPaper-root {
+            position: static !important; max-width: 100% !important;
+            box-shadow: none !important;
+          }
+          .no-print { display: none !important; }
+          .mission-report-print, .mission-report-print * {
+            color: #1a1a1a !important;
+            background: white !important;
+            border-color: rgba(0,0,0,0.15) !important;
+            box-shadow: none !important;
+          }
+          .mission-report-print .report-section { page-break-inside: avoid; }
+          .mission-report-print h1, .mission-report-print h2, .mission-report-print h3 {
+            page-break-after: avoid;
+          }
+        }
+      `}</style>
+
+      {/* Header bar (hidden on print) */}
+      <Box className="no-print" sx={{
+        display: "flex", alignItems: "center", gap: 1, p: 1.5,
+        borderBottom: "1px solid rgba(255,255,255,0.08)", bgcolor: "#1A1A1A",
+      }}>
+        <Article sx={{ color: "#4285F4" }} />
+        <Typography sx={{ color: "white", fontWeight: 700 }}>Workflow Report</Typography>
+        <Chip label={run.status} size="small"
+          sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+            bgcolor: run.status === "success" ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+            color: run.status === "success" ? "#34A853" : "#EA4335" }} />
+        <Box sx={{ flex: 1 }} />
+        <Button size="small" variant="outlined" startIcon={<Print />} onClick={() => window.print()}
+          sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)",
+            "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
+          Download PDF
+        </Button>
+        <IconButton size="small" onClick={onClose} sx={{ color: "rgba(255,255,255,0.6)" }}>
+          <CloseIcon />
+        </IconButton>
+      </Box>
+
+      {/* Report body — same template every run */}
+      <DialogContent className="mission-report-print" sx={{ p: 4, bgcolor: "#0F0F0F" }}>
+        {/* Title block */}
+        <Box sx={{ mb: 3, pb: 2, borderBottom: "2px solid #4285F4" }}>
+          <Typography variant="caption" sx={{
+            color: "#4285F4", letterSpacing: 2, textTransform: "uppercase",
+            fontWeight: 700, fontSize: 11,
+          }}>
+            {report.mission_type_label || mission?.mission_type || "Workflow"} · Standardised Report
+          </Typography>
+          <Typography variant="h4" sx={{ color: "white", fontWeight: 700, lineHeight: 1.2, mt: 0.5 }}>
+            {report.title}
+          </Typography>
+          {report.subtitle && (
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.65)", mt: 0.75 }}>
+              {report.subtitle}
+            </Typography>
+          )}
+          <Box sx={{ display: "flex", gap: 2, mt: 1.5, flexWrap: "wrap" }}>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <strong>Client:</strong> {report.client_name}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <strong>Generated:</strong> {report.generated_at ? new Date(report.generated_at).toLocaleString() : "—"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <strong>Model:</strong> {report.model || "—"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <strong>Trigger:</strong> {run.triggered_by}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* KPI metrics row — always 4 cards, same template */}
+        {report.metrics?.length > 0 && (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {report.metrics.map((m, i) => {
+              const color = METRIC_TONE_COLOR[m.tone || "neutral"] || "#4285F4";
+              return (
+                <Grid size={{ xs: 6, md: 3 }} key={i}>
+                  <Box sx={{
+                    bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 2, p: 1.75, height: "100%",
+                  }}>
+                    <Typography variant="caption" sx={{
+                      color: "rgba(255,255,255,0.5)", textTransform: "uppercase",
+                      letterSpacing: 1, fontSize: 10, fontWeight: 700,
+                    }}>
+                      {m.label}
+                    </Typography>
+                    <Typography sx={{ color, fontSize: 26, fontWeight: 700, lineHeight: 1.15, mt: 0.5 }}>
+                      {m.value}
+                    </Typography>
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
+
+        {/* Sections — fixed 7-section order */}
+        {(report.sections || []).map((s) => (
+          <Box key={s.id} className="report-section" sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{
+              color: "#4285F4", fontWeight: 700, mb: 1.5,
+              pb: 0.5, borderBottom: "1px solid rgba(66,133,244,0.3)",
+              fontSize: 16, letterSpacing: -0.2,
+            }}>
+              {s.title}
+            </Typography>
+            <RichOutput value={s.body} />
+          </Box>
+        ))}
+
+        {/* Footer */}
+        <Box sx={{ mt: 4, pt: 2, borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>
+            NexGenCyberAI — Generated by AI on standardised template v{1}. This report is advisory and
+            should be reviewed by a qualified security professional before acting on recommendations.
+          </Typography>
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 }

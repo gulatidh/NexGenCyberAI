@@ -116,6 +116,17 @@ async def execute_mission(db: Session, mission: ScheduledMission, triggered_by: 
         mission.last_run_at = run.completed_at
         db.flush()
 
+    # Generate the structured AI report for this run. SAME code path
+    # whether the scheduler or a user fired the workflow — produces the
+    # SAME report schema every time so the UI / PDF look identical across
+    # runs. Best-effort: failures here don't change the run's success/fail
+    # status (the handler outcome is the source of truth).
+    try:
+        from services.mission_reports import generate_report
+        await generate_report(db, mission, run)
+    except Exception:
+        logger.exception("Report generation failed for mission run %s", run.id)
+
     # Post-run actions (best-effort; failures here don't fail the run)
     if run.status == MissionRunStatus.SUCCESS:
         if mission.send_summary_email:

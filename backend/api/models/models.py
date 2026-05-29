@@ -527,6 +527,9 @@ class ScheduledMissionRun(Base):
     completed_at = Column(DateTime(timezone=True))
     output = Column(Text)
     error = Column(Text)
+    # Structured LLM-generated report. Same fixed schema for every run so
+    # the UI renders identically. See services/mission_reports.py.
+    report = Column(JSON)
 
     mission = relationship("ScheduledMission", back_populates="runs")
 
