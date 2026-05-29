@@ -70,26 +70,89 @@ def compute_rps(finding: Finding) -> Dict[str, Any]:
             "rationale": f"No CVSS available; derived from severity={sev}.",
         }
 
-    # EPSS — no FIRST.org feed wired yet, mark estimated
-    factors["epss"] = {
-        "value": SEV_TO_EPSS_ESTIMATE.get(sev, 0.05),
-        "source": "estimated",
-        "rationale": "No EPSS feed integration yet; severity-mapped fallback. Wire FIRST.org for evidenced values.",
-    }
+    # EPSS — real lookup against the cached FIRST.org feed; fall back to a
+    # severity-mapped estimate if the finding has no CVE or the CVE isn't in
+    # the EPSS catalog yet (very new CVEs lag a day or two).
+    from services.threat_intel import get_epss, get_kev, stats as ti_stats
+    _ti = ti_stats()
+    _epss_loaded = _ti.get("epss_count", 0) > 0
+    _kev_loaded = _ti.get("kev_count", 0) > 0
+    epss_row = get_epss(finding.cve_id) if finding.cve_id else None
+    if epss_row:
+        factors["epss"] = {
+            "value": round(float(epss_row["score"]), 4),
+            "percentile": round(float(epss_row.get("percentile") or 0), 4),
+            "source": "evidenced",
+            "provider": "FIRST.org EPSS",
+            "rationale": (
+                f"EPSS {epss_row['score']:.4f} (percentile {epss_row.get('percentile', 0):.2%}) "
+                f"from FIRST.org for {finding.cve_id}."
+            ),
+        }
+    elif not _epss_loaded:
+        factors["epss"] = {
+            "value": SEV_TO_EPSS_ESTIMATE.get(sev, 0.05),
+            "source": "unknown",
+            "rationale": "EPSS feed not yet loaded — refresh runs daily; trigger /admin/threat-intel/refresh to backfill.",
+        }
+    else:
+        factors["epss"] = {
+            "value": SEV_TO_EPSS_ESTIMATE.get(sev, 0.05),
+            "source": "estimated",
+            "rationale": (
+                f"No CVE on this finding so EPSS can't be looked up — using severity-mapped estimate ({sev})."
+                if not finding.cve_id else
+                f"{finding.cve_id} not yet in the cached EPSS feed — using severity-mapped estimate."
+            ),
+        }
 
-    # KEV multiplier — no CISA KEV catalog ingestion yet
-    factors["kev_multiplier"] = {
-        "value": 1.0,
-        "source": "unknown",
-        "rationale": "CISA KEV catalog not yet integrated. CVEs found in KEV will multiply by 3 once enabled.",
-    }
+    # KEV — CVE present in CISA Known Exploited Vulnerabilities catalog
+    # multiplies the score; ransomware-flagged CVEs multiply more aggressively.
+    kev_row = get_kev(finding.cve_id) if finding.cve_id else None
+    if kev_row:
+        ransomware = bool(kev_row.get("knownRansomwareCampaignUse"))
+        mult = 3.0 if ransomware else 2.0
+        factors["kev_multiplier"] = {
+            "value": mult,
+            "source": "evidenced",
+            "provider": "CISA KEV",
+            "rationale": (
+                f"{finding.cve_id} is on the CISA Known Exploited Vulnerabilities catalog "
+                f"(added {kev_row.get('dateAdded')}; due {kev_row.get('dueDate')})."
+                + (" Known ransomware campaign use." if ransomware else "")
+            ),
+            "kev": {
+                "dateAdded": kev_row.get("dateAdded"),
+                "dueDate": kev_row.get("dueDate"),
+                "requiredAction": kev_row.get("requiredAction"),
+                "ransomware": ransomware,
+            },
+        }
+    elif finding.cve_id and _kev_loaded:
+        factors["kev_multiplier"] = {
+            "value": 1.0,
+            "source": "evidenced",
+            "provider": "CISA KEV",
+            "rationale": f"{finding.cve_id} is not on the CISA KEV catalog — no exploitation-in-the-wild multiplier applied.",
+        }
+    elif not _kev_loaded:
+        factors["kev_multiplier"] = {
+            "value": 1.0,
+            "source": "unknown",
+            "rationale": "CISA KEV catalog not yet loaded — refresh runs daily; trigger /admin/threat-intel/refresh to backfill.",
+        }
+    else:
+        factors["kev_multiplier"] = {
+            "value": 1.0,
+            "source": "unknown",
+            "rationale": "Finding has no CVE — KEV catalog lookup not possible.",
+        }
 
-    # Reachability — Wiz ∩ CrowdStrike Spotlight cross-join not wired
-    factors["reachability"] = {
-        "value": 1.0,
-        "source": "unknown",
-        "rationale": "Runtime reachability requires Wiz/CrowdStrike integration. Default 1.0 (assume reachable).",
-    }
+    # Reachability — Wiz / CrowdStrike Spotlight runtime exposure. Returns an
+    # evidenced multiplier when either integration is configured; otherwise
+    # unknown (won't penalise the score).
+    from services.reachability import get_reachability
+    factors["reachability"] = get_reachability(finding.cve_id, finding.resource_id)
 
     # Exploitability — heuristic based on CVSS bucket
     cvss = factors["cvss"]["value"]
@@ -332,8 +395,9 @@ def _data_completeness(findings: List[Finding]) -> Dict[str, Any]:
         "unknown_pct": round(100 * counts["unknown"] / total, 1),
         "counts": counts,
         "notes": (
-            "Plug EPSS, CISA KEV, Wiz reachability, and crown-jewel asset criticality feeds "
-            "to flip estimated → evidenced. RPS already drops unknown factors so they don't penalise scores."
+            "EPSS (FIRST.org) and CISA KEV are integrated — CVE-bearing findings now use evidenced "
+            "values. Reachability uses Wiz/CrowdStrike Spotlight when configured; otherwise marked "
+            "unknown and dropped from the score. Asset criticality + business context still default-estimated."
         ),
     }
 

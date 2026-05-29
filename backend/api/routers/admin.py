@@ -21,6 +21,24 @@ from core.authz import (
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
+@router.get("/threat-intel/stats")
+async def threat_intel_stats(_=Depends(get_current_user)):
+    """Inspect the EPSS / KEV cache state — count of cached CVEs and last
+    fetched timestamp per feed. Surfaces in the admin UI so we can see at
+    a glance whether the daily refresh is healthy."""
+    from services.threat_intel import stats
+    return stats()
+
+
+@router.post("/threat-intel/refresh")
+async def threat_intel_refresh(force: bool = True, _=Depends(get_current_user)):
+    """Trigger an immediate refresh of EPSS + KEV. The scheduler also runs
+    this once every 24h on its own; this endpoint is for after-deploy
+    warm-ups and one-off troubleshooting."""
+    from services.threat_intel import refresh_all
+    return refresh_all(force=force)
+
+
 def _scope_label(scope_type: AccessScope, scope_id: Optional[str], db: Session) -> Optional[str]:
     if scope_type == AccessScope.GLOBAL:
         return "Global"

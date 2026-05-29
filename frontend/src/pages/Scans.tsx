@@ -144,6 +144,17 @@ export default function Scans() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete finding"),
   });
 
+  const [pendingDeleteScan, setPendingDeleteScan] = useState<any | null>(null);
+  const deleteScanMutation = useMutation({
+    mutationFn: (tile: any) => scansApi.delete(tile.client_id, tile.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      setPendingDeleteScan(null);
+      toast.success("Assessment deleted");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete assessment"),
+  });
+
   const startMutation = useMutation({
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
     onSuccess: () => {
@@ -258,11 +269,24 @@ export default function Scans() {
                     "&:hover": { borderColor: statusColor, bgcolor: "rgba(255,255,255,0.02)", transform: "translateY(-1px)" },
                   }}>
                   <Box sx={{ p: 2, position: "relative" }}>
+                    <Tooltip title="Delete assessment">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
+                        sx={{
+                          position: "absolute", top: 6, right: 6,
+                          color: "rgba(255,255,255,0.35)",
+                          "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                        }}
+                      >
+                        <DeleteOutlined sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
                     <Chip
                       label={status}
                       size="small"
                       sx={{
-                        position: "absolute", top: 12, right: 12,
+                        position: "absolute", top: 12, right: 40,
                         bgcolor: `${statusColor}20`,
                         color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
                         textTransform: "uppercase", letterSpacing: 0.5,
@@ -562,6 +586,37 @@ export default function Scans() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setViewScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm assessment (scan) delete */}
+      <Dialog open={!!pendingDeleteScan} onClose={() => setPendingDeleteScan(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete assessment?</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+            This permanently removes the scan and every finding, agent run, and AI verdict tied to it. It does NOT delete the connector or affect future scans.
+          </Typography>
+          {pendingDeleteScan && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDeleteScan.tile_name}</Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                {pendingDeleteScan.scan_type} · {pendingDeleteScan.findings_count ?? 0} finding{pendingDeleteScan.findings_count === 1 ? "" : "s"}
+                {pendingDeleteScan.framework ? ` · ${pendingDeleteScan.framework}` : ""}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDeleteScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={deleteScanMutation.isPending}
+            onClick={() => pendingDeleteScan && deleteScanMutation.mutate(pendingDeleteScan)}
+            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
+          >
+            Delete
+          </Button>
         </DialogActions>
       </Dialog>
 
