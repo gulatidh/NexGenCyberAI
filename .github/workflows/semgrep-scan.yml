@@ -1,8 +1,8 @@
-name: Gitleaks Scan
+name: Semgrep SAST Scan
 
 # Triggered by the NexGenCyberAI backend (workflow_dispatch). Clones a
-# target repo and runs Gitleaks across its full git history, then POSTs
-# findings to /api/v1/scans/ingest/.
+# target repo, runs Semgrep with curated rule packs, parses JSON results,
+# and POSTs findings to /api/v1/scans/ingest/.
 
 on:
   workflow_dispatch:
@@ -21,13 +21,13 @@ permissions:
   contents: read
 
 jobs:
-  gitleaks:
-    name: Run Gitleaks
+  semgrep:
+    name: Run Semgrep
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    container:
+      image: semgrep/semgrep:latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Fetch scan config from API
         id: cfg
         env:
@@ -43,11 +43,9 @@ jobs:
           import json, urllib.parse as up
           c = json.load(open("cfg.json"))
           repo = c.get("repo_url") or ""
-          # Inject PAT into the URL for private-repo clone, if provided.
           user = c.get("git_username") or "x-access-token"
           tok = c.get("git_token") or ""
           if repo.startswith("https://") and tok:
-              # https://USER:TOK@host/...
               host_and_path = repo[len("https://"):]
               repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
           else:
@@ -56,23 +54,16 @@ jobs:
           print(f"repo_clone_url={repo_auth}")
           PY
 
-      - name: Clone target repo (full history)
+      - name: Clone target repo
         if: steps.cfg.outputs.repo_url != ''
         run: |
-          git clone "${{ steps.cfg.outputs.repo_clone_url }}" target
+          git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
 
-      - name: Install Gitleaks
-        run: |
-          GITLEAKS_VERSION=8.18.4
-          wget -q "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -O gl.tgz
-          tar -xzf gl.tgz gitleaks
-          sudo mv gitleaks /usr/local/bin/gitleaks
-          gitleaks version
-
-      - name: Run Gitleaks
+      - name: Run Semgrep (auto config)
         if: steps.cfg.outputs.repo_url != ''
         run: |
-          gitleaks detect --source target --report-format json --report-path results.json --no-banner --exit-code 0
+          cd target
+          semgrep --config auto --json --output ../results.json --metrics off --quiet || true
 
       - name: Post findings to API
         if: always()
@@ -91,31 +82,40 @@ jobs:
           if os.path.exists("results.json"):
               try:
                   data = json.load(open("results.json"))
-                  for item in data or []:
-                      # Secrets are always high — leaked credentials are
-                      # immediately exploitable. Verified webhook keys are
-                      # critical but we can't tell verification status here.
+                  SEV = {"ERROR":"high", "WARNING":"medium", "INFO":"low"}
+                  for r in data.get("results", []) or []:
+                      sev = SEV.get((r.get("extra", {}).get("severity") or "INFO").upper(), "info")
+                      meta = r.get("extra", {}).get("metadata") or {}
+                      # Critical bumps for high-impact rule categories
+                      categories = meta.get("category") or []
+                      if isinstance(categories, str):
+                          categories = [categories]
+                      if sev == "high" and any(c in {"security"} for c in categories):
+                          cwe = meta.get("cwe") or []
+                          if isinstance(cwe, str): cwe = [cwe]
+                          if any("CWE-78" in str(c) or "CWE-89" in str(c) or "CWE-94" in str(c) for c in cwe):
+                              sev = "critical"
                       findings.append({
-                          "title": f"Secret detected: {item.get('RuleID') or item.get('Description','secret')}",
-                          "description": (item.get("Description") or "")[:4000],
-                          "severity": "high",
-                          "resource_id": f"{item.get('File','')}:{item.get('StartLine','')}",
+                          "title": r.get("check_id") or "Semgrep finding",
+                          "description": (r.get("extra", {}).get("message") or "")[:4000],
+                          "severity": sev,
+                          "resource_id": f"{r.get('path','')}:{r.get('start', {}).get('line','')}",
                           "resource_type": "file",
-                          "control_id": item.get("RuleID") or "GITLEAKS",
-                          "remediation": "Rotate the leaked credential immediately. Remove from git history (BFG / git-filter-repo). Add the pattern to allowlist if it's a known test fixture.",
+                          "control_id": r.get("check_id"),
+                          "remediation": (r.get("extra", {}).get("fix") or "Review the matched code and apply the rule's recommended fix.")[:4000],
                           "evidence": {
-                              "file": item.get("File"),
-                              "line": item.get("StartLine"),
-                              "commit": item.get("Commit"),
-                              "author": item.get("Author"),
-                              "date": item.get("Date"),
-                              "rule": item.get("RuleID"),
-                              # Don't echo the secret itself
+                              "file": r.get("path"),
+                              "line": r.get("start", {}).get("line"),
+                              "end_line": r.get("end", {}).get("line"),
+                              "rule": r.get("check_id"),
+                              "snippet": (r.get("extra", {}).get("lines") or "")[:500],
+                              "owasp": meta.get("owasp"),
+                              "cwe": meta.get("cwe"),
                           },
                           "control_mappings": {},
                       })
               except Exception as e:
-                  err = f"Failed to parse Gitleaks report: {e}"
+                  err = f"Failed to parse Semgrep report: {e}"
           elif not repo:
               err = "No repo_url configured for scan"
 

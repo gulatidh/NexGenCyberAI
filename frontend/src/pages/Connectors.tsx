@@ -25,7 +25,11 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
 };
 
-const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: string; secret?: boolean }>> = {
+type CredField = {
+  key: string; label: string; secret?: boolean;
+  placeholder?: string; help?: string;
+};
+const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
   azure: [
     { key: "tenant_id", label: "Tenant ID" },
     { key: "client_id", label: "Client ID" },
@@ -76,40 +80,99 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: strin
   // Web connector handles its own form (target URL + auth method picker
   // with conditional fields), so no static credential fields here.
   web: [],
-  // SAST — most just need a repo URL
+  // SAST — most just need a repo URL. Add git_username + git_token for
+  // private repos. The clone URL will be rewritten with the PAT at runtime.
   semgrep: [
-    { key: "repo_url", label: "Git Repo URL (https://github.com/org/repo)" },
+    { key: "repo_url", label: "Git Repo URL", placeholder: "https://github.com/org/repo",
+      help: "HTTPS clone URL. Public repos work as-is; private repos also need the token below." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token",
+      help: "For GitHub PATs use 'x-access-token' (default). For Azure DevOps use any non-empty string." },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…",
+      help: "Required for private repos. GitHub: scope 'repo' (read). Azure DevOps: 'Code (Read)'." },
   ],
   codeql: [
-    { key: "repo_url", label: "Git Repo URL" },
+    { key: "repo_url", label: "Git Repo URL", placeholder: "https://github.com/org/repo",
+      help: "HTTPS clone URL. CodeQL works best on GitHub-hosted repos." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…",
+      help: "Required for private repos. Scope 'repo' for code-read; 'security_events' if writing back SARIF." },
   ],
   sonarqube: [
-    { key: "repo_url", label: "Git Repo URL (optional for SonarCloud)" },
-    { key: "sonar_host_url", label: "SonarQube Host URL (https://sonar.example.com)" },
-    { key: "sonar_project_key", label: "SonarQube Project Key" },
-    { key: "sonar_token", label: "Sonar Token", secret: true },
+    { key: "repo_url", label: "Git Repo URL (optional for SonarCloud)",
+      placeholder: "https://github.com/org/repo",
+      help: "Leave blank if SonarCloud will pull from its own integration." },
+    { key: "sonar_host_url", label: "SonarQube Host URL",
+      placeholder: "https://sonar.example.com",
+      help: "Use https://sonarcloud.io for SonarCloud Enterprise." },
+    { key: "sonar_project_key", label: "SonarQube Project Key",
+      placeholder: "org_repo",
+      help: "The unique projectKey from your SonarQube/SonarCloud project settings." },
+    { key: "sonar_token", label: "Sonar Token", secret: true,
+      placeholder: "sqp_… or squ_…",
+      help: "User token from My Account → Security in Sonar." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true },
   ],
   // Network
   nmap: [
-    { key: "target", label: "Target host / IP / CIDR (e.g. 10.0.0.0/24)" },
+    { key: "target", label: "Target host / IP / CIDR",
+      placeholder: "10.0.0.0/24  or  scanme.nmap.org",
+      help: "Single host, IP, or CIDR range. Authorisation required — never scan systems you don't own." },
   ],
   openvas: [
-    { key: "target", label: "Target host / IP / CIDR" },
+    { key: "target", label: "Target host / IP / CIDR",
+      placeholder: "10.0.1.5  or  192.168.1.0/24",
+      help: "Greenbone/OpenVAS scans this target with the default vulnerability profile." },
   ],
   trivy: [
-    { key: "image", label: "Container image (registry.io/org/img:tag) — optional" },
-    { key: "repo_url", label: "Git Repo URL — optional (alternative to image)" },
+    { key: "image", label: "Container image (optional)",
+      placeholder: "ghcr.io/org/app:1.2.3  or  ubuntu:22.04",
+      help: "Provide an image to scan a container; or use repo_url below for IaC/filesystem scans." },
+    { key: "repo_url", label: "Git Repo URL (alternative to image)",
+      placeholder: "https://github.com/org/repo" },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true },
   ],
   // Dependency & Secret
   owasp_dc: [
-    { key: "repo_url", label: "Git Repo URL" },
+    { key: "repo_url", label: "Git Repo URL",
+      placeholder: "https://github.com/org/repo",
+      help: "OWASP Dependency-Check runs against the cloned repo's manifests (pom.xml, package.json, etc.)." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true },
   ],
   gitleaks: [
-    { key: "repo_url", label: "Git Repo URL" },
+    { key: "repo_url", label: "Git Repo URL",
+      placeholder: "https://github.com/org/repo",
+      help: "Full git history is scanned for committed secrets — clone is non-shallow." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…",
+      help: "Required for private repos. Scope 'repo' (read) — Gitleaks doesn't push anything back." },
   ],
   trufflehog: [
-    { key: "repo_url", label: "Git Repo URL" },
+    { key: "repo_url", label: "Git Repo URL",
+      placeholder: "https://github.com/org/repo",
+      help: "TruffleHog walks git history; verified secrets (where it can ping the issuer) are flagged critical." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…" },
   ],
+};
+
+// Top-of-dialog quick-setup guidance per connector type. Shown above the form.
+const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
+  semgrep: "Point at a Git repo URL. For private repos, paste a PAT below. Semgrep runs `--config auto` (curated security rules) inside GitHub Actions.",
+  codeql: "GitHub-hosted repos work best. CodeQL workflow is not yet wired — the connector saves and tests, but Run will be enabled in a future release.",
+  sonarqube: "Either point at a self-hosted SonarQube server, or use SonarCloud (host=https://sonarcloud.io). Workflow coming soon.",
+  nmap: "Scan a single host, IP, or CIDR. Requires explicit written authorisation from the network owner. Workflow coming soon.",
+  openvas: "Greenbone/OpenVAS scans the target IP/CIDR with the default profile. Workflow coming soon.",
+  trivy: "Provide either a container image OR a Git repo URL. Image scans hit the registry; repo scans pull manifests + IaC for misconfigs and CVEs.",
+  owasp_dc: "Scans dependency manifests in the cloned repo. Workflow coming soon.",
+  gitleaks: "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
+  trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets (where TruffleHog can ping the issuer) are flagged critical.",
 };
 
 // Connector → category mapping (mirrors backend CONNECTOR_CATEGORY).
@@ -236,7 +299,25 @@ export default function Connectors() {
             </Select>
           </FormControl>
           <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId || projects.length === 0}
-            onClick={() => { setConnProjectId(selectedProjectId || projects[0]?.id || ""); setOpen(true); }}
+            onClick={() => {
+              // Important: reset editing state so the dialog runs in "create"
+              // mode. Without this, a previous edit leaves `editing` set and
+              // the next Save fires a PATCH against the stale connector ID
+              // — produces a 404 if that connector was since deleted or
+              // belonged to a different client.
+              setEditing(null);
+              setConnName("");
+              setConnectorType("azure");
+              setCredentials({});
+              setTestResults({});
+              setWebTargetUrl("");
+              setWebProfile("baseline");
+              setWebAuthMethod("none");
+              setWebAuth({});
+              setWebExcludes("");
+              setConnProjectId(selectedProjectId || projects[0]?.id || "");
+              setOpen(true);
+            }}
             sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Add Connector
           </Button>
@@ -364,11 +445,27 @@ export default function Connectors() {
                 </Select>
               </FormControl>
             </Grid>
-            {connectorType !== "web" && credFields.map(({ key, label, secret }) => (
+            {connectorType !== "web" && TYPE_HELP[connectorType] && (
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="info"
+                  sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.85)",
+                    border: "1px solid rgba(66,133,244,0.25)",
+                    "& .MuiAlert-icon": { color: "#4285F4" } }}>
+                  {TYPE_HELP[connectorType]}
+                </Alert>
+              </Grid>
+            )}
+            {connectorType !== "web" && credFields.map(({ key, label, secret, placeholder, help }) => (
               <Grid size={{ xs: 12 }} key={key}>
                 <TextField fullWidth size="small" label={label} type={secret ? "password" : "text"}
+                  placeholder={placeholder}
+                  helperText={help}
                   value={credentials[key] || ""} onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
-                  slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                  slotProps={{
+                    inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } },
+                    htmlInput: { style: { color: 'white' } },
+                    formHelperText: { sx: { color: "rgba(255,255,255,0.45)", fontSize: 11 } },
+                  }}
                   sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
               </Grid>
             ))}

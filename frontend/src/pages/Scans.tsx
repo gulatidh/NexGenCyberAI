@@ -59,8 +59,8 @@ const SCANNERS: ScannerDef[] = [
   { id: "zap", name: "OWASP ZAP", connectorType: "web", category: "dast", status: "live",
     description: "Web app DAST — passive (unauth) and active (auth) profiles via GitHub Actions." },
   // SAST
-  { id: "semgrep", name: "Semgrep", connectorType: "semgrep", category: "sast", status: "soon",
-    description: "Open-source static analysis with curated rule packs. Connector configurable now; workflow coming soon." },
+  { id: "semgrep", name: "Semgrep", connectorType: "semgrep", category: "sast", status: "live",
+    description: "Open-source static analysis with curated rule packs. Runs in GitHub Actions via semgrep/semgrep image." },
   { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "soon",
     description: "GitHub's semantic code analysis. Connector configurable; workflow coming soon." },
   { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",

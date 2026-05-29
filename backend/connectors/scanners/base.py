@@ -39,12 +39,27 @@ class WorkflowConnector(BaseConnector):
     def __init__(self, credentials: Dict[str, Any], config: Dict[str, Any]):
         super().__init__(credentials, config)
 
+    def _get(self, key: str) -> str:
+        """Pull a value by key from either `config` (non-secret) or
+        `credentials` (where the standard credential form puts everything).
+
+        The Connectors UI doesn't have a config/credentials split for these
+        scanners, so target URLs / image refs / project keys land under
+        `credentials` even though they aren't secret. Read from both so the
+        scanner works regardless of which side the field was saved on.
+        """
+        for source in (self.config or {}, self.credentials or {}):
+            v = source.get(key)
+            if v:
+                return str(v)
+        return ""
+
     def _primary_target(self) -> str:
         """Return whichever required config key is populated (the 'target')."""
         for key in self.REQUIRED_CONFIG:
-            val = (self.config or {}).get(key)
-            if val:
-                return str(val)
+            v = self._get(key)
+            if v:
+                return v
         return ""
 
     async def test_connection(self) -> ConnectorTestResult:

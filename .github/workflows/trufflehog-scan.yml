@@ -39,13 +39,25 @@ jobs:
           curl -fsS \
             "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
             -o cfg.json
-          REPO=$(python3 -c "import json; print(json.load(open('cfg.json')).get('repo_url',''))")
-          echo "repo_url=${REPO}" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          PY
 
       - name: Clone target repo (full history)
         if: steps.cfg.outputs.repo_url != ''
         run: |
-          git clone "${{ steps.cfg.outputs.repo_url }}" target
+          git clone "${{ steps.cfg.outputs.repo_clone_url }}" target
 
       - name: Install TruffleHog
         run: |

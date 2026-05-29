@@ -40,20 +40,27 @@ jobs:
           curl -fsS \
             "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
             -o cfg.json
-          python3 - <<'PY'
-          import json, os, pathlib
-          cfg = json.load(open("cfg.json"))
-          out = pathlib.Path(os.environ["GITHUB_OUTPUT"])
-          with out.open("a") as f:
-              f.write(f"image={cfg.get('image','')}\n")
-              f.write(f"repo_url={cfg.get('repo_url','')}\n")
-              f.write(f"target={cfg.get('image') or cfg.get('repo_url') or ''}\n")
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"image={c.get('image') or ''}")
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          print(f"target={c.get('image') or repo or ''}")
           PY
 
       - name: Clone target repo (if repo scan)
         if: steps.cfg.outputs.image == '' && steps.cfg.outputs.repo_url != ''
         run: |
-          git clone --depth 1 "${{ steps.cfg.outputs.repo_url }}" target
+          git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
 
       - name: Install Trivy
         run: |

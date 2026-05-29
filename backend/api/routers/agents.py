@@ -27,9 +27,30 @@ async def run_agent(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    # Load findings if scan_id provided
+    # Load findings if scan_id provided. Refuse if the scan returned
+    # nothing — running an agent on an empty/incomplete scan wastes LLM
+    # budget and produces useless output. Tell the user to re-scan first.
     findings = []
     if payload.scan_id:
+        from api.models.models import Scan as _Scan, ScanStatus as _ScanStatus
+        scan = db.query(_Scan).filter(_Scan.id == payload.scan_id).first()
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+        scan_status = scan.status.value if hasattr(scan.status, "value") else str(scan.status)
+        if scan_status in ("pending", "running"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Scan is still {scan_status}. Wait for it to complete before running an AI agent.",
+            )
+        finding_count = db.query(Finding).filter(Finding.scan_id == payload.scan_id).count()
+        if finding_count == 0:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "This scan has no findings to analyse. Re-run the scan "
+                    "(or pick a scan with results) before invoking an AI agent."
+                ),
+            )
         raw = db.query(Finding).filter(Finding.scan_id == payload.scan_id).all()
         findings = [
             {
