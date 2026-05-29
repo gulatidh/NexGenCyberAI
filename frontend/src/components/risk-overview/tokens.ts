@@ -6,7 +6,7 @@ export const SEV_COLOR: Record<string, string> = {
   high: "#ff9800",
   medium: "#ffeb3b",
   low: "#4caf50",
-  info: "#00e5ff",
+  info: "#4285F4",
 };
 
 export const SEV_BG: Record<string, string> = {
@@ -14,7 +14,7 @@ export const SEV_BG: Record<string, string> = {
   high: "rgba(255,152,0,0.10)",
   medium: "rgba(255,235,59,0.10)",
   low: "rgba(76,175,80,0.10)",
-  info: "rgba(0,229,255,0.10)",
+  info: "rgba(66,133,244,0.10)",
 };
 
 export const RISK_COLOR: Record<string, string> = {
@@ -31,7 +31,7 @@ export const SCORE_COLOR = (score: number): string => {
 };
 
 export const cardSx = {
-  bgcolor: "#161b22",
+  bgcolor: "#1E1E1E",
   border: "1px solid rgba(255,255,255,0.08)",
   borderRadius: 2,
 };

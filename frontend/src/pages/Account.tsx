@@ -61,7 +61,7 @@ export default function Account() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <AccountCircle sx={{ color: "#00e5ff", fontSize: 32 }} />
+        <AccountCircle sx={{ color: "#4285F4", fontSize: 32 }} />
         <Box>
           <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Account</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -73,7 +73,7 @@ export default function Account() {
       <Grid container spacing={2}>
         {/* Profile */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
             <CardContent>
               <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mb: 2 }}>Profile</Typography>
               <Field label="Display name" value={userName} />
@@ -88,10 +88,10 @@ export default function Account() {
 
         {/* Preferences */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
             <CardContent>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                <Schedule sx={{ color: "#00e5ff", fontSize: 20 }} />
+                <Schedule sx={{ color: "#4285F4", fontSize: 20 }} />
                 <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>Timezone</Typography>
               </Box>
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
@@ -110,12 +110,12 @@ export default function Account() {
                 </Select>
               </FormControl>
 
-              <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "rgba(0,229,255,0.05)", border: "1px solid rgba(0,229,255,0.2)", mb: 2 }}>
+              <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "rgba(66,133,244,0.05)", border: "1px solid rgba(66,133,244,0.2)", mb: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
                   <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>ACTIVE TIMEZONE</Typography>
                   <Tooltip title="Detected from browser if not overridden"><Public sx={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }} /></Tooltip>
                 </Box>
-                <Typography sx={{ color: "#00e5ff", fontFamily: "monospace", fontSize: 14 }}>{activeTz}</Typography>
+                <Typography sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 14 }}>{activeTz}</Typography>
                 <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.5 }}>
                   Now: {fmt(now, "YYYY-MM-DD HH:mm:ss")} · UTC: {dayjs.utc(now).format("YYYY-MM-DD HH:mm:ss")}
                 </Typography>
@@ -127,7 +127,7 @@ export default function Account() {
 
               <Box sx={{ display: "flex", gap: 1 }}>
                 <Button variant="contained" startIcon={<Save />} onClick={handleSave}
-                  sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+                  sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
                   Save
                 </Button>
                 <Button variant="outlined" startIcon={<RestartAlt />} onClick={handleReset}
@@ -141,7 +141,7 @@ export default function Account() {
 
         {/* Access summary */}
         <Grid size={{ xs: 12 }}>
-          <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mb: 2 }}>Your access</Typography>
               {!me ? (
@@ -155,7 +155,7 @@ export default function Account() {
                   {me.grants.map((g) => (
                     <Chip key={g.id} size="small"
                       label={`${g.role} · ${g.scope_label || g.scope_type}`}
-                      sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 11 }} />
+                      sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 11 }} />
                   ))}
                 </Box>
               )}

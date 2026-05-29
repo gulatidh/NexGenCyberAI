@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi import Depends
@@ -33,19 +33,54 @@ async def get_scan_runtime_config(
     scan_token: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    """Workflow fetches what to scan + the prepared auth headers."""
+    """Workflow fetches what to scan + the prepared auth/credentials.
+
+    For ZAP scans the runtime store has prepared auth_headers + target_url.
+    For workflow-based scanners (Trivy/Gitleaks/TruffleHog/...) we also
+    surface the connector's config + selected credential fields (repo_url,
+    image, target, git_username, git_token, sonar_*) so workflows can
+    clone private repos and scan the right target. The HMAC scan_token
+    gates access, so secrets only leave the API for an authorized scan.
+    """
     if verify_scan_token(scan_token, expected_scan_id=scan_id) is None:
         raise HTTPException(status_code=401, detail="Invalid or expired scan token")
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     runtime = get_runtime(scan_id) or {}
+
+    # Pull connector config + credentials when the scan is tied to a
+    # connector — workflow scanners read fields like repo_url from here.
+    connector_fields: Dict[str, Any] = {}
+    if scan.connector_id:
+        import json
+        from api.models.models import Connector
+        from core.encryption import decrypt
+        c = db.query(Connector).filter(Connector.id == scan.connector_id).first()
+        if c:
+            cfg = c.config or {}
+            try:
+                creds = json.loads(decrypt(c.credentials_enc)) if c.credentials_enc else {}
+            except Exception:
+                creds = {}
+            # Whitelist fields the workflows actually need
+            for key in (
+                "repo_url", "image", "target",
+                "git_username", "git_token",
+                "sonar_host_url", "sonar_project_key", "sonar_token",
+            ):
+                v = cfg.get(key) or creds.get(key)
+                if v:
+                    connector_fields[key] = v
+
     return {
         "scan_id": scan_id,
         "target_url": runtime.get("target_url"),
         "profile": runtime.get("profile") or "baseline",
         "auth_headers": runtime.get("auth_headers") or {},
         "exclude_paths": runtime.get("exclude_paths") or [],
+        # Workflow-scanner fields (private repo auth, target image, etc.)
+        **connector_fields,
     }
 
 
@@ -77,7 +112,7 @@ _VALID_SEV = {"critical", "high", "medium", "low", "info"}
 
 
 @router.post("/scans/ingest/")
-async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = Depends(get_db)):
+async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = Depends(get_db), background_tasks: BackgroundTasks = None):  # type: ignore[assignment]
     """Workflow posts findings here when it finishes (or on error)."""
     if verify_scan_token(payload.scan_token, expected_scan_id=payload.scan_id) is None:
         raise HTTPException(status_code=401, detail="Invalid or expired scan token")
@@ -129,5 +164,16 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
         recompute_all_frameworks_for_client(db, scan.client_id)
     except Exception as exc:
         logger.warning("Post-ingest recompute failed: %s", exc)
+
+    # Auto-generate the structured AI verdict on scan completion. Best-effort
+    # background task — Verdict generator never raises out to the request,
+    # and if no LLM provider is configured it falls back to deterministic text
+    # so the UI always has something to render.
+    if background_tasks is not None:
+        try:
+            from services.verdict import generate_verdict_bg
+            background_tasks.add_task(generate_verdict_bg, scan.id)
+        except Exception:
+            logger.exception("Failed to enqueue verdict generation for scan %s", scan.id)
 
     return {"ok": True, "status": "completed", "ingested": len(payload.findings)}

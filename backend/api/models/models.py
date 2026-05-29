@@ -35,6 +35,43 @@ class ConnectorType(str, enum.Enum):
     GITHUB = "github"
     JIRA = "jira"
     WEB = "web"  # OWASP ZAP target — auth or unauth web/API scanning
+    # SAST (Static Application Security Testing)
+    SEMGREP = "semgrep"
+    CODEQL = "codeql"
+    SONARQUBE = "sonarqube"
+    # Network & Infrastructure Scanning
+    NMAP = "nmap"
+    OPENVAS = "openvas"
+    TRIVY = "trivy"
+    # Dependency & Secret Scanning
+    OWASP_DC = "owasp_dc"
+    GITLEAKS = "gitleaks"
+    TRUFFLEHOG = "trufflehog"
+
+
+class ScannerCategory(str, enum.Enum):
+    """Logical grouping for scanners on the Scans / Connectors UI."""
+    DAST = "dast"           # Dynamic Application Security Testing (web ZAP)
+    SAST = "sast"           # Static Application Security Testing (semgrep, codeql, sonar)
+    NETWORK = "network"     # Network & infra (nmap, openvas, trivy container)
+    DEPENDENCY = "dependency"  # Dependency + secret scanning (OWASP DC, gitleaks, trufflehog)
+    CLOUD = "cloud"         # Existing cloud / identity connectors
+
+
+# ConnectorType → ScannerCategory dispatch. New scanners must register here so
+# the UI and factory both know which group they belong to.
+CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
+    ConnectorType.WEB: ScannerCategory.DAST,
+    ConnectorType.SEMGREP: ScannerCategory.SAST,
+    ConnectorType.CODEQL: ScannerCategory.SAST,
+    ConnectorType.SONARQUBE: ScannerCategory.SAST,
+    ConnectorType.NMAP: ScannerCategory.NETWORK,
+    ConnectorType.OPENVAS: ScannerCategory.NETWORK,
+    ConnectorType.TRIVY: ScannerCategory.NETWORK,
+    ConnectorType.OWASP_DC: ScannerCategory.DEPENDENCY,
+    ConnectorType.GITLEAKS: ScannerCategory.DEPENDENCY,
+    ConnectorType.TRUFFLEHOG: ScannerCategory.DEPENDENCY,
+}
 
 class ConnectorStatus(str, enum.Enum):
     ACTIVE = "active"
@@ -218,6 +255,11 @@ class Scan(Base):
     summary = Column(JSON, default={})       # {total, critical, high, medium, low, passed, failed}
     error_message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Structured AI verdict — see services/verdict.py for shape.
+    # Generated automatically when a scan flips to COMPLETED, can be
+    # regenerated via POST /scans/{id}/generate-verdict.
+    ai_verdict = Column(JSON)
+    ai_verdict_generated_at = Column(DateTime(timezone=True))
 
     client = relationship("Client", back_populates="scans")
     project = relationship("Project", back_populates="scans")
@@ -422,3 +464,160 @@ class AISettings(Base):
 
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by = Column(String(255))
+
+
+# ── Scheduled Missions ────────────────────────────────────────────────────────
+
+class MissionType(str, enum.Enum):
+    SOC_DESIGN = "soc_design"
+    VULNERABILITY_RESPONSE = "vulnerability_response"
+    GRC_ADVISORY = "grc_advisory"
+    CLOUD_SECURITY_ASSESSMENT = "cloud_security_assessment"
+    ZERO_TRUST_DESIGN = "zero_trust_design"
+    INCIDENT_RESPONSE_PROGRAM = "incident_response_program"
+    THREAT_INTEL_PROGRAM = "threat_intel_program"
+    DATA_PROTECTION_ASSESSMENT = "data_protection_assessment"
+    IGA_DEPLOYMENT = "iga_deployment"
+    PHISHING_TRIAGE = "phishing_triage"
+    PORTFOLIO_RATIONALIZATION = "portfolio_rationalization"
+    SECURITY_ARCHITECTURE_REVIEW = "security_architecture_review"
+
+
+class MissionRunStatus(str, enum.Enum):
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class ScheduledMission(Base):
+    """A recurring security mission configured to run on a cron schedule."""
+    __tablename__ = "scheduled_missions"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(255), nullable=False, default="New Scheduled Mission")
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    mission_type = Column(SAEnum(MissionType, values_callable=_ev), nullable=False)
+    cron_expression = Column(String(64), nullable=False)
+    cron_label = Column(String(255))
+    timezone = Column(String(64), default="UTC")
+    # Post-run actions
+    send_summary_email = Column(Boolean, default=False)
+    update_risk_quantification = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    created_by = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    last_run_at = Column(DateTime(timezone=True))
+    next_run_at = Column(DateTime(timezone=True))
+
+    client = relationship("Client")
+    runs = relationship("ScheduledMissionRun", back_populates="mission", cascade="all, delete-orphan")
+
+
+class ScheduledMissionRun(Base):
+    """Audit log row for each execution of a scheduled mission."""
+    __tablename__ = "scheduled_mission_runs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    mission_id = Column(String(36), ForeignKey("scheduled_missions.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(SAEnum(MissionRunStatus, values_callable=_ev), nullable=False)
+    triggered_by = Column(String(32), default="scheduler")  # "scheduler" | "manual" | "system"
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True))
+    output = Column(Text)
+    error = Column(Text)
+
+    mission = relationship("ScheduledMission", back_populates="runs")
+
+
+# ── Knowledge Base ────────────────────────────────────────────────────────────
+
+class KnowledgeFile(Base):
+    """A structured security knowledge file consumed by AI specialist agents.
+
+    Files are organized by category (e.g. "frameworks_and_standards") and
+    contain nested sections (Disclaimer, Frameworks, Regulatory Deadlines, …).
+    Each file tracks which agents reference it so the dashboard can show
+    "X knowledge files powering Y specialist agents".
+    """
+    __tablename__ = "knowledge_files"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(255), nullable=False, index=True)
+    category = Column(String(64), nullable=False, index=True)
+    description = Column(Text)
+    version = Column(String(32), default="v1.0")
+    size_kb = Column(Integer, default=0)
+    # JSON list of agent identifiers (string IDs/types) that consume this file
+    used_by = Column(JSON, default=list)
+    metadata_ = Column("metadata", JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    sections = relationship("KnowledgeFileSection", back_populates="file",
+                            cascade="all, delete-orphan", order_by="KnowledgeFileSection.position")
+
+
+class AIAgent(Base):
+    """A configurable AI specialist agent in the catalog.
+
+    Each row defines an agent's identity, group, and LLM configuration.
+    Built-in agents (`is_builtin=True`) are seeded on startup and cannot
+    be deleted by non-admins. Custom agents are added via the admin UI.
+
+    Note: legacy operational agents from `AgentType` enum (risk_manager,
+    va_scanner, etc.) also live in this table with `key` matching the
+    enum value, so the Agents page can render one unified grouped list.
+    Their `legacy_orchestrator=True` flag tells the UI to use the
+    existing `/clients/{client_id}/agents/run/` execution path.
+    """
+    __tablename__ = "ai_agents"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    key = Column(String(128), nullable=False, unique=True, index=True)  # slug
+    name = Column(String(255), nullable=False)
+    group_key = Column(String(64), nullable=False, index=True)
+    group_label = Column(String(128), nullable=False)
+    description = Column(Text)
+    objective = Column(Text)
+    domain = Column(String(255))
+    system_prompt = Column(Text)
+    # LLM overrides — null means inherit from AISettings/env defaults
+    provider = Column(String(64))
+    model = Column(String(128))
+    temperature = Column(Float, default=0.1)
+    max_tokens = Column(Integer, default=4096)
+    # JSON list of tool identifiers + knowledge file IDs
+    tools_enabled = Column(JSON, default=list)
+    knowledge_file_ids = Column(JSON, default=list)
+    # Flags
+    is_builtin = Column(Boolean, default=False, nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    legacy_orchestrator = Column(Boolean, default=False, nullable=False)
+    # Audit
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    created_by = Column(String(255))
+    updated_by = Column(String(255))
+
+
+class KnowledgeFileSection(Base):
+    """One section inside a KnowledgeFile.
+
+    Section types observed: disclaimer (char count), frameworks (list of names),
+    regulatory_deadlines (list), capability_matrix (key→count map), applicability
+    (key list), cross_mapping (key list), industry_benchmarks (key list).
+    """
+    __tablename__ = "knowledge_file_sections"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    file_id = Column(String(36), ForeignKey("knowledge_files.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = Column(Integer, default=0)
+    name = Column(String(255), nullable=False)
+    section_type = Column(String(64), nullable=False)  # disclaimer | frameworks | items | matrix | applicability
+    # Free-form section body. For list sections: {"items": [...]}; for matrix
+    # sections: {"keys": {"key": count, ...}}; for disclaimer: {"chars": N, "text": "..."}
+    body = Column(JSON, default={})
+
+    file = relationship("KnowledgeFile", back_populates="sections")

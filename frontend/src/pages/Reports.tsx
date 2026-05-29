@@ -20,7 +20,7 @@ import { Print, Download, Description } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import {
   clientsApi, projectsApi, findingsApi, risksApi, assetsApi,
-  frameworksApi, riskOverviewApi,
+  frameworksApi, riskOverviewApi, missionsApi,
 } from "../services/api";
 import {
   Client, Project, Finding, Risk, Asset, FrameworkSummary,
@@ -241,18 +241,18 @@ export default function Reports() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button variant="outlined" startIcon={<Download />} disabled={exportDisabled}
             onClick={handleExportCSV}
-            sx={{ color: "#00e5ff", borderColor: "rgba(0,229,255,0.5)" }}>
+            sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}>
             Export CSV
           </Button>
           <Button variant="contained" startIcon={<Print />} disabled={!clientId}
             onClick={handlePrint}
-            sx={{ bgcolor: "#00e5ff", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Print / PDF
           </Button>
         </Box>
       </Box>
 
-      <Card className="no-print" sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+      <Card className="no-print" sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
         <CardContent>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
@@ -307,15 +307,15 @@ export default function Reports() {
       </Card>
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
           Pick a client to generate a report.
         </Alert>
       ) : (
         <Card className="print-area" ref={printRef as any}
-          sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <Description sx={{ color: "#00e5ff" }} />
+              <Description sx={{ color: "#4285F4" }} />
               <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>{reportTitle}</Typography>
             </Box>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
@@ -324,41 +324,114 @@ export default function Reports() {
             <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
 
             {reportType === "executive" && (
-              overviewLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              overviewLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
               !overview ? <Alert severity="warning">No data yet — run a scan first.</Alert> :
               <ExecutiveBlock overview={overview} fwSummaries={fwSummaries} />
             )}
 
             {reportType === "compliance" && (
-              fwLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              fwLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
               !fwDetail ? <Alert severity="warning">No control data — recompute on the Frameworks page.</Alert> :
               <ComplianceBlock detail={fwDetail} />
             )}
 
             {reportType === "findings" && (
-              findingsLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              findingsLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
               <FindingsBlock rows={findings} />
             )}
 
             {reportType === "risks" && (
-              risksLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              risksLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
               <RisksBlock rows={risks} />
             )}
 
             {reportType === "assets" && (
-              assetsLoading ? <CircularProgress sx={{ color: "#00e5ff" }} /> :
+              assetsLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
               <AssetsBlock rows={assets} />
             )}
           </CardContent>
         </Card>
       )}
+
+      {/* Workflow Outputs — recent runs across all scheduled workflows */}
+      <WorkflowOutputsSection />
     </Box>
+  );
+}
+
+function WorkflowOutputsSection() {
+  const [expanded, setExpanded] = useState(false);
+  const { data: runs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["mission-runs-recent"],
+    queryFn: () => missionsApi.recentRuns(50),
+  });
+  return (
+    <Card className="no-print" sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 2 }}>
+      <CardContent>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, cursor: "pointer" }}
+          onClick={() => setExpanded((v) => !v)}>
+          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
+            Workflow Outputs
+          </Typography>
+          <Chip label={runs.length} size="small"
+            sx={{ height: 18, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, fontWeight: 700 }} />
+          <Box sx={{ flex: 1 }} />
+          <Button size="small" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>
+            {expanded ? "Hide" : "Show recent runs"}
+          </Button>
+        </Box>
+        {expanded && (
+          <Box sx={{ mt: 1 }}>
+            {isLoading ? (
+              <CircularProgress size={20} sx={{ color: "#4285F4" }} />
+            ) : runs.length === 0 ? (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                No workflow runs yet — schedule one and click Run Now.
+              </Typography>
+            ) : (
+              runs.map((run) => (
+                <Box key={run.id} sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                    <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>
+                      {run.mission_name}
+                    </Typography>
+                    <Chip label={run.mission_type.replace(/_/g, " ")} size="small"
+                      sx={{ height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.08)", color: "#4285F4", textTransform: "capitalize" }} />
+                    <Chip label={run.status} size="small"
+                      sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                        bgcolor: run.status === "success" ? "rgba(52,168,83,0.15)" : run.status === "failed" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
+                        color: run.status === "success" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
+                    <Box sx={{ flex: 1 }} />
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                      {run.started_at ? fmtDate(run.started_at) : ""}
+                    </Typography>
+                  </Box>
+                  {run.output && (
+                    <Typography component="pre" sx={{
+                      color: "rgba(255,255,255,0.8)", fontSize: 12, whiteSpace: "pre-wrap",
+                      wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.4,
+                    }}>
+                      {run.output}
+                    </Typography>
+                  )}
+                  {run.error && (
+                    <Typography variant="caption" sx={{ color: "#EA4335", display: "block", mt: 0.5 }}>
+                      Error: {run.error}
+                    </Typography>
+                  )}
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 // ── Report sections ──────────────────────────────────────────────────────────
 
-function StatTile({ label, value, color = "#00e5ff" }: { label: string; value: string | number; color?: string }) {
+function StatTile({ label, value, color = "#4285F4" }: { label: string; value: string | number; color?: string }) {
   return (
     <Card sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
@@ -519,7 +592,7 @@ function FindingsBlock({ rows }: { rows: Finding[] }) {
                 <TableRow key={f.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
                   <TableCell><Chip label={sev} size="small" sx={{ bgcolor: `${SEV_COLOR[sev]}20`, color: SEV_COLOR[sev], height: 18, fontSize: 10 }} /></TableCell>
                   <TableCell sx={{ maxWidth: 320, fontSize: 12 }}>{f.title}</TableCell>
-                  <TableCell sx={{ color: "#00e5ff", fontSize: 11 }}>{f.cve_id || "—"}</TableCell>
+                  <TableCell sx={{ color: "#4285F4", fontSize: 11 }}>{f.cve_id || "—"}</TableCell>
                   <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, maxWidth: 200 }}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                       {f.resource_id || "—"}

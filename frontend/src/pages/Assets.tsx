@@ -12,9 +12,9 @@ import { Client, Connector, Asset, Project } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const CLASS_COLOR: Record<string, string> = {
-  vm: "#00e5ff",
+  vm: "#4285F4",
   storage: "#ff9800",
-  network: "#7c4dff",
+  network: "#34A853",
   database: "#00e676",
   identity: "#f06292",
   keyvault: "#ffd54f",
@@ -161,7 +161,7 @@ export default function Assets() {
             startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}
             disabled={!clientId || syncMutation.isPending}
             onClick={() => syncMutation.mutate()}
-            sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
+            sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
           >
             Sync Now
           </Button>
@@ -172,7 +172,7 @@ export default function Assets() {
         <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
           <Chip label={`All: ${assets.length}`} size="small" clickable
             onClick={() => setAssetClass("")}
-            sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(0,229,255,0.2)", color: "white", border: assetClass ? "none" : "1px solid #00e5ff" }} />
+            sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "white", border: assetClass ? "none" : "1px solid #4285F4" }} />
           {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
             <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
               onClick={() => setAssetClass(assetClass === c ? "" : c)}
@@ -221,22 +221,22 @@ export default function Assets() {
       )}
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
           Select a client to view its asset inventory.
         </Alert>
       ) : isLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-          <CircularProgress sx={{ color: "#00e5ff" }} />
+          <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : assets.length === 0 ? (
-        <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Storage sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
             No assets discovered yet. Click <b>Sync Now</b> to pull inventory from your connectors.
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -316,7 +316,7 @@ export default function Assets() {
                               startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
                               disabled={scanMutation.isPending}
                               onClick={() => scanMutation.mutate(a.id)}
-                              sx={{ borderColor: "#00e5ff", color: "#00e5ff", fontSize: 10, py: 0.25, minWidth: 0 }}
+                              sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 10, py: 0.25, minWidth: 0 }}
                             >
                               Scan
                             </Button>

@@ -1,0 +1,137 @@
+name: Semgrep SAST Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Clones a
+# target repo, runs Semgrep with curated rule packs, parses JSON results,
+# and POSTs findings to /api/v1/scans/ingest/.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Run Semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          PY
+
+      - name: Clone target repo
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
+
+      - name: Run Semgrep (auto config)
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          cd target
+          semgrep --config auto --json --output ../results.json --metrics off --quiet || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          findings = []
+          err = None
+          repo = os.environ.get("REPO_URL", "")
+          if os.path.exists("results.json"):
+              try:
+                  data = json.load(open("results.json"))
+                  SEV = {"ERROR":"high", "WARNING":"medium", "INFO":"low"}
+                  for r in data.get("results", []) or []:
+                      sev = SEV.get((r.get("extra", {}).get("severity") or "INFO").upper(), "info")
+                      meta = r.get("extra", {}).get("metadata") or {}
+                      # Critical bumps for high-impact rule categories
+                      categories = meta.get("category") or []
+                      if isinstance(categories, str):
+                          categories = [categories]
+                      if sev == "high" and any(c in {"security"} for c in categories):
+                          cwe = meta.get("cwe") or []
+                          if isinstance(cwe, str): cwe = [cwe]
+                          if any("CWE-78" in str(c) or "CWE-89" in str(c) or "CWE-94" in str(c) for c in cwe):
+                              sev = "critical"
+                      findings.append({
+                          "title": r.get("check_id") or "Semgrep finding",
+                          "description": (r.get("extra", {}).get("message") or "")[:4000],
+                          "severity": sev,
+                          "resource_id": f"{r.get('path','')}:{r.get('start', {}).get('line','')}",
+                          "resource_type": "file",
+                          "control_id": r.get("check_id"),
+                          "remediation": (r.get("extra", {}).get("fix") or "Review the matched code and apply the rule's recommended fix.")[:4000],
+                          "evidence": {
+                              "file": r.get("path"),
+                              "line": r.get("start", {}).get("line"),
+                              "end_line": r.get("end", {}).get("line"),
+                              "rule": r.get("check_id"),
+                              "snippet": (r.get("extra", {}).get("lines") or "")[:500],
+                              "owasp": meta.get("owasp"),
+                              "cwe": meta.get("cwe"),
+                          },
+                          "control_mappings": {},
+                      })
+              except Exception as e:
+                  err = f"Failed to parse Semgrep report: {e}"
+          elif not repo:
+              err = "No repo_url configured for scan"
+
+          payload = {"scan_id": os.environ["SCAN_ID"],
+                     "scan_token": os.environ["SCAN_TOKEN"],
+                     "findings": findings,
+                     "error": err if not findings and err else None}
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}, method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

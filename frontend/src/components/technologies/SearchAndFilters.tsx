@@ -79,18 +79,18 @@ export default function SearchAndFilters({ state, options, onChange }: Props) {
               onClick={() => update({ status: state.status === p.key ? "" : p.key as any })}
               sx={{
                 bgcolor: state.status === p.key
-                  ? `${p.key ? STATUS_COLOR[p.key] : "#00e5ff"}30`
+                  ? `${p.key ? STATUS_COLOR[p.key] : "#4285F4"}30`
                   : "rgba(255,255,255,0.04)",
-                color: p.key ? STATUS_COLOR[p.key] : "#00e5ff",
+                color: p.key ? STATUS_COLOR[p.key] : "#4285F4",
                 border: state.status === p.key
-                  ? `1px solid ${p.key ? STATUS_COLOR[p.key] : "#00e5ff"}`
+                  ? `1px solid ${p.key ? STATUS_COLOR[p.key] : "#4285F4"}`
                   : "1px solid transparent",
                 fontWeight: 600, fontSize: 11,
               }}
             />
           </Tooltip>
         ))}
-        <IconButton onClick={() => setAdvanced((v) => !v)} sx={{ color: advanced ? "#00e5ff" : "rgba(255,255,255,0.5)" }}>
+        <IconButton onClick={() => setAdvanced((v) => !v)} sx={{ color: advanced ? "#4285F4" : "rgba(255,255,255,0.5)" }}>
           <FilterList />
         </IconButton>
       </Box>

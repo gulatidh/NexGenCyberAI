@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -122,6 +122,33 @@ def _ensure_added_columns() -> None:
                 logger.info("Added findings.control_mappings column (%s)", dialect)
             except Exception as exc:
                 logger.warning("findings.control_mappings ALTER failed (likely already added by another worker): %s", exc)
+
+        # Add scans.ai_verdict + scans.ai_verdict_generated_at — structured
+        # LLM verdict produced when a scan completes.
+        try:
+            scan_cols = {c["name"] for c in inspector.get_columns("scans")}
+        except Exception:
+            scan_cols = set()
+        if "ai_verdict" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD ai_verdict NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN ai_verdict TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.ai_verdict column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.ai_verdict ALTER failed: %s", exc)
+        if "ai_verdict_generated_at" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD ai_verdict_generated_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN ai_verdict_generated_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.ai_verdict_generated_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.ai_verdict_generated_at ALTER failed: %s", exc)
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
@@ -427,6 +454,58 @@ app.include_router(technologies.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
+app.include_router(missions.router, prefix="/api/v1")
+app.include_router(knowledge.router, prefix="/api/v1")
+app.include_router(agent_catalog.router, prefix="/api/v1")
+app.include_router(risk_portfolio.router, prefix="/api/v1")
+app.include_router(scans_overview.router, prefix="/api/v1")
+
+
+# ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
+
+@app.on_event("startup")
+async def _start_mission_scheduler() -> None:
+    # Lazy import so the app still boots even if APScheduler isn't installed
+    # (development without `pip install -r requirements.txt`).
+    try:
+        from services.mission_scheduler import start_scheduler
+        start_scheduler()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to start mission scheduler")
+
+
+@app.on_event("shutdown")
+async def _stop_mission_scheduler() -> None:
+    try:
+        from services.mission_scheduler import shutdown_scheduler
+        shutdown_scheduler()
+    except Exception:
+        pass
+
+
+# ── Knowledge base seeding ───────────────────────────────────────────────────
+
+def _seed_knowledge_base() -> None:
+    try:
+        from services.knowledge_seed import seed_knowledge_base
+        seed_knowledge_base()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Knowledge base seed failed")
+
+
+def _seed_agents() -> None:
+    try:
+        from services.agent_seed import seed_agent_catalog
+        seed_agent_catalog()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Agent catalog seed failed")
+
+
+_seed_knowledge_base()
+_seed_agents()
 
 
 @app.get("/api/health")

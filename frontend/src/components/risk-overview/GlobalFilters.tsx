@@ -103,7 +103,7 @@ export default function GlobalFilters({ clients, options, state, onChange }: Pro
         .filter(([_, v]) => v).length > 0 && (
         <Stack direction="row" spacing={0.5}>
           <Chip size="small" label="Clear filters" onClick={() => onChange({ ...state, severity: "", framework: "", project: "", environment: "", cloud: "", status: "" })}
-            sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", cursor: "pointer" }} />
+            sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", cursor: "pointer" }} />
         </Stack>
       )}
     </Box>

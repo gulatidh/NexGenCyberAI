@@ -14,11 +14,11 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   success: <CheckCircle sx={{ fontSize: 16, color: "#00e676" }} />,
   error: <Error sx={{ fontSize: 16, color: "#f44336" }} />,
   warning: <Warning sx={{ fontSize: 16, color: "#ff9800" }} />,
-  info: <Info sx={{ fontSize: 16, color: "#00e5ff" }} />,
+  info: <Info sx={{ fontSize: 16, color: "#4285F4" }} />,
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  success: "#00e676", error: "#f44336", warning: "#ff9800", info: "#00e5ff",
+  success: "#00e676", error: "#f44336", warning: "#ff9800", info: "#4285F4",
 };
 
 export default function NotificationBell() {
@@ -49,7 +49,7 @@ export default function NotificationBell() {
         <IconButton onClick={handleOpen} size="small" sx={{ mr: 1 }}>
           <Badge badgeContent={count} color="error" max={99}>
             {count > 0
-              ? <Notifications sx={{ color: "#00e5ff", fontSize: 22 }} />
+              ? <Notifications sx={{ color: "#4285F4", fontSize: 22 }} />
               : <NotificationsNone sx={{ color: "rgba(255,255,255,0.5)", fontSize: 22 }} />}
           </Badge>
         </IconButton>
@@ -61,7 +61,7 @@ export default function NotificationBell() {
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 2, width: 400, maxHeight: 520 } } }}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 2, width: 400, maxHeight: 520 } } }}
       >
         <Box sx={{ p: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14 }}>
@@ -92,7 +92,7 @@ export default function NotificationBell() {
             {notifications.map((n, i) => (
               <React.Fragment key={n.id}>
                 <ListItem sx={{ py: 1, px: 1.5, alignItems: "flex-start", gap: 1,
-                  bgcolor: n.read ? "transparent" : "rgba(0,229,255,0.03)" }}>
+                  bgcolor: n.read ? "transparent" : "rgba(66,133,244,0.03)" }}>
                   <Box sx={{ mt: 0.2, flexShrink: 0 }}>{TYPE_ICON[n.type] || TYPE_ICON.info}</Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ color: "white", fontSize: 12, fontWeight: 500, wordBreak: "break-word" }}>

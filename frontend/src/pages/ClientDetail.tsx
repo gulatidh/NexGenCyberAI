@@ -15,19 +15,19 @@ import { Client, Connector, Scan, Project, ProjectSummary, Asset } from "../type
 import { fromNow } from "../utils/datetime";
 
 const CONNECTOR_COLOR: Record<string, string> = {
-  entraid: "#00e5ff", azure: "#0078d4", aws: "#ff9900", gcp: "#4285f4",
+  entraid: "#4285F4", azure: "#0078d4", aws: "#ff9900", gcp: "#4285f4",
   onprem: "#9e9e9e", okta: "#007dc1", github: "#f0f6fc",
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#ff9800", running: "#00e5ff", completed: "#00e676",
+  pending: "#ff9800", running: "#4285F4", completed: "#00e676",
   failed: "#f44336", cancelled: "rgba(255,255,255,0.3)",
   active: "#00e676", inactive: "#ff9800", error: "#f44336",
 };
 
 const ENV_COLOR: Record<string, string> = {
   production: "#f44336", staging: "#ff9800",
-  development: "#00e5ff", dr: "#7c4dff", other: "rgba(255,255,255,0.5)",
+  development: "#4285F4", dr: "#34A853", other: "rgba(255,255,255,0.5)",
 };
 
 
@@ -40,8 +40,8 @@ function ProjectCardCompact({ project, clientId, onDelete }: {
   });
   const isDefault = project.name === "Default";
   return (
-    <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
-      transition: "border-color .15s", "&:hover": { borderColor: "rgba(0,229,255,0.3)" } }}>
+    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
+      transition: "border-color .15s", "&:hover": { borderColor: "rgba(66,133,244,0.3)" } }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
           <Box>
@@ -139,8 +139,13 @@ export default function ClientDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects", clientId] }),
   });
 
+  const deleteConnectorMutation = useMutation({
+    mutationFn: (id: string) => connectorsApi.delete(clientId!, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["connectors", clientId] }),
+  });
+
   if (clientLoading) {
-    return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#00e5ff" }} /></Box>;
+    return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   }
   if (!client) {
     return <Box sx={{ color: "rgba(255,255,255,0.5)", p: 4 }}>Client not found.</Box>;
@@ -162,10 +167,10 @@ export default function ClientDetail() {
       </Box>
 
       {/* Header */}
-      <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
         <CardContent>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", width: 56, height: 56, fontSize: 24, fontWeight: 700 }}>
+            <Avatar sx={{ bgcolor: "#4285F4", color: "#000", width: 56, height: 56, fontSize: 24, fontWeight: 700 }}>
               {client.name.charAt(0)}
             </Avatar>
             <Box sx={{ flex: 1 }}>
@@ -186,8 +191,8 @@ export default function ClientDetail() {
 
           <Grid container spacing={3}>
             {[
-              { label: "Projects", value: projects.length, icon: <FolderOpen sx={{ color: "#00e5ff" }} /> },
-              { label: "Connectors", value: connectors.length, icon: <Cable sx={{ color: "#7c4dff" }} /> },
+              { label: "Projects", value: projects.length, icon: <FolderOpen sx={{ color: "#4285F4" }} /> },
+              { label: "Connectors", value: connectors.length, icon: <Cable sx={{ color: "#34A853" }} /> },
               { label: "Total Scans", value: scans.length, icon: <Scanner sx={{ color: "#ff9800" }} /> },
               { label: "Total Findings", value: totalFindings, icon: <Security sx={{ color: "#ffeb3b" }} /> },
               { label: "Critical Findings", value: criticalFindings, icon: <Security sx={{ color: "#f44336" }} /> },
@@ -210,7 +215,7 @@ export default function ClientDetail() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
           "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
-          "& .Mui-selected": { color: "#00e5ff" }, "& .MuiTabs-indicator": { backgroundColor: "#00e5ff" } }}>
+          "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab label="Overview" value="overview" />
         <Tab label={`Projects (${projects.length})`} value="projects" />
         <Tab label={`Connectors (${connectors.length})`} value="connectors" />
@@ -222,11 +227,11 @@ export default function ClientDetail() {
       {tab === "overview" && (
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                   <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Connectors</Typography>
-                  <Button size="small" onClick={() => setTab("connectors")} sx={{ color: "#00e5ff", fontSize: 11 }}>
+                  <Button size="small" onClick={() => setTab("connectors")} sx={{ color: "#4285F4", fontSize: 11 }}>
                     Manage
                   </Button>
                 </Box>
@@ -254,11 +259,11 @@ export default function ClientDetail() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                   <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Recent Scans</Typography>
-                  <Button size="small" onClick={() => setTab("scans")} sx={{ color: "#00e5ff", fontSize: 11 }}>
+                  <Button size="small" onClick={() => setTab("scans")} sx={{ color: "#4285F4", fontSize: 11 }}>
                     View All
                   </Button>
                 </Box>
@@ -277,7 +282,7 @@ export default function ClientDetail() {
                     <TableBody>
                       {scans.slice(0, 5).map((s) => (
                         <TableRow key={s.id} sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", fontSize: 12 } }}>
-                          <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 10, height: 18 }} /></TableCell>
+                          <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 10, height: 18 }} /></TableCell>
                           <TableCell><Chip label={s.status} size="small"
                             sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>
                           <TableCell>{s.summary?.total ?? "—"}</TableCell>
@@ -302,7 +307,7 @@ export default function ClientDetail() {
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
               onClick={() => navigate(`/projects?clientId=${clientId}`)}
-              sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+              sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
               New Project
             </Button>
           </Box>
@@ -328,12 +333,12 @@ export default function ClientDetail() {
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
               onClick={() => navigate(`/connectors?clientId=${clientId}`)}
-              sx={{ bgcolor: "#00e5ff", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+              sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
               Add Connector
             </Button>
           </Box>
           {connectors.length === 0 ? (
-            <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Cable sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
               <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No connectors yet.</Typography>
             </Card>
@@ -341,7 +346,7 @@ export default function ClientDetail() {
             <Grid container spacing={2}>
               {connectors.map((c) => (
                 <Grid key={c.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                  <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
                     <CardContent>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
                         <Box>
@@ -356,13 +361,35 @@ export default function ClientDetail() {
                       {c.project_id && projectMap.has(c.project_id) && (
                         <Chip label={`Project: ${projectMap.get(c.project_id)}`} size="small"
                           icon={<FolderOpen sx={{ fontSize: 12 }} />}
-                          sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#7c4dff", fontSize: 10, height: 18, mt: 0.5 }} />
+                          sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#34A853", fontSize: 10, height: 18, mt: 0.5 }} />
                       )}
                       {c.last_synced_at && (
                         <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mt: 1, fontSize: 10 }}>
                           Last synced {fromNow(c.last_synced_at)}
                         </Typography>
                       )}
+                      <Box sx={{ display: "flex", gap: 0.75, mt: 1.5, flexWrap: "wrap" }}>
+                        <Button
+                          size="small" variant="outlined" startIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                          onClick={() => navigate(`/connectors?clientId=${clientId}`)}
+                          sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)", fontSize: 11,
+                            "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
+                          Manage
+                        </Button>
+                        <Box sx={{ flex: 1 }} />
+                        <Button
+                          size="small" variant="outlined" startIcon={<Delete sx={{ fontSize: 14 }} />}
+                          disabled={deleteConnectorMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Delete connector "${c.name}"? Linked assets stay but won't be re-synced.`)) {
+                              deleteConnectorMutation.mutate(c.id);
+                            }
+                          }}
+                          sx={{ borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
+                            "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" } }}>
+                          Delete
+                        </Button>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -381,19 +408,19 @@ export default function ClientDetail() {
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
               onClick={() => navigate(`/assets?clientId=${clientId}`)}
-              sx={{ color: "#00e5ff", fontSize: 11 }}>
+              sx={{ color: "#4285F4", fontSize: 11 }}>
               Open Asset Inventory
             </Button>
           </Box>
           {assets.length === 0 ? (
-            <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <StorageIcon sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
               <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
                 No assets discovered yet. Trigger a connector sync to populate.
               </Typography>
             </Card>
           ) : (
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
@@ -447,17 +474,17 @@ export default function ClientDetail() {
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
               onClick={() => navigate(`/scans?clientId=${clientId}`)}
-              sx={{ color: "#00e5ff", fontSize: 11 }}>
+              sx={{ color: "#4285F4", fontSize: 11 }}>
               Manage Scans
             </Button>
           </Box>
           {scans.length === 0 ? (
-            <Card sx={{ bgcolor: "#161b22", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Scanner sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
               <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No scans yet for this client.</Typography>
             </Card>
           ) : (
-            <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
@@ -476,7 +503,7 @@ export default function ClientDetail() {
                       : s.status === "running" ? "Running…" : "—";
                     return (
                       <TableRow key={s.id} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)" } }}>
-                        <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 10, height: 18 }} /></TableCell>
+                        <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 10, height: 18 }} /></TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{s.framework || "—"}</TableCell>
                         <TableCell><Chip label={s.status} size="small"
                           sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>

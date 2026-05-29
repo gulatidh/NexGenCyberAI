@@ -9,7 +9,7 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings,
+  AdminPanelSettings, Schedule, AutoStories,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -31,13 +31,15 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Dashboard",      icon: <Dashboard />,  path: "/dashboard" },
       { label: "Risk Overview",  icon: <Insights />,   path: "/risk-overview" },
       { label: "Clients",        icon: <People />,     path: "/clients" },
-      { label: "Scans",          icon: <BugReport />,  path: "/scans" },
+      { label: "Assessments",    icon: <BugReport />,  path: "/scans" },
       { label: "Findings",       icon: <Security />,   path: "/findings" },
       { label: "Risk Register",  icon: <Assessment />, path: "/risks" },
       { label: "Asset Inventory", icon: <Storage />,   path: "/assets" },
       { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
       { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
       { label: "AI Agents",      icon: <SmartToy />,   path: "/agents" },
+      { label: "Workflows",      icon: <Schedule />,   path: "/missions" },
+      { label: "Knowledge Base", icon: <AutoStories />, path: "/knowledge" },
       { label: "Reports",        icon: <BarChart />,   path: "/reports" },
     ],
   },
@@ -75,13 +77,13 @@ export default function AppLayout() {
   const drawer = (
     <Box sx={{ height: "100%", bgcolor: "grey.900", color: "white" }}>
       <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <Shield sx={{ color: "#00e5ff", fontSize: 32 }} />
+        <Shield sx={{ color: "#4285F4", fontSize: 32 }} />
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#00e5ff", lineHeight: 1.1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
             NexGen
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>
-            CyberAI Platform
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+            A DRJ Product
           </Typography>
         </Box>
       </Box>
@@ -114,11 +116,11 @@ export default function AppLayout() {
                   onClick={() => navigate(item.path)}
                   sx={{
                     mx: 1, my: 0.3, borderRadius: 1,
-                    bgcolor: active ? "rgba(0,229,255,0.15)" : "transparent",
+                    bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
                     "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
                   }}
                 >
-                  <ListItemIcon sx={{ color: active ? "#00e5ff" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
+                  <ListItemIcon sx={{ color: active ? "#4285F4" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
@@ -128,7 +130,7 @@ export default function AppLayout() {
                         style: {
                           fontSize: 13,
                           fontWeight: active ? 600 : 400,
-                          color: active ? "#00e5ff" : "rgba(255,255,255,0.8)",
+                          color: active ? "#4285F4" : "rgba(255,255,255,0.8)",
                         },
                       },
                     }}
@@ -144,7 +146,7 @@ export default function AppLayout() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0f1117" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0F0F0F" }}>
       {/* Sidebar */}
       <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: 0 }}>
         <Drawer
@@ -170,22 +172,36 @@ export default function AppLayout() {
         <AppBar
           position="sticky"
           elevation={0}
-          sx={{ bgcolor: "#161b22", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          sx={{ bgcolor: "#1E1E1E", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
         >
           <Toolbar>
             <IconButton color="inherit" onClick={() => setMobileOpen(true)} sx={{ mr: 1, display: { md: "none" } }}>
               <MenuIcon />
             </IconButton>
             <Box sx={{ flexGrow: 1 }} />
+            <Typography
+              sx={{
+                fontFamily: '"Inter", sans-serif',
+                fontSize: 16,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                mr: 2,
+                display: { xs: "none", sm: "block" },
+              }}
+            >
+              <Box component="span" sx={{ color: "#4285F4" }}>D</Box>
+              <Box component="span" sx={{ color: "#EA4335" }}>R</Box>
+              <Box component="span" sx={{ color: "#FBBC04" }}>J</Box>
+            </Typography>
             <Chip
               label="LIVE"
               size="small"
-              sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
+              sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
             />
             <NotificationBell />
             <Tooltip title="Account">
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-                <Avatar sx={{ bgcolor: "#00e5ff", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>
+                <Avatar sx={{ bgcolor: "#4285F4", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>
                   {userInitial}
                 </Avatar>
               </IconButton>

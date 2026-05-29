@@ -212,3 +212,49 @@ export const assetsApi = {
   scan: (clientId: string, assetId: string) =>
     apiClient.post(`/clients/${clientId}/assets/${assetId}/scan/`).then((r) => r.data),
 };
+
+export const missionsApi = {
+  list: (clientId?: string) =>
+    apiClient.get(`/missions/`, { params: clientId ? { client_id: clientId } : {} }).then((r) => r.data),
+  create: (data: any) => apiClient.post(`/missions/`, data).then((r) => r.data),
+  update: (missionId: string, data: any) =>
+    apiClient.patch(`/missions/${missionId}`, data).then((r) => r.data),
+  delete: (missionId: string) =>
+    apiClient.delete(`/missions/${missionId}`).then((r) => r.data),
+  runNow: (missionId: string) =>
+    apiClient.post(`/missions/${missionId}/run`).then((r) => r.data),
+  runs: (missionId: string) =>
+    apiClient.get(`/missions/${missionId}/runs`).then((r) => r.data),
+  recentRuns: (limit = 50) =>
+    apiClient.get(`/missions/runs/recent`, { params: { limit } }).then((r) => r.data),
+};
+
+export const knowledgeApi = {
+  list: () => apiClient.get(`/knowledge/`).then((r) => r.data),
+  search: (q: string) => apiClient.get(`/knowledge/search`, { params: { q } }).then((r) => r.data),
+  stats: () => apiClient.get(`/knowledge/stats`).then((r) => r.data),
+  get: (fileId: string) => apiClient.get(`/knowledge/${fileId}`).then((r) => r.data),
+};
+
+export const riskPortfolioApi = {
+  get: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/risk-portfolio/`).then((r) => r.data),
+};
+
+export const assessmentsApi = {
+  listAll: () => apiClient.get(`/scans/all`).then((r) => r.data),
+  detail: (scanId: string) => apiClient.get(`/scans/${scanId}/detail`).then((r) => r.data),
+  generateVerdict: (scanId: string) =>
+    apiClient.post(`/scans/${scanId}/generate-verdict`).then((r) => r.data),
+};
+
+export const agentCatalogApi = {
+  list: () => apiClient.get(`/agents/catalog/`).then((r) => r.data),
+  get: (agentId: string) => apiClient.get(`/agents/catalog/${agentId}`).then((r) => r.data),
+  create: (data: any) => apiClient.post(`/agents/catalog/`, data).then((r) => r.data),
+  update: (agentId: string, data: any) =>
+    apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
+  delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
+  run: (agentId: string, prompt?: string, clientId?: string) =>
+    apiClient.post(`/agents/catalog/${agentId}/run`, { prompt, client_id: clientId }).then((r) => r.data),
+};

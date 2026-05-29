@@ -1,47 +1,107 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Button, Card, Grid, Chip, IconButton,
+  Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, Alert,
-  Divider, TableSortLabel,
+  Tabs, Tab, Stack, Tooltip, Divider,
+  Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility, Delete } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi, frameworksApi, projectsApi } from "../services/api";
-import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi } from "../services/api";
+import { useNavigate } from "react-router-dom";
+import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#ff9800", running: "#00e5ff", completed: "#00e676",
+  pending: "#ff9800", running: "#4285F4", completed: "#00e676",
   failed: "#f44336", cancelled: "rgba(255,255,255,0.3)",
 };
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b",
-  low: "#4caf50", info: "#00e5ff",
+  low: "#4caf50", info: "#4285F4",
 };
+
+// ── Scanner catalog ──────────────────────────────────────────────────────────
+// Drives the category → scanner cascade in the New Scan dialog. `connectorType`
+// must match a backend ConnectorType value. `status` controls whether the row
+// is selectable (Live) or shown as a teaser (Soon).
+type ScannerStatus = "live" | "soon";
+type ScanCategory = "cloud" | "dast" | "sast" | "network" | "dependency";
+type ScannerDef = {
+  id: string;             // unique key
+  name: string;           // display label
+  connectorType: string;  // backend ConnectorType.value
+  category: ScanCategory;
+  status: ScannerStatus;
+  description: string;
+};
+
+const CATEGORY_LABEL: Record<ScanCategory, string> = {
+  cloud: "Cloud & Identity",
+  dast: "DAST — Dynamic AppSec",
+  sast: "SAST — Static AppSec",
+  network: "Network & Infrastructure",
+  dependency: "Dependency & Secret",
+};
+
+const CATEGORY_COLOR: Record<ScanCategory, string> = {
+  cloud: "#4285F4",       // Google Blue
+  dast: "#FBBC04",        // Google Yellow — dynamic
+  sast: "#4285F4",        // Google Blue — static
+  network: "#34A853",     // Google Green — infra
+  dependency: "#EA4335",  // Google Red — secrets / deps
+};
+
+const SCANNERS: ScannerDef[] = [
+  // DAST
+  { id: "zap", name: "OWASP ZAP", connectorType: "web", category: "dast", status: "live",
+    description: "Web app DAST — passive (unauth) and active (auth) profiles via GitHub Actions." },
+  // SAST
+  { id: "semgrep", name: "Semgrep", connectorType: "semgrep", category: "sast", status: "live",
+    description: "Open-source static analysis with curated rule packs. Runs in GitHub Actions via semgrep/semgrep image." },
+  { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "soon",
+    description: "GitHub's semantic code analysis. Connector configurable; workflow coming soon." },
+  { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
+    description: "Community Edition (self-hosted) or Enterprise (SonarCloud via Action). Workflow coming soon." },
+  // Network
+  { id: "nmap", name: "NMAP", connectorType: "nmap", category: "network", status: "soon",
+    description: "Service / port discovery on hosts or CIDR ranges. Workflow coming soon." },
+  { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "soon",
+    description: "Open-source network vulnerability scanner. Workflow coming soon." },
+  { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
+    description: "Container image + filesystem + IaC scanner. Runs in GitHub Actions." },
+  // Dependency / Secret
+  { id: "owasp_dc", name: "OWASP Dependency-Check", connectorType: "owasp_dc", category: "dependency", status: "soon",
+    description: "SCA / CVE matching for application dependencies. Workflow coming soon." },
+  { id: "gitleaks", name: "Gitleaks", connectorType: "gitleaks", category: "dependency", status: "live",
+    description: "Secret scanner for git history. Runs in GitHub Actions." },
+  { id: "trufflehog", name: "TruffleHog", connectorType: "trufflehog", category: "dependency", status: "live",
+    description: "Secret scanner (git + filesystem) with verification. Runs in GitHub Actions." },
+];
+
+const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency"];
 
 export default function Scans() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
+  // Tile filter state
+  const [tileStatusFilter, setTileStatusFilter] = useState<string>("");
+  const [tileCategoryFilter, setTileCategoryFilter] = useState<string>("");
   const [scanType, setScanType] = useState<ScanType>("full");
   const [connectorId, setConnectorId] = useState("");
   const [framework, setFramework] = useState<FrameworkType | "">("");
   const [scanName, setScanName] = useState("");
+  const [category, setCategory] = useState<ScanCategory>("cloud");
+  const [scannerId, setScannerId] = useState<string>("");
   const [viewScan, setViewScan] = useState<Scan | null>(null);
-  const [sortKey, setSortKey] = useState<string>("started_at");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
-  const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["projects", selectedClientId],
-    queryFn: () => projectsApi.list(selectedClientId),
-    enabled: !!selectedClientId,
-  });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
     queryKey: ["framework-catalog"],
     queryFn: frameworksApi.catalog,
@@ -51,11 +111,19 @@ export default function Scans() {
     queryFn: () => connectorsApi.list(selectedClientId, selectedProjectId || undefined),
     enabled: !!selectedClientId,
   });
-  const { data: scans = [], isLoading, refetch } = useQuery<Scan[]>({
-    queryKey: ["scans", selectedClientId, selectedProjectId],
-    queryFn: () => scansApi.list(selectedClientId, selectedProjectId || undefined),
-    enabled: !!selectedClientId,
-    refetchInterval: (query) => (query.state.data as any[])?.some((s: any) => s.status === "running") ? 5000 : false,
+
+  // Cross-client tile feed (default view). Refetches every 5s while any tile
+  // is still running.
+  const { data: tilesData, isLoading: tilesLoading, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
+    queryKey: ["assessments-tiles"],
+    queryFn: () => assessmentsApi.listAll(),
+    refetchInterval: (q) => ((q.state.data as any)?.scans || []).some((s: any) => s.status === "running") ? 5000 : false,
+  });
+  const tiles = (tilesData?.scans || []).filter((t) => {
+    if (tileStatusFilter && t.status !== tileStatusFilter) return false;
+    if (tileCategoryFilter && t.category !== tileCategoryFilter) return false;
+    if (selectedClientId && t.client_id !== selectedClientId) return false;
+    return true;
   });
 
   const { data: findings = [], isLoading: findingsLoading } = useQuery<any[]>({
@@ -66,199 +134,338 @@ export default function Scans() {
 
   const startMutation = useMutation({
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); setOpen(false); setScanName(""); toast.success("Scan started"); },
-    onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting scan"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      setOpen(false); setScanName("");
+      toast.success("Assessment started");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: (scanId: string) => scansApi.delete(selectedClientId, scanId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["scans"] }); toast.success("Scan deleted"); },
-    onError: (e: any) => toast.error(e.response?.data?.detail || "Error deleting scan"),
-  });
-
-  const sortedScans = React.useMemo(() => {
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...scans].sort((a, b) => {
-      const av: any = (a as any)[sortKey] ?? "";
-      const bv: any = (b as any)[sortKey] ?? "";
-      return String(av).localeCompare(String(bv)) * dir;
-    });
-  }, [scans, sortKey, sortDir]);
-
-  const setSort = (k: string) => {
-    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortKey(k); setSortDir("desc"); }
-  };
 
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Vulnerability & Configuration Scans</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>Run VA scans, config reviews, and compliance assessments</Typography>
+          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Assessments</Typography>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+            Every scan across all clients · click a tile for the AI verdict, findings, and agent runs
+          </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client"
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client (filter)</InputLabel>
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client (filter)"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              <MenuItem value="">All clients</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!selectedClientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
-            <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-              <MenuItem value="">All projects</MenuItem>
-              {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
-          <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>New Scan</Button>
+          <Button variant="outlined" startIcon={<Refresh />}
+            onClick={() => refetchTiles()}
+            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
+          <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}>
+            New Assessment
+          </Button>
         </Box>
       </Box>
 
-      {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "white" }}>Select a client to view scans.</Alert>
-      ) : isLoading ? (
-        <CircularProgress sx={{ color: "#00e5ff" }} />
-      ) : (
-        <Card sx={{ bgcolor: "#161b22", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600 } }}>
-                <TableCell>
-                  <TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>
-                    Name
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel active={sortKey === "scan_type"} direction={sortDir} onClick={() => setSort("scan_type")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Type</TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel active={sortKey === "framework"} direction={sortDir} onClick={() => setSort("framework")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Framework</TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Status</TableSortLabel>
-                </TableCell>
-                <TableCell>Findings</TableCell>
-                <TableCell>
-                  <TableSortLabel active={sortKey === "started_at"} direction={sortDir} onClick={() => setSort("started_at")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>Started</TableSortLabel>
-                </TableCell>
-                <TableCell>Duration</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {sortedScans.length === 0 ? (
-                <TableRow><TableCell colSpan={8} sx={{ textAlign: "center", color: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.08)" }}>No scans yet</TableCell></TableRow>
-              ) : sortedScans.map((scan) => {
-                const dur = scan.started_at && scan.completed_at
-                  ? `${Math.round((new Date(scan.completed_at).getTime() - new Date(scan.started_at).getTime()) / 1000)}s`
-                  : scan.status === "running" ? "Running..." : "-";
-                return (
-                  <TableRow key={scan.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white" } }}>
-                    <TableCell><Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>{scan.name || `Scan ${scan.id.slice(0, 8)}`}</Typography></TableCell>
-                    <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(0,229,255,0.1)", color: "#00e5ff", fontSize: 11 }} /></TableCell>
-                    <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{scan.framework || "—"}</Typography></TableCell>
-                    <TableCell>
-                      <Chip label={scan.status} size="small"
-                        sx={{ bgcolor: `${STATUS_COLOR[scan.status]}20`, color: STATUS_COLOR[scan.status] }} />
-                    </TableCell>
-                    <TableCell>
-                      {scan.summary ? (
-                        <Box sx={{ display: "flex", gap: 0.5 }}>
-                          {scan.summary.critical! > 0 && <Chip label={`${scan.summary.critical}C`} size="small" sx={{ bgcolor: "rgba(244,67,54,0.2)", color: "#f44336", fontSize: 10, height: 18 }} />}
-                          {scan.summary.high! > 0 && <Chip label={`${scan.summary.high}H`} size="small" sx={{ bgcolor: "rgba(255,152,0,0.2)", color: "#ff9800", fontSize: 10, height: 18 }} />}
-                          {scan.summary.medium! > 0 && <Chip label={`${scan.summary.medium}M`} size="small" sx={{ bgcolor: "rgba(255,235,59,0.2)", color: "#ffeb3b", fontSize: 10, height: 18 }} />}
-                        </Box>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell><Typography variant="caption">{fromNow(scan.started_at)}</Typography></TableCell>
-                    <TableCell><Typography variant="caption">{dur}</Typography></TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
-                        onClick={() => setViewScan(scan)}
-                        sx={{ color: "#00e5ff", fontSize: 11, minWidth: 0 }}>View</Button>
-                      <IconButton size="small"
-                        onClick={() => {
-                          if (window.confirm(`Delete scan "${scan.name || scan.id.slice(0, 8)}"? Findings will also be removed.`)) {
-                            deleteMutation.mutate(scan.id);
-                          }
-                        }}
-                        sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#f44336" } }}>
-                        <Delete sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+      {/* Tile filter chips */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>STATUS</Typography>
+        {["completed", "running", "failed", "pending", "cancelled"].map((s) => (
+          <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
+            onClick={() => setTileStatusFilter(tileStatusFilter === s ? "" : s)}
+            sx={{
+              cursor: "pointer",
+              bgcolor: tileStatusFilter === s ? `${STATUS_COLOR[s] || "#888"}25` : "rgba(255,255,255,0.04)",
+              color: tileStatusFilter === s ? (STATUS_COLOR[s] || "#888") : "rgba(255,255,255,0.7)",
+              border: tileStatusFilter === s ? `1px solid ${STATUS_COLOR[s] || "#888"}` : "1px solid transparent",
+              fontWeight: tileStatusFilter === s ? 700 : 400,
+            }} />
+        ))}
+        <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>CATEGORY</Typography>
+        {["DAST", "SAST", "Network", "Dependency", "Cloud", "Other"].map((c) => (
+          <Chip key={c} size="small" label={c}
+            onClick={() => setTileCategoryFilter(tileCategoryFilter === c ? "" : c)}
+            sx={{
+              cursor: "pointer",
+              bgcolor: tileCategoryFilter === c ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.04)",
+              color: tileCategoryFilter === c ? "#4285F4" : "rgba(255,255,255,0.7)",
+              border: tileCategoryFilter === c ? "1px solid #4285F4" : "1px solid transparent",
+              fontWeight: tileCategoryFilter === c ? 700 : 400,
+            }} />
+        ))}
+        {(tileStatusFilter || tileCategoryFilter) && (
+          <Button size="small" sx={{ ml: 0.5, color: "rgba(255,255,255,0.5)", fontSize: 11 }}
+            onClick={() => { setTileStatusFilter(""); setTileCategoryFilter(""); }}>
+            Clear
+          </Button>
+        )}
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          Showing {tiles.length} of {tilesData?.scans?.length || 0} assessments
+        </Typography>
+      </Box>
+
+      {tilesLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
+          <CircularProgress sx={{ color: "#4285F4" }} />
+        </Box>
+      ) : tiles.length === 0 ? (
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <Visibility sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
+          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+            No assessments yet. Pick a client and click "New Assessment" to run one.
+          </Typography>
         </Card>
+      ) : (
+        <Grid container spacing={2}>
+          {tiles.map((tile) => {
+            const status = tile.status as string;
+            const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
+            const cat = (tile.category as string) || "Other";
+            const catColor = CATEGORY_COLOR[cat.toLowerCase() as ScanCategory] || "#4285F4";
+            const dur = tile.duration_seconds != null
+              ? (tile.duration_seconds >= 60
+                  ? `${Math.round(tile.duration_seconds / 60)} min`
+                  : `${tile.duration_seconds}s`)
+              : (status === "running" ? "Running…" : "—");
+            const agentTypes = Array.from(new Set((tile.agents_ran || []).map((a: any) => a.agent_type)));
+            return (
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
+                <Card
+                  onClick={() => navigate(`/scans/${tile.id}`)}
+                  sx={{
+                    bgcolor: "#1E1E1E",
+                    border: `1px solid ${statusColor}40`,
+                    borderRadius: 2,
+                    cursor: "pointer",
+                    transition: "transform 0.12s, border-color 0.12s, background-color 0.12s",
+                    height: "100%",
+                    "&:hover": { borderColor: statusColor, bgcolor: "rgba(255,255,255,0.02)", transform: "translateY(-1px)" },
+                  }}>
+                  <Box sx={{ p: 2, position: "relative" }}>
+                    <Chip
+                      label={status}
+                      size="small"
+                      sx={{
+                        position: "absolute", top: 12, right: 12,
+                        bgcolor: `${statusColor}20`,
+                        color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
+                        textTransform: "uppercase", letterSpacing: 0.5,
+                      }} />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, pr: 9 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: catColor, flexShrink: 0 }} />
+                      <Typography variant="caption"
+                        sx={{ color: catColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                        {cat}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ color: "white", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>
+                      {tile.tile_name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.25 }}>
+                      {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
+                      {tile.name || `${tile.scan_type} scan`}
+                      {tile.findings_count > 0 ? ` · ${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}` : ""}
+                      {tile.framework ? ` · ${tile.framework}` : ""}
+                    </Typography>
+                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
+                      {tile.summary?.critical > 0 && (
+                        <Chip size="small" label={`${tile.summary.critical}C`}
+                          sx={{ bgcolor: "rgba(234,67,53,0.18)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {tile.summary?.high > 0 && (
+                        <Chip size="small" label={`${tile.summary.high}H`}
+                          sx={{ bgcolor: "rgba(255,112,67,0.18)", color: "#FF7043", height: 18, fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {tile.summary?.medium > 0 && (
+                        <Chip size="small" label={`${tile.summary.medium}M`}
+                          sx={{ bgcolor: "rgba(251,188,4,0.18)", color: "#FBBC04", height: 18, fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      {tile.has_verdict && (
+                        <Chip size="small" label="AI verdict"
+                          sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
+                      )}
+                      <Box sx={{ flex: 1 }} />
+                      {agentTypes.length > 0 && (
+                        <Tooltip title={`Agents that ran: ${agentTypes.join(", ")}`}>
+                          <Chip size="small" label={`${agentTypes.length} agent${agentTypes.length === 1 ? "" : "s"}`}
+                            sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0", height: 18, fontSize: 10, fontWeight: 700 }} />
+                        </Tooltip>
+                      )}
+                    </Box>
+                  </Box>
+                </Card>
+              </Grid>
+            );
+          })}
+        </Grid>
       )}
 
-      {/* Start scan dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white", minWidth: 420 } } }}>
-        <DialogTitle>Start New Scan</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth size="small" label="Scan name (optional)"
-                value={scanName} onChange={(e) => setScanName(e.target.value)}
-                placeholder='e.g. "Weekly Azure prod compliance"'
-                slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+      {/* Start scan dialog — category → scanner cascade */}
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle>
+          Start New Scan
+          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+            Pick a category, choose a scanner, then point it at a connector.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          {/* Category tabs */}
+          <Tabs
+            value={category}
+            onChange={(_, v) => { setCategory(v as ScanCategory); setScannerId(""); setConnectorId(""); }}
+            sx={{
+              mb: 2,
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600, minHeight: 40 },
+              "& .Mui-selected": { color: CATEGORY_COLOR[category] },
+              "& .MuiTabs-indicator": { backgroundColor: CATEGORY_COLOR[category] },
+            }}
+          >
+            {CATEGORY_ORDER.map((c) => (
+              <Tab key={c} value={c} label={CATEGORY_LABEL[c]} />
+            ))}
+          </Tabs>
+
+          {category === "cloud" ? (
+            // Cloud & Identity keeps the existing scan-type / framework form.
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth size="small" label="Scan name (optional)"
+                  value={scanName} onChange={(e) => setScanName(e.target.value)}
+                  placeholder='e.g. "Weekly Azure prod compliance"'
+                  slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
+                  <Select value={scanType} onChange={(e) => setScanType(e.target.value as ScanType)} label="Scan Type"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
+                    <MenuItem value="configuration">Configuration Review</MenuItem>
+                    <MenuItem value="compliance">Compliance Assessment</MenuItem>
+                    <MenuItem value="full">Full Assessment (all)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector (optional)</InputLabel>
+                  <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="">All connectors</MenuItem>
+                    {connectors
+                      .filter((c) => !SCANNERS.some((s) => s.connectorType === c.connector_type))
+                      .map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+                  <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="">None</MenuItem>
+                    {frameworkCatalog.map((f) => (
+                      <MenuItem key={f.framework} value={f.framework}>
+                        {f.name} ({f.total_controls})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
-                <Select value={scanType} onChange={(e) => setScanType(e.target.value as ScanType)} label="Scan Type"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
-                  <MenuItem value="configuration">Configuration Review</MenuItem>
-                  <MenuItem value="compliance">Compliance Assessment</MenuItem>
-                  <MenuItem value="full">Full Assessment (all)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector (optional)</InputLabel>
-                <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="">All connectors</MenuItem>
-                  {connectors.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
-                <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="">None</MenuItem>
-                  {frameworkCatalog.map((f) => (
-                    <MenuItem key={f.framework} value={f.framework}>
-                      {f.name} ({f.total_controls})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          ) : (
+            // Scanner-driven categories (DAST/SAST/Network/Dependency)
+            <Box>
+              {/* Scanner cards */}
+              <Stack spacing={1} sx={{ mb: 2 }}>
+                {SCANNERS.filter((s) => s.category === category).map((s) => {
+                  const isPicked = scannerId === s.id;
+                  const isLive = s.status === "live";
+                  return (
+                    <Card
+                      key={s.id}
+                      onClick={() => isLive && setScannerId(s.id)}
+                      sx={{
+                        bgcolor: isPicked ? "rgba(66,133,244,0.08)" : "transparent",
+                        border: `1px solid ${isPicked ? CATEGORY_COLOR[category] : "rgba(255,255,255,0.1)"}`,
+                        borderRadius: 2, p: 1.5, cursor: isLive ? "pointer" : "not-allowed",
+                        opacity: isLive ? 1 : 0.55,
+                        transition: "all 0.15s",
+                        "&:hover": isLive ? { borderColor: CATEGORY_COLOR[category], bgcolor: "rgba(255,255,255,0.03)" } : {},
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: 14, color: "white" }}>{s.name}</Typography>
+                        <Chip
+                          label={isLive ? "Live" : "Coming soon"}
+                          size="small"
+                          sx={{
+                            bgcolor: isLive ? "rgba(52,168,83,0.15)" : "rgba(255,255,255,0.06)",
+                            color: isLive ? "#34A853" : "rgba(255,255,255,0.5)",
+                            fontWeight: 700, fontSize: 10, height: 20,
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block" }}>
+                        {s.description}
+                      </Typography>
+                    </Card>
+                  );
+                })}
+              </Stack>
+
+              {/* Per-scanner config: connector picker + name */}
+              {scannerId && (
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField fullWidth size="small" label="Scan name (optional)"
+                      value={scanName} onChange={(e) => setScanName(e.target.value)}
+                      slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+                      <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
+                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                        {(() => {
+                          const def = SCANNERS.find((s) => s.id === scannerId);
+                          const matching = connectors.filter((c) => c.connector_type === def?.connectorType);
+                          if (matching.length === 0) {
+                            return <MenuItem disabled value="">No {def?.name} connector configured — create one under Connectors first</MenuItem>;
+                          }
+                          return matching.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>);
+                        })()}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
-          <Button variant="contained" startIcon={<PlayArrow />} disabled={startMutation.isPending}
-            onClick={() => startMutation.mutate({ scan_type: scanType, connector_id: connectorId || undefined, framework: framework || undefined, name: scanName || undefined })}
-            sx={{ bgcolor: "#00e5ff", color: "#000" }}>
+          <Button variant="contained" startIcon={<PlayArrow />}
+            disabled={
+              startMutation.isPending ||
+              (category !== "cloud" && (!scannerId || !connectorId))
+            }
+            onClick={() => startMutation.mutate({
+              scan_type: scanType,
+              connector_id: connectorId || undefined,
+              framework: framework || undefined,
+              name: scanName || undefined,
+            })}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
         </DialogActions>
@@ -266,7 +473,7 @@ export default function Scans() {
 
       {/* Findings dialog */}
       <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#161b22", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
             <Typography variant="h6">Scan Findings</Typography>
@@ -285,7 +492,7 @@ export default function Scans() {
         <DialogContent sx={{ p: 0 }}>
           {findingsLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-              <CircularProgress sx={{ color: "#00e5ff" }} />
+              <CircularProgress sx={{ color: "#4285F4" }} />
             </Box>
           ) : findings.length === 0 ? (
             <Box sx={{ p: 4, textAlign: "center", color: "rgba(255,255,255,0.4)" }}>
@@ -318,7 +525,7 @@ export default function Scans() {
                       )}
                     </TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
-                    <TableCell><Typography variant="caption" sx={{ color: "#00e5ff" }}>{f.cve_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
                   </TableRow>
                 ))}

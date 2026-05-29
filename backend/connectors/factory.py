@@ -14,6 +14,15 @@ from connectors.containers.connector import ContainerConnector
 from connectors.saas.servicenow.connector import ServiceNowConnector
 from connectors.saas.okta.connector import OktaConnector
 from connectors.web.connector import WebConnector
+from connectors.scanners.semgrep import SemgrepConnector
+from connectors.scanners.codeql import CodeQLConnector
+from connectors.scanners.sonarqube import SonarQubeConnector
+from connectors.scanners.nmap import NmapConnector
+from connectors.scanners.openvas import OpenVASConnector
+from connectors.scanners.trivy import TrivyConnector
+from connectors.scanners.owasp_dc import OwaspDependencyCheckConnector
+from connectors.scanners.gitleaks import GitleaksConnector
+from connectors.scanners.trufflehog import TruffleHogConnector
 
 
 _REGISTRY = {
@@ -26,6 +35,18 @@ _REGISTRY = {
     ConnectorType.SERVICENOW: ServiceNowConnector,
     ConnectorType.OKTA: OktaConnector,
     ConnectorType.WEB: WebConnector,
+    # SAST
+    ConnectorType.SEMGREP: SemgrepConnector,
+    ConnectorType.CODEQL: CodeQLConnector,
+    ConnectorType.SONARQUBE: SonarQubeConnector,
+    # Network & Infrastructure
+    ConnectorType.NMAP: NmapConnector,
+    ConnectorType.OPENVAS: OpenVASConnector,
+    ConnectorType.TRIVY: TrivyConnector,
+    # Dependency & Secret
+    ConnectorType.OWASP_DC: OwaspDependencyCheckConnector,
+    ConnectorType.GITLEAKS: GitleaksConnector,
+    ConnectorType.TRUFFLEHOG: TruffleHogConnector,
 }
 
 

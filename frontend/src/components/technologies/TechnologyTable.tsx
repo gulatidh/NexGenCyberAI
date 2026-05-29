@@ -100,7 +100,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 110 }}>
             <LinearProgress variant="determinate" value={row.organization_usage_pct}
               sx={{ flex: 1, height: 5, borderRadius: 2, bgcolor: "rgba(255,255,255,0.06)",
-                "& .MuiLinearProgress-bar": { bgcolor: "#00e5ff", borderRadius: 2 } }} />
+                "& .MuiLinearProgress-bar": { bgcolor: "#4285F4", borderRadius: 2 } }} />
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, minWidth: 28 }}>
               {row.organization_usage_pct}%
             </Typography>
@@ -177,7 +177,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
             <TableContainer sx={{ maxHeight: 540 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
-                  <TableRow sx={{ "& th": { bgcolor: "#161b22", color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { bgcolor: "#1E1E1E", color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
                     {visibleColumnDefs.map((c) => (
                       <TableCell key={c.key} align={c.numeric ? "right" : "left"}>
                         <TableSortLabel active={sortKey === c.key} direction={sortDir} onClick={() => setSort(c.key)}

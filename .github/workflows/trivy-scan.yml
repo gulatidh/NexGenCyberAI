@@ -1,0 +1,141 @@
+name: Trivy Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Scans either
+# a container image (config.image) or a git repository (config.repo_url)
+# and POSTs findings back to /api/v1/scans/ingest/.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Run Trivy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (host runner workspace)
+        uses: actions/checkout@v4
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"image={c.get('image') or ''}")
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          print(f"target={c.get('image') or repo or ''}")
+          PY
+
+      - name: Clone target repo (if repo scan)
+        if: steps.cfg.outputs.image == '' && steps.cfg.outputs.repo_url != ''
+        run: |
+          git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update && sudo apt-get install -y trivy
+
+      - name: Run Trivy (image)
+        if: steps.cfg.outputs.image != ''
+        run: |
+          trivy image --quiet --no-progress --format json -o results.json "${{ steps.cfg.outputs.image }}" || true
+
+      - name: Run Trivy (filesystem)
+        if: steps.cfg.outputs.image == '' && steps.cfg.outputs.repo_url != ''
+        run: |
+          trivy fs --quiet --no-progress --format json -o results.json target || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          findings = []
+          err = None
+          target = os.environ.get("TARGET", "")
+          if os.path.exists("results.json"):
+              try:
+                  data = json.load(open("results.json"))
+                  SEV = {"CRITICAL":"critical","HIGH":"high","MEDIUM":"medium","LOW":"low","UNKNOWN":"info"}
+                  for r in data.get("Results", []) or []:
+                      for v in r.get("Vulnerabilities", []) or []:
+                          findings.append({
+                              "title": f"{v.get('VulnerabilityID','')}: {v.get('Title') or v.get('PkgName','')}",
+                              "description": (v.get("Description") or "")[:4000],
+                              "severity": SEV.get((v.get("Severity") or "").upper(), "info"),
+                              "resource_id": r.get("Target", target),
+                              "resource_type": r.get("Class", "package"),
+                              "control_id": v.get("VulnerabilityID") or None,
+                              "remediation": f"Upgrade {v.get('PkgName','')} to {v.get('FixedVersion') or 'latest'}",
+                              "evidence": {
+                                  "pkg": v.get("PkgName"),
+                                  "installed": v.get("InstalledVersion"),
+                                  "fixed": v.get("FixedVersion"),
+                                  "primary_url": v.get("PrimaryURL"),
+                                  "references": (v.get("References") or [])[:5],
+                              },
+                              "cve_id": v.get("VulnerabilityID","") if (v.get("VulnerabilityID","") or "").startswith("CVE-") else "",
+                              "cvss_score": float(((v.get("CVSS") or {}).get("nvd",{}) or {}).get("V3Score") or 0),
+                              "control_mappings": {},
+                          })
+              except Exception as e:
+                  err = f"Failed to parse Trivy report: {e}"
+          else:
+              err = "Trivy report not found — scan may have failed"
+
+          payload = {"scan_id": os.environ["SCAN_ID"],
+                     "scan_token": os.environ["SCAN_TOKEN"],
+                     "findings": findings,
+                     "error": err if not findings and err else None}
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}, method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

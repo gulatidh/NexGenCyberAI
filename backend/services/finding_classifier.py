@@ -32,6 +32,7 @@ SECTIONS = {
         ("secret",              "Secret Findings",              "VpnKey"),
         ("end_of_life",         "End of Life Findings",         "EventBusy"),
         ("sast",                "SAST Findings",                "Code"),
+        ("web",                 "Web Findings",                 "Language"),
         ("network_exposure",    "Network Exposure",             "Lan"),
         ("excessive_access",    "Excessive Access Findings",    "GroupAdd"),
         ("identity_access",     "Identity Access Findings",     "Person"),
@@ -67,6 +68,14 @@ def classify(finding) -> Tuple[str, str]:
     rt = (finding.resource_type or "").lower()
     ctrl = _norm_ctrl(finding.control_id or "")
     cve = finding.cve_id or ""
+
+    # Web findings — DAST (ZAP) results. Must come before the vulnerability
+    # CVE check because we want ZAP CWE-tagged issues to live in their own
+    # tab, not get pulled into the generic Vulnerability bucket.
+    if rt.startswith("web/") or ctrl.startswith("ZAP-") or ctrl.startswith("CWE-"):
+        return "security_posture", "web"
+    if any(k in title for k in ("xss", "cross-site scripting", "sql injection", "csrf", "click-jacking", "clickjacking", "session fixation", "open redirect")):
+        return "security_posture", "web"
 
     # Vulnerabilities — anything with a CVE or non-trivial CVSS
     if cve or (finding.cvss_score and finding.cvss_score > 0):
