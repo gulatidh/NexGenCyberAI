@@ -227,3 +227,37 @@ async def list_runs(
         .limit(min(limit, 200))
         .all()
     )
+
+
+@router.get("/runs/recent")
+async def list_recent_runs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Cross-mission feed of recent workflow runs — powers the Reports page
+    'Workflow Outputs' section. Joins to ScheduledMission for the workflow
+    name so the UI can render rows without a second request per row."""
+    rows = (
+        db.query(ScheduledMissionRun, ScheduledMission)
+        .join(ScheduledMission, ScheduledMissionRun.mission_id == ScheduledMission.id)
+        .order_by(ScheduledMissionRun.started_at.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    return [
+        {
+            "id": run.id,
+            "mission_id": run.mission_id,
+            "mission_name": mission.name,
+            "mission_type": mission.mission_type.value if hasattr(mission.mission_type, "value") else str(mission.mission_type),
+            "client_id": mission.client_id,
+            "status": run.status.value if hasattr(run.status, "value") else str(run.status),
+            "triggered_by": run.triggered_by,
+            "started_at": run.started_at.isoformat() if run.started_at else None,
+            "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+            "output": run.output,
+            "error": run.error,
+        }
+        for run, mission in rows
+    ]

@@ -3,7 +3,7 @@ import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Switch, IconButton, Tooltip,
+  Switch, IconButton, Tooltip, Drawer, Divider,
 } from "@mui/material";
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
@@ -240,6 +240,10 @@ export default function Agents() {
   const [selectedScanId, setSelectedScanId] = useState("");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [briefingAgent, setBriefingAgent] = useState<Agent | null>(null);
+  const [briefingPrompt, setBriefingPrompt] = useState("");
+  const [briefingOutput, setBriefingOutput] = useState<{ output: string; provider: string; model?: string; tokens_used: number; duration_ms: number } | null>(null);
+  const [briefingError, setBriefingError] = useState<string>("");
 
   const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
   const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
@@ -263,6 +267,16 @@ export default function Agents() {
       agentsApi.run(selectedClientId, { agent_type: agentType, scan_id: selectedScanId || undefined }),
     onSuccess: (_, agentType) => { qc.invalidateQueries({ queryKey: ["agent-runs"] }); toast.success(`${agentType} started`); },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Agent run failed"),
+  });
+
+  const briefingMutation = useMutation({
+    mutationFn: ({ agentId, prompt }: { agentId: string; prompt?: string }) =>
+      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined),
+    onSuccess: (data) => { setBriefingOutput(data); setBriefingError(""); },
+    onError: (e: any) => {
+      setBriefingError(e.response?.data?.detail || e.message || "Briefing failed");
+      setBriefingOutput(null);
+    },
   });
 
   const updateMutation = useMutation({
@@ -366,10 +380,22 @@ export default function Agents() {
                           {agent.description}
                         </Typography>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                          {agent.legacy_orchestrator && (
+                          {agent.legacy_orchestrator ? (
                             <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
                               disabled={!selectedClientId || runMutation.isPending}
                               onClick={() => runMutation.mutate(agent.key as AgentType)}
+                              sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
+                              Run
+                            </Button>
+                          ) : (
+                            <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
+                              disabled={!agent.is_enabled}
+                              onClick={() => {
+                                setBriefingAgent(agent);
+                                setBriefingPrompt("");
+                                setBriefingOutput(null);
+                                setBriefingError("");
+                              }}
                               sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
                               Run
                             </Button>
@@ -416,6 +442,74 @@ export default function Agents() {
         onCreate={(data) => createMutation.mutate(data)}
         existingGroups={groupOptions}
       />
+
+      {/* Briefing drawer — invoke a catalog agent and view its LLM-generated output */}
+      <Drawer anchor="right" open={!!briefingAgent} onClose={() => setBriefingAgent(null)}
+        slotProps={{ paper: { sx: { width: { xs: "100%", sm: 540 }, bgcolor: "#1E1E1E", color: "white" } } }}>
+        {briefingAgent && (
+          <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{briefingAgent.name}</Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 2 }}>
+              {briefingAgent.group_label} · {briefingAgent.domain || briefingAgent.description}
+            </Typography>
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
+            <TextField
+              fullWidth size="small" multiline minRows={3} label="Your instruction (optional)"
+              placeholder="Leave blank for a standard briefing on this agent's domain."
+              value={briefingPrompt} onChange={(e) => setBriefingPrompt(e.target.value)}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              sx={{ mb: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+            <Button variant="contained" startIcon={<PlayArrow />}
+              disabled={briefingMutation.isPending}
+              onClick={() => briefingMutation.mutate({ agentId: briefingAgent.id, prompt: briefingPrompt || undefined })}
+              sx={{ mb: 2 }}>
+              {briefingMutation.isPending ? <CircularProgress size={18} /> : "Generate Briefing"}
+            </Button>
+            <Box sx={{ flex: 1, overflow: "auto", borderTop: "1px solid rgba(255,255,255,0.06)", pt: 2 }}>
+              {briefingMutation.isPending && (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <CircularProgress size={28} sx={{ color: "#4285F4" }} />
+                  <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", mt: 1 }}>
+                    Calling the AI engine…
+                  </Typography>
+                </Box>
+              )}
+              {briefingError && (
+                <Alert severity="error" sx={{ mb: 1 }}>{briefingError}</Alert>
+              )}
+              {briefingOutput && (
+                <>
+                  <Box sx={{ display: "flex", gap: 1, mb: 1.5, flexWrap: "wrap" }}>
+                    <Chip size="small" label={`Provider: ${briefingOutput.provider}`}
+                      sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 20 }} />
+                    {briefingOutput.model && (
+                      <Chip size="small" label={`Model: ${briefingOutput.model}`}
+                        sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 10, height: 20 }} />
+                    )}
+                    {briefingOutput.tokens_used > 0 && (
+                      <Chip size="small" label={`${briefingOutput.tokens_used} tokens`}
+                        sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                    )}
+                    <Chip size="small" label={`${briefingOutput.duration_ms} ms`}
+                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                  </Box>
+                  <Typography component="pre" sx={{
+                    color: "rgba(255,255,255,0.9)", fontSize: 13, whiteSpace: "pre-wrap",
+                    wordBreak: "break-word", fontFamily: "inherit", lineHeight: 1.5, m: 0,
+                  }}>
+                    {briefingOutput.output}
+                  </Typography>
+                </>
+              )}
+              {!briefingMutation.isPending && !briefingOutput && !briefingError && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                  Click "Generate Briefing" to invoke this agent.
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 }

@@ -225,6 +225,8 @@ export const missionsApi = {
     apiClient.post(`/missions/${missionId}/run`).then((r) => r.data),
   runs: (missionId: string) =>
     apiClient.get(`/missions/${missionId}/runs`).then((r) => r.data),
+  recentRuns: (limit = 50) =>
+    apiClient.get(`/missions/runs/recent`, { params: { limit } }).then((r) => r.data),
 };
 
 export const knowledgeApi = {
@@ -241,4 +243,6 @@ export const agentCatalogApi = {
   update: (agentId: string, data: any) =>
     apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
   delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
+  run: (agentId: string, prompt?: string, clientId?: string) =>
+    apiClient.post(`/agents/catalog/${agentId}/run`, { prompt, client_id: clientId }).then((r) => r.data),
 };

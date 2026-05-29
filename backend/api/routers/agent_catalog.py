@@ -179,3 +179,91 @@ async def delete_agent(
     db.delete(a)
     db.commit()
     return {"deleted": True}
+
+
+class AgentRunRequest(BaseModel):
+    prompt: Optional[str] = None  # user instruction; default is "Provide your standard briefing."
+    client_id: Optional[str] = None  # optional context anchor
+
+
+class AgentRunResponse(BaseModel):
+    agent_id: str
+    agent_name: str
+    output: str
+    provider: str
+    model: Optional[str] = None
+    tokens_used: int = 0
+    duration_ms: int = 0
+
+
+@router.post("/{agent_id}/run", response_model=AgentRunResponse)
+async def run_agent(
+    agent_id: str,
+    payload: AgentRunRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Execute a catalog agent against an optional client context.
+
+    Catalog agents are advisory: we ship the system prompt + the user's
+    instruction to the configured LLM provider and return the completion.
+    Legacy operational agents (`legacy_orchestrator=True`) are not run via
+    this path — they have their own routers at `/clients/{client_id}/agents/run/`.
+    """
+    import time
+    from core.ai_providers import get_llm
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    a = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if not a.is_enabled:
+        raise HTTPException(status_code=409, detail="Agent is disabled. Enable it before running.")
+    if a.legacy_orchestrator:
+        raise HTTPException(
+            status_code=409,
+            detail="Legacy operational agents must be run via /clients/{client_id}/agents/run/ with a client context.",
+        )
+
+    instruction = (payload.prompt or "").strip() or (
+        f"Provide your standard briefing on {a.domain or a.name}. "
+        f"Be concise and senior-level. Cite framework controls where relevant."
+    )
+
+    started = time.perf_counter()
+    try:
+        llm = get_llm(
+            provider=a.provider,
+            model=a.model,
+            temperature=float(a.temperature or 0.1),
+            max_tokens=int(a.max_tokens or 4096),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"LLM unavailable: {exc}")
+
+    messages = [
+        SystemMessage(content=a.system_prompt or f"You are the {a.name}."),
+        HumanMessage(content=instruction),
+    ]
+    try:
+        result = await llm.ainvoke(messages)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Agent invocation failed: {type(exc).__name__}: {exc}")
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    # Extract text + token count from various LangChain BaseChatModel shapes
+    text = result.content if hasattr(result, "content") else str(result)
+    if isinstance(text, list):
+        text = "\n".join(str(p) for p in text)
+    usage = getattr(result, "usage_metadata", None) or {}
+    tokens = int(usage.get("total_tokens") or 0)
+
+    return AgentRunResponse(
+        agent_id=a.id,
+        agent_name=a.name,
+        output=text,
+        provider=a.provider or "default",
+        model=a.model,
+        tokens_used=tokens,
+        duration_ms=duration_ms,
+    )

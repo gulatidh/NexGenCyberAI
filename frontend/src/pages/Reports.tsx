@@ -20,7 +20,7 @@ import { Print, Download, Description } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import {
   clientsApi, projectsApi, findingsApi, risksApi, assetsApi,
-  frameworksApi, riskOverviewApi,
+  frameworksApi, riskOverviewApi, missionsApi,
 } from "../services/api";
 import {
   Client, Project, Finding, Risk, Asset, FrameworkSummary,
@@ -352,7 +352,80 @@ export default function Reports() {
           </CardContent>
         </Card>
       )}
+
+      {/* Workflow Outputs — recent runs across all scheduled workflows */}
+      <WorkflowOutputsSection />
     </Box>
+  );
+}
+
+function WorkflowOutputsSection() {
+  const [expanded, setExpanded] = useState(false);
+  const { data: runs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["mission-runs-recent"],
+    queryFn: () => missionsApi.recentRuns(50),
+  });
+  return (
+    <Card className="no-print" sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 2 }}>
+      <CardContent>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, cursor: "pointer" }}
+          onClick={() => setExpanded((v) => !v)}>
+          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
+            Workflow Outputs
+          </Typography>
+          <Chip label={runs.length} size="small"
+            sx={{ height: 18, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, fontWeight: 700 }} />
+          <Box sx={{ flex: 1 }} />
+          <Button size="small" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>
+            {expanded ? "Hide" : "Show recent runs"}
+          </Button>
+        </Box>
+        {expanded && (
+          <Box sx={{ mt: 1 }}>
+            {isLoading ? (
+              <CircularProgress size={20} sx={{ color: "#4285F4" }} />
+            ) : runs.length === 0 ? (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                No workflow runs yet — schedule one and click Run Now.
+              </Typography>
+            ) : (
+              runs.map((run) => (
+                <Box key={run.id} sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                    <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>
+                      {run.mission_name}
+                    </Typography>
+                    <Chip label={run.mission_type.replace(/_/g, " ")} size="small"
+                      sx={{ height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.08)", color: "#4285F4", textTransform: "capitalize" }} />
+                    <Chip label={run.status} size="small"
+                      sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                        bgcolor: run.status === "success" ? "rgba(52,168,83,0.15)" : run.status === "failed" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
+                        color: run.status === "success" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
+                    <Box sx={{ flex: 1 }} />
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                      {run.started_at ? fmtDate(run.started_at) : ""}
+                    </Typography>
+                  </Box>
+                  {run.output && (
+                    <Typography component="pre" sx={{
+                      color: "rgba(255,255,255,0.8)", fontSize: 12, whiteSpace: "pre-wrap",
+                      wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.4,
+                    }}>
+                      {run.output}
+                    </Typography>
+                  )}
+                  {run.error && (
+                    <Typography variant="caption" sx={{ color: "#EA4335", display: "block", mt: 0.5 }}>
+                      Error: {run.error}
+                    </Typography>
+                  )}
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

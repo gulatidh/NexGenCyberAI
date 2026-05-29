@@ -38,7 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
       { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
       { label: "AI Agents",      icon: <SmartToy />,   path: "/agents" },
-      { label: "Missions",       icon: <Schedule />,   path: "/missions" },
+      { label: "Workflows",      icon: <Schedule />,   path: "/missions" },
       { label: "Knowledge Base", icon: <AutoStories />, path: "/knowledge" },
       { label: "Reports",        icon: <BarChart />,   path: "/reports" },
     ],

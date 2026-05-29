@@ -5,8 +5,9 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Alert,
   ToggleButton, ToggleButtonGroup, FormControlLabel, Checkbox, Grid,
+  Drawer, Divider,
 } from "@mui/material";
-import { Add, PlayArrow, Edit, Delete, Schedule } from "@mui/icons-material";
+import { Add, PlayArrow, Edit, Delete, Schedule, History } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { missionsApi, clientsApi } from "../services/api";
@@ -77,6 +78,8 @@ export default function Missions() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Mission | null>(null);
 
+  const [historyMission, setHistoryMission] = useState<Mission | null>(null);
+
   // Form state
   const [name, setName] = useState("New Scheduled Mission");
   const [clientId, setClientId] = useState("");
@@ -88,6 +91,12 @@ export default function Missions() {
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: missions = [], isLoading } = useQuery<Mission[]>({
     queryKey: ["missions"], queryFn: () => missionsApi.list(),
+  });
+
+  const { data: historyRuns = [], isLoading: historyLoading } = useQuery<any[]>({
+    queryKey: ["mission-runs", historyMission?.id],
+    queryFn: () => missionsApi.runs(historyMission!.id),
+    enabled: !!historyMission,
   });
 
   const cronLabel = useMemo(() => cronToHuman(cron), [cron]);
@@ -156,14 +165,14 @@ export default function Missions() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Scheduled Missions</Typography>
+          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Workflows</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
-            Pre-configured security missions that run on a recurring schedule
+            Pre-configured security workflows that run on a recurring schedule
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />}
           onClick={() => { resetForm(); setOpen(true); }}>
-          Schedule Mission
+          Schedule Workflow
         </Button>
       </Box>
 
@@ -173,7 +182,7 @@ export default function Missions() {
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
           <Schedule sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
-            No scheduled missions yet. Click "Schedule Mission" to set one up.
+            No workflows yet. Click "Schedule Workflow" to set one up.
           </Typography>
         </Card>
       ) : (
@@ -184,7 +193,7 @@ export default function Missions() {
                 <TableCell>Active</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Client</TableCell>
-                <TableCell>Mission Type</TableCell>
+                <TableCell>Workflow Type</TableCell>
                 <TableCell>Schedule</TableCell>
                 <TableCell>Next Run</TableCell>
                 <TableCell>Last Run</TableCell>
@@ -241,6 +250,12 @@ export default function Missions() {
                           <PlayArrow sx={{ fontSize: 18 }} />
                         </IconButton>
                       </Tooltip>
+                      <Tooltip title="Run history & outputs">
+                        <IconButton size="small" onClick={() => setHistoryMission(m)}
+                          sx={{ color: "rgba(255,255,255,0.6)", "&:hover": { color: "#4285F4" } }}>
+                          <History sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Edit">
                         <IconButton size="small" onClick={() => openEdit(m)}
                           sx={{ color: "rgba(255,255,255,0.6)", "&:hover": { color: "#4285F4" } }}>
@@ -268,7 +283,7 @@ export default function Missions() {
       {/* Schedule dialog */}
       <Dialog open={open} onClose={() => { setOpen(false); resetForm(); }} maxWidth="sm" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
-        <DialogTitle>{editing ? `Edit Mission — ${editing.name}` : "Schedule a Mission"}</DialogTitle>
+        <DialogTitle>{editing ? `Edit Workflow — ${editing.name}` : "Schedule a Workflow"}</DialogTitle>
         <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12 }}>
@@ -288,8 +303,8 @@ export default function Missions() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Mission Type</InputLabel>
-                <Select value={missionType} onChange={(e) => setMissionType(e.target.value)} label="Mission Type"
+                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Workflow Type</InputLabel>
+                <Select value={missionType} onChange={(e) => setMissionType(e.target.value)} label="Workflow Type"
                   sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
                   {MISSION_TYPES.map((mt) => <MenuItem key={mt.value} value={mt.value}>{mt.label}</MenuItem>)}
                 </Select>
@@ -352,8 +367,59 @@ export default function Missions() {
       </Dialog>
 
       <Alert severity="info" sx={{ mt: 2, bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.7)" }}>
-        Cron expressions are evaluated in <b>UTC</b>. Mission handlers run inside the backend process via APScheduler — no external broker required.
+        Cron expressions are evaluated in <b>UTC</b>. Workflow handlers run inside the backend process via APScheduler — no external broker required.
       </Alert>
+
+      {/* Run history + output drawer */}
+      <Drawer anchor="right" open={!!historyMission} onClose={() => setHistoryMission(null)}
+        slotProps={{ paper: { sx: { width: { xs: "100%", md: 640 }, bgcolor: "#1E1E1E", color: "white" } } }}>
+        {historyMission && (
+          <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{historyMission.name}</Typography>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 2 }}>
+              Run history & outputs · {historyMission.client_name || historyMission.client_id.slice(0, 8)}
+            </Typography>
+            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
+            <Box sx={{ flex: 1, overflow: "auto" }}>
+              {historyLoading ? (
+                <CircularProgress sx={{ color: "#4285F4" }} />
+              ) : historyRuns.length === 0 ? (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                  No runs yet. Click the Run Now button on the row, or wait for the schedule to fire.
+                </Typography>
+              ) : (
+                historyRuns.map((run) => (
+                  <Card key={run.id} sx={{ bgcolor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 2, p: 1.5, mb: 1.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Chip label={run.status} size="small"
+                        sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                          bgcolor: run.status === "success" ? "rgba(52,168,83,0.15)" : run.status === "failed" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
+                          color: run.status === "success" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
+                      <Chip label={run.triggered_by} size="small"
+                        sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)" }} />
+                      <Box sx={{ flex: 1 }} />
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                        {run.started_at ? fromNow(run.started_at) : ""}
+                      </Typography>
+                    </Box>
+                    {run.output && (
+                      <Typography component="pre" sx={{
+                        color: "rgba(255,255,255,0.85)", fontSize: 12, whiteSpace: "pre-wrap",
+                        wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.45,
+                      }}>
+                        {run.output}
+                      </Typography>
+                    )}
+                    {run.error && (
+                      <Alert severity="error" sx={{ mt: 1, fontSize: 11 }}>{run.error}</Alert>
+                    )}
+                  </Card>
+                ))
+              )}
+            </Box>
+          </Box>
+        )}
+      </Drawer>
     </Box>
   );
 }

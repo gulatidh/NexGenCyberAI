@@ -139,6 +139,11 @@ export default function ClientDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects", clientId] }),
   });
 
+  const deleteConnectorMutation = useMutation({
+    mutationFn: (id: string) => connectorsApi.delete(clientId!, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["connectors", clientId] }),
+  });
+
   if (clientLoading) {
     return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   }
@@ -363,6 +368,28 @@ export default function ClientDetail() {
                           Last synced {fromNow(c.last_synced_at)}
                         </Typography>
                       )}
+                      <Box sx={{ display: "flex", gap: 0.75, mt: 1.5, flexWrap: "wrap" }}>
+                        <Button
+                          size="small" variant="outlined" startIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                          onClick={() => navigate(`/connectors?clientId=${clientId}`)}
+                          sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)", fontSize: 11,
+                            "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
+                          Manage
+                        </Button>
+                        <Box sx={{ flex: 1 }} />
+                        <Button
+                          size="small" variant="outlined" startIcon={<Delete sx={{ fontSize: 14 }} />}
+                          disabled={deleteConnectorMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Delete connector "${c.name}"? Linked assets stay but won't be re-synced.`)) {
+                              deleteConnectorMutation.mutate(c.id);
+                            }
+                          }}
+                          sx={{ borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
+                            "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" } }}>
+                          Delete
+                        </Button>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>

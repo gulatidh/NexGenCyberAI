@@ -64,23 +64,29 @@ def _coerce_framework(framework: str) -> FrameworkType:
 
 @router.get("/frameworks/", response_model=List[FrameworkCatalogEntry])
 async def list_frameworks(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Catalog returns every framework defined in `_FRAMEWORK_NAMES` even if
+    no controls have been seeded yet — frameworks like GDPR/ISO/SOC2/PCI
+    intentionally start empty so users can import controls via the CSV
+    upload flow. Returning 0-count rows keeps them visible in the UI
+    instead of dropping the whole Standards family.
+    """
     try:
-        out: List[FrameworkCatalogEntry] = []
         rows = db.query(FrameworkControl.framework, FrameworkControl.id).all()
         by_fw: Dict[str, int] = {}
         for fw, _id in rows:
             v = fw.value if hasattr(fw, "value") else str(fw)
             by_fw[v] = by_fw.get(v, 0) + 1
         valid_values = {m.value for m in FrameworkType}
-        for fw_value, count in sorted(by_fw.items()):
+        out: List[FrameworkCatalogEntry] = []
+        for fw_value, display_name in _FRAMEWORK_NAMES.items():
             if fw_value not in valid_values:
-                logger.warning("Skipping unknown framework value in DB: %r", fw_value)
                 continue
             out.append(FrameworkCatalogEntry(
                 framework=FrameworkType(fw_value),
-                name=_FRAMEWORK_NAMES.get(fw_value, fw_value),
-                total_controls=count,
+                name=display_name,
+                total_controls=by_fw.get(fw_value, 0),
             ))
+        out.sort(key=lambda e: e.name.lower())
         return out
     except Exception as exc:
         logger.exception("list_frameworks failed")
