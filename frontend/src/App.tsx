@@ -31,13 +31,15 @@ import Account from "./pages/Account";
 const darkTheme = createTheme({
   palette: {
     mode: "dark",
-    primary: { main: "#A100FF" },
-    secondary: { main: "#7500C0" },
-    background: { default: "#0A0A0A", paper: "#1A1A1A" },
+    primary: { main: "#4285F4" },
+    secondary: { main: "#34A853" },
+    warning: { main: "#FBBC04" },
+    error: { main: "#EA4335" },
+    background: { default: "#0F0F0F", paper: "#1E1E1E" },
     divider: "rgba(255,255,255,0.08)",
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Google Sans", sans-serif',
     button: { textTransform: "none", fontWeight: 600 },
     h1: { fontWeight: 700, letterSpacing: "-0.02em" },
     h2: { fontWeight: 700, letterSpacing: "-0.02em" },
@@ -46,7 +48,7 @@ const darkTheme = createTheme({
     h5: { fontWeight: 600 },
     h6: { fontWeight: 600 },
   },
-  shape: { borderRadius: 10 },
+  shape: { borderRadius: 12 },
   components: {
     MuiCard: {
       styleOverrides: {
@@ -61,17 +63,17 @@ const darkTheme = createTheme({
     },
     MuiButton: {
       styleOverrides: {
-        root: { textTransform: "none", fontWeight: 600 },
+        root: { textTransform: "none", fontWeight: 600, borderRadius: 24 },
       },
       variants: [
         {
           props: { variant: "contained", color: "primary" },
           style: {
-            background: "linear-gradient(135deg, #A100FF 0%, #7500C0 100%)",
-            boxShadow: "0 4px 14px rgba(161,0,255,0.35)",
+            background: "linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)",
+            boxShadow: "0 4px 14px rgba(66,133,244,0.35)",
             "&:hover": {
-              background: "linear-gradient(135deg, #B533FF 0%, #8810D0 100%)",
-              boxShadow: "0 6px 20px rgba(161,0,255,0.5)",
+              background: "linear-gradient(135deg, #5B9CFF 0%, #2B85F5 100%)",
+              boxShadow: "0 6px 20px rgba(66,133,244,0.5)",
             },
           },
         },
@@ -88,17 +90,23 @@ function LoginPage() {
   return (
     <div style={{
       height: "100vh", display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center", background: "#0A0A0A",
+      alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
       <div style={{ fontSize: 64, marginBottom: 16 }}>🛡️</div>
-      <h1 style={{ color: "#A100FF", fontFamily: "Inter, sans-serif", fontSize: 32, margin: 0, letterSpacing: "-0.02em" }}>
-        NexGenCyberAI
+      <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 32, margin: 0, letterSpacing: "-0.02em" }}>
+        <span style={{ color: "#4285F4" }}>N</span>
+        <span style={{ color: "#EA4335" }}>e</span>
+        <span style={{ color: "#FBBC04" }}>x</span>
+        <span style={{ color: "#4285F4" }}>G</span>
+        <span style={{ color: "#34A853" }}>e</span>
+        <span style={{ color: "#EA4335" }}>n</span>
+        <span style={{ color: "#FFFFFF" }}>CyberAI</span>
       </h1>
       <p style={{ color: "rgba(255,255,255,0.5)", fontFamily: "Inter, sans-serif", marginBottom: 8 }}>
         AI-Powered Cybersecurity Posture Management
       </p>
-      <p style={{ color: "#A100FF", fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, marginTop: 0, marginBottom: 32 }}>
-        An Accenture Product
+      <p style={{ color: "#4285F4", fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, marginTop: 0, marginBottom: 32 }}>
+        A DRJ Product
       </p>
       <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Redirecting to Microsoft Entra ID login...</p>
     </div>

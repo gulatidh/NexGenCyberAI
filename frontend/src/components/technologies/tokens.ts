@@ -24,12 +24,12 @@ export const RISK_COLOR: Record<RiskLevelLow, string> = {
 };
 
 export const TYPE_COLORS = [
-  "#A100FF", "#7500C0", "#ff6d00", "#00e676", "#ff4081",
+  "#4285F4", "#34A853", "#ff6d00", "#00e676", "#ff4081",
   "#ffd54f", "#ba68c8", "#26c6da", "#9ccc65", "#ff8a65",
 ];
 
 export const cardSx = {
-  bgcolor: "#1A1A1A",
+  bgcolor: "#1E1E1E",
   border: "1px solid rgba(255,255,255,0.08)",
   borderRadius: 2,
 };

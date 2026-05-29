@@ -35,6 +35,43 @@ class ConnectorType(str, enum.Enum):
     GITHUB = "github"
     JIRA = "jira"
     WEB = "web"  # OWASP ZAP target — auth or unauth web/API scanning
+    # SAST (Static Application Security Testing)
+    SEMGREP = "semgrep"
+    CODEQL = "codeql"
+    SONARQUBE = "sonarqube"
+    # Network & Infrastructure Scanning
+    NMAP = "nmap"
+    OPENVAS = "openvas"
+    TRIVY = "trivy"
+    # Dependency & Secret Scanning
+    OWASP_DC = "owasp_dc"
+    GITLEAKS = "gitleaks"
+    TRUFFLEHOG = "trufflehog"
+
+
+class ScannerCategory(str, enum.Enum):
+    """Logical grouping for scanners on the Scans / Connectors UI."""
+    DAST = "dast"           # Dynamic Application Security Testing (web ZAP)
+    SAST = "sast"           # Static Application Security Testing (semgrep, codeql, sonar)
+    NETWORK = "network"     # Network & infra (nmap, openvas, trivy container)
+    DEPENDENCY = "dependency"  # Dependency + secret scanning (OWASP DC, gitleaks, trufflehog)
+    CLOUD = "cloud"         # Existing cloud / identity connectors
+
+
+# ConnectorType → ScannerCategory dispatch. New scanners must register here so
+# the UI and factory both know which group they belong to.
+CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
+    ConnectorType.WEB: ScannerCategory.DAST,
+    ConnectorType.SEMGREP: ScannerCategory.SAST,
+    ConnectorType.CODEQL: ScannerCategory.SAST,
+    ConnectorType.SONARQUBE: ScannerCategory.SAST,
+    ConnectorType.NMAP: ScannerCategory.NETWORK,
+    ConnectorType.OPENVAS: ScannerCategory.NETWORK,
+    ConnectorType.TRIVY: ScannerCategory.NETWORK,
+    ConnectorType.OWASP_DC: ScannerCategory.DEPENDENCY,
+    ConnectorType.GITLEAKS: ScannerCategory.DEPENDENCY,
+    ConnectorType.TRUFFLEHOG: ScannerCategory.DEPENDENCY,
+}
 
 class ConnectorStatus(str, enum.Enum):
     ACTIVE = "active"

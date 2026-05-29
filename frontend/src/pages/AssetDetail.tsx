@@ -12,13 +12,13 @@ import { Client, Connector, AssetDetail, Finding, Risk } from "../types";
 import { fmt, fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
-  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#A100FF",
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
 const RISK_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50",
 };
 const CLASS_COLOR: Record<string, string> = {
-  vm: "#A100FF", storage: "#ff9800", network: "#7500C0", database: "#00e676",
+  vm: "#4285F4", storage: "#ff9800", network: "#34A853", database: "#00e676",
   identity: "#f06292", keyvault: "#ffd54f", other: "rgba(255,255,255,0.5)",
 };
 const STATUS_COLOR: Record<string, string> = {
@@ -77,7 +77,7 @@ export default function AssetDetailPage() {
   if (!asset) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-        <CircularProgress sx={{ color: "#A100FF" }} />
+        <CircularProgress sx={{ color: "#4285F4" }} />
       </Box>
     );
   }
@@ -139,7 +139,7 @@ export default function AssetDetailPage() {
               <Button startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
                 onClick={() => scanMutation.mutate()}
                 disabled={scanMutation.isPending}
-                sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
+                sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
                 variant="contained">
                 Scan This Asset
               </Button>
@@ -149,7 +149,7 @@ export default function AssetDetailPage() {
       </Box>
 
       {scanMutation.isSuccess && (
-        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
           Scan started. Findings will appear here once it completes.
         </Alert>
       )}
@@ -157,7 +157,7 @@ export default function AssetDetailPage() {
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Open Findings</Typography>
             <Typography variant="h4" sx={{ color: openFindings > 0 ? "#f44336" : "white", fontWeight: 700 }}>
               {openFindings}
@@ -168,7 +168,7 @@ export default function AssetDetailPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Linked Risks</Typography>
             <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "white", fontWeight: 700 }}>
               {risks.length}
@@ -176,7 +176,7 @@ export default function AssetDetailPage() {
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
             <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Tags</Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
               {Object.keys(asset.tags || {}).length === 0 ? (
@@ -193,7 +193,7 @@ export default function AssetDetailPage() {
       </Grid>
 
       {/* Metadata grid */}
-      <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
+      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
         <Grid container spacing={2}>
           {metaItems.map((m) => (
             <Grid key={m.label} size={{ xs: 6, sm: 4, md: 3 }}>
@@ -210,7 +210,7 @@ export default function AssetDetailPage() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
           "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none" },
-          "& .Mui-selected": { color: "#A100FF" }, "& .MuiTabs-indicator": { backgroundColor: "#A100FF" } }}>
+          "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab label={`Findings (${findings.length})`} />
         <Tab label={`Risks (${risks.length})`} />
         <Tab label="Raw Metadata" />
@@ -218,11 +218,11 @@ export default function AssetDetailPage() {
 
       {tab === 0 && (
         findings.length === 0 ? (
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
             <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No findings linked to this asset.</Typography>
           </Card>
         ) : (
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -249,7 +249,7 @@ export default function AssetDetailPage() {
                             {f.title}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={{ color: f.cve_id ? "#A100FF" : "rgba(255,255,255,0.3)", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
+                        <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
                         <TableCell sx={{ fontSize: 12, color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
                           {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
                         </TableCell>
@@ -269,11 +269,11 @@ export default function AssetDetailPage() {
 
       {tab === 1 && (
         risks.length === 0 ? (
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
             <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No risks linked to this asset.</Typography>
           </Card>
         ) : (
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
@@ -311,7 +311,7 @@ export default function AssetDetailPage() {
       )}
 
       {tab === 2 && (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
           <Box component="pre" sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
             {JSON.stringify(asset.provider_metadata || {}, null, 2)}
           </Box>

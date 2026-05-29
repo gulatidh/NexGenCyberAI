@@ -17,6 +17,12 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   okta: "🔑 Okta", entraid: "🆔 Entra ID",
   containers: "🐳 Containers", github: "🐙 GitHub", jira: "📋 Jira",
   web: "🌐 Web App (ZAP)",
+  // SAST
+  semgrep: "🔍 Semgrep", codeql: "🧬 CodeQL", sonarqube: "📊 SonarQube",
+  // Network
+  nmap: "📡 NMAP", openvas: "🛰️ OpenVAS", trivy: "🏷️ Trivy",
+  // Dependency & Secret
+  owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
 };
 
 const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: string; secret?: boolean }>> = {
@@ -70,7 +76,63 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, Array<{ key: string; label: strin
   // Web connector handles its own form (target URL + auth method picker
   // with conditional fields), so no static credential fields here.
   web: [],
+  // SAST — most just need a repo URL
+  semgrep: [
+    { key: "repo_url", label: "Git Repo URL (https://github.com/org/repo)" },
+  ],
+  codeql: [
+    { key: "repo_url", label: "Git Repo URL" },
+  ],
+  sonarqube: [
+    { key: "repo_url", label: "Git Repo URL (optional for SonarCloud)" },
+    { key: "sonar_host_url", label: "SonarQube Host URL (https://sonar.example.com)" },
+    { key: "sonar_project_key", label: "SonarQube Project Key" },
+    { key: "sonar_token", label: "Sonar Token", secret: true },
+  ],
+  // Network
+  nmap: [
+    { key: "target", label: "Target host / IP / CIDR (e.g. 10.0.0.0/24)" },
+  ],
+  openvas: [
+    { key: "target", label: "Target host / IP / CIDR" },
+  ],
+  trivy: [
+    { key: "image", label: "Container image (registry.io/org/img:tag) — optional" },
+    { key: "repo_url", label: "Git Repo URL — optional (alternative to image)" },
+  ],
+  // Dependency & Secret
+  owasp_dc: [
+    { key: "repo_url", label: "Git Repo URL" },
+  ],
+  gitleaks: [
+    { key: "repo_url", label: "Git Repo URL" },
+  ],
+  trufflehog: [
+    { key: "repo_url", label: "Git Repo URL" },
+  ],
 };
+
+// Connector → category mapping (mirrors backend CONNECTOR_CATEGORY).
+// Drives the section grouping on the Connectors page.
+const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
+  azure: "cloud", aws: "cloud", gcp: "cloud", onprem: "cloud",
+  servicenow: "cloud", okta: "cloud", entraid: "cloud",
+  containers: "cloud", github: "cloud", jira: "cloud",
+  web: "dast",
+  semgrep: "sast", codeql: "sast", sonarqube: "sast",
+  nmap: "network", openvas: "network", trivy: "network",
+  owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
+};
+
+const CATEGORY_LABEL: Record<string, string> = {
+  cloud: "Cloud & Identity",
+  dast: "DAST — Dynamic AppSec",
+  sast: "SAST — Static AppSec",
+  network: "Network & Infrastructure",
+  dependency: "Dependency & Secret",
+};
+
+const CATEGORY_ORDER = ["cloud", "dast", "sast", "network", "dependency"] as const;
 
 const STATUS_PROPS: Record<string, any> = {
   active: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#00e676", label: "Active" },
@@ -175,80 +237,104 @@ export default function Connectors() {
           </FormControl>
           <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId || projects.length === 0}
             onClick={() => { setConnProjectId(selectedProjectId || projects[0]?.id || ""); setOpen(true); }}
-            sx={{ bgcolor: "#A100FF", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
             Add Connector
           </Button>
         </Box>
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view and manage its connectors.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view and manage its connectors.</Alert>
       ) : isLoading ? (
-        <CircularProgress sx={{ color: "#A100FF" }} />
+        <CircularProgress sx={{ color: "#4285F4" }} />
       ) : connectors.length === 0 ? (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
           <Cable sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No connectors. Add one to start scanning.</Typography>
         </Card>
       ) : (
-        <Grid container spacing={2}>
-          {connectors.map((conn) => {
-            const sp = STATUS_PROPS[conn.status] || STATUS_PROPS.inactive;
-            const tr = testResults[conn.id];
+        <Box>
+          {CATEGORY_ORDER.map((cat) => {
+            const group = connectors.filter((c) => CONNECTOR_CATEGORY[c.connector_type] === cat);
+            if (group.length === 0) return null;
             return (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
-                <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-                  <CardContent>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                      <Typography sx={{ color: "white", fontWeight: 600 }}>{conn.name}</Typography>
-                      <Chip size="small" icon={sp.icon} label={sp.label}
-                        sx={{ bgcolor: `${sp.color}20`, color: sp.color, fontSize: 11 }} />
-                    </Box>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", mb: 1.5 }}>
-                      {CONNECTOR_ICONS[conn.connector_type] || conn.connector_type}
-                    </Typography>
-                    {conn.error_message && (
-                      <Typography variant="caption" sx={{ color: "#f44336", display: "block", mb: 1 }}>{conn.error_message}</Typography>
-                    )}
-                    {tr && (
-                      <Alert severity={tr.success ? "success" : "error"} sx={{ py: 0, mb: 1, fontSize: 11 }}>{tr.message}</Alert>
-                    )}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                      <Button size="small" variant="outlined" startIcon={<PlayArrow />}
-                        onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
-                        disabled={testMutation.isPending}
-                        sx={{ borderColor: "#A100FF", color: "#A100FF", fontSize: 11 }}>
-                        Test
-                      </Button>
-                      <Box sx={{ flex: 1 }} />
-                      <Tooltip title="Edit connector">
-                        <IconButton size="small" onClick={() => openEdit(conn)}
-                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#A100FF" } }}>
-                          <Edit sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete connector">
-                        <IconButton size="small"
-                          onClick={() => {
-                            if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
-                              deleteMutation.mutate(conn.id);
-                            }
-                          }}
-                          sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#f44336" } }}>
-                          <Delete sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+              <Box key={cat} sx={{ mb: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                  <Typography sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1 }}>
+                    {CATEGORY_LABEL[cat]}
+                  </Typography>
+                  <Chip
+                    label={group.length}
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: 11, fontWeight: 700,
+                      bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4",
+                    }}
+                  />
+                  <Box sx={{ flex: 1, height: 1, bgcolor: "rgba(255,255,255,0.08)" }} />
+                </Box>
+                <Grid container spacing={2}>
+                  {group.map((conn) => {
+                    const sp = STATUS_PROPS[conn.status] || STATUS_PROPS.inactive;
+                    const tr = testResults[conn.id];
+                    return (
+                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
+                        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                          <CardContent>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                              <Typography sx={{ color: "white", fontWeight: 600 }}>{conn.name}</Typography>
+                              <Chip size="small" icon={sp.icon} label={sp.label}
+                                sx={{ bgcolor: `${sp.color}20`, color: sp.color, fontSize: 11 }} />
+                            </Box>
+                            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", mb: 1.5 }}>
+                              {CONNECTOR_ICONS[conn.connector_type] || conn.connector_type}
+                            </Typography>
+                            {conn.error_message && (
+                              <Typography variant="caption" sx={{ color: "#f44336", display: "block", mb: 1 }}>{conn.error_message}</Typography>
+                            )}
+                            {tr && (
+                              <Alert severity={tr.success ? "success" : "error"} sx={{ py: 0, mb: 1, fontSize: 11 }}>{tr.message}</Alert>
+                            )}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                              <Button size="small" variant="outlined" startIcon={<PlayArrow />}
+                                onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
+                                disabled={testMutation.isPending}
+                                sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11 }}>
+                                Test
+                              </Button>
+                              <Box sx={{ flex: 1 }} />
+                              <Tooltip title="Edit connector">
+                                <IconButton size="small" onClick={() => openEdit(conn)}
+                                  sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#4285F4" } }}>
+                                  <Edit sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete connector">
+                                <IconButton size="small"
+                                  onClick={() => {
+                                    if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
+                                      deleteMutation.mutate(conn.id);
+                                    }
+                                  }}
+                                  sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#f44336" } }}>
+                                  <Delete sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
             );
           })}
-        </Grid>
+        </Box>
       )}
 
       {/* Add Connector Dialog */}
-      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white", minWidth: 520 } } }}>
+      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white", minWidth: 520 } } }}>
         <DialogTitle>{editing ? `Edit Connector — ${editing.name}` : "Add Connector"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -449,7 +535,7 @@ export default function Connectors() {
                   : { name: connName, connector_type: connectorType, project_id: connProjectId, credentials });
               }
             }}
-            sx={{ bgcolor: "#A100FF", color: "#000" }}>
+            sx={{ bgcolor: "#4285F4", color: "#000" }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
           </Button>
         </DialogActions>

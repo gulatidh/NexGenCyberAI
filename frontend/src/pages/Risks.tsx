@@ -15,7 +15,7 @@ const LEVEL_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50",
 };
 const STATUS_COLOR: Record<string, string> = {
-  open: "#ff9800", mitigated: "#00e676", accepted: "#7500C0", closed: "rgba(255,255,255,0.3)",
+  open: "#ff9800", mitigated: "#00e676", accepted: "#34A853", closed: "rgba(255,255,255,0.3)",
 };
 
 export default function Risks() {
@@ -96,18 +96,18 @@ export default function Risks() {
       )}
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view the risk register.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view the risk register.</Alert>
       ) : isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#A100FF" }} /></Box>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
       ) : filtered.length === 0 ? (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Warning sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
             No risks yet. Run an AI risk assessment from the Agents page.
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -175,7 +175,7 @@ export default function Risks() {
 
       {/* Detail dialog */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         {selected && (() => {
           const lv = typeof selected.risk_level === "object" ? (selected.risk_level as any).value ?? selected.risk_level : selected.risk_level;
           return (

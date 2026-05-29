@@ -4,7 +4,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Alert,
-  Divider, TableSortLabel,
+  Divider, TableSortLabel, Tabs, Tab, Stack,
 } from "@mui/material";
 import { PlayArrow, Add, Refresh, Visibility, Delete } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,14 +14,74 @@ import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<string, string> = {
-  pending: "#ff9800", running: "#A100FF", completed: "#00e676",
+  pending: "#ff9800", running: "#4285F4", completed: "#00e676",
   failed: "#f44336", cancelled: "rgba(255,255,255,0.3)",
 };
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b",
-  low: "#4caf50", info: "#A100FF",
+  low: "#4caf50", info: "#4285F4",
 };
+
+// ── Scanner catalog ──────────────────────────────────────────────────────────
+// Drives the category → scanner cascade in the New Scan dialog. `connectorType`
+// must match a backend ConnectorType value. `status` controls whether the row
+// is selectable (Live) or shown as a teaser (Soon).
+type ScannerStatus = "live" | "soon";
+type ScanCategory = "cloud" | "dast" | "sast" | "network" | "dependency";
+type ScannerDef = {
+  id: string;             // unique key
+  name: string;           // display label
+  connectorType: string;  // backend ConnectorType.value
+  category: ScanCategory;
+  status: ScannerStatus;
+  description: string;
+};
+
+const CATEGORY_LABEL: Record<ScanCategory, string> = {
+  cloud: "Cloud & Identity",
+  dast: "DAST — Dynamic AppSec",
+  sast: "SAST — Static AppSec",
+  network: "Network & Infrastructure",
+  dependency: "Dependency & Secret",
+};
+
+const CATEGORY_COLOR: Record<ScanCategory, string> = {
+  cloud: "#4285F4",       // Google Blue
+  dast: "#FBBC04",        // Google Yellow — dynamic
+  sast: "#4285F4",        // Google Blue — static
+  network: "#34A853",     // Google Green — infra
+  dependency: "#EA4335",  // Google Red — secrets / deps
+};
+
+const SCANNERS: ScannerDef[] = [
+  // DAST
+  { id: "zap", name: "OWASP ZAP", connectorType: "web", category: "dast", status: "live",
+    description: "Web app DAST — passive (unauth) and active (auth) profiles via GitHub Actions." },
+  // SAST
+  { id: "semgrep", name: "Semgrep", connectorType: "semgrep", category: "sast", status: "soon",
+    description: "Open-source static analysis with curated rule packs. Connector configurable now; workflow coming soon." },
+  { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "soon",
+    description: "GitHub's semantic code analysis. Connector configurable; workflow coming soon." },
+  { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
+    description: "Community Edition (self-hosted) or Enterprise (SonarCloud via Action). Workflow coming soon." },
+  // Network
+  { id: "nmap", name: "NMAP", connectorType: "nmap", category: "network", status: "soon",
+    description: "Service / port discovery on hosts or CIDR ranges. Workflow coming soon." },
+  { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "soon",
+    description: "Open-source network vulnerability scanner. Workflow coming soon." },
+  { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
+    description: "Container image + filesystem + IaC scanner. Runs in GitHub Actions." },
+  // Dependency / Secret
+  { id: "owasp_dc", name: "OWASP Dependency-Check", connectorType: "owasp_dc", category: "dependency", status: "soon",
+    description: "SCA / CVE matching for application dependencies. Workflow coming soon." },
+  { id: "gitleaks", name: "Gitleaks", connectorType: "gitleaks", category: "dependency", status: "live",
+    description: "Secret scanner for git history. Runs in GitHub Actions." },
+  { id: "trufflehog", name: "TruffleHog", connectorType: "trufflehog", category: "dependency", status: "live",
+    description: "Secret scanner (git + filesystem) with verification. Runs in GitHub Actions." },
+];
+
+const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency"];
 
 export default function Scans() {
   const qc = useQueryClient();
@@ -32,6 +92,8 @@ export default function Scans() {
   const [connectorId, setConnectorId] = useState("");
   const [framework, setFramework] = useState<FrameworkType | "">("");
   const [scanName, setScanName] = useState("");
+  const [category, setCategory] = useState<ScanCategory>("cloud");
+  const [scannerId, setScannerId] = useState<string>("");
   const [viewScan, setViewScan] = useState<Scan | null>(null);
   const [sortKey, setSortKey] = useState<string>("started_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -115,16 +177,16 @@ export default function Scans() {
           </FormControl>
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()} sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
           <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}
-            sx={{ bgcolor: "#A100FF", color: "#000" }}>New Scan</Button>
+            sx={{ bgcolor: "#4285F4", color: "#000" }}>New Scan</Button>
         </Box>
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view scans.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view scans.</Alert>
       ) : isLoading ? (
-        <CircularProgress sx={{ color: "#A100FF" }} />
+        <CircularProgress sx={{ color: "#4285F4" }} />
       ) : (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
           <Table>
             <TableHead>
               <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600 } }}>
@@ -165,7 +227,7 @@ export default function Scans() {
                 return (
                   <TableRow key={scan.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white" } }}>
                     <TableCell><Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>{scan.name || `Scan ${scan.id.slice(0, 8)}`}</Typography></TableCell>
-                    <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "#A100FF", fontSize: 11 }} /></TableCell>
+                    <TableCell><Chip label={scan.scan_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 11 }} /></TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{scan.framework || "—"}</Typography></TableCell>
                     <TableCell>
                       <Chip label={scan.status} size="small"
@@ -185,7 +247,7 @@ export default function Scans() {
                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                       <Button size="small" startIcon={<Visibility sx={{ fontSize: 14 }} />}
                         onClick={() => setViewScan(scan)}
-                        sx={{ color: "#A100FF", fontSize: 11, minWidth: 0 }}>View</Button>
+                        sx={{ color: "#4285F4", fontSize: 11, minWidth: 0 }}>View</Button>
                       <IconButton size="small"
                         onClick={() => {
                           if (window.confirm(`Delete scan "${scan.name || scan.id.slice(0, 8)}"? Findings will also be removed.`)) {
@@ -204,61 +266,166 @@ export default function Scans() {
         </Card>
       )}
 
-      {/* Start scan dialog */}
-      <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white", minWidth: 420 } } }}>
-        <DialogTitle>Start New Scan</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth size="small" label="Scan name (optional)"
-                value={scanName} onChange={(e) => setScanName(e.target.value)}
-                placeholder='e.g. "Weekly Azure prod compliance"'
-                slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+      {/* Start scan dialog — category → scanner cascade */}
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle>
+          Start New Scan
+          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+            Pick a category, choose a scanner, then point it at a connector.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          {/* Category tabs */}
+          <Tabs
+            value={category}
+            onChange={(_, v) => { setCategory(v as ScanCategory); setScannerId(""); setConnectorId(""); }}
+            sx={{
+              mb: 2,
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600, minHeight: 40 },
+              "& .Mui-selected": { color: CATEGORY_COLOR[category] },
+              "& .MuiTabs-indicator": { backgroundColor: CATEGORY_COLOR[category] },
+            }}
+          >
+            {CATEGORY_ORDER.map((c) => (
+              <Tab key={c} value={c} label={CATEGORY_LABEL[c]} />
+            ))}
+          </Tabs>
+
+          {category === "cloud" ? (
+            // Cloud & Identity keeps the existing scan-type / framework form.
+            <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth size="small" label="Scan name (optional)"
+                  value={scanName} onChange={(e) => setScanName(e.target.value)}
+                  placeholder='e.g. "Weekly Azure prod compliance"'
+                  slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
+                  <Select value={scanType} onChange={(e) => setScanType(e.target.value as ScanType)} label="Scan Type"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
+                    <MenuItem value="configuration">Configuration Review</MenuItem>
+                    <MenuItem value="compliance">Compliance Assessment</MenuItem>
+                    <MenuItem value="full">Full Assessment (all)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector (optional)</InputLabel>
+                  <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="">All connectors</MenuItem>
+                    {connectors
+                      .filter((c) => !SCANNERS.some((s) => s.connectorType === c.connector_type))
+                      .map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+                  <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
+                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    <MenuItem value="">None</MenuItem>
+                    {frameworkCatalog.map((f) => (
+                      <MenuItem key={f.framework} value={f.framework}>
+                        {f.name} ({f.total_controls})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
-                <Select value={scanType} onChange={(e) => setScanType(e.target.value as ScanType)} label="Scan Type"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
-                  <MenuItem value="configuration">Configuration Review</MenuItem>
-                  <MenuItem value="compliance">Compliance Assessment</MenuItem>
-                  <MenuItem value="full">Full Assessment (all)</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector (optional)</InputLabel>
-                <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="">All connectors</MenuItem>
-                  {connectors.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
-                <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                  <MenuItem value="">None</MenuItem>
-                  {frameworkCatalog.map((f) => (
-                    <MenuItem key={f.framework} value={f.framework}>
-                      {f.name} ({f.total_controls})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          ) : (
+            // Scanner-driven categories (DAST/SAST/Network/Dependency)
+            <Box>
+              {/* Scanner cards */}
+              <Stack spacing={1} sx={{ mb: 2 }}>
+                {SCANNERS.filter((s) => s.category === category).map((s) => {
+                  const isPicked = scannerId === s.id;
+                  const isLive = s.status === "live";
+                  return (
+                    <Card
+                      key={s.id}
+                      onClick={() => isLive && setScannerId(s.id)}
+                      sx={{
+                        bgcolor: isPicked ? "rgba(66,133,244,0.08)" : "transparent",
+                        border: `1px solid ${isPicked ? CATEGORY_COLOR[category] : "rgba(255,255,255,0.1)"}`,
+                        borderRadius: 2, p: 1.5, cursor: isLive ? "pointer" : "not-allowed",
+                        opacity: isLive ? 1 : 0.55,
+                        transition: "all 0.15s",
+                        "&:hover": isLive ? { borderColor: CATEGORY_COLOR[category], bgcolor: "rgba(255,255,255,0.03)" } : {},
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: 14, color: "white" }}>{s.name}</Typography>
+                        <Chip
+                          label={isLive ? "Live" : "Coming soon"}
+                          size="small"
+                          sx={{
+                            bgcolor: isLive ? "rgba(52,168,83,0.15)" : "rgba(255,255,255,0.06)",
+                            color: isLive ? "#34A853" : "rgba(255,255,255,0.5)",
+                            fontWeight: 700, fontSize: 10, height: 20,
+                          }}
+                        />
+                      </Box>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block" }}>
+                        {s.description}
+                      </Typography>
+                    </Card>
+                  );
+                })}
+              </Stack>
+
+              {/* Per-scanner config: connector picker + name */}
+              {scannerId && (
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField fullWidth size="small" label="Scan name (optional)"
+                      value={scanName} onChange={(e) => setScanName(e.target.value)}
+                      slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+                      <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
+                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                        {(() => {
+                          const def = SCANNERS.find((s) => s.id === scannerId);
+                          const matching = connectors.filter((c) => c.connector_type === def?.connectorType);
+                          if (matching.length === 0) {
+                            return <MenuItem disabled value="">No {def?.name} connector configured — create one under Connectors first</MenuItem>;
+                          }
+                          return matching.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>);
+                        })()}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
-          <Button variant="contained" startIcon={<PlayArrow />} disabled={startMutation.isPending}
-            onClick={() => startMutation.mutate({ scan_type: scanType, connector_id: connectorId || undefined, framework: framework || undefined, name: scanName || undefined })}
-            sx={{ bgcolor: "#A100FF", color: "#000" }}>
+          <Button variant="contained" startIcon={<PlayArrow />}
+            disabled={
+              startMutation.isPending ||
+              (category !== "cloud" && (!scannerId || !connectorId))
+            }
+            onClick={() => startMutation.mutate({
+              scan_type: scanType,
+              connector_id: connectorId || undefined,
+              framework: framework || undefined,
+              name: scanName || undefined,
+            })}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
         </DialogActions>
@@ -266,7 +433,7 @@ export default function Scans() {
 
       {/* Findings dialog */}
       <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
             <Typography variant="h6">Scan Findings</Typography>
@@ -285,7 +452,7 @@ export default function Scans() {
         <DialogContent sx={{ p: 0 }}>
           {findingsLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-              <CircularProgress sx={{ color: "#A100FF" }} />
+              <CircularProgress sx={{ color: "#4285F4" }} />
             </Box>
           ) : findings.length === 0 ? (
             <Box sx={{ p: 4, textAlign: "center", color: "rgba(255,255,255,0.4)" }}>
@@ -318,7 +485,7 @@ export default function Scans() {
                       )}
                     </TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
-                    <TableCell><Typography variant="caption" sx={{ color: "#A100FF" }}>{f.cve_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
                   </TableRow>
                 ))}

@@ -5,7 +5,7 @@ import {
   Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
-  FormControlLabel, Checkbox,
+  FormControlLabel, Checkbox, Tabs, Tab,
 } from "@mui/material";
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +24,7 @@ const STATUS_COLOR: Record<ControlStatus, string> = {
   not_applicable: "rgba(255,255,255,0.4)",
 };
 const SEV_COLOR: Record<string, string> = {
-  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#A100FF",
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
 const STATUS_LABEL: Record<ControlStatus, string> = {
   compliant: "Compliant",
@@ -33,6 +33,21 @@ const STATUS_LABEL: Record<ControlStatus, string> = {
   not_applicable: "N/A",
 };
 const STATUS_ORDER: ControlStatus[] = ["compliant", "non_compliant", "partial", "not_applicable"];
+
+// Framework families — derived from framework key/name so the list scales as we add benchmarks.
+// New families fall under "Other" automatically.
+const FAMILY_ORDER = ["CIS", "NIST", "OWASP", "Standards", "Other"] as const;
+type FrameworkFamily = typeof FAMILY_ORDER[number];
+
+function getFrameworkFamily(key: string, name?: string): FrameworkFamily {
+  const k = key.toLowerCase();
+  const n = (name || "").toLowerCase();
+  if (k.startsWith("cis_") || k === "cis_v8" || n.startsWith("cis ")) return "CIS";
+  if (k.startsWith("nist_") || n.startsWith("nist")) return "NIST";
+  if (k.startsWith("zap_") || n.includes("owasp") || n.includes("zap")) return "OWASP";
+  if (["gdpr", "iso_27001", "soc2", "pci_dss"].includes(k)) return "Standards";
+  return "Other";
+}
 
 function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
   const r = (size - 12) / 2;
@@ -61,6 +76,7 @@ export default function Frameworks() {
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [framework, setFramework] = useState("");
+  const [family, setFamily] = useState<FrameworkFamily>("CIS");
   const [statusFilter, setStatusFilter] = useState<ControlStatus | "">("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ControlStatusEntry | null>(null);
@@ -195,6 +211,44 @@ export default function Frameworks() {
     setScanOpen(true);
   };
 
+  // Group catalog entries by family — used to render family tabs and to filter
+  // the framework dropdown to the active family. Empty families are hidden.
+  const familyCounts = useMemo(() => {
+    const counts = new Map<FrameworkFamily, number>();
+    for (const entry of catalog) {
+      const fam = getFrameworkFamily(entry.framework, entry.name);
+      counts.set(fam, (counts.get(fam) || 0) + 1);
+    }
+    return counts;
+  }, [catalog]);
+
+  const availableFamilies = useMemo(
+    () => FAMILY_ORDER.filter((f) => (familyCounts.get(f) || 0) > 0),
+    [familyCounts],
+  );
+
+  const filteredCatalog = useMemo(
+    () => catalog.filter((f) => getFrameworkFamily(f.framework, f.name) === family),
+    [catalog, family],
+  );
+
+  // If the catalog loads and the default family ("CIS") has no entries, fall
+  // back to the first available family. Also reset framework when family
+  // changes so the dropdown doesn't show a value from a hidden family.
+  React.useEffect(() => {
+    if (availableFamilies.length === 0) return;
+    if (!availableFamilies.includes(family)) {
+      setFamily(availableFamilies[0]);
+      setFramework("");
+    }
+  }, [availableFamilies, family]);
+
+  React.useEffect(() => {
+    if (framework && !filteredCatalog.some((f) => f.framework === framework)) {
+      setFramework("");
+    }
+  }, [filteredCatalog, framework]);
+
   const grouped = useMemo(() => {
     if (!detail) return new Map<string, ControlStatusEntry[]>();
     const out = new Map<string, ControlStatusEntry[]>();
@@ -219,7 +273,7 @@ export default function Frameworks() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Frameworks</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -246,31 +300,36 @@ export default function Frameworks() {
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
             <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-              {catalog.map((f) => (
+              {filteredCatalog.map((f) => (
                 <MenuItem key={f.framework} value={f.framework}>
                   {f.name} ({f.total_controls})
                 </MenuItem>
               ))}
+              {filteredCatalog.length === 0 && (
+                <MenuItem disabled value="">
+                  No frameworks in this family
+                </MenuItem>
+              )}
             </Select>
           </FormControl>
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={!clientId || !framework || scanMutation.isPending}
             onClick={() => { setScanOpen(true); setScanConnectorId(""); setScanScope("full"); setScanCustomIds(""); }}
-            sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             Scan
           </Button>
           <Button variant="outlined" startIcon={<Refresh />}
             disabled={!clientId || !framework || recomputeMutation.isPending}
             onClick={() => recomputeMutation.mutate()}
-            sx={{ borderColor: "#A100FF", color: "#A100FF" }}>
+            sx={{ borderColor: "#4285F4", color: "#4285F4" }}>
             Recompute
           </Button>
           <Tooltip title="Upload CSV/JSON of controls (e.g. CIS XLSX export converted to CSV)">
             <span>
-              <Button variant="outlined" startIcon={importMutation.isPending ? <CircularProgress size={14} sx={{ color: "#7500C0" }} /> : <UploadFile />}
+              <Button variant="outlined" startIcon={importMutation.isPending ? <CircularProgress size={14} sx={{ color: "#34A853" }} /> : <UploadFile />}
                 disabled={!framework || importMutation.isPending}
                 onClick={() => fileInputRef.current?.click()}
-                sx={{ borderColor: "#7500C0", color: "#7500C0" }}>
+                sx={{ borderColor: "#34A853", color: "#34A853" }}>
                 Upload Controls
               </Button>
             </span>
@@ -283,6 +342,46 @@ export default function Frameworks() {
             }} />
         </Box>
       </Box>
+
+      {/* Family tabs — keeps the framework dropdown short by grouping benchmarks
+          (CIS, NIST, etc.) into their own tabs. New families auto-appear. */}
+      {availableFamilies.length > 1 && (
+        <Box sx={{ mb: 2, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <Tabs
+            value={family}
+            onChange={(_, v) => setFamily(v as FrameworkFamily)}
+            textColor="inherit"
+            indicatorColor="primary"
+            sx={{
+              "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
+              "& .Mui-selected": { color: "#4285F4" },
+            }}
+          >
+            {availableFamilies.map((f) => (
+              <Tab
+                key={f}
+                value={f}
+                label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {f}
+                    <Chip
+                      size="small"
+                      label={familyCounts.get(f) || 0}
+                      sx={{
+                        height: 18,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        bgcolor: family === f ? "rgba(66,133,244,0.15)" : "rgba(255,255,255,0.08)",
+                        color: family === f ? "#4285F4" : "rgba(255,255,255,0.7)",
+                      }}
+                    />
+                  </Box>
+                }
+              />
+            ))}
+          </Tabs>
+        </Box>
+      )}
 
       {importMutation.isSuccess && importMutation.data && (
         <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "white" }}
@@ -297,15 +396,15 @@ export default function Frameworks() {
       )}
 
       {!clientId || !framework ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
           Select a client and a framework to view the control catalog and compliance status.
         </Alert>
       ) : isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#A100FF" }} /></Box>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
       ) : summary ? (
         <>
           {/* Summary banner */}
-          <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
             display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
             <ScoreDonut score={summary.score} />
             <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
@@ -339,8 +438,8 @@ export default function Frameworks() {
           <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
             <Chip label={`All`} size="small" clickable
               onClick={() => setStatusFilter("")}
-              sx={{ bgcolor: !statusFilter ? "rgba(161,0,255,0.2)" : "rgba(255,255,255,0.05)",
-                color: "white", border: !statusFilter ? "1px solid #A100FF" : "none" }} />
+              sx={{ bgcolor: !statusFilter ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.05)",
+                color: "white", border: !statusFilter ? "1px solid #4285F4" : "none" }} />
             {STATUS_ORDER.map((s) => (
               <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
                 onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
@@ -359,9 +458,9 @@ export default function Frameworks() {
 
           {/* Selection toolbar — appears when at least one row is ticked */}
           {selectedControlIds.size > 0 && (
-            <Card sx={{ bgcolor: "rgba(161,0,255,0.08)", border: "1px solid rgba(161,0,255,0.3)", borderRadius: 2,
+            <Card sx={{ bgcolor: "rgba(66,133,244,0.08)", border: "1px solid rgba(66,133,244,0.3)", borderRadius: 2,
               p: 1.5, mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
-              <Typography sx={{ color: "#A100FF", fontWeight: 600 }}>
+              <Typography sx={{ color: "#4285F4", fontWeight: 600 }}>
                 {selectedControlIds.size} control{selectedControlIds.size === 1 ? "" : "s"} selected
               </Typography>
               <Box sx={{ flex: 1 }} />
@@ -369,7 +468,7 @@ export default function Frameworks() {
                 sx={{ color: "rgba(255,255,255,0.6)" }}>Clear</Button>
               <Button size="small" variant="contained" startIcon={<PlayArrow />}
                 onClick={openScanForSelected}
-                sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+                sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
                 Scan Selected
               </Button>
             </Card>
@@ -377,7 +476,7 @@ export default function Frameworks() {
 
           {/* Grouped accordions */}
           {Array.from(grouped.entries()).length === 0 ? (
-            <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No controls match the current filters.</Typography>
             </Card>
           ) : (
@@ -388,7 +487,7 @@ export default function Frameworks() {
               const someDomainSelected = domainSelectedCount > 0 && !allDomainSelected;
               return (
                 <Accordion key={domain} defaultExpanded
-                  sx={{ bgcolor: "#1A1A1A", color: "white", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
+                  sx={{ bgcolor: "#1E1E1E", color: "white", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
                   <AccordionSummary expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}>
                     <Typography sx={{ flexGrow: 1, fontWeight: 600 }}>{domain}</Typography>
                     <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mr: 2 }}>
@@ -405,7 +504,7 @@ export default function Frameworks() {
                               indeterminate={someDomainSelected}
                               onChange={() => toggleDomain(items, allDomainSelected)}
                               onClick={(e) => e.stopPropagation()}
-                              sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#A100FF" }, "&.MuiCheckbox-indeterminate": { color: "#A100FF" } }} />
+                              sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }} />
                           </TableCell>
                           <TableCell sx={{ width: 110 }}>CONTROL</TableCell>
                           <TableCell>TITLE</TableCell>
@@ -419,14 +518,14 @@ export default function Frameworks() {
                           return (
                             <TableRow key={item.control.id}
                               sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                                bgcolor: checked ? "rgba(161,0,255,0.06)" : "transparent",
+                                bgcolor: checked ? "rgba(66,133,244,0.06)" : "transparent",
                                 "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
                               onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
                               <TableCell sx={{ p: 0, pl: 1 }} onClick={(e) => { e.stopPropagation(); toggleControl(item.control.control_id); }}>
                                 <Checkbox size="small" checked={checked}
-                                  sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#A100FF" } }} />
+                                  sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#4285F4" } }} />
                               </TableCell>
-                              <TableCell sx={{ color: "#A100FF", fontFamily: "monospace", fontSize: 12 }}>
+                              <TableCell sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
                                 {item.control.control_id}
                               </TableCell>
                               <TableCell sx={{ color: "white", fontSize: 13, maxWidth: 600 }}>
@@ -456,7 +555,7 @@ export default function Frameworks() {
       ) : null}
 
       {scanMutation.isSuccess && (
-        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(161,0,255,0.1)", color: "white" }}
+        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "white" }}
           onClose={() => scanMutation.reset()}>
           Scan started. Compliance status will refresh automatically when it completes.
         </Alert>
@@ -464,7 +563,7 @@ export default function Frameworks() {
 
       {/* Scan dialog */}
       <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           Scan against framework
         </DialogTitle>
@@ -527,7 +626,7 @@ export default function Frameworks() {
               (scanScope === "failing" && failingControlIds.length === 0) ||
               (scanScope === "selected" && selectedControlIds.size === 0)}
             startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
-            sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             Start Scan
           </Button>
         </DialogActions>
@@ -535,11 +634,11 @@ export default function Frameworks() {
 
       {/* Detail drawer */}
       <Drawer anchor="right" open={!!selected} onClose={() => setSelected(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#0A0A0A", color: "white", width: { xs: "100%", sm: 480 }, p: 3 } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#0F0F0F", color: "white", width: { xs: "100%", sm: 480 }, p: 3 } } }}>
         {selected && (
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-              <Typography variant="caption" sx={{ color: "#A100FF", fontFamily: "monospace" }}>
+              <Typography variant="caption" sx={{ color: "#4285F4", fontFamily: "monospace" }}>
                 {selected.control.control_id}
               </Typography>
               <IconButton onClick={() => setSelected(null)} size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -550,7 +649,7 @@ export default function Frameworks() {
               {selected.control.title}
             </Typography>
             <Chip label={selected.control.domain || "—"} size="small"
-              sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#7500C0", mb: 2 }} />
+              sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#34A853", mb: 2 }} />
 
             {selected.control.description && (
               <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 3, whiteSpace: "pre-wrap" }}>
@@ -633,7 +732,7 @@ export default function Frameworks() {
                           {f.asset_id ? (
                             <Typography variant="caption" component="span"
                               onClick={() => navigate(`/assets/${f.asset_id}`)}
-                              sx={{ color: "#A100FF", fontSize: 11, cursor: "pointer",
+                              sx={{ color: "#4285F4", fontSize: 11, cursor: "pointer",
                                 "&:hover": { textDecoration: "underline" } }}>
                               {f.asset_name || f.resource_id} →
                             </Typography>

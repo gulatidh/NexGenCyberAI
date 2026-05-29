@@ -15,8 +15,8 @@ const CLOUD_OPTIONS = ["azure", "aws", "gcp", "multi", "other"];
 const ENV_COLOR: Record<string, string> = {
   production: "#f44336",
   staging: "#ff9800",
-  development: "#A100FF",
-  dr: "#7500C0",
+  development: "#4285F4",
+  dr: "#34A853",
   other: "rgba(255,255,255,0.5)",
 };
 
@@ -29,8 +29,8 @@ function ProjectCard({ project, onEdit, onDelete, clientId }: ProjectCardProps) 
   });
   const isDefault = project.name === "Default";
   return (
-    <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
-      transition: "border-color .15s", "&:hover": { borderColor: "rgba(161,0,255,0.3)" } }}>
+    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
+      transition: "border-color .15s", "&:hover": { borderColor: "rgba(66,133,244,0.3)" } }}>
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
           <Box>
@@ -150,7 +150,7 @@ export default function Projects() {
             </Select>
           </FormControl>
           <Button variant="contained" startIcon={<Add />} disabled={!clientId} onClick={openCreate}
-            sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             New Project
           </Button>
         </Box>
@@ -169,7 +169,7 @@ export default function Projects() {
           ))
         ) : projects.length === 0 && clientId ? (
           <Grid size={12}>
-            <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
                 No projects yet. Create one to organize your connectors.
               </Typography>
@@ -191,7 +191,7 @@ export default function Projects() {
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         <DialogTitle>{editing ? `Edit Project — ${editing.name}` : "New Project"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
@@ -243,7 +243,7 @@ export default function Projects() {
               environment: form.environment || undefined,
               cloud_provider: form.cloud_provider || undefined,
             })}
-            sx={{ bgcolor: "#A100FF", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
+            sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             {createMutation.isPending ? <CircularProgress size={18} /> : (editing ? "Save" : "Create")}
           </Button>
         </DialogActions>

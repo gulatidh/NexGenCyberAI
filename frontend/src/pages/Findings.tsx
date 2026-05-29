@@ -13,10 +13,10 @@ import { Client, Finding, Project, FindingCategoriesResponse } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
-  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#A100FF",
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
 const STATUS_COLOR: Record<string, string> = {
-  open: "#ff9800", remediated: "#00e676", accepted: "#7500C0", false_positive: "rgba(255,255,255,0.4)",
+  open: "#ff9800", remediated: "#00e676", accepted: "#34A853", false_positive: "rgba(255,255,255,0.4)",
 };
 
 function CatIcon({ name, sx }: { name: string; sx?: any }) {
@@ -27,13 +27,14 @@ function CatIcon({ name, sx }: { name: string; sx?: any }) {
 // Per-category accent colors — keeps each tile distinct in the grid.
 const CAT_COLOR: Record<string, string> = {
   vulnerability:       "#f44336",
-  cloud_configuration: "#A100FF",
-  host_configuration:  "#7500C0",
+  cloud_configuration: "#4285F4",
+  host_configuration:  "#34A853",
   attack_surface:      "#ff6d00",
   data:                "#ff9800",
   secret:              "#ffd54f",
   end_of_life:         "#9e9e9e",
   sast:                "#00e676",
+  web:                 "#FBBC04",
   network_exposure:    "#03a9f4",
   excessive_access:    "#ff5252",
   identity_access:     "#f06292",
@@ -48,12 +49,12 @@ function CategoryTile({ cat, active, onClick }: {
   active: boolean;
   onClick: () => void;
 }) {
-  const color = CAT_COLOR[cat.key] || "#A100FF";
+  const color = CAT_COLOR[cat.key] || "#4285F4";
   const empty = cat.count === 0;
   return (
     <Card onClick={onClick}
       sx={{
-        bgcolor: active ? `${color}15` : "#1A1A1A",
+        bgcolor: active ? `${color}15` : "#1E1E1E",
         border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
         borderRadius: 2, cursor: "pointer", height: "100%",
         transition: "transform .12s, border-color .12s, background-color .12s",
@@ -204,7 +205,7 @@ export default function Findings() {
           <Tabs value={section} onChange={(_, v) => { setSection(v); setCategory(""); }}
             sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 1.5,
               "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
-              "& .Mui-selected": { color: "#A100FF" }, "& .MuiTabs-indicator": { backgroundColor: "#A100FF" } }}>
+              "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
             {(catData?.sections || []).map((s) => (
               <Tab key={s.key} value={s.key} label={`${s.label} (${s.total})`} />
             ))}
@@ -217,7 +218,7 @@ export default function Findings() {
             </Typography>
             {category && (
               <Button size="small" onClick={() => setCategory("")}
-                sx={{ color: "#A100FF", fontSize: 11 }}>
+                sx={{ color: "#4285F4", fontSize: 11 }}>
                 Clear category
               </Button>
             )}
@@ -258,18 +259,18 @@ export default function Findings() {
       )}
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "white" }}>Select a client to view findings.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view findings.</Alert>
       ) : isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#A100FF" }} /></Box>
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
       ) : findings.length === 0 ? (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <BugReport sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
           <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
             No findings found. Run a scan to discover security issues.
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "#1A1A1A", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -309,12 +310,12 @@ export default function Findings() {
                           {(f.seen_count ?? 1) > 1 && (
                             <Tooltip title={`Detected in ${f.seen_count} scans`}>
                               <Chip label={`×${f.seen_count}`} size="small"
-                                sx={{ bgcolor: "rgba(161,0,255,0.12)", color: "#A100FF", fontSize: 10, height: 16, flexShrink: 0 }} />
+                                sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 16, flexShrink: 0 }} />
                             </Tooltip>
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ color: f.cve_id ? "#A100FF" : "rgba(255,255,255,0.3)", fontSize: 12 }}>
+                      <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>
                         {f.cve_id || "—"}
                       </TableCell>
                       <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)", fontSize: 12 }}>
@@ -347,7 +348,7 @@ export default function Findings() {
 
       {/* Detail / status update dialog */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1A1A1A", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
         {selected && (() => {
           const sev = typeof selected.severity === "object" ? (selected.severity as any).value ?? selected.severity : selected.severity;
           return (
@@ -363,9 +364,9 @@ export default function Findings() {
                   <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>{selected.description}</Typography>
                 )}
                 <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
-                  {selected.cve_id && <Chip label={selected.cve_id} size="small" sx={{ bgcolor: "rgba(161,0,255,0.1)", color: "#A100FF" }} />}
+                  {selected.cve_id && <Chip label={selected.cve_id} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4" }} />}
                   {selected.cvss_score != null && <Chip label={`CVSS ${selected.cvss_score.toFixed(1)}`} size="small" sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "white" }} />}
-                  {selected.control_id && <Chip label={selected.control_id} size="small" sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#7500C0" }} />}
+                  {selected.control_id && <Chip label={selected.control_id} size="small" sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#34A853" }} />}
                 </Box>
                 {selected.resource_id && (
                   <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>

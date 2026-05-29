@@ -1,0 +1,133 @@
+name: TruffleHog Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Clones a
+# target repo, runs TruffleHog (git history + filesystem), and POSTs
+# findings (one secret per record) to /api/v1/scans/ingest/.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  trufflehog:
+    name: Run TruffleHog
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          REPO=$(python3 -c "import json; print(json.load(open('cfg.json')).get('repo_url',''))")
+          echo "repo_url=${REPO}" >> "$GITHUB_OUTPUT"
+
+      - name: Clone target repo (full history)
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          git clone "${{ steps.cfg.outputs.repo_url }}" target
+
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sudo sh -s -- -b /usr/local/bin
+          trufflehog --version
+
+      - name: Run TruffleHog (git mode, NDJSON output)
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          # NDJSON: one finding per line
+          trufflehog git --json file://target > results.ndjson || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          findings = []
+          err = None
+          repo = os.environ.get("REPO_URL", "")
+          if os.path.exists("results.ndjson"):
+              try:
+                  with open("results.ndjson") as fh:
+                      for line in fh:
+                          line = line.strip()
+                          if not line: continue
+                          try:
+                              item = json.loads(line)
+                          except json.JSONDecodeError:
+                              continue
+                          detector = item.get("DetectorName") or "unknown"
+                          verified = bool(item.get("Verified"))
+                          # Verified live credentials are critical; unverified
+                          # matches are high (still likely real secrets).
+                          sev = "critical" if verified else "high"
+                          src = (item.get("SourceMetadata") or {}).get("Data", {}) or {}
+                          git_meta = src.get("Git") or {}
+                          fs_meta = src.get("Filesystem") or {}
+                          file_path = git_meta.get("file") or fs_meta.get("file") or ""
+                          line_no = git_meta.get("line") or fs_meta.get("line") or ""
+                          commit = git_meta.get("commit") or ""
+                          findings.append({
+                              "title": f"Secret detected: {detector}" + (" (verified)" if verified else ""),
+                              "description": f"TruffleHog detected a {detector} credential. Verified: {verified}.",
+                              "severity": sev,
+                              "resource_id": f"{file_path}:{line_no}",
+                              "resource_type": "file",
+                              "control_id": f"TRUFFLEHOG-{detector.upper().replace(' ','_')}",
+                              "remediation": "Revoke this credential at the issuer immediately, rotate, and remove from git history (BFG / git-filter-repo).",
+                              "evidence": {
+                                  "detector": detector,
+                                  "verified": verified,
+                                  "file": file_path,
+                                  "line": line_no,
+                                  "commit": commit,
+                              },
+                              "control_mappings": {},
+                          })
+              except Exception as e:
+                  err = f"Failed to parse TruffleHog NDJSON: {e}"
+          elif not repo:
+              err = "No repo_url configured for scan"
+
+          payload = {"scan_id": os.environ["SCAN_ID"],
+                     "scan_token": os.environ["SCAN_TOKEN"],
+                     "findings": findings,
+                     "error": err if not findings and err else None}
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}, method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

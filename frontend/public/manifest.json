@@ -1,6 +1,6 @@
 {
   "short_name": "NexGenCyberAI",
-  "name": "NexGenCyberAI — by Accenture",
+  "name": "NexGenCyberAI — a DRJ Product",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#A100FF",
-  "background_color": "#0A0A0A"
+  "theme_color": "#4285F4",
+  "background_color": "#0F0F0F"
 }
