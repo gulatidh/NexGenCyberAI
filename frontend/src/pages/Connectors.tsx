@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Box, Typography, Button, Card, CardContent, Grid, Chip, IconButton, Tooltip,
+  Box, Typography, Button, Card, CardContent, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
   CircularProgress, Alert,
@@ -295,31 +295,30 @@ export default function Connectors() {
                             {tr && (
                               <Alert severity={tr.success ? "success" : "error"} sx={{ py: 0, mb: 1, fontSize: 11 }}>{tr.message}</Alert>
                             )}
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
                               <Button size="small" variant="outlined" startIcon={<PlayArrow />}
                                 onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
                                 disabled={testMutation.isPending}
                                 sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11 }}>
                                 Test
                               </Button>
-                              <Box sx={{ flex: 1 }} />
-                              <Tooltip title="Edit connector">
-                                <IconButton size="small" onClick={() => openEdit(conn)}
-                                  sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#4285F4" } }}>
-                                  <Edit sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete connector">
-                                <IconButton size="small"
-                                  onClick={() => {
-                                    if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
-                                      deleteMutation.mutate(conn.id);
-                                    }
-                                  }}
-                                  sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#f44336" } }}>
-                                  <Delete sx={{ fontSize: 16 }} />
-                                </IconButton>
-                              </Tooltip>
+                              <Button size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}
+                                onClick={() => openEdit(conn)}
+                                sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)", fontSize: 11,
+                                  "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" } }}>
+                                Edit
+                              </Button>
+                              <Button size="small" variant="outlined" startIcon={<Delete sx={{ fontSize: 14 }} />}
+                                onClick={() => {
+                                  if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
+                                    deleteMutation.mutate(conn.id);
+                                  }
+                                }}
+                                disabled={deleteMutation.isPending}
+                                sx={{ borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
+                                  "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" } }}>
+                                Delete
+                              </Button>
                             </Box>
                           </CardContent>
                         </Card>
