@@ -69,11 +69,23 @@ def _accessible_ids(db: Session, user: dict) -> Optional[set]:
     return visible
 
 
+def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """Coerce a possibly-naive datetime to UTC-aware. SQLite (dev) returns
+    naive datetimes; mssql (prod) returns aware. Without this coercion,
+    subtracting from `datetime.now(timezone.utc)` raises TypeError and
+    crashes the /scans/all endpoint."""
+    if dt is None:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 def _duration_seconds(s: Scan) -> Optional[int]:
-    if s.started_at and s.completed_at:
-        return int((s.completed_at - s.started_at).total_seconds())
-    if s.started_at and s.status in (ScanStatus.RUNNING, ScanStatus.PENDING):
-        return int((datetime.now(timezone.utc) - s.started_at).total_seconds())
+    started = _aware(s.started_at)
+    completed = _aware(s.completed_at)
+    if started and completed:
+        return int((completed - started).total_seconds())
+    if started and s.status in (ScanStatus.RUNNING, ScanStatus.PENDING):
+        return int((datetime.now(timezone.utc) - started).total_seconds())
     return None
 
 
