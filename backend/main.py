@@ -387,9 +387,11 @@ def _seed_framework_controls() -> None:
 
 
 def _bootstrap_initial_admin() -> None:
-    """If no global admin grants exist and INITIAL_ADMIN_UPN is configured,
-    create the first admin grant. Idempotent — runs every startup but only
-    inserts when the table is empty of admins."""
+    """Ensure the UPN configured in INITIAL_ADMIN_UPN always has a global
+    admin grant. Idempotent — checks per-UPN, not "any global admin
+    exists". Without this, if a previous deploy left other admin rows in
+    the table, the configured UPN never gets re-granted and is locked out
+    after a DB reset / migration / inadvertent grant revoke."""
     import os
     from sqlalchemy.orm import Session
     from api.models.models import AccessRole, AccessScope, UserAccess
@@ -399,11 +401,12 @@ def _bootstrap_initial_admin() -> None:
         return
     try:
         with Session(engine) as db:
-            existing_admin = db.query(UserAccess).filter(
+            existing = db.query(UserAccess).filter(
+                UserAccess.email == upn,
                 UserAccess.role == AccessRole.ADMIN,
                 UserAccess.scope_type == AccessScope.GLOBAL,
             ).first()
-            if existing_admin:
+            if existing:
                 return
             db.add(UserAccess(
                 email=upn,
@@ -413,7 +416,7 @@ def _bootstrap_initial_admin() -> None:
                 granted_by="bootstrap",
             ))
             db.commit()
-            logger.info("Bootstrapped initial global admin: %s", upn)
+            logger.info("Bootstrapped global admin grant for %s", upn)
     except Exception as exc:
         logger.warning("Initial admin bootstrap failed: %s", exc)
 
