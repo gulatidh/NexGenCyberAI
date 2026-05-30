@@ -67,8 +67,8 @@ const SCANNERS: ScannerDef[] = [
   { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
     description: "Community Edition (self-hosted) or Enterprise (SonarCloud via Action). Workflow coming soon." },
   // Network
-  { id: "nmap", name: "NMAP", connectorType: "nmap", category: "network", status: "soon",
-    description: "Service / port discovery on hosts or CIDR ranges. Workflow coming soon." },
+  { id: "nmap", name: "NMAP", connectorType: "nmap", category: "network", status: "live",
+    description: "Service / port discovery on hosts or CIDR ranges with NSE safe + vuln scripts. Runs in GitHub Actions." },
   { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "soon",
     description: "Open-source network vulnerability scanner. Workflow coming soon." },
   { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
