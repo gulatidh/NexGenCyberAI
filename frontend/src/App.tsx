@@ -129,11 +129,76 @@ export default function App() {
             interactionType={InteractionType.Redirect}
             authenticationRequest={loginRequest}
             loadingComponent={LoginPage}
-            errorComponent={() => (
-              <div style={{ color: "red", padding: 40, fontFamily: "Inter, sans-serif" }}>
-                Authentication Error — check Entra ID app registration
-              </div>
-            )}
+            errorComponent={({ error }: any) => {
+              const code = error?.errorCode || error?.name || "unknown";
+              const msg = error?.errorMessage || error?.message || String(error || "");
+              const isInteractionInProgress =
+                code === "interaction_in_progress" ||
+                /interaction.in.progress/i.test(msg);
+              return (
+                <div style={{
+                  minHeight: "100vh", display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center", padding: 40,
+                  fontFamily: "Inter, sans-serif", color: "white",
+                  background: "#0d1117",
+                }}>
+                  <div style={{
+                    maxWidth: 640, width: "100%",
+                    background: "#1E1E1E", border: "1px solid rgba(234,67,53,0.4)",
+                    borderRadius: 12, padding: 32,
+                  }}>
+                    <h2 style={{ color: "#EA4335", marginTop: 0 }}>Sign-in failed</h2>
+                    <p style={{ color: "rgba(255,255,255,0.85)", marginBottom: 24 }}>
+                      Microsoft Entra ID returned an error during the sign-in flow.
+                    </p>
+                    <div style={{
+                      background: "rgba(234,67,53,0.08)",
+                      border: "1px solid rgba(234,67,53,0.3)",
+                      borderRadius: 8, padding: 16, marginBottom: 24,
+                      fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.85)",
+                      wordBreak: "break-word",
+                    }}>
+                      <div style={{ color: "#FBBC04", marginBottom: 6, fontWeight: 700 }}>
+                        Error code: {code}
+                      </div>
+                      <div>{msg || "(no error message)"}</div>
+                    </div>
+                    {isInteractionInProgress && (
+                      <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 1.5 }}>
+                        A previous sign-in attempt is still in progress. Clearing browser
+                        session storage usually resolves this.
+                      </p>
+                    )}
+                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => {
+                          try { sessionStorage.clear(); localStorage.clear(); } catch {}
+                          window.location.href = "/";
+                        }}
+                        style={{
+                          background: "#4285F4", color: "white", border: "none",
+                          padding: "10px 18px", borderRadius: 6, cursor: "pointer",
+                          fontWeight: 600, fontSize: 14,
+                        }}
+                      >
+                        Clear session and retry
+                      </button>
+                      <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                          background: "transparent", color: "rgba(255,255,255,0.8)",
+                          border: "1px solid rgba(255,255,255,0.2)",
+                          padding: "10px 18px", borderRadius: 6, cursor: "pointer",
+                          fontSize: 14,
+                        }}
+                      >
+                        Just retry
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
           >
             <BrowserRouter>
               <Routes>
