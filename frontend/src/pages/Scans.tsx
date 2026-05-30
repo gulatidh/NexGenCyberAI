@@ -186,7 +186,12 @@ export default function Scans() {
           <Button variant="outlined" startIcon={<Refresh />}
             onClick={() => refetchTiles()}
             sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
-          <Button variant="contained" startIcon={<Add />} disabled={!selectedClientId} onClick={() => setOpen(true)}>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            disabled={clients.length === 0}
+            onClick={() => setOpen(true)}
+          >
             New Assessment
           </Button>
         </Box>
@@ -238,9 +243,34 @@ export default function Scans() {
       ) : tiles.length === 0 ? (
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Visibility sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
-            No assessments yet. Pick a client and click "New Assessment" to run one.
-          </Typography>
+          {clients.length === 0 ? (
+            <>
+              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+                No accessible clients
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                Your account has no RBAC grants yet. Ask a global admin to grant you reader / editor / admin access from <b>Settings → Administration → Grant access</b>.
+              </Typography>
+            </>
+          ) : (tilesData?.scans?.length || 0) === 0 ? (
+            <>
+              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+                No assessments yet
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                Click "New Assessment" to run your first scan.
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+                No assessments match the current filters
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                {tilesData?.scans?.length} assessment{(tilesData?.scans?.length || 0) === 1 ? "" : "s"} exist for clients you have access to — clear the Client / Status / Category filters above to see them.
+              </Typography>
+            </>
+          )}
         </Card>
       ) : (
         <Grid container spacing={2}>
@@ -352,6 +382,39 @@ export default function Scans() {
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          {/* Client picker — required first step. Allows starting a scan
+              from this dialog even when no tile-grid client filter is set. */}
+          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <Select
+              value={selectedClientId}
+              onChange={(e) => {
+                setSelectedClientId(e.target.value);
+                setSelectedProjectId("");
+                setConnectorId("");
+                setScannerId("");
+              }}
+              label="Client"
+              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+            >
+              {clients.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+              {clients.length === 0 && (
+                <MenuItem value="" disabled>No clients you can access — ask an admin for a grant</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+
+          {!selectedClientId ? (
+            <Box sx={{
+              p: 3, textAlign: "center", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 1.5,
+              color: "rgba(255,255,255,0.55)",
+            }}>
+              <Typography variant="body2">Pick a client above to continue.</Typography>
+            </Box>
+          ) : (
+          <>
           {/* Category tabs */}
           <Tabs
             value={category}
@@ -487,6 +550,8 @@ export default function Scans() {
                 </Grid>
               )}
             </Box>
+          )}
+          </>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
