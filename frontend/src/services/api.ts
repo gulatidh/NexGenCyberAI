@@ -3,6 +3,7 @@
  * Automatically attaches the Entra ID bearer token to every request.
  */
 import axios, { InternalAxiosRequestConfig } from "axios";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { msalInstance } from "../auth/AuthProvider";
 import { loginRequest as loginReq } from "../auth/msalConfig";
 import { addNotification } from "./notifications";
@@ -12,6 +13,12 @@ const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1"
 export const apiClient = axios.create({ baseURL: BASE_URL });
 
 // Attach Entra ID token on every request
+// Throttle interactive redirects — if multiple API calls race to "needs
+// login", we still trigger only one acquireTokenRedirect per page load.
+// Otherwise concurrent requests cause MSAL 'interaction_in_progress'
+// loops where every retry kicks another redirect.
+let _redirectInFlight = false;
+
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   // Ensure MSAL has finished loading the cache (no-op if already initialized)
   await msalInstance.initialize();
@@ -23,9 +30,24 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
         account,
       });
       config.headers.Authorization = `Bearer ${tokenResponse.accessToken}`;
-    } catch {
-      // Silent token acquisition failed — redirect to login
-      await msalInstance.acquireTokenRedirect(loginReq);
+    } catch (err) {
+      // Only redirect for errors that actually need interactive login
+      // (consent required, MFA, expired refresh token, account changed).
+      // Transient AAD glitches, network blips, or non-auth errors should
+      // NOT trigger a redirect — that's how the 'login loop' happens.
+      if (err instanceof InteractionRequiredAuthError && !_redirectInFlight) {
+        _redirectInFlight = true;
+        try {
+          await msalInstance.acquireTokenRedirect(loginReq);
+        } catch {
+          _redirectInFlight = false;
+        }
+      } else {
+        // Let the request go through without a token; the backend will
+        // 401 and the user sees a real error instead of a silent reload.
+        // eslint-disable-next-line no-console
+        console.warn("Token acquisition failed:", err);
+      }
     }
   }
   return config;
