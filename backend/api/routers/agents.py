@@ -132,3 +132,15 @@ async def get_agent_run(client_id: str, run_id: str, db: Session = Depends(get_d
     if not run:
         raise HTTPException(status_code=404, detail="Agent run not found")
     return run
+
+
+@router.delete("/runs/{run_id}")
+async def delete_agent_run(client_id: str, run_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Remove a single agent run — useful for clearing out empty / failed /
+    stuck-running runs from the Risk Register's AI Agent Risk Analysis tiles."""
+    run = db.query(AgentRun).filter(AgentRun.id == run_id, AgentRun.client_id == client_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    db.delete(run)
+    db.commit()
+    return {"deleted": True}

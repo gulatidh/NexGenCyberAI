@@ -119,6 +119,16 @@ export default function Risks() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["risks"] }); setSelected(null); },
   });
 
+  const [pendingDeleteRun, setPendingDeleteRun] = useState<any | null>(null);
+  const deleteRunMutation = useMutation({
+    mutationFn: (runId: string) => agentsApi.deleteRun(clientId, runId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-runs", clientId] });
+      if (expandedRunId === pendingDeleteRun?.id) setExpandedRunId(null);
+      setPendingDeleteRun(null);
+    },
+  });
+
   const lvOf = (r: Risk) => (typeof r.risk_level === "object" ? (r.risk_level as any).value ?? r.risk_level : r.risk_level) as string;
 
   // KPI calculations
@@ -420,6 +430,7 @@ export default function Risks() {
                       run={run}
                       expanded={isExpanded}
                       onToggle={() => setExpandedRunId(isExpanded ? null : run.id)}
+                      onDelete={() => setPendingDeleteRun(run)}
                     />
                   </Grid>
                 );
@@ -476,6 +487,41 @@ export default function Risks() {
             </>
           );
         })()}
+      </Dialog>
+
+      {/* Confirm delete of an AI agent risk analysis run */}
+      <Dialog open={!!pendingDeleteRun} onClose={() => setPendingDeleteRun(null)}
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          Delete risk analysis?
+        </DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+            This removes the agent run and its output from the Risk Register feed. The risks that were created from this run (in the table above) stay — only the agent narrative is deleted.
+          </Typography>
+          {pendingDeleteRun && (
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "white", fontWeight: 600, textTransform: "capitalize" }}>
+                {(pendingDeleteRun.agent_type || "").replace(/_/g, " ")}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                Status: {pendingDeleteRun.status}
+                {pendingDeleteRun.started_at ? ` · started ${fromNow(pendingDeleteRun.started_at)}` : ""}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDeleteRun(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={deleteRunMutation.isPending}
+            onClick={() => pendingDeleteRun && deleteRunMutation.mutate(pendingDeleteRun.id)}
+            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

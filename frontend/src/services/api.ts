@@ -143,6 +143,8 @@ export const agentsApi = {
   listRuns: (clientId: string) => apiClient.get(`/clients/${clientId}/agents/runs/`).then((r) => r.data),
   getRun: (clientId: string, runId: string) =>
     apiClient.get(`/clients/${clientId}/agents/runs/${runId}`).then((r) => r.data),
+  deleteRun: (clientId: string, runId: string) =>
+    apiClient.delete(`/clients/${clientId}/agents/runs/${runId}`).then((r) => r.data),
 };
 
 export const aiApi = {

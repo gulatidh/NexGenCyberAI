@@ -11,8 +11,11 @@
  * collapse.
  */
 import React from "react";
-import { Box, Card, CardContent, Chip, Collapse, IconButton, Typography } from "@mui/material";
-import { ExpandMore, ExpandLess, SmartToy, ErrorOutlined, CheckCircleOutlined, HourglassEmpty } from "@mui/icons-material";
+import { Box, Card, CardContent, Chip, Collapse, IconButton, Tooltip, Typography } from "@mui/material";
+import {
+  ExpandMore, ExpandLess, SmartToy, ErrorOutlined, CheckCircleOutlined, HourglassEmpty,
+  DeleteOutlined,
+} from "@mui/icons-material";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "./RichOutput";
 
@@ -27,6 +30,7 @@ interface Props {
   };
   expanded: boolean;
   onToggle: () => void;
+  onDelete?: () => void;
 }
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; Icon: any }> = {
@@ -91,7 +95,7 @@ function extractSummary(output: any, maxLen = 220): string {
   return (lastDot > 80 ? cut.slice(0, lastDot + 1) : cut.trim() + "…");
 }
 
-export default function AgentInsightCard({ run, expanded, onToggle }: Props) {
+export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: Props) {
   const status = (run.status || "").toLowerCase();
   const style = STATUS_STYLE[status] || STATUS_STYLE.completed;
   const label = AGENT_LABEL[run.agent_type] || run.agent_type.replace(/_/g, " ");
@@ -160,6 +164,20 @@ export default function AgentInsightCard({ run, expanded, onToggle }: Props) {
             </Typography>
           )}
         </Box>
+        {onDelete && (
+          <Tooltip title="Delete this analysis">
+            <IconButton
+              size="small"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              sx={{
+                color: "rgba(255,255,255,0.4)",
+                "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+              }}
+            >
+              <DeleteOutlined sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        )}
         <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }} aria-label={expanded ? "Collapse" : "Expand"}>
           {expanded ? <ExpandLess /> : <ExpandMore />}
         </IconButton>
