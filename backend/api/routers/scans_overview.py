@@ -233,6 +233,7 @@ async def scan_detail(
             "started_at": ar.started_at.isoformat() if ar.started_at else None,
             "completed_at": ar.completed_at.isoformat() if ar.completed_at else None,
             "output_data": ar.output_data,
+            "input_data": ar.input_data,
             "error_message": ar.error_message,
             "tokens_used": ar.tokens_used,
         })

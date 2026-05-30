@@ -288,6 +288,10 @@ export const agentCatalogApi = {
   update: (agentId: string, data: any) =>
     apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
   delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
-  run: (agentId: string, prompt?: string, clientId?: string) =>
-    apiClient.post(`/agents/catalog/${agentId}/run`, { prompt, client_id: clientId }).then((r) => r.data),
+  run: (agentId: string, prompt?: string, clientId?: string, scanId?: string) =>
+    apiClient.post(`/agents/catalog/${agentId}/run`, {
+      prompt,
+      client_id: clientId,
+      scan_id: scanId,
+    }).then((r) => r.data),
 };

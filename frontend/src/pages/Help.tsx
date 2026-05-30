@@ -74,7 +74,7 @@ const GROUPS: Group[] = [
         title: "Where to find things in the nav",
         summary: "The left navigation is split into a main workflow group and a Settings group.",
         steps: [
-          { text: "Main workflow group (top): Dashboard, Risk Overview, Clients, Assessments, Findings, Risk Register, Asset Inventory, Technologies, Frameworks, AI Agents, Workflows, Knowledge Base, Reports." },
+          { text: "Main workflow group (top): Dashboard, Risk Overview, Clients, Assessments, Findings, Risk Register, Asset Inventory, Technologies, Frameworks, AI Buddies, Workflows, Knowledge Base, Reports." },
           { text: "Settings group (bottom): AI Settings, Sync (admin), Administration (admin), Help." },
           { text: "Connectors and Projects don't have top-level nav — they're tabs inside the Client Detail page." },
         ],
@@ -213,7 +213,7 @@ const GROUPS: Group[] = [
   },
   {
     id: "ai-agents",
-    title: "AI Agents",
+    title: "AI Buddies",
     icon: <SmartToy />,
     color: "#9C27B0",
     topics: [
@@ -222,7 +222,7 @@ const GROUPS: Group[] = [
         title: "Run an AI agent against a scan",
         summary: "Agents enrich a scan with risk scoring, framework mapping, remediation, threat intel.",
         steps: [
-          { text: "Open the AI Agents tab from the left nav." },
+          { text: "Open the AI Buddies tab from the left nav." },
           { text: "Pick a Client and the Scan to analyse." },
           { text: "Choose which agents to run (Risk Manager, Vulnerability Analysis, Framework Mapping, Threat Intel, Remediation, Compliance) and click 'Run agents'." },
           { text: "Agents run in parallel; outputs land both on the Scan Detail per-agent tab and on the Risk Register (for risk-related agents)." },
@@ -244,10 +244,10 @@ const GROUPS: Group[] = [
       },
       {
         id: "agent-catalog",
-        title: "Browse the AI Agent catalog",
+        title: "Browse the AI Buddies catalog",
         summary: "Beyond the operational agents, ~43 advisory agents covering SOC design, GRC, IR, zero trust, IGA, threat intel, and more.",
         steps: [
-          { text: "AI Agents → Catalog tab." },
+          { text: "AI Buddies → Catalog tab." },
           { text: "Browse the 7 groups (Operational, Strategy, Compliance, Cloud, Identity, Detection, Response)." },
           { text: "Admins can add / edit / delete agents from this view; non-admins can read and run." },
         ],

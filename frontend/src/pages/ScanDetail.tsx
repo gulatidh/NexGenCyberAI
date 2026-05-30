@@ -42,7 +42,15 @@ interface Finding {
 interface AgentRunRow {
   id: string; agent_type: string; status: string;
   started_at?: string; completed_at?: string;
-  output_data?: any; error_message?: string; tokens_used?: number;
+  output_data?: any; input_data?: any; error_message?: string; tokens_used?: number;
+}
+
+// Prefer the catalog agent's friendly name (input_data.agent_name) when
+// present — otherwise fall back to agent_type.
+function agentLabel(ar: AgentRunRow): string {
+  const fromInput = ar.input_data?.agent_name;
+  const fromOutput = ar.output_data?.agent_name;
+  return (fromInput || fromOutput || ar.agent_type || "agent").replace(/_/g, " ");
 }
 interface Verdict {
   generated_at: string;
@@ -583,7 +591,7 @@ export default function ScanDetail() {
           label={`Findings (${data.findings.length})`} />
         {data.agent_runs.map((ar) => (
           <Tab key={ar.id} icon={<SmartToy sx={{ fontSize: 16 }} />} iconPosition="start"
-            value={`agent-${ar.id}`} label={ar.agent_type.replace(/_/g, " ")} />
+            value={`agent-${ar.id}`} label={agentLabel(ar)} />
         ))}
       </Tabs>
 
@@ -663,7 +671,7 @@ export default function ScanDetail() {
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
               <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, textTransform: "capitalize" }}>
-                {ar.agent_type.replace(/_/g, " ")}
+                {agentLabel(ar)}
               </Typography>
               <Chip label={ar.status} size="small"
                 sx={{

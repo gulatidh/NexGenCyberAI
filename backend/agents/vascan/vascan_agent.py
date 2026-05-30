@@ -115,10 +115,20 @@ class VAScanAgent(BaseAgent):
             "dedup_summary": json.loads(dedup) if dedup.startswith("{") else dedup,
             "priority_list": priority,
             "instructions": (
-                "1. Summarise the vulnerability landscape. "
-                "2. Identify top 5 critical vulnerabilities to patch immediately. "
-                "3. Group by asset type. "
-                "4. Provide patch/mitigation steps for each critical item."
+                "Produce a professional vulnerability assessment using EXACTLY these "
+                "markdown level-3 headers, in order:\n"
+                "  ### Vulnerability Landscape\n"
+                "  ### Top Critical Vulnerabilities\n"
+                "  ### Affected Asset Classes\n"
+                "  ### Patch & Mitigation Plan\n\n"
+                "Rules:\n"
+                "- Third-person, executive-report tone. No greetings, no 'I will', "
+                "no questions to the user, no offers like 'If you want, I can also'.\n"
+                "- Concise bulleted lines under each header.\n"
+                "- Top Critical Vulnerabilities: 5-10 bullets with CVE id, CVSS, "
+                "affected component, and one-line impact statement.\n"
+                "- Patch & Mitigation Plan: actionable steps grouped by asset class, "
+                "ordered by urgency."
             ),
         }
         result = await self.run({"input": json.dumps(input_data)})

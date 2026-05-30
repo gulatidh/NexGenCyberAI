@@ -184,6 +184,7 @@ async def delete_agent(
 class AgentRunRequest(BaseModel):
     prompt: Optional[str] = None  # user instruction; default is "Provide your standard briefing."
     client_id: Optional[str] = None  # optional context anchor
+    scan_id: Optional[str] = None  # if set, agent reads findings + verdict and run is attached to scan
 
 
 class AgentRunResponse(BaseModel):
@@ -194,6 +195,8 @@ class AgentRunResponse(BaseModel):
     model: Optional[str] = None
     tokens_used: int = 0
     duration_ms: int = 0
+    run_id: Optional[str] = None       # persisted AgentRun id when scan_id was provided
+    scan_id: Optional[str] = None
 
 
 @router.post("/{agent_id}/run", response_model=AgentRunResponse)
@@ -203,16 +206,20 @@ async def run_agent(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    """Execute a catalog agent against an optional client context.
+    """Execute a catalog agent. If `scan_id` is provided, the agent reads
+    that scan's findings + verdict, treats them as context, and the run is
+    persisted as an AgentRun tied to the scan so it shows up on the
+    Assessment detail page just like operational agents do.
 
-    Catalog agents are advisory: we ship the system prompt + the user's
-    instruction to the configured LLM provider and return the completion.
     Legacy operational agents (`legacy_orchestrator=True`) are not run via
-    this path — they have their own routers at `/clients/{client_id}/agents/run/`.
+    this path — they have their own routers at
+    `/clients/{client_id}/agents/run/`.
     """
     import time
+    from datetime import datetime, timezone
     from core.ai_providers import get_llm
     from langchain_core.messages import HumanMessage, SystemMessage
+    from api.models.models import AgentRun, AgentType, Scan, Finding, Client
 
     a = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not a:
@@ -225,11 +232,91 @@ async def run_agent(
             detail="Legacy operational agents must be run via /clients/{client_id}/agents/run/ with a client context.",
         )
 
-    instruction = (payload.prompt or "").strip() or (
-        f"Provide your standard briefing on {a.domain or a.name}. "
-        f"Be concise and senior-level. Cite framework controls where relevant."
+    # ── Build scan context if scan_id is supplied ───────────────────────────
+    scan: Optional[Scan] = None
+    client: Optional[Client] = None
+    findings_for_prompt: List[dict] = []
+    context_block = ""
+    effective_client_id = payload.client_id
+
+    if payload.scan_id:
+        scan = db.query(Scan).filter(Scan.id == payload.scan_id).first()
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+        effective_client_id = scan.client_id
+        client = db.query(Client).filter(Client.id == scan.client_id).first()
+        rows = (
+            db.query(Finding)
+            .filter(Finding.scan_id == scan.id)
+            .order_by(Finding.cvss_score.desc())
+            .limit(80)
+            .all()
+        )
+        for f in rows:
+            sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+            findings_for_prompt.append({
+                "title": f.title or "",
+                "severity": sev,
+                "resource": f.resource_id or "",
+                "cve": f.cve_id or "",
+                "cvss": float(f.cvss_score) if f.cvss_score else None,
+                "control": f.control_id or "",
+            })
+        sev_counts: Dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in findings_for_prompt:
+            sev_counts[f["severity"]] = sev_counts.get(f["severity"], 0) + 1
+        verdict_obj = scan.ai_verdict or {}
+        verdict_summary = verdict_obj.get("verdict") if isinstance(verdict_obj, dict) else None
+
+        lines = [
+            "## Scan context",
+            f"- Client: {client.name if client else 'Unknown'}",
+            f"- Scan ID: {scan.id}",
+            f"- Scan type: {scan.scan_type.value if hasattr(scan.scan_type, 'value') else scan.scan_type}",
+            f"- Findings: {len(findings_for_prompt)} ({sev_counts})",
+        ]
+        if verdict_summary:
+            lines.append(f"- Previous AI verdict (one-liner): {verdict_summary}")
+        lines.append("")
+        lines.append("## Top findings (severity-ordered, capped at 30)")
+        for f in findings_for_prompt[:30]:
+            extra = []
+            if f["cve"]:
+                extra.append(f["cve"])
+            if f["cvss"] is not None:
+                extra.append(f"CVSS {f['cvss']:.1f}")
+            if f["control"]:
+                extra.append(f["control"])
+            tail = f" [{' · '.join(extra)}]" if extra else ""
+            lines.append(f"- [{f['severity']}] {f['title']} on `{f['resource'] or 'n/a'}`{tail}")
+        context_block = "\n".join(lines)
+
+    # ── Build the instruction ───────────────────────────────────────────────
+    base_instruction = (payload.prompt or "").strip()
+    if not base_instruction:
+        if scan:
+            base_instruction = (
+                f"Analyse the findings above from the {a.domain or a.name} perspective. "
+                "Identify the most material issues, map them to your domain's controls, "
+                "and recommend concrete next steps."
+            )
+        else:
+            base_instruction = (
+                f"Provide your standard briefing on {a.domain or a.name}. "
+                "Be concise and senior-level. Cite framework controls where relevant."
+            )
+
+    formatting_guidance = (
+        "\n\nFormatting rules: Respond in well-structured markdown using level-3 "
+        "headers (### ...) for sections, bulleted lists for items, and bold for "
+        "key terms. Third-person executive tone. No greetings, no 'I will', "
+        "no questions to the user, no offers like 'If you want, I can also'."
     )
 
+    instruction = (context_block + "\n\n" + base_instruction + formatting_guidance) if context_block \
+        else base_instruction + formatting_guidance
+
+    # ── LLM call ────────────────────────────────────────────────────────────
     started = time.perf_counter()
     try:
         llm = get_llm(
@@ -251,12 +338,44 @@ async def run_agent(
         raise HTTPException(status_code=502, detail=f"Agent invocation failed: {type(exc).__name__}: {exc}")
 
     duration_ms = int((time.perf_counter() - started) * 1000)
-    # Extract text + token count from various LangChain BaseChatModel shapes
     text = result.content if hasattr(result, "content") else str(result)
     if isinstance(text, list):
         text = "\n".join(str(p) for p in text)
     usage = getattr(result, "usage_metadata", None) or {}
     tokens = int(usage.get("total_tokens") or 0)
+
+    # ── Persist as AgentRun when we have a scan, so it appears on the
+    # Assessment detail page next to operational agent tabs. agent_type is
+    # ORCHESTRATOR (existing enum value); the catalog agent's display name +
+    # key live in input_data so the UI can label the tab correctly.
+    run_id: Optional[str] = None
+    if scan:
+        ar = AgentRun(
+            client_id=effective_client_id,
+            scan_id=scan.id,
+            agent_type=AgentType.ORCHESTRATOR,
+            status="completed",
+            input_data={
+                "catalog": True,
+                "agent_name": a.name,
+                "agent_key": a.key,
+                "domain": a.domain,
+                "group": a.group_key,
+                "user_prompt": payload.prompt or "",
+            },
+            output_data={
+                "summary": text,
+                "agent_name": a.name,
+                "agent_key": a.key,
+                "domain": a.domain,
+            },
+            tokens_used=tokens,
+        )
+        ar.completed_at = datetime.now(timezone.utc)
+        db.add(ar)
+        db.commit()
+        db.refresh(ar)
+        run_id = ar.id
 
     return AgentRunResponse(
         agent_id=a.id,
@@ -266,4 +385,6 @@ async def run_agent(
         model=a.model,
         tokens_used=tokens,
         duration_ms=duration_ms,
+        run_id=run_id,
+        scan_id=scan.id if scan else None,
     )

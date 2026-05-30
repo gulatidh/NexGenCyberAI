@@ -272,7 +272,7 @@ export default function Agents() {
 
   const briefingMutation = useMutation({
     mutationFn: ({ agentId, prompt }: { agentId: string; prompt?: string }) =>
-      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined),
+      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined, selectedScanId || undefined),
     onSuccess: (data) => { setBriefingOutput(data); setBriefingError(""); },
     onError: (e: any) => {
       setBriefingError(e.response?.data?.detail || e.message || "Briefing failed");
@@ -302,7 +302,7 @@ export default function Agents() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Agents</Typography>
+          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Buddies</Typography>
           <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
             {groups.length > 0
               ? `${groups.reduce((s, g) => s + g.agents.length, 0)} specialist agents across ${groups.length} groups${isAdmin ? "" : " — admin role required to modify"}`
