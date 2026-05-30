@@ -1,0 +1,243 @@
+name: CodeQL Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Clones the
+# target Git repo, runs CodeQL CLI against an auto-detected language,
+# parses the SARIF output, and POSTs findings to /api/v1/scans/ingest/.
+#
+# Uses the standalone CodeQL CLI bundle (not github/codeql-action) because
+# we're scanning a third-party repo, not this workflow's own repo. The
+# bundle ships with the standard query suites for every supported
+# language so we don't need to pull them separately.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: Run CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          PY
+
+      - name: Clone target repo
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
+
+      - name: Detect language
+        if: steps.cfg.outputs.repo_url != ''
+        id: lang
+        run: |
+          set -euo pipefail
+          LANG=""
+          if   [ -f target/package.json ]; then LANG="javascript-typescript";
+          elif [ -f target/tsconfig.json ]; then LANG="javascript-typescript";
+          elif [ -f target/requirements.txt ] || [ -f target/pyproject.toml ] || [ -f target/setup.py ]; then LANG="python";
+          elif [ -f target/go.mod ]; then LANG="go";
+          elif [ -f target/pom.xml ] || [ -f target/build.gradle ] || [ -f target/build.gradle.kts ]; then LANG="java-kotlin";
+          elif [ -f target/Cargo.toml ]; then LANG="rust";
+          elif [ -f target/Gemfile ]; then LANG="ruby";
+          elif [ -f target/*.csproj ] 2>/dev/null || [ -f target/*.sln ] 2>/dev/null; then LANG="csharp";
+          elif find target -maxdepth 3 -name "*.swift" | grep -q .; then LANG="swift";
+          elif find target -maxdepth 3 -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.h" | grep -q .; then LANG="cpp";
+          else LANG="javascript-typescript"; fi
+          echo "language=$LANG" >> "$GITHUB_OUTPUT"
+          echo "Detected language: $LANG"
+
+      - name: Install CodeQL CLI bundle
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          set -euo pipefail
+          # Latest tagged CodeQL CLI bundle release.
+          BUNDLE_URL="https://github.com/github/codeql-action/releases/latest/download/codeql-bundle-linux64.tar.gz"
+          wget -q "$BUNDLE_URL" -O codeql-bundle.tar.gz
+          tar -xzf codeql-bundle.tar.gz
+          echo "$PWD/codeql" >> "$GITHUB_PATH"
+          ./codeql/codeql version
+
+      - name: Create CodeQL database
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          set -uo pipefail
+          codeql database create db \
+            --language="${{ steps.lang.outputs.language }}" \
+            --source-root=./target \
+            --overwrite \
+            || true
+          ls -la db || true
+
+      - name: Analyze with security-and-quality suite
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          set -uo pipefail
+          # Map our detected language to the right query suite shipped in
+          # the bundle. CodeQL CLI accepts the suite ID directly.
+          LANG="${{ steps.lang.outputs.language }}"
+          case "$LANG" in
+            javascript-typescript) SUITE="javascript-security-and-quality.qls" ;;
+            python)                SUITE="python-security-and-quality.qls" ;;
+            go)                    SUITE="go-security-and-quality.qls" ;;
+            java-kotlin)           SUITE="java-security-and-quality.qls" ;;
+            csharp)                SUITE="csharp-security-and-quality.qls" ;;
+            ruby)                  SUITE="ruby-security-and-quality.qls" ;;
+            cpp)                   SUITE="cpp-security-and-quality.qls" ;;
+            swift)                 SUITE="swift-security-and-quality.qls" ;;
+            rust)                  SUITE="rust-security-and-quality.qls" ;;
+            *)                     SUITE="javascript-security-and-quality.qls" ;;
+          esac
+          codeql database analyze db "codeql/$SUITE" \
+            --format=sarif-latest \
+            --output=results.sarif \
+            --threads=0 \
+            --download \
+            || true
+          ls -la results.sarif || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+          LANGUAGE: ${{ steps.lang.outputs.language }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+
+          findings = []
+          err = None
+          repo = os.environ.get("REPO_URL", "")
+          language = os.environ.get("LANGUAGE", "")
+
+          def severity_for(rule, result) -> str:
+              # CodeQL emits 'precision' + 'security-severity' (CVSS-style 0-10)
+              # under rule.properties. Map security-severity to our buckets.
+              props = (rule or {}).get("properties", {}) if rule else {}
+              try:
+                  ss = float(props.get("security-severity") or 0)
+              except Exception:
+                  ss = 0.0
+              if ss >= 9: return "critical"
+              if ss >= 7: return "high"
+              if ss >= 4: return "medium"
+              # Fall back to level if no security-severity
+              lvl = (result.get("level") or "").lower()
+              if lvl == "error":   return "high"
+              if lvl == "warning": return "medium"
+              if lvl == "note":    return "low"
+              return "info"
+
+          if os.path.exists("results.sarif") and os.path.getsize("results.sarif") > 0:
+              try:
+                  data = json.load(open("results.sarif"))
+                  for run in data.get("runs", []) or []:
+                      tool = ((run.get("tool") or {}).get("driver") or {})
+                      rules = {r.get("id"): r for r in (tool.get("rules") or [])}
+                      for result in run.get("results", []) or []:
+                          rule_id = result.get("ruleId") or "codeql"
+                          rule = rules.get(rule_id) or {}
+                          msg = (result.get("message") or {}).get("text") or rule.get("shortDescription", {}).get("text") or rule_id
+                          # First location (file + line)
+                          loc = (result.get("locations") or [{}])[0]
+                          phys = (loc.get("physicalLocation") or {})
+                          art = (phys.get("artifactLocation") or {})
+                          region = (phys.get("region") or {})
+                          file_path = art.get("uri", "")
+                          start_line = region.get("startLine", "")
+                          props = (rule.get("properties") or {})
+                          tags = props.get("tags") or []
+                          cwes = [t.split("/")[-1].upper() for t in tags if isinstance(t, str) and "cwe" in t.lower()]
+                          # CodeQL ruleId often looks like 'js/sql-injection'
+                          findings.append({
+                              "title": (rule.get("shortDescription", {}).get("text") or msg or rule_id)[:255],
+                              "description": (
+                                  (rule.get("fullDescription", {}).get("text") or msg or "")
+                                  + (f"\n\nFile: {file_path}:{start_line}" if file_path else "")
+                              )[:4000],
+                              "severity": severity_for(rule, result),
+                              "resource_id": f"{file_path}:{start_line}" if file_path else "",
+                              "resource_type": "code/file",
+                              "control_id": cwes[0] if cwes else rule_id,
+                              "remediation": rule.get("help", {}).get("text", "")[:1000] or "Review the CodeQL alert in context and apply the suggested fix.",
+                              "evidence": {
+                                  "rule": rule_id,
+                                  "file": file_path,
+                                  "line": start_line,
+                                  "language": language,
+                                  "precision": props.get("precision"),
+                                  "security_severity": props.get("security-severity"),
+                                  "cwes": cwes,
+                                  "tags": tags[:10],
+                              },
+                              "cve_id": "",
+                              "cvss_score": float(props.get("security-severity") or 0) if props.get("security-severity") else 0,
+                              "control_mappings": {"cwe": cwes, "owasp_top_10": []},
+                          })
+              except Exception as e:
+                  err = f"Failed to parse SARIF: {e}"
+          elif not repo:
+              err = "No repo_url configured for scan"
+          else:
+              err = "CodeQL produced no SARIF — analysis may have failed (check workflow logs)"
+
+          payload = {
+              "scan_id": os.environ["SCAN_ID"],
+              "scan_token": os.environ["SCAN_TOKEN"],
+              "findings": findings,
+              "error": err if (not findings and err) else None,
+          }
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

@@ -62,8 +62,8 @@ const SCANNERS: ScannerDef[] = [
   // SAST
   { id: "semgrep", name: "Semgrep", connectorType: "semgrep", category: "sast", status: "live",
     description: "Open-source static analysis with curated rule packs. Runs in GitHub Actions via semgrep/semgrep image." },
-  { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "soon",
-    description: "GitHub's semantic code analysis. Connector configurable; workflow coming soon." },
+  { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "live",
+    description: "GitHub's semantic code analysis. Auto-detects language; runs the security-and-quality query suite in GitHub Actions." },
   { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
     description: "Community Edition (self-hosted) or Enterprise (SonarCloud via Action). Workflow coming soon." },
   // Network

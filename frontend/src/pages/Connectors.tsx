@@ -165,7 +165,7 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
 // Top-of-dialog quick-setup guidance per connector type. Shown above the form.
 const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   semgrep: "Point at a Git repo URL. For private repos, paste a PAT below. Semgrep runs `--config auto` (curated security rules) inside GitHub Actions.",
-  codeql: "GitHub-hosted repos work best. CodeQL workflow is not yet wired — the connector saves and tests, but Run will be enabled in a future release.",
+  codeql: "Point at a Git repo URL (public or PAT-accessible). The workflow auto-detects the language (JS/TS, Python, Go, Java/Kotlin, C#, Ruby, C/C++, Swift, Rust) and runs CodeQL's security-and-quality query suite in GitHub Actions.",
   sonarqube: "Either point at a self-hosted SonarQube server, or use SonarCloud (host=https://sonarcloud.io). Workflow coming soon.",
   nmap: "Scan a single host, IP, or CIDR. Requires explicit written authorisation from the network owner. Runs `nmap -Pn -sS -sV --top-ports 1000 --script=default,safe,vuln` inside GitHub Actions and posts findings back.",
   openvas: "Greenbone/OpenVAS scans the target IP/CIDR with the default profile. Workflow coming soon.",
