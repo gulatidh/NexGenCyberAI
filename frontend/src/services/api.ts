@@ -191,6 +191,22 @@ export const riskOverviewApi = {
     apiClient.get(`/clients/${clientId}/risk-overview/`, { params: { days } }).then((r) => r.data),
 };
 
+export const threatModelsApi = {
+  methodologies: () => apiClient.get(`/threat-models/methodologies`).then((r) => r.data),
+  list: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/`).then((r) => r.data),
+  get: (clientId: string, modelId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}`).then((r) => r.data),
+  create: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/threat-models/`, data).then((r) => r.data),
+  rescan: (clientId: string, modelId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/rescan`).then((r) => r.data),
+  versions: (clientId: string, modelId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/versions`).then((r) => r.data),
+  delete: (clientId: string, modelId: string) =>
+    apiClient.delete(`/clients/${clientId}/threat-models/${modelId}`),
+};
+
 export const adminApi = {
   me: () => apiClient.get("/admin/me").then((r) => r.data),
   listUsers: () => apiClient.get("/admin/users").then((r) => r.data),

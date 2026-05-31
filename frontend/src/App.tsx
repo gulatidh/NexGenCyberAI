@@ -27,6 +27,8 @@ import Technologies from "./pages/Technologies";
 import Admin from "./pages/Admin";
 import SyncPage from "./pages/Sync";
 import Help from "./pages/Help";
+import ThreatModels from "./pages/ThreatModels";
+import ThreatModelDetail from "./pages/ThreatModelDetail";
 import Reports from "./pages/Reports";
 import Account from "./pages/Account";
 import Missions from "./pages/Missions";
@@ -224,6 +226,8 @@ export default function App() {
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/sync" element={<SyncPage />} />
                   <Route path="/help" element={<Help />} />
+                  <Route path="/threat-models" element={<ThreatModels />} />
+                  <Route path="/threat-models/:modelId" element={<ThreatModelDetail />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/missions" element={<Missions />} />
                   <Route path="/knowledge" element={<KnowledgeBase />} />

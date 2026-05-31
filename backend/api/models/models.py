@@ -444,6 +444,57 @@ class AgentRun(Base):
     error_message = Column(Text)
 
 
+class ThreatModel(Base):
+    """A STRIDE-style threat model generated for a scope (Client or Project
+    or single Asset). Output of services/threat_modeler.py — a Threat
+    Modeler buddy reads asset inventory + recent findings + framework
+    catalog and produces structured JSON.
+
+    Schema mirrors what services.threat_modeler._normalise() enforces:
+      components_json    : [{id, name, type, trust_zone, criticality, …}]
+      data_flows_json    : [{from, to, protocol, data, encrypted}]
+      threats_json       : [{id, stride, asset_id, severity, evidence,
+                             capec_refs, attack_techniques, rationale}]
+      mitigations_json   : [{threat_id, action, control_id, status}]
+      dfd_mermaid        : flowchart TD … (Mermaid syntax)
+      executive_summary  : str
+
+    parent_threat_model_id links rescans to the root, same pattern as
+    scans.parent_scan_id — flat sibling graph for version history.
+    """
+    __tablename__ = "threat_models"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id"), index=True)
+    name = Column(String(200))
+    scope_type = Column(String(32))   # "client" | "project" | "asset"
+    scope_id = Column(String(36))     # null for client-wide
+    framework = Column(SAEnum(FrameworkType, values_callable=_ev))
+    # Threat modelling methodology — string (not enum) so adding new
+    # methodologies later doesn't require a DB migration. Currently
+    # supported: stride | pasta | linddun | mitre_attack | kill_chain.
+    methodology = Column(String(32), default="stride")
+    status = Column(String(32), default="pending")  # pending | generating | completed | failed
+    error_message = Column(Text)
+
+    components_json = Column(JSON, default=list)
+    data_flows_json = Column(JSON, default=list)
+    threats_json = Column(JSON, default=list)
+    mitigations_json = Column(JSON, default=list)
+    dfd_mermaid = Column(Text)
+    executive_summary = Column(Text)
+
+    ai_provider = Column(String(64))
+    ai_model = Column(String(128))
+    tokens_used = Column(Integer, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    generated_at = Column(DateTime(timezone=True))
+    initiated_by = Column(String(200))
+    parent_threat_model_id = Column(String(36), ForeignKey("threat_models.id"), nullable=True)
+
+
 class AISettings(Base):
     """Single-row table holding tenant-wide AI provider configuration. Lets
     admins override env-var keys/endpoints from the UI. API keys are stored

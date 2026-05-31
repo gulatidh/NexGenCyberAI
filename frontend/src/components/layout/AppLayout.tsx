@@ -9,7 +9,7 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook,
+  AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Assessments",    icon: <BugReport />,  path: "/scans" },
       { label: "Findings",       icon: <Security />,   path: "/findings" },
       { label: "Risk Register",  icon: <Assessment />, path: "/risks" },
+      { label: "Threat Models",  icon: <Hub />,        path: "/threat-models" },
       { label: "Asset Inventory", icon: <Storage />,   path: "/assets" },
       { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
       { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
