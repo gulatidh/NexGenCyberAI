@@ -181,6 +181,212 @@ def _stats_nvd_recent() -> Dict[str, Any]:
     return s
 
 
+# ── MITRE ATT&CK + CAPEC threat-library sync ────────────────────────────────
+
+
+_ATTACK_URL = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
+_CAPEC_URL = "https://raw.githubusercontent.com/mitre/cti/master/capec/2.1/stix-capec.json"
+
+
+def _upsert_library(rows: List[Dict[str, Any]], source: str) -> int:
+    """Bulk upsert into the threat_library table. Returns rows touched."""
+    from db.database import SessionLocal
+    from api.models.models import ThreatLibrary
+
+    if not rows:
+        return 0
+    db = SessionLocal()
+    touched = 0
+    try:
+        # Build a {source_id: row} map of existing entries for this source so
+        # we update in-place instead of N round-trips.
+        existing = {
+            r.source_id: r
+            for r in db.query(ThreatLibrary).filter(ThreatLibrary.source == source).all()
+        }
+        for row in rows:
+            sid = row.get("source_id")
+            if not sid:
+                continue
+            obj = existing.get(sid)
+            if obj is None:
+                obj = ThreatLibrary(source=source, source_id=sid)
+                db.add(obj)
+            obj.name = (row.get("name") or "")[:512]
+            obj.description = row.get("description") or ""
+            obj.category = row.get("category")
+            obj.severity_default = row.get("severity_default")
+            obj.mitigation_hint = row.get("mitigation_hint")
+            obj.related_cwes = row.get("related_cwes") or []
+            obj.extra = row.get("extra") or {}
+            touched += 1
+        db.commit()
+    finally:
+        db.close()
+    return touched
+
+
+def _sync_attack() -> Dict[str, Any]:
+    """Download the MITRE ATT&CK enterprise STIX bundle, extract every
+    attack-pattern object, and upsert into threat_library with
+    source='attack'. Stores tactic (initial_access, execution, …) in
+    `category` so the threat modeler can sample by tactic."""
+    import httpx
+    logger.info("Refreshing MITRE ATT&CK from %s", _ATTACK_URL)
+    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+        resp = client.get(_ATTACK_URL)
+        resp.raise_for_status()
+        bundle = resp.json()
+    rows: List[Dict[str, Any]] = []
+    for obj in bundle.get("objects", []) or []:
+        if obj.get("type") != "attack-pattern":
+            continue
+        if obj.get("revoked") or obj.get("x_mitre_deprecated"):
+            continue
+        # Pull T-id from external_references
+        tid = None
+        for ref in obj.get("external_references", []) or []:
+            if ref.get("source_name") == "mitre-attack":
+                tid = ref.get("external_id")
+                break
+        if not tid or not tid.startswith("T"):
+            continue
+        # Tactic from kill_chain_phases (mitre-attack)
+        tactics = []
+        for kc in obj.get("kill_chain_phases", []) or []:
+            if kc.get("kill_chain_name") == "mitre-attack":
+                tactics.append(kc.get("phase_name"))
+        rows.append({
+            "source_id": tid,
+            "name": obj.get("name") or tid,
+            "description": (obj.get("description") or "")[:4000],
+            "category": tactics[0] if tactics else None,
+            "severity_default": "high",  # ATT&CK techniques generally high-risk
+            "mitigation_hint": None,
+            "related_cwes": [],
+            "extra": {
+                "tactics": tactics,
+                "platforms": obj.get("x_mitre_platforms") or [],
+                "data_sources": obj.get("x_mitre_data_sources") or [],
+            },
+        })
+    n = _upsert_library(rows, source="attack")
+    _record_generic("attack", n)
+    return {"count": n}
+
+
+def _stats_attack() -> Dict[str, Any]:
+    from db.database import SessionLocal
+    from api.models.models import ThreatLibrary
+    n = 0
+    db = SessionLocal()
+    try:
+        n = db.query(ThreatLibrary).filter(ThreatLibrary.source == "attack").count()
+    except Exception:
+        # Table doesn't exist yet (e.g. before create_all). Treat as 0.
+        pass
+    finally:
+        db.close()
+    s = _generic_stats("attack")
+    s["count"] = n
+    return s
+
+
+# Mapping CAPEC top-level abstractions → STRIDE buckets. CAPEC doesn't
+# ship a clean STRIDE mapping so we use heuristics from CAPEC's "scope"
+# field if present, else leave category null.
+_CAPEC_STRIDE_KEYS = {
+    "spoofing": "spoofing",
+    "integrity": "tampering",
+    "non-repudiation": "repudiation",
+    "non repudiation": "repudiation",
+    "confidentiality": "information_disclosure",
+    "availability": "denial_of_service",
+    "authorization": "elevation_of_privilege",
+    "authorisation": "elevation_of_privilege",
+    "access control": "elevation_of_privilege",
+}
+
+
+def _capec_stride(obj: Dict[str, Any]) -> Optional[str]:
+    """Best-effort STRIDE bucket from CAPEC's 'scope' or 'consequences'."""
+    text_blobs: List[str] = []
+    for c in obj.get("x_capec_consequences", {}).values() if isinstance(obj.get("x_capec_consequences"), dict) else []:
+        if isinstance(c, list):
+            text_blobs.extend(x for x in c if isinstance(x, str))
+    text_blobs.append((obj.get("description") or "")[:200])
+    haystack = " ".join(text_blobs).lower()
+    for key, stride in _CAPEC_STRIDE_KEYS.items():
+        if key in haystack:
+            return stride
+    return None
+
+
+def _sync_capec() -> Dict[str, Any]:
+    """Download the CAPEC STIX bundle (mitre/cti) and upsert as source='capec'."""
+    import httpx
+    logger.info("Refreshing CAPEC from %s", _CAPEC_URL)
+    with httpx.Client(timeout=90.0, follow_redirects=True) as client:
+        resp = client.get(_CAPEC_URL)
+        resp.raise_for_status()
+        bundle = resp.json()
+    rows: List[Dict[str, Any]] = []
+    for obj in bundle.get("objects", []) or []:
+        if obj.get("type") != "attack-pattern":
+            continue
+        if obj.get("revoked") or obj.get("x_capec_status") == "Deprecated":
+            continue
+        cid = None
+        for ref in obj.get("external_references", []) or []:
+            if ref.get("source_name") == "capec":
+                cid = ref.get("external_id")
+                break
+        if not cid or not cid.startswith("CAPEC-"):
+            continue
+        # Pull CWE refs
+        cwes = [
+            ref.get("external_id")
+            for ref in (obj.get("external_references", []) or [])
+            if ref.get("source_name") == "cwe" and ref.get("external_id")
+        ]
+        # Severity from x_capec_likelihood_of_attack + typical_severity if present
+        sev_default = (obj.get("x_capec_typical_severity") or "").lower() or None
+        rows.append({
+            "source_id": cid,
+            "name": obj.get("name") or cid,
+            "description": (obj.get("description") or "")[:4000],
+            "category": _capec_stride(obj),
+            "severity_default": sev_default,
+            "mitigation_hint": (obj.get("x_capec_skills_required") or {}).get("High")
+                or (obj.get("x_capec_skills_required") or {}).get("Medium")
+                or None,
+            "related_cwes": cwes[:8],
+            "extra": {
+                "abstraction": obj.get("x_capec_abstraction"),
+                "likelihood": obj.get("x_capec_likelihood_of_attack"),
+            },
+        })
+    n = _upsert_library(rows, source="capec")
+    _record_generic("capec", n)
+    return {"count": n}
+
+
+def _stats_capec() -> Dict[str, Any]:
+    from db.database import SessionLocal
+    from api.models.models import ThreatLibrary
+    n = 0
+    db = SessionLocal()
+    try:
+        n = db.query(ThreatLibrary).filter(ThreatLibrary.source == "capec").count()
+    except Exception:
+        pass
+    finally:
+        db.close()
+    s = _generic_stats("capec")
+    s["count"] = n
+    return s
+
+
 def _sync_frameworks() -> Dict[str, Any]:
     """Re-run framework compliance recompute across every client.
 
@@ -284,6 +490,34 @@ REGISTRY: Dict[str, SyncFeed] = {
         sync_fn=_sync_frameworks,
         stats_fn=_stats_frameworks,
         item_label="clients recomputed",
+    ),
+    "attack": SyncFeed(
+        id="attack",
+        name="MITRE ATT&CK — Enterprise techniques",
+        category="threat_library",
+        description=(
+            "MITRE's enterprise adversary playbook. Stored in the threat_library "
+            "table so the Threat Modeler buddy can cite real T-IDs (T1190, T1078, "
+            "etc.) instead of hallucinating numbers."
+        ),
+        source_url="https://github.com/mitre/cti/tree/master/enterprise-attack",
+        sync_fn=_sync_attack,
+        stats_fn=_stats_attack,
+        item_label="techniques cached",
+    ),
+    "capec": SyncFeed(
+        id="capec",
+        name="MITRE CAPEC — Common Attack Pattern Enumeration",
+        category="threat_library",
+        description=(
+            "MITRE's catalog of attack patterns. Mapped to STRIDE buckets via "
+            "CAPEC's consequences scope. The Threat Modeler buddy cites CAPEC-NN "
+            "refs from this table instead of inventing them."
+        ),
+        source_url="https://capec.mitre.org/",
+        sync_fn=_sync_capec,
+        stats_fn=_stats_capec,
+        item_label="attack patterns cached",
     ),
 }
 

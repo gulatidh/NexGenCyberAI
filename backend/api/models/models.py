@@ -444,6 +444,35 @@ class AgentRun(Base):
     error_message = Column(Text)
 
 
+class ThreatLibrary(Base):
+    """Canonical threat-library entries — CAPEC patterns and MITRE ATT&CK
+    techniques, ingested via the Sync page. The Threat Modeler service
+    samples from this table to ground the LLM in real catalog IDs so it
+    doesn't hallucinate CAPEC numbers.
+
+    Indexed by (source, source_id) for fast lookup from the threat-model
+    detail page (tooltip on a CAPEC / ATT&CK chip).
+    """
+    __tablename__ = "threat_library"
+    __table_args__ = (
+        UniqueConstraint("source", "source_id", name="uq_threat_library_source_id"),
+    )
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    source = Column(String(32), nullable=False, index=True)   # "capec" | "attack"
+    source_id = Column(String(64), nullable=False, index=True)  # "CAPEC-66" | "T1190"
+    name = Column(String(512))
+    description = Column(Text)
+    # Methodology-agnostic bucket — STRIDE category for CAPEC entries where
+    # known, ATT&CK tactic for technique entries (e.g. "initial_access").
+    category = Column(String(64), index=True)
+    severity_default = Column(String(16))
+    mitigation_hint = Column(Text)
+    related_cwes = Column(JSON, default=list)
+    extra = Column(JSON, default=dict)          # tactic IDs, kill_chain_phases, etc.
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ThreatModel(Base):
     """A STRIDE-style threat model generated for a scope (Client or Project
     or single Asset). Output of services/threat_modeler.py — a Threat

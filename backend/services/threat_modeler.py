@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from api.models.models import (
-    Asset, Client, Connector, Finding, Project, Scan, ThreatModel,
+    Asset, Client, Connector, Finding, Project, Scan, ThreatLibrary, ThreatModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -248,7 +248,66 @@ def _build_system_prompt(methodology: str) -> str:
     )
 
 
-def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodology: str) -> str:
+def _library_sample(db: Session, methodology: str, limit: int = 25) -> List[Dict[str, Any]]:
+    """Pull up to `limit` library entries that the LLM should cite from.
+    Strategy per methodology:
+
+      - mitre_attack: source='attack', sampled across tactics
+      - stride / pasta / linddun / kill_chain: source='capec' first,
+        falling back to 'attack' if CAPEC isn't synced yet
+
+    Returns a list of dicts {source_id, name, category, description (short)}.
+    Empty list when no library data exists yet — generator works fine
+    without it (just won't be grounded in real catalog IDs)."""
+    try:
+        if methodology == "mitre_attack":
+            rows = (
+                db.query(ThreatLibrary)
+                .filter(ThreatLibrary.source == "attack")
+                .order_by(ThreatLibrary.category, ThreatLibrary.source_id)
+                .limit(limit * 3)
+                .all()
+            )
+        else:
+            rows = (
+                db.query(ThreatLibrary)
+                .filter(ThreatLibrary.source == "capec")
+                .order_by(ThreatLibrary.source_id)
+                .limit(limit * 2)
+                .all()
+            )
+            if not rows:
+                rows = (
+                    db.query(ThreatLibrary)
+                    .filter(ThreatLibrary.source == "attack")
+                    .limit(limit * 2)
+                    .all()
+                )
+    except Exception:
+        return []
+
+    # Diversify by category — pick at most N per bucket to avoid the
+    # prompt being dominated by one tactic.
+    per_cat: Dict[str, int] = {}
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        cat = r.category or "uncategorised"
+        per_cat[cat] = per_cat.get(cat, 0) + 1
+        if per_cat[cat] > 4:
+            continue
+        out.append({
+            "source_id": r.source_id,
+            "name": (r.name or "")[:160],
+            "category": cat,
+            "summary": (r.description or "")[:200].replace("\n", " "),
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodology: str,
+                       library: Optional[List[Dict[str, Any]]] = None) -> str:
     spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
     parts: List[str] = [
         "## Scope",
@@ -272,6 +331,16 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
                      f"(CVE={f['cve'] or '—'}, CVSS={f['cvss'] or '—'}, control={f['control'] or '—'})")
     if not scope["findings"]:
         parts.append("- (no findings yet — model purely from architecture)")
+
+    if library:
+        parts.append("")
+        parts.append(
+            f"## Threat library — cite from THIS list only (CAPEC / ATT&CK refs MUST be real IDs from below)"
+        )
+        for entry in library:
+            parts.append(f"- {entry['source_id']} ({entry['category'] or 'misc'}): {entry['name']} — {entry['summary']}")
+        parts.append("")
+        parts.append("If a threat doesn't map to any entry above, leave its capec_refs / attack_techniques arrays empty rather than inventing IDs.")
 
     parts.append("")
     parts.append(f"Produce the {spec['label']} threat model now. STRICT JSON only.")
@@ -360,6 +429,7 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
 
 async def _invoke_llm(
     scope: Dict[str, Any], framework: Optional[str], methodology: str,
+    library: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Call configured LLM. Returns the normalised model. Falls back to a
     deterministic skeleton when no provider is available."""
@@ -371,7 +441,7 @@ async def _invoke_llm(
         logger.warning("Threat modeler LLM unavailable, returning skeleton: %s", exc)
         return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0}
 
-    user_prompt = _build_user_prompt(scope, framework, methodology)
+    user_prompt = _build_user_prompt(scope, framework, methodology, library=library)
     try:
         result = await llm.ainvoke([
             SystemMessage(content=_build_system_prompt(methodology)),
@@ -458,7 +528,8 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         methodology = (tm.methodology or DEFAULT_METHODOLOGY).lower()
         if methodology not in METHODOLOGIES:
             methodology = DEFAULT_METHODOLOGY
-        model, meta = await _invoke_llm(scope, fw, methodology)
+        library = _library_sample(db, methodology)
+        model, meta = await _invoke_llm(scope, fw, methodology, library=library)
 
         tm.components_json = model["components"]
         tm.data_flows_json = model["data_flows"]

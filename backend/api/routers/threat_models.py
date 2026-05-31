@@ -35,6 +35,43 @@ async def list_methodologies(_=Depends(get_current_user)):
     return {"methodologies": methodology_catalog(), "default": DEFAULT_METHODOLOGY}
 
 
+@methodology_router.get("/library/{source}/{source_id}")
+async def get_library_entry(
+    source: str,
+    source_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Look up a single threat-library entry. Powers the tooltip on a
+    CAPEC / ATT&CK chip on the Threat Model detail page so the user can
+    see what a reference actually means."""
+    from api.models.models import ThreatLibrary
+    src = (source or "").lower()
+    if src not in ("capec", "attack"):
+        raise HTTPException(status_code=400, detail="source must be 'capec' or 'attack'")
+    row = (
+        db.query(ThreatLibrary)
+        .filter(ThreatLibrary.source == src, ThreatLibrary.source_id == source_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{source_id} not in cache — run a Sync to refresh the threat library.",
+        )
+    return {
+        "source": row.source,
+        "source_id": row.source_id,
+        "name": row.name,
+        "description": row.description,
+        "category": row.category,
+        "severity_default": row.severity_default,
+        "mitigation_hint": row.mitigation_hint,
+        "related_cwes": row.related_cwes or [],
+        "extra": row.extra or {},
+    }
+
+
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
 

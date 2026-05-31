@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import DfdDiagram from "../components/DfdDiagram";
+import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 interface Component {
   id: string; name: string; type: string;
@@ -337,10 +338,10 @@ export default function ThreatModelDetail() {
                         )}
                         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                           {(t.capec_refs || []).map((c) => (
-                            <Chip key={c} label={c} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />
+                            <ThreatLibraryChip key={c} source="capec" sourceId={c} />
                           ))}
                           {(t.attack_techniques || []).map((a) => (
-                            <Chip key={a} label={`ATT&CK ${a}`} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
+                            <ThreatLibraryChip key={a} source="attack" sourceId={a} label={`ATT&CK ${a}`} />
                           ))}
                           {t.evidence && (
                             <Chip label={`Evidence: ${t.evidence}`} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04" }} />

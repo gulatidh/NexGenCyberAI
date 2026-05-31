@@ -193,6 +193,8 @@ export const riskOverviewApi = {
 
 export const threatModelsApi = {
   methodologies: () => apiClient.get(`/threat-models/methodologies`).then((r) => r.data),
+  libraryEntry: (source: string, sourceId: string) =>
+    apiClient.get(`/threat-models/library/${source}/${encodeURIComponent(sourceId)}`).then((r) => r.data),
   list: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/`).then((r) => r.data),
   get: (clientId: string, modelId: string) =>
