@@ -13,9 +13,9 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
-  TableBody, Divider, Tooltip,
+  TableBody, Divider, Tooltip, IconButton,
 } from "@mui/material";
-import { ArrowBack, Hub, Replay, Print } from "@mui/icons-material";
+import { ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
@@ -46,6 +46,7 @@ interface ThreatModelDetailData {
   generated_at?: string | null; created_at?: string | null;
   ai_provider?: string | null; ai_model?: string | null;
   error_message?: string | null;
+  converted_threat_ids?: string[];
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -94,6 +95,34 @@ export default function ThreatModelDetail() {
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to re-model"),
   });
 
+  const convertOne = useMutation({
+    mutationFn: (threatId: string) => threatModelsApi.convertThreat(clientId, modelId!, threatId),
+    onSuccess: (resp: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      qc.invalidateQueries({ queryKey: ["risks", clientId] });
+      toast.success(resp?.created ? "Risk created" : "Risk already exists for this threat");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to convert"),
+  });
+
+  const convertAll = useMutation({
+    mutationFn: () => threatModelsApi.convertAll(clientId, modelId!),
+    onSuccess: (resp: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      qc.invalidateQueries({ queryKey: ["risks", clientId] });
+      const created = resp?.created ?? 0;
+      const skipped = resp?.skipped ?? 0;
+      if (created === 0 && skipped > 0) {
+        toast.info(`Every threat is already in the Risk Register (${skipped} skipped)`);
+      } else if (created > 0 && skipped > 0) {
+        toast.success(`Added ${created} new risk${created === 1 ? "" : "s"} · skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}`);
+      } else {
+        toast.success(`Added ${created} risk${created === 1 ? "" : "s"} to the register`);
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Bulk convert failed"),
+  });
+
   if (isLoading) {
     return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   }
@@ -115,6 +144,10 @@ export default function ThreatModelDetail() {
   for (const m of data.mitigations) {
     (mitigationsByThreat[m.threat_id] = mitigationsByThreat[m.threat_id] || []).push(m);
   }
+  // IDs of threats already converted into Risk Register entries — disables
+  // per-row Convert buttons and powers the bulk action's count badge.
+  const convertedSet = new Set<string>(data.converted_threat_ids || []);
+  const newCount = data.threats.filter((t) => !convertedSet.has(t.id)).length;
 
   return (
     <Box className="tm-print-area">
@@ -301,6 +334,33 @@ export default function ThreatModelDetail() {
       {/* THREATS — grouped by category */}
       {tab === "threats" && (
         <>
+          {data.threats.length > 0 && (
+            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, mb: 1.5 }}>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)" }}>
+                {convertedSet.size > 0
+                  ? `${convertedSet.size} of ${data.threats.length} already in Risk Register`
+                  : "Convert threats into trackable Risk Register entries"}
+              </Typography>
+              <Tooltip title={newCount === 0 ? "Every threat is already in the Risk Register" : `Create ${newCount} new risk${newCount === 1 ? "" : "s"}; skip ${convertedSet.size} duplicate${convertedSet.size === 1 ? "" : "s"}`}>
+                <span>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={convertAll.isPending ? <CircularProgress size={14} sx={{ color: "#34A853" }} /> : <PlaylistAddCheck />}
+                    disabled={newCount === 0 || convertAll.isPending}
+                    onClick={() => convertAll.mutate()}
+                    sx={{
+                      color: "#34A853", borderColor: "rgba(52,168,83,0.5)", textTransform: "none", fontWeight: 600,
+                      "&:hover": { borderColor: "#34A853", bgcolor: "rgba(52,168,83,0.08)" },
+                      "&.Mui-disabled": { color: "rgba(52,168,83,0.4)", borderColor: "rgba(52,168,83,0.2)" },
+                    }}
+                  >
+                    {newCount === 0 ? "All converted" : `Convert ${newCount} to Risk Register`}
+                  </Button>
+                </span>
+              </Tooltip>
+            </Box>
+          )}
           {Object.keys(threatsByCat).length === 0 ? (
             <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
@@ -330,6 +390,25 @@ export default function ThreatModelDetail() {
                           <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)" }}>
                             on <b>{compName.get(t.asset_id) || t.asset_id || "—"}</b>
                           </Typography>
+                          <Tooltip title={convertedSet.has(t.id) ? "Already in Risk Register" : "Convert this threat to a Risk Register entry"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                className="no-print"
+                                disabled={convertedSet.has(t.id) || (convertOne.isPending && convertOne.variables === t.id)}
+                                onClick={() => convertOne.mutate(t.id)}
+                                sx={{
+                                  color: convertedSet.has(t.id) ? "rgba(52,168,83,0.5)" : "#34A853",
+                                  "&:hover": { bgcolor: "rgba(52,168,83,0.12)" },
+                                  "&.Mui-disabled": { color: "rgba(52,168,83,0.4)" },
+                                }}
+                              >
+                                {convertOne.isPending && convertOne.variables === t.id
+                                  ? <CircularProgress size={14} sx={{ color: "#34A853" }} />
+                                  : <AddTask sx={{ fontSize: 18 }} />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                         </Box>
                         {t.rationale && (
                           <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", lineHeight: 1.5, mb: 0.75 }}>

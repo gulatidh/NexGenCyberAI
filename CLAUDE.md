@@ -25,7 +25,7 @@ AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). 
 │   │                          clients, scans, scans_overview, scans_runner,
 │   │                          findings, risks, risk_portfolio, agents,
 │   │                          agent_catalog, frameworks, missions, knowledge,
-│   │                          admin, ai_settings, technologies, …
+│   │                          threat_models, admin, ai_settings, technologies, …
 │   ├── connectors/           Cloud + scanner connectors
 │   │   ├── base.py           BaseConnector, ConnectorFinding, FindingSeverity
 │   │   ├── factory.py        get_connector(type, creds, config) dispatcher
@@ -58,6 +58,14 @@ AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). 
 │   │   ├── scan_binaries.py  Local filesystem store for CodeQL --build-mode=none
 │   │   │                     uploads (/home/data/uploads/<scan_id>/...). 30-day
 │   │   │                     cleanup loop, scheduled in main.py.
+│   │   ├── threat_modeler.py On-demand AI threat-model generator. Pulls scope
+│   │   │                     (assets/findings/connectors), samples up to 25
+│   │   │                     diversified CAPEC/ATT&CK library entries, calls
+│   │   │                     the LLM with a methodology-specific prompt
+│   │   │                     (STRIDE / PASTA / LINDDUN / MITRE ATT&CK / Kill Chain),
+│   │   │                     enforces a fixed JSON output schema, persists to
+│   │   │                     ThreatModel. Falls back to deterministic skeleton
+│   │   │                     when no LLM is configured.
 │   │   ├── mission_scheduler.py APScheduler in-process cron for workflows
 │   │   ├── mission_executor.py Dispatches a ScheduledMission to its handler
 │   │   ├── mission_reports.py  Standardised AI report (7 fixed sections) per run
@@ -74,7 +82,8 @@ AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). 
 ├── frontend/                 React 18 + TypeScript + MUI v6
 │   └── src/
 │       ├── pages/            Dashboard, RiskOverview, Clients, Scans (Assessments),
-│       │                     ScanDetail, Findings, Risks (Risk Register), Assets,
+│       │                     ScanDetail, Findings, Risks (Risk Register),
+│       │                     ThreatModels, ThreatModelDetail, Assets,
 │       │                     Technologies, AssetDetail, Frameworks, Agents,
 │       │                     Missions (Workflows), KnowledgeBase, Reports,
 │       │                     AISettings, Admin, Sync, Account, …
@@ -86,6 +95,8 @@ AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). 
 │           ├── RichOutput.tsx Markdown renderer for agent output (dark theme +
 │           │                  conversational-tail stripping + risk_register table)
 │           ├── AgentInsightCard.tsx Tile-style expandable agent run card
+│           ├── DfdDiagram.tsx Lazy-loaded Mermaid renderer for threat-model DFDs
+│           ├── ThreatLibraryChip.tsx Hover-to-fetch CAPEC/ATT&CK chip tooltip
 │           ├── technologies/, risk-overview/  Tokens + presentational pieces
 └── infrastructure/terraform/ Azure infrastructure as code
     ├── main.tf, variables.tf, outputs.tf
@@ -153,7 +164,7 @@ Single environment (cost-optimised — prod App Services are provisioned on dema
 
 `AppLayout.tsx` defines two nav groups:
 
-**Main workflow**: Dashboard · Risk Overview · Clients · Assessments (Scans) · Findings · Risk Register (Risks) · Asset Inventory · Technologies · Frameworks · AI Buddies (the operational + advisory agents catalog) · Workflows (Missions) · Knowledge Base · Reports
+**Main workflow**: Dashboard · Risk Overview · Clients · Assessments (Scans) · Findings · Risk Register (Risks) · Threat Models · Asset Inventory · Technologies · Frameworks · AI Buddies (the operational + advisory agents catalog) · Workflows (Missions) · Knowledge Base · Reports
 
 **Settings** (some admin-only): AI Settings · Sync · Administration · Help
 
@@ -165,6 +176,7 @@ Routes live in `App.tsx`. Connectors and Projects no longer have top-level nav �
 - **ScanDetail** (`/scans/:scanId`) — top tabs: Verdict / Findings / one per agent run. Verdict tab renders the structured AI verdict (The Verdict, What We Found, Why It Matters, Executive Summary, Capability Gaps, Signal Coverage, Attack Paths, Vendor Scorecard, RPS factor breakdown with evidenced/estimated/unknown tags, Data Completeness, Automation Opportunities). Per-finding delete in the Findings table. Print/PDF button at top expands every tab + applies print stylesheet.
 - **Findings** (`/findings`) — section tabs + category tiles + sortable table. Per-row delete + "Delete blank findings" toolbar button.
 - **Risk Register** (`/risks`) — KPI strip + severity donut + Top 5 + slicer chips + table + **AI Agent Risk Analysis** tile grid. Each agent run is a tile with heading/status/summary; click to expand; only one open at a time.
+- **Threat Models** (`/threat-models`) — On-demand AI threat modelling. List page tile grid (one tile per model, collapsed by version chain) + Create dialog with methodology picker (STRIDE / PASTA / LINDDUN / MITRE ATT&CK / Lockheed Kill Chain). Detail page has 4 tabs: Diagram (Mermaid DFD) / Components / Threats (with hoverable CAPEC + ATT&CK chips citing real library IDs) / Mitigations. Each threat row has an "Add to Risk Register" icon, and the Threats tab header has a bulk "Convert N to Risk Register" button — converted threats are pinned to their Risk via `risks.source_threat_model_id` + `source_threat_id` so duplicates are skipped. Polls every 4s while status is `generating`. Rescan + version history mirror the Assessments pattern.
 - **Risk Overview** (`/risk-overview`) — Risk Portfolio dashboard. FAIR-lite ALE: Total/Net Exposure, Open Critical/High, 30-Day Breach Probability. Risk-by-domain bar chart, full risk table with ALE range, Remediation status, Source link.
 - **Workflows** (`/missions`) — scheduled missions (cron picker + presets). History drawer per row; "View Report" opens the standardised PDF-ready report dialog (KPI strip + 7 fixed sections).
 - **Knowledge Base** (`/knowledge`) — pre-seeded files in categories, expandable cards, search, stats endpoint.
@@ -251,6 +263,43 @@ Auto-generated on scan completion via the `BackgroundTasks` queue in `/scans/ing
 
 ---
 
+## Threat Modelling
+
+On-demand threat models scoped to a client (and optionally a project / asset). Five methodologies supported in one engine:
+
+| Methodology | Categories used for `threats[].category` |
+|---|---|
+| STRIDE | spoofing · tampering · repudiation · information_disclosure · denial_of_service · elevation_of_privilege |
+| PASTA | technical_attack · business_impact · application_threat · attack_vector · countermeasure |
+| LINDDUN | linking · identifying · non_repudiation · detecting · data_disclosure · unawareness · non_compliance |
+| MITRE ATT&CK | initial_access · execution · persistence · privilege_escalation · defense_evasion · credential_access · discovery · lateral_movement · collection · exfiltration · impact |
+| Lockheed Kill Chain | reconnaissance · weaponization · delivery · exploitation · installation · command_and_control · actions_on_objectives |
+
+**Generation flow** (`services/threat_modeler.py`):
+1. `_collect_scope()` pulls assets, recent findings, and connector summary for the chosen scope from the DB
+2. `_library_sample()` pulls up to 25 diversified `ThreatLibrary` entries (≤4 per category), preferring ATT&CK for `mitre_attack` methodology and CAPEC otherwise (falls back to ATT&CK when CAPEC isn't synced)
+3. `_build_system_prompt()` + `_build_user_prompt()` inject methodology-specific guidance plus a "Threat library — cite from THIS list only" block when library entries are present. Each threat's `capec_refs` / `attack_techniques` must come from the listed IDs (empty arrays allowed if nothing matches)
+4. LLM call returns JSON; `_normalise()` enforces the fixed schema (`executive_summary`, `components`, `data_flows`, `threats`, `mitigations`, `dfd_mermaid`)
+5. Persisted to `ThreatModel`; the detail page polls every 4s while `status == "generating"`
+
+**Versioning**: `parent_threat_model_id` mirrors the `Scan.parent_scan_id` flat-sibling chain — first ancestor with `parent_threat_model_id IS NULL` is the root. Rescan creates a new row linked to the root; list endpoint collapses to newest sibling per root.
+
+**Library tooltip**: Frontend `ThreatLibraryChip.tsx` lazy-fetches `GET /threat-models/library/{source}/{source_id}` on hover and shows `source_id · name · category · description · CWEs`. Returns 404 with a "run Sync" hint when the entry isn't cached yet.
+
+**Endpoints**:
+- `GET /threat-models/methodologies` — public catalog for the create-dialog picker (returns labels + descriptions + default)
+- `GET /threat-models/library/{source}/{source_id}` — chip tooltip lookup
+- `POST /clients/{cid}/threat-models/` — create + kick off background generation
+- `GET /clients/{cid}/threat-models/` — list, collapsed by version chain
+- `GET /clients/{cid}/threat-models/{id}` — full detail (poll for status)
+- `GET /clients/{cid}/threat-models/{id}/versions` — every sibling in the chain
+- `POST /clients/{cid}/threat-models/{id}/rescan` — new version with same scope + methodology
+- `POST /clients/{cid}/threat-models/{id}/threats/{tid}/convert-to-risk` — create one Risk from a single threat (idempotent: returns existing risk_id if already converted)
+- `POST /clients/{cid}/threat-models/{id}/convert-all-to-risks` — bulk-create risks for every unconverted threat. Returns `{created, skipped, risk_ids}`
+- `DELETE /clients/{cid}/threat-models/{id}` — delete one row
+
+---
+
 ## Rescan + version history
 
 Every Assessment tile has a Replay icon (`POST /clients/{cid}/scans/{sid}/rescan`). Rescan creates a fresh `Scan` row reusing the original's connector / scan_type / framework / name, then dispatches as a normal scan. The new row sets `parent_scan_id` to the **root** of the chain (first ancestor whose `parent_scan_id` is NULL) so siblings stay flat — not a deep parent → parent chain.
@@ -296,6 +345,8 @@ Admin-triggered, **manual on-demand only** — there is no automatic schedule. F
 | EPSS | https://epss.cyentia.com/epss_scores-current.csv.gz | Per-CVE exploit probability |
 | CISA KEV | https://www.cisa.gov/.../known_exploited_vulnerabilities.json | CVEs confirmed exploited in the wild |
 | NVD Recent | https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz | 8-day rolling window — CVSS v3, CWE list, descriptions for finding enrichment |
+| MITRE ATT&CK | https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json | ~600 Enterprise techniques, written into `threat_library` (source=`attack`). Cited by the Threat Modeler when methodology is `mitre_attack` (and as a fallback for others) |
+| MITRE CAPEC | https://raw.githubusercontent.com/mitre/cti/master/capec/2.1/stix-capec.json | ~550 attack patterns, mapped to STRIDE buckets via `x_capec_consequences` heuristic. Cited by the Threat Modeler for STRIDE / PASTA / LINDDUN / Kill Chain methodologies |
 | Frameworks | bundled (no network) | Recompute compliance for every client using bundled catalogs |
 
 Caches persist to `backend/data/`:

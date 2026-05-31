@@ -178,6 +178,34 @@ def _ensure_added_columns() -> None:
                 logger.info("Added scheduled_mission_runs.report column (%s)", dialect)
             except Exception as exc:
                 logger.warning("scheduled_mission_runs.report ALTER failed: %s", exc)
+
+        # Add risks.source_threat_model_id + risks.source_threat_id — pin a
+        # Risk row back to the threat it was converted from so the UI can
+        # disable the convert button on already-converted threats.
+        try:
+            risk_cols = {c["name"] for c in inspector.get_columns("risks")}
+        except Exception:
+            risk_cols = set()
+        if risk_cols and "source_threat_model_id" not in risk_cols:
+            ddl = ("ALTER TABLE risks ADD source_threat_model_id NVARCHAR(36) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE risks ADD COLUMN source_threat_model_id VARCHAR(36)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added risks.source_threat_model_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("risks.source_threat_model_id ALTER failed: %s", exc)
+        if risk_cols and "source_threat_id" not in risk_cols:
+            ddl = ("ALTER TABLE risks ADD source_threat_id NVARCHAR(64) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE risks ADD COLUMN source_threat_id VARCHAR(64)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added risks.source_threat_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("risks.source_threat_id ALTER failed: %s", exc)
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

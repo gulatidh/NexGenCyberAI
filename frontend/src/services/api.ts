@@ -207,6 +207,10 @@ export const threatModelsApi = {
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/versions`).then((r) => r.data),
   delete: (clientId: string, modelId: string) =>
     apiClient.delete(`/clients/${clientId}/threat-models/${modelId}`),
+  convertThreat: (clientId: string, modelId: string, threatId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}/convert-to-risk`).then((r) => r.data),
+  convertAll: (clientId: string, modelId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/convert-all-to-risks`).then((r) => r.data),
 };
 
 export const adminApi = {

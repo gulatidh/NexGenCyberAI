@@ -15,12 +15,25 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.models.models import Client, FrameworkType, Project, ThreatModel
+from api.models.models import Client, FrameworkType, Project, Risk, RiskLevel, ThreatModel
 from db.database import get_db
 from core.security import get_current_user
 from services.threat_modeler import (
     DEFAULT_METHODOLOGY, METHODOLOGIES, generate_threat_model_bg, methodology_catalog,
 )
+
+
+# Severity → (likelihood, impact, RiskLevel) for the threat→risk mapping.
+# Keep the dimensions modest: a single high-severity threat shouldn't
+# necessarily mean catastrophe — likelihood / impact get tuned in the
+# Risk Register afterwards.
+_SEV_TO_RISK: Dict[str, tuple[int, int, RiskLevel]] = {
+    "critical": (5, 5, RiskLevel.CRITICAL),
+    "high": (4, 4, RiskLevel.HIGH),
+    "medium": (3, 3, RiskLevel.MEDIUM),
+    "low": (2, 2, RiskLevel.LOW),
+    "info": (1, 2, RiskLevel.LOW),
+}
 
 router = APIRouter(prefix="/clients/{client_id}/threat-models", tags=["threat-models"])
 
@@ -115,6 +128,16 @@ class ThreatModelDetail(ThreatModelSummary):
     ai_provider: Optional[str] = None
     ai_model: Optional[str] = None
     tokens_used: int = 0
+    # IDs of threats already converted to Risk Register entries — UI uses
+    # this to grey out the per-row Convert button and tell the bulk action
+    # how many threats are new vs. already converted.
+    converted_threat_ids: List[str] = []
+
+
+class ConvertResult(BaseModel):
+    created: int
+    skipped: int
+    risk_ids: List[str] = []
 
 
 def _summary_from(tm: ThreatModel) -> Dict[str, Any]:
@@ -138,7 +161,14 @@ def _summary_from(tm: ThreatModel) -> Dict[str, Any]:
     }
 
 
-def _detail_from(tm: ThreatModel) -> Dict[str, Any]:
+def _detail_from(tm: ThreatModel, db: Optional[Session] = None) -> Dict[str, Any]:
+    converted: List[str] = []
+    if db is not None:
+        converted = [
+            sid for (sid,) in db.query(Risk.source_threat_id)
+            .filter(Risk.source_threat_model_id == tm.id, Risk.source_threat_id.isnot(None))
+            .all()
+        ]
     return {
         **_summary_from(tm),
         "executive_summary": tm.executive_summary,
@@ -150,7 +180,60 @@ def _detail_from(tm: ThreatModel) -> Dict[str, Any]:
         "ai_provider": tm.ai_provider,
         "ai_model": tm.ai_model,
         "tokens_used": tm.tokens_used or 0,
+        "converted_threat_ids": converted,
     }
+
+
+def _threat_to_risk(
+    *,
+    tm: ThreatModel,
+    threat: Dict[str, Any],
+    mitigations: List[Dict[str, Any]],
+    user: dict,
+) -> Risk:
+    """Build a Risk ORM object from a single threat + its mitigations."""
+    sev = (threat.get("severity") or "medium").lower()
+    likelihood, impact, level = _SEV_TO_RISK.get(sev, _SEV_TO_RISK["medium"])
+
+    desc_parts: List[str] = []
+    if threat.get("rationale"):
+        desc_parts.append(threat["rationale"])
+    refs: List[str] = []
+    for c in threat.get("capec_refs") or []:
+        refs.append(str(c))
+    for a in threat.get("attack_techniques") or []:
+        refs.append(f"ATT&CK {a}")
+    if refs:
+        desc_parts.append("References: " + ", ".join(refs))
+    if threat.get("evidence"):
+        desc_parts.append(f"Evidence: {threat['evidence']}")
+    desc_parts.append(
+        f"Sourced from threat model · {tm.methodology or 'stride'} · threat {threat.get('id', '')}"
+    )
+
+    mit_lines: List[str] = []
+    for m in mitigations:
+        line = f"{m.get('id', '')}: {m.get('action', '')}".strip(": ")
+        if m.get("control_id"):
+            line += f" (control {m['control_id']})"
+        mit_lines.append(line)
+
+    return Risk(
+        client_id=tm.client_id,
+        title=(threat.get("title") or f"Threat {threat.get('id', '')}")[:500],
+        description="\n\n".join(p for p in desc_parts if p),
+        risk_level=level,
+        likelihood=likelihood,
+        impact=impact,
+        risk_score=round(likelihood * impact / 2.5, 1),
+        category=(threat.get("category") or "").replace("_", " ").title() or None,
+        owner=user.get("upn") or user.get("preferred_username"),
+        status="open",
+        mitigation_plan="\n".join(mit_lines) if mit_lines else None,
+        finding_ids=[],
+        source_threat_model_id=tm.id,
+        source_threat_id=str(threat.get("id") or ""),
+    )
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -235,7 +318,7 @@ async def get_threat_model(
     ).first()
     if not tm:
         raise HTTPException(status_code=404, detail="Threat model not found")
-    return _detail_from(tm)
+    return _detail_from(tm, db=db)
 
 
 @router.get("/{model_id}/versions", response_model=List[ThreatModelSummary])
@@ -294,6 +377,89 @@ async def rescan(
     db.refresh(new)
     background_tasks.add_task(generate_threat_model_bg, new.id)
     return _summary_from(new)
+
+
+@router.post("/{model_id}/threats/{threat_id}/convert-to-risk", status_code=201)
+async def convert_threat_to_risk(
+    client_id: str,
+    model_id: str,
+    threat_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Create a Risk Register entry from a single threat in this model.
+
+    Idempotent: if a Risk already exists for (model_id, threat_id), return
+    the existing one with 200 instead of 201."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+
+    existing = (
+        db.query(Risk)
+        .filter(Risk.source_threat_model_id == tm.id, Risk.source_threat_id == threat_id)
+        .first()
+    )
+    if existing:
+        return {"risk_id": existing.id, "created": False}
+
+    threats = tm.threats_json or []
+    threat = next((t for t in threats if str(t.get("id")) == threat_id), None)
+    if not threat:
+        raise HTTPException(status_code=404, detail=f"Threat {threat_id} not in model")
+
+    mitigations = [m for m in (tm.mitigations_json or []) if str(m.get("threat_id")) == threat_id]
+    risk = _threat_to_risk(tm=tm, threat=threat, mitigations=mitigations, user=user)
+    db.add(risk)
+    db.commit()
+    db.refresh(risk)
+    return {"risk_id": risk.id, "created": True}
+
+
+@router.post("/{model_id}/convert-all-to-risks", response_model=ConvertResult)
+async def convert_all_threats_to_risks(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Bulk-convert every threat in the model to Risk Register entries,
+    skipping any that already have a Risk for this (model_id, threat_id)."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+
+    already = {
+        sid for (sid,) in db.query(Risk.source_threat_id)
+        .filter(Risk.source_threat_model_id == tm.id, Risk.source_threat_id.isnot(None))
+        .all()
+    }
+    mitigations_by_threat: Dict[str, List[Dict[str, Any]]] = {}
+    for m in tm.mitigations_json or []:
+        mitigations_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
+
+    created_ids: List[str] = []
+    skipped = 0
+    for threat in tm.threats_json or []:
+        tid = str(threat.get("id") or "")
+        if not tid:
+            skipped += 1
+            continue
+        if tid in already:
+            skipped += 1
+            continue
+        risk = _threat_to_risk(
+            tm=tm, threat=threat, mitigations=mitigations_by_threat.get(tid, []), user=user,
+        )
+        db.add(risk)
+        db.flush()
+        created_ids.append(risk.id)
+    db.commit()
+    return ConvertResult(created=len(created_ids), skipped=skipped, risk_ids=created_ids)
 
 
 @router.delete("/{model_id}", status_code=204)

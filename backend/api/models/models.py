@@ -312,6 +312,11 @@ class Risk(Base):
     status = Column(String(50), default="open")
     mitigation_plan = Column(Text)
     finding_ids = Column(JSON, default=[])
+    # When a Risk row is created by "Convert to Risk Register" on a threat
+    # model, these pin it back to the originating threat so the UI can flag
+    # already-converted threats and avoid duplicates on bulk convert.
+    source_threat_model_id = Column(String(36), ForeignKey("threat_models.id"), nullable=True, index=True)
+    source_threat_id = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
