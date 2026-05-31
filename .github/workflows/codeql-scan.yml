@@ -110,22 +110,25 @@ jobs:
         if: steps.cfg.outputs.repo_url != ''
         run: |
           set -uo pipefail
-          # Map our detected language to the right query suite shipped in
-          # the bundle. CodeQL CLI accepts the suite ID directly.
+          # CodeQL pack reference is "<pack>:<path-in-pack>". Each language
+          # has its own queries pack; the security-and-quality suite lives
+          # at codeql-suites/<lang>-security-and-quality.qls inside it.
           LANG="${{ steps.lang.outputs.language }}"
           case "$LANG" in
-            javascript-typescript) SUITE="javascript-security-and-quality.qls" ;;
-            python)                SUITE="python-security-and-quality.qls" ;;
-            go)                    SUITE="go-security-and-quality.qls" ;;
-            java-kotlin)           SUITE="java-security-and-quality.qls" ;;
-            csharp)                SUITE="csharp-security-and-quality.qls" ;;
-            ruby)                  SUITE="ruby-security-and-quality.qls" ;;
-            cpp)                   SUITE="cpp-security-and-quality.qls" ;;
-            swift)                 SUITE="swift-security-and-quality.qls" ;;
-            rust)                  SUITE="rust-security-and-quality.qls" ;;
-            *)                     SUITE="javascript-security-and-quality.qls" ;;
+            javascript-typescript) PACK="codeql/javascript-queries"; SUITE="javascript-security-and-quality.qls" ;;
+            python)                PACK="codeql/python-queries";     SUITE="python-security-and-quality.qls" ;;
+            go)                    PACK="codeql/go-queries";         SUITE="go-security-and-quality.qls" ;;
+            java-kotlin)           PACK="codeql/java-queries";       SUITE="java-security-and-quality.qls" ;;
+            csharp)                PACK="codeql/csharp-queries";     SUITE="csharp-security-and-quality.qls" ;;
+            ruby)                  PACK="codeql/ruby-queries";       SUITE="ruby-security-and-quality.qls" ;;
+            cpp)                   PACK="codeql/cpp-queries";        SUITE="cpp-security-and-quality.qls" ;;
+            swift)                 PACK="codeql/swift-queries";      SUITE="swift-security-and-quality.qls" ;;
+            rust)                  PACK="codeql/rust-queries";       SUITE="rust-security-and-quality.qls" ;;
+            *)                     PACK="codeql/javascript-queries"; SUITE="javascript-security-and-quality.qls" ;;
           esac
-          codeql database analyze db "codeql/$SUITE" \
+          QUERY_REF="${PACK}:codeql-suites/${SUITE}"
+          echo "Running CodeQL analysis with $QUERY_REF"
+          codeql database analyze db "$QUERY_REF" \
             --format=sarif-latest \
             --output=results.sarif \
             --threads=0 \
