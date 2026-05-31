@@ -55,17 +55,22 @@ jobs:
               repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
           else:
               repo_auth = repo
+          binary = c.get("binary_filename") or ""
+          mode = "binary" if binary else ("source" if repo else "none")
           print(f"repo_url={repo}")
           print(f"repo_clone_url={repo_auth}")
+          print(f"binary_filename={binary}")
+          print(f"mode={mode}")
           PY
 
+      # ── Source mode (clone repo, autodetect language from manifests) ────
       - name: Clone target repo
-        if: steps.cfg.outputs.repo_url != ''
+        if: steps.cfg.outputs.mode == 'source'
         run: |
           git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
 
-      - name: Detect language
-        if: steps.cfg.outputs.repo_url != ''
+      - name: Detect language (source mode)
+        if: steps.cfg.outputs.mode == 'source'
         id: lang
         run: |
           set -euo pipefail
@@ -84,19 +89,64 @@ jobs:
           echo "language=$LANG" >> "$GITHUB_OUTPUT"
           echo "Detected language: $LANG"
 
-      - name: Install CodeQL CLI bundle
-        if: steps.cfg.outputs.repo_url != ''
+      # ── Binary mode (download uploaded artifact, extract, --mode=none) ──
+      - name: Download uploaded binary
+        if: steps.cfg.outputs.mode == 'binary'
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
         run: |
           set -euo pipefail
-          # Latest tagged CodeQL CLI bundle release.
+          mkdir -p target
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/binary/${SCAN_ID}?scan_token=${SCAN_TOKEN}" \
+            -o "binary_payload"
+          ls -la binary_payload
+
+      - name: Extract binary archive
+        if: steps.cfg.outputs.mode == 'binary'
+        id: lang_bin
+        run: |
+          set -euo pipefail
+          FNAME="${{ steps.cfg.outputs.binary_filename }}"
+          case "$FNAME" in
+            *.zip|*.jar|*.war|*.ear)
+              unzip -q binary_payload -d target ;;
+            *.tar.gz|*.tgz)
+              tar -xzf binary_payload -C target ;;
+            *.tar)
+              tar -xf binary_payload -C target ;;
+            *)
+              # Treat as a single bare artifact — put it under target/ for scanning
+              mv binary_payload "target/$FNAME" ;;
+          esac
+          # --mode=none currently only supports JVM bytecode reliably. We
+          # default to java-kotlin; users can drop in C# DLLs but expect
+          # worse results.
+          if find target -maxdepth 4 -name "*.class" -o -name "*.jar" | grep -q .; then
+            LANG="java-kotlin"
+          elif find target -maxdepth 4 -name "*.dll" -o -name "*.exe" | grep -q .; then
+            LANG="csharp"
+          else
+            LANG="java-kotlin"
+          fi
+          echo "language=$LANG" >> "$GITHUB_OUTPUT"
+          echo "Detected binary language: $LANG"
+          ls -la target | head -40
+
+      - name: Install CodeQL CLI bundle
+        if: steps.cfg.outputs.mode != 'none'
+        run: |
+          set -euo pipefail
           BUNDLE_URL="https://github.com/github/codeql-action/releases/latest/download/codeql-bundle-linux64.tar.gz"
           wget -q "$BUNDLE_URL" -O codeql-bundle.tar.gz
           tar -xzf codeql-bundle.tar.gz
           echo "$PWD/codeql" >> "$GITHUB_PATH"
           ./codeql/codeql version
 
-      - name: Create CodeQL database
-        if: steps.cfg.outputs.repo_url != ''
+      - name: Create CodeQL database (source mode)
+        if: steps.cfg.outputs.mode == 'source'
         run: |
           set -uo pipefail
           codeql database create db \
@@ -106,14 +156,26 @@ jobs:
             || true
           ls -la db || true
 
+      - name: Create CodeQL database (binary mode, --build-mode=none)
+        if: steps.cfg.outputs.mode == 'binary'
+        run: |
+          set -uo pipefail
+          codeql database create db \
+            --language="${{ steps.lang_bin.outputs.language }}" \
+            --build-mode=none \
+            --source-root=./target \
+            --overwrite \
+            || true
+          ls -la db || true
+
       - name: Analyze with security-and-quality suite
-        if: steps.cfg.outputs.repo_url != ''
+        if: steps.cfg.outputs.mode != 'none'
         run: |
           set -uo pipefail
           # CodeQL pack reference is "<pack>:<path-in-pack>". Each language
           # has its own queries pack; the security-and-quality suite lives
           # at codeql-suites/<lang>-security-and-quality.qls inside it.
-          LANG="${{ steps.lang.outputs.language }}"
+          LANG="${{ steps.lang.outputs.language || steps.lang_bin.outputs.language }}"
           case "$LANG" in
             javascript-typescript) PACK="codeql/javascript-queries"; SUITE="javascript-security-and-quality.qls" ;;
             python)                PACK="codeql/python-queries";     SUITE="python-security-and-quality.qls" ;;

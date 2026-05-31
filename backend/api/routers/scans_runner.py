@@ -73,6 +73,11 @@ async def get_scan_runtime_config(
                 if v:
                     connector_fields[key] = v
 
+    # Surface uploaded-binary metadata if any (CodeQL --mode=none mode).
+    # Workflow uses these fields to decide whether to fetch the binary
+    # from /scans/binary/{scan_id} instead of cloning a repo.
+    binary_meta = (scan.summary or {}).get("binary") or {}
+
     return {
         "scan_id": scan_id,
         "target_url": runtime.get("target_url"),
@@ -81,7 +86,41 @@ async def get_scan_runtime_config(
         "exclude_paths": runtime.get("exclude_paths") or [],
         # Workflow-scanner fields (private repo auth, target image, etc.)
         **connector_fields,
+        # Binary-mode CodeQL scanning
+        "binary_filename": binary_meta.get("filename") or None,
+        "binary_size": binary_meta.get("size") or None,
+        "binary_sha256": binary_meta.get("sha256") or None,
     }
+
+
+# ── GET /scans/binary/{scan_id} ─────────────────────────────────────────────
+
+
+@router.get("/scans/binary/{scan_id}")
+async def fetch_scan_binary(
+    scan_id: str,
+    scan_token: str,
+    db: Session = Depends(get_db),
+):
+    """Stream the uploaded binary back to the workflow runner. HMAC token
+    gates access (same token the runner uses for /scans/config/)."""
+    from fastapi.responses import FileResponse
+    from services.scan_binaries import get_file_path, get_meta
+
+    if verify_scan_token(scan_token, expected_scan_id=scan_id) is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired scan token")
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    path = get_file_path(scan_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="No binary uploaded for this scan")
+    meta = get_meta(scan_id) or {}
+    return FileResponse(
+        path=str(path),
+        filename=meta.get("filename") or "binary.bin",
+        media_type="application/octet-stream",
+    )
 
 
 # ── POST /scans/ingest/ ──────────────────────────────────────────────────────

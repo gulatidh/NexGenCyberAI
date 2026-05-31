@@ -36,6 +36,14 @@ async def refresh_sync_feed(feed_id: str, _=Depends(get_current_user)):
     return sync_feed(feed_id)
 
 
+@router.post("/scan-binaries/cleanup")
+async def cleanup_scan_binaries(days: int = 30, _=Depends(get_current_user)):
+    """Manually purge uploaded scan binaries older than `days` days.
+    Mirrors the daily scheduled cleanup so admins can free disk on demand."""
+    from services.scan_binaries import cleanup_old_binaries
+    return cleanup_old_binaries(days=days)
+
+
 @router.post("/sync/feeds/refresh-all")
 async def refresh_all_sync_feeds(_=Depends(get_current_user)):
     """Sync every feed sequentially. Returns per-feed results."""

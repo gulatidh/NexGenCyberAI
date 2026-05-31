@@ -116,6 +116,10 @@ class ScanCreate(BaseModel):
     # connector still runs full discovery but persisted findings are filtered to
     # those whose control_mappings[framework] (or normalized control_id) intersects.
     control_ids: Optional[List[str]] = None
+    # If true, the scan is created in PENDING but no _execute_scan task is
+    # queued — caller must follow up with another call (e.g. upload-binary)
+    # that fires the workflow once the prerequisite is ready.
+    defer_dispatch: Optional[bool] = False
 
 class ScanResponse(BaseModel):
     id: str

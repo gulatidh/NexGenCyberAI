@@ -508,6 +508,33 @@ async def _start_mission_scheduler() -> None:
 
 
 @app.on_event("startup")
+async def _start_scan_binary_cleanup() -> None:
+    """Daily 02:00 UTC purge of uploaded scan binaries older than 30 days.
+    Best-effort: failure to schedule never blocks boot. Admins can also
+    trigger this manually via POST /admin/scan-binaries/cleanup."""
+    import asyncio
+    import logging
+    log = logging.getLogger(__name__)
+
+    async def _loop() -> None:
+        from services.scan_binaries import cleanup_old_binaries
+        # Run once shortly after boot to clean any stragglers, then every 24h.
+        await asyncio.sleep(60)
+        while True:
+            try:
+                result = await asyncio.to_thread(cleanup_old_binaries, 30)
+                log.info("Scan binary cleanup: %s", result)
+            except Exception:
+                log.exception("Scan binary cleanup failed")
+            await asyncio.sleep(24 * 3600)
+
+    try:
+        asyncio.create_task(_loop())
+    except Exception:
+        log.exception("Failed to schedule scan binary cleanup")
+
+
+@app.on_event("startup")
 async def _warm_threat_intel_cache() -> None:
     """Load whatever threat-intel snapshot exists on disk from a prior sync.
 

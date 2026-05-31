@@ -1,5 +1,5 @@
 """Scan management and execution endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -111,11 +111,17 @@ async def _execute_scan(
                     import os as _os
 
                     target = conn_obj._primary_target()
-                    if not target:
+                    # Binary-mode scans don't need a target from the connector
+                    # config — the uploaded binary is the target. Its presence
+                    # is recorded on scan.summary["binary"] by the upload
+                    # endpoint.
+                    has_binary = bool((scan.summary or {}).get("binary"))
+                    if not target and not has_binary:
                         scan.status = ScanStatus.FAILED
                         scan.error_message = (
                             f"Cannot start {connector_db.connector_type} scan — missing "
-                            f"required config (need one of: {', '.join(conn_obj.REQUIRED_CONFIG)})"
+                            f"required config (need one of: {', '.join(conn_obj.REQUIRED_CONFIG)}) "
+                            "or an uploaded binary."
                         )
                         scan.completed_at = datetime.now(timezone.utc)
                         db.commit()
@@ -332,10 +338,11 @@ async def start_scan(
     db.add(scan)
     db.commit()
     db.refresh(scan)
-    from core.config import get_settings
-    background_tasks.add_task(
-        _execute_scan, scan.id, get_settings().DATABASE_URL, None, payload.control_ids,
-    )
+    if not payload.defer_dispatch:
+        from core.config import get_settings
+        background_tasks.add_task(
+            _execute_scan, scan.id, get_settings().DATABASE_URL, None, payload.control_ids,
+        )
     return scan
 
 
@@ -452,6 +459,72 @@ async def list_scan_versions(
         .order_by(Scan.created_at.desc())
         .all()
     )
+
+
+@router.post("/{scan_id}/upload-binary", status_code=201)
+async def upload_scan_binary(
+    client_id: str,
+    scan_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Upload a compiled artifact (JAR / WAR / DLL / EAR / tar.gz / zip)
+    that the workflow runner will scan with `codeql database create
+    --mode=none`. The file is stored on the App Service `/home/data/`
+    mount (persistent across restarts) and the workflow fetches it via
+    `GET /scans/binary/{scan_id}` with the per-scan HMAC token.
+
+    Auto-deleted after 30 days. After the upload succeeds, the scan's
+    dispatch fires (the scan is left in PENDING by the create call when
+    a binary is expected — that handshake is what makes the workflow
+    only run after the binary is actually on disk)."""
+    from services.scan_binaries import save_upload
+
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # 500 MB hard limit to protect /home/ disk. App Service Basic = 1 GB.
+    MAX_BYTES = 500 * 1024 * 1024
+
+    def _chunks():
+        total = 0
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_BYTES:
+                raise HTTPException(status_code=413, detail="Binary exceeds 500 MB limit")
+            yield chunk
+
+    try:
+        meta = save_upload(scan_id, file.filename or "binary.bin", _chunks())
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+
+    # Stash filename + sha on the scan so /scans/config/ can advertise it
+    # to the workflow runner.
+    summary = dict(scan.summary or {})
+    summary["binary"] = {
+        "filename": meta["filename"],
+        "size": meta["size"],
+        "sha256": meta["sha256"],
+        "uploaded_at": meta["uploaded_at"],
+    }
+    scan.summary = summary
+    db.commit()
+
+    # Now that the binary is on disk, fire the workflow.
+    from core.config import get_settings
+    background_tasks.add_task(
+        _execute_scan, scan.id, get_settings().DATABASE_URL, None, None,
+    )
+    return {"ok": True, **meta, "scan_id": scan_id}
 
 
 @router.patch("/{scan_id}/findings/{finding_id}", response_model=FindingResponse)

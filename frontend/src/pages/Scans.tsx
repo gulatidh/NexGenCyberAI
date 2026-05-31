@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi } from "../services/api";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
 import { useNavigate } from "react-router-dom";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
@@ -100,6 +100,9 @@ export default function Scans() {
   const [category, setCategory] = useState<ScanCategory>("cloud");
   const [scannerId, setScannerId] = useState<string>("");
   const [viewScan, setViewScan] = useState<Scan | null>(null);
+  // CodeQL binary-mode upload state
+  const [codeqlMode, setCodeqlMode] = useState<"source" | "binary">("source");
+  const [binaryFile, setBinaryFile] = useState<File | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
@@ -636,6 +639,73 @@ export default function Scans() {
                       </Select>
                     </FormControl>
                   </Grid>
+                  {/* CodeQL-only: pick source-repo mode vs upload-binary mode. */}
+                  {scannerId === "codeql" && (
+                    <>
+                      <Grid size={{ xs: 12 }}>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+                          SCAN MODE
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          {([
+                            { id: "source", label: "Source repo", hint: "Workflow clones the connector's repo_url and runs the security-and-quality suite." },
+                            { id: "binary", label: "Upload binary", hint: "Upload a JAR / WAR / EAR / ZIP / tar.gz. Workflow runs CodeQL with --build-mode=none (JVM / .NET). 500 MB max. Auto-deleted after 30 days." },
+                          ] as const).map((opt) => {
+                            const picked = codeqlMode === opt.id;
+                            return (
+                              <Tooltip key={opt.id} title={opt.hint}>
+                                <Card
+                                  onClick={() => { setCodeqlMode(opt.id); if (opt.id === "source") setBinaryFile(null); }}
+                                  sx={{
+                                    flex: 1, p: 1.25, cursor: "pointer",
+                                    bgcolor: picked ? "rgba(66,133,244,0.08)" : "transparent",
+                                    border: `1px solid ${picked ? "#4285F4" : "rgba(255,255,255,0.1)"}`,
+                                    borderRadius: 1.5,
+                                    "&:hover": { borderColor: "#4285F4" },
+                                  }}
+                                >
+                                  <Typography sx={{ color: "white", fontSize: 13, fontWeight: 600 }}>{opt.label}</Typography>
+                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block", mt: 0.25 }}>
+                                    {opt.hint}
+                                  </Typography>
+                                </Card>
+                              </Tooltip>
+                            );
+                          })}
+                        </Box>
+                      </Grid>
+                      {codeqlMode === "binary" && (
+                        <Grid size={{ xs: 12 }}>
+                          <Box sx={{ p: 1.5, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 1.5 }}>
+                            <Button
+                              component="label"
+                              size="small"
+                              variant="outlined"
+                              sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)" }}
+                            >
+                              {binaryFile ? "Change file" : "Choose binary archive"}
+                              <input
+                                hidden
+                                type="file"
+                                accept=".jar,.war,.ear,.zip,.tar,.tar.gz,.tgz,.dll,.exe"
+                                onChange={(e) => setBinaryFile(e.target.files?.[0] || null)}
+                              />
+                            </Button>
+                            {binaryFile && (
+                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", mt: 1 }}>
+                                <b>{binaryFile.name}</b> · {(binaryFile.size / 1024 / 1024).toFixed(2)} MB
+                              </Typography>
+                            )}
+                            {!binaryFile && (
+                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mt: 1 }}>
+                                Accepts JAR / WAR / EAR / ZIP / tar.gz / DLL / EXE up to 500 MB.
+                              </Typography>
+                            )}
+                          </Box>
+                        </Grid>
+                      )}
+                    </>
+                  )}
                 </Grid>
               )}
             </Box>
@@ -648,14 +718,44 @@ export default function Scans() {
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={
               startMutation.isPending ||
-              (category !== "cloud" && (!scannerId || !connectorId))
+              (category !== "cloud" && (!scannerId || !connectorId)) ||
+              (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile)
             }
-            onClick={() => startMutation.mutate({
-              scan_type: scanType,
-              connector_id: connectorId || undefined,
-              framework: framework || undefined,
-              name: scanName || undefined,
-            })}>
+            onClick={async () => {
+              const isBinary = scannerId === "codeql" && codeqlMode === "binary" && binaryFile;
+              if (isBinary) {
+                try {
+                  // Two-step: create scan with defer_dispatch=true so the
+                  // workflow only fires AFTER the binary upload lands.
+                  const created = await scansApi.start(selectedClientId, {
+                    scan_type: scanType,
+                    connector_id: connectorId || undefined,
+                    framework: framework || undefined,
+                    name: scanName || undefined,
+                    defer_dispatch: true,
+                  });
+                  const fd = new FormData();
+                  fd.append("file", binaryFile);
+                  await apiClient.post(
+                    `/clients/${selectedClientId}/scans/${created.id}/upload-binary`,
+                    fd,
+                    { headers: { "Content-Type": "multipart/form-data" } }
+                  );
+                  qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+                  setOpen(false); setScanName(""); setBinaryFile(null);
+                  toast.success(`Uploaded ${binaryFile.name} — scan starting`);
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.detail || "Binary upload failed");
+                }
+              } else {
+                startMutation.mutate({
+                  scan_type: scanType,
+                  connector_id: connectorId || undefined,
+                  framework: framework || undefined,
+                  name: scanName || undefined,
+                });
+              }
+            }}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
         </DialogActions>
