@@ -72,6 +72,20 @@ export default function ThreatModelDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("diagram");
+  // When the browser triggers print (button or Ctrl+P), expand every tab
+  // section so the whole threat model — Diagram + Components + Threats +
+  // Mitigations — renders as a single paginated PDF.
+  const [printing, setPrinting] = useState<boolean>(false);
+  React.useEffect(() => {
+    const onBefore = () => setPrinting(true);
+    const onAfter = () => setPrinting(false);
+    window.addEventListener("beforeprint", onBefore);
+    window.addEventListener("afterprint", onAfter);
+    return () => {
+      window.removeEventListener("beforeprint", onBefore);
+      window.removeEventListener("afterprint", onAfter);
+    };
+  }, []);
 
   const { data, isLoading, error } = useQuery<ThreatModelDetailData>({
     queryKey: ["threat-model-detail", modelId],
@@ -158,7 +172,31 @@ export default function ThreatModelDetail() {
           .MuiDrawer-root, .MuiAppBar-root, .no-print { display: none !important; }
           .tm-print-area, .tm-print-area * { color: #1a1a1a !important; background: white !important;
             border-color: rgba(0,0,0,0.15) !important; box-shadow: none !important; }
+          .tm-print-area .MuiCard-root,
+          .tm-print-area .MuiCardContent-root { background: white !important; }
+          .tm-print-area .MuiChip-root {
+            background: rgba(0,0,0,0.05) !important;
+            color: #1a1a1a !important;
+            border: 1px solid rgba(0,0,0,0.1) !important;
+          }
+          /* Mermaid SVG ships with inline fills — let it render in its own
+             palette instead of being washed out by the global * { background:
+             white } rule above. */
+          .tm-print-area svg, .tm-print-area svg * {
+            background: transparent !important;
+          }
           .tm-print-area .MuiCard-root { page-break-inside: avoid; }
+          .tm-print-area .tm-print-section { page-break-before: always; }
+          .tm-print-area .tm-print-section:first-of-type { page-break-before: auto; }
+          .tm-print-area .tm-print-section-heading {
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin: 0 0 8px 0;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 4px;
+          }
         }
       `}</style>
 
@@ -235,6 +273,7 @@ export default function ThreatModelDetail() {
       )}
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
+        className="no-print"
         sx={{
           borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
           "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
@@ -248,7 +287,9 @@ export default function ThreatModelDetail() {
       </Tabs>
 
       {/* DIAGRAM */}
-      {tab === "diagram" && (
+      {(tab === "diagram" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Data Flow Diagram</Typography>}
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <DfdDiagram source={data.dfd_mermaid || ""} />
@@ -286,10 +327,13 @@ export default function ThreatModelDetail() {
             )}
           </CardContent>
         </Card>
+        </Box>
       )}
 
       {/* COMPONENTS */}
-      {tab === "components" && (
+      {(tab === "components" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Components ({data.component_count})</Typography>}
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Table size="small">
@@ -329,11 +373,13 @@ export default function ThreatModelDetail() {
             )}
           </CardContent>
         </Card>
+        </Box>
       )}
 
       {/* THREATS — grouped by category */}
-      {tab === "threats" && (
-        <>
+      {(tab === "threats" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Threats ({data.threat_count})</Typography>}
           {data.threats.length > 0 && (
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, mb: 1.5 }}>
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)" }}>
@@ -447,11 +493,13 @@ export default function ThreatModelDetail() {
               </Card>
             ))
           )}
-        </>
+        </Box>
       )}
 
       {/* MITIGATIONS */}
-      {tab === "mitigations" && (
+      {(tab === "mitigations" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Mitigations ({data.mitigation_count})</Typography>}
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Table size="small">
@@ -491,6 +539,7 @@ export default function ThreatModelDetail() {
             )}
           </CardContent>
         </Card>
+        </Box>
       )}
     </Box>
   );
