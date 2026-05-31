@@ -522,6 +522,100 @@ REGISTRY: Dict[str, SyncFeed] = {
 }
 
 
+# ── Scheduling ───────────────────────────────────────────────────────────────
+#
+# Cadence for the background refresh that runs on the shared APScheduler. All
+# in UTC; admins can still hit "Sync" at any time to force a refresh.
+# Frameworks recompute is intentionally excluded — it's a bulk DB rewrite, not
+# an external feed.
+SCHEDULES: Dict[str, Dict[str, str]] = {
+    "epss":       {"cron": "15 3 * * *",   "label": "Daily · 03:15 UTC"},
+    "kev":        {"cron": "30 3 * * *",   "label": "Daily · 03:30 UTC"},
+    "nvd_recent": {"cron": "0 */6 * * *",  "label": "Every 6 hours"},
+    "attack":     {"cron": "0 4 * * 0",    "label": "Weekly · Sun 04:00 UTC"},
+    "capec":      {"cron": "15 4 * * 0",   "label": "Weekly · Sun 04:15 UTC"},
+}
+
+
+def _feed_job_id(feed_id: str) -> str:
+    return f"sync-feed:{feed_id}"
+
+
+def _scheduled_sync_job(feed_id: str) -> None:
+    """APScheduler entry point — calls the same sync function the admin
+    button calls. Records the last attempt in the generic stats blob
+    regardless of success so the UI can show 'scheduled run failed'."""
+    rec = _read_generic_stats()
+    info = rec.setdefault(feed_id, {})
+    try:
+        result = sync_feed(feed_id)
+        ok = bool(result.get("ok"))
+        info["last_scheduled_at"] = datetime.now(timezone.utc).isoformat()
+        info["last_scheduled_ok"] = ok
+        info["last_scheduled_error"] = None if ok else result.get("error")
+        _write_generic_stats(rec)
+    except Exception as exc:
+        logger.exception("Scheduled sync for %s crashed", feed_id)
+        info["last_scheduled_at"] = datetime.now(timezone.utc).isoformat()
+        info["last_scheduled_ok"] = False
+        info["last_scheduled_error"] = str(exc)
+        _write_generic_stats(rec)
+
+
+def start_feed_schedules() -> None:
+    """Register every feed in SCHEDULES on the shared APScheduler.
+    Idempotent: safe to call once from FastAPI startup."""
+    try:
+        from apscheduler.triggers.cron import CronTrigger
+        from services.mission_scheduler import get_scheduler
+    except Exception:
+        logger.exception("APScheduler / mission_scheduler unavailable; skipping feed schedules")
+        return
+    sched = get_scheduler()
+    if sched is None:
+        logger.warning("Shared scheduler not running; feed schedules will not be registered")
+        return
+    for fid, spec in SCHEDULES.items():
+        if fid not in REGISTRY:
+            continue
+        try:
+            parts = spec["cron"].split()
+            if len(parts) != 5:
+                raise ValueError(f"Invalid cron: {spec['cron']!r}")
+            minute, hour, day, month, dow = parts
+            trigger = CronTrigger(
+                minute=minute, hour=hour, day=day, month=month, day_of_week=dow,
+                timezone="UTC",
+            )
+            sched.add_job(
+                _scheduled_sync_job,
+                trigger=trigger,
+                args=[fid],
+                id=_feed_job_id(fid),
+                replace_existing=True,
+                misfire_grace_time=60 * 60,  # 1-hour grace if app was down
+            )
+            logger.info("Scheduled feed %s: %s", fid, spec.get("label") or spec["cron"])
+        except Exception:
+            logger.exception("Failed to schedule feed %s", fid)
+
+
+def next_feed_run_time(feed_id: str) -> Optional[str]:
+    """Return the next scheduled fire time as an ISO string, or None when
+    the feed isn't scheduled / scheduler isn't running."""
+    try:
+        from services.mission_scheduler import get_scheduler
+    except Exception:
+        return None
+    sched = get_scheduler()
+    if sched is None:
+        return None
+    job = sched.get_job(_feed_job_id(feed_id))
+    if not job or not job.next_run_time:
+        return None
+    return job.next_run_time.astimezone(timezone.utc).isoformat()
+
+
 def list_feeds() -> List[Dict[str, Any]]:
     """Return every registered feed with its current stats merged in."""
     out: List[Dict[str, Any]] = []
@@ -531,6 +625,7 @@ def list_feeds() -> List[Dict[str, Any]]:
         except Exception as exc:
             logger.exception("Stats lookup failed for feed %s", feed.id)
             stats = {"error": str(exc)}
+        sched_spec = SCHEDULES.get(feed.id)
         out.append({
             "id": feed.id,
             "name": feed.name,
@@ -540,6 +635,9 @@ def list_feeds() -> List[Dict[str, Any]]:
             "item_label": feed.item_label,
             "count": stats.get("count", 0),
             "last_synced_at": stats.get("last_synced_at"),
+            "schedule_cron": sched_spec["cron"] if sched_spec else None,
+            "schedule_label": sched_spec["label"] if sched_spec else None,
+            "next_run_at": next_feed_run_time(feed.id) if sched_spec else None,
             "extra": {k: v for k, v in stats.items() if k not in ("count", "last_synced_at")},
         })
     return out

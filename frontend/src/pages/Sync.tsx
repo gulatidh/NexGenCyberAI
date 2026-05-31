@@ -26,12 +26,15 @@ import { fromNow } from "../utils/datetime";
 interface SyncFeed {
   id: string;
   name: string;
-  category: "threat_intel" | "cve" | "framework";
+  category: "threat_intel" | "cve" | "framework" | "threat_library";
   description: string;
   source_url: string;
   item_label: string;
   count: number;
   last_synced_at: string | null;
+  schedule_cron?: string | null;
+  schedule_label?: string | null;
+  next_run_at?: string | null;
   extra?: Record<string, any>;
 }
 
@@ -46,16 +49,19 @@ const CATEGORY_COLOR: Record<string, string> = {
   threat_intel: "#EA4335",
   cve: "#4285F4",
   framework: "#34A853",
+  threat_library: "#9C27B0",
 };
 const CATEGORY_LABEL: Record<string, string> = {
   threat_intel: "Threat Intel",
   cve: "External CVE",
   framework: "Framework",
+  threat_library: "Threat Library",
 };
 const CATEGORY_ICON: Record<string, React.ReactNode> = {
   threat_intel: <ShieldOutlined sx={{ fontSize: 22 }} />,
   cve: <CloudDownload sx={{ fontSize: 22 }} />,
   framework: <Policy sx={{ fontSize: 22 }} />,
+  threat_library: <ShieldOutlined sx={{ fontSize: 22 }} />,
 };
 
 function FeedTile({
@@ -138,9 +144,23 @@ function FeedTile({
             {feed.item_label}
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mb: 1.5 }}>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block" }}>
           {feed.last_synced_at ? `Last sync ${fromNow(feed.last_synced_at)}` : "Never synced"}
         </Typography>
+        {feed.schedule_label && (
+          <Tooltip title={feed.next_run_at ? `Next run ${fromNow(feed.next_run_at)}` : feed.schedule_label}>
+            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", gap: 0.5, mb: 1.5 }}>
+              <ScheduleOutlined sx={{ fontSize: 12 }} />
+              {feed.schedule_label}
+              {feed.next_run_at && (
+                <Box component="span" sx={{ color: "rgba(255,255,255,0.55)" }}>
+                  · next {fromNow(feed.next_run_at)}
+                </Box>
+              )}
+            </Typography>
+          </Tooltip>
+        )}
+        {!feed.schedule_label && <Box sx={{ mb: 1.5 }} />}
 
         {hasError && lastResult?.error && (
           <Typography variant="caption" sx={{ color: "#EA4335", display: "block", mb: 1 }}>
@@ -307,9 +327,9 @@ export default function ThreatIntel() {
             How sync works
           </Typography>
           <Box component="ul" sx={{ pl: 2.5, color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 1.7, m: 0 }}>
-            <li><b>Manual / on-demand.</b> No automatic schedule — each feed runs only when you click its <i>Sync</i> button (or <i>Sync all</i>).</li>
-            <li><b>Outbound HTTPS</b> to public feeds (FIRST.org, cisa.gov, nvd.nist.gov). No credentials required.</li>
-            <li><b>Cached on disk</b> at <code>backend/data/</code> so a process restart doesn't require re-downloading.</li>
+            <li><b>Auto-scheduled in the background</b> via APScheduler on the API process (EPSS/KEV daily, NVD every 6h, ATT&CK/CAPEC weekly). The "Sync" button on each tile still works for an immediate refresh — useful when an upstream feed has just published an update.</li>
+            <li><b>Outbound HTTPS</b> to public feeds (FIRST.org, cisa.gov, nvd.nist.gov, github.com/mitre). No credentials required.</li>
+            <li><b>Cached on disk</b> at <code>backend/data/</code> (and the <code>threat_library</code> table for ATT&CK/CAPEC) so a process restart doesn't require re-downloading.</li>
             <li><b>RPS picks up changes immediately</b> — every subsequent finding render uses the refreshed cache. No need to re-run scans.</li>
             <li><b>Wiz / CrowdStrike Spotlight reachability</b> is separate and live — it queries the provider per finding when configured via env vars.</li>
           </Box>

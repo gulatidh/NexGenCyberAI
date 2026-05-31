@@ -535,6 +535,14 @@ async def _start_mission_scheduler() -> None:
     except Exception:
         import logging
         logging.getLogger(__name__).exception("Failed to start mission scheduler")
+    # Register the external-feed cron jobs on the same scheduler so EPSS,
+    # KEV, NVD, ATT&CK, and CAPEC stay fresh without manual clicks.
+    try:
+        from services.sync_feeds import start_feed_schedules
+        start_feed_schedules()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to start feed schedules")
 
 
 @app.on_event("startup")

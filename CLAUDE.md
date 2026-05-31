@@ -338,7 +338,20 @@ When the threat-intel cache is empty (never synced), EPSS/KEV report `unknown` r
 
 ## External Feeds (Sync page)
 
-Admin-triggered, **manual on-demand only** — there is no automatic schedule. Feed registry lives in `backend/services/sync_feeds.py`; admin endpoints under `/admin/sync/feeds/...`.
+Auto-scheduled in the background via APScheduler (the same scheduler the missions service uses — `services/mission_scheduler.get_scheduler()`), with a manual "Sync" button on each tile for immediate refresh. Cadences are defined in `sync_feeds.SCHEDULES`:
+
+| Feed | Cadence |
+|---|---|
+| EPSS | Daily 03:15 UTC |
+| KEV | Daily 03:30 UTC |
+| NVD recent | Every 6 hours |
+| MITRE ATT&CK | Weekly Sun 04:00 UTC |
+| MITRE CAPEC | Weekly Sun 04:15 UTC |
+| Frameworks recompute | Not scheduled — manual only (DB recompute, not an external feed) |
+
+Each scheduled run records `last_scheduled_at` / `last_scheduled_ok` / `last_scheduled_error` in `sync_feed_stats.json` so admins can see whether the background fetcher is healthy. The Sync UI shows `next_run_at` per tile.
+
+Feed registry lives in `backend/services/sync_feeds.py`; admin endpoints under `/admin/sync/feeds/...`.
 
 | Feed | Source | What it does |
 |---|---|---|
@@ -354,7 +367,7 @@ Caches persist to `backend/data/`:
 - `nvd_cve_cache.json`
 - `sync_feed_stats.json` — per-feed last-sync timestamps for non-threat-intel feeds
 
-`main.py` only warms the in-memory cache from disk at startup. No network calls happen until an admin clicks Sync.
+`main.py` warms the in-memory cache from disk at startup. The first scheduled fetch happens once the registered cron triggers; admins can always force one earlier via the Sync page.
 
 ---
 

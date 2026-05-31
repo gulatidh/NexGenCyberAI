@@ -79,6 +79,13 @@ def shutdown_scheduler() -> None:
         logger.info("Mission scheduler stopped")
 
 
+def get_scheduler() -> Optional[AsyncIOScheduler]:
+    """Return the shared APScheduler instance. Other services (sync_feeds)
+    register jobs on the same instance instead of spinning up a second
+    AsyncIOScheduler, so we stay on one event loop and one set of threads."""
+    return _scheduler
+
+
 def _load_all_active_missions() -> None:
     """Read every active ScheduledMission from the DB and register it."""
     db = SessionLocal()
