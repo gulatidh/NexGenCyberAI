@@ -105,7 +105,7 @@ const GROUPS: Group[] = [
       },
       {
         id: "scanner-connector",
-        title: "Add a workflow scanner (Nmap, Trivy, Gitleaks, Semgrep, ZAP, …)",
+        title: "Add a workflow scanner (Nmap, Trivy, Gitleaks, Semgrep, CodeQL, ZAP, …)",
         summary: "Workflow scanners run in GitHub Actions and post findings back to the platform.",
         steps: [
           { text: "On the Client Detail → Connectors tab, click 'Add connector' and pick the scanner type." },
@@ -116,6 +116,26 @@ const GROUPS: Group[] = [
         tips: [
           "The setup help text at the top of each connector dialog shows the exact command the workflow runs and which credentials are needed.",
           "Each scan dispatch is authenticated via a per-scan HMAC token; secrets are never logged in the GitHub Actions workflow inputs.",
+          "CodeQL supports two modes: 'Source repo' (clone + autodetect language + scan) and 'Upload binary' (multipart upload of a compiled artifact, then --build-mode=none scan). Pick the mode in the New Assessment dialog after choosing CodeQL.",
+        ],
+      },
+      {
+        id: "codeql-binary",
+        title: "Scan a compiled binary with CodeQL (no source needed)",
+        summary: "Upload a JAR / WAR / EAR / ZIP / tar.gz / DLL / EXE — CodeQL runs --build-mode=none against the bytecode.",
+        steps: [
+          { text: "Make sure you have a CodeQL connector for the client (the binary doesn't need a repo_url, but the connector is the access anchor)." },
+          { text: "Open Assessments → New Assessment → SAST tab → click CodeQL." },
+          { text: "Pick the connector. A 'SCAN MODE' chooser appears below — pick 'Upload binary'." },
+          { text: "Click 'Choose binary archive' and pick a file. 500 MB hard cap." },
+          { text: "Click 'Start Scan'. The platform creates the scan, uploads the file, and only then triggers the workflow — so the runner never starts before the binary lands." },
+        ],
+        tips: [
+          "Java/Kotlin (.class/.jar) yields the best results. C# (.dll/.exe with IL) works but is less mature. Stripped native binaries (.so/.dylib without symbols) yield poor results — CodeQL was never designed for those.",
+          "Uploads are stored on the App Service's /home/data/uploads mount, auto-deleted after 30 days. Admins can trigger an immediate purge via POST /admin/scan-binaries/cleanup.",
+        ],
+        warnings: [
+          "Treat uploaded binaries as customer-sensitive — the App Service /home/ disk is in your Azure tenant but not encrypted at rest by default. For production tenants, consider moving the storage to Azure Blob with a customer-managed key.",
         ],
       },
     ],
@@ -142,13 +162,27 @@ const GROUPS: Group[] = [
       {
         id: "tile-view",
         title: "Understanding the tile view",
-        summary: "Assessments is a tile grid — one tile per scan across all clients you have access to.",
+        summary: "Assessments is a tile grid — one tile per target across all clients you have access to.",
         steps: [
           { text: "Header shows 'Category · Client' (DAST · Acme, Network · TechCorp, etc.)." },
           { text: "Top-right status chip: pending → running → completed (or failed)." },
-          { text: "Top-right trash icon deletes the entire scan + its findings + agent runs + verdict (with a confirm dialog)." },
+          { text: "Top-right corner has three icons (when applicable): trash (delete the entire scan + findings + verdict), replay (re-trigger the same scan as a new version), and a yellow history badge if previous versions exist." },
           { text: "Footer chips show severity counts and whether an AI verdict has been generated." },
-          { text: "Click anywhere on the tile to drill into the Assessment detail." },
+          { text: "Click anywhere on the tile (not the icons) to drill into the Assessment detail." },
+        ],
+      },
+      {
+        id: "rescan",
+        title: "Rescan / re-trigger a failed or completed scan",
+        summary: "Replay icon on every tile. Keeps version history.",
+        steps: [
+          { text: "On the Assessments tile grid, hover over any tile — top-right shows trash + replay icons." },
+          { text: "Click the replay icon to start a fresh run with the same connector + scan_type + framework as the original. Disabled while a previous run is still in progress." },
+          { text: "The grid only shows the newest version per target. Older runs collapse into a History dialog." },
+          { text: "If the same target has been scanned more than once, the newest tile shows a yellow history badge with the total run count. Click it to see every version with timestamp, findings count, duration, and status — click any row to open that version's detail." },
+        ],
+        tips: [
+          "Rescan is the right move for a failed scan — easier than recreating the scan dialog. The original failure row stays as historical record.",
         ],
       },
       {
@@ -359,6 +393,19 @@ const GROUPS: Group[] = [
         tips: [
           "First-time visit shows 'no data synced yet' — click 'Run first sync' to populate. EPSS download is the largest (~10MB compressed); usually completes in under 30 seconds.",
           "Wiz / CrowdStrike Spotlight reachability is separate — it uses live API calls per finding (no batch sync needed) and only activates when WIZ_* or FALCON_* env vars are configured.",
+        ],
+      },
+      {
+        id: "binary-cleanup",
+        title: "Manage uploaded scan binaries",
+        summary: "CodeQL binary uploads live on the App Service disk. A daily job purges binaries older than 30 days, or you can trigger it manually.",
+        steps: [
+          { text: "Binaries land at /home/data/uploads/<scan_id>/<filename> on the App Service." },
+          { text: "Background cleanup runs every 24h (kicked off ~60s after each boot)." },
+          { text: "For an on-demand purge: POST /api/v1/admin/scan-binaries/cleanup?days=30 (or any retention you want). Returns {scanned, removed, freed_bytes}." },
+        ],
+        warnings: [
+          "Deleting a scan from the Assessments tile does NOT delete its binary — the cleanup job handles that. If you need to wipe a binary immediately, delete its directory via Kudu console or call the cleanup endpoint with days=0.",
         ],
       },
     ],

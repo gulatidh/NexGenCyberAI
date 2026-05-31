@@ -55,6 +55,9 @@ AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). 
 │   │   ├── sync_feeds.py     Registry of on-demand external feeds — surfaces
 │   │   │                     to /admin/sync/feeds endpoints + Sync page
 │   │   ├── scan_runtime.py   Per-scan transient state (auth headers, target)
+│   │   ├── scan_binaries.py  Local filesystem store for CodeQL --build-mode=none
+│   │   │                     uploads (/home/data/uploads/<scan_id>/...). 30-day
+│   │   │                     cleanup loop, scheduled in main.py.
 │   │   ├── mission_scheduler.py APScheduler in-process cron for workflows
 │   │   ├── mission_executor.py Dispatches a ScheduledMission to its handler
 │   │   ├── mission_reports.py  Standardised AI report (7 fixed sections) per run
@@ -150,22 +153,22 @@ Single environment (cost-optimised — prod App Services are provisioned on dema
 
 `AppLayout.tsx` defines two nav groups:
 
-**Main workflow**: Dashboard · Risk Overview · Clients · Assessments (Scans) · Findings · Risk Register (Risks) · Asset Inventory · Technologies · Frameworks · AI Agents · Workflows (Missions) · Knowledge Base · Reports
+**Main workflow**: Dashboard · Risk Overview · Clients · Assessments (Scans) · Findings · Risk Register (Risks) · Asset Inventory · Technologies · Frameworks · AI Buddies (the operational + advisory agents catalog) · Workflows (Missions) · Knowledge Base · Reports
 
-**Settings** (some admin-only): AI Settings · Sync · Administration
+**Settings** (some admin-only): AI Settings · Sync · Administration · Help
 
 Routes live in `App.tsx`. Connectors and Projects no longer have top-level nav — they're tabs inside the Client Detail page.
 
 ### Key pages and what they do
 
-- **Assessments** (`/scans`) — tile grid of every scan across all clients (access-filtered). Each tile has a top-right delete icon, status chip, category dot, "Category · Client" header. Click → ScanDetail.
+- **Assessments** (`/scans`) — tile grid of every scan across all clients (access-filtered). Tiles collapse by version group: only the newest run per target renders, older versions live in the History dialog. Each tile has top-right icons (delete, replay/rescan, history badge with run count), status chip, category dot, "Category · Client" header. Click anywhere on the tile (not the icons) to drill into ScanDetail.
 - **ScanDetail** (`/scans/:scanId`) — top tabs: Verdict / Findings / one per agent run. Verdict tab renders the structured AI verdict (The Verdict, What We Found, Why It Matters, Executive Summary, Capability Gaps, Signal Coverage, Attack Paths, Vendor Scorecard, RPS factor breakdown with evidenced/estimated/unknown tags, Data Completeness, Automation Opportunities). Per-finding delete in the Findings table. Print/PDF button at top expands every tab + applies print stylesheet.
 - **Findings** (`/findings`) — section tabs + category tiles + sortable table. Per-row delete + "Delete blank findings" toolbar button.
 - **Risk Register** (`/risks`) — KPI strip + severity donut + Top 5 + slicer chips + table + **AI Agent Risk Analysis** tile grid. Each agent run is a tile with heading/status/summary; click to expand; only one open at a time.
 - **Risk Overview** (`/risk-overview`) — Risk Portfolio dashboard. FAIR-lite ALE: Total/Net Exposure, Open Critical/High, 30-Day Breach Probability. Risk-by-domain bar chart, full risk table with ALE range, Remediation status, Source link.
 - **Workflows** (`/missions`) — scheduled missions (cron picker + presets). History drawer per row; "View Report" opens the standardised PDF-ready report dialog (KPI strip + 7 fixed sections).
 - **Knowledge Base** (`/knowledge`) — pre-seeded files in categories, expandable cards, search, stats endpoint.
-- **AI Agents** (`/agents`) — Catalog of ~43 advisory agents in 7 groups + admin-only CRUD with current config shown.
+- **AI Buddies** (`/agents`, formerly "AI Agents") — Catalog of operational + ~43 advisory buddies in 7 groups. Admin-only CRUD with current config shown. When a Client + Scan are selected on this page, catalog agents consume the scan findings as context, persist their output as an `AgentRun` tied to the scan, and appear as tabs on the ScanDetail page.
 - **Sync** (`/sync`, admin-only) — manual on-demand sync of external feeds (EPSS, CISA KEV, NVD recent CVEs, framework recompute). Per-tile sync button + "Sync all".
 
 ---
@@ -207,7 +210,7 @@ Follow `backend/connectors/azure/connector.py`:
 4. Register in `backend/connectors/factory.py`
 5. Add `ConnectorType.NEWCLOUD` enum + `CONNECTOR_CATEGORY` entry in `models.py`
 
-### Workflow-driven scanners (Nmap, Trivy, Gitleaks, Semgrep, …)
+### Workflow-driven scanners (Nmap, Trivy, Gitleaks, Semgrep, CodeQL, …)
 
 These defer execution to GitHub Actions. Backend just stores config + mints the HMAC scan token + fires `workflow_dispatch`.
 
@@ -215,6 +218,16 @@ These defer execution to GitHub Actions. Backend just stores config + mints the 
 2. Create `.github/workflows/newscanner-scan.yml` with inputs `scan_id`, `scan_token`, `api_base`. Fetch config via `GET /api/v1/scans/config/`, run the scanner, POST findings to `POST /api/v1/scans/ingest/`
 3. `scans.py` already has a generic `WorkflowConnector` dispatch path — any new scanner inherits it automatically
 4. The `_get(key)` helper on `WorkflowConnector` reads from both `config` and `credentials` because the Connectors UI saves everything under `credentials`
+
+### CodeQL binary-upload mode (special-case workflow scanner)
+
+CodeQL also accepts a compiled artifact instead of a source repo:
+- Frontend toggle in the New Assessment dialog (Source repo / Upload binary)
+- Binary path: `POST /clients/{cid}/scans/` with `defer_dispatch=true` → multipart `POST /clients/{cid}/scans/{sid}/upload-binary` (500 MB cap)
+- Backend stores under `/home/data/uploads/<scan_id>/<filename>` + `.meta.json` sidecar (size, sha256). `services/scan_binaries.py` owns the layout + the 30-day cleanup loop scheduled in `main.py`.
+- Workflow fetches via `GET /scans/binary/<id>?scan_token=...` (HMAC-gated), extracts by archive type, autodetects Java vs C#, runs `codeql database create --build-mode=none`
+- `/scans/config/` surfaces `binary_filename` / `binary_size` / `binary_sha256` so the workflow YAML can branch on `mode == 'binary'`
+- Generic dispatch in `scans.py` allows the connector's `repo_url` to be empty when `scan.summary.binary` is set
 
 ---
 
@@ -235,6 +248,17 @@ Every `ScheduledMissionRun` (scheduled or manual) auto-generates a JSON report w
 ### Per-scan AI verdict (`services/verdict.py`)
 
 Auto-generated on scan completion via the `BackgroundTasks` queue in `/scans/ingest/`. Falls back to deterministic text if no LLM is available. Persisted to `Scan.ai_verdict` (JSON column) and rendered by ScanDetail.
+
+---
+
+## Rescan + version history
+
+Every Assessment tile has a Replay icon (`POST /clients/{cid}/scans/{sid}/rescan`). Rescan creates a fresh `Scan` row reusing the original's connector / scan_type / framework / name, then dispatches as a normal scan. The new row sets `parent_scan_id` to the **root** of the chain (first ancestor whose `parent_scan_id` is NULL) so siblings stay flat — not a deep parent → parent chain.
+
+- Tile grid shows only the newest sibling per `(parent_scan_id ?? id)` group.
+- `GET /clients/{cid}/scans/{sid}/versions` returns every sibling sharing the same root, newest-first — powers the History dialog.
+- `/scans/all` exposes `parent_scan_id` on each tile so the frontend groups without an extra round-trip.
+- Schema: `scans.parent_scan_id VARCHAR(36) NULL` — idempotent ALTER TABLE in `main.py::_ensure_added_columns()`.
 
 ---
 
@@ -301,6 +325,8 @@ Caches persist to `backend/data/`:
 | `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` / `GITHUB_WORKFLOW_REF` | Where to fire workflow_dispatch (default ref: `main`) |
 | `WIZ_API_TOKEN` / `WIZ_TENANT_URL` | (Optional) enable Wiz reachability — GraphQL endpoint |
 | `FALCON_CLIENT_ID` / `FALCON_CLIENT_SECRET` / `FALCON_BASE_URL` | (Optional) enable CrowdStrike Spotlight reachability |
+| `INITIAL_ADMIN_UPN` | UPN that the bootstrap will always grant global admin (per-UPN check, not "any admin exists"). Use this to recover when grants get wiped. |
+| `SCAN_BINARIES_DIR` | (Optional) override CodeQL binary upload path. Default `/home/data/uploads`. |
 
 ---
 
@@ -328,3 +354,9 @@ Caches persist to `backend/data/`:
 - **MissionRunResponse datetime fields** — Use `Optional[datetime]`, not `Optional[str]`, so Pydantic v2 auto-serialises. Wrong type caused 500s on `/missions/{id}/run`
 - **Connector PATCH 404 after "Add"** — The Add button must reset `editing` state + form fields, otherwise the save fires PATCH against a stale ID
 - **Conversational AI output** — Filter conversational tails server-side via prompt engineering AND client-side in `RichOutput.tsx`. Belt-and-braces — the LLM ignores prompt instructions occasionally
+- **MSAL redirect loop** — `services/api.ts` only calls `acquireTokenRedirect` on `InteractionRequiredAuthError`. Other silent-token failures log + let the request 401 instead of looping. `_redirectInFlight` flag prevents concurrent redirects causing `interaction_in_progress` errors
+- **Tz-mixing crash on `/scans/all`** — Some DB rows have naive `started_at` (SQLite default), others tz-aware (MSSQL). Always coerce to UTC via the `_aware()` helper before subtracting from `datetime.now(timezone.utc)`. The bug 500'd the endpoint and made every tile disappear
+- **GITHUB_WORKFLOW_REF on App Service** — Must point at an existing branch (we're on `main`). Stale value (`develop` after that branch was deleted) caused `workflow_dispatch` to fail with HTTP 422 and made Nmap/CodeQL scans fail in ~1 second with no GitHub Actions run
+- **`INITIAL_ADMIN_UPN` bootstrap** — `main.py::_bootstrap_initial_admin()` checks per-UPN, not "any global admin exists". If you wipe the user_access table or a different admin grant lingers, the configured UPN still gets re-granted on startup
+- **CodeQL pack:suite syntax** — CLI rejects `codeql/javascript-security-and-quality.qls`. Must be `<pack-name>:<path-in-pack>` e.g. `codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls`
+- **Binary uploads (`scan_binaries.py`)** — Created scan has `defer_dispatch=true` so the workflow only fires AFTER the multipart upload completes. Otherwise the runner would 404 on `/scans/binary/<id>` because the binary isn't on disk yet
