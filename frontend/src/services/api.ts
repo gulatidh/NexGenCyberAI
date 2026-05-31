@@ -132,6 +132,10 @@ export const scansApi = {
     }).then((r) => r.data),
   delete: (clientId: string, scanId: string) =>
     apiClient.delete(`/clients/${clientId}/scans/${scanId}`),
+  rescan: (clientId: string, scanId: string) =>
+    apiClient.post(`/clients/${clientId}/scans/${scanId}/rescan`).then((r) => r.data),
+  versions: (clientId: string, scanId: string) =>
+    apiClient.get(`/clients/${clientId}/scans/${scanId}/versions`).then((r) => r.data),
 };
 
 export const findingsApi = {

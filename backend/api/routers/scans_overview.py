@@ -175,6 +175,7 @@ async def list_all_scans(
             "agents_ran": agent_runs_by_scan.get(s.id, []),
             "has_verdict": bool(s.ai_verdict),
             "error_message": s.error_message,
+            "parent_scan_id": s.parent_scan_id,
         })
     return {"scans": out}
 

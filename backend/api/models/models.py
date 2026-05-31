@@ -260,6 +260,10 @@ class Scan(Base):
     # regenerated via POST /scans/{id}/generate-verdict.
     ai_verdict = Column(JSON)
     ai_verdict_generated_at = Column(DateTime(timezone=True))
+    # When this scan is a rescan, points at the previous run sharing the
+    # same connector + scan_type + framework. UI walks the chain to build
+    # version history for a target.
+    parent_scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
 
     client = relationship("Client", back_populates="scans")
     project = relationship("Project", back_populates="scans")

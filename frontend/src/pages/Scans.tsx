@@ -3,10 +3,10 @@ import {
   Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
-  Tabs, Tab, Stack, Tooltip, Divider, IconButton,
+  Tabs, Tab, Stack, Tooltip, Divider, IconButton, Badge,
   Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -165,6 +165,34 @@ export default function Scans() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
   });
 
+  const rescanMutation = useMutation({
+    mutationFn: (tile: any) => scansApi.rescan(tile.client_id, tile.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      toast.success("Rescan started");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to rescan"),
+  });
+
+  // Build a version-count map per tile: every tile and its parent share the
+  // same root, so siblings = (parent_scan_id ?? id). Lets us show "vN of M"
+  // on the live tile and an icon to open the version history.
+  const versionMap = React.useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const t of (tilesData?.scans || [])) {
+      const root = t.parent_scan_id || t.id;
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(t);
+    }
+    // newest first per group
+    groups.forEach((arr) => {
+      arr.sort((a, b) => new Date(b.started_at || b.id).getTime() - new Date(a.started_at || a.id).getTime());
+    });
+    return groups;
+  }, [tilesData]);
+
+  const [historyOpenForRoot, setHistoryOpenForRoot] = useState<string | null>(null);
+
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
@@ -299,24 +327,76 @@ export default function Scans() {
                     "&:hover": { borderColor: statusColor, bgcolor: "rgba(255,255,255,0.02)", transform: "translateY(-1px)" },
                   }}>
                   <Box sx={{ p: 2, position: "relative" }}>
-                    <Tooltip title="Delete assessment">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
-                        sx={{
-                          position: "absolute", top: 6, right: 6,
-                          color: "rgba(255,255,255,0.35)",
-                          "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-                        }}
-                      >
-                        <DeleteOutlined sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
+                    {(() => {
+                      const root = tile.parent_scan_id || tile.id;
+                      const versions = versionMap.get(root) || [];
+                      const versionCount = versions.length;
+                      // Only render the version icon on the newest tile in
+                      // the group — older ones already show as siblings in
+                      // the history dialog.
+                      const isLive = versions[0]?.id === tile.id;
+                      return (
+                        <>
+                          <Tooltip title="Delete assessment">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
+                              sx={{
+                                position: "absolute", top: 6, right: 6,
+                                color: "rgba(255,255,255,0.35)",
+                                "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                              }}
+                            >
+                              <DeleteOutlined sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={status === "running" ? "Rescan disabled while a run is in progress" : "Rescan — keeps history of this assessment"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={status === "running" || rescanMutation.isPending}
+                                onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
+                                sx={{
+                                  position: "absolute", top: 6, right: 32,
+                                  color: "rgba(255,255,255,0.35)",
+                                  "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
+                                  "&.Mui-disabled": { color: "rgba(255,255,255,0.15)" },
+                                }}
+                              >
+                                <Replay sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          {isLive && versionCount > 1 && (
+                            <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
+                                sx={{
+                                  position: "absolute", top: 6, right: 58,
+                                  color: "#FBBC04",
+                                  bgcolor: "rgba(251,188,4,0.10)",
+                                  "&:hover": { bgcolor: "rgba(251,188,4,0.22)" },
+                                  pr: 0.5,
+                                }}
+                              >
+                                <Badge
+                                  badgeContent={versionCount}
+                                  sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}
+                                >
+                                  <History sx={{ fontSize: 16 }} />
+                                </Badge>
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </>
+                      );
+                    })()}
                     <Chip
                       label={status}
                       size="small"
                       sx={{
-                        position: "absolute", top: 12, right: 40,
+                        position: "absolute", top: 12, right: 84,
                         bgcolor: `${statusColor}20`,
                         color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
                         textTransform: "uppercase", letterSpacing: 0.5,
@@ -651,6 +731,74 @@ export default function Scans() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setViewScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Version history — all rescans of the same assessment, newest first */}
+      <Dialog open={!!historyOpenForRoot} onClose={() => setHistoryOpenForRoot(null)} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <History sx={{ color: "#FBBC04" }} />
+            <Typography component="span" sx={{ fontWeight: 700 }}>Assessment history</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          {historyOpenForRoot && (() => {
+            const versions = versionMap.get(historyOpenForRoot) || [];
+            return (
+              <Box>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.5 }}>
+                  {versions.length} run{versions.length === 1 ? "" : "s"} for this assessment, newest first. v{versions.length} is the live tile; older runs stay queryable for comparison.
+                </Typography>
+                {versions.map((v: any, idx: number) => {
+                  const isLatest = idx === 0;
+                  const versionNum = versions.length - idx;
+                  const vStatus = (v.status || "").toLowerCase();
+                  const vColor = STATUS_COLOR[vStatus] || "rgba(255,255,255,0.4)";
+                  return (
+                    <Box
+                      key={v.id}
+                      onClick={() => { setHistoryOpenForRoot(null); navigate(`/scans/${v.id}`); }}
+                      sx={{
+                        display: "flex", alignItems: "center", gap: 1.5, p: 1.25, mb: 0.75,
+                        borderRadius: 1, cursor: "pointer",
+                        bgcolor: isLatest ? "rgba(66,133,244,0.08)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isLatest ? "rgba(66,133,244,0.3)" : "rgba(255,255,255,0.06)"}`,
+                        "&:hover": { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.12)" },
+                      }}
+                    >
+                      <Chip
+                        label={`v${versionNum}${isLatest ? " · LIVE" : ""}`}
+                        size="small"
+                        sx={{
+                          height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, minWidth: 78,
+                          bgcolor: isLatest ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.06)",
+                          color: isLatest ? "#4285F4" : "rgba(255,255,255,0.65)",
+                        }} />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>
+                          {v.started_at ? new Date(v.started_at).toLocaleString() : (v.created_at ? new Date(v.created_at).toLocaleString() : "—")}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                          {v.findings_count || 0} finding{(v.findings_count || 0) === 1 ? "" : "s"}
+                          {v.duration_seconds != null
+                            ? ` · ${v.duration_seconds >= 60 ? Math.round(v.duration_seconds / 60) + " min" : v.duration_seconds + "s"}`
+                            : ""}
+                        </Typography>
+                      </Box>
+                      <Chip label={vStatus} size="small"
+                        sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                          bgcolor: `${vColor}25`, color: vColor }} />
+                    </Box>
+                  );
+                })}
+              </Box>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setHistoryOpenForRoot(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
         </DialogActions>
       </Dialog>
 

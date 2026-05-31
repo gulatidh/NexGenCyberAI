@@ -150,6 +150,19 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.ai_verdict_generated_at ALTER failed: %s", exc)
 
+        # Add scans.parent_scan_id — links a rescan to its predecessor so the
+        # UI can walk the chain and render version history per target.
+        if "parent_scan_id" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD parent_scan_id NVARCHAR(36) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN parent_scan_id VARCHAR(36)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.parent_scan_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.parent_scan_id ALTER failed: %s", exc)
+
         # Add scheduled_mission_runs.report — structured LLM report per run.
         try:
             run_cols = {c["name"] for c in inspector.get_columns("scheduled_mission_runs")}

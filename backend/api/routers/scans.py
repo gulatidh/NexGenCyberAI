@@ -388,6 +388,72 @@ async def delete_scan(
     db.commit()
 
 
+@router.post("/{scan_id}/rescan", response_model=ScanResponse, status_code=201)
+async def rescan(
+    client_id: str,
+    scan_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Create a new scan that duplicates an existing scan's configuration
+    (connector, scan_type, framework, name). Sets parent_scan_id on the new
+    scan so the UI can render version history for the target.
+
+    Works on completed, failed, or even running scans — every rescan is a
+    fresh row, the old one stays as-is for history."""
+    original = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Walk to the root of the rescan chain so version history is flat —
+    # every rescan points at the original scan, not the immediately
+    # previous one. Simpler to render N versions when they're all siblings.
+    root_id = original.parent_scan_id or original.id
+
+    new = Scan(
+        client_id=client_id,
+        project_id=original.project_id,
+        connector_id=original.connector_id,
+        name=original.name,
+        scan_type=original.scan_type,
+        framework=original.framework,
+        initiated_by=user.get("upn", user.get("preferred_username", "system")),
+        status=ScanStatus.PENDING,
+        parent_scan_id=root_id,
+    )
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    from core.config import get_settings
+    background_tasks.add_task(
+        _execute_scan, new.id, get_settings().DATABASE_URL, None, None,
+    )
+    return new
+
+
+@router.get("/{scan_id}/versions", response_model=List[ScanResponse])
+async def list_scan_versions(
+    client_id: str,
+    scan_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Every scan that shares the same root with this one — i.e. the
+    original scan + every rescan of it. Newest first."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    root_id = scan.parent_scan_id or scan.id
+    return (
+        db.query(Scan)
+        .filter(Scan.client_id == client_id)
+        .filter((Scan.id == root_id) | (Scan.parent_scan_id == root_id))
+        .order_by(Scan.created_at.desc())
+        .all()
+    )
+
+
 @router.patch("/{scan_id}/findings/{finding_id}", response_model=FindingResponse)
 async def update_finding(
     client_id: str, scan_id: str, finding_id: str,
