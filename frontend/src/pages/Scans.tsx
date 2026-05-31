@@ -119,12 +119,37 @@ export default function Scans() {
     queryFn: () => assessmentsApi.listAll(),
     refetchInterval: (q) => ((q.state.data as any)?.scans || []).some((s: any) => s.status === "running") ? 5000 : false,
   });
-  const tiles = (tilesData?.scans || []).filter((t) => {
-    if (tileStatusFilter && t.status !== tileStatusFilter) return false;
-    if (tileCategoryFilter && t.category !== tileCategoryFilter) return false;
-    if (selectedClientId && t.client_id !== selectedClientId) return false;
-    return true;
-  });
+  // Group scans by version root (parent_scan_id ?? id). Only the newest
+  // sibling in each group renders as its own tile — older versions live in
+  // the History dialog accessible via the yellow badge.
+  const { tiles, versionMap: _versionMap } = React.useMemo(() => {
+    const allScans = (tilesData?.scans || []) as any[];
+    const groups = new Map<string, any[]>();
+    for (const t of allScans) {
+      const root = t.parent_scan_id || t.id;
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(t);
+    }
+    groups.forEach((arr) => {
+      arr.sort((a, b) => {
+        const at = new Date(a.started_at || a.created_at || 0).getTime();
+        const bt = new Date(b.started_at || b.created_at || 0).getTime();
+        return bt - at;
+      });
+    });
+    // Keep only the newest sibling per group, then apply user filters.
+    const latestIds = new Set<string>();
+    groups.forEach((arr) => { if (arr[0]) latestIds.add(arr[0].id); });
+    const filtered = allScans
+      .filter((t) => latestIds.has(t.id))
+      .filter((t) => {
+        if (tileStatusFilter && t.status !== tileStatusFilter) return false;
+        if (tileCategoryFilter && t.category !== tileCategoryFilter) return false;
+        if (selectedClientId && t.client_id !== selectedClientId) return false;
+        return true;
+      });
+    return { tiles: filtered, versionMap: groups };
+  }, [tilesData, tileStatusFilter, tileCategoryFilter, selectedClientId]);
 
   const { data: findings = [], isLoading: findingsLoading } = useQuery<any[]>({
     queryKey: ["findings", selectedClientId, viewScan?.id],
@@ -174,23 +199,7 @@ export default function Scans() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to rescan"),
   });
 
-  // Build a version-count map per tile: every tile and its parent share the
-  // same root, so siblings = (parent_scan_id ?? id). Lets us show "vN of M"
-  // on the live tile and an icon to open the version history.
-  const versionMap = React.useMemo(() => {
-    const groups = new Map<string, any[]>();
-    for (const t of (tilesData?.scans || [])) {
-      const root = t.parent_scan_id || t.id;
-      if (!groups.has(root)) groups.set(root, []);
-      groups.get(root)!.push(t);
-    }
-    // newest first per group
-    groups.forEach((arr) => {
-      arr.sort((a, b) => new Date(b.started_at || b.id).getTime() - new Date(a.started_at || a.id).getTime());
-    });
-    return groups;
-  }, [tilesData]);
-
+  const versionMap = _versionMap;
   const [historyOpenForRoot, setHistoryOpenForRoot] = useState<string | null>(null);
 
   return (
