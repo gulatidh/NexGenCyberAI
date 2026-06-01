@@ -742,11 +742,54 @@ class AIAgent(Base):
     is_builtin = Column(Boolean, default=False, nullable=False)
     is_enabled = Column(Boolean, default=True, nullable=False)
     legacy_orchestrator = Column(Boolean, default=False, nullable=False)
+    # Phase 7A — artifact-producing buddies. When != "prose", the runner
+    # appends a JSON-schema directive to the system prompt and parses the
+    # output into structured artifacts persisted on AgentRun.output_data.
+    # Valid kinds (validated in agent_catalog router):
+    #   prose | risk_drafts | jira_drafts | control_mappings |
+    #   runbook | finding_triage
+    output_kind = Column(String(32), default="prose")
+    # Optional override of the per-kind canonical schema (advanced; null
+    # means use the schema baked into services/agent_artifacts.py).
+    output_schema_json = Column(Text)
+    # Phase 7C — personality. Avatar + signature opening line make each
+    # buddy feel like a colleague rather than a search bar. accent_color
+    # also tints the buddy's card border + chip backgrounds so they're
+    # visually distinguishable.
+    avatar_url = Column(String(512))                 # /buddies/appsec.svg or absolute URL
+    signature_opening = Column(String(300))          # "From the AppSec lens —" prefixed to every output
+    accent_color = Column(String(16))                # "#4285F4" etc.
     # Audit
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     created_by = Column(String(255))
     updated_by = Column(String(255))
+
+
+class BuddyTrigger(Base):
+    """Phase 7B — event → buddy proactive triggers.
+
+    When a tracked event fires (new Critical finding, connector status
+    change to 'error', new Critical risk, etc.) the matching enabled
+    trigger queues the buddy to run in the background. Result is posted
+    to the relevant scan blackboard or, when scan-less, a dashboard
+    notification.
+
+    Triggers are intentionally configurable per-tenant — different
+    customers want different buddies on different alarms. A handful of
+    sensible defaults are seeded on startup."""
+    __tablename__ = "buddy_triggers"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    agent_key = Column(String(128), nullable=False, index=True)
+    event_kind = Column(String(64), nullable=False, index=True)
+    # JSON encoding of threshold conditions, e.g. {"severity":"critical"}.
+    threshold_json = Column(JSON, default=dict)
+    enabled = Column(Boolean, default=True, nullable=False)
+    last_fired_at = Column(DateTime(timezone=True))
+    last_status = Column(String(32))                 # 'ok' | 'error' | 'skipped'
+    last_error = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class KnowledgeFileSection(Base):

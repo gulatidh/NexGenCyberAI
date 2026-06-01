@@ -207,6 +207,33 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("risks.source_threat_id ALTER failed: %s", exc)
 
+        # Phase 7A — AIAgent.output_kind + output_schema_json. Lets each
+        # buddy declare what shape its output takes (risk_drafts /
+        # control_mappings / runbook / etc.).
+        try:
+            agent_cols = {c["name"] for c in inspector.get_columns("ai_agents")}
+        except Exception:
+            agent_cols = set()
+        _agent_additions = [
+            ("output_kind",         "NVARCHAR(32) NULL",  "VARCHAR(32)"),
+            ("output_schema_json",  "NVARCHAR(MAX) NULL", "TEXT"),
+            # Phase 7C — personality fields
+            ("avatar_url",          "NVARCHAR(512) NULL", "VARCHAR(512)"),
+            ("signature_opening",   "NVARCHAR(300) NULL", "VARCHAR(300)"),
+            ("accent_color",        "NVARCHAR(16) NULL",  "VARCHAR(16)"),
+        ]
+        for col, mssql_type, sqlite_type in _agent_additions:
+            if agent_cols and col not in agent_cols:
+                ddl = (f"ALTER TABLE ai_agents ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE ai_agents ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added ai_agents.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("ai_agents.%s ALTER failed: %s", col, exc)
+
         # Phase 5 — AISettings feature flags + embedding model fields.
         try:
             ai_cols = {c["name"] for c in inspector.get_columns("ai_settings")}
@@ -567,6 +594,20 @@ async def _start_mission_scheduler() -> None:
     except Exception:
         import logging
         logging.getLogger(__name__).exception("Failed to start feed schedules")
+
+    # Phase 7B — seed default buddy triggers + register weekly roundup.
+    try:
+        from services.buddy_triggers import seed_default_triggers, start_weekly_roundup
+        from db.database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            seed_default_triggers(bg_db)
+        finally:
+            bg_db.close()
+        start_weekly_roundup()
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to start buddy triggers")
 
 
 @app.on_event("startup")

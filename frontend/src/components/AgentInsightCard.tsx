@@ -11,13 +11,14 @@
  * collapse.
  */
 import React from "react";
-import { Box, Card, CardContent, Chip, Collapse, IconButton, Tooltip, Typography } from "@mui/material";
+import { Avatar, Box, Card, CardContent, Chip, Collapse, IconButton, Tooltip, Typography } from "@mui/material";
 import {
   ExpandMore, ExpandLess, SmartToy, ErrorOutlined, CheckCircleOutlined, HourglassEmpty,
-  DeleteOutlined,
+  DeleteOutlined, AutoAwesome, Bolt,
 } from "@mui/icons-material";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "./RichOutput";
+import ArtifactCard from "./ArtifactCard";
 
 interface Props {
   run: {
@@ -98,9 +99,22 @@ function extractSummary(output: any, maxLen = 220): string {
 export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: Props) {
   const status = (run.status || "").toLowerCase();
   const style = STATUS_STYLE[status] || STATUS_STYLE.completed;
-  const label = AGENT_LABEL[run.agent_type] || run.agent_type.replace(/_/g, " ");
+  // Catalog buddies persist their display name in input_data.agent_name —
+  // prefer that over the generic AgentType label.
+  const input = (run as any).input_data || {};
+  const catalogName = typeof input?.agent_name === "string" ? input.agent_name : null;
+  const label = catalogName || AGENT_LABEL[run.agent_type] || run.agent_type.replace(/_/g, " ");
   const summary = React.useMemo(() => extractSummary(run.output_data), [run.output_data]);
   const StatusIcon = style.Icon;
+
+  // Phase 7A — structured artifacts produced by the buddy. Phase 7C —
+  // avatar / accent / proactive marker.
+  const output = (run.output_data as any) || {};
+  const artifacts: any[] = Array.isArray(output.artifacts) ? output.artifacts : [];
+  const outputKind: string = output.output_kind || "prose";
+  const isProactive: boolean = !!output.proactive;
+  const accent = (input.accent_color as string) || "#4285F4";
+  const avatarUrl: string | undefined = input.avatar_url || undefined;
 
   return (
     <Card
@@ -119,12 +133,16 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
           display: "flex", alignItems: "center", gap: 1.25, px: 2, py: 1.5, cursor: "pointer",
         }}
       >
-        <Box sx={{
-          width: 32, height: 32, borderRadius: 1, bgcolor: "rgba(66,133,244,0.12)",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          <SmartToy sx={{ color: "#4285F4", fontSize: 18 }} />
-        </Box>
+        {avatarUrl ? (
+          <Avatar src={avatarUrl} sx={{ width: 32, height: 32, bgcolor: `${accent}22`, flexShrink: 0 }} />
+        ) : (
+          <Box sx={{
+            width: 32, height: 32, borderRadius: 1, bgcolor: `${accent}22`,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <SmartToy sx={{ color: accent, fontSize: 18 }} />
+          </Box>
+        )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <Typography sx={{ color: "white", fontSize: 14, fontWeight: 700, textTransform: "capitalize" }}>
@@ -140,6 +158,20 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
                 "& .MuiChip-icon": { ml: 0.5, mr: -0.25 },
               }}
             />
+            {isProactive && (
+              <Tooltip title="Buddy ran proactively in response to a platform event">
+                <Chip icon={<Bolt sx={{ fontSize: 11, color: "#FBBC04 !important" }} />}
+                  label="proactive" size="small"
+                  sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04" }} />
+              </Tooltip>
+            )}
+            {artifacts.length > 0 && (
+              <Chip icon={<AutoAwesome sx={{ fontSize: 11, color: `${accent} !important` }} />}
+                label={`${artifacts.length} ${outputKind.replace(/_/g, " ")}`}
+                size="small"
+                sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "lowercase",
+                  bgcolor: `${accent}1A`, color: accent }} />
+            )}
             {run.started_at && (
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
                 {fromNow(run.started_at)}
@@ -192,6 +224,9 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
             </Typography>
           )}
           <RichOutput value={run.output_data} />
+          {artifacts.length > 0 && (
+            <ArtifactCard runId={run.id} kind={outputKind} artifacts={artifacts} clientId={(run as any).client_id} />
+          )}
         </CardContent>
       </Collapse>
     </Card>

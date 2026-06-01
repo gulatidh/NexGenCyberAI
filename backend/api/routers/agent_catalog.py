@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from core.security import get_current_user
-from api.models.models import AIAgent
+from api.models.models import AIAgent, AgentRun, Risk, RiskLevel
 from core.authz import get_user_grants, is_admin_anywhere
 
 router = APIRouter(prefix="/agents/catalog", tags=["agent_catalog"])
@@ -65,6 +65,13 @@ class AgentBase(BaseModel):
     tools_enabled: List[str] = []
     knowledge_file_ids: List[str] = []
     is_enabled: bool = True
+    # Phase 7A — artifact-producing buddy config
+    output_kind: str = "prose"
+    output_schema_json: Optional[str] = None
+    # Phase 7C — personality
+    avatar_url: Optional[str] = None
+    signature_opening: Optional[str] = None
+    accent_color: Optional[str] = None
 
 
 class AgentCreate(AgentBase):
@@ -86,6 +93,11 @@ class AgentUpdate(BaseModel):
     tools_enabled: Optional[List[str]] = None
     knowledge_file_ids: Optional[List[str]] = None
     is_enabled: Optional[bool] = None
+    output_kind: Optional[str] = None
+    output_schema_json: Optional[str] = None
+    avatar_url: Optional[str] = None
+    signature_opening: Optional[str] = None
+    accent_color: Optional[str] = None
 
 
 class AgentResponse(AgentBase):
@@ -363,8 +375,25 @@ async def run_agent(
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"LLM unavailable: {exc}")
 
+    # Phase 7A — if the buddy declares a non-prose output_kind, append the
+    # canonical JSON schema directive so we get back a structured response
+    # we can parse into actionable artifacts.
+    output_kind = (a.output_kind or "prose").lower().strip()
+    from services.agent_artifacts import VALID_KINDS, prompt_suffix as artifact_prompt_suffix, parse_response as parse_artifact_response
+    if output_kind not in VALID_KINDS:
+        output_kind = "prose"
+    system_prompt_full = a.system_prompt or f"You are the {a.name}."
+    if a.signature_opening:
+        # Phase 7C — the signature is a one-liner the buddy uses to open
+        # every response. Reinforces identity across runs.
+        system_prompt_full += (
+            f"\n\nBegin your response with: \"{a.signature_opening.strip()}\""
+        )
+    if output_kind != "prose":
+        system_prompt_full += artifact_prompt_suffix(output_kind, a.output_schema_json)
+
     messages = [
-        SystemMessage(content=a.system_prompt or f"You are the {a.name}."),
+        SystemMessage(content=system_prompt_full),
         HumanMessage(content=instruction),
     ]
     try:
@@ -379,6 +408,21 @@ async def run_agent(
     usage = getattr(result, "usage_metadata", None) or {}
     tokens = int(usage.get("total_tokens") or 0)
     original_output = text
+
+    # Phase 7A — parse structured artifacts when the buddy declares a
+    # non-prose output_kind. On parse failure, we keep the prose summary
+    # and surface a soft error in the meta so the UI can tell the user.
+    artifacts: List[Dict[str, Any]] = []
+    artifact_errors: List[str] = []
+    if output_kind != "prose":
+        parsed = parse_artifact_response(output_kind, text)
+        artifacts = parsed.get("artifacts") or []
+        artifact_errors = parsed.get("errors") or []
+        # When structured parsing succeeded, replace the prose body with
+        # the model's own `summary` field — it's the executive overview
+        # paired with the artifacts.
+        if artifacts and parsed.get("summary"):
+            text = parsed["summary"]
 
     # ── Self-critique pass (opt-in via AISettings.self_critique_enabled) ──
     critique_meta: Optional[Dict[str, Any]] = None
@@ -423,6 +467,18 @@ async def run_agent(
                 "agent_name": a.name,
                 "agent_key": a.key,
                 "domain": a.domain,
+                # Phase 7A — structured artifacts the user can act on via
+                # POST /agents/catalog/runs/{run_id}/artifacts/{idx}/apply.
+                # Each artifact's `applied` field starts false; the apply
+                # endpoint flips it to true and stores the resulting entity
+                # id (risk_id / kb_file_id / etc.) so the UI can disable
+                # the button + link to the created entity.
+                "output_kind": output_kind,
+                "artifacts": [
+                    {**art, "applied": False, "applied_entity_id": None, "applied_entity_kind": None}
+                    for art in artifacts
+                ],
+                "artifact_errors": artifact_errors,
                 # When self-critique ran, persist the original alongside the
                 # revised version so the UI can show "self-reviewed" and let
                 # the user inspect what changed.
@@ -463,6 +519,283 @@ async def run_agent(
         run_id=run_id,
         scan_id=scan.id if scan else None,
     )
+
+
+class ArtifactApplyResponse(BaseModel):
+    applied: bool
+    entity_kind: Optional[str] = None   # 'risk' | 'kb_file' | 'framework_assessment' | 'finding' | 'jira_copy'
+    entity_id: Optional[str] = None
+    message: Optional[str] = None
+
+
+def _risk_level_from(sev: str) -> RiskLevel:
+    s = (sev or "medium").lower().strip()
+    mapping = {
+        "critical": RiskLevel.CRITICAL,
+        "high": RiskLevel.HIGH,
+        "medium": RiskLevel.MEDIUM,
+        "low": RiskLevel.LOW,
+    }
+    return mapping.get(s, RiskLevel.MEDIUM)
+
+
+def _apply_risk_draft(db: Session, run: AgentRun, artifact: Dict[str, Any], user: dict) -> Risk:
+    """Create a Risk Register row from a risk_drafts artifact."""
+    title = (artifact.get("title") or "(untitled)").strip()[:500]
+    sev = (artifact.get("severity") or "medium").lower()
+    likelihood = int(artifact.get("likelihood") or 3)
+    impact = int(artifact.get("impact") or 3)
+    rationale = (artifact.get("rationale") or "").strip()
+    refs = artifact.get("control_refs") or []
+    if isinstance(refs, list) and refs:
+        rationale = (rationale + "\n\nControl refs: " + ", ".join(str(r) for r in refs)).strip()
+    risk = Risk(
+        client_id=run.client_id,
+        title=title,
+        description=rationale,
+        risk_level=_risk_level_from(sev),
+        likelihood=max(1, min(5, likelihood)),
+        impact=max(1, min(5, impact)),
+        risk_score=round(likelihood * impact / 2.5, 1),
+        category=(artifact.get("category") or "").strip()[:100] or None,
+        owner=user.get("upn") or user.get("preferred_username"),
+        status="open",
+        mitigation_plan=(artifact.get("mitigation_plan") or "").strip() or None,
+        finding_ids=[],
+    )
+    db.add(risk)
+    db.flush()
+    return risk
+
+
+def _apply_runbook(db: Session, run: AgentRun, artifact: Dict[str, Any]) -> Any:
+    """Save a runbook artifact as a KnowledgeFile in the 'Buddy Runbooks' category."""
+    from api.models.models import KnowledgeFile
+    title = (artifact.get("title") or "Untitled runbook").strip()[:255]
+    steps_md = []
+    for s in (artifact.get("steps") or []):
+        if isinstance(s, dict):
+            line = f"{s.get('order', '?')}. {s.get('action', '')}"
+            if s.get("notes"):
+                line += f"\n   _{s['notes']}_"
+            steps_md.append(line)
+    rollback_md = ""
+    rb = artifact.get("rollback_steps") or []
+    if rb:
+        rollback_md = "\n\n## Rollback\n" + "\n".join(f"- {r}" for r in rb)
+    description = (
+        f"**Trigger:** {artifact.get('trigger', '—')}\n\n"
+        f"**Audience:** {artifact.get('audience', '—')}\n\n"
+        f"## Steps\n" + "\n".join(steps_md) + rollback_md
+    )
+    kf = KnowledgeFile(
+        name=title,
+        category="buddy_runbooks",
+        description=description,
+        version="v1.0",
+        size_kb=max(1, len(description) // 1024),
+        used_by=[],
+        metadata_={"source": "buddy_artifact", "agent_run_id": run.id},
+    )
+    db.add(kf)
+    db.flush()
+    return kf
+
+
+def _apply_control_mapping(db: Session, run: AgentRun, artifact: Dict[str, Any]) -> Any:
+    """Stash a control-mapping artifact as a note on the latest FrameworkAssessment
+    for this client + framework. We don't overwrite the canonical scoring — we
+    add to a 'buddy_suggested_mappings' JSON array so the user reviews them
+    before they affect the assessment."""
+    from api.models.models import FrameworkAssessment, FrameworkType
+    framework_str = (artifact.get("framework") or "").lower().strip()
+    try:
+        fw = FrameworkType(framework_str)
+    except ValueError:
+        return None
+    assessment = (
+        db.query(FrameworkAssessment)
+        .filter(FrameworkAssessment.client_id == run.client_id, FrameworkAssessment.framework == fw)
+        .order_by(FrameworkAssessment.assessed_at.desc())
+        .first()
+    )
+    if assessment is None:
+        return None
+    bucket = (assessment.gaps or []) if isinstance(assessment.gaps, list) else []
+    bucket.append({
+        "source": "buddy_artifact",
+        "agent_run_id": run.id,
+        "control_id": artifact.get("control_id"),
+        "evidence": artifact.get("evidence"),
+        "status": artifact.get("status"),
+        "confidence": artifact.get("confidence"),
+    })
+    assessment.gaps = bucket
+    db.flush()
+    return assessment
+
+
+def _apply_finding_triage(db: Session, run: AgentRun, artifact: Dict[str, Any]) -> Any:
+    """Update a finding's status / owner based on the buddy's triage."""
+    from api.models.models import Finding
+    fid = artifact.get("finding_id")
+    if not fid:
+        return None
+    f = db.query(Finding).filter(Finding.id == fid).first()
+    if not f:
+        return None
+    new_status = (artifact.get("recommended_status") or "").strip()
+    if new_status:
+        f.status = new_status
+    # Owner role doesn't map to a single field; stash it in evidence
+    role = (artifact.get("recommended_owner_role") or "").strip()
+    if role:
+        ev = dict(f.evidence or {})
+        ev["buddy_owner_role"] = role
+        ev["buddy_rationale"] = artifact.get("rationale", "")
+        f.evidence = ev
+    db.flush()
+    return f
+
+
+@router.post("/runs/{run_id}/artifacts/{idx}/apply", response_model=ArtifactApplyResponse)
+async def apply_artifact(
+    run_id: str,
+    idx: int,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """One-click apply for a buddy-produced artifact (Phase 7A).
+
+    Dispatches by `output_kind`:
+      risk_drafts      → creates a Risk Register row
+      runbook          → saves a KnowledgeFile under 'buddy_runbooks'
+      control_mappings → appends to the latest FrameworkAssessment's gaps[]
+      finding_triage   → updates the referenced Finding's status / evidence
+      jira_drafts      → no-op (frontend handles copy-to-clipboard)
+
+    Idempotent: the artifact's `applied` flag prevents double-apply."""
+    run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="AgentRun not found")
+    out = dict(run.output_data or {})
+    artifacts = list(out.get("artifacts") or [])
+    if idx < 0 or idx >= len(artifacts):
+        raise HTTPException(status_code=404, detail=f"Artifact index {idx} out of range")
+    artifact = dict(artifacts[idx])
+    if artifact.get("applied"):
+        return ArtifactApplyResponse(
+            applied=True,
+            entity_kind=artifact.get("applied_entity_kind"),
+            entity_id=artifact.get("applied_entity_id"),
+            message="Already applied",
+        )
+
+    kind = (out.get("output_kind") or "prose").lower()
+    entity_kind: Optional[str] = None
+    entity_id: Optional[str] = None
+    try:
+        if kind == "risk_drafts":
+            risk = _apply_risk_draft(db, run, artifact, user)
+            entity_kind, entity_id = "risk", risk.id
+        elif kind == "runbook":
+            kf = _apply_runbook(db, run, artifact)
+            entity_kind, entity_id = "kb_file", kf.id
+        elif kind == "control_mappings":
+            a = _apply_control_mapping(db, run, artifact)
+            if a is None:
+                raise HTTPException(status_code=409, detail="No matching FrameworkAssessment for this client/framework — run a scan against this framework first.")
+            entity_kind, entity_id = "framework_assessment", a.id
+        elif kind == "finding_triage":
+            f = _apply_finding_triage(db, run, artifact)
+            if f is None:
+                raise HTTPException(status_code=404, detail="Finding not found")
+            entity_kind, entity_id = "finding", f.id
+        elif kind == "jira_drafts":
+            # Frontend handles copy-to-clipboard. We still mark it applied
+            # so the button toggles to "copied".
+            entity_kind, entity_id = "jira_copy", None
+        else:
+            raise HTTPException(status_code=400, detail=f"output_kind '{kind}' has no apply handler")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("artifact apply failed (run=%s idx=%s kind=%s)", run_id, idx, kind)
+        raise HTTPException(status_code=500, detail=f"Apply failed: {type(exc).__name__}: {exc}")
+
+    # Mark the artifact applied on the AgentRun row.
+    artifact["applied"] = True
+    artifact["applied_entity_kind"] = entity_kind
+    artifact["applied_entity_id"] = entity_id
+    artifacts[idx] = artifact
+    out["artifacts"] = artifacts
+    run.output_data = out
+    # SQLAlchemy doesn't detect in-place dict mutation on JSON columns
+    # without flag_modified.
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(run, "output_data")
+    db.commit()
+    return ArtifactApplyResponse(applied=True, entity_kind=entity_kind, entity_id=entity_id, message="Applied")
+
+
+@router.get("/{agent_id}/stats")
+async def get_agent_stats(
+    agent_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 7C — per-buddy usage telemetry. Powers the strip on each
+    catalog tile: 'N runs · M artifacts applied · K learnings stored'."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func, cast, String
+    from api.models.models import AgentRun, MissionLearning
+    a = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    last_30 = datetime.now(timezone.utc) - timedelta(days=30)
+    # Use a substring match on input_data JSON since agent_key is encoded there.
+    marker = f'"agent_key": "{a.key}"'
+    runs_30d = (
+        db.query(func.count(AgentRun.id))
+        .filter(AgentRun.started_at >= last_30)
+        .filter(cast(AgentRun.input_data, String).ilike(f"%{marker}%"))
+        .scalar() or 0
+    )
+    runs_total = (
+        db.query(func.count(AgentRun.id))
+        .filter(cast(AgentRun.input_data, String).ilike(f"%{marker}%"))
+        .scalar() or 0
+    )
+    # Artifacts applied — counts agent_runs whose output_data contains "applied": true
+    applied_30d = (
+        db.query(func.count(AgentRun.id))
+        .filter(AgentRun.started_at >= last_30)
+        .filter(cast(AgentRun.input_data, String).ilike(f"%{marker}%"))
+        .filter(cast(AgentRun.output_data, String).ilike('%"applied": true%'))
+        .scalar() or 0
+    )
+    learnings = (
+        db.query(func.count(MissionLearning.id))
+        .filter(MissionLearning.agent_key == a.key)
+        .scalar() or 0
+    )
+    last_run_row = (
+        db.query(AgentRun.completed_at)
+        .filter(cast(AgentRun.input_data, String).ilike(f"%{marker}%"))
+        .order_by(AgentRun.completed_at.desc())
+        .first()
+    )
+    last_run_at = last_run_row[0].isoformat() if last_run_row and last_run_row[0] else None
+    return {
+        "agent_id": a.id,
+        "agent_key": a.key,
+        "runs_total": int(runs_total),
+        "runs_30d": int(runs_30d),
+        "artifacts_applied_30d": int(applied_30d),
+        "learnings_contributed": int(learnings),
+        "last_run_at": last_run_at,
+    }
 
 
 def _post_run_learning_and_blackboard(

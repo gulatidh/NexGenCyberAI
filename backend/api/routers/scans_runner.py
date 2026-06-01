@@ -215,4 +215,35 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
         except Exception:
             logger.exception("Failed to enqueue verdict generation for scan %s", scan.id)
 
+    # Phase 7B — fire buddy triggers for any new Critical / High findings.
+    # We send one event per severity bucket (not per finding) with a sample
+    # so the buddies get context without an explosion of LLM calls.
+    if background_tasks is not None:
+        try:
+            from services.buddy_triggers import fire_event
+            critical_findings = [f for f in payload.findings if (f.severity or "").lower() == "critical"]
+            high_findings = [f for f in payload.findings if (f.severity or "").lower() == "high"]
+            for kind, bucket in (("finding.critical", critical_findings), ("finding.high", high_findings)):
+                if not bucket:
+                    continue
+                background_tasks.add_task(
+                    fire_event,
+                    event_kind=kind,
+                    payload={
+                        "_event_kind": kind,
+                        "severity": kind.split(".")[1],
+                        "count": len(bucket),
+                        "scan_id": scan.id,
+                        "client_id": scan.client_id,
+                    },
+                    client_id=scan.client_id,
+                    scan_id=scan.id,
+                    findings_for_prompt=[
+                        {"title": f.title, "severity": (f.severity or "info").lower(),
+                         "resource": f.resource_id, "cve": f.cve_id} for f in bucket[:8]
+                    ],
+                )
+        except Exception:
+            logger.exception("Failed to fire buddy triggers for scan %s", scan.id)
+
     return {"ok": True, "status": "completed", "ingested": len(payload.findings)}

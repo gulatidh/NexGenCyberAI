@@ -339,4 +339,10 @@ export const agentCatalogApi = {
       client_id: clientId,
       scan_id: scanId,
     }).then((r) => r.data),
+  // Phase 7A — one-click apply for a buddy-produced artifact
+  applyArtifact: (runId: string, idx: number) =>
+    apiClient.post(`/agents/catalog/runs/${runId}/artifacts/${idx}/apply`).then((r) => r.data),
+  // Phase 7C — per-buddy usage stats
+  stats: (agentId: string) =>
+    apiClient.get(`/agents/catalog/${agentId}/stats`).then((r) => r.data),
 };

@@ -367,8 +367,56 @@ _CATALOG: List[Dict[str, Any]] = [
 ]
 
 
+# Phase 7A/7C — personality + artifact defaults applied to a curated set
+# of built-in buddies. Other catalog entries inherit `output_kind="prose"`
+# and a default avatar/colour. Operators can override any of these in the
+# AI Buddies admin page.
+_BUDDY_PERSONALITY: dict = {
+    "appsec_lead": {
+        "output_kind": "risk_drafts",
+        "signature_opening": "From the AppSec lens —",
+        "avatar_url": "/buddies/appsec.svg",
+        "accent_color": "#EA4335",
+    },
+    "vulnerability_response": {
+        "output_kind": "finding_triage",
+        "signature_opening": "Triage call —",
+        "avatar_url": "/buddies/vuln.svg",
+        "accent_color": "#FF7043",
+    },
+    "grc_advisor": {
+        "output_kind": "control_mappings",
+        "signature_opening": "Compliance read —",
+        "avatar_url": "/buddies/grc.svg",
+        "accent_color": "#9C27B0",
+    },
+    "soc_director": {
+        "output_kind": "runbook",
+        "signature_opening": "From the SOC —",
+        "avatar_url": "/buddies/soc.svg",
+        "accent_color": "#4285F4",
+    },
+    "ciso_advisor": {
+        "output_kind": "prose",
+        "signature_opening": "Executive view —",
+        "avatar_url": "/buddies/ciso.svg",
+        "accent_color": "#34A853",
+    },
+    "identity_engineer": {
+        "output_kind": "prose",
+        "signature_opening": "Identity perspective —",
+        "avatar_url": "/buddies/identity.svg",
+        "accent_color": "#FBBC04",
+    },
+}
+
+
 def seed_agent_catalog() -> None:
-    """Insert any agents whose `key` doesn't already exist. Idempotent."""
+    """Insert any agents whose `key` doesn't already exist. Idempotent.
+
+    Also applies the Phase 7A/7C personality + artifact defaults (one-shot
+    backfill — only fills fields that are still null so admin edits are
+    preserved)."""
     db = SessionLocal()
     try:
         existing_keys = {row[0] for row in db.query(AIAgent.key).all()}
@@ -376,6 +424,7 @@ def seed_agent_catalog() -> None:
         for entry in _CATALOG:
             if entry["key"] in existing_keys:
                 continue
+            persona = _BUDDY_PERSONALITY.get(entry["key"], {})
             db.add(AIAgent(
                 key=entry["key"],
                 name=entry["name"],
@@ -394,11 +443,41 @@ def seed_agent_catalog() -> None:
                 is_builtin=True,
                 is_enabled=True,
                 legacy_orchestrator=entry.get("legacy_orchestrator", False),
+                output_kind=persona.get("output_kind", "prose"),
+                signature_opening=persona.get("signature_opening"),
+                avatar_url=persona.get("avatar_url"),
+                accent_color=persona.get("accent_color"),
             ))
             inserted += 1
         db.commit()
         if inserted:
             logger.info("Seeded %d new agents into catalog", inserted)
+
+        # Backfill personality on existing built-in rows — only fields
+        # still NULL get filled, so admin edits never get overwritten.
+        backfilled = 0
+        for key, persona in _BUDDY_PERSONALITY.items():
+            a = db.query(AIAgent).filter(AIAgent.key == key, AIAgent.is_builtin == True).first()
+            if not a:
+                continue
+            changed = False
+            if not a.output_kind or a.output_kind == "prose":
+                a.output_kind = persona.get("output_kind", "prose")
+                changed = a.output_kind != "prose"
+            if not a.signature_opening and persona.get("signature_opening"):
+                a.signature_opening = persona["signature_opening"]
+                changed = True
+            if not a.avatar_url and persona.get("avatar_url"):
+                a.avatar_url = persona["avatar_url"]
+                changed = True
+            if not a.accent_color and persona.get("accent_color"):
+                a.accent_color = persona["accent_color"]
+                changed = True
+            if changed:
+                backfilled += 1
+        if backfilled:
+            db.commit()
+            logger.info("Backfilled Phase 7 personality on %d existing buddies", backfilled)
     except Exception:
         db.rollback()
         logger.exception("Agent catalog seed failed")
