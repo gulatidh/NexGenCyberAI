@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
@@ -10,6 +10,7 @@ import {
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
+  ChevronLeft, ChevronRight,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -18,30 +19,48 @@ import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
 
 const DRAWER_WIDTH = 240;
+const DRAWER_RAIL_WIDTH = 64;
+const COLLAPSE_KEY = "nav-collapsed";
 
 type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean };
 type NavGroup = { section?: string; items: NavItem[] };
 
-// Top-level pages group "main workflow"; Settings group at the bottom holds
-// admin/config items. Connectors + Projects no longer appear in main nav —
-// they live as tabs inside the Client Detail page.
+// Grouped navigation. Sections collapse into a small icon-rail when the
+// sidebar is collapsed; when expanded the section label sits above each
+// group. Order = importance to a security analyst's day.
 const NAV_GROUPS: NavGroup[] = [
   {
+    section: "Overview",
     items: [
       { label: "Dashboard",      icon: <Dashboard />,  path: "/dashboard" },
       { label: "Risk Overview",  icon: <Insights />,   path: "/risk-overview" },
-      { label: "Clients",        icon: <People />,     path: "/clients" },
-      { label: "Assessments",    icon: <BugReport />,  path: "/scans" },
-      { label: "Findings",       icon: <Security />,   path: "/findings" },
-      { label: "Risk Register",  icon: <Assessment />, path: "/risks" },
-      { label: "Threat Models",  icon: <Hub />,        path: "/threat-models" },
-      { label: "Asset Inventory", icon: <Storage />,   path: "/assets" },
-      { label: "Technologies",   icon: <Apps />,       path: "/assets/technologies" },
-      { label: "Frameworks",     icon: <Policy />,     path: "/frameworks" },
-      { label: "AI Buddies",     icon: <SmartToy />,   path: "/agents" },
-      { label: "Workflows",      icon: <Schedule />,   path: "/missions" },
-      { label: "Knowledge Base", icon: <AutoStories />, path: "/knowledge" },
       { label: "Reports",        icon: <BarChart />,   path: "/reports" },
+    ],
+  },
+  {
+    section: "Foundation",
+    items: [
+      { label: "Clients",         icon: <People />,   path: "/clients" },
+      { label: "Asset Inventory", icon: <Storage />,  path: "/assets" },
+      { label: "Technologies",    icon: <Apps />,     path: "/assets/technologies" },
+      { label: "Frameworks",      icon: <Policy />,   path: "/frameworks" },
+    ],
+  },
+  {
+    section: "Assessments",
+    items: [
+      { label: "Assessments",   icon: <BugReport />, path: "/scans" },
+      { label: "Findings",      icon: <Security />,  path: "/findings" },
+      { label: "Threat Models", icon: <Hub />,       path: "/threat-models" },
+      { label: "Risk Register", icon: <Assessment />, path: "/risks" },
+    ],
+  },
+  {
+    section: "Automation",
+    items: [
+      { label: "AI Buddies",     icon: <SmartToy />,    path: "/agents" },
+      { label: "Workflows",      icon: <Schedule />,    path: "/missions" },
+      { label: "Knowledge Base", icon: <AutoStories />, path: "/knowledge" },
     ],
   },
   {
@@ -61,6 +80,20 @@ export default function AppLayout() {
   const { instance, accounts } = useMsal();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Default to collapsed (rail mode) — gives pages maximum width. User can
+  // pin the expanded mode via the toggle, persisted in localStorage.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    const v = typeof window !== "undefined" ? window.localStorage.getItem(COLLAPSE_KEY) : null;
+    return v === null ? true : v === "1";
+  });
+  // When collapsed, hovering over the sidebar temporarily expands it so the
+  // user can read labels without un-pinning.
+  const [hovering, setHovering] = useState(false);
+  const expanded = !collapsed || hovering;
+
+  useEffect(() => {
+    window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
 
   const { data: me } = useQuery<MyAccess>({
     queryKey: ["my-access"],
@@ -78,80 +111,143 @@ export default function AppLayout() {
   };
 
   const drawer = (
-    <Box sx={{ height: "100%", bgcolor: "grey.900", color: "white" }}>
-      <Box sx={{ p: 2, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-        <Shield sx={{ color: "#4285F4", fontSize: 32 }} />
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-            NexGen
-          </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
-            A DRJ Product
-          </Typography>
+    <Box
+      sx={{ height: "100%", bgcolor: "grey.900", color: "white", overflowX: "hidden" }}
+      onMouseEnter={() => collapsed && setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
+      {/* Brand + collapse toggle */}
+      <Box sx={{
+        p: expanded ? 2 : 1, display: "flex", alignItems: "center",
+        gap: 1, justifyContent: expanded ? "space-between" : "center",
+        borderBottom: "1px solid rgba(255,255,255,0.1)", minHeight: 64,
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
+          <Shield sx={{ color: "#4285F4", fontSize: 32, flexShrink: 0 }} />
+          {expanded && (
+            <Box sx={{ whiteSpace: "nowrap" }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+                NexGen
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+                A DRJ Product
+              </Typography>
+            </Box>
+          )}
         </Box>
+        {expanded && (
+          <Tooltip title={collapsed ? "Pin expanded" : "Collapse to icons"}>
+            <IconButton
+              size="small"
+              onClick={() => setCollapsed((c) => !c)}
+              sx={{ color: "rgba(255,255,255,0.6)" }}
+            >
+              {collapsed ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
-      <List sx={{ pt: 1 }}>
+
+      {/* When collapsed and not hovering, show a tiny expand-rail button just
+          below the brand so the user has an obvious way to pin-open. */}
+      {!expanded && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 0.5 }}>
+          <Tooltip title="Expand navigation" placement="right">
+            <IconButton size="small" onClick={() => setCollapsed(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>
+              <ChevronRight fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+
+      <List sx={{ pt: 0.5 }}>
         {NAV_GROUPS.map((group, gi) => {
           const items = group.items.filter((i) => !i.adminOnly || me?.is_admin || me?.is_admin_anywhere);
           if (items.length === 0) return null;
           return (
-          <React.Fragment key={gi}>
-            {group.section && (
-              <Typography
-                variant="caption"
-                sx={{
-                  display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10,
-                  fontWeight: 700, letterSpacing: 1, mt: 1.5, mb: 0.5, mx: 2.5,
-                  textTransform: "uppercase",
-                }}
-              >
-                {group.section}
-              </Typography>
-            )}
-            {items.map((item) => {
-              // Exact-match for /assets to avoid /assets/technologies highlighting both
-              const active = item.path === "/assets"
-                ? pathname === "/assets" || /^\/assets\/[^/]+$/.test(pathname)  // /assets and /assets/:id
-                : pathname.startsWith(item.path);
-              return (
-                <ListItemButton
-                  key={item.path}
-                  onClick={() => navigate(item.path)}
+            <React.Fragment key={gi}>
+              {group.section && expanded && (
+                <Typography
+                  variant="caption"
                   sx={{
-                    mx: 1, my: 0.3, borderRadius: 1,
-                    bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                    display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10,
+                    fontWeight: 700, letterSpacing: 1, mt: gi === 0 ? 1 : 1.5, mb: 0.5, mx: 2.5,
+                    textTransform: "uppercase",
                   }}
                 >
-                  <ListItemIcon sx={{ color: active ? "#4285F4" : "rgba(255,255,255,0.6)", minWidth: 36 }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.label}
-                    slotProps={{
-                      primary: {
-                        style: {
-                          fontSize: 13,
-                          fontWeight: active ? 600 : 400,
-                          color: active ? "#4285F4" : "rgba(255,255,255,0.8)",
-                        },
-                      },
+                  {group.section}
+                </Typography>
+              )}
+              {/* Group divider rail when collapsed — keeps visual grouping
+                  even without section labels. Skip for first group. */}
+              {!expanded && gi > 0 && (
+                <Divider sx={{ mx: 1.5, my: 0.75, borderColor: "rgba(255,255,255,0.08)" }} />
+              )}
+              {items.map((item) => {
+                const active = item.path === "/assets"
+                  ? pathname === "/assets" || /^\/assets\/[^/]+$/.test(pathname)
+                  : pathname.startsWith(item.path);
+                const button = (
+                  <ListItemButton
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      mx: 1, my: 0.3, borderRadius: 1,
+                      minHeight: 42,
+                      justifyContent: expanded ? "flex-start" : "center",
+                      px: expanded ? 1.5 : 1,
+                      bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
+                      "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
                     }}
-                  />
-                </ListItemButton>
-              );
-            })}
-          </React.Fragment>
+                  >
+                    <ListItemIcon sx={{
+                      color: active ? "#4285F4" : "rgba(255,255,255,0.6)",
+                      minWidth: expanded ? 36 : 0,
+                      justifyContent: "center",
+                    }}>
+                      {item.icon}
+                    </ListItemIcon>
+                    {expanded && (
+                      <ListItemText
+                        primary={item.label}
+                        slotProps={{
+                          primary: {
+                            style: {
+                              fontSize: 13,
+                              fontWeight: active ? 600 : 400,
+                              color: active ? "#4285F4" : "rgba(255,255,255,0.8)",
+                              whiteSpace: "nowrap",
+                            },
+                          },
+                        }}
+                      />
+                    )}
+                  </ListItemButton>
+                );
+                // Tooltip only when collapsed-and-not-hovering — otherwise
+                // labels are visible and tooltips would just add noise.
+                if (!expanded) {
+                  return (
+                    <Tooltip key={item.path} title={item.label} placement="right">
+                      {button}
+                    </Tooltip>
+                  );
+                }
+                return button;
+              })}
+            </React.Fragment>
           );
         })}
       </List>
     </Box>
   );
 
+  const effectiveWidth = collapsed ? DRAWER_RAIL_WIDTH : DRAWER_WIDTH;
+
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0F0F0F" }}>
       {/* Sidebar */}
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: 0 }}>
+      <Box component="nav" sx={{ width: { md: effectiveWidth }, flexShrink: 0, transition: "width 200ms ease" }}>
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -163,7 +259,16 @@ export default function AppLayout() {
         </Drawer>
         <Drawer
           variant="permanent"
-          sx={{ display: { xs: "none", md: "block" }, "& .MuiDrawer-paper": { width: DRAWER_WIDTH, border: "none" } }}
+          sx={{
+            display: { xs: "none", md: "block" },
+            "& .MuiDrawer-paper": {
+              width: hovering ? DRAWER_WIDTH : effectiveWidth,
+              border: "none",
+              overflowX: "hidden",
+              transition: "width 200ms ease",
+              boxShadow: hovering ? "6px 0 24px rgba(0,0,0,0.45)" : "none",
+            },
+          }}
           open
         >
           {drawer}
@@ -171,7 +276,7 @@ export default function AppLayout() {
       </Box>
 
       {/* Main content */}
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
           position="sticky"
           elevation={0}
@@ -181,6 +286,15 @@ export default function AppLayout() {
             <IconButton color="inherit" onClick={() => setMobileOpen(true)} sx={{ mr: 1, display: { md: "none" } }}>
               <MenuIcon />
             </IconButton>
+            <Tooltip title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+              <IconButton
+                color="inherit"
+                onClick={() => setCollapsed((c) => !c)}
+                sx={{ mr: 1, display: { xs: "none", md: "inline-flex" }, color: "rgba(255,255,255,0.65)" }}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Tooltip>
             <Box sx={{ flexGrow: 1 }} />
             <Typography
               sx={{
