@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ThemeProvider, createTheme, CssBaseline } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeModeProvider } from "./theme/ThemeModeContext";
 import { MsalAuthenticationTemplate } from "@azure/msal-react";
 import { InteractionType } from "@azure/msal-browser";
 import { ToastContainer } from "react-toastify";
@@ -34,60 +34,6 @@ import Account from "./pages/Account";
 import Missions from "./pages/Missions";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
-
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: { main: "#4285F4" },
-    secondary: { main: "#34A853" },
-    warning: { main: "#FBBC04" },
-    error: { main: "#EA4335" },
-    background: { default: "#0F0F0F", paper: "#1E1E1E" },
-    divider: "rgba(255,255,255,0.08)",
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Google Sans", sans-serif',
-    button: { textTransform: "none", fontWeight: 600 },
-    h1: { fontWeight: 700, letterSpacing: "-0.02em" },
-    h2: { fontWeight: 700, letterSpacing: "-0.02em" },
-    h3: { fontWeight: 700, letterSpacing: "-0.01em" },
-    h4: { fontWeight: 700, letterSpacing: "-0.01em" },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
-  },
-  shape: { borderRadius: 12 },
-  components: {
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          backgroundImage: "none",
-          border: "1px solid rgba(255,255,255,0.06)",
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: { root: { backgroundImage: "none" } },
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: { textTransform: "none", fontWeight: 600, borderRadius: 24 },
-      },
-      variants: [
-        {
-          props: { variant: "contained", color: "primary" },
-          style: {
-            background: "linear-gradient(135deg, #4285F4 0%, #1A73E8 100%)",
-            boxShadow: "0 4px 14px rgba(66,133,244,0.35)",
-            "&:hover": {
-              background: "linear-gradient(135deg, #5B9CFF 0%, #2B85F5 100%)",
-              boxShadow: "0 6px 20px rgba(66,133,244,0.5)",
-            },
-          },
-        },
-      ],
-    },
-  },
-});
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -124,8 +70,7 @@ export default function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={darkTheme}>
-          <CssBaseline />
+        <ThemeModeProvider>
           <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
           <MsalAuthenticationTemplate
             interactionType={InteractionType.Redirect}
@@ -235,7 +180,7 @@ export default function App() {
               </Routes>
             </BrowserRouter>
           </MsalAuthenticationTemplate>
-        </ThemeProvider>
+        </ThemeModeProvider>
       </QueryClientProvider>
     </AuthProvider>
   );

@@ -10,13 +10,14 @@ import {
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
 import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
+import { useThemeMode } from "../../theme/ThemeModeContext";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -79,7 +80,9 @@ export default function AppLayout() {
   const { pathname } = useLocation();
   const { instance, accounts } = useMsal();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [themeAnchor, setThemeAnchor] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { mode, setMode, customPalette, setCustomPalette } = useThemeMode();
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -112,7 +115,12 @@ export default function AppLayout() {
 
   const drawer = (
     <Box
-      sx={{ height: "100%", bgcolor: "grey.900", color: "white", overflowX: "hidden" }}
+      sx={{
+        height: "100%",
+        bgcolor: mode === "light" ? "#0F172A" : "background.paper",
+        color: "white",
+        overflowX: "hidden",
+      }}
       onMouseEnter={() => collapsed && setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
@@ -245,7 +253,7 @@ export default function AppLayout() {
   const effectiveWidth = collapsed ? DRAWER_RAIL_WIDTH : DRAWER_WIDTH;
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#0F0F0F" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       {/* Sidebar */}
       <Box component="nav" sx={{ width: { md: effectiveWidth }, flexShrink: 0, transition: "width 200ms ease" }}>
         <Drawer
@@ -280,7 +288,12 @@ export default function AppLayout() {
         <AppBar
           position="sticky"
           elevation={0}
-          sx={{ bgcolor: "#1E1E1E", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          sx={{
+            bgcolor: "background.paper",
+            color: "text.primary",
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
         >
           <Toolbar>
             <IconButton color="inherit" onClick={() => setMobileOpen(true)} sx={{ mr: 1, display: { md: "none" } }}>
@@ -290,7 +303,7 @@ export default function AppLayout() {
               <IconButton
                 color="inherit"
                 onClick={() => setCollapsed((c) => !c)}
-                sx={{ mr: 1, display: { xs: "none", md: "inline-flex" }, color: "rgba(255,255,255,0.65)" }}
+                sx={{ mr: 1, display: { xs: "none", md: "inline-flex" } }}
               >
                 <MenuIcon />
               </IconButton>
@@ -316,6 +329,73 @@ export default function AppLayout() {
               sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", mr: 2, fontSize: 10, height: 20, fontWeight: 700 }}
             />
             <NotificationBell />
+            <Tooltip title="Theme">
+              <IconButton onClick={(e) => setThemeAnchor(e.currentTarget)} sx={{ color: "rgba(255,255,255,0.75)" }}>
+                {mode === "light" ? <LightMode /> : mode === "custom" ? <Palette /> : <DarkMode />}
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={themeAnchor}
+              open={Boolean(themeAnchor)}
+              onClose={() => setThemeAnchor(null)}
+              slotProps={{ paper: { sx: { minWidth: 220 } } }}
+            >
+              <MenuItem onClick={() => { setMode("dark"); setThemeAnchor(null); }}>
+                <DarkMode fontSize="small" sx={{ mr: 1.25, color: "#4285F4" }} />
+                Dark
+                {mode === "dark" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
+              </MenuItem>
+              <MenuItem onClick={() => { setMode("light"); setThemeAnchor(null); }}>
+                <LightMode fontSize="small" sx={{ mr: 1.25, color: "#F9AB00" }} />
+                Light
+                {mode === "light" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
+              </MenuItem>
+              <MenuItem onClick={() => { setMode("custom"); setThemeAnchor(null); }}>
+                <Palette fontSize="small" sx={{ mr: 1.25, color: "#9C27B0" }} />
+                Custom…
+                {mode === "custom" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
+              </MenuItem>
+              {mode === "custom" && (
+                <Box sx={{ px: 2, py: 1, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
+                    PRIMARY ACCENT
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.5, mb: 1 }}>
+                    {["#4285F4", "#34A853", "#EA4335", "#FBBC04", "#9C27B0", "#00B8D4"].map((c) => (
+                      <Box
+                        key={c}
+                        onClick={() => setCustomPalette({ ...customPalette, primary: c })}
+                        sx={{
+                          width: 24, height: 24, borderRadius: "50%", bgcolor: c, cursor: "pointer",
+                          border: customPalette.primary === c ? "2px solid white" : "2px solid transparent",
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
+                    BACKGROUND
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    {[
+                      { bg: "#0B1220", paper: "#141B2B", label: "Navy" },
+                      { bg: "#000000", paper: "#121212", label: "Midnight" },
+                      { bg: "#0F1A14", paper: "#142319", label: "Forest" },
+                      { bg: "#1A0F1A", paper: "#231423", label: "Plum" },
+                    ].map((b) => (
+                      <Tooltip key={b.bg} title={b.label}>
+                        <Box
+                          onClick={() => setCustomPalette({ ...customPalette, background: b.bg, paper: b.paper })}
+                          sx={{
+                            width: 24, height: 24, borderRadius: 1, bgcolor: b.bg, cursor: "pointer",
+                            border: customPalette.background === b.bg ? "2px solid white" : "2px solid rgba(255,255,255,0.15)",
+                          }}
+                        />
+                      </Tooltip>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Menu>
             <Tooltip title="Account">
               <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
                 <Avatar sx={{ bgcolor: "#4285F4", color: "#000", width: 32, height: 32, fontSize: 14, fontWeight: 700 }}>
