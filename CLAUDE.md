@@ -180,7 +180,7 @@ Routes live in `App.tsx`. Connectors and Projects no longer have top-level nav �
 - **Risk Overview** (`/risk-overview`) — Risk Portfolio dashboard. FAIR-lite ALE: Total/Net Exposure, Open Critical/High, 30-Day Breach Probability. Risk-by-domain bar chart, full risk table with ALE range, Remediation status, Source link.
 - **Workflows** (`/missions`) — scheduled missions (cron picker + presets). History drawer per row; "View Report" opens the standardised PDF-ready report dialog (KPI strip + 7 fixed sections).
 - **Knowledge Base** (`/knowledge`) — pre-seeded files in categories, expandable cards, search, stats endpoint.
-- **AI Buddies** (`/agents`, formerly "AI Agents") — Catalog of operational + ~43 advisory buddies in 7 groups. Admin-only CRUD with current config shown. When a Client + Scan are selected on this page, catalog agents consume the scan findings as context, persist their output as an `AgentRun` tied to the scan, and appear as tabs on the ScanDetail page.
+- **AI Buddies** (`/agents`, formerly "AI Agents") — Catalog of operational + ~43 advisory buddies in 7 groups. Admin-only CRUD with current config shown. When a Client + Scan are selected on this page, catalog agents consume the scan findings as context, persist their output as an `AgentRun` tied to the scan (`agent_type=ORCHESTRATOR`, real identity in `input_data.agent_key`/`agent_name`), and appear as tabs on the ScanDetail page. Phase 7C personality (signature line / avatar / accent colour, from `_BUDDY_PERSONALITY` in `services/agent_seed.py`) renders on each tile. **Personality + trigger keys must match the real catalog keys** (`appsec_advisor`, `vuln_commander`, `soc_strategist`, `partner_advisor`, `iam_posture_advisor`, …) — earlier they pointed at non-existent slugs and silently did nothing. Phase 7B proactive triggers (`services/buddy_triggers.py::fire_event`) are gated by `PROACTIVE_BUDDIES_ENABLED` (default OFF — see Known Issues).
 - **Sync** (`/sync`, admin-only) — manual on-demand sync of external feeds (EPSS, CISA KEV, NVD recent CVEs, framework recompute). Per-tile sync button + "Sync all".
 
 ---
@@ -394,6 +394,7 @@ Caches persist to `backend/data/`:
 | `AZURE_TENANT_ID` | Entra ID tenant for JWT validation |
 | `AZURE_CLIENT_ID` | Backend app registration client ID |
 | `DEFAULT_AI_PROVIDER` | `azure_openai` \| `openai` \| `anthropic` \| `google_gemini` \| `aws_bedrock` |
+| `PROACTIVE_BUDDIES_ENABLED` | Phase 7B proactive buddy auto-runs on scan ingest. **Default `false`** — firing real buddy LLM runs inline during ingest OOM-kills small App Service workers and loses findings. Only flip on once runs are moved off the web worker / the plan has headroom |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `AZURE_OPENAI_API_KEY` | Provider keys |
 | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
 | `ENCRYPTION_KEY` | Fernet key for connector credential encryption |
@@ -439,3 +440,5 @@ Caches persist to `backend/data/`:
 - **`INITIAL_ADMIN_UPN` bootstrap** — `main.py::_bootstrap_initial_admin()` checks per-UPN, not "any global admin exists". If you wipe the user_access table or a different admin grant lingers, the configured UPN still gets re-granted on startup
 - **CodeQL pack:suite syntax** — CLI rejects `codeql/javascript-security-and-quality.qls`. Must be `<pack-name>:<path-in-pack>` e.g. `codeql/javascript-queries:codeql-suites/javascript-security-and-quality.qls`
 - **Binary uploads (`scan_binaries.py`)** — Created scan has `defer_dispatch=true` so the workflow only fires AFTER the multipart upload completes. Otherwise the runner would 404 on `/scans/binary/<id>` because the binary isn't on disk yet
+- **Proactive buddies OOM → "no findings"** — Phase 7B `buddy_triggers.fire_event` (fired from `/scans/ingest/`) ran real buddy LLM runs inline in the web worker. On the B1 plan (1.75 GB, `uvicorn --workers 4`) that OOM-killed the worker mid-ingest, the scanner's POST got HTTP 500, and findings failed to land. Gated behind `PROACTIVE_BUDDIES_ENABLED` (default OFF) in `core/config.py` — `fire_event` returns `0` immediately unless the flag is set, restoring the lightweight known-good ingest path. Buddies still run on demand from the AI Buddies page. Root weakness is the over-subscribed B1 plan; re-enable proactive runs only after right-sizing or moving runs off the web worker
+- **CI Node version** — `deploy.yml` `NODE_VERSION` is `22` to match the App Service runtime (`node_version = "22-lts"` in `main.tf`). A mismatch surfaces a setup-node warning; keep these in lock-step
