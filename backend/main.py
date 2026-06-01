@@ -538,6 +538,51 @@ def _bootstrap_initial_admin() -> None:
         logger.warning("Initial admin bootstrap failed: %s", exc)
 
 
+def _fail_stale_threat_models() -> None:
+    """Reconcile orphaned threat-model generations on startup.
+
+    Generation runs as a FastAPI BackgroundTask in the web worker. If the
+    worker is OOM-killed (or otherwise dies) mid-run, the `except` that sets
+    status='failed' never executes, so the row is stuck at 'generating' /
+    'pending' forever and the detail page polls indefinitely. Flip anything
+    older than the threshold to 'failed' so the UI stops spinning and the
+    user can rescan. Age-gated so a legitimately in-flight run started just
+    before another worker restarted is never killed."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy.orm import Session
+    from api.models.models import ThreatModel
+
+    STALE_AFTER = timedelta(minutes=20)
+    cutoff = datetime.now(timezone.utc) - STALE_AFTER
+    try:
+        with Session(engine) as db:
+            stale = (
+                db.query(ThreatModel)
+                .filter(ThreatModel.status.in_(["generating", "pending"]))
+                .all()
+            )
+            n = 0
+            for tm in stale:
+                created = tm.created_at
+                # created_at may be naive (SQLite) or tz-aware (MSSQL).
+                if created is not None and created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                if created is not None and created > cutoff:
+                    continue  # still within the grace window — leave it running
+                tm.status = "failed"
+                tm.error_message = (
+                    "Generation was interrupted (worker restart or timeout). "
+                    "Please rescan."
+                )
+                tm.generated_at = datetime.now(timezone.utc)
+                n += 1
+            if n:
+                db.commit()
+                logger.info("Reconciled %d stale threat-model generation(s) to 'failed'", n)
+    except Exception as exc:
+        logger.warning("Stale threat-model reconcile failed: %s", exc)
+
+
 _ensure_added_columns()
 _ensure_projects_schema()
 _normalize_enum_case()
@@ -545,6 +590,7 @@ _provision_entraid_connector()
 _provision_azure_connector()
 _seed_framework_controls()
 _bootstrap_initial_admin()
+_fail_stale_threat_models()
 
 app = FastAPI(
     title="NexGenCyberAI API",

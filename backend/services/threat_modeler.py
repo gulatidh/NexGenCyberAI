@@ -12,6 +12,7 @@ shape every time so the frontend can render deterministically.
 See `api/models/models.py::ThreatModel` for the storage shape.
 """
 from __future__ import annotations
+import asyncio
 import json
 import logging
 from collections import Counter
@@ -108,6 +109,10 @@ METHODOLOGIES: Dict[str, Dict[str, Any]] = {
     },
 }
 DEFAULT_METHODOLOGY = "stride"
+
+# Hard ceiling on a single threat-model LLM call. A stalled provider socket
+# would otherwise leave the row wedged in 'generating' indefinitely.
+LLM_TIMEOUT_SECONDS = 180
 
 _SEV = {"critical", "high", "medium", "low", "info"}
 _STATUS = {"open", "in_progress", "accepted", "compensating_control", "closed"}
@@ -848,10 +853,20 @@ async def _invoke_llm(
         preset_components=preset_components, preset_data_flows=preset_data_flows,
     )
     try:
-        result = await llm.ainvoke([
-            SystemMessage(content=_build_system_prompt(methodology)),
-            HumanMessage(content=user_prompt),
-        ])
+        # Bound the call so a stalled provider connection can't leave the
+        # threat model wedged in 'generating' forever (the worker would just
+        # await indefinitely with nothing to interrupt it).
+        result = await asyncio.wait_for(
+            llm.ainvoke([
+                SystemMessage(content=_build_system_prompt(methodology)),
+                HumanMessage(content=user_prompt),
+            ]),
+            timeout=LLM_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Threat modeler LLM call timed out after %ss", LLM_TIMEOUT_SECONDS)
+        return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,
+                                               "error": f"LLM call timed out after {LLM_TIMEOUT_SECONDS}s"}
     except Exception as exc:
         logger.exception("Threat modeler LLM call failed")
         return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,

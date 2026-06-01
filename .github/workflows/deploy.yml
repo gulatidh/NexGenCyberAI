@@ -153,7 +153,7 @@ jobs:
           az webapp config set \
             --name "${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}" \
             --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}'].resourceGroup" -o tsv)" \
-            --startup-file "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4"
+            --startup-file "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"
 
       - name: Package backend
         run: |
