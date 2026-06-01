@@ -847,6 +847,74 @@ def _categories_for(methodology: str) -> List[str]:
     return list(spec["categories"])
 
 
+@router.post("/{model_id}/coverage/fill-gaps")
+async def fill_coverage_gaps(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 8B — targeted LLM fill of every 'missing' cell in the coverage
+    matrix. For each (component, category) gap, the LLM either:
+
+      - emits a new threat (full Phase 8 shape) and the cell flips to 'threat'
+      - emits a coverage decision (considered | not_applicable) with rationale
+
+    Cells that already have state != 'missing' are left untouched. New threats
+    are appended to threats_json; the coverage_decisions list is updated in
+    place. Maturity scores are recomputed.
+
+    Best-effort: errors surface to the caller; rows aren't half-updated."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+
+    decisions = list(tm.coverage_decisions or [])
+    missing = [d for d in decisions if d.get("state") == "missing"]
+    if not missing:
+        return {"filled": 0, "threats_added": 0, "decisions_updated": 0, "message": "Nothing missing"}
+
+    try:
+        from services.threat_modeler_gapfill import fill_gaps
+        from services.maturity_scorer import compute_maturity_scores
+        added_threats, updated_decisions = await fill_gaps(
+            db=db, tm=tm, missing_cells=missing,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    # Merge: keep all non-missing decisions, replace missing ones with the
+    # updated ones (matched by component_id + category).
+    keep = {(d["component_id"], d["category"]): d for d in decisions if d.get("state") != "missing"}
+    for d in updated_decisions:
+        keep[(d["component_id"], d["category"])] = d
+    new_decisions = list(keep.values())
+
+    # Append new threats
+    threats_list = list(tm.threats_json or [])
+    threats_list.extend(added_threats)
+    tm.threats_json = threats_list
+    tm.coverage_decisions = new_decisions
+    try:
+        tm.maturity_scores = compute_maturity_scores(db, tm.client_id, tm.methodology or "stride", threats_list)
+    except Exception:
+        pass
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(tm, "threats_json")
+    flag_modified(tm, "coverage_decisions")
+    flag_modified(tm, "maturity_scores")
+    db.commit()
+    db.refresh(tm)
+    return {
+        "filled": len(updated_decisions),
+        "threats_added": len(added_threats),
+        "decisions_updated": len(updated_decisions),
+        "message": f"Filled {len(updated_decisions)} cells ({len(added_threats)} new threats)",
+    }
+
+
 @router.get("/{model_id}/maturity")
 async def get_maturity(
     client_id: str,

@@ -221,6 +221,8 @@ export const threatModelsApi = {
   // Phase 8 endpoints
   coverage: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/coverage`).then((r) => r.data),
+  fillGaps: (clientId: string, modelId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/coverage/fill-gaps`).then((r) => r.data),
   maturity: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/maturity`).then((r) => r.data),
   diff: (clientId: string, modelId: string, prevId: string) =>

@@ -13,9 +13,12 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
-  TableBody, Divider, Tooltip, IconButton,
+  TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
 } from "@mui/material";
-import { ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema } from "@mui/icons-material";
+import {
+  ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
+  KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh,
+} from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
@@ -162,6 +165,25 @@ export default function ThreatModelDetail() {
       toast.success(resp?.created ? "Risk created" : "Risk already exists for this threat");
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to convert"),
+  });
+
+  const patchThreatMutation = useMutation({
+    mutationFn: ({ threatId, body }: { threatId: string; body: any }) =>
+      threatModelsApi.patchThreat(clientId, modelId!, threatId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      toast.success("Threat updated");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Update failed"),
+  });
+
+  const fillGapsMutation = useMutation({
+    mutationFn: () => threatModelsApi.fillGaps(clientId, modelId!),
+    onSuccess: (resp: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      toast.success(resp?.message || `Filled ${resp?.filled ?? 0} cells`);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Gap-fill failed"),
   });
 
   const startModelingMutation = useMutation({
@@ -573,66 +595,18 @@ export default function ThreatModelDetail() {
                     const sc = SEV_COLOR[t.severity] || "rgba(255,255,255,0.4)";
                     const ms = mitigationsByThreat[t.id] || [];
                     return (
-                      <Box key={t.id} sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
-                          <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontFamily: "monospace", minWidth: 40 }}>{t.id}</Typography>
-                          <Chip label={t.severity} size="small"
-                            sx={{ bgcolor: `${sc}20`, color: sc, height: 18, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }} />
-                          <Typography sx={{ color: "white", fontSize: 13.5, fontWeight: 600, flex: 1 }}>{t.title}</Typography>
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)" }}>
-                            on <b>{compName.get(t.asset_id) || t.asset_id || "—"}</b>
-                          </Typography>
-                          <Tooltip title={convertedSet.has(t.id) ? "Already in Risk Register" : "Convert this threat to a Risk Register entry"}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                className="no-print"
-                                disabled={convertedSet.has(t.id) || (convertOne.isPending && convertOne.variables === t.id)}
-                                onClick={() => convertOne.mutate(t.id)}
-                                sx={{
-                                  color: convertedSet.has(t.id) ? "rgba(52,168,83,0.5)" : "#34A853",
-                                  "&:hover": { bgcolor: "rgba(52,168,83,0.12)" },
-                                  "&.Mui-disabled": { color: "rgba(52,168,83,0.4)" },
-                                }}
-                              >
-                                {convertOne.isPending && convertOne.variables === t.id
-                                  ? <CircularProgress size={14} sx={{ color: "#34A853" }} />
-                                  : <AddTask sx={{ fontSize: 18 }} />}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        </Box>
-                        {t.rationale && (
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", lineHeight: 1.5, mb: 0.75 }}>
-                            {t.rationale}
-                          </Typography>
-                        )}
-                        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                          {(t.capec_refs || []).map((c) => (
-                            <ThreatLibraryChip key={c} source="capec" sourceId={c} />
-                          ))}
-                          {(t.attack_techniques || []).map((a) => (
-                            <ThreatLibraryChip key={a} source="attack" sourceId={a} label={`ATT&CK ${a}`} />
-                          ))}
-                          {t.evidence && (
-                            <Chip label={`Evidence: ${t.evidence}`} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04" }} />
-                          )}
-                        </Box>
-                        {ms.length > 0 && (
-                          <Box sx={{ mt: 0.75, ml: 1, borderLeft: "2px solid rgba(52,168,83,0.4)", pl: 1.25 }}>
-                            {ms.map((m) => (
-                              <Box key={m.id} sx={{ mb: 0.25 }}>
-                                <Typography variant="caption" sx={{ color: "#34A853", fontWeight: 700 }}>
-                                  {m.id}: </Typography>
-                                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>{m.action}</Typography>
-                                {m.control_id && (
-                                  <Chip label={m.control_id} size="small" sx={{ ml: 1, height: 14, fontSize: 9, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
-                                )}
-                              </Box>
-                            ))}
-                          </Box>
-                        )}
-                      </Box>
+                      <ThreatRow
+                        key={t.id}
+                        threat={t}
+                        sc={sc}
+                        compName={compName.get(t.asset_id) || t.asset_id || "—"}
+                        converted={convertedSet.has(t.id)}
+                        onConvert={() => convertOne.mutate(t.id)}
+                        convertPending={convertOne.isPending && convertOne.variables === t.id}
+                        onPatch={(body) => patchThreatMutation.mutate({ threatId: t.id, body })}
+                        patching={patchThreatMutation.isPending && patchThreatMutation.variables?.threatId === t.id}
+                        mitigations={ms}
+                      />
                     );
                   })}
                 </CardContent>
@@ -641,12 +615,15 @@ export default function ThreatModelDetail() {
           )}
         </Box>
       )}
-
       {/* COVERAGE — STRIDE matrix */}
       {(tab === "coverage" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">STRIDE Coverage Matrix</Typography>}
-          <CoverageMatrixView data={data} />
+          <CoverageMatrixView
+            data={data}
+            onFillGaps={() => fillGapsMutation.mutate()}
+            filling={fillGapsMutation.isPending}
+          />
         </Box>
       )}
 
@@ -717,7 +694,7 @@ const STATE_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
   missing:         { bg: "rgba(251,188,4,0.15)",  fg: "#FBBC04", label: "Missing" },
 };
 
-function CoverageMatrixView({ data }: { data: ThreatModelDetailData }) {
+function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDetailData; onFillGaps?: () => void; filling?: boolean }) {
   const decisions = data.coverage_decisions || [];
   const components = data.components || [];
   // Distinct categories
@@ -739,6 +716,24 @@ function CoverageMatrixView({ data }: { data: ThreatModelDetailData }) {
           <Chip label={`${pct}% covered`} sx={{ bgcolor: pct >= 80 ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)", color: pct >= 80 ? "#34A853" : "#FBBC04", fontWeight: 700, height: 22, fontSize: 11 }} />
           <Chip label={`${threatCells} threats`} sx={{ bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700, height: 22, fontSize: 11 }} />
           <Chip label={`${missing} missing`} sx={{ bgcolor: missing > 0 ? "rgba(251,188,4,0.18)" : "rgba(255,255,255,0.04)", color: missing > 0 ? "#FBBC04" : "rgba(255,255,255,0.5)", fontWeight: 700, height: 22, fontSize: 11 }} />
+          {missing > 0 && onFillGaps && (
+            <Tooltip title={`Run a targeted LLM call against the ${missing} missing cells — each one resolves to either a threat or a 'considered' decision.`}>
+              <span>
+                <Button
+                  size="small"
+                  variant="contained"
+                  className="no-print"
+                  startIcon={filling ? <CircularProgress size={14} sx={{ color: "white" }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
+                  disabled={filling}
+                  onClick={onFillGaps}
+                  sx={{ bgcolor: "#FBBC04", color: "#1A1A1A", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26,
+                    "&:hover": { bgcolor: "#FFC53D" } }}
+                >
+                  {filling ? "Filling…" : `Fill ${missing} gap${missing === 1 ? "" : "s"}`}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
           <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: "auto" }}>
             Critical &amp; High components get full STRIDE; Medium gets applicable categories; Low only where surface exists.
           </Typography>
@@ -844,5 +839,216 @@ function MaturityView({ data }: { data: ThreatModelDetailData }) {
         </Box>
       </CardContent>
     </Card>
+  );
+}
+
+
+// ── Phase 8 — enriched threat row ────────────────────────────────────────────
+
+const THREAT_STATUS_COLOR: Record<string, string> = {
+  identified: "#FBBC04",
+  mitigated: "#34A853",
+  accepted: "#4285F4",
+  transferred: "#9C27B0",
+  compensated: "#00B8D4",
+  not_applicable: "rgba(255,255,255,0.45)",
+};
+
+const THREAT_STATUS_OPTIONS = [
+  "identified", "mitigated", "accepted", "transferred", "compensated", "not_applicable",
+];
+
+interface ThreatRowProps {
+  threat: Threat;
+  sc: string;
+  compName: string;
+  converted: boolean;
+  onConvert: () => void;
+  convertPending: boolean;
+  onPatch: (body: any) => void;
+  patching: boolean;
+  mitigations: Mitigation[];
+}
+
+function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPending, onPatch, patching, mitigations: ms }: ThreatRowProps) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [statusAnchor, setStatusAnchor] = React.useState<null | HTMLElement>(null);
+  const status = t.status || "identified";
+  const statusColor = THREAT_STATUS_COLOR[status] || "rgba(255,255,255,0.5)";
+  const detection = t.detection_status || "gap";
+  const detColor = detection === "detected" ? "#34A853" : detection === "not_applicable" ? "rgba(255,255,255,0.5)" : "#EA4335";
+  const grounded = t.is_grounded !== false;
+  const evidenceRefs = t.evidence_refs || [];
+
+  return (
+    <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+        <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontFamily: "monospace", minWidth: 40 }}>{t.id}</Typography>
+        <Chip label={t.severity} size="small"
+          sx={{ bgcolor: `${sc}20`, color: sc, height: 18, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }} />
+        {typeof t.priority_score === "number" && (
+          <Chip label={`P ${t.priority_score}`} size="small"
+            sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
+        )}
+        {(typeof t.likelihood === "number" && typeof t.impact === "number") && (
+          <Chip label={`L${t.likelihood}·I${t.impact}`} size="small"
+            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", height: 18, fontSize: 10 }} />
+        )}
+        <Tooltip title={detection === "detected" ? "SOC rule named" : detection === "gap" ? "No detection in place" : "Detection not applicable"}>
+          <Chip label={`Detection: ${detection}`} size="small"
+            sx={{ bgcolor: `${detColor}20`, color: detColor, height: 18, fontSize: 10, fontWeight: 700 }} />
+        </Tooltip>
+        {!grounded && (
+          <Tooltip title="No evidence_refs cited — consultant should validate or discard">
+            <Chip label="UNGROUNDED" size="small"
+              sx={{ bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />
+          </Tooltip>
+        )}
+        <Typography sx={{ color: "white", fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 200 }}>{t.title}</Typography>
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)" }}>
+          on <b>{compName}</b>
+        </Typography>
+        {/* Status menu (workshop mode) */}
+        <Tooltip title="Change threat status (workshop mode)">
+          <Chip
+            className="no-print"
+            label={status}
+            size="small"
+            onClick={(e) => setStatusAnchor(e.currentTarget)}
+            sx={{
+              bgcolor: `${statusColor}25`, color: statusColor, height: 20, fontSize: 10, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: 0.3, cursor: "pointer",
+              "&:hover": { bgcolor: `${statusColor}40` },
+            }}
+          />
+        </Tooltip>
+        <Menu anchorEl={statusAnchor} open={Boolean(statusAnchor)} onClose={() => setStatusAnchor(null)}>
+          {THREAT_STATUS_OPTIONS.map((s) => (
+            <MenuItem
+              key={s}
+              selected={s === status}
+              onClick={() => { setStatusAnchor(null); if (s !== status) onPatch({ status: s }); }}
+              sx={{ fontSize: 13 }}
+            >
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: THREAT_STATUS_COLOR[s], mr: 1 }} />
+              {s.replace(/_/g, " ")}
+            </MenuItem>
+          ))}
+        </Menu>
+        <Tooltip title={converted ? "Already in Risk Register" : "Convert this threat to a Risk Register entry"}>
+          <span>
+            <IconButton
+              size="small"
+              className="no-print"
+              disabled={converted || convertPending}
+              onClick={onConvert}
+              sx={{
+                color: converted ? "rgba(52,168,83,0.5)" : "#34A853",
+                "&:hover": { bgcolor: "rgba(52,168,83,0.12)" },
+                "&.Mui-disabled": { color: "rgba(52,168,83,0.4)" },
+              }}
+            >
+              {convertPending ? <CircularProgress size={14} sx={{ color: "#34A853" }} /> : <AddTask sx={{ fontSize: 18 }} />}
+            </IconButton>
+          </span>
+        </Tooltip>
+        <IconButton size="small" className="no-print" onClick={() => setExpanded((x) => !x)} sx={{ color: "rgba(255,255,255,0.5)" }}>
+          {expanded ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
+        </IconButton>
+      </Box>
+      {t.rationale && (
+        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", lineHeight: 1.5, mb: 0.75 }}>
+          {t.rationale}
+        </Typography>
+      )}
+      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+        {(t.capec_refs || []).map((c) => (
+          <ThreatLibraryChip key={c} source="capec" sourceId={c} />
+        ))}
+        {(t.attack_techniques || []).map((a) => (
+          <ThreatLibraryChip key={a} source="attack" sourceId={a} label={`ATT&CK ${a}`} />
+        ))}
+        {(t.cwe_refs || []).map((c) => (
+          <Chip key={c} label={c} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700 }} />
+        ))}
+        {evidenceRefs.map((ref, i) => (
+          <Tooltip key={i} title={ref.label || `${ref.kind}: ${ref.id}`}>
+            <Chip
+              label={`${ref.kind}:${ref.id.slice(0, 12)}`}
+              size="small"
+              sx={{ height: 16, fontSize: 9, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontFamily: "monospace" }}
+            />
+          </Tooltip>
+        ))}
+        {evidenceRefs.length === 0 && t.evidence && (
+          <Chip label={`Evidence: ${t.evidence.slice(0, 80)}`} size="small" sx={{ height: 16, fontSize: 9.5, bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04" }} />
+        )}
+      </Box>
+      <Collapse in={expanded} unmountOnExit>
+        <Box sx={{ mt: 1, p: 1.25, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1.5, borderLeft: "2px solid rgba(66,133,244,0.5)" }}>
+          {t.attack_narrative && (
+            <Box sx={{ mb: 1.25 }}>
+              <Typography variant="caption" sx={{ color: "#4285F4", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
+                Attack narrative
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", fontSize: 12.5, lineHeight: 1.5 }}>
+                {t.attack_narrative}
+              </Typography>
+            </Box>
+          )}
+          {Array.isArray(t.blast_radius) && t.blast_radius.length > 0 && (
+            <Box sx={{ mb: 1.25 }}>
+              <Typography variant="caption" sx={{ color: "#EA4335", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
+                Blast radius
+              </Typography>
+              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                {t.blast_radius.map((b) => (
+                  <Chip key={b} label={b} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(234,67,53,0.1)", color: "#EA4335", fontFamily: "monospace" }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+          {t.owner_role && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Owner</Typography>
+              <Chip label={t.owner_role} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" }} />
+            </Box>
+          )}
+          {t.decision_notes && (
+            <Box sx={{ mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.25 }}>Decision notes</Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12 }}>{t.decision_notes}</Typography>
+            </Box>
+          )}
+          {t.residual_severity && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Residual</Typography>
+              <Chip label={t.residual_severity} size="small" sx={{ height: 18, fontSize: 10, bgcolor: `${SEV_COLOR[t.residual_severity] || "rgba(255,255,255,0.3)"}25`, color: SEV_COLOR[t.residual_severity] || "rgba(255,255,255,0.5)", fontWeight: 700 }} />
+              {t.residual_rationale && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: 11.5 }}>{t.residual_rationale}</Typography>
+              )}
+            </Box>
+          )}
+        </Box>
+      </Collapse>
+      {ms.length > 0 && (
+        <Box sx={{ mt: 0.75, ml: 1, borderLeft: "2px solid rgba(52,168,83,0.4)", pl: 1.25 }}>
+          {ms.map((m: any) => (
+            <Box key={m.id} sx={{ mb: 0.25 }}>
+              <Typography variant="caption" sx={{ color: "#34A853", fontWeight: 700 }}>
+                {m.id}: </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>{m.action}</Typography>
+              {(m.control_refs || []).map((r: any, i: number) => (
+                <Chip key={i} label={`${r.framework || "ctrl"}:${r.control_id}`} size="small" sx={{ ml: 0.75, height: 14, fontSize: 9, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
+              ))}
+              {!(m.control_refs && m.control_refs.length) && m.control_id && (
+                <Chip label={m.control_id} size="small" sx={{ ml: 1, height: 14, fontSize: 9, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
+              )}
+              {patching && <span> </span>}
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
   );
 }
