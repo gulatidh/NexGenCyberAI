@@ -11,3 +11,155 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* ── Print / PDF export ────────────────────────────────────────────────────
+ *
+ * Browser print picks up only what's currently rendered, NOT what's hidden
+ * behind a parent's `overflow: auto`. AppLayout's main content area has
+ * `overflow: auto` so without this stylesheet, half the page gets cut off.
+ *
+ * Rules:
+ *   1. Hide chrome (sidebar, app bar) and anything marked .no-print.
+ *   2. Reset the flex layout to a plain block so main content becomes the
+ *      whole page width (no leftover sidebar gutter).
+ *   3. Remove every parent overflow so the printer sees the full document.
+ *   4. Force backgrounds to white and text to dark — we ship a dark UI.
+ *   5. Preserve diagram (SVG / canvas) colors via print-color-adjust.
+ *   6. Avoid page-breaks inside cards / tables / images.
+ *
+ * Pages that need extra section breaks (e.g. ThreatModelDetail expanding
+ * its tabs into a paginated document) add their own page-break rules
+ * inside their component scope.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
+
+  /* Preserve gradient + chip + Mermaid colors instead of stripping them. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-shadow: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Hide the navigation chrome + anything tagged no-print. */
+  .MuiDrawer-root,
+  .MuiAppBar-root,
+  .no-print,
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* AppLayout root + main content: kill the flex layout and the overflow
+   * trap so the document flows naturally onto pages. */
+  body > #root,
+  body > #root > div,
+  main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* MUI cards / paper / containers — strip dark backgrounds and overflows. */
+  .MuiCard-root,
+  .MuiCardContent-root,
+  .MuiPaper-root,
+  .MuiBox-root {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    overflow: visible !important;
+    max-width: 100% !important;
+  }
+
+  .MuiCard-root {
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    border-radius: 8px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Tables — wider tables otherwise overflow off-page. */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Chips / status pills — keep their colored fills but use a light
+   * background to stay legible on paper. */
+  .MuiChip-root {
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    color: inherit !important;
+  }
+
+  /* SVG (Mermaid DFD, charts) — let them keep their inline colors and
+   * scale to fit the page width. */
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  svg * {
+    background: transparent !important;
+  }
+
+  /* Headings + paragraphs */
+  h1, h2, h3, h4, h5, h6 {
+    color: #0F172A !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  p, li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Links — show URL inline only if explicitly opted in. Default: hide
+   * the URL so links don't bloat the page. */
+  a, a:visited {
+    color: #1a73e8 !important;
+    text-decoration: none !important;
+  }
+
+  /* Toastify popups (and any other fixed/portal overlays) MUST hide
+   * during print. */
+  .Toastify,
+  .Toastify__toast-container,
+  .MuiPopper-root,
+  .MuiModal-root[aria-hidden="true"] {
+    display: none !important;
+  }
+
+  /* Buttons in the print output add noise — they're not actionable on
+   * paper. Pages should mark them .no-print explicitly, but as a safety
+   * net hide top-level Buttons in the main content. */
+  button.no-print {
+    display: none !important;
+  }
+}
