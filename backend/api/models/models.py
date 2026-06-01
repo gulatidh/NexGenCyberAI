@@ -511,6 +511,10 @@ class ThreatModel(Base):
     methodology = Column(String(32), default="stride")
     status = Column(String(32), default="pending")  # pending | generating | completed | failed
     error_message = Column(Text)
+    # Live generation progress for the UI step checklist. Shape:
+    #   {"current": "<label>", "pct": <int>, "steps": [
+    #       {"key","label","status": pending|active|done|skipped|error,"detail"} ]}
+    progress_json = Column(JSON, default=dict)
 
     components_json = Column(JSON, default=list)
     data_flows_json = Column(JSON, default=list)

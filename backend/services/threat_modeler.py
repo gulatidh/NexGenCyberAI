@@ -17,12 +17,12 @@ import json
 import logging
 from collections import Counter
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from api.models.models import (
-    Asset, Client, Connector, Finding, Project, Scan, ThreatLibrary, ThreatModel,
+    Asset, Client, Connector, Finding, Project, Risk, Scan, ThreatLibrary, ThreatModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -187,6 +187,26 @@ def _collect_scope(
             "control": f.control_id or "",
         })
 
+    # ── Risk register / assessment (top 25 by score) ────
+    risks = (
+        db.query(Risk)
+        .filter(Risk.client_id == client_id)
+        .order_by(Risk.risk_score.desc())
+        .limit(25)
+        .all()
+    )
+    risk_rows = []
+    for r in risks:
+        risk_rows.append({
+            "id": r.id,
+            "title": (r.title or "")[:160],
+            "category": r.category or "",
+            "score": float(r.risk_score) if r.risk_score is not None else None,
+            "likelihood": getattr(r, "likelihood", None),
+            "impact": getattr(r, "impact", None),
+            "status": r.status or "open",
+        })
+
     # ── Connector topology ────
     connectors = (
         db.query(Connector)
@@ -207,6 +227,8 @@ def _collect_scope(
         "finding_count": len(finding_rows),
         "findings_severity_counts": dict(sev_counts),
         "findings": finding_rows,
+        "risk_count": len(risk_rows),
+        "risks": risk_rows,
         "connector_types": connector_types,
     }
 
@@ -476,6 +498,19 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
                      f"(CVE={f['cve'] or '—'}, CVSS={f['cvss'] or '—'}, control={f['control'] or '—'})")
     if not scope["findings"]:
         parts.append("- (no findings yet — model purely from architecture)")
+
+    # ── Risk assessment context ────
+    parts.append("")
+    parts.append(f"## Risk assessment — {scope.get('risk_count', 0)} tracked risks (Risk Register)")
+    if scope.get("risks"):
+        parts.append("Align threats with the customer's existing risk posture. Where a threat reinforces a "
+                     "tracked risk, reference it in `evidence_refs` (kind='finding') and keep severities consistent.")
+        for r in scope["risks"][:20]:
+            parts.append(f"- risk_id={r['id']} [{r.get('category') or 'uncategorised'}] {r['title']} "
+                         f"(score={r.get('score') if r.get('score') is not None else '—'}, "
+                         f"L={r.get('likelihood') or '—'}/I={r.get('impact') or '—'}, status={r.get('status')})")
+    else:
+        parts.append("- (no risks recorded yet — propose the risks this architecture introduces)")
 
     if library:
         parts.append("")
@@ -932,38 +967,156 @@ def _skeleton(scope: Dict[str, Any], methodology: str) -> Dict[str, Any]:
 # ── Public entry point ──────────────────────────────────────────────────────
 
 
+# ── Stepped generation pipeline (live progress for the UI) ───────────────────
+
+# (key, label) — label may use {methodology} which is filled in per-run.
+_PIPELINE: List[Tuple[str, str]] = [
+    ("assets",   "Discover assets in scope"),
+    ("context",  "Gather findings & risk assessment"),
+    ("library",  "Load CAPEC / ATT&CK threat library"),
+    ("model",    "Run {methodology} threat analysis"),
+    ("finalize", "Finalize model & score coverage"),
+]
+
+
+def _init_progress(methodology_label: str) -> Dict[str, Any]:
+    return {
+        "current": "Starting…",
+        "pct": 0,
+        "steps": [
+            {"key": k, "label": lbl.format(methodology=methodology_label),
+             "status": "pending", "detail": ""}
+            for k, lbl in _PIPELINE
+        ],
+    }
+
+
+def _set_step(db: Session, tm: ThreatModel, key: str, status: str, detail: str = "") -> None:
+    """Update one pipeline step and commit so the polling detail endpoint
+    reflects it in near-real-time. Best-effort — never raises out."""
+    from sqlalchemy.orm.attributes import flag_modified
+    try:
+        prog = dict(tm.progress_json or {})
+        steps = [dict(s) for s in (prog.get("steps") or [])]
+        for s in steps:
+            if s.get("key") == key:
+                s["status"] = status
+                if detail:
+                    s["detail"] = detail
+                prog["current"] = s.get("label", "") + (f" — {detail}" if detail else "")
+        n = len(steps) or 1
+        done = sum(1 for s in steps if s.get("status") in ("done", "skipped"))
+        active = sum(1 for s in steps if s.get("status") == "active")
+        prog["pct"] = int(min(99, round(100 * (done + 0.5 * active) / n)))
+        prog["steps"] = steps
+        tm.progress_json = prog
+        flag_modified(tm, "progress_json")  # in-place dict mutations aren't auto-tracked
+        db.commit()
+    except Exception:
+        logger.exception("progress update failed (continuing)")
+        db.rollback()
+
+
+def _scope_asset_count(db: Session, tm: ThreatModel) -> int:
+    q = db.query(Asset).filter(Asset.client_id == tm.client_id)
+    if tm.scope_type == "project" and tm.scope_id:
+        q = q.filter(Asset.project_id == tm.scope_id)
+    elif tm.scope_type == "asset" and tm.scope_id:
+        q = q.filter(Asset.id == tm.scope_id)
+    return q.count()
+
+
+async def _ensure_assets(db: Session, tm: ThreatModel) -> int:
+    """Make sure the scope has assets to model. If it's empty but the client
+    has connectors, sync them one connector at a time (best-effort, with live
+    progress) so the model is built from real inventory rather than guesses."""
+    have = _scope_asset_count(db, tm)
+    if have > 0:
+        _set_step(db, tm, "assets", "done", f"{have} assets already in scope")
+        return have
+
+    connectors = db.query(Connector).filter(Connector.client_id == tm.client_id).all()
+    if not connectors:
+        _set_step(db, tm, "assets", "skipped", "no assets or connectors — modelling from architecture")
+        return 0
+
+    from connectors.sync import sync_connector_assets
+    total_new = 0
+    for c in connectors:
+        cname = c.name or (c.connector_type.value if hasattr(c.connector_type, "value") else str(c.connector_type))
+        _set_step(db, tm, "assets", "active", f"syncing from {cname}…")
+        try:
+            created, _updated, _stale = await sync_connector_assets(db, c)
+            db.commit()
+            total_new += created
+        except Exception as exc:
+            logger.warning("asset sync failed for connector %s: %s", c.id, exc)
+            db.rollback()
+    have = _scope_asset_count(db, tm)
+    if have:
+        _set_step(db, tm, "assets", "done", f"{have} assets discovered ({total_new} new)")
+    else:
+        _set_step(db, tm, "assets", "skipped", "connectors returned no assets — modelling from architecture")
+    return have
+
+
 async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
     """Run the modeler against a ThreatModel row that's already persisted in
-    `pending` state. Updates the row in-place with normalised output, sets
-    status to `completed` / `failed`."""
+    `pending` state, as a visible multi-step pipeline. Updates the row in
+    place with normalised output and per-step progress, sets status to
+    `completed` / `failed`."""
+    from sqlalchemy.orm.attributes import flag_modified
     tm = db.query(ThreatModel).filter(ThreatModel.id == model_id).first()
     if not tm:
         raise ValueError(f"ThreatModel {model_id} not found")
+    methodology = (tm.methodology or DEFAULT_METHODOLOGY).lower()
+    if methodology not in METHODOLOGIES:
+        methodology = DEFAULT_METHODOLOGY
+    label = METHODOLOGIES[methodology]["label"]
     tm.status = "generating"
+    tm.error_message = None
+    tm.progress_json = _init_progress(label)
+    flag_modified(tm, "progress_json")
     db.commit()
 
     try:
-        scope = _collect_scope(db, tm.client_id, tm.scope_type or "client", tm.scope_id)
-        fw = tm.framework.value if hasattr(tm.framework, "value") else (tm.framework or None)
-        methodology = (tm.methodology or DEFAULT_METHODOLOGY).lower()
-        if methodology not in METHODOLOGIES:
-            methodology = DEFAULT_METHODOLOGY
-        library = _library_sample(db, methodology)
-        # If the model was created from an uploaded diagram, the user-reviewed
-        # components + data_flows are already on the row. Pass them through
-        # to the LLM so it produces threats keyed to those exact IDs rather
-        # than re-deriving an architecture from assets.
+        # If created from an uploaded diagram, the user already reviewed the
+        # architecture — treat it as authoritative and skip live discovery.
         preset_components = tm.components_json if tm.components_json else None
         preset_data_flows = tm.data_flows_json if tm.data_flows_json else None
+
+        # Step 1 — assets
+        if preset_components:
+            _set_step(db, tm, "assets", "done", f"{len(preset_components)} components from uploaded diagram")
+        else:
+            await _ensure_assets(db, tm)
+
+        # Step 2 — context (assets + findings + risk register + connectors)
+        _set_step(db, tm, "context", "active")
+        scope = _collect_scope(db, tm.client_id, tm.scope_type or "client", tm.scope_id)
+        _set_step(db, tm, "context", "done",
+                  f"{scope['asset_count']} assets · {scope['finding_count']} findings · "
+                  f"{scope.get('risk_count', 0)} risks")
+
+        fw = tm.framework.value if hasattr(tm.framework, "value") else (tm.framework or None)
+
+        # Step 3 — threat library
+        _set_step(db, tm, "library", "active")
+        library = _library_sample(db, methodology)
+        _set_step(db, tm, "library", "done", f"{len(library)} reference patterns")
+
+        # Step 4 — LLM analysis
+        _set_step(db, tm, "model", "active", f"calling {label} model")
         model, meta = await _invoke_llm(
             scope, fw, methodology, library=library,
             preset_components=preset_components, preset_data_flows=preset_data_flows,
         )
+        _set_step(db, tm, "model", "done", f"{len(model.get('threats') or [])} threats identified")
 
-        # When the user supplied the architecture, keep their components +
-        # flows verbatim; only the threats / mitigations / dfd / summary
-        # come from the LLM. This means the LLM can't accidentally drop
-        # or rename a component the user reviewed.
+        # Step 5 — finalize. When the user supplied the architecture, keep
+        # their components + flows verbatim; only threats / mitigations / dfd /
+        # summary come from the LLM, so it can't drop or rename a reviewed one.
+        _set_step(db, tm, "finalize", "active")
         if preset_components:
             tm.components_json = preset_components
             tm.data_flows_json = preset_data_flows or []
@@ -974,7 +1127,7 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         tm.mitigations_json = model["mitigations"]
         tm.dfd_mermaid = model["dfd_mermaid"]
         tm.executive_summary = model["executive_summary"]
-        # Phase 8 — persist the new completeness + coverage fields.
+        # Phase 8 — persist the completeness + coverage fields.
         tm.trust_boundaries_json = model.get("trust_boundaries") or []
         tm.entry_points_json = model.get("entry_points") or []
         tm.coverage_decisions = model.get("coverage_decisions") or []
@@ -988,6 +1141,13 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         tm.ai_provider = meta.get("provider")
         tm.ai_model = meta.get("model")
         tm.tokens_used = int(meta.get("tokens") or 0)
+        _set_step(db, tm, "finalize", "done", "model ready")
+
+        prog = dict(tm.progress_json or {})
+        prog["pct"] = 100
+        prog["current"] = "Completed"
+        tm.progress_json = prog
+        flag_modified(tm, "progress_json")
         tm.status = "completed"
         tm.generated_at = datetime.now(timezone.utc)
         if meta.get("error"):
@@ -1000,6 +1160,16 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         tm.status = "failed"
         tm.error_message = f"{type(exc).__name__}: {exc}"
         tm.generated_at = datetime.now(timezone.utc)
+        try:
+            prog = dict(tm.progress_json or {})
+            for s in prog.get("steps") or []:
+                if s.get("status") == "active":
+                    s["status"] = "error"
+            prog["current"] = "Failed"
+            tm.progress_json = prog
+            flag_modified(tm, "progress_json")
+        except Exception:
+            pass
         db.commit()
         return tm
 

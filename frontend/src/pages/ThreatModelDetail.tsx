@@ -66,6 +66,14 @@ interface Mitigation {
   id: string; threat_id: string; action: string;
   control_id?: string; status: string; owner?: string;
 }
+interface ProgressStep {
+  key: string; label: string;
+  status: "pending" | "active" | "done" | "skipped" | "error";
+  detail?: string;
+}
+interface GenerationProgress {
+  current?: string; pct?: number; steps?: ProgressStep[];
+}
 interface ThreatModelDetailData {
   id: string; client_id: string; name?: string | null;
   scope_type: string; framework?: string | null; methodology: string;
@@ -78,6 +86,7 @@ interface ThreatModelDetailData {
   error_message?: string | null;
   converted_threat_ids?: string[];
   parent_threat_model_id?: string | null;
+  progress?: GenerationProgress | null;
   // Phase 8
   trust_boundaries?: any[];
   entry_points?: any[];
@@ -346,12 +355,66 @@ export default function ThreatModelDetail() {
       </Box>
 
       {inFlight && (
-        <Box sx={{ mb: 2 }}>
-          <LinearProgress sx={{ bgcolor: "rgba(66,133,244,0.1)", "& .MuiLinearProgress-bar": { bgcolor: "#4285F4" } }} />
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 0.5, display: "block" }}>
-            AI is producing the model — polling every 4 seconds.
-          </Typography>
-        </Box>
+        <Card className="no-print" sx={{ mb: 2, bgcolor: "#1E1E1E", border: "1px solid rgba(66,133,244,0.3)" }}>
+          <CardContent>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+              <CircularProgress size={18} sx={{ color: "#4285F4" }} />
+              <Typography variant="subtitle2" sx={{ color: "#fff", fontWeight: 600 }}>
+                {data.progress?.current || "Building threat model…"}
+              </Typography>
+              {typeof data.progress?.pct === "number" && (
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", ml: "auto" }}>
+                  {data.progress.pct}%
+                </Typography>
+              )}
+            </Box>
+            <LinearProgress
+              variant={typeof data.progress?.pct === "number" ? "determinate" : "indeterminate"}
+              value={data.progress?.pct ?? 0}
+              sx={{ mb: 1.5, bgcolor: "rgba(66,133,244,0.1)", "& .MuiLinearProgress-bar": { bgcolor: "#4285F4" } }}
+            />
+            {(data.progress?.steps && data.progress.steps.length > 0) ? (
+              <Box>
+                {data.progress.steps.map((s) => {
+                  const icon =
+                    s.status === "done" ? "✓" :
+                    s.status === "error" ? "✕" :
+                    s.status === "skipped" ? "–" :
+                    s.status === "active" ? "" : "○";
+                  const color =
+                    s.status === "done" ? "#34A853" :
+                    s.status === "error" ? "#EA4335" :
+                    s.status === "active" ? "#4285F4" :
+                    "rgba(255,255,255,0.35)";
+                  return (
+                    <Box key={s.key} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                      <Box sx={{ width: 18, textAlign: "center", color, fontWeight: 700, flexShrink: 0 }}>
+                        {s.status === "active"
+                          ? <CircularProgress size={12} sx={{ color: "#4285F4" }} />
+                          : icon}
+                      </Box>
+                      <Typography variant="body2" sx={{
+                        color: s.status === "pending" ? "rgba(255,255,255,0.4)" : "#fff",
+                        fontWeight: s.status === "active" ? 600 : 400,
+                      }}>
+                        {s.label}
+                      </Typography>
+                      {s.detail && (
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: 0.5 }}>
+                          — {s.detail}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : (
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                AI is producing the model — polling every 4 seconds.
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
       )}
       {data.error_message && (
         <Alert severity="error" sx={{ mb: 2 }}>{data.error_message}</Alert>

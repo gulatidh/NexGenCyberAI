@@ -179,6 +179,23 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scheduled_mission_runs.report ALTER failed: %s", exc)
 
+        # Add threat_models.progress_json — live generation step progress for
+        # the UI checklist (Discover assets → Gather context → Build → …).
+        try:
+            tm_cols = {c["name"] for c in inspector.get_columns("threat_models")}
+        except Exception:
+            tm_cols = set()
+        if tm_cols and "progress_json" not in tm_cols:
+            ddl = ("ALTER TABLE threat_models ADD progress_json NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE threat_models ADD COLUMN progress_json TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added threat_models.progress_json column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("threat_models.progress_json ALTER failed: %s", exc)
+
         # Add risks.source_threat_model_id + risks.source_threat_id — pin a
         # Risk row back to the threat it was converted from so the UI can
         # disable the convert button on already-converted threats.

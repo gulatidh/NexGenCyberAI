@@ -122,6 +122,8 @@ class ThreatModelSummary(BaseModel):
     generated_at: Optional[datetime] = None
     parent_threat_model_id: Optional[str] = None
     error_message: Optional[str] = None
+    # Live generation progress: {"current","pct","steps":[{key,label,status,detail}]}
+    progress: Optional[Dict[str, Any]] = None
 
     model_config = {"from_attributes": True}
 
@@ -171,6 +173,7 @@ def _summary_from(tm: ThreatModel) -> Dict[str, Any]:
         "generated_at": tm.generated_at,
         "parent_threat_model_id": tm.parent_threat_model_id,
         "error_message": tm.error_message,
+        "progress": tm.progress_json or None,
     }
 
 
