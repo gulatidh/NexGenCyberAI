@@ -140,6 +140,11 @@ class ThreatModelDetail(ThreatModelSummary):
     # this to grey out the per-row Convert button and tell the bulk action
     # how many threats are new vs. already converted.
     converted_threat_ids: List[str] = []
+    # Phase 8 — completeness + coverage fields
+    trust_boundaries: List[Dict[str, Any]] = []
+    entry_points: List[Dict[str, Any]] = []
+    coverage_decisions: List[Dict[str, Any]] = []
+    maturity_scores: Dict[str, float] = {}
 
 
 class ConvertResult(BaseModel):
@@ -189,6 +194,11 @@ def _detail_from(tm: ThreatModel, db: Optional[Session] = None) -> Dict[str, Any
         "ai_model": tm.ai_model,
         "tokens_used": tm.tokens_used or 0,
         "converted_threat_ids": converted,
+        # Phase 8 — completeness + coverage
+        "trust_boundaries": tm.trust_boundaries_json or [],
+        "entry_points": tm.entry_points_json or [],
+        "coverage_decisions": tm.coverage_decisions or [],
+        "maturity_scores": tm.maturity_scores or {},
     }
 
 
@@ -654,6 +664,293 @@ async def start_modeling_from_diagram(
     db.refresh(tm)
     background_tasks.add_task(generate_threat_model_bg, tm.id)
     return _summary_from(tm)
+
+
+# ── Phase 8 endpoints ───────────────────────────────────────────────────────
+
+
+class ThreatPatch(BaseModel):
+    """Inline edit for a single threat (Phase 8C workshop mode)."""
+    status: Optional[str] = None
+    decision_notes: Optional[str] = None
+    residual_severity: Optional[str] = None
+    residual_rationale: Optional[str] = None
+    owner_role: Optional[str] = None
+
+
+class MitigationPatch(BaseModel):
+    status: Optional[str] = None
+    implementation_detail: Optional[str] = None
+    evidence_link: Optional[Dict[str, Any]] = None
+    owner_role: Optional[str] = None
+
+
+_VALID_THREAT_STATUS = {"identified", "mitigated", "accepted", "transferred", "compensated", "not_applicable"}
+_VALID_OWNER_ROLES = {"security", "appdev", "platform", "grc"}
+_VALID_SEV = {"critical", "high", "medium", "low"}
+
+
+def _user_label(user: dict) -> str:
+    return user.get("upn") or user.get("preferred_username") or user.get("email") or "system"
+
+
+def _mark_modified(tm: ThreatModel, field: str) -> None:
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(tm, field)
+
+
+@router.patch("/{model_id}/threats/{threat_id}")
+async def patch_threat(
+    client_id: str,
+    model_id: str,
+    threat_id: str,
+    payload: ThreatPatch,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Workshop-mode inline edit for a single threat. Updates status,
+    decision_notes, residual_severity/rationale, owner_role."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    threats = list(tm.threats_json or [])
+    found = None
+    for t in threats:
+        if str(t.get("id")) == threat_id:
+            found = t
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Threat {threat_id} not in model")
+    changes = payload.model_dump(exclude_unset=True)
+    if "status" in changes:
+        s = (changes["status"] or "").lower()
+        if s not in _VALID_THREAT_STATUS:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Valid: {sorted(_VALID_THREAT_STATUS)}")
+        found["status"] = s
+    if "decision_notes" in changes:
+        found["decision_notes"] = str(changes["decision_notes"] or "")[:2000]
+    if "residual_severity" in changes:
+        s = (changes["residual_severity"] or "").lower()
+        found["residual_severity"] = s if s in _VALID_SEV else None
+    if "residual_rationale" in changes:
+        found["residual_rationale"] = str(changes["residual_rationale"] or "")[:2000]
+    if "owner_role" in changes:
+        r = (changes["owner_role"] or "").lower()
+        if r in _VALID_OWNER_ROLES:
+            found["owner_role"] = r
+    found["decided_by"] = _user_label(user)
+    found["decided_at"] = datetime.now(timezone.utc).isoformat()
+    tm.threats_json = threats
+    _mark_modified(tm, "threats_json")
+    db.commit()
+    db.refresh(tm)
+    return found
+
+
+@router.patch("/{model_id}/mitigations/{mitigation_id}")
+async def patch_mitigation(
+    client_id: str,
+    model_id: str,
+    mitigation_id: str,
+    payload: MitigationPatch,
+    db: Session = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    mits = list(tm.mitigations_json or [])
+    found = None
+    for m in mits:
+        if str(m.get("id")) == mitigation_id:
+            found = m
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Mitigation {mitigation_id} not in model")
+    changes = payload.model_dump(exclude_unset=True)
+    if "status" in changes:
+        found["status"] = str(changes["status"] or "open")
+    if "implementation_detail" in changes:
+        found["implementation_detail"] = str(changes["implementation_detail"] or "")[:5000]
+    if "evidence_link" in changes:
+        found["evidence_link"] = changes["evidence_link"]
+    if "owner_role" in changes:
+        r = (changes["owner_role"] or "").lower()
+        if r in _VALID_OWNER_ROLES:
+            found["owner_role"] = r
+    tm.mitigations_json = mits
+    _mark_modified(tm, "mitigations_json")
+    db.commit()
+    db.refresh(tm)
+    return found
+
+
+@router.get("/{model_id}/coverage")
+async def get_coverage_matrix(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 8B — coverage matrix endpoint. Returns the (component × category)
+    grid plus completion stats. Used by the Coverage tab in the UI."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    decisions = tm.coverage_decisions or []
+    components = tm.components_json or []
+    threats_by_id = {str(t.get("id")): t for t in (tm.threats_json or [])}
+    # Flat list keyed (component_id, category)
+    matrix: Dict[str, Dict[str, Any]] = {}
+    for d in decisions:
+        key = f"{d.get('component_id')}|{d.get('category')}"
+        matrix[key] = {
+            "component_id": d.get("component_id"),
+            "category": d.get("category"),
+            "state": d.get("state"),
+            "threat_id": d.get("threat_id"),
+            "rationale": d.get("rationale"),
+            "threat": threats_by_id.get(str(d.get("threat_id"))) if d.get("threat_id") else None,
+        }
+    total = len(decisions)
+    threat_cells = sum(1 for d in decisions if d.get("state") == "threat")
+    considered_cells = sum(1 for d in decisions if d.get("state") == "considered")
+    na_cells = sum(1 for d in decisions if d.get("state") == "not_applicable")
+    missing_cells = sum(1 for d in decisions if d.get("state") == "missing")
+    coverage_pct = 0 if total == 0 else round(((total - missing_cells) / total) * 100, 1)
+    return {
+        "model_id": model_id,
+        "methodology": tm.methodology,
+        "components": components,
+        "categories": _categories_for(tm.methodology or "stride"),
+        "cells": list(matrix.values()),
+        "stats": {
+            "total_cells": total,
+            "threat_cells": threat_cells,
+            "considered_cells": considered_cells,
+            "not_applicable_cells": na_cells,
+            "missing_cells": missing_cells,
+            "coverage_pct": coverage_pct,
+        },
+    }
+
+
+def _categories_for(methodology: str) -> List[str]:
+    from services.threat_modeler import METHODOLOGIES, DEFAULT_METHODOLOGY
+    spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
+    return list(spec["categories"])
+
+
+@router.get("/{model_id}/maturity")
+async def get_maturity(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 8E — maturity scores + a summary. Recomputes on demand so a
+    workshop edit (mitigated → score++) shows up immediately."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    from services.maturity_scorer import compute_maturity_scores, maturity_summary
+    scores = compute_maturity_scores(db, tm.client_id, tm.methodology or "stride", tm.threats_json or [])
+    tm.maturity_scores = scores
+    _mark_modified(tm, "maturity_scores")
+    db.commit()
+    summary = maturity_summary(scores)
+    return {"scores": scores, "summary": summary}
+
+
+@router.get("/{model_id}/diff/{prev_id}")
+async def diff_threat_models(
+    client_id: str,
+    model_id: str,
+    prev_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 8D — diff two threat models in the same chain. Returns
+    {added, removed, severity_changed, status_changed} of threats."""
+    a = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    b = db.query(ThreatModel).filter(
+        ThreatModel.id == prev_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="Threat model(s) not found")
+
+    def key_for(t: Dict[str, Any]) -> str:
+        # Match by (asset_id, category, title) — id changes on rescan.
+        return f"{t.get('asset_id')}|{t.get('category')}|{str(t.get('title') or '').strip().lower()[:80]}"
+
+    a_threats = {key_for(t): t for t in (a.threats_json or [])}
+    b_threats = {key_for(t): t for t in (b.threats_json or [])}
+
+    added = [a_threats[k] for k in a_threats.keys() - b_threats.keys()]
+    removed = [b_threats[k] for k in b_threats.keys() - a_threats.keys()]
+    severity_changed: List[Dict[str, Any]] = []
+    status_changed: List[Dict[str, Any]] = []
+    for k in a_threats.keys() & b_threats.keys():
+        at, bt = a_threats[k], b_threats[k]
+        if at.get("severity") != bt.get("severity"):
+            severity_changed.append({
+                "title": at.get("title"), "asset_id": at.get("asset_id"),
+                "category": at.get("category"),
+                "from": bt.get("severity"), "to": at.get("severity"),
+            })
+        if at.get("status") != bt.get("status"):
+            status_changed.append({
+                "title": at.get("title"), "asset_id": at.get("asset_id"),
+                "category": at.get("category"),
+                "from": bt.get("status"), "to": at.get("status"),
+            })
+
+    return {
+        "current": {"id": a.id, "generated_at": a.generated_at.isoformat() if a.generated_at else None},
+        "previous": {"id": b.id, "generated_at": b.generated_at.isoformat() if b.generated_at else None},
+        "added": added,
+        "removed": removed,
+        "severity_changed": severity_changed,
+        "status_changed": status_changed,
+    }
+
+
+@router.get("/{model_id}/pdf")
+async def get_threat_model_pdf(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 8F — server-rendered board-ready deliverable.
+
+    Returns a standalone HTML document with print CSS embedded. The
+    frontend opens it in a new tab and the user prints to PDF. This
+    avoids the AppLayout shell / overflow issues that browser-print
+    of the live page hits, and produces a deliverable-quality
+    artifact without server-side native-PDF dependencies."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    client_name = "Unknown Client"
+    c = db.query(Client).filter(Client.id == tm.client_id).first()
+    if c:
+        client_name = c.name
+    from services.threat_model_pdf import render_threat_model_html
+    html = render_threat_model_html(tm, client_name=client_name)
+    return Response(content=html, media_type="text/html; charset=utf-8")
 
 
 @router.delete("/{model_id}", status_code=204)

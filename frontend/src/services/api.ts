@@ -218,6 +218,19 @@ export const threatModelsApi = {
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/drawio`).then((r) => r.data),
   drawioDownloadUrl: (clientId: string, modelId: string) =>
     `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/drawio?download=1`,
+  // Phase 8 endpoints
+  coverage: (clientId: string, modelId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/coverage`).then((r) => r.data),
+  maturity: (clientId: string, modelId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/maturity`).then((r) => r.data),
+  diff: (clientId: string, modelId: string, prevId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/diff/${prevId}`).then((r) => r.data),
+  pdfUrl: (clientId: string, modelId: string) =>
+    `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/pdf`,
+  patchThreat: (clientId: string, modelId: string, threatId: string, body: any) =>
+    apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}`, body).then((r) => r.data),
+  patchMitigation: (clientId: string, modelId: string, mitId: string, body: any) =>
+    apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/mitigations/${encodeURIComponent(mitId)}`, body).then((r) => r.data),
   createFromDiagram: (clientId: string, file: File, opts: { name?: string; methodology?: string; framework?: string }) => {
     const fd = new FormData();
     fd.append("file", file);

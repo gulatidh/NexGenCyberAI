@@ -518,6 +518,19 @@ class ThreatModel(Base):
     mitigations_json = Column(JSON, default=list)
     dfd_mermaid = Column(Text)
     executive_summary = Column(Text)
+    # Phase 8B — per-cell coverage decisions for the (component × STRIDE-category)
+    # matrix. Each entry: {component_id, category, state, threat_id?, rationale}
+    # where state ∈ {threat | considered | not_applicable | missing}.
+    coverage_decisions = Column(JSON, default=list)
+    # Phase 8 — trust boundaries explicitly enumerated (not just inferred from
+    # zones). Each entry: {id, name, from_zone, to_zone, description, crossed_by_flow_ids}
+    trust_boundaries_json = Column(JSON, default=list)
+    # Phase 8 — entry points explicitly enumerated. Each entry: {id, kind, name,
+    # component_id, exposure: "internet"|"intranet"|"partner"|"internal", auth_required}
+    entry_points_json = Column(JSON, default=list)
+    # Phase 8E — per-STRIDE-category maturity scores (0..5) derived from
+    # framework control coverage. Computed at generation time + on demand.
+    maturity_scores = Column(JSON, default=dict)
 
     ai_provider = Column(String(64))
     ai_model = Column(String(128))

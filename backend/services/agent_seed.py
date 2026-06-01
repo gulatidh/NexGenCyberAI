@@ -453,6 +453,19 @@ def seed_agent_catalog() -> None:
         if inserted:
             logger.info("Seeded %d new agents into catalog", inserted)
 
+        # Backfill output_kind="prose" on every existing row that has NULL
+        # in that column — happens immediately after the column migration
+        # runs, before the per-buddy persona pass below.
+        try:
+            null_rows = db.query(AIAgent).filter(AIAgent.output_kind.is_(None)).all()
+            if null_rows:
+                for r in null_rows:
+                    r.output_kind = "prose"
+                db.commit()
+                logger.info("Backfilled output_kind='prose' on %d agents", len(null_rows))
+        except Exception:
+            logger.exception("output_kind NULL backfill failed (non-fatal)")
+
         # Backfill personality on existing built-in rows — only fields
         # still NULL get filled, so admin edits never get overwritten.
         backfilled = 0

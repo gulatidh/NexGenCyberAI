@@ -29,9 +29,35 @@ interface Component {
   trust_zone: string; criticality: string; notes?: string;
 }
 interface DataFlow { from: string; to: string; protocol: string; data: string; encrypted: boolean; notes?: string; }
+interface EvidenceRef { kind: string; id: string; label?: string }
+interface DetectionRuleRef { platform: string; rule_id: string }
 interface Threat {
   id: string; category: string; asset_id: string; title: string; severity: string;
   evidence?: string; capec_refs?: string[]; attack_techniques?: string[]; rationale?: string;
+  // Phase 8 additions
+  evidence_refs?: EvidenceRef[];
+  cwe_refs?: string[];
+  attack_narrative?: string;
+  blast_radius?: string[];
+  owner_role?: string;
+  is_grounded?: boolean;
+  likelihood?: number;
+  impact?: number;
+  priority_score?: number;
+  status?: string;
+  decision_notes?: string;
+  residual_severity?: string | null;
+  residual_rationale?: string;
+  linked_finding_ids?: string[];
+  detection_status?: string;
+  detection_rule_refs?: DetectionRuleRef[];
+}
+interface CoverageDecision {
+  component_id: string;
+  category: string;
+  state: string;
+  threat_id?: string | null;
+  rationale?: string;
 }
 interface Mitigation {
   id: string; threat_id: string; action: string;
@@ -48,6 +74,12 @@ interface ThreatModelDetailData {
   ai_provider?: string | null; ai_model?: string | null;
   error_message?: string | null;
   converted_threat_ids?: string[];
+  parent_threat_model_id?: string | null;
+  // Phase 8
+  trust_boundaries?: any[];
+  entry_points?: any[];
+  coverage_decisions?: CoverageDecision[];
+  maturity_scores?: Record<string, number>;
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -239,8 +271,16 @@ export default function ThreatModelDetail() {
             </Button>
           </span>
         </Tooltip>
-        <Button startIcon={<Print />} size="small" onClick={() => window.print()}
-          sx={{ color: "rgba(255,255,255,0.6)" }}>
+        <Button
+          startIcon={<Print />}
+          size="small"
+          onClick={() => {
+            // Open the server-rendered deliverable in a new tab; it auto-prints.
+            const w = window.open(threatModelsApi.pdfUrl(clientId, modelId!), "_blank");
+            if (!w) window.print();
+          }}
+          sx={{ color: "rgba(255,255,255,0.6)" }}
+        >
           Print / PDF
         </Button>
       </Box>
@@ -335,6 +375,8 @@ export default function ThreatModelDetail() {
         <Tab value="diagram" label="Diagram" />
         <Tab value="components" label={`Components (${data.component_count})`} />
         <Tab value="threats" label={`Threats (${data.threat_count})`} />
+        <Tab value="coverage" label="Coverage" />
+        <Tab value="maturity" label="Maturity" />
         <Tab value="mitigations" label={`Mitigations (${data.mitigation_count})`} />
       </Tabs>
 
@@ -600,6 +642,22 @@ export default function ThreatModelDetail() {
         </Box>
       )}
 
+      {/* COVERAGE — STRIDE matrix */}
+      {(tab === "coverage" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">STRIDE Coverage Matrix</Typography>}
+          <CoverageMatrixView data={data} />
+        </Box>
+      )}
+
+      {/* MATURITY radar */}
+      {(tab === "maturity" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Maturity by Category</Typography>}
+          <MaturityView data={data} />
+        </Box>
+      )}
+
       {/* MITIGATIONS */}
       {(tab === "mitigations" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
@@ -646,5 +704,145 @@ export default function ThreatModelDetail() {
         </Box>
       )}
     </Box>
+  );
+}
+
+
+// ── Phase 8 sub-views ─────────────────────────────────────────────────────────
+
+const STATE_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
+  threat:          { bg: "rgba(234,67,53,0.15)",  fg: "#EA4335", label: "Threat" },
+  considered:      { bg: "rgba(66,133,244,0.15)", fg: "#4285F4", label: "Considered" },
+  not_applicable:  { bg: "rgba(255,255,255,0.04)", fg: "rgba(255,255,255,0.5)", label: "N/A" },
+  missing:         { bg: "rgba(251,188,4,0.15)",  fg: "#FBBC04", label: "Missing" },
+};
+
+function CoverageMatrixView({ data }: { data: ThreatModelDetailData }) {
+  const decisions = data.coverage_decisions || [];
+  const components = data.components || [];
+  // Distinct categories
+  const categories = Array.from(new Set(decisions.map((d) => d.category))).sort();
+  // Quick lookup
+  const cellMap = new Map<string, CoverageDecision>();
+  for (const d of decisions) cellMap.set(`${d.component_id}|${d.category}`, d);
+  const total = decisions.length;
+  const missing = decisions.filter((d) => d.state === "missing").length;
+  const threatCells = decisions.filter((d) => d.state === "threat").length;
+  const pct = total === 0 ? 0 : Math.round(((total - missing) / total) * 100);
+  return (
+    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <CardContent>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>
+            Coverage Matrix
+          </Typography>
+          <Chip label={`${pct}% covered`} sx={{ bgcolor: pct >= 80 ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)", color: pct >= 80 ? "#34A853" : "#FBBC04", fontWeight: 700, height: 22, fontSize: 11 }} />
+          <Chip label={`${threatCells} threats`} sx={{ bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700, height: 22, fontSize: 11 }} />
+          <Chip label={`${missing} missing`} sx={{ bgcolor: missing > 0 ? "rgba(251,188,4,0.18)" : "rgba(255,255,255,0.04)", color: missing > 0 ? "#FBBC04" : "rgba(255,255,255,0.5)", fontWeight: 700, height: 22, fontSize: 11 }} />
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: "auto" }}>
+            Critical &amp; High components get full STRIDE; Medium gets applicable categories; Low only where surface exists.
+          </Typography>
+        </Box>
+        {decisions.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+            No coverage decisions yet. Re-generate this model to populate the matrix.
+          </Typography>
+        ) : (
+          <Box sx={{
+            display: "grid",
+            gridTemplateColumns: `minmax(180px, 1fr) repeat(${categories.length}, minmax(120px, 1fr))`,
+            gap: 0.5,
+            overflowX: "auto",
+          }}>
+            <Box sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>Component</Box>
+            {categories.map((c) => (
+              <Box key={c} sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                {c.replace(/_/g, " ")}
+              </Box>
+            ))}
+            {components.map((comp) => (
+              <React.Fragment key={comp.id}>
+                <Box sx={{ p: 1, color: "white", fontWeight: 600, fontSize: 12.5, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1 }}>
+                  {comp.name}
+                  <Box sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 400, mt: 0.25 }}>{comp.criticality}</Box>
+                </Box>
+                {categories.map((cat) => {
+                  const d = cellMap.get(`${comp.id}|${cat}`);
+                  if (!d) {
+                    return <Box key={cat} sx={{ p: 1, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1, fontSize: 10, color: "rgba(255,255,255,0.3)" }}>—</Box>;
+                  }
+                  const style = STATE_STYLE[d.state] || STATE_STYLE.missing;
+                  return (
+                    <Tooltip key={cat} title={d.rationale || (d.state === "threat" ? `Threat ${d.threat_id}` : style.label)}>
+                      <Box sx={{ p: 1, bgcolor: style.bg, borderRadius: 1, cursor: "default", minHeight: 50 }}>
+                        <Typography variant="caption" sx={{ color: style.fg, fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, display: "block" }}>
+                          {style.label}
+                        </Typography>
+                        {d.rationale && (
+                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: 10.5, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {d.rationale}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MaturityView({ data }: { data: ThreatModelDetailData }) {
+  const scores = data.maturity_scores || {};
+  const entries = Object.entries(scores).sort();
+  if (entries.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6" sx={{ color: "white" }}>Maturity by Category</Typography>
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+            No maturity scores yet — generate or re-model to populate.
+          </Typography>
+        </CardContent>
+      </Card>
+    );
+  }
+  const avg = entries.reduce((s, [, v]) => s + v, 0) / entries.length;
+  return (
+    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <CardContent>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>Maturity by Category</Typography>
+          <Chip label={`avg ${avg.toFixed(2)} / 5.0`} sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", fontWeight: 700, height: 22, fontSize: 11 }} />
+          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: "auto" }}>
+            Score = (mitigated×2 + detected×1.2 + closed-evidence×0.8 + grounded×0.5) − unmitigated-critical×1
+          </Typography>
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 1.5 }}>
+          {entries.map(([cat, score]) => {
+            const pct = Math.max(0, Math.min(1, score / 5));
+            const color = score >= 3.5 ? "#34A853" : score >= 2 ? "#FBBC04" : "#EA4335";
+            return (
+              <Box key={cat} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1.5, border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
+                  {cat.replace(/_/g, " ")}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5, mt: 0.5 }}>
+                  <Typography sx={{ color, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>{score.toFixed(1)}</Typography>
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>/ 5.0</Typography>
+                </Box>
+                <Box sx={{ mt: 1, height: 6, bgcolor: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
+                  <Box sx={{ width: `${pct * 100}%`, height: "100%", bgcolor: color }} />
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      </CardContent>
+    </Card>
   );
 }

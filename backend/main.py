@@ -207,6 +207,31 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("risks.source_threat_id ALTER failed: %s", exc)
 
+        # Phase 8 — ThreatModel: coverage_decisions, trust_boundaries_json,
+        # entry_points_json, maturity_scores.
+        try:
+            tm_cols = {c["name"] for c in inspector.get_columns("threat_models")}
+        except Exception:
+            tm_cols = set()
+        _tm_additions = [
+            ("coverage_decisions",     "NVARCHAR(MAX) NULL"),
+            ("trust_boundaries_json",  "NVARCHAR(MAX) NULL"),
+            ("entry_points_json",      "NVARCHAR(MAX) NULL"),
+            ("maturity_scores",        "NVARCHAR(MAX) NULL"),
+        ]
+        for col, mssql_type in _tm_additions:
+            if tm_cols and col not in tm_cols:
+                sqlite_type = "TEXT"
+                ddl = (f"ALTER TABLE threat_models ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE threat_models ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added threat_models.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("threat_models.%s ALTER failed: %s", col, exc)
+
         # Phase 7A — AIAgent.output_kind + output_schema_json. Lets each
         # buddy declare what shape its output takes (risk_drafts /
         # control_mappings / runbook / etc.).

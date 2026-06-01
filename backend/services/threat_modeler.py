@@ -32,11 +32,28 @@ logger = logging.getLogger(__name__)
 
 _COMPONENT_FIELDS = ("id", "name", "type", "trust_zone", "criticality", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes")
+# Phase 8 — expanded threat shape. Required: id, category, asset_id, title,
+# severity, evidence_refs, rationale. Strongly encouraged: capec/attack/cwe
+# refs, attack_narrative, blast_radius, owner_role, detection_status.
 _THREAT_FIELDS = (
     "id", "category", "asset_id", "title", "severity",
-    "evidence", "capec_refs", "attack_techniques", "rationale",
+    "evidence", "evidence_refs", "capec_refs", "attack_techniques", "cwe_refs",
+    "rationale", "attack_narrative", "blast_radius", "owner_role",
+    "likelihood", "impact", "priority_score",
+    "status", "decision_notes", "decided_by", "decided_at",
+    "residual_severity", "residual_rationale",
+    "linked_finding_ids",
+    "detection_status", "detection_rule_refs",
 )
-_MITIGATION_FIELDS = ("id", "threat_id", "action", "control_id", "status", "owner")
+# Phase 8 — mitigation shape gets control_refs (multi-framework), required
+# implementation_detail, and an evidence_link for "actually applied".
+_MITIGATION_FIELDS = (
+    "id", "threat_id", "action", "implementation_detail",
+    "control_id", "control_refs", "status", "owner_role",
+    "evidence_link",
+)
+_TRUST_BOUNDARY_FIELDS = ("id", "name", "from_zone", "to_zone", "description", "crossed_by_flow_ids")
+_ENTRY_POINT_FIELDS = ("id", "kind", "name", "component_id", "exposure", "auth_required")
 
 # Per-methodology valid categories. `category` on each threat must be one of
 # these values for the picked methodology — if the LLM emits anything else
@@ -148,6 +165,7 @@ def _collect_scope(
         sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
         sev_counts[sev] += 1
         finding_rows.append({
+            "id": f.id,
             "title": (f.title or "")[:160],
             "severity": sev,
             "resource": f.resource_id or "",
@@ -183,16 +201,16 @@ def _collect_scope(
 # ── Prompt building ──────────────────────────────────────────────────────────
 
 
-_SYSTEM_PROMPT_TMPL = """You are a senior cybersecurity threat modeler. You apply the {label}
-methodology to architecture + finding evidence. {description}
+_SYSTEM_PROMPT_TMPL = """You are a senior cybersecurity threat modeler producing a CONSULTANT-GRADE deliverable.
+You apply the {label} methodology rigorously. {description}
 
-Output STRICT JSON only — no prose, no markdown fences, no commentary
-outside the JSON object. The schema:
+Output STRICT JSON only — no prose, no markdown fences, no commentary outside the JSON object. The schema:
 
 {{
   "executive_summary": "<2-4 sentence CISO-level overview>",
   "components": [
-    {{ "id": "<short-slug>", "name": "<asset name>", "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
+    {{ "id": "<short-slug>", "name": "<asset name>",
+      "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
       "trust_zone": "<public|dmz|private|data-tier|management>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
@@ -201,41 +219,115 @@ outside the JSON object. The schema:
     {{ "from": "<component id>", "to": "<component id>",
       "protocol": "<https|sql|ssh|smb|grpc|amqp|other>",
       "data": "<credentials|pii|financial|telemetry|config|other>",
-      "encrypted": <true|false>,
-      "notes": "<one-line>" }}
+      "encrypted": <true|false>, "notes": "<one-line>" }}
+  ],
+  "trust_boundaries": [
+    {{ "id": "tb1", "name": "Internet → DMZ",
+      "from_zone": "public", "to_zone": "dmz",
+      "description": "<one-line>", "crossed_by_flow_ids": ["f1","f2"] }}
+  ],
+  "entry_points": [
+    {{ "id": "ep1", "kind": "http|websocket|api|cli|email|file_upload|webhook|other",
+      "name": "/api/v1/login", "component_id": "<id>",
+      "exposure": "internet|intranet|partner|internal",
+      "auth_required": <true|false> }}
   ],
   "threats": [
     {{ "id": "T01",
       "category": "<one of: {categories_csv}>",
-      "asset_id": "<component id>",
+      "asset_id": "<component id this threat targets>",
       "title": "<short threat statement>",
-      "severity": "<critical|high|medium|low|info>",
-      "evidence": "<reference a finding, a CVE, or 'no evidence — derived from {label}'>",
-      "capec_refs": ["CAPEC-NN"],
-      "attack_techniques": ["T1234"],
-      "rationale": "<2-3 sentences justifying severity and evidence>" }}
+      "severity": "<critical|high|medium|low>",
+      "likelihood": <1-5>,
+      "impact": <1-5>,
+      "evidence_refs": [
+        {{ "kind": "asset|finding|cve|capec|attack", "id": "<id>", "label": "<short>" }}
+      ],
+      "capec_refs": ["CAPEC-NN"], "attack_techniques": ["T1234"], "cwe_refs": ["CWE-79"],
+      "rationale": "<2-3 sentences justifying severity grounded in evidence>",
+      "attack_narrative": "<2-4 sentences: how an adversary would actually execute this — concrete steps, not abstract>",
+      "blast_radius": ["<component id reachable if this is exploited>", "..."],
+      "owner_role": "<security|appdev|platform|grc>",
+      "linked_finding_ids": ["<finding id from the supplied finding list>", "..."],
+      "detection_status": "detected|gap|not_applicable",
+      "detection_rule_refs": [
+        {{ "platform": "sentinel|splunk|elastic|chronicle|generic", "rule_id": "<id or name>" }}
+      ],
+      "status": "identified",
+      "residual_severity": null,
+      "residual_rationale": null
+    }}
   ],
   "mitigations": [
     {{ "id": "M01", "threat_id": "T01",
       "action": "<concrete remediation step>",
-      "control_id": "<NIST/CIS/OWASP control ID if applicable>",
+      "implementation_detail": "<3-6 sentences: exactly what to configure / code / deploy. Not 'review your IAM policies' — 'enable Conditional Access policy requiring MFA for any sign-in from outside the corporate IP range, scoped to the Finance group'>",
+      "control_refs": [
+        {{ "framework": "nist_800_53|nist_csf|owasp_asvs|owasp_top10|cis_v8|iso_27001", "control_id": "AC-2" }}
+      ],
       "status": "open",
-      "owner": "<role or team — security|platform|appdev|grc>" }}
+      "owner_role": "<security|appdev|platform|grc>",
+      "evidence_link": null
+    }}
+  ],
+  "coverage_decisions": [
+    {{ "component_id": "<id>", "category": "<stride/methodology category>",
+      "state": "threat|considered|not_applicable",
+      "threat_id": "<T0N if state=threat, else null>",
+      "rationale": "<required when state != threat — one sentence explaining why no threat>" }}
   ],
   "dfd_mermaid": "flowchart TD\\n  ..."
 }}
 
-Rules:
-- The dfd_mermaid value MUST be valid Mermaid `flowchart TD` syntax. Use the component
-  IDs as node IDs. Group nodes by trust zone using `subgraph` blocks.
-- Every threat must have at least one mitigation.
-- Prefer evidence-grounded threats: if a finding cites an open SSH port,
-  raise the relevant threat category around that port, not a generic one.
-- Use the connector topology to identify trust boundaries (e.g. internet
-  → public; Entra ID → identity zone).
-- Aim for 8-15 components, 10-25 threats. Quality over volume.
-- Third-person, executive tone. No greetings, no questions to the user.
-- The `category` field MUST be exactly one of the listed values for {label}.
+CRITICAL rules (these are gates, not preferences):
+
+1. EVIDENCE — every threat MUST have at least one evidence_refs entry. Acceptable kinds:
+   - asset: cite an asset by id from the supplied scope
+   - finding: cite a finding_id from the supplied finding list
+   - cve: cite a CVE-YYYY-NNNN if a finding references one
+   - capec: cite a CAPEC-NN from the supplied threat library
+   - attack: cite an ATT&CK technique ID (T1234) from the supplied threat library
+   Threats without evidence_refs will be flagged 'ungrounded' and demoted on screen.
+
+2. COMPLETENESS — components, data_flows, trust_boundaries, AND entry_points are ALL required. Do not
+   omit trust_boundaries or entry_points. An entry point is anywhere data crosses INTO the system from
+   an external actor (HTTP endpoints, file uploads, webhooks, message queues consumed from outside).
+
+3. TIERED STRIDE COVERAGE — produce coverage_decisions covering:
+   - Critical + High criticality components: ALL 6 STRIDE categories (or your methodology's full set)
+   - Medium criticality components: only categories that plausibly apply (omit n/a with rationale)
+   - Low criticality components: only categories with concrete attack surface
+   Every (component, category) pair in this matrix MUST appear as a coverage_decisions entry — either
+   pointing to a threat (state=threat with threat_id) or carrying a one-sentence rationale (state=considered
+   or state=not_applicable). Empty coverage is a defect.
+
+4. ATTACK NARRATIVE — for every threat, attack_narrative must read like an after-action report a SOC analyst
+   would write. Concrete adversary, concrete steps, concrete data. Avoid 'an attacker could potentially' —
+   say what they DO.
+
+5. BLAST RADIUS — list the component ids the adversary reaches on success. Walk the data_flows from the
+   compromised component; include any node connected by an unencrypted or credentials-bearing flow.
+
+6. MITIGATIONS — every threat has at least one mitigation. implementation_detail is REQUIRED and must be
+   specific enough to action without further analysis. control_refs MUST cite at least one of:
+   nist_800_53 / nist_csf / owasp_asvs / owasp_top10 / cis_v8 / iso_27001.
+
+7. DETECTION COVERAGE — for each threat, detection_status defaults to 'gap' unless you can name a
+   specific generic detection family that would catch it (Microsoft Sentinel analytic rule, Splunk ES
+   correlation search, etc.). When detection_status='detected', include detection_rule_refs.
+
+8. DFD — dfd_mermaid is valid Mermaid `flowchart TD`. Group nodes by trust zone via `subgraph` blocks
+   with the trust boundary names as labels.
+
+9. NO HALLUCINATED IDs — CAPEC, ATT&CK, CWE, and finding references must exist in the supplied lists.
+   If you can't ground a threat in supplied evidence, leave its refs empty rather than inventing them.
+
+10. PRIORITY — likelihood and impact are 1-5 integers. Severity tier is your overall call. The platform
+    computes priority_score = severity_weight × likelihood × impact × asset_criticality_weight.
+
+11. Use category values ONLY from this set for {label}: {categories_csv}.
+
+12. Third-person, executive tone. No greetings, no questions, no 'I can also', no apologies.
 """
 
 
@@ -355,8 +447,9 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
 
     parts.append("")
     parts.append(f"## Finding signals — {scope['finding_count']} total: {scope['findings_severity_counts']}")
+    parts.append("Cite finding IDs in `linked_finding_ids` and `evidence_refs` when a threat traces back to one.")
     for f in scope["findings"][:25]:
-        parts.append(f"- [{f['severity']}] {f['title']} on `{f['resource'] or 'n/a'}` "
+        parts.append(f"- finding_id={f['id']} [{f['severity']}] {f['title']} on `{f['resource'] or 'n/a'}` "
                      f"(CVE={f['cve'] or '—'}, CVSS={f['cvss'] or '—'}, control={f['control'] or '—'})")
     if not scope["findings"]:
         parts.append("- (no findings yet — model purely from architecture)")
@@ -391,47 +484,299 @@ def _pick_fields(obj: Any, keys) -> Dict[str, Any]:
     return {k: obj.get(k, "" if k != "encrypted" else False) for k in keys}
 
 
+_VALID_THREAT_STATUS = {"identified", "mitigated", "accepted", "transferred", "compensated", "not_applicable"}
+_VALID_OWNER_ROLE = {"security", "appdev", "platform", "grc"}
+_VALID_DETECTION_STATUS = {"detected", "gap", "not_applicable"}
+_VALID_EXPOSURE = {"internet", "intranet", "partner", "internal"}
+_VALID_COVERAGE_STATE = {"threat", "considered", "not_applicable", "missing"}
+_SEV_WEIGHT = {"critical": 4.0, "high": 3.0, "medium": 2.0, "low": 1.0}
+_CRIT_WEIGHT = {"critical": 1.5, "high": 1.25, "medium": 1.0, "low": 0.75}
+
+
+def _clip(v: Any, lo: int, hi: int, default: int) -> int:
+    try:
+        n = int(v)
+        return max(lo, min(hi, n))
+    except Exception:
+        return default
+
+
 def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
-    """Enforce schema regardless of LLM compliance."""
+    """Enforce the Phase 8 schema. Threats without evidence_refs are flagged
+    `is_grounded=False` (kept, not dropped — UI demotes them so the
+    consultant decides). Coverage matrix is derived if the LLM didn't emit one."""
     if not isinstance(raw, dict):
         raw = {}
     spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
     valid_cats = set(spec["categories"])
     default_cat = spec["default_category"]
 
-    components = [_pick_fields(c, _COMPONENT_FIELDS) for c in (raw.get("components") or [])][:50]
-    data_flows = [_pick_fields(d, _DATA_FLOW_FIELDS) for d in (raw.get("data_flows") or [])][:60]
+    components = [_pick_fields(c, _COMPONENT_FIELDS) for c in (raw.get("components") or [])][:60]
+    component_ids = {str(c.get("id") or "") for c in components}
+    data_flows = [_pick_fields(d, _DATA_FLOW_FIELDS) for d in (raw.get("data_flows") or [])][:80]
+    crit_map = {str(c.get("id") or ""): _str(c.get("criticality")).lower() or "medium" for c in components}
+
+    # ── Trust boundaries (Phase 8 — new) ──────────────────────────────────
+    trust_boundaries_raw = raw.get("trust_boundaries") or []
+    trust_boundaries = []
+    for i, tb in enumerate((trust_boundaries_raw if isinstance(trust_boundaries_raw, list) else [])[:25], 1):
+        if not isinstance(tb, dict):
+            continue
+        crossed = tb.get("crossed_by_flow_ids") or []
+        trust_boundaries.append({
+            "id": _str(tb.get("id")) or f"tb{i}",
+            "name": _str(tb.get("name"), default=f"boundary-{i}"),
+            "from_zone": _str(tb.get("from_zone")).lower() or "unknown",
+            "to_zone": _str(tb.get("to_zone")).lower() or "unknown",
+            "description": _str(tb.get("description")),
+            "crossed_by_flow_ids": crossed if isinstance(crossed, list) else [],
+        })
+    # If the LLM didn't supply any, derive one boundary per distinct (from_zone, to_zone)
+    # pair seen in data_flows.
+    if not trust_boundaries and components:
+        zone_of = {c["id"]: _str(c.get("trust_zone")).lower() or "private" for c in components}
+        seen_pairs = set()
+        for f in data_flows:
+            fz = zone_of.get(_str(f.get("from")), "")
+            tz = zone_of.get(_str(f.get("to")), "")
+            if fz and tz and fz != tz and (fz, tz) not in seen_pairs:
+                seen_pairs.add((fz, tz))
+                trust_boundaries.append({
+                    "id": f"tb-auto-{len(trust_boundaries)+1}",
+                    "name": f"{fz} → {tz}",
+                    "from_zone": fz, "to_zone": tz,
+                    "description": "Derived from data-flow zones (LLM did not emit explicit boundaries).",
+                    "crossed_by_flow_ids": [],
+                })
+
+    # ── Entry points (Phase 8 — new) ──────────────────────────────────────
+    entry_points_raw = raw.get("entry_points") or []
+    entry_points = []
+    for i, ep in enumerate((entry_points_raw if isinstance(entry_points_raw, list) else [])[:30], 1):
+        if not isinstance(ep, dict):
+            continue
+        comp_id = _str(ep.get("component_id"))
+        if comp_id and comp_id not in component_ids:
+            comp_id = ""  # drop orphan
+        exposure = _str(ep.get("exposure")).lower()
+        if exposure not in _VALID_EXPOSURE:
+            exposure = "internet"
+        entry_points.append({
+            "id": _str(ep.get("id")) or f"ep{i}",
+            "kind": _str(ep.get("kind")) or "api",
+            "name": _str(ep.get("name"), default=f"entry-{i}"),
+            "component_id": comp_id,
+            "exposure": exposure,
+            "auth_required": bool(ep.get("auth_required", False)),
+        })
+
+    # ── Threats (Phase 8 — full expanded shape) ───────────────────────────
     threats_raw = raw.get("threats") or []
-    threats = []
-    for i, t in enumerate(threats_raw[:50], 1):
-        t = _pick_fields(t, _THREAT_FIELDS)
-        t["id"] = _str(t["id"]) or f"T{i:02d}"
-        # Accept "stride" as a legacy alias for "category" so prior models
-        # still render.
-        cat = _str(t.get("category") or "").lower()
+    threats: List[Dict[str, Any]] = []
+    for i, t in enumerate(threats_raw[:80], 1):
+        if not isinstance(t, dict):
+            continue
+        cat = _str(t.get("category")).lower()
         if cat not in valid_cats:
             cat = default_cat
-        t["category"] = cat
-        t["severity"] = _str(t["severity"]).lower() if _str(t["severity"]).lower() in _SEV else "medium"
-        t["capec_refs"] = t.get("capec_refs") if isinstance(t.get("capec_refs"), list) else []
-        t["attack_techniques"] = t.get("attack_techniques") if isinstance(t.get("attack_techniques"), list) else []
-        threats.append(t)
-    mitigations_raw = raw.get("mitigations") or []
-    mitigations = []
-    for i, m in enumerate(mitigations_raw[:80], 1):
-        m = _pick_fields(m, _MITIGATION_FIELDS)
-        m["id"] = _str(m["id"]) or f"M{i:02d}"
-        m["status"] = _str(m["status"]).lower() if _str(m["status"]).lower() in _STATUS else "open"
-        mitigations.append(m)
+        sev = _str(t.get("severity")).lower()
+        if sev not in _SEV:
+            sev = "medium"
+        # evidence_refs is the new required-ish field. We accept the LLM's
+        # output if it's a list of dicts; we also fold the legacy free-text
+        # `evidence` into a refs entry so old models migrate naturally.
+        evidence_refs_raw = t.get("evidence_refs") or []
+        evidence_refs: List[Dict[str, Any]] = []
+        if isinstance(evidence_refs_raw, list):
+            for r in evidence_refs_raw[:8]:
+                if not isinstance(r, dict):
+                    continue
+                kind = _str(r.get("kind")).lower()
+                if kind not in ("asset", "finding", "cve", "capec", "attack"):
+                    continue
+                evidence_refs.append({
+                    "kind": kind,
+                    "id": _str(r.get("id"), default=""),
+                    "label": _str(r.get("label"), default=""),
+                })
+        is_grounded = bool(evidence_refs)
+        capec_refs = t.get("capec_refs") if isinstance(t.get("capec_refs"), list) else []
+        attack_techniques = t.get("attack_techniques") if isinstance(t.get("attack_techniques"), list) else []
+        cwe_refs = t.get("cwe_refs") if isinstance(t.get("cwe_refs"), list) else []
+        blast_radius = t.get("blast_radius") if isinstance(t.get("blast_radius"), list) else []
+        # Drop blast-radius entries that point at non-existent components.
+        blast_radius = [_str(b) for b in blast_radius if _str(b) in component_ids][:20]
+        linked_finding_ids = t.get("linked_finding_ids") if isinstance(t.get("linked_finding_ids"), list) else []
+        owner_role = _str(t.get("owner_role")).lower()
+        if owner_role not in _VALID_OWNER_ROLE:
+            owner_role = "security"
+        likelihood = _clip(t.get("likelihood"), 1, 5, 3)
+        impact = _clip(t.get("impact"), 1, 5, 3)
+        # Priority score: severity_weight × likelihood × impact × asset_criticality_weight.
+        # Lands roughly in 1 .. 150 range; UI just sorts by it.
+        asset_id = _str(t.get("asset_id"))
+        asset_crit = crit_map.get(asset_id, "medium")
+        priority_score = round(_SEV_WEIGHT.get(sev, 2.0) * likelihood * impact * _CRIT_WEIGHT.get(asset_crit, 1.0), 2)
+        det_status = _str(t.get("detection_status")).lower()
+        if det_status not in _VALID_DETECTION_STATUS:
+            det_status = "gap"
+        det_rules_raw = t.get("detection_rule_refs") or []
+        det_rules = []
+        if isinstance(det_rules_raw, list):
+            for r in det_rules_raw[:5]:
+                if isinstance(r, dict):
+                    det_rules.append({
+                        "platform": _str(r.get("platform"), default="generic"),
+                        "rule_id": _str(r.get("rule_id")),
+                    })
+        status = _str(t.get("status")).lower()
+        if status not in _VALID_THREAT_STATUS:
+            status = "identified"
+        residual_sev = _str(t.get("residual_severity")).lower()
+        residual_sev = residual_sev if residual_sev in _SEV else None
+        threat = {
+            "id": _str(t.get("id")) or f"T{i:02d}",
+            "category": cat,
+            "asset_id": asset_id,
+            "title": _str(t.get("title"), default="(untitled threat)"),
+            "severity": sev,
+            "likelihood": likelihood,
+            "impact": impact,
+            "priority_score": priority_score,
+            "evidence": _str(t.get("evidence")),  # legacy free-text kept
+            "evidence_refs": evidence_refs,
+            "is_grounded": is_grounded,
+            "capec_refs": capec_refs,
+            "attack_techniques": attack_techniques,
+            "cwe_refs": cwe_refs,
+            "rationale": _str(t.get("rationale")),
+            "attack_narrative": _str(t.get("attack_narrative")),
+            "blast_radius": blast_radius,
+            "owner_role": owner_role,
+            "linked_finding_ids": linked_finding_ids,
+            "detection_status": det_status,
+            "detection_rule_refs": det_rules,
+            "status": status,
+            "decision_notes": _str(t.get("decision_notes")),
+            "decided_by": _str(t.get("decided_by")),
+            "decided_at": _str(t.get("decided_at")),
+            "residual_severity": residual_sev,
+            "residual_rationale": _str(t.get("residual_rationale")),
+        }
+        threats.append(threat)
 
+    # ── Mitigations (Phase 8 — implementation_detail required, control_refs[]) ──
+    mitigations_raw = raw.get("mitigations") or []
+    mitigations: List[Dict[str, Any]] = []
+    for i, m in enumerate(mitigations_raw[:120], 1):
+        if not isinstance(m, dict):
+            continue
+        owner_role = _str(m.get("owner_role")).lower()
+        if owner_role not in _VALID_OWNER_ROLE:
+            owner_role = _str(m.get("owner")).lower() or "security"
+            if owner_role not in _VALID_OWNER_ROLE:
+                owner_role = "security"
+        control_refs_raw = m.get("control_refs") or []
+        control_refs = []
+        if isinstance(control_refs_raw, list):
+            for r in control_refs_raw[:6]:
+                if isinstance(r, dict):
+                    control_refs.append({
+                        "framework": _str(r.get("framework")).lower(),
+                        "control_id": _str(r.get("control_id")),
+                    })
+        # Fold legacy single control_id into the refs list when control_refs is empty
+        legacy_control = _str(m.get("control_id"))
+        if not control_refs and legacy_control:
+            control_refs.append({"framework": "generic", "control_id": legacy_control})
+        ev_link = m.get("evidence_link")
+        if not isinstance(ev_link, dict):
+            ev_link = None
+        mitigations.append({
+            "id": _str(m.get("id")) or f"M{i:02d}",
+            "threat_id": _str(m.get("threat_id")),
+            "action": _str(m.get("action")),
+            "implementation_detail": _str(m.get("implementation_detail")),
+            "control_id": legacy_control,  # keep for backward compat
+            "control_refs": control_refs,
+            "status": _str(m.get("status")).lower() if _str(m.get("status")).lower() in _STATUS else "open",
+            "owner_role": owner_role,
+            "owner": owner_role,  # legacy alias
+            "evidence_link": ev_link,
+        })
+
+    # ── Coverage decisions (Phase 8B) ─────────────────────────────────────
+    cov_raw = raw.get("coverage_decisions") or []
+    coverage_decisions: List[Dict[str, Any]] = []
+    seen_cells = set()
+    if isinstance(cov_raw, list):
+        for c in cov_raw[:600]:
+            if not isinstance(c, dict):
+                continue
+            comp_id = _str(c.get("component_id"))
+            cat = _str(c.get("category")).lower()
+            if not comp_id or comp_id not in component_ids or cat not in valid_cats:
+                continue
+            state = _str(c.get("state")).lower()
+            if state not in _VALID_COVERAGE_STATE:
+                state = "missing"
+            entry = {
+                "component_id": comp_id,
+                "category": cat,
+                "state": state,
+                "threat_id": _str(c.get("threat_id")) or None,
+                "rationale": _str(c.get("rationale")),
+            }
+            coverage_decisions.append(entry)
+            seen_cells.add((comp_id, cat))
+
+    # Tiered fill-in: critical/high components should have ALL categories
+    # covered. If the LLM missed some cells, mark them `missing` so the UI
+    # can highlight gaps. We DON'T invent rationales — that's the consultant's
+    # job (or a follow-up "fill gaps" LLM call from the matrix endpoint).
+    threat_by_cell: Dict[tuple, str] = {}
+    for t in threats:
+        key = (t["asset_id"], t["category"])
+        if key[0] and key[1] and key not in threat_by_cell:
+            threat_by_cell[key] = t["id"]
+
+    for c in components:
+        comp_id = _str(c.get("id"))
+        crit = _str(c.get("criticality")).lower() or "medium"
+        # Decide which categories to require for this component's tier.
+        if crit in ("critical", "high"):
+            required_cats = list(valid_cats)
+        elif crit == "medium":
+            # Pick the categories that already have threats on this component,
+            # plus the methodology's default; lower tiers don't force full coverage.
+            required_cats = list({cat for (cid, cat) in threat_by_cell.keys() if cid == comp_id} | {default_cat})
+        else:
+            required_cats = [cat for (cid, cat) in threat_by_cell.keys() if cid == comp_id]
+        for cat in required_cats:
+            if (comp_id, cat) in seen_cells:
+                continue
+            # Auto-promote when a threat exists for this cell.
+            if (comp_id, cat) in threat_by_cell:
+                coverage_decisions.append({
+                    "component_id": comp_id, "category": cat,
+                    "state": "threat", "threat_id": threat_by_cell[(comp_id, cat)],
+                    "rationale": "",
+                })
+            else:
+                coverage_decisions.append({
+                    "component_id": comp_id, "category": cat,
+                    "state": "missing", "threat_id": None,
+                    "rationale": "",
+                })
+            seen_cells.add((comp_id, cat))
+
+    # ── DFD ───────────────────────────────────────────────────────────────
     dfd = _str(raw.get("dfd_mermaid")).strip()
     if dfd and not dfd.lstrip().startswith("flowchart"):
-        # Anything not starting with `flowchart` — wrap it so Mermaid still renders.
         dfd = "flowchart TD\n" + dfd
     if not dfd:
-        # Skeleton DFD from component list
         lines = ["flowchart TD"]
-        zones: Dict[str, List[str]] = {}
+        zones: Dict[str, List[Dict[str, Any]]] = {}
         for c in components:
             zone = _str(c.get("trust_zone")) or "private"
             zones.setdefault(zone, []).append(c)
@@ -444,11 +789,14 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
 
     return {
         "executive_summary": _str(raw.get("executive_summary")) or
-            f"Threat model covers {len(components)} component(s) with {len(threats)} STRIDE-derived threats.",
+            f"Threat model covers {len(components)} component(s) with {len(threats)} threats.",
         "components": components,
         "data_flows": data_flows,
+        "trust_boundaries": trust_boundaries,
+        "entry_points": entry_points,
         "threats": threats,
         "mitigations": mitigations,
+        "coverage_decisions": coverage_decisions,
         "dfd_mermaid": dfd,
     }
 
@@ -588,6 +936,17 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         tm.mitigations_json = model["mitigations"]
         tm.dfd_mermaid = model["dfd_mermaid"]
         tm.executive_summary = model["executive_summary"]
+        # Phase 8 — persist the new completeness + coverage fields.
+        tm.trust_boundaries_json = model.get("trust_boundaries") or []
+        tm.entry_points_json = model.get("entry_points") or []
+        tm.coverage_decisions = model.get("coverage_decisions") or []
+        # Phase 8E — compute maturity scores at generation time (best-effort).
+        try:
+            from services.maturity_scorer import compute_maturity_scores
+            tm.maturity_scores = compute_maturity_scores(db, tm.client_id, methodology, model["threats"])
+        except Exception:
+            logger.exception("maturity score computation failed (continuing)")
+            tm.maturity_scores = {}
         tm.ai_provider = meta.get("provider")
         tm.ai_model = meta.get("model")
         tm.tokens_used = int(meta.get("tokens") or 0)

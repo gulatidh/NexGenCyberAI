@@ -65,8 +65,9 @@ class AgentBase(BaseModel):
     tools_enabled: List[str] = []
     knowledge_file_ids: List[str] = []
     is_enabled: bool = True
-    # Phase 7A — artifact-producing buddy config
-    output_kind: str = "prose"
+    # Phase 7A — artifact-producing buddy config. Optional so existing rows
+    # with NULL values don't fail Pydantic validation pre-migration.
+    output_kind: Optional[str] = "prose"
     output_schema_json: Optional[str] = None
     # Phase 7C — personality
     avatar_url: Optional[str] = None
