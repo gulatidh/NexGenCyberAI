@@ -219,6 +219,8 @@ export const threatModelsApi = {
   drawioDownloadUrl: (clientId: string, modelId: string) =>
     `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/drawio?download=1`,
   // Phase 8 endpoints
+  styledDfd: (clientId: string, modelId: string, view: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/dfd`, { params: { view } }).then((r) => r.data),
   coverage: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/coverage`).then((r) => r.data),
   fillGaps: (clientId: string, modelId: string) =>

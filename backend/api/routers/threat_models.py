@@ -915,6 +915,41 @@ async def fill_coverage_gaps(
     }
 
 
+@router.get("/{model_id}/dfd")
+async def get_dfd_styled(
+    client_id: str,
+    model_id: str,
+    view: str = "architecture",
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Phase 9B — return the Mermaid DFD styled for a specific lens.
+
+    view ∈ {architecture, threat_heat, detection_coverage}.
+
+    For 'architecture' we just return the canonical dfd_mermaid; the
+    other views append `style nodeId ...` + `linkStyle N ...` lines
+    that overlay threat-severity heat or SOC detection-coverage colors.
+    """
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    from services.dfd_styler import style_dfd, VIEWS
+    v = (view or "architecture").lower()
+    if v not in VIEWS:
+        raise HTTPException(status_code=400, detail=f"Unknown view. Valid: {sorted(VIEWS)}")
+    styled = style_dfd(
+        view=v,
+        base_mermaid=tm.dfd_mermaid or "",
+        components=tm.components_json or [],
+        data_flows=tm.data_flows_json or [],
+        threats=tm.threats_json or [],
+    )
+    return {"view": v, "mermaid": styled}
+
+
 @router.get("/{model_id}/maturity")
 async def get_maturity(
     client_id: str,

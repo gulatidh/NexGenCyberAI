@@ -142,13 +142,21 @@ def _collect_scope(
     elif scope_type == "asset" and scope_id:
         assets_q = assets_q.filter(Asset.id == scope_id)
     assets = assets_q.limit(120).all()
-    asset_rows = [{
-        "id": a.id,
-        "name": a.name or a.external_id or a.id,
-        "type": a.asset_type or "unknown",
-        "external_id": a.external_id,
-        "criticality": getattr(a, "criticality", None) or "medium",
-    } for a in assets]
+    asset_rows = []
+    for a in assets:
+        # Pull every signal we can about an asset so the LLM uses real names,
+        # types, and provider hints in the diagram instead of inventing
+        # generic labels like "API1" / "Web Service".
+        tags = getattr(a, "tags", None) or {}
+        provider = tags.get("provider") if isinstance(tags, dict) else None
+        asset_rows.append({
+            "id": a.id,
+            "name": a.name or a.external_id or a.id,
+            "type": a.asset_type or "unknown",
+            "external_id": a.external_id,
+            "provider": provider,
+            "criticality": getattr(a, "criticality", None) or "medium",
+        })
 
     # ── Recent findings (last 50, severity-ordered) ────
     findings_q = (
@@ -317,7 +325,12 @@ CRITICAL rules (these are gates, not preferences):
    correlation search, etc.). When detection_status='detected', include detection_rule_refs.
 
 8. DFD — dfd_mermaid is valid Mermaid `flowchart TD`. Group nodes by trust zone via `subgraph` blocks
-   with the trust boundary names as labels.
+   with the trust boundary names as labels. Each node MUST use the component's real `name` (verbatim
+   from asset inventory when supplied) and include a `<br/><small>type</small>` sub-label so the
+   diagram reads as a real architecture, not a generic abstract topology. Example node:
+       order_db["payment-cosmosdb-prod<br/><small>database</small>"]
+   Subgraph labels should be human-readable zone names, e.g.:
+       subgraph DMZ["DMZ — public-facing"]
 
 9. NO HALLUCINATED IDs — CAPEC, ATT&CK, CWE, and finding references must exist in the supplied lists.
    If you can't ground a threat in supplied evidence, leave its refs empty rather than inventing them.
@@ -439,11 +452,16 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
                 )
 
     parts.append("")
-    parts.append("## Asset inventory (supplemental — for evidence grounding only)")
-    for a in scope["assets"][:60]:
-        parts.append(f"- [{a['type']}] {a['name']} (criticality={a['criticality']})")
-    if not scope["assets"]:
-        parts.append("- (no assets discovered for this scope)")
+    if scope["assets"]:
+        parts.append(f"## Asset inventory — {len(scope['assets'])} discovered assets in scope. USE THESE EXACT NAMES.")
+        parts.append("When you emit a component, set `name` to the asset's `name` verbatim and `id` to the asset's `id`. "
+                     "Do NOT invent generic labels like 'API Gateway' or 'Web Service' when a real asset matches.")
+        for a in scope["assets"][:60]:
+            prov = f" provider={a.get('provider')}" if a.get('provider') else ""
+            parts.append(f"- asset_id={a['id']}  name=\"{a['name']}\"  type={a['type']}  criticality={a['criticality']}{prov}")
+    else:
+        parts.append("## Asset inventory")
+        parts.append("- (no assets discovered for this scope — model from architecture only, use descriptive names like 'Customer-facing API' not 'API1')")
 
     parts.append("")
     parts.append(f"## Finding signals — {scope['finding_count']} total: {scope['findings_severity_counts']}")
@@ -781,9 +799,14 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
             zone = _str(c.get("trust_zone")) or "private"
             zones.setdefault(zone, []).append(c)
         for zone, comps in zones.items():
-            lines.append(f"  subgraph {zone.replace(' ', '_').upper()}")
+            lines.append(f"  subgraph {zone.replace(' ', '_').upper()}[\"{zone.title().replace('-', ' ')}\"]")
             for c in comps:
-                lines.append(f"    {_str(c['id']) or 'n'}[\"{_str(c['name']) or '?'}\"]")
+                nid = _str(c['id']) or 'n'
+                name = _str(c['name']) or '?'
+                ctype = _str(c.get('type')) or ''
+                # Two-line label: name on top, type subtle below
+                label = f"{name}<br/><small>{ctype}</small>" if ctype else name
+                lines.append(f'    {nid}["{label}"]')
             lines.append("  end")
         dfd = "\n".join(lines)
 

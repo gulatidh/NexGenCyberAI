@@ -110,6 +110,8 @@ export default function ThreatModelDetail() {
   const [tab, setTab] = useState<string>("diagram");
   // Diagram-renderer toggle: 'mermaid' (built-in, fast) | 'drawio' (rich, editable)
   const [diagramMode, setDiagramMode] = useState<"mermaid" | "drawio">("mermaid");
+  // Phase 9B — diagram VIEW (overlay lens for the Mermaid renderer).
+  const [diagramView, setDiagramView] = useState<"architecture" | "threat_heat" | "detection_coverage">("architecture");
   // When the browser triggers print (button or Ctrl+P), expand every tab
   // section so the whole threat model — Diagram + Components + Threats +
   // Mitigations — renders as a single paginated PDF.
@@ -143,6 +145,17 @@ export default function ThreatModelDetail() {
     queryFn: () => threatModelsApi.drawioXml(clientId, modelId!),
     enabled: !!modelId && !!clientId && diagramMode === "drawio" && data?.status === "completed",
     staleTime: 60_000,
+  });
+
+  // Phase 9B — styled Mermaid for the selected view lens. The architecture
+  // view falls back to the canonical dfd_mermaid; threat_heat and
+  // detection_coverage hit the server endpoint that appends style overlays.
+  const styledDfdQuery = useQuery<{ view: string; mermaid: string }>({
+    queryKey: ["threat-model-dfd", modelId, diagramView],
+    queryFn: () => threatModelsApi.styledDfd(clientId, modelId!, diagramView),
+    enabled: !!modelId && !!clientId && diagramMode === "mermaid"
+             && diagramView !== "architecture" && data?.status === "completed",
+    staleTime: 30_000,
   });
 
   const rescanMutation = useMutation({
@@ -434,21 +447,57 @@ export default function ThreatModelDetail() {
                   }}
                 >draw.io</Button>
               </Box>
-              <Button
-                size="small"
-                startIcon={<Download sx={{ fontSize: 16 }} />}
-                href={threatModelsApi.drawioDownloadUrl(clientId, modelId!)}
-                disabled={data.status !== "completed"}
-                sx={{
-                  textTransform: "none", fontSize: 12, fontWeight: 600,
-                  color: "rgba(255,255,255,0.75)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.2)" },
-                }}
-              >Download .drawio</Button>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                {/* Phase 9B — view-lens toggle, only meaningful in Mermaid mode */}
+                {diagramMode === "mermaid" && data.status === "completed" && (
+                  <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
+                    {(
+                      [
+                        { v: "architecture", label: "Architecture", color: "#4285F4" },
+                        { v: "threat_heat", label: "Threat heat", color: "#EA4335" },
+                        { v: "detection_coverage", label: "Detections", color: "#34A853" },
+                      ] as Array<{ v: typeof diagramView; label: string; color: string }>
+                    ).map((opt) => {
+                      const active = diagramView === opt.v;
+                      return (
+                        <Button
+                          key={opt.v}
+                          size="small"
+                          onClick={() => setDiagramView(opt.v)}
+                          sx={{
+                            minWidth: 102, color: active ? "white" : "rgba(255,255,255,0.55)",
+                            bgcolor: active ? `${opt.color}33` : "transparent",
+                            border: active ? `1px solid ${opt.color}` : "1px solid transparent",
+                            textTransform: "none", fontSize: 11.5, fontWeight: 600,
+                            "&:hover": { bgcolor: active ? `${opt.color}44` : "rgba(255,255,255,0.06)" },
+                          }}
+                        >{opt.label}</Button>
+                      );
+                    })}
+                  </Box>
+                )}
+                <Button
+                  size="small"
+                  startIcon={<Download sx={{ fontSize: 16 }} />}
+                  href={threatModelsApi.drawioDownloadUrl(clientId, modelId!)}
+                  disabled={data.status !== "completed"}
+                  sx={{
+                    textTransform: "none", fontSize: 12, fontWeight: 600,
+                    color: "rgba(255,255,255,0.75)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.2)" },
+                  }}
+                >Download .drawio</Button>
+              </Box>
             </Box>
             {(diagramMode === "mermaid" || printing) ? (
-              <DfdDiagram source={data.dfd_mermaid || ""} />
+              <DfdDiagram
+                source={
+                  diagramView !== "architecture" && styledDfdQuery.data?.mermaid
+                    ? styledDfdQuery.data.mermaid
+                    : (data.dfd_mermaid || "")
+                }
+              />
             ) : drawioQuery.isLoading ? (
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, gap: 1.5, color: "rgba(255,255,255,0.55)" }}>
                 <CircularProgress size={20} sx={{ color: "#4285F4" }} />

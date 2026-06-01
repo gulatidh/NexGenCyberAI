@@ -46,8 +46,11 @@ _COMP_INSET_X = 20
 
 # Component-type → mxGraph style. Defaults to a rounded rectangle; richer
 # stencils used for the common types so the diagram doesn't look like a
-# wall of identical boxes.
+# wall of identical boxes. Phase 9C — provider-aware keys map directly to
+# native draw.io AWS / Azure / GCP / generic stencils so the output looks
+# like an actual architecture diagram.
 _TYPE_STYLE = {
+    # Generic types (kept for back-compat)
     "database": (
         "shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;"
         "size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;"
@@ -79,7 +82,85 @@ _TYPE_STYLE = {
     "repo": (
         "rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=10;"
     ),
+    # ── AWS stencils ───────────────────────────────────────────────────
+    "aws_s3":           "sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[1,1,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;",
+    "aws_lambda":       "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D45B07;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;",
+    "aws_rds":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#3334B9;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.rds;",
+    "aws_dynamodb":     "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#3334B9;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;",
+    "aws_ec2":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D45B07;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.ec2;",
+    "aws_eks":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#D45B07;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.elastic_kubernetes_service;",
+    "aws_iam":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management_iam;",
+    "aws_apigateway":   "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;",
+    "aws_cognito":      "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cognito;",
+    "aws_sqs":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#E7157B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.simple_queue_service;",
+    "aws_secretsmanager":"sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#DD344C;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.secrets_manager;",
+    # ── Azure stencils ─────────────────────────────────────────────────
+    "azure_appservice": "sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[1,1,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.app_services;",
+    "azure_functions":  "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.function_apps;",
+    "azure_sql":        "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.sql_database;",
+    "azure_cosmos":     "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.cosmos_db;",
+    "azure_storage":    "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.storage_accounts;",
+    "azure_keyvault":   "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.key_vaults;",
+    "azure_vm":         "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.virtual_machine;",
+    "azure_aks":        "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.kubernetes_services;",
+    "azure_apim":       "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.api_management_services;",
+    "azure_servicebus": "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.service_bus;",
+    "entra_id":         "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#0078D4;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.azure2.azure_active_directory;",
+    # ── GCP stencils ───────────────────────────────────────────────────
+    "gcp_storage":      "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#4284F3;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.gcp2.cloud_storage;",
+    "gcp_sql":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#4284F3;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.gcp2.cloud_sql;",
+    "gcp_gke":          "sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#4284F3;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;shape=mxgraph.gcp2.kubernetes_engine;",
+    # ── Datastore + identity generic ──────────────────────────────────
+    "postgres":         "shape=mxgraph.networking.postgresql;html=1;fillColor=#336791;strokeColor=#ffffff;fontColor=#ffffff;",
+    "mongodb":          "shape=mxgraph.networking.mongodb;html=1;fillColor=#13aa52;strokeColor=#ffffff;fontColor=#ffffff;",
+    "redis":            "shape=mxgraph.networking.redis;html=1;fillColor=#dc382c;strokeColor=#ffffff;fontColor=#ffffff;",
+    "kafka":            "shape=mxgraph.networking.kafka;html=1;fillColor=#231f20;strokeColor=#ffffff;fontColor=#ffffff;",
 }
+
+
+# Aliases / hints from common asset_type or connector_type strings to the
+# canonical _TYPE_STYLE keys above. Order matters — first match wins.
+_TYPE_HINTS = [
+    # AWS
+    ("aws s3", "aws_s3"), ("s3 bucket", "aws_s3"), ("s3", "aws_s3"),
+    ("aws lambda", "aws_lambda"), ("lambda", "aws_lambda"),
+    ("aws rds", "aws_rds"), ("rds", "aws_rds"),
+    ("dynamodb", "aws_dynamodb"),
+    ("aws ec2", "aws_ec2"), ("ec2", "aws_ec2"),
+    ("eks", "aws_eks"),
+    ("aws iam", "aws_iam"), ("iam role", "aws_iam"),
+    ("api gateway", "aws_apigateway"), ("apigw", "aws_apigateway"),
+    ("cognito", "aws_cognito"),
+    ("sqs", "aws_sqs"),
+    ("secrets manager", "aws_secretsmanager"), ("aws secret", "aws_secretsmanager"),
+    # Azure
+    ("app service", "azure_appservice"), ("appsvc", "azure_appservice"), ("azure app", "azure_appservice"),
+    ("function app", "azure_functions"), ("azure function", "azure_functions"),
+    ("azure sql", "azure_sql"), ("sql database", "azure_sql"),
+    ("cosmos", "azure_cosmos"),
+    ("azure storage", "azure_storage"), ("blob storage", "azure_storage"), ("blob", "azure_storage"),
+    ("key vault", "azure_keyvault"), ("keyvault", "azure_keyvault"),
+    ("azure vm", "azure_vm"),
+    ("aks", "azure_aks"),
+    ("apim", "azure_apim"), ("api management", "azure_apim"),
+    ("service bus", "azure_servicebus"), ("servicebus", "azure_servicebus"),
+    ("entra", "entra_id"), ("azure ad", "entra_id"), ("aad", "entra_id"),
+    # GCP
+    ("gcs", "gcp_storage"), ("cloud storage", "gcp_storage"),
+    ("cloud sql", "gcp_sql"),
+    ("gke", "gcp_gke"),
+    # Datastores
+    ("postgres", "postgres"), ("postgresql", "postgres"),
+    ("mongo", "mongodb"),
+    ("redis", "redis"),
+    ("kafka", "kafka"),
+    # Generic
+    ("database", "database"), ("storage", "storage"), ("queue", "queue"),
+    ("api", "api"), ("endpoint", "endpoint"), ("vm", "vm"),
+    ("identity", "identity"), ("user", "identity"),
+    ("secret", "secret-store"), ("vault", "secret-store"),
+    ("repo", "repo"), ("repository", "repo"),
+]
 _DEFAULT_STYLE = (
     "rounded=1;whiteSpace=wrap;html=1;arcSize=10;fillColor=#f5f5f5;strokeColor=#666666;"
 )
@@ -99,21 +180,25 @@ def _safe(s: Any) -> str:
     return escape(str(s or "")).replace('"', "&quot;")
 
 
-def _style_for(component_type: Optional[str]) -> str:
+def _style_for(component_type: Optional[str], notes: Optional[str] = None) -> str:
+    """Pick the right mxGraph style for a component.
+
+    Tries (in order):
+      1. Direct match on a provider-specific key (`aws_s3`, `azure_keyvault`, ...)
+      2. Substring hint match against `_TYPE_HINTS`
+      3. Substring against notes (sometimes the provider hint lives there)
+      4. Generic fallback
+    """
     if not component_type:
-        return _DEFAULT_STYLE
-    key = component_type.lower().strip()
-    if key in _TYPE_STYLE:
-        return _TYPE_STYLE[key]
-    # Try a few aliases
-    if "db" in key or "sql" in key:
-        return _TYPE_STYLE["database"]
-    if "bucket" in key or "blob" in key or "object" in key:
-        return _TYPE_STYLE["storage"]
-    if "web" in key or "app" in key:
-        return _TYPE_STYLE["api"]
-    if "user" in key or "person" in key:
-        return _TYPE_STYLE["identity"]
+        component_type = ""
+    haystack = (component_type or "").lower().strip()
+    if haystack in _TYPE_STYLE:
+        return _TYPE_STYLE[haystack]
+    extra = (notes or "").lower()
+    full = f"{haystack} {extra}"
+    for needle, target in _TYPE_HINTS:
+        if needle in full and target in _TYPE_STYLE:
+            return _TYPE_STYLE[target]
     return _DEFAULT_STYLE
 
 
@@ -202,7 +287,7 @@ def render_drawio_xml(
             if crit in ("critical", "high"):
                 badge = f"\n[{crit.upper()}]"
             label = f"{name}{badge}"
-            style = _style_for(comp.get("type"))
+            style = _style_for(comp.get("type"), comp.get("notes"))
             cells.append(
                 f'<mxCell id="{_safe(cid)}" value="{_safe(label)}" '
                 f'style="{style}" vertex="1" parent="{zone_id}">'
