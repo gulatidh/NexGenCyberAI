@@ -114,6 +114,14 @@ DEFAULT_METHODOLOGY = "stride"
 # would otherwise leave the row wedged in 'generating' indefinitely.
 LLM_TIMEOUT_SECONDS = 180
 
+# Output-token budget for the model JSON. The deliverable schema is large
+# (components + data_flows + threats + mitigations + trust_boundaries +
+# entry_points + coverage_decisions); at the old 4096 cap the JSON was
+# truncated mid-document for any non-trivial scope, so it failed to parse and
+# the model came back empty. gpt-4.1-mini (the configured deployment) allows
+# up to 32k output tokens — give it generous headroom.
+THREAT_MODEL_MAX_TOKENS = 16000
+
 _SEV = {"critical", "high", "medium", "low", "info"}
 _STATUS = {"open", "in_progress", "accepted", "compensating_control", "closed"}
 
@@ -878,7 +886,7 @@ async def _invoke_llm(
     try:
         from core.ai_providers import get_llm
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = get_llm(temperature=0.2, max_tokens=4096)
+        llm = get_llm(temperature=0.2, max_tokens=THREAT_MODEL_MAX_TOKENS)
     except Exception as exc:
         logger.warning("Threat modeler LLM unavailable, returning skeleton: %s", exc)
         return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0}
@@ -918,21 +926,40 @@ async def _invoke_llm(
         if text.endswith("```"):
             text = text[: -3]
 
+    # finish_reason='length' means the model hit the output-token cap before
+    # finishing — the JSON is truncated and won't parse.
+    finish = ""
+    try:
+        finish = (getattr(result, "response_metadata", None) or {}).get("finish_reason", "") or ""
+    except Exception:
+        finish = ""
+
+    parse_error: Optional[str] = None
     try:
         # Find first { ... last }
         start = text.find("{")
         end = text.rfind("}")
         parsed = json.loads(text[start:end + 1]) if start >= 0 and end > start else {}
+        if not parsed:
+            parse_error = "no JSON object found in response"
     except Exception as exc:
-        logger.warning("Threat modeler JSON parse failed: %s", exc)
+        parse_error = str(exc)
+        logger.warning("Threat modeler JSON parse failed (finish=%s, %d chars): %s | head=%r",
+                       finish, len(text), exc, text[:300])
         parsed = {}
 
     usage = getattr(result, "usage_metadata", None) or {}
-    meta = {
+    meta: Dict[str, Any] = {
         "provider": "configured",  # core.ai_providers picks the actual provider
         "model": getattr(llm, "model_name", None) or getattr(llm, "model", None),
         "tokens": int(usage.get("total_tokens") or 0),
     }
+    if parse_error:
+        if finish == "length":
+            meta["error"] = ("The model's response was truncated at the output-token limit before "
+                             "the JSON was complete. The output cap has been raised — please rescan.")
+        else:
+            meta["error"] = f"The model's response could not be parsed as JSON ({parse_error})."
     return _normalise(parsed, methodology), meta
 
 
@@ -1111,7 +1138,17 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
             scope, fw, methodology, library=library,
             preset_components=preset_components, preset_data_flows=preset_data_flows,
         )
-        _set_step(db, tm, "model", "done", f"{len(model.get('threats') or [])} threats identified")
+        # If the LLM produced nothing usable (e.g. unparseable/truncated JSON),
+        # don't quietly save an empty "completed" model — surface it as failed
+        # with the reason so the user knows to rescan rather than seeing a
+        # blank deliverable.
+        comps_out = model.get("components") or []
+        threats_out = model.get("threats") or []
+        if not preset_components and not comps_out and not threats_out:
+            reason = meta.get("error") or "The model returned an empty threat model. Please rescan."
+            _set_step(db, tm, "model", "error", reason)
+            raise RuntimeError(reason)
+        _set_step(db, tm, "model", "done", f"{len(threats_out)} threats identified")
 
         # Step 5 — finalize. When the user supplied the architecture, keep
         # their components + flows verbatim; only threats / mitigations / dfd /
