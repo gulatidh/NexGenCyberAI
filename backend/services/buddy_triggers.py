@@ -8,10 +8,10 @@ scan) or — eventually — a tenant-wide notification feed.
 
 Default triggers seeded on first start:
 
-  - finding.critical → appsec_lead (output: risk_drafts)
-  - finding.high     → vulnerability_response (output: finding_triage)
-  - risk.critical    → ciso_advisor (output: prose)
-  - connector.error  → identity_engineer (output: prose)
+  - finding.critical → appsec_advisor (output: risk_drafts)
+  - finding.high     → vuln_commander (output: finding_triage)
+  - risk.critical    → partner_advisor (output: prose)
+  - connector.error  → iam_posture_advisor (output: risk_drafts)
 
 Operators add / remove / disable triggers in the AI Buddies admin page.
 
@@ -37,15 +37,34 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_TRIGGERS: List[Dict[str, Any]] = [
-    {"agent_key": "appsec_lead",            "event_kind": "finding.critical", "threshold": {"severity": "critical"}},
-    {"agent_key": "vulnerability_response", "event_kind": "finding.high",     "threshold": {"severity": "high"}},
-    {"agent_key": "ciso_advisor",           "event_kind": "risk.critical",    "threshold": {"risk_level": "critical"}},
-    {"agent_key": "identity_engineer",      "event_kind": "connector.error",  "threshold": {}},
+    # Critical findings → AppSec Advisor (drafts risks)
+    {"agent_key": "appsec_advisor",     "event_kind": "finding.critical", "threshold": {"severity": "critical"}},
+    # High findings → Vuln Commander (triages)
+    {"agent_key": "vuln_commander",     "event_kind": "finding.high",     "threshold": {"severity": "high"}},
+    # New Critical risk → Partner Advisor (executive read)
+    {"agent_key": "partner_advisor",    "event_kind": "risk.critical",    "threshold": {"risk_level": "critical"}},
+    # Connector error → IAM Posture Advisor (identity infra often manifests this way)
+    {"agent_key": "iam_posture_advisor","event_kind": "connector.error",  "threshold": {}},
 ]
 
 
 def seed_default_triggers(db: Session) -> int:
-    """Seed the default trigger rows once. Skips any that already exist."""
+    """Seed the default trigger rows once. Skips any that already exist.
+
+    Also cleans up triggers that point at agent_keys no longer in the
+    catalog (e.g. when our defaults were renamed during development)."""
+    # ── Cleanup: drop stale triggers pointing at missing buddies ───────
+    try:
+        valid_keys = {k for (k,) in db.query(AIAgent.key).all()}
+        stale = db.query(BuddyTrigger).filter(~BuddyTrigger.agent_key.in_(valid_keys)).all()
+        if stale:
+            for s in stale:
+                db.delete(s)
+            db.commit()
+            logger.info("Removed %d stale buddy triggers pointing at non-existent keys", len(stale))
+    except Exception:
+        logger.exception("stale buddy-trigger cleanup failed (non-fatal)")
+
     written = 0
     for spec in DEFAULT_TRIGGERS:
         existing = (
@@ -57,6 +76,10 @@ def seed_default_triggers(db: Session) -> int:
             .first()
         )
         if existing:
+            continue
+        # Only seed if the buddy actually exists in the catalog.
+        if not db.query(AIAgent.id).filter(AIAgent.key == spec["agent_key"]).first():
+            logger.info("Skipping trigger seed — buddy '%s' not in catalog", spec["agent_key"])
             continue
         db.add(BuddyTrigger(
             agent_key=spec["agent_key"],
@@ -249,7 +272,7 @@ def _run_triggered_buddy(
 
 # Buddies that participate in the weekly roundup. Each produces one
 # paragraph; the aggregated result lands on the Dashboard.
-ROUNDUP_AGENT_KEYS = ["ciso_advisor", "appsec_lead", "soc_director", "grc_advisor"]
+ROUNDUP_AGENT_KEYS = ["partner_advisor", "appsec_advisor", "soc_strategist", "grc_advisor"]
 
 
 def weekly_roundup_job() -> None:

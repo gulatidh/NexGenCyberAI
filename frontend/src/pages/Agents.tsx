@@ -37,6 +37,12 @@ interface Agent {
   legacy_orchestrator: boolean;
   updated_at?: string;
   updated_by?: string;
+  // Phase 7A/7C — artifact + personality
+  output_kind?: string;
+  output_schema_json?: string;
+  avatar_url?: string;
+  signature_opening?: string;
+  accent_color?: string;
 }
 
 interface AgentGroup { key: string; label: string; agents: Agent[]; }
@@ -377,6 +383,14 @@ export default function Agents() {
                               sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }} />
                           )}
                         </Box>
+                        {agent.signature_opening && (
+                          <Typography variant="caption" sx={{
+                            color: agent.accent_color || color, fontStyle: "italic",
+                            fontWeight: 600, display: "block", mb: 0.5,
+                          }}>
+                            “{agent.signature_opening}”
+                          </Typography>
+                        )}
                         <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block", mb: 1.5, minHeight: 36 }}>
                           {agent.description}
                         </Typography>

@@ -367,46 +367,95 @@ _CATALOG: List[Dict[str, Any]] = [
 ]
 
 
-# Phase 7A/7C — personality + artifact defaults applied to a curated set
-# of built-in buddies. Other catalog entries inherit `output_kind="prose"`
-# and a default avatar/colour. Operators can override any of these in the
-# AI Buddies admin page.
+# Phase 7A/7C — personality + artifact defaults applied to existing
+# built-in buddies. Keys MUST match the `key` field of an entry in
+# _CATALOG above (the catalog lookup table grep'd from this file).
+# Other catalog entries inherit output_kind="prose" and a default
+# avatar. Operators can override any field per buddy via the admin UI.
 _BUDDY_PERSONALITY: dict = {
-    "appsec_lead": {
+    # ── Application Security ──────────────────────────────────────────
+    "appsec_advisor": {
         "output_kind": "risk_drafts",
         "signature_opening": "From the AppSec lens —",
         "avatar_url": "/buddies/appsec.svg",
         "accent_color": "#EA4335",
     },
-    "vulnerability_response": {
+    # ── Vulnerability Management ──────────────────────────────────────
+    "vuln_commander": {
         "output_kind": "finding_triage",
         "signature_opening": "Triage call —",
         "avatar_url": "/buddies/vuln.svg",
         "accent_color": "#FF7043",
     },
+    "vuln_remediation_orchestrator": {
+        "output_kind": "runbook",
+        "signature_opening": "Remediation plan —",
+        "avatar_url": "/buddies/vuln.svg",
+        "accent_color": "#FF7043",
+    },
+    # ── Risk, Compliance & Governance ─────────────────────────────────
     "grc_advisor": {
         "output_kind": "control_mappings",
         "signature_opening": "Compliance read —",
         "avatar_url": "/buddies/grc.svg",
         "accent_color": "#9C27B0",
     },
-    "soc_director": {
+    "nist_assessment_advisor": {
+        "output_kind": "control_mappings",
+        "signature_opening": "NIST mapping —",
+        "avatar_url": "/buddies/grc.svg",
+        "accent_color": "#9C27B0",
+    },
+    "data_protection_advisor": {
+        "output_kind": "risk_drafts",
+        "signature_opening": "Privacy lens —",
+        "avatar_url": "/buddies/grc.svg",
+        "accent_color": "#9C27B0",
+    },
+    # ── SOC / Threat & IR ─────────────────────────────────────────────
+    "soc_strategist": {
         "output_kind": "runbook",
         "signature_opening": "From the SOC —",
         "avatar_url": "/buddies/soc.svg",
         "accent_color": "#4285F4",
     },
-    "ciso_advisor": {
+    "soc_triage_analyst": {
+        "output_kind": "finding_triage",
+        "signature_opening": "Triage decision —",
+        "avatar_url": "/buddies/soc.svg",
+        "accent_color": "#4285F4",
+    },
+    "ir_advisor": {
+        "output_kind": "runbook",
+        "signature_opening": "IR response —",
+        "avatar_url": "/buddies/soc.svg",
+        "accent_color": "#00B8D4",
+    },
+    # ── Identity ───────────────────────────────────────────────────────
+    "iam_posture_advisor": {
+        "output_kind": "risk_drafts",
+        "signature_opening": "Identity perspective —",
+        "avatar_url": "/buddies/identity.svg",
+        "accent_color": "#FBBC04",
+    },
+    "iga_architect": {
+        "output_kind": "prose",
+        "signature_opening": "IGA design view —",
+        "avatar_url": "/buddies/identity.svg",
+        "accent_color": "#FBBC04",
+    },
+    # ── Executive / Strategy (synthesis voices — prose) ───────────────
+    "partner_advisor": {
         "output_kind": "prose",
         "signature_opening": "Executive view —",
         "avatar_url": "/buddies/ciso.svg",
         "accent_color": "#34A853",
     },
-    "identity_engineer": {
+    "board_packet_translator": {
         "output_kind": "prose",
-        "signature_opening": "Identity perspective —",
-        "avatar_url": "/buddies/identity.svg",
-        "accent_color": "#FBBC04",
+        "signature_opening": "For the board —",
+        "avatar_url": "/buddies/ciso.svg",
+        "accent_color": "#34A853",
     },
 }
 
