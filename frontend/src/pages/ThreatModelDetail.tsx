@@ -15,12 +15,13 @@ import {
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton,
 } from "@mui/material";
-import { ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask } from "@mui/icons-material";
+import { ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import DfdDiagram from "../components/DfdDiagram";
+import DrawioDiagram from "../components/DrawioDiagram";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 interface Component {
@@ -72,6 +73,8 @@ export default function ThreatModelDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("diagram");
+  // Diagram-renderer toggle: 'mermaid' (built-in, fast) | 'drawio' (rich, editable)
+  const [diagramMode, setDiagramMode] = useState<"mermaid" | "drawio">("mermaid");
   // When the browser triggers print (button or Ctrl+P), expand every tab
   // section so the whole threat model — Diagram + Components + Threats +
   // Mitigations — renders as a single paginated PDF.
@@ -97,6 +100,16 @@ export default function ThreatModelDetail() {
     },
   });
 
+  // Lazy-load draw.io XML only when the user picks that diagram mode — the
+  // server-side render is cheap but we don't want to ship it for every
+  // page load.
+  const drawioQuery = useQuery<{ xml: string; filename: string }>({
+    queryKey: ["threat-model-drawio", modelId],
+    queryFn: () => threatModelsApi.drawioXml(clientId, modelId!),
+    enabled: !!modelId && !!clientId && diagramMode === "drawio" && data?.status === "completed",
+    staleTime: 60_000,
+  });
+
   const rescanMutation = useMutation({
     mutationFn: () => threatModelsApi.rescan(clientId, modelId!),
     onSuccess: (created: any) => {
@@ -117,6 +130,16 @@ export default function ThreatModelDetail() {
       toast.success(resp?.created ? "Risk created" : "Risk already exists for this threat");
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to convert"),
+  });
+
+  const startModelingMutation = useMutation({
+    mutationFn: () => threatModelsApi.startModeling(clientId, modelId!, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      qc.invalidateQueries({ queryKey: ["threat-models", clientId] });
+      toast.success("AI threat modelling started");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to start modelling"),
   });
 
   const convertAll = useMutation({
@@ -259,6 +282,35 @@ export default function ThreatModelDetail() {
         <Alert severity="error" sx={{ mb: 2 }}>{data.error_message}</Alert>
       )}
 
+      {data.status === "extracted_review" && (
+        <Card className="no-print" sx={{
+          bgcolor: "rgba(156,39,176,0.08)",
+          border: "1px solid rgba(156,39,176,0.4)",
+          borderRadius: 2, mb: 2,
+        }}>
+          <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+            <Box sx={{ flex: 1, minWidth: 240 }}>
+              <Typography sx={{ color: "#CE93D8", fontWeight: 700, fontSize: 13, mb: 0.5 }}>
+                Diagram extracted · review before AI threat modelling
+              </Typography>
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+                We pulled {data.component_count} component{data.component_count === 1 ? "" : "s"} and {data.data_flows.length} data flow{data.data_flows.length === 1 ? "" : "s"} from your uploaded file.
+                Check the <strong>Diagram</strong> and <strong>Components</strong> tabs below — when it looks right, click <em>Start AI threat modelling</em>.
+                Anything wrong? Delete this model and re-upload a cleaner diagram.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              disabled={startModelingMutation.isPending}
+              onClick={() => startModelingMutation.mutate()}
+              sx={{ bgcolor: "#9C27B0", "&:hover": { bgcolor: "#7B1FA2" } }}
+            >
+              {startModelingMutation.isPending ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Start AI threat modelling"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {data.executive_summary && (
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
           <CardContent>
@@ -292,7 +344,59 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">Data Flow Diagram</Typography>}
         <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
-            <DfdDiagram source={data.dfd_mermaid || ""} />
+            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
+                <Button
+                  size="small"
+                  startIcon={<Hub sx={{ fontSize: 16 }} />}
+                  onClick={() => setDiagramMode("mermaid")}
+                  sx={{
+                    minWidth: 120, color: diagramMode === "mermaid" ? "white" : "rgba(255,255,255,0.55)",
+                    bgcolor: diagramMode === "mermaid" ? "rgba(66,133,244,0.18)" : "transparent",
+                    textTransform: "none", fontSize: 12, fontWeight: 600,
+                    "&:hover": { bgcolor: diagramMode === "mermaid" ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
+                  }}
+                >Mermaid</Button>
+                <Button
+                  size="small"
+                  startIcon={<Schema sx={{ fontSize: 16 }} />}
+                  onClick={() => setDiagramMode("drawio")}
+                  disabled={data.status !== "completed"}
+                  sx={{
+                    minWidth: 120, color: diagramMode === "drawio" ? "white" : "rgba(255,255,255,0.55)",
+                    bgcolor: diagramMode === "drawio" ? "rgba(66,133,244,0.18)" : "transparent",
+                    textTransform: "none", fontSize: 12, fontWeight: 600,
+                    "&:hover": { bgcolor: diagramMode === "drawio" ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
+                  }}
+                >draw.io</Button>
+              </Box>
+              <Button
+                size="small"
+                startIcon={<Download sx={{ fontSize: 16 }} />}
+                href={threatModelsApi.drawioDownloadUrl(clientId, modelId!)}
+                disabled={data.status !== "completed"}
+                sx={{
+                  textTransform: "none", fontSize: 12, fontWeight: 600,
+                  color: "rgba(255,255,255,0.75)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.2)" },
+                }}
+              >Download .drawio</Button>
+            </Box>
+            {(diagramMode === "mermaid" || printing) ? (
+              <DfdDiagram source={data.dfd_mermaid || ""} />
+            ) : drawioQuery.isLoading ? (
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, gap: 1.5, color: "rgba(255,255,255,0.55)" }}>
+                <CircularProgress size={20} sx={{ color: "#4285F4" }} />
+                <Typography variant="body2">Rendering draw.io diagram…</Typography>
+              </Box>
+            ) : drawioQuery.data ? (
+              <DrawioDiagram xml={drawioQuery.data.xml} />
+            ) : (
+              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", py: 4, textAlign: "center" }}>
+                draw.io view unavailable.
+              </Typography>
+            )}
             {data.data_flows.length > 0 && (
               <>
                 <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.06)" }} />

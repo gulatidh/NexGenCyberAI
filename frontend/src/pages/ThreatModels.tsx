@@ -16,7 +16,7 @@ import {
   DialogContent, DialogActions, TextField, CircularProgress, Alert,
   LinearProgress,
 } from "@mui/material";
-import { Add, Hub, Replay, DeleteOutlined } from "@mui/icons-material";
+import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -54,18 +54,27 @@ const STATUS_COLOR: Record<string, string> = {
   generating: "#4285F4",
   completed: "#34A853",
   failed: "#EA4335",
+  extracted_review: "#9C27B0",
 };
+
+const ACCEPTED_UPLOAD = ".drawio,.xml,.pdf,.jpg,.jpeg,.png";
 
 export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [openCreate, setOpenCreate] = useState(false);
+  const [openUpload, setOpenUpload] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ThreatModelSummary | null>(null);
 
   // ── Create-dialog form state
   const [tmName, setTmName] = useState("");
   const [methodology, setMethodology] = useState<string>("stride");
+
+  // ── Upload-dialog form state
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadName, setUploadName] = useState("");
+  const [uploadMethodology, setUploadMethodology] = useState<string>("stride");
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["clients"], queryFn: clientsApi.list,
@@ -98,6 +107,23 @@ export default function ThreatModels() {
       setTimeout(() => navigate(`/threat-models/${created.id}?client=${selectedClientId}`), 200);
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to start threat model"),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: () => threatModelsApi.createFromDiagram(selectedClientId, uploadFile!, {
+      name: uploadName || undefined,
+      methodology: uploadMethodology,
+    }),
+    onSuccess: (resp: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
+      setOpenUpload(false);
+      setUploadFile(null);
+      setUploadName("");
+      const warnSuffix = (resp?.warnings || []).length ? ` (${resp.warnings.length} warning)` : "";
+      toast.success(`Extracted ${resp?.components?.length || 0} components${warnSuffix} — review and start modelling`);
+      setTimeout(() => navigate(`/threat-models/${resp.model_id}?client=${selectedClientId}`), 200);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to extract diagram"),
   });
 
   const rescanMutation = useMutation({
@@ -141,6 +167,16 @@ export default function ThreatModels() {
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
+          <Button variant="outlined" startIcon={<UploadFile />}
+            disabled={!selectedClientId}
+            onClick={() => setOpenUpload(true)}
+            sx={{
+              color: "rgba(255,255,255,0.8)",
+              borderColor: "rgba(255,255,255,0.2)",
+              "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
+            }}>
+            Upload Diagram
+          </Button>
           <Button variant="contained" startIcon={<Add />}
             disabled={!selectedClientId}
             onClick={() => setOpenCreate(true)}>
@@ -311,6 +347,92 @@ export default function ThreatModels() {
             disabled={createMutation.isPending || !methodology}
             onClick={() => createMutation.mutate()}>
             {createMutation.isPending ? <CircularProgress size={18} /> : "Generate"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Upload dialog */}
+      <Dialog open={openUpload} onClose={() => setOpenUpload(false)} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        <DialogTitle>
+          Upload an architecture diagram
+          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+            Upload a .drawio / .xml / .pdf / .jpg / .png. We'll extract components and data flows, then you review before AI threat modelling runs.
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mb: 1, display: "block" }}>
+                DIAGRAM FILE
+              </Typography>
+              <Box
+                onDragOver={(e) => { e.preventDefault(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) setUploadFile(f);
+                }}
+                sx={{
+                  border: "1px dashed rgba(255,255,255,0.25)",
+                  borderRadius: 1.5,
+                  p: 3, textAlign: "center",
+                  bgcolor: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <UploadFile sx={{ fontSize: 32, color: "rgba(255,255,255,0.4)", mb: 0.5 }} />
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 1.5 }}>
+                  {uploadFile ? uploadFile.name : "Drop file here or pick one below"}
+                </Typography>
+                <Button
+                  component="label"
+                  size="small"
+                  variant="outlined"
+                  sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)" }}
+                >
+                  Choose file
+                  <input
+                    hidden
+                    type="file"
+                    accept={ACCEPTED_UPLOAD}
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  />
+                </Button>
+                {uploadFile && (
+                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "rgba(255,255,255,0.5)" }}>
+                    {(uploadFile.size / 1024).toFixed(1)} KB · {uploadFile.type || "unknown"}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+
+            <TextField size="small" label="Name (optional)" value={uploadName}
+              onChange={(e) => setUploadName(e.target.value)}
+              placeholder='e.g. "Payment platform architecture"'
+              slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+
+            <FormControl size="small">
+              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Methodology</InputLabel>
+              <Select value={uploadMethodology} onChange={(e) => setUploadMethodology(e.target.value)} label="Methodology"
+                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                {methodologies.map((m) => <MenuItem key={m.id} value={m.id}>{m.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+
+            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(66,133,244,0.2)" }}>
+              <strong>How extraction works:</strong> .drawio files are parsed deterministically.
+              PDFs use text extraction; if text is sparse the file is rejected — re-upload as PNG/JPG instead.
+              Images are read by the configured vision LLM (OpenAI GPT-4o, Claude, Gemini all supported).
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenUpload(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button variant="contained"
+            disabled={!uploadFile || uploadMutation.isPending}
+            onClick={() => uploadMutation.mutate()}>
+            {uploadMutation.isPending ? <CircularProgress size={18} /> : "Extract diagram"}
           </Button>
         </DialogActions>
       </Dialog>

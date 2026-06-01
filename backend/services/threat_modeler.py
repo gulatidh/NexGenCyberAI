@@ -307,7 +307,9 @@ def _library_sample(db: Session, methodology: str, limit: int = 25) -> List[Dict
 
 
 def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodology: str,
-                       library: Optional[List[Dict[str, Any]]] = None) -> str:
+                       library: Optional[List[Dict[str, Any]]] = None,
+                       preset_components: Optional[List[Dict[str, Any]]] = None,
+                       preset_data_flows: Optional[List[Dict[str, Any]]] = None) -> str:
     spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
     parts: List[str] = [
         "## Scope",
@@ -316,9 +318,36 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
         f"Connectors in play: {', '.join(scope['connector_types']) or 'none'}",
         f"Framework target: {framework or 'NIST CSF (default)'}",
         f"Methodology: {spec['label']}",
-        "",
-        "## Asset inventory (sample)",
     ]
+
+    # When the model was created from an uploaded diagram, the components +
+    # data flows are already extracted. Treat them as authoritative
+    # architecture and instruct the LLM to reuse the exact IDs so the
+    # resulting DFD stays consistent with what the user reviewed.
+    if preset_components:
+        parts.append("")
+        parts.append("## Authoritative architecture (from uploaded diagram — DO NOT modify or invent components)")
+        parts.append(
+            "These components and data flows were extracted from the customer's own architecture "
+            "diagram and reviewed by them. Use the IDs exactly as given when emitting components, "
+            "data_flows, and threats. Do not introduce new components; only the listed ones are in scope."
+        )
+        parts.append("### Components")
+        for c in preset_components[:60]:
+            parts.append(
+                f"- id={c.get('id')}  name={c.get('name')}  type={c.get('type')}  "
+                f"trust_zone={c.get('trust_zone')}  criticality={c.get('criticality')}"
+            )
+        if preset_data_flows:
+            parts.append("### Data flows")
+            for f in preset_data_flows[:60]:
+                parts.append(
+                    f"- {f.get('from')} → {f.get('to')}  protocol={f.get('protocol')}  "
+                    f"data={f.get('data')}  encrypted={f.get('encrypted')}"
+                )
+
+    parts.append("")
+    parts.append("## Asset inventory (supplemental — for evidence grounding only)")
     for a in scope["assets"][:60]:
         parts.append(f"- [{a['type']}] {a['name']} (criticality={a['criticality']})")
     if not scope["assets"]:
@@ -430,6 +459,8 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
 async def _invoke_llm(
     scope: Dict[str, Any], framework: Optional[str], methodology: str,
     library: Optional[List[Dict[str, Any]]] = None,
+    preset_components: Optional[List[Dict[str, Any]]] = None,
+    preset_data_flows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Call configured LLM. Returns the normalised model. Falls back to a
     deterministic skeleton when no provider is available."""
@@ -441,7 +472,10 @@ async def _invoke_llm(
         logger.warning("Threat modeler LLM unavailable, returning skeleton: %s", exc)
         return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0}
 
-    user_prompt = _build_user_prompt(scope, framework, methodology, library=library)
+    user_prompt = _build_user_prompt(
+        scope, framework, methodology, library=library,
+        preset_components=preset_components, preset_data_flows=preset_data_flows,
+    )
     try:
         result = await llm.ainvoke([
             SystemMessage(content=_build_system_prompt(methodology)),
@@ -529,10 +563,27 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         if methodology not in METHODOLOGIES:
             methodology = DEFAULT_METHODOLOGY
         library = _library_sample(db, methodology)
-        model, meta = await _invoke_llm(scope, fw, methodology, library=library)
+        # If the model was created from an uploaded diagram, the user-reviewed
+        # components + data_flows are already on the row. Pass them through
+        # to the LLM so it produces threats keyed to those exact IDs rather
+        # than re-deriving an architecture from assets.
+        preset_components = tm.components_json if tm.components_json else None
+        preset_data_flows = tm.data_flows_json if tm.data_flows_json else None
+        model, meta = await _invoke_llm(
+            scope, fw, methodology, library=library,
+            preset_components=preset_components, preset_data_flows=preset_data_flows,
+        )
 
-        tm.components_json = model["components"]
-        tm.data_flows_json = model["data_flows"]
+        # When the user supplied the architecture, keep their components +
+        # flows verbatim; only the threats / mitigations / dfd / summary
+        # come from the LLM. This means the LLM can't accidentally drop
+        # or rename a component the user reviewed.
+        if preset_components:
+            tm.components_json = preset_components
+            tm.data_flows_json = preset_data_flows or []
+        else:
+            tm.components_json = model["components"]
+            tm.data_flows_json = model["data_flows"]
         tm.threats_json = model["threats"]
         tm.mitigations_json = model["mitigations"]
         tm.dfd_mermaid = model["dfd_mermaid"]

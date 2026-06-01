@@ -211,6 +211,22 @@ export const threatModelsApi = {
     apiClient.post(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}/convert-to-risk`).then((r) => r.data),
   convertAll: (clientId: string, modelId: string) =>
     apiClient.post(`/clients/${clientId}/threat-models/${modelId}/convert-all-to-risks`).then((r) => r.data),
+  drawioXml: (clientId: string, modelId: string) =>
+    apiClient.get(`/clients/${clientId}/threat-models/${modelId}/drawio`).then((r) => r.data),
+  drawioDownloadUrl: (clientId: string, modelId: string) =>
+    `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/drawio?download=1`,
+  createFromDiagram: (clientId: string, file: File, opts: { name?: string; methodology?: string; framework?: string }) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (opts.name) fd.append("name", opts.name);
+    if (opts.methodology) fd.append("methodology", opts.methodology);
+    if (opts.framework) fd.append("framework", opts.framework);
+    return apiClient.post(`/clients/${clientId}/threat-models/from-diagram`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+  startModeling: (clientId: string, modelId: string, body: any = {}) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/start-modeling`, body).then((r) => r.data),
 };
 
 export const adminApi = {

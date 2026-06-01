@@ -11,16 +11,24 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from api.models.models import Client, FrameworkType, Project, Risk, RiskLevel, ThreatModel
 from db.database import get_db
 from core.security import get_current_user
+from services.diagram_extractor import SUPPORTED_EXTENSIONS, extract as extract_diagram
+from services.drawio_renderer import render_drawio_xml
 from services.threat_modeler import (
     DEFAULT_METHODOLOGY, METHODOLOGIES, generate_threat_model_bg, methodology_catalog,
 )
+
+# Max upload size for diagram files. PDFs can be big with embedded fonts;
+# images we expect to be small. 10 MB is plenty for any reasonable
+# architecture diagram and protects the API from accidental abuse.
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 # Severity → (likelihood, impact, RiskLevel) for the threat→risk mapping.
@@ -460,6 +468,192 @@ async def convert_all_threats_to_risks(
         created_ids.append(risk.id)
     db.commit()
     return ConvertResult(created=len(created_ids), skipped=skipped, risk_ids=created_ids)
+
+
+@router.get("/{model_id}/drawio")
+async def get_threat_model_drawio(
+    client_id: str,
+    model_id: str,
+    download: int = 0,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Render this threat model's DFD as draw.io / mxGraph XML.
+
+    - `?download=1` returns the XML as a `.drawio` attachment, ready to
+      open in draw.io desktop or diagrams.net.
+    - default returns JSON `{xml, filename}` so the embedded viewer in
+      the frontend can postMessage the XML into the diagrams.net iframe.
+    """
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+
+    title = tm.name or f"Threat Model {tm.id[:8]}"
+    xml = render_drawio_xml(
+        title=title,
+        components=tm.components_json or [],
+        data_flows=tm.data_flows_json or [],
+        executive_summary=tm.executive_summary,
+    )
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "-" for c in title)[:80] or "threat-model"
+    filename = f"{safe_name}.drawio"
+    if download:
+        return Response(
+            content=xml,
+            media_type="application/vnd.jgraph.mxfile",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    return {"xml": xml, "filename": filename}
+
+
+class FromDiagramResponse(BaseModel):
+    model_id: str
+    components: List[Dict[str, Any]]
+    data_flows: List[Dict[str, Any]]
+    source: str
+    warnings: List[str] = []
+
+
+@router.post("/from-diagram", response_model=FromDiagramResponse, status_code=201)
+async def create_from_diagram(
+    client_id: str,
+    file: UploadFile = File(...),
+    project_id: Optional[str] = Form(None),
+    name: Optional[str] = Form(None),
+    framework: Optional[str] = Form(None),
+    methodology: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Upload an architecture diagram (.drawio / .xml / .pdf / .jpg / .png),
+    extract components + data flows, and persist a ThreatModel row in
+    `extracted_review` status.
+
+    The user reviews / edits the extracted DFD on the detail page, then
+    calls `POST /{id}/start-modeling` to kick off AI threat generation."""
+    if not db.query(Client.id).filter(Client.id == client_id).first():
+        raise HTTPException(status_code=404, detail="Client not found")
+    if project_id and not db.query(Project.id).filter(
+        Project.id == project_id, Project.client_id == client_id,
+    ).first():
+        raise HTTPException(status_code=404, detail="Project not found for this client")
+
+    data = await file.read()
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(data)} bytes). Max {_MAX_UPLOAD_BYTES} bytes.",
+        )
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if not any((file.filename or "").lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file extension. Allowed: {sorted(SUPPORTED_EXTENSIONS)}",
+        )
+
+    try:
+        extracted = await extract_diagram(file.filename or "", file.content_type, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    chosen_methodology = (methodology or DEFAULT_METHODOLOGY).lower()
+    if chosen_methodology not in METHODOLOGIES:
+        chosen_methodology = DEFAULT_METHODOLOGY
+    chosen_framework: Optional[FrameworkType] = None
+    if framework:
+        try:
+            chosen_framework = FrameworkType(framework)
+        except ValueError:
+            chosen_framework = None
+
+    fallback_name = (file.filename or "Diagram upload").rsplit(".", 1)[0]
+    tm = ThreatModel(
+        client_id=client_id,
+        project_id=project_id,
+        name=(name or "").strip() or fallback_name[:200],
+        scope_type="diagram",
+        scope_id=None,
+        framework=chosen_framework,
+        methodology=chosen_methodology,
+        status="extracted_review",
+        initiated_by=user.get("upn", user.get("preferred_username", "system")),
+        components_json=extracted["components"],
+        data_flows_json=extracted["data_flows"],
+        threats_json=[],
+        mitigations_json=[],
+        dfd_mermaid=None,
+        executive_summary=(
+            f"Diagram-derived architecture from uploaded {extracted['source']} "
+            f"file `{file.filename}`. Pending AI threat analysis."
+        ),
+    )
+    db.add(tm)
+    db.commit()
+    db.refresh(tm)
+    return FromDiagramResponse(
+        model_id=tm.id,
+        components=extracted["components"],
+        data_flows=extracted["data_flows"],
+        source=extracted["source"],
+        warnings=extracted.get("warnings", []),
+    )
+
+
+class ReviewedDfd(BaseModel):
+    components: Optional[List[Dict[str, Any]]] = None
+    data_flows: Optional[List[Dict[str, Any]]] = None
+    name: Optional[str] = None
+    framework: Optional[FrameworkType] = None
+    methodology: Optional[str] = None
+
+
+@router.post("/{model_id}/start-modeling", response_model=ThreatModelSummary, status_code=202)
+async def start_modeling_from_diagram(
+    client_id: str,
+    model_id: str,
+    payload: ReviewedDfd,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """After the user has reviewed (and optionally edited) the
+    diagram-extracted components and data flows, accept the reviewed
+    payload and kick off AI threat generation on top of it."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    if tm.status != "extracted_review":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot start modelling — status is '{tm.status}', expected 'extracted_review'.",
+        )
+
+    if payload.components is not None:
+        tm.components_json = payload.components
+    if payload.data_flows is not None:
+        tm.data_flows_json = payload.data_flows
+    if payload.name:
+        tm.name = payload.name.strip()[:200] or tm.name
+    if payload.framework is not None:
+        tm.framework = payload.framework
+    if payload.methodology:
+        m = payload.methodology.lower()
+        if m in METHODOLOGIES:
+            tm.methodology = m
+    tm.status = "pending"
+    tm.initiated_by = user.get("upn", user.get("preferred_username", "system"))
+    db.commit()
+    db.refresh(tm)
+    background_tasks.add_task(generate_threat_model_bg, tm.id)
+    return _summary_from(tm)
 
 
 @router.delete("/{model_id}", status_code=204)
