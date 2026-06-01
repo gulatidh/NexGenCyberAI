@@ -122,6 +122,41 @@ def get_llm(
         raise RuntimeError(f"Failed to initialise {resolved_provider} LLM: {exc}") from exc
 
 
+def get_embeddings(
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+):
+    """Return a LangChain Embeddings client for the requested provider.
+
+    Used by services/learning_memory.py to embed extracted learnings for
+    cosine-similarity retrieval. Defaults to OpenAI text-embedding-3-small
+    (1536-d) — cheap, widely available. Azure OpenAI uses the same model
+    family via a deployment name.
+
+    Raises if no embedding-capable provider is configured."""
+    from services.ai_settings import get_resolved_value
+    try:
+        cfg_provider = get_resolved_value("embedding_provider") or "openai"
+    except Exception:
+        cfg_provider = "openai"
+    resolved = (provider or cfg_provider or "openai").lower()
+    if resolved == "openai":
+        from langchain_openai import OpenAIEmbeddings
+        return OpenAIEmbeddings(
+            model=model or _resolved("embedding_model") or "text-embedding-3-small",
+            api_key=_resolved("openai_api_key") or settings.OPENAI_API_KEY,
+        )
+    if resolved == "azure_openai":
+        from langchain_openai import AzureOpenAIEmbeddings
+        return AzureOpenAIEmbeddings(
+            azure_endpoint=_resolved("azure_openai_endpoint") or settings.AZURE_OPENAI_ENDPOINT,
+            azure_deployment=model or _resolved("embedding_model") or "text-embedding-3-small",
+            openai_api_version=_resolved("azure_openai_api_version") or settings.AZURE_OPENAI_API_VERSION,
+            api_key=_resolved("azure_openai_api_key") or settings.AZURE_OPENAI_API_KEY,
+        )
+    raise ValueError(f"Unsupported embedding provider: {resolved}")
+
+
 def list_providers() -> list[dict]:
     """Return all providers with their availability status."""
     azure_endpoint = _resolved("azure_openai_endpoint") or settings.AZURE_OPENAI_ENDPOINT

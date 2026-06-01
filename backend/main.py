@@ -206,6 +206,30 @@ def _ensure_added_columns() -> None:
                 logger.info("Added risks.source_threat_id column (%s)", dialect)
             except Exception as exc:
                 logger.warning("risks.source_threat_id ALTER failed: %s", exc)
+
+        # Phase 5 — AISettings feature flags + embedding model fields.
+        try:
+            ai_cols = {c["name"] for c in inspector.get_columns("ai_settings")}
+        except Exception:
+            ai_cols = set()
+        _ai_additions = [
+            ("embedding_provider",     "NVARCHAR(64) NULL",   "VARCHAR(64)"),
+            ("embedding_model",        "NVARCHAR(128) NULL",  "VARCHAR(128)"),
+            ("self_critique_enabled",  "BIT NULL",            "INTEGER"),
+            ("semantic_learning_enabled", "BIT NULL",         "INTEGER"),
+            ("blackboard_enabled",     "BIT NULL",            "INTEGER"),
+        ]
+        for col, mssql_type, sqlite_type in _ai_additions:
+            if ai_cols and col not in ai_cols:
+                ddl = (f"ALTER TABLE ai_settings ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE ai_settings ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added ai_settings.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("ai_settings.%s ALTER failed: %s", col, exc)
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

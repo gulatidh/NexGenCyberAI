@@ -23,6 +23,17 @@ _PLAIN_FIELDS = {
     "azure_openai_deployment": "AZURE_OPENAI_DEPLOYMENT",
     "azure_openai_api_version": "AZURE_OPENAI_API_VERSION",
     "aws_bedrock_region": "AWS_BEDROCK_REGION",
+    # Phase 5 — learning memory / critique / blackboard config (string fields)
+    "embedding_provider": None,
+    "embedding_model": None,
+}
+
+# Phase 5 boolean toggles. Same plumbing as _PLAIN_FIELDS but cast to bool
+# on read/write so the UI gets `true`/`false` and the DB stores 0/1.
+_BOOL_FIELDS = {
+    "self_critique_enabled",
+    "semantic_learning_enabled",
+    "blackboard_enabled",
 }
 
 # Encrypted-at-rest secret fields. Map: db column → env-var name.
@@ -92,6 +103,16 @@ def get_config_safe(db: Session) -> Dict[str, Any]:
         out[f"{name}_configured"] = db_set or env_set
         out[f"{name}_source"] = "db" if db_set else ("env" if env_set else "none")
 
+    # Phase 5 toggles — explicit defaults so the UI doesn't see undefined.
+    _defaults = {
+        "self_critique_enabled": False,
+        "semantic_learning_enabled": False,
+        "blackboard_enabled": True,
+    }
+    for name in _BOOL_FIELDS:
+        v = getattr(row, name, None) if row else None
+        out[name] = bool(v) if v is not None else _defaults[name]
+
     return out
 
 
@@ -105,6 +126,10 @@ def update_config(db: Session, payload: Dict[str, Any], updated_by: Optional[str
     for name in _PLAIN_FIELDS:
         if name in payload and payload[name] is not None:
             setattr(row, name, payload[name] or None)
+
+    for name in _BOOL_FIELDS:
+        if name in payload and payload[name] is not None:
+            setattr(row, name, bool(payload[name]))
 
     for name in _SECRET_FIELDS:
         if name in payload:

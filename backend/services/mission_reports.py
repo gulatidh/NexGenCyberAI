@@ -447,4 +447,25 @@ async def generate_report(db: Session, mission: ScheduledMission, run: Scheduled
 
     run.report = report
     db.flush()
+
+    # Phase 5E — extract durable learnings from the completed report into
+    # the mission_learnings table for future retrieval. Best-effort; never
+    # blocks the report return value.
+    try:
+        from services.learning_memory import extract_learnings
+        report_text = (report.get("title") or "") + "\n\n"
+        for sec in report.get("sections") or []:
+            report_text += f"## {sec.get('title') or ''}\n{sec.get('body') or ''}\n\n"
+        await extract_learnings(
+            db,
+            text=report_text,
+            source_kind="mission_run",
+            source_id=run.id,
+            client_id=mission.client_id,
+            agent_key=None,
+            domain=_mission_type_value(mission),
+        )
+    except Exception:
+        logger.exception("learning extraction from mission report failed")
+
     return report

@@ -180,6 +180,7 @@ export const aiApi = {
   getConfig: () => apiClient.get("/ai/config/").then((r) => r.data),
   updateConfig: (data: Record<string, any>) =>
     apiClient.patch("/ai/config/", data).then((r) => r.data),
+  learningStats: () => apiClient.get("/ai/learning-stats/").then((r) => r.data),
 };
 
 export const dashboardApi = {

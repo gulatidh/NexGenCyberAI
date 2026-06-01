@@ -261,6 +261,18 @@ Every `ScheduledMissionRun` (scheduled or manual) auto-generates a JSON report w
 
 Auto-generated on scan completion via the `BackgroundTasks` queue in `/scans/ingest/`. Falls back to deterministic text if no LLM is available. Persisted to `Scan.ai_verdict` (JSON column) and rendered by ScanDetail.
 
+### Phase 5 — agent quality loop (`services/agent_critique.py`, `services/learning_memory.py`, `services/blackboard.py`)
+
+Three opt-in capabilities that improve agent output without changing any individual agent's prompt:
+
+1. **Self-critique** (`self_critique_enabled`, default OFF — doubles per-agent LLM cost). After an agent emits its output, a second LLM call audits it against a rubric (severity calls, evidence grounding, vagueness, contradiction) and either confirms or returns a revised version. Original + revised + critique notes are stored in `AgentRun.output_data` so the UI can show "self-reviewed".
+
+2. **Semantic learning + retrieval** (`semantic_learning_enabled`, default OFF — adds embedding cost per atom). Every completed `AgentRun` and `ScheduledMissionRun` is post-processed by an LLM that extracts 3-7 atomic learnings (categories: pattern / correction / recommendation / pitfall). Each is embedded with `text-embedding-3-small` (1536-d) via `core.ai_providers.get_embeddings()` and stored in `mission_learnings` with `embedding_json` as a JSON list of floats (works on SQLite + Azure SQL without pgvector — cosine computed in Python; fine to ~10k rows). Before each agent runs, `find_relevant(query, agent_key, domain, ...)` retrieves the top-5 cosine-similar atoms (90-day recency window) and prepends them as a "## Prior learnings" block to the prompt.
+
+3. **Scan blackboard** (`blackboard_enabled`, default ON — negligible cost). When multiple agents run on the same `Scan`, each writes a one-paragraph synopsis to `scan_blackboard` after completion; subsequent agents read recent peer synopses as "## Other agents on this scan" context. Cross-pollination without forcing the orchestrator to centrally aggregate.
+
+All three are surfaced on the **AI Settings** page with a stats strip (learnings stored / embedded / blackboard entries / self-critique runs in 30d) and toggles. Stats endpoint: `GET /ai/learning-stats/`. Embedding provider/model are configurable from the same page.
+
 ---
 
 ## Threat Modelling

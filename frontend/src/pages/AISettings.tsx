@@ -7,10 +7,11 @@ import React, { useState, useEffect } from "react";
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, TextField,
-  CircularProgress, Alert, Divider, IconButton, Tooltip,
+  CircularProgress, Alert, Divider, IconButton, Tooltip, Switch, FormControlLabel,
 } from "@mui/material";
 import {
   CheckCircle, Cancel, PlayArrow, Psychology, Save, Visibility, VisibilityOff,
+  AutoAwesome, ManageSearch, Forum,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -65,6 +66,13 @@ export default function AISettings() {
     retry: 0,
   });
 
+  const { data: learningStats } = useQuery({
+    queryKey: ["ai-learning-stats"],
+    queryFn: aiApi.learningStats,
+    retry: 0,
+    staleTime: 30_000,
+  });
+
   useEffect(() => {
     // Reset staged edits whenever the canonical config changes.
     setForm({});
@@ -107,9 +115,12 @@ export default function AISettings() {
 
   const handleSave = () => {
     // Only send changed fields. Empty-string entries get sent (signals clear).
-    const payload = Object.fromEntries(
-      Object.entries(form).filter(([, v]) => v !== null)
-    );
+    const BOOL_KEYS = new Set(["self_critique_enabled", "semantic_learning_enabled", "blackboard_enabled"]);
+    const payload: Record<string, any> = {};
+    for (const [k, v] of Object.entries(form)) {
+      if (v === null) continue;
+      payload[k] = BOOL_KEYS.has(k) ? v === "true" : v;
+    }
     if (Object.keys(payload).length === 0) {
       toast.info("No changes to save");
       return;
@@ -163,6 +174,14 @@ export default function AISettings() {
       sx={inputSx}
     />
   );
+
+  // Phase 5 toggles — staged through the same `form` object as everything
+  // else but stored as 'true'/'false' strings; converted on save.
+  const boolVal = (name: string): boolean => {
+    if (name in form) return form[name] === "true";
+    return !!config?.[name];
+  };
+  const setBool = (name: string, v: boolean) => setForm((f) => ({ ...f, [name]: v ? "true" : "false" }));
 
   const dirty = Object.values(form).some((v) => v !== null);
 
@@ -325,6 +344,183 @@ export default function AISettings() {
                     Read-only — admin role required to edit AI provider configuration.
                   </Alert>
                 )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Learning & Critique (Phase 5) */}
+          <Grid size={{ xs: 12 }}>
+            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(156,39,176,0.25)", borderRadius: 2 }}>
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                  <AutoAwesome sx={{ color: "#CE93D8", fontSize: 22 }} />
+                  <Typography variant="h6" sx={{ color: "white" }}>Learning &amp; Critique</Typography>
+                  <Chip label="Phase 5" size="small" sx={{ bgcolor: "rgba(156,39,176,0.18)", color: "#CE93D8", fontWeight: 700, fontSize: 10, height: 18, ml: 1 }} />
+                </Box>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block", mb: 2 }}>
+                  Make agents better over time. Self-critique catches weak answers before they're saved; semantic learning extracts durable lessons from completed engagements and feeds them to future agent runs via cosine-similarity retrieval; the blackboard lets peer agents on the same scan see each other's conclusions.
+                </Typography>
+
+                {/* Stats strip */}
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.5, bgcolor: "rgba(156,39,176,0.06)", borderRadius: 1.5, border: "1px solid rgba(156,39,176,0.15)" }}>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                        Learnings stored
+                      </Typography>
+                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                        {learningStats?.learnings?.total ?? "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                        +{learningStats?.learnings?.last_30d ?? 0} in 30d
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1.5, border: "1px solid rgba(66,133,244,0.15)" }}>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                        Embedded
+                      </Typography>
+                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                        {learningStats?.learnings?.with_embeddings ?? "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                        retrievable by cosine
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.5, bgcolor: "rgba(52,168,83,0.06)", borderRadius: 1.5, border: "1px solid rgba(52,168,83,0.15)" }}>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                        Blackboard
+                      </Typography>
+                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                        {learningStats?.blackboard?.total ?? "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                        +{learningStats?.blackboard?.last_30d ?? 0} in 30d
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid size={{ xs: 6, sm: 3 }}>
+                    <Box sx={{ p: 1.5, bgcolor: "rgba(251,188,4,0.06)", borderRadius: 1.5, border: "1px solid rgba(251,188,4,0.15)" }}>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                        Self-critiqued
+                      </Typography>
+                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                        {learningStats?.self_critique?.runs_30d ?? "—"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                        agent runs in 30d
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+
+                {/* Toggles */}
+                <Grid container spacing={1}>
+                  <Grid size={{ xs: 12 }}>
+                    <FormControlLabel
+                      disabled={!isAdmin}
+                      control={
+                        <Switch
+                          checked={boolVal("self_critique_enabled")}
+                          onChange={(e) => setBool("self_critique_enabled", e.target.checked)}
+                          sx={{ "& .MuiSwitch-thumb": { backgroundColor: boolVal("self_critique_enabled") ? "#FBBC04" : undefined } }}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <ManageSearch sx={{ fontSize: 18, color: "#FBBC04" }} />
+                          <Box>
+                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Self-critique pass</Typography>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                              Each agent reviews its own output before saving. ~2× LLM cost per agent run.
+                            </Typography>
+                          </Box>
+                        </Box>
+                      }
+                      sx={{ alignItems: "flex-start", mr: 0 }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <FormControlLabel
+                      disabled={!isAdmin}
+                      control={
+                        <Switch
+                          checked={boolVal("semantic_learning_enabled")}
+                          onChange={(e) => setBool("semantic_learning_enabled", e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <AutoAwesome sx={{ fontSize: 18, color: "#CE93D8" }} />
+                          <Box>
+                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Semantic learning &amp; retrieval</Typography>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                              Extract durable lessons from every completed agent run / workflow report and inject the top-5 cosine-similar lessons into future agent prompts. Adds an embeddings call per atom (cheap with text-embedding-3-small).
+                            </Typography>
+                          </Box>
+                        </Box>
+                      }
+                      sx={{ alignItems: "flex-start", mr: 0 }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <FormControlLabel
+                      disabled={!isAdmin}
+                      control={
+                        <Switch
+                          checked={boolVal("blackboard_enabled")}
+                          onChange={(e) => setBool("blackboard_enabled", e.target.checked)}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Forum sx={{ fontSize: 18, color: "#34A853" }} />
+                          <Box>
+                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Shared scan blackboard</Typography>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                              When multiple agents run on the same scan, each reads peer agents' one-paragraph synopses as context. Default on — cost is negligible.
+                            </Typography>
+                          </Box>
+                        </Box>
+                      }
+                      sx={{ alignItems: "flex-start", mr: 0 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
+                  EMBEDDING MODEL
+                </Typography>
+                <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <FormControl fullWidth size="small" sx={inputSx} disabled={!isAdmin}>
+                      <InputLabel>Embedding Provider</InputLabel>
+                      <Select
+                        value={fieldVal("embedding_provider") || "openai"}
+                        onChange={(e) => setField("embedding_provider", e.target.value)}
+                        label="Embedding Provider"
+                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+                      >
+                        <MenuItem value="openai">OpenAI</MenuItem>
+                        <MenuItem value="azure_openai">Azure OpenAI</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 8 }}>
+                    <TextField
+                      fullWidth size="small" label="Embedding Model"
+                      value={fieldVal("embedding_model") || "text-embedding-3-small"}
+                      onChange={(e) => setField("embedding_model", e.target.value)}
+                      disabled={!isAdmin}
+                      helperText="Default: text-embedding-3-small (1536-d, cheap). For Azure use the deployment name."
+                      sx={inputSx}
+                    />
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           </Grid>

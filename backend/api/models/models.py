@@ -551,8 +551,63 @@ class AISettings(Base):
     aws_bedrock_access_key_enc = Column(Text)
     aws_bedrock_secret_key_enc = Column(Text)
 
+    # Embedding model — used by the Phase 5 learning-memory layer to embed
+    # extracted learnings for cosine-similarity retrieval. Defaults to
+    # OpenAI's small model (1536-d, cheap). If embedding is disabled or no
+    # API key is configured, the learning loop persists text only and skips
+    # vector retrieval.
+    embedding_provider = Column(String(64), default="openai")        # openai | azure_openai | none
+    embedding_model = Column(String(128), default="text-embedding-3-small")
+
+    # Phase 5 feature flags. Default off for opt-in introduction — operator
+    # turns these on from the AI Settings page once budget is set aside.
+    self_critique_enabled = Column(Boolean, default=False)            # 5A — 2x cost
+    semantic_learning_enabled = Column(Boolean, default=False)        # 5B/C/E — extraction + retrieval
+    blackboard_enabled = Column(Boolean, default=True)                # 5D — cheap, on by default
+
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by = Column(String(255))
+
+
+class MissionLearning(Base):
+    """A single atomic learning extracted from a completed engagement —
+    either an AgentRun (per-agent) or a ScheduledMissionRun (per-workflow).
+
+    The text is short and self-contained (one finding / pattern / pitfall /
+    recommendation). The embedding is a JSON-encoded list of 1536 floats
+    from the configured embedding model — stored as text so it works on
+    SQLite + Azure SQL alike without needing pgvector. Retrieval computes
+    cosine similarity in Python; fast enough up to ~10k rows, after which
+    we'd promote this to a real vector column / index.
+    """
+    __tablename__ = "mission_learnings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    source_kind = Column(String(32), nullable=False, index=True)      # 'agent_run' | 'mission_run'
+    source_id = Column(String(36), nullable=False, index=True)
+    client_id = Column(String(36), ForeignKey("clients.id"), index=True)
+    agent_key = Column(String(128), index=True)                       # which agent produced it (catalog.key)
+    domain = Column(String(128), index=True)                          # agent domain or mission type
+    category = Column(String(32), index=True)                         # pattern | correction | recommendation | pitfall
+    text = Column(Text, nullable=False)
+    embedding_json = Column(Text)                                     # JSON list[float] — null when embeddings disabled
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ScanBlackboardEntry(Base):
+    """Cross-agent blackboard — when multiple agents run on the same Scan,
+    later agents read earlier agents' one-paragraph summaries as context.
+    Cheap N-way pollination without forcing the orchestrator to centrally
+    aggregate."""
+    __tablename__ = "scan_blackboard"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=False, index=True)
+    agent_run_id = Column(String(36), ForeignKey("agent_runs.id"), index=True)
+    agent_name = Column(String(200))
+    agent_key = Column(String(128))
+    summary = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 # ── Scheduled Missions ────────────────────────────────────────────────────────

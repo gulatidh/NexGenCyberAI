@@ -6,11 +6,14 @@ delete agents. Built-in agents (`is_builtin=True`) cannot be deleted via
 the API; admins can edit them. New agents are always `is_builtin=False`.
 """
 from __future__ import annotations
+import logging
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+logger = logging.getLogger(__name__)
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -203,6 +206,7 @@ class AgentRunResponse(BaseModel):
 async def run_agent(
     agent_id: str,
     payload: AgentRunRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -316,6 +320,37 @@ async def run_agent(
     instruction = (context_block + "\n\n" + base_instruction + formatting_guidance) if context_block \
         else base_instruction + formatting_guidance
 
+    # ── Retrieval-augmented context — prepend top-k semantically similar
+    # learnings from prior engagements (Phase 5C). When semantic learning is
+    # disabled or no learnings exist yet, this is a no-op.
+    try:
+        from services.learning_memory import find_relevant, render_learnings_block
+        learnings = find_relevant(
+            db,
+            query_text=(context_block + "\n\n" + base_instruction)[:4000],
+            client_id=effective_client_id,
+            agent_key=a.key,
+            domain=a.domain,
+            k=5,
+        )
+        if learnings:
+            instruction = render_learnings_block(learnings) + "\n" + instruction
+    except Exception:
+        logger.exception("learning retrieval failed (continuing without)")
+
+    # ── Blackboard injection (Phase 5D) — peer agents' synopses on the
+    # same scan. No-op when scan is None or blackboard is disabled.
+    if scan:
+        try:
+            from services.blackboard import recent_entries as bb_recent, render_blackboard_block, is_enabled as bb_enabled
+            if bb_enabled(db):
+                entries = bb_recent(db, scan_id=scan.id, k=6)
+                bb_block = render_blackboard_block(entries, exclude_agent_key=a.key)
+                if bb_block:
+                    instruction = bb_block + "\n" + instruction
+        except Exception:
+            logger.exception("blackboard read failed (continuing without)")
+
     # ── LLM call ────────────────────────────────────────────────────────────
     started = time.perf_counter()
     try:
@@ -343,6 +378,26 @@ async def run_agent(
         text = "\n".join(str(p) for p in text)
     usage = getattr(result, "usage_metadata", None) or {}
     tokens = int(usage.get("total_tokens") or 0)
+    original_output = text
+
+    # ── Self-critique pass (opt-in via AISettings.self_critique_enabled) ──
+    critique_meta: Optional[Dict[str, Any]] = None
+    try:
+        from services.agent_critique import is_enabled as critique_is_enabled, critique as run_critique
+        if critique_is_enabled(db):
+            cres = await run_critique(llm=llm, instruction=instruction, output=text)
+            critique_meta = {
+                "decision": cres["decision"],
+                "issues": cres["issues"],
+                "tokens": cres.get("tokens", 0),
+            }
+            if cres["decision"] == "revise" and cres["revised_output"]:
+                text = cres["revised_output"]
+            tokens += int(cres.get("tokens") or 0)
+    except Exception as exc:
+        # Never let the critique step break the agent run.
+        logger.exception("self-critique pass failed (continuing with original output)")
+        critique_meta = {"decision": "error", "issues": [str(exc)[:160]], "tokens": 0}
 
     # ── Persist as AgentRun when we have a scan, so it appears on the
     # Assessment detail page next to operational agent tabs. agent_type is
@@ -368,6 +423,12 @@ async def run_agent(
                 "agent_name": a.name,
                 "agent_key": a.key,
                 "domain": a.domain,
+                # When self-critique ran, persist the original alongside the
+                # revised version so the UI can show "self-reviewed" and let
+                # the user inspect what changed.
+                **({"original_summary": original_output, "critique": critique_meta}
+                   if critique_meta is not None and original_output != text
+                   else ({"critique": critique_meta} if critique_meta is not None else {})),
             },
             tokens_used=tokens,
         )
@@ -376,6 +437,20 @@ async def run_agent(
         db.commit()
         db.refresh(ar)
         run_id = ar.id
+
+        # ── Post-run: extract learnings (Phase 5B) and post blackboard
+        # summary (Phase 5D). Both are background tasks so the user sees
+        # their result immediately; failures don't block the response.
+        background_tasks.add_task(
+            _post_run_learning_and_blackboard,
+            agent_run_id=ar.id,
+            scan_id=scan.id,
+            client_id=effective_client_id,
+            agent_key=a.key,
+            agent_name=a.name,
+            domain=a.domain,
+            output_text=text,
+        )
 
     return AgentRunResponse(
         agent_id=a.id,
@@ -388,3 +463,52 @@ async def run_agent(
         run_id=run_id,
         scan_id=scan.id if scan else None,
     )
+
+
+def _post_run_learning_and_blackboard(
+    *,
+    agent_run_id: str,
+    scan_id: str,
+    client_id: Optional[str],
+    agent_key: Optional[str],
+    agent_name: Optional[str],
+    domain: Optional[str],
+    output_text: str,
+) -> None:
+    """Background-task target. Opens its own DB session because BackgroundTasks
+    fire after the request's session is closed."""
+    import asyncio
+    from db.database import SessionLocal
+    bg_db = SessionLocal()
+    try:
+        # 5D — write to blackboard first (cheap, no LLM call).
+        try:
+            from services.blackboard import is_enabled as bb_enabled, post as bb_post
+            if bb_enabled(bg_db):
+                bb_post(
+                    bg_db,
+                    scan_id=scan_id,
+                    agent_run_id=agent_run_id,
+                    agent_name=agent_name,
+                    agent_key=agent_key,
+                    summary_text=output_text,
+                )
+        except Exception:
+            logger.exception("blackboard post failed for agent_run %s", agent_run_id)
+
+        # 5B — extract learnings (LLM call). Awaited in a fresh event loop.
+        try:
+            from services.learning_memory import extract_learnings
+            asyncio.run(extract_learnings(
+                bg_db,
+                text=output_text,
+                source_kind="agent_run",
+                source_id=agent_run_id,
+                client_id=client_id,
+                agent_key=agent_key,
+                domain=domain,
+            ))
+        except Exception:
+            logger.exception("learning extraction failed for agent_run %s", agent_run_id)
+    finally:
+        bg_db.close()
