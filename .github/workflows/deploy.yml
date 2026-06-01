@@ -148,12 +148,22 @@ jobs:
       # force Oryx build (which installs requirements.txt into antenv).
       # The default azure/webapps-deploy@v3 action sometimes skips Oryx and
       # leaves the venv missing, causing 'uvicorn: not found' / exit 127.
+      # Serve via gunicorn managing uvicorn workers (Azure's default Python
+      # serving combo). On the B1 plan (1.75 GB) plain `uvicorn --workers 4`
+      # over-subscribed RAM — any heavy LLM run (verdict / buddies / threat
+      # model) OOM-killed a worker. Tuning here:
+      #   --workers 2            halve peak memory pressure vs 4
+      #   --max-requests 600     recycle each worker after ~600 requests
+      #   --max-requests-jitter  stagger recycles so workers don't all drop at
+      #                          once; reclaims memory that creeps between LLM runs
+      #   --timeout 300          generous worker timeout (async LLM calls yield to
+      #                          the event loop, so the heartbeat keeps firing)
       - name: Set startup command
         run: |
           az webapp config set \
             --name "${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}" \
             --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}'].resourceGroup" -o tsv)" \
-            --startup-file "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"
+            --startup-file "gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
       - name: Package backend
         run: |
