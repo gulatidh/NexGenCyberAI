@@ -243,6 +243,24 @@ def recompute_all_frameworks_for_client(db: Session, client_id: str) -> Dict[str
     return out
 
 
+def recompute_all_frameworks_for_client_bg(client_id: str) -> None:
+    """Background-task entry point: opens its own session, never raises out.
+
+    Recomputing all three frameworks touches ~740 controls and is too heavy
+    to run inline in the scan-ingest request — it blocked the scanner's POST
+    past its client timeout and added memory pressure mid-request. Run it off
+    the response path so findings (already committed before this) land fast
+    and reliably regardless of recompute cost."""
+    from db.database import SessionLocal
+    db = SessionLocal()
+    try:
+        recompute_all_frameworks_for_client(db, client_id)
+    except Exception:
+        logger.exception("Background framework recompute failed for %s", client_id)
+    finally:
+        db.close()
+
+
 # ── Defender for Cloud direct-write path ────────────────────────────────────
 
 _DEFENDER_STATE_TO_STATUS = {

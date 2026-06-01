@@ -197,12 +197,18 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
     db.commit()
     clear_runtime(payload.scan_id)
 
-    # Recompute frameworks once findings are persisted.
-    try:
-        from services.compliance import recompute_all_frameworks_for_client
-        recompute_all_frameworks_for_client(db, scan.client_id)
-    except Exception as exc:
-        logger.warning("Post-ingest recompute failed: %s", exc)
+    # Recompute frameworks off the request path. Findings are already
+    # committed above, so the scanner gets a fast 200 regardless of how long
+    # the recompute takes. Running it inline (it iterates ~740 controls across
+    # 3 frameworks) blocked the ingest POST past the scanner's client timeout
+    # and piled memory pressure onto the request, risking an OOM kill that
+    # made scans look like they ingested nothing.
+    if background_tasks is not None:
+        try:
+            from services.compliance import recompute_all_frameworks_for_client_bg
+            background_tasks.add_task(recompute_all_frameworks_for_client_bg, scan.client_id)
+        except Exception:
+            logger.exception("Failed to enqueue framework recompute for scan %s", scan.id)
 
     # Auto-generate the structured AI verdict on scan completion. Best-effort
     # background task — Verdict generator never raises out to the request,
