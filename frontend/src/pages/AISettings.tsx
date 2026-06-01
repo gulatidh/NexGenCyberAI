@@ -11,8 +11,9 @@ import {
 } from "@mui/material";
 import {
   CheckCircle, Cancel, PlayArrow, Psychology, Save, Visibility, VisibilityOff,
-  AutoAwesome, ManageSearch, Forum,
+  AutoAwesome, ManageSearch, Forum, Edit, ExpandLess, NetworkCheck,
 } from "@mui/icons-material";
+import { Collapse } from "@mui/material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { aiApi, adminApi } from "../services/api";
@@ -46,6 +47,13 @@ export default function AISettings() {
   // before saving. `null` means "no change", `""` means "clear value".
   const [form, setForm] = useState<Record<string, string | null>>({});
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
+  // Which provider tile is currently expanded for inline editing. Only one
+  // tile open at a time keeps the page compact and stops the eye from
+  // bouncing between several long forms.
+  const [expandedTile, setExpandedTile] = useState<string | null>(null);
+  // Per-tile test result so each provider tile can show its own status.
+  const [tileTest, setTileTest] = useState<Record<string, any>>({});
+  const [tileTesting, setTileTesting] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["ai-providers"],
@@ -111,6 +119,21 @@ export default function AISettings() {
       model: selectedModel || undefined,
       prompt: testPrompt,
     });
+  };
+
+  const handleTileTest = async (providerKey: string) => {
+    setTileTesting(providerKey);
+    try {
+      const result = await aiApi.testProvider({
+        provider: providerKey,
+        prompt: "Reply with the single word 'ok' to confirm the connection.",
+      });
+      setTileTest((m) => ({ ...m, [providerKey]: result }));
+    } catch (e: any) {
+      setTileTest((m) => ({ ...m, [providerKey]: { success: false, error: e?.message || "Test failed" } }));
+    } finally {
+      setTileTesting(null);
+    }
   };
 
   const handleSave = () => {
@@ -201,152 +224,216 @@ export default function AISettings() {
         <CircularProgress sx={{ color: "#4285F4" }} />
       ) : (
         <Grid container spacing={2}>
-          {/* Provider Cards */}
-          {providers.map((provider) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.provider}>
-              <Card
-                sx={{
-                  bgcolor: provider.available ? "rgba(66,133,244,0.05)" : "#1E1E1E",
-                  border: `1px solid ${provider.available ? "rgba(66,133,244,0.3)" : "rgba(255,255,255,0.08)"}`,
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                  "&:hover": { borderColor: "#4285F4" },
-                }}
-                onClick={() => { setSelectedProvider(provider.provider); setSelectedModel(""); }}
-              >
-                <CardContent>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                    <Typography variant="h6" sx={{ color: "white", fontSize: 15 }}>
-                      {PROVIDER_LOGOS[provider.provider] || provider.provider}
-                    </Typography>
-                    {provider.available ? (
-                      <CheckCircle sx={{ color: "#00e676", fontSize: 20 }} />
-                    ) : (
-                      <Cancel sx={{ color: "#f44336", fontSize: 20 }} />
-                    )}
-                  </Box>
-                  <Chip
-                    label={provider.available ? "Configured" : "Not Configured"}
-                    size="small"
-                    sx={{
-                      bgcolor: provider.available ? "rgba(0,230,118,0.15)" : "rgba(244,67,54,0.15)",
-                      color: provider.available ? "#00e676" : "#f44336",
-                      mb: 1.5,
-                    }}
-                  />
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block" }}>
-                    Models:
-                  </Typography>
-                  {provider.models.slice(0, 3).map((m) => (
-                    <Chip key={m} label={m} size="small" sx={{ mr: 0.5, mb: 0.5, bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", fontSize: 10 }} />
-                  ))}
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-
-          {/* Configuration */}
+          {/* Defaults & Save strip — slim row above the provider tiles */}
           <Grid size={{ xs: 12 }}>
             <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-              <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                  <Typography variant="h6" sx={{ color: "white" }}>Provider Configuration</Typography>
-                  <Tooltip title={!isAdmin ? "Admin role required to edit" : ""}>
-                    <span>
-                      <Button
-                        variant="contained" startIcon={<Save />}
-                        disabled={!isAdmin || !dirty || saveMutation.isPending}
-                        onClick={handleSave}
-                        sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
-                        {saveMutation.isPending ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </span>
-                  </Tooltip>
+              <CardContent sx={{ "&:last-child": { pb: 2 } }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                  <Box sx={{ flex: "1 1 auto", minWidth: 220 }}>
+                    <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11, display: "block", mb: 0.5 }}>
+                      DEFAULTS — APPLIED WHEN AN AGENT DOESN'T OVERRIDE PROVIDER/MODEL
+                    </Typography>
+                    <Grid container spacing={1.5}>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <FormControl fullWidth size="small" sx={inputSx} disabled={!isAdmin}>
+                          <InputLabel>Default Provider</InputLabel>
+                          <Select
+                            value={fieldVal("default_provider")}
+                            onChange={(e) => setField("default_provider", e.target.value)}
+                            label="Default Provider"
+                            sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                            <MenuItem value="">— None —</MenuItem>
+                            {providers.map((p) => (
+                              <MenuItem key={p.provider} value={p.provider}>
+                                {PROVIDER_LOGOS[p.provider] || p.provider}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 4 }}>{plainField("default_model", "Default Model")}</Grid>
+                      <Grid size={{ xs: 12, sm: 4 }}>
+                        <TextField fullWidth size="small" type="number" label="Default Temperature"
+                          value={fieldVal("default_temperature")}
+                          onChange={(e) => setField("default_temperature", e.target.value)}
+                          slotProps={{ htmlInput: { step: 0.1, min: 0, max: 2 } }}
+                          sx={inputSx} disabled={!isAdmin} />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {dirty && (
+                      <Chip label={`${Object.values(form).filter((v) => v !== null).length} unsaved`}
+                        size="small" sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700, fontSize: 11 }} />
+                    )}
+                    <Tooltip title={!isAdmin ? "Admin role required to edit" : ""}>
+                      <span>
+                        <Button
+                          variant="contained" startIcon={<Save />}
+                          disabled={!isAdmin || !dirty || saveMutation.isPending}
+                          onClick={handleSave}
+                          sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+                          {saveMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Box>
                 </Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
-                  Stored values override the deployment env vars. API keys are encrypted at rest. Secrets are never echoed back — leave blank to keep the current value.
-                </Typography>
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  DEFAULTS
-                </Typography>
-                <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <FormControl fullWidth size="small" sx={inputSx}>
-                      <InputLabel>Default Provider</InputLabel>
-                      <Select
-                        value={fieldVal("default_provider")}
-                        onChange={(e) => setField("default_provider", e.target.value)}
-                        label="Default Provider"
-                        disabled={!isAdmin}
-                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-                        <MenuItem value="">— None —</MenuItem>
-                        {providers.map((p) => (
-                          <MenuItem key={p.provider} value={p.provider}>
-                            {PROVIDER_LOGOS[p.provider] || p.provider}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>{plainField("default_model", "Default Model")}</Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <TextField fullWidth size="small" type="number" label="Default Temperature"
-                      value={fieldVal("default_temperature")}
-                      onChange={(e) => setField("default_temperature", e.target.value)}
-                      slotProps={{ htmlInput: { step: 0.1, min: 0, max: 2 } }}
-                      sx={inputSx} />
-                  </Grid>
-                </Grid>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  AZURE OPENAI
-                </Typography>
-                <Grid container spacing={2} sx={{ mt: 0.5, mb: 2 }}>
-                  <Grid size={{ xs: 12, sm: 6 }}>{plainField("azure_openai_endpoint", "Endpoint URL")}</Grid>
-                  <Grid size={{ xs: 12, sm: 3 }}>{plainField("azure_openai_deployment", "Deployment")}</Grid>
-                  <Grid size={{ xs: 12, sm: 3 }}>{plainField("azure_openai_api_version", "API Version")}</Grid>
-                  <Grid size={{ xs: 12, sm: 12 }}>{secretField("azure_openai_api_key", "Azure OpenAI API Key")}</Grid>
-                </Grid>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  OPENAI
-                </Typography>
-                <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("openai_api_key", "OpenAI API Key")}</Box>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  ANTHROPIC CLAUDE
-                </Typography>
-                <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("anthropic_api_key", "Anthropic API Key")}</Box>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  GOOGLE GEMINI
-                </Typography>
-                <Box sx={{ mt: 0.5, mb: 2 }}>{secretField("google_api_key", "Google API Key")}</Box>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-
-                <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
-                  AWS BEDROCK
-                </Typography>
-                <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                  <Grid size={{ xs: 12, sm: 4 }}>{plainField("aws_bedrock_region", "Region")}</Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_access_key", "Access Key ID")}</Grid>
-                  <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_secret_key", "Secret Access Key")}</Grid>
-                </Grid>
-
                 {!isAdmin && (
-                  <Alert severity="info" sx={{ mt: 2, bgcolor: "rgba(66,133,244,0.08)", color: "white" }}>
-                    Read-only — admin role required to edit AI provider configuration.
+                  <Alert severity="info" sx={{ mt: 1.5, bgcolor: "rgba(66,133,244,0.08)", color: "white", py: 0.5 }}>
+                    Read-only — admin role required to edit provider configuration.
                   </Alert>
                 )}
               </CardContent>
             </Card>
           </Grid>
+
+          {/* Provider tiles — click Edit to expand inline */}
+          {providers.map((provider) => {
+            const expanded = expandedTile === provider.provider;
+            const tres = tileTest[provider.provider];
+            return (
+              <Grid size={{ xs: 12, sm: 6, md: expanded ? 12 : 4 }} key={provider.provider}>
+                <Card
+                  sx={{
+                    bgcolor: provider.available ? "rgba(52,168,83,0.04)" : "#1E1E1E",
+                    border: `1px solid ${expanded ? "#4285F4" : (provider.available ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.08)")}`,
+                    borderRadius: 2,
+                    transition: "border-color .15s ease",
+                  }}
+                >
+                  <CardContent>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+                          <Typography variant="h6" sx={{ color: "white", fontSize: 15, fontWeight: 700 }}>
+                            {PROVIDER_LOGOS[provider.provider] || provider.provider}
+                          </Typography>
+                          {provider.available
+                            ? <CheckCircle sx={{ color: "#00e676", fontSize: 18 }} />
+                            : <Cancel sx={{ color: "rgba(244,67,54,0.7)", fontSize: 18 }} />}
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mb: 1 }}>
+                          <Chip
+                            label={provider.available ? "Configured" : "Not Configured"}
+                            size="small"
+                            sx={{
+                              height: 20, fontSize: 10, fontWeight: 700,
+                              bgcolor: provider.available ? "rgba(0,230,118,0.12)" : "rgba(244,67,54,0.12)",
+                              color: provider.available ? "#00e676" : "#f44336",
+                            }}
+                          />
+                          {tres && (
+                            <Chip
+                              label={tres.success ? "Test ok" : "Test failed"}
+                              size="small"
+                              sx={{
+                                height: 20, fontSize: 10, fontWeight: 700,
+                                bgcolor: tres.success ? "rgba(66,133,244,0.15)" : "rgba(244,67,54,0.15)",
+                                color: tres.success ? "#4285F4" : "#f44336",
+                              }}
+                            />
+                          )}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
+                          MODELS
+                        </Typography>
+                        <Box sx={{ mt: 0.5, mb: 0.5 }}>
+                          {provider.models.slice(0, expanded ? 6 : 3).map((m) => (
+                            <Chip key={m} label={m} size="small"
+                              sx={{ mr: 0.5, mb: 0.5, bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                          ))}
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        <Tooltip title={!isAdmin ? "Admin role required" : (expanded ? "Collapse" : "Edit configuration")}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!isAdmin}
+                              onClick={() => setExpandedTile(expanded ? null : provider.provider)}
+                              sx={{
+                                color: expanded ? "#4285F4" : "rgba(255,255,255,0.55)",
+                                bgcolor: expanded ? "rgba(66,133,244,0.1)" : "transparent",
+                                "&:hover": { bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" },
+                              }}
+                            >
+                              {expanded ? <ExpandLess fontSize="small" /> : <Edit fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Test connection">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!provider.available || tileTesting === provider.provider}
+                              onClick={() => handleTileTest(provider.provider)}
+                              sx={{
+                                color: "rgba(255,255,255,0.55)",
+                                "&:hover": { bgcolor: "rgba(52,168,83,0.12)", color: "#34A853" },
+                              }}
+                            >
+                              {tileTesting === provider.provider
+                                ? <CircularProgress size={14} sx={{ color: "#34A853" }} />
+                                : <NetworkCheck fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+
+                    <Collapse in={expanded} unmountOnExit>
+                      <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1.5 }} />
+                      <Grid container spacing={1.5}>
+                        {provider.provider === "azure_openai" && (
+                          <>
+                            <Grid size={{ xs: 12, sm: 6 }}>{plainField("azure_openai_endpoint", "Endpoint URL")}</Grid>
+                            <Grid size={{ xs: 12, sm: 3 }}>{plainField("azure_openai_deployment", "Deployment")}</Grid>
+                            <Grid size={{ xs: 12, sm: 3 }}>{plainField("azure_openai_api_version", "API Version")}</Grid>
+                            <Grid size={{ xs: 12 }}>{secretField("azure_openai_api_key", "Azure OpenAI API Key")}</Grid>
+                          </>
+                        )}
+                        {provider.provider === "openai" && (
+                          <Grid size={{ xs: 12 }}>{secretField("openai_api_key", "OpenAI API Key")}</Grid>
+                        )}
+                        {provider.provider === "anthropic" && (
+                          <Grid size={{ xs: 12 }}>{secretField("anthropic_api_key", "Anthropic API Key")}</Grid>
+                        )}
+                        {provider.provider === "google_gemini" && (
+                          <Grid size={{ xs: 12 }}>{secretField("google_api_key", "Google API Key")}</Grid>
+                        )}
+                        {provider.provider === "aws_bedrock" && (
+                          <>
+                            <Grid size={{ xs: 12, sm: 4 }}>{plainField("aws_bedrock_region", "Region")}</Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_access_key", "Access Key ID")}</Grid>
+                            <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_secret_key", "Secret Access Key")}</Grid>
+                          </>
+                        )}
+                      </Grid>
+                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", display: "block", mt: 1.5 }}>
+                        Stored values override deployment env vars. API keys are encrypted at rest and never echoed back — leave blank to keep the current value.
+                      </Typography>
+                      {tres && (
+                        <Alert
+                          severity={tres.success ? "success" : "error"}
+                          sx={{ mt: 1.5, bgcolor: tres.success ? "rgba(52,168,83,0.08)" : "rgba(244,67,54,0.08)", color: "white" }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 12 }}>
+                            {tres.success ? `${provider.provider} responded` : `Error: ${tres.error}`}
+                          </Typography>
+                          {tres.response && (
+                            <Typography variant="caption" sx={{ display: "block", mt: 0.5, fontFamily: "monospace", whiteSpace: "pre-wrap", opacity: 0.85 }}>
+                              {String(tres.response).slice(0, 240)}
+                            </Typography>
+                          )}
+                        </Alert>
+                      )}
+                    </Collapse>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
 
           {/* Learning & Critique (Phase 5) */}
           <Grid size={{ xs: 12 }}>
