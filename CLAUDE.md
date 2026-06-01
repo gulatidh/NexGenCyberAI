@@ -287,12 +287,14 @@ On-demand threat models scoped to a client (and optionally a project / asset). F
 | MITRE ATT&CK | initial_access · execution · persistence · privilege_escalation · defense_evasion · credential_access · discovery · lateral_movement · collection · exfiltration · impact |
 | Lockheed Kill Chain | reconnaissance · weaponization · delivery · exploitation · installation · command_and_control · actions_on_objectives |
 
-**Generation flow** (`services/threat_modeler.py`):
-1. `_collect_scope()` pulls assets, recent findings, and connector summary for the chosen scope from the DB
-2. `_library_sample()` pulls up to 25 diversified `ThreatLibrary` entries (≤4 per category), preferring ATT&CK for `mitre_attack` methodology and CAPEC otherwise (falls back to ATT&CK when CAPEC isn't synced)
-3. `_build_system_prompt()` + `_build_user_prompt()` inject methodology-specific guidance plus a "Threat library — cite from THIS list only" block when library entries are present. Each threat's `capec_refs` / `attack_techniques` must come from the listed IDs (empty arrays allowed if nothing matches)
-4. LLM call returns JSON; `_normalise()` enforces the fixed schema (`executive_summary`, `components`, `data_flows`, `threats`, `mitigations`, `dfd_mermaid`)
-5. Persisted to `ThreatModel`; the detail page polls every 4s while `status == "generating"`
+**Generation flow** (`services/threat_modeler.py::generate_threat_model`) — a **visible, asset-first multi-step pipeline**. Threat modelling is **architecture-driven, not findings-driven**: components come from the asset inventory, threats from the structure (methodology + CAPEC/ATT&CK library); findings/risks are corroborating evidence, not a prerequisite. Each step writes `ThreatModel.progress_json` and commits, so the 4s detail poll renders a live checklist (`{"current","pct","steps":[{key,label,status,detail}]}`; statuses `pending|active|done|skipped|error`):
+1. **Discover assets** (`_ensure_assets`) — if the scope has no assets but the client has connectors, sync them **one connector at a time** via `connectors.sync.sync_connector_assets` (best-effort, each surfaced as progress); else `skipped` → model from architecture. Diagram-upload models skip this (their components are authoritative).
+2. **Gather context** (`_collect_scope`) — assets + recent findings + **Risk Register (top 25 by score)** + connector topology. Risk rows feed a `## Risk assessment` block in the prompt so threats align with tracked risk.
+3. **Load threat library** (`_library_sample`) — up to 25 diversified `ThreatLibrary` entries (≤4 per category), preferring ATT&CK for `mitre_attack` and CAPEC otherwise (falls back to ATT&CK when CAPEC isn't synced).
+4. **Run analysis** — `_build_system_prompt()` + `_build_user_prompt()` inject methodology guidance + a "cite from THIS list only" library block; `_invoke_llm` is bounded by `asyncio.wait_for(LLM_TIMEOUT_SECONDS=180)`. `_normalise()` enforces the fixed schema (`executive_summary`, `components`, `data_flows`, `threats`, `mitigations`, `dfd_mermaid`, `trust_boundaries`, `entry_points`, `coverage_decisions`).
+5. **Finalize** — persist output + maturity scores; `status="completed"`, `pct=100`.
+
+`progress_json` is a JSON column (idempotent ALTER TABLE in `main.py::_ensure_added_columns`), surfaced on `ThreatModelSummary`/`_summary_from` as `progress`. `_set_step()` uses `flag_modified` so in-place dict mutations are tracked. Orphaned `generating` rows (worker died mid-run) are self-healed by `main.py::_fail_stale_threat_models()` on startup (>20 min → `failed`).
 
 **Versioning**: `parent_threat_model_id` mirrors the `Scan.parent_scan_id` flat-sibling chain — first ancestor with `parent_threat_model_id IS NULL` is the root. Rescan creates a new row linked to the root; list endpoint collapses to newest sibling per root.
 
