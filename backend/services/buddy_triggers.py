@@ -117,6 +117,12 @@ def fire_event(
     """Run the matching enabled triggers for this event. Opens its own
     short-lived DB session (caller may be in another scope). Returns the
     number of buddies queued."""
+    # Proactive auto-runs are gated behind a feature flag (default OFF).
+    # Running real buddy LLM calls inline during ingest can OOM small App
+    # Service plans, killing the worker before findings finish ingesting.
+    from core.config import get_settings
+    if not get_settings().PROACTIVE_BUDDIES_ENABLED:
+        return 0
     from db.database import SessionLocal
     bg_db = SessionLocal()
     try:

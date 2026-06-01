@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # Set DEFAULT_AI_PROVIDER to one of: openai | azure_openai | anthropic | google_gemini | aws_bedrock
     DEFAULT_AI_PROVIDER: str = "azure_openai"
 
+    # Phase 7B — proactive buddy triggers. OFF by default: firing real buddy
+    # LLM runs inline during scan ingest can OOM small App Service plans (the
+    # worker dies mid-request and findings fail to ingest). Operators can flip
+    # this on once the runtime has headroom / runs work off the web worker.
+    PROACTIVE_BUDDIES_ENABLED: bool = False
+
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""
     AZURE_OPENAI_ENDPOINT: str = ""
