@@ -145,8 +145,15 @@ async def list_all_scans(
     if scan_ids:
         for ar in db.query(AgentRun).filter(AgentRun.scan_id.in_(scan_ids)).all():
             agent_type = ar.agent_type.value if hasattr(ar.agent_type, "value") else str(ar.agent_type)
+            # Catalog buddies all persist as agent_type="orchestrator"; their
+            # real identity lives in input_data. Surface key + friendly name so
+            # the Assessment tile can list distinct buddies instead of
+            # collapsing every advisory run into a single "orchestrator".
+            idata = ar.input_data or {}
             agent_runs_by_scan[ar.scan_id].append({
                 "id": ar.id, "agent_type": agent_type, "status": ar.status,
+                "agent_key": idata.get("agent_key") or agent_type,
+                "agent_name": idata.get("agent_name") or agent_type.replace("_", " ").title(),
             })
 
     out: List[Dict[str, Any]] = []

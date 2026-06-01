@@ -324,7 +324,14 @@ export default function Scans() {
                   ? `${Math.round(tile.duration_seconds / 60)} min`
                   : `${tile.duration_seconds}s`)
               : (status === "running" ? "Running…" : "—");
-            const agentTypes = Array.from(new Set((tile.agents_ran || []).map((a: any) => a.agent_type)));
+            // Distinct buddies that ran — prefer the friendly catalog name so
+            // advisory buddies (all stored as agent_type="orchestrator") don't
+            // collapse into one entry.
+            const agentRuns = (tile.agents_ran || []) as any[];
+            const agentNames = Array.from(new Set(agentRuns.map((a) => a.agent_name || a.agent_type)));
+            const anyAgentFailed = agentRuns.some(
+              (a) => /fail|error/i.test(String(a.status || "")),
+            );
             return (
               <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
                 <Card
@@ -449,10 +456,14 @@ export default function Scans() {
                           sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
                       )}
                       <Box sx={{ flex: 1 }} />
-                      {agentTypes.length > 0 && (
-                        <Tooltip title={`Agents that ran: ${agentTypes.join(", ")}`}>
-                          <Chip size="small" label={`${agentTypes.length} agent${agentTypes.length === 1 ? "" : "s"}`}
-                            sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0", height: 18, fontSize: 10, fontWeight: 700 }} />
+                      {agentNames.length > 0 && (
+                        <Tooltip title={`${anyAgentFailed ? "Some agent runs failed. " : ""}Agents that ran: ${agentNames.join(", ")}`}>
+                          <Chip size="small" label={`${agentNames.length} agent${agentNames.length === 1 ? "" : "s"}`}
+                            sx={{
+                              bgcolor: anyAgentFailed ? "rgba(234,67,53,0.18)" : "rgba(124,77,255,0.15)",
+                              color: anyAgentFailed ? "#EA4335" : "#9C27B0",
+                              height: 18, fontSize: 10, fontWeight: 700,
+                            }} />
                         </Tooltip>
                       )}
                     </Box>
