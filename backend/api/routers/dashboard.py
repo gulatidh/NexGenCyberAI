@@ -3,8 +3,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
-from typing import Dict
-from api.models.models import Client, Connector, Finding, Risk, Scan, ScanStatus, FrameworkAssessment, AgentRun
+from typing import Any, Dict, List, Optional
+from api.models.models import (
+    Client, Connector, Finding, Risk, Scan, ScanStatus, FrameworkAssessment,
+    AgentRun, ThreatModel, ScheduledMissionRun, ScheduledMission,
+)
 from api.schemas.schemas import DashboardSummary
 from db.database import get_db
 from core.security import get_current_user
@@ -103,3 +106,142 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
         recent_findings=recent_findings,
         agent_runs_total=agent_runs_total,
     )
+
+
+@router.get("/activity")
+async def get_activity_feed(
+    days: int = 3,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Unified activity feed across all engagement types, last N days.
+
+    Aggregates scans, threat models, mission runs, risks (open critical /
+    high only), and agent runs into one timeline sorted by timestamp.
+    Total events capped at 80 so the response stays small."""
+    days = max(1, min(days, 30))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    events: List[Dict[str, Any]] = []
+
+    # Build a quick id→name lookup so we don't issue one query per event
+    client_names: Dict[str, str] = {
+        c.id: c.name for c in db.query(Client.id, Client.name).all()  # type: ignore[arg-type]
+    }
+
+    def client_name(cid: Optional[str]) -> str:
+        return client_names.get(cid or "", "—")
+
+    # ── Scans ────────────────────────────────────────────────────────────────
+    scans = (
+        db.query(Scan)
+        .filter(Scan.created_at >= cutoff)
+        .order_by(Scan.created_at.desc())
+        .limit(60)
+        .all()
+    )
+    for s in scans:
+        status = s.status.value if hasattr(s.status, "value") else str(s.status or "")
+        scan_type = s.scan_type.value if hasattr(s.scan_type, "value") else str(s.scan_type or "")
+        events.append({
+            "kind": "scan",
+            "label": f"{scan_type.replace('_', ' ').title()} scan {status}",
+            "target": (s.summary or {}).get("target") if isinstance(s.summary, dict) else None,
+            "client_id": s.client_id,
+            "client_name": client_name(s.client_id),
+            "status": status,
+            "when_iso": (s.created_at or datetime.now(timezone.utc)).isoformat(),
+            "link": f"/scans/{s.id}",
+        })
+
+    # ── Threat models ────────────────────────────────────────────────────────
+    tms = (
+        db.query(ThreatModel)
+        .filter(ThreatModel.created_at >= cutoff)
+        .order_by(ThreatModel.created_at.desc())
+        .limit(40)
+        .all()
+    )
+    for t in tms:
+        events.append({
+            "kind": "threat_model",
+            "label": f"Threat model · {(t.methodology or 'stride').upper()} · {t.status or 'pending'}",
+            "target": t.name,
+            "client_id": t.client_id,
+            "client_name": client_name(t.client_id),
+            "status": t.status or "pending",
+            "when_iso": ((t.generated_at or t.created_at) or datetime.now(timezone.utc)).isoformat(),
+            "link": f"/threat-models/{t.id}?client={t.client_id}",
+        })
+
+    # ── Workflow / mission runs ──────────────────────────────────────────────
+    mruns = (
+        db.query(ScheduledMissionRun, ScheduledMission)
+        .join(ScheduledMission, ScheduledMission.id == ScheduledMissionRun.mission_id)
+        .filter(ScheduledMissionRun.completed_at >= cutoff)
+        .order_by(ScheduledMissionRun.completed_at.desc())
+        .limit(40)
+        .all()
+    )
+    for run, mission in mruns:
+        mtype = mission.mission_type.value if hasattr(mission.mission_type, "value") else str(mission.mission_type or "")
+        status = run.status.value if hasattr(run.status, "value") else str(run.status or "")
+        events.append({
+            "kind": "workflow",
+            "label": f"{mtype.replace('_', ' ').title()} · {status}",
+            "target": mission.name,
+            "client_id": mission.client_id,
+            "client_name": client_name(mission.client_id),
+            "status": status,
+            "when_iso": (run.completed_at or run.created_at or datetime.now(timezone.utc)).isoformat(),
+            "link": f"/missions",
+        })
+
+    # ── New high-impact risks ────────────────────────────────────────────────
+    risks = (
+        db.query(Risk)
+        .filter(Risk.created_at >= cutoff)
+        .filter(Risk.risk_level.in_(["critical", "high"]))
+        .order_by(Risk.created_at.desc())
+        .limit(40)
+        .all()
+    )
+    for r in risks:
+        lvl = r.risk_level.value if hasattr(r.risk_level, "value") else str(r.risk_level or "")
+        events.append({
+            "kind": "risk",
+            "label": f"New {lvl.upper()} risk",
+            "target": r.title,
+            "client_id": r.client_id,
+            "client_name": client_name(r.client_id),
+            "status": (r.status or "open"),
+            "when_iso": (r.created_at or datetime.now(timezone.utc)).isoformat(),
+            "link": f"/risks",
+        })
+
+    # ── Agent runs ───────────────────────────────────────────────────────────
+    aruns = (
+        db.query(AgentRun)
+        .filter(AgentRun.started_at >= cutoff)
+        .order_by(AgentRun.started_at.desc())
+        .limit(40)
+        .all()
+    )
+    for a in aruns:
+        agent_label: Optional[str] = None
+        if isinstance(a.input_data, dict):
+            agent_label = a.input_data.get("agent_name") or a.input_data.get("agent_key")
+        if not agent_label:
+            agent_label = (a.agent_type.value if hasattr(a.agent_type, "value") else str(a.agent_type or "agent")).replace("_", " ").title()
+        events.append({
+            "kind": "agent",
+            "label": f"{agent_label}",
+            "target": None,
+            "client_id": a.client_id,
+            "client_name": client_name(a.client_id),
+            "status": (a.status or "completed"),
+            "when_iso": (a.completed_at or a.started_at or datetime.now(timezone.utc)).isoformat(),
+            "link": f"/scans/{a.scan_id}" if a.scan_id else "/agents",
+        })
+
+    events.sort(key=lambda e: e["when_iso"], reverse=True)
+    return {"days": days, "events": events[:80]}

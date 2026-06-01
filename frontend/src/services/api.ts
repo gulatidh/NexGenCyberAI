@@ -185,6 +185,8 @@ export const aiApi = {
 
 export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
+  activity: (days: number = 3) =>
+    apiClient.get(`/dashboard/activity`, { params: { days } }).then((r) => r.data),
 };
 
 export const riskOverviewApi = {

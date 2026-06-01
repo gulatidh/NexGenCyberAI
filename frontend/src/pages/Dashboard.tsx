@@ -7,6 +7,7 @@ import {
 import {
   BugReport, Security, Warning,
   TrendingUp, People, Cable, SmartToy, ArrowForward,
+  Hub, Schedule, Bolt,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -46,12 +47,37 @@ function StatCard({ title, value, icon, color, subtitle, onClick }: any) {
   );
 }
 
+const ACTIVITY_META: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+  scan:         { color: "#4285F4", icon: <BugReport sx={{ fontSize: 16 }} />, label: "Scans" },
+  threat_model: { color: "#9C27B0", icon: <Hub sx={{ fontSize: 16 }} />,       label: "Threat Models" },
+  workflow:     { color: "#34A853", icon: <Schedule sx={{ fontSize: 16 }} />,  label: "Workflows" },
+  risk:         { color: "#EA4335", icon: <Warning sx={{ fontSize: 16 }} />,   label: "Risks" },
+  agent:        { color: "#FF6D00", icon: <SmartToy sx={{ fontSize: 16 }} />,  label: "Agents" },
+};
+
+interface ActivityEvent {
+  kind: string;
+  label: string;
+  target?: string | null;
+  client_id?: string | null;
+  client_name?: string;
+  status?: string;
+  when_iso: string;
+  link?: string;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [activityFilter, setActivityFilter] = React.useState<string>("all");
   const { data, isLoading } = useQuery<DashboardSummary>({
     queryKey: ["dashboard"],
     queryFn: dashboardApi.summary,
     refetchInterval: 30_000,
+  });
+  const { data: activityResp } = useQuery<{ days: number; events: ActivityEvent[] }>({
+    queryKey: ["dashboard-activity", 3],
+    queryFn: () => dashboardApi.activity(3),
+    refetchInterval: 60_000,
   });
 
   if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
@@ -185,6 +211,104 @@ export default function Dashboard() {
                   );
                 })}
               </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Unified Activity Feed (last 3 days) */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12 }}>
+          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <CardContent>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Bolt sx={{ color: "#FBBC04", fontSize: 22 }} />
+                  <Typography variant="h6" sx={{ color: "white" }}>Activity Feed</Typography>
+                  <Chip label="LAST 3 DAYS" size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", letterSpacing: 0.5 }} />
+                </Box>
+                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                  {(["all", "scan", "threat_model", "workflow", "risk", "agent"]).map((k) => {
+                    const active = activityFilter === k;
+                    const meta = ACTIVITY_META[k];
+                    return (
+                      <Chip
+                        key={k}
+                        label={k === "all" ? "All" : (meta?.label || k)}
+                        size="small"
+                        onClick={() => setActivityFilter(k)}
+                        sx={{
+                          height: 22, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                          bgcolor: active ? (meta ? `${meta.color}25` : "rgba(255,255,255,0.12)") : "rgba(255,255,255,0.04)",
+                          color: active ? (meta?.color || "white") : "rgba(255,255,255,0.65)",
+                          border: active ? `1px solid ${meta ? `${meta.color}80` : "rgba(255,255,255,0.3)"}` : "1px solid transparent",
+                          "&:hover": { bgcolor: meta ? `${meta.color}15` : "rgba(255,255,255,0.08)" },
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+              </Box>
+              {(() => {
+                const events = (activityResp?.events || []).filter((e) => activityFilter === "all" || e.kind === activityFilter);
+                if (!events.length) {
+                  return (
+                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+                      No activity in the last 3 days {activityFilter !== "all" ? `for ${ACTIVITY_META[activityFilter]?.label || activityFilter}` : ""}.
+                    </Typography>
+                  );
+                }
+                return (
+                  <Box sx={{ maxHeight: 360, overflowY: "auto", pr: 0.5 }}>
+                    {events.map((e, idx) => {
+                      const meta = ACTIVITY_META[e.kind] || { color: "rgba(255,255,255,0.4)", icon: <Bolt sx={{ fontSize: 16 }} />, label: e.kind };
+                      const clickable = !!e.link;
+                      return (
+                        <Box
+                          key={`${e.kind}-${idx}-${e.when_iso}`}
+                          onClick={() => clickable && navigate(e.link!)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.5,
+                            p: 1.25, borderRadius: 1.5,
+                            cursor: clickable ? "pointer" : "default",
+                            bgcolor: "rgba(255,255,255,0.02)",
+                            borderLeft: `3px solid ${meta.color}`,
+                            mb: 0.75,
+                            transition: "background-color .12s",
+                            "&:hover": clickable ? { bgcolor: "rgba(255,255,255,0.05)" } : {},
+                          }}
+                        >
+                          <Box sx={{ color: meta.color, display: "flex", alignItems: "center", justifyContent: "center", width: 24 }}>
+                            {meta.icon}
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ color: "white", fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
+                              {e.label}
+                              {e.target && (
+                                <Box component="span" sx={{ color: "rgba(255,255,255,0.55)", fontWeight: 400, ml: 0.75 }}>· {e.target}</Box>
+                              )}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+                              {e.client_name} · {fromNow(e.when_iso)}
+                            </Typography>
+                          </Box>
+                          {e.status && (
+                            <Chip
+                              label={e.status}
+                              size="small"
+                              sx={{
+                                height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                                bgcolor: `${meta.color}1A`,
+                                color: meta.color,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })()}
             </CardContent>
           </Card>
         </Grid>
