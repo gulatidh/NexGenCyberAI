@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -567,6 +568,67 @@ def _clip(v: Any, lo: int, hi: int, default: int) -> int:
         return default
 
 
+def _mm_id(raw_id: Any) -> str:
+    """Mermaid-safe node id: alphanumerics + underscore, never empty, never
+    leading digit (Mermaid rejects those)."""
+    s = re.sub(r"[^A-Za-z0-9_]", "_", _str(raw_id)).strip("_")
+    if not s:
+        return "n"
+    return ("n_" + s) if s[0].isdigit() else s
+
+
+def _mm_label(text: Any) -> str:
+    """Sanitise text for use inside a quoted Mermaid label. Strips the
+    characters that break the parser even when quoted, collapses whitespace,
+    and caps length."""
+    s = _str(text).replace('"', "'").replace("|", "/")
+    s = s.replace("[", "(").replace("]", ")").replace("{", "(").replace("}", ")")
+    s = re.sub(r"[<>]", "", s)          # avoid stray HTML-ish tokens in labels
+    s = " ".join(s.split())
+    return s[:80]
+
+
+def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, Any]]) -> str:
+    """Deterministically render a valid Mermaid `flowchart TD` from the
+    structured DFD. Nodes are grouped into trust-zone subgraphs; edge labels
+    are quoted + sanitised so protocol/data annotations like
+    `https (pii, encrypted)` can't break the parser."""
+    lines: List[str] = ["flowchart TD"]
+    id_map: Dict[str, str] = {}
+    zones: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
+    for c in components:
+        cid = _str(c.get("id"))
+        if not cid:
+            continue
+        nid = _mm_id(cid)
+        id_map[cid] = nid
+        zones.setdefault(_str(c.get("trust_zone")) or "private", []).append((nid, c))
+
+    for zone, comps in zones.items():
+        zlabel = _mm_label(zone.title().replace("-", " ")) or "Zone"
+        lines.append(f'  subgraph {_mm_id("zone_" + zone)}["{zlabel}"]')
+        for nid, c in comps:
+            name = _mm_label(c.get("name") or c.get("id") or "?")
+            ctype = _mm_label(c.get("type") or "")
+            label = f"{name}<br/><small>{ctype}</small>" if ctype else name
+            lines.append(f'    {nid}["{label}"]')
+        lines.append("  end")
+
+    for f in data_flows or []:
+        frm, to = _str(f.get("from")), _str(f.get("to"))
+        if not frm or not to:
+            continue
+        a = id_map.get(frm) or _mm_id(frm)
+        b = id_map.get(to) or _mm_id(to)
+        bits = [x for x in (_str(f.get("protocol")), _str(f.get("data"))) if x]
+        if f.get("encrypted") is True:
+            bits.append("encrypted")
+        lbl = _mm_label(", ".join(bits))
+        lines.append(f'  {a} -->|"{lbl}"| {b}' if lbl else f"  {a} --> {b}")
+
+    return "\n".join(lines)
+
+
 def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
     """Enforce the Phase 8 schema. Threats without evidence_refs are flagged
     `is_grounded=False` (kept, not dropped — UI demotes them so the
@@ -837,26 +899,12 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
             seen_cells.add((comp_id, cat))
 
     # ── DFD ───────────────────────────────────────────────────────────────
-    dfd = _str(raw.get("dfd_mermaid")).strip()
-    if dfd and not dfd.lstrip().startswith("flowchart"):
-        dfd = "flowchart TD\n" + dfd
-    if not dfd:
-        lines = ["flowchart TD"]
-        zones: Dict[str, List[Dict[str, Any]]] = {}
-        for c in components:
-            zone = _str(c.get("trust_zone")) or "private"
-            zones.setdefault(zone, []).append(c)
-        for zone, comps in zones.items():
-            lines.append(f"  subgraph {zone.replace(' ', '_').upper()}[\"{zone.title().replace('-', ' ')}\"]")
-            for c in comps:
-                nid = _str(c['id']) or 'n'
-                name = _str(c['name']) or '?'
-                ctype = _str(c.get('type')) or ''
-                # Two-line label: name on top, type subtle below
-                label = f"{name}<br/><small>{ctype}</small>" if ctype else name
-                lines.append(f'    {nid}["{label}"]')
-            lines.append("  end")
-        dfd = "\n".join(lines)
+    # Always render the diagram deterministically from the structured
+    # components + data_flows. LLM-authored Mermaid frequently has syntax
+    # errors (e.g. unquoted parens in edge labels like `-->|https (pii)|`)
+    # that break the client renderer; building it ourselves from data we
+    # control guarantees valid Mermaid.
+    dfd = _build_mermaid(components, data_flows)
 
     return {
         "executive_summary": _str(raw.get("executive_summary")) or

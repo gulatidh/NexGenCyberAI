@@ -15,7 +15,14 @@ from typing import Any, Dict, List, Tuple
 from sqlalchemy.orm import Session
 
 from api.models.models import ThreatModel
-from services.threat_modeler import METHODOLOGIES, DEFAULT_METHODOLOGY, _normalise
+from services.threat_modeler import (
+    METHODOLOGIES, DEFAULT_METHODOLOGY, THREAT_MODEL_MAX_TOKENS, _normalise,
+)
+
+# Cap how many gap cells we resolve per LLM call so the JSON response stays
+# comfortably within the output-token budget (each cell yields a full threat
+# or a decision). The router can be clicked again to fill the remainder.
+_MAX_CELLS_PER_CALL = 40
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +99,18 @@ async def fill_gaps(
     if not missing_cells:
         return [], []
 
+    # Bound the batch so the response JSON doesn't truncate at the output cap.
+    missing_cells = missing_cells[:_MAX_CELLS_PER_CALL]
+
     methodology = (tm.methodology or DEFAULT_METHODOLOGY).lower()
     spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
 
     try:
         from core.ai_providers import get_llm
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = get_llm(temperature=0.2, max_tokens=4096)
+        # Generous output budget — at the old 4096 cap a multi-cell response
+        # truncated mid-JSON and failed to parse (502).
+        llm = get_llm(temperature=0.2, max_tokens=THREAT_MODEL_MAX_TOKENS)
     except Exception as exc:
         raise RuntimeError(f"LLM unavailable for gap-fill: {exc}")
 
