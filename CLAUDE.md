@@ -1,6 +1,6 @@
 # NexGenCyberAI — Claude Code Context
 
-AI-Powered Cybersecurity Posture Management Platform (branded **DRJ Product**). Multi-tenant SaaS connecting to Azure, AWS, GCP, Entra ID, Okta and running AI security agents (Azure OpenAI / Claude / OpenAI / Gemini / Bedrock). Frontend uses a Google-vibrant dark theme (primary `#4285F4`, secondary `#34A853`, accent `#FBBC04`, danger `#EA4335`, surface `#1E1E1E`).
+AI-Powered Cybersecurity Posture Management Platform (branded **Security Product**). Multi-tenant SaaS connecting to Azure, AWS, GCP, Entra ID, Okta and running AI security agents (Azure OpenAI / Claude / OpenAI / Gemini / Bedrock). Frontend uses a Google-vibrant dark theme (primary `#4285F4`, secondary `#34A853`, accent `#FBBC04`, danger `#EA4335`, surface `#1E1E1E`).
 
 ---
 

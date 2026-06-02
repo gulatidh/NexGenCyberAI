@@ -59,7 +59,7 @@ function LoginPage() {
         AI-Powered Cybersecurity Posture Management
       </p>
       <p style={{ color: "#4285F4", fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, marginTop: 0, marginBottom: 32 }}>
-        A DRJ Product
+        A Security Product
       </p>
       <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Redirecting to Microsoft Entra ID login...</p>
     </div>
