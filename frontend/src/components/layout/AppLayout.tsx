@@ -135,10 +135,10 @@ export default function AppLayout() {
           {expanded && (
             <Box sx={{ whiteSpace: "nowrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                NexGen
+                Aegis<span style={{ color: "#FFFFFF" }}>&nbsp;AI</span>
               </Typography>
               <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
-                A Security Product
+                AI Security Posture
               </Typography>
             </Box>
           )}

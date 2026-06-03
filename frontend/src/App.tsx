@@ -46,20 +46,19 @@ function LoginPage() {
       alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
       <div style={{ fontSize: 64, marginBottom: 16 }}>🛡️</div>
-      <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 32, margin: 0, letterSpacing: "-0.02em" }}>
-        <span style={{ color: "#4285F4" }}>N</span>
+      <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 36, margin: 0, letterSpacing: "-0.02em", fontWeight: 800 }}>
+        <span style={{ color: "#4285F4" }}>A</span>
         <span style={{ color: "#EA4335" }}>e</span>
-        <span style={{ color: "#FBBC04" }}>x</span>
-        <span style={{ color: "#4285F4" }}>G</span>
-        <span style={{ color: "#34A853" }}>e</span>
-        <span style={{ color: "#EA4335" }}>n</span>
-        <span style={{ color: "#FFFFFF" }}>CyberAI</span>
+        <span style={{ color: "#FBBC04" }}>g</span>
+        <span style={{ color: "#4285F4" }}>i</span>
+        <span style={{ color: "#34A853" }}>s</span>
+        <span style={{ color: "#FFFFFF" }}>{" AI"}</span>
       </h1>
       <p style={{ color: "rgba(255,255,255,0.5)", fontFamily: "Inter, sans-serif", marginBottom: 8 }}>
-        AI-Powered Cybersecurity Posture Management
+        AI-Powered Security Posture &amp; Threat Modeling
       </p>
-      <p style={{ color: "#4285F4", fontFamily: "Inter, sans-serif", fontSize: 12, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, marginTop: 0, marginBottom: 32 }}>
-        A Security Product
+      <p style={{ color: "#4285F4", fontFamily: "Inter, sans-serif", fontSize: 13, letterSpacing: 0.5, fontWeight: 600, marginTop: 0, marginBottom: 32 }}>
+        See your risk. Model your threats. Fix what matters.
       </p>
       <p style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Redirecting to Microsoft Entra ID login...</p>
     </div>

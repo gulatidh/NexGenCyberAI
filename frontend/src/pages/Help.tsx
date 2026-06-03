@@ -47,7 +47,7 @@ const GROUPS: Group[] = [
     topics: [
       {
         id: "sign-in",
-        title: "Sign in to NexGenCyberAI",
+        title: "Sign in to Aegis AI",
         summary: "Use your work Microsoft account — there's no separate password to manage.",
         steps: [
           { text: "Open the platform URL provided by your administrator." },
