@@ -10,6 +10,7 @@
  * methodology threat table live.
  */
 import React, { useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import {
   Box, Typography, Card, CardContent, Button, Chip, Grid, IconButton,
   Tooltip, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle,
@@ -63,6 +64,7 @@ const ACCEPTED_UPLOAD = ".drawio,.xml,.pdf,.jpg,.jpeg,.png";
 export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { canAct } = useViewMode();
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [openCreate, setOpenCreate] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
@@ -179,7 +181,7 @@ export default function ThreatModels() {
             </Select>
           </FormControl>
           <Button variant="outlined" startIcon={<UploadFile />}
-            disabled={!selectedClientId}
+            disabled={!selectedClientId || !canAct}
             onClick={() => setOpenUpload(true)}
             sx={{
               color: "text.secondary",
@@ -188,11 +190,15 @@ export default function ThreatModels() {
             }}>
             Upload Diagram
           </Button>
-          <Button variant="contained" startIcon={<Add />}
-            disabled={!selectedClientId}
-            onClick={() => setOpenCreate(true)}>
-            New Threat Model
-          </Button>
+          <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to generate models." : ""}>
+            <span>
+              <Button variant="contained" startIcon={<Add />}
+                disabled={!selectedClientId || !canAct}
+                onClick={() => setOpenCreate(true)}>
+                New Threat Model
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -243,9 +249,9 @@ export default function ThreatModels() {
                         <DeleteOutlined sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Tooltip>
-                    <Tooltip title={inFlight ? "Re-model disabled while generation is in progress" : "Re-model (keeps history)"}>
+                    <Tooltip title={!canAct ? "Read-only in Executive mode" : inFlight ? "Re-model disabled while generation is in progress" : "Re-model (keeps history)"}>
                       <span>
-                        <IconButton size="small" disabled={inFlight || rescanMutation.isPending}
+                        <IconButton size="small" disabled={inFlight || rescanMutation.isPending || !canAct}
                           onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(m); }}
                           sx={{
                             color: "text.secondary",

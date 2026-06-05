@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
-  IconButton, Chip, Tooltip, Collapse,
+  IconButton, Chip, Tooltip, Collapse, ToggleButton, ToggleButtonGroup,
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
@@ -11,7 +11,7 @@ import {
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
-  ExpandLess, ExpandMore,
+  ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import NotificationBell from "./NotificationBell";
 import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
 import { useThemeMode } from "../../theme/ThemeModeContext";
+import { useViewMode } from "../../theme/ViewModeContext";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -87,6 +88,7 @@ export default function AppLayout() {
   const [themeAnchor, setThemeAnchor] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode, setMode, customPalette, setCustomPalette } = useThemeMode();
+  const { mode: viewMode, setMode: setViewMode } = useViewMode();
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -350,6 +352,25 @@ export default function AppLayout() {
               </IconButton>
             </Tooltip>
             <Box sx={{ flexGrow: 1 }} />
+            <Tooltip title={viewMode === "executive"
+              ? "Executive — read-only: dashboards & reports. Switch to Analyst to run jobs."
+              : "Analyst — full access: initiate scans, agents, threat models, syncs."}>
+              <ToggleButtonGroup
+                size="small" exclusive value={viewMode}
+                onChange={(_, v) => { if (v) setViewMode(v); }}
+                sx={{
+                  mr: 2,
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none", py: 0.3, px: 1, fontSize: 12,
+                    color: "text.secondary", borderColor: "divider",
+                  },
+                  "& .Mui-selected": { color: "#4285F4 !important", bgcolor: "rgba(66,133,244,0.12) !important" },
+                }}
+              >
+                <ToggleButton value="executive"><VisibilityOutlined sx={{ fontSize: 15, mr: 0.5 }} />Executive</ToggleButton>
+                <ToggleButton value="analyst"><Engineering sx={{ fontSize: 16, mr: 0.5 }} />Analyst</ToggleButton>
+              </ToggleButtonGroup>
+            </Tooltip>
             <Typography
               sx={{
                 fontFamily: '"Inter", sans-serif',
@@ -360,9 +381,8 @@ export default function AppLayout() {
                 display: { xs: "none", sm: "block" },
               }}
             >
-              <Box component="span" sx={{ color: "#4285F4" }}>D</Box>
-              <Box component="span" sx={{ color: "#EA4335" }}>R</Box>
-              <Box component="span" sx={{ color: "#FBBC04" }}>J</Box>
+              <Box component="span" sx={{ color: "#4285F4" }}>Aegis</Box>
+              <Box component="span" sx={{ color: "text.primary" }}> AI</Box>
             </Typography>
             <Chip
               label="LIVE"

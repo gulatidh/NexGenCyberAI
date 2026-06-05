@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeModeProvider } from "./theme/ThemeModeContext";
+import { ViewModeProvider } from "./theme/ViewModeContext";
 import { MsalAuthenticationTemplate } from "@azure/msal-react";
 import { InteractionType } from "@azure/msal-browser";
 import { ToastContainer } from "react-toastify";
@@ -72,6 +73,7 @@ export default function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
+         <ViewModeProvider>
           <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
           <MsalAuthenticationTemplate
             interactionType={InteractionType.Redirect}
@@ -182,6 +184,7 @@ export default function App() {
               </Routes>
             </BrowserRouter>
           </MsalAuthenticationTemplate>
+         </ViewModeProvider>
         </ThemeModeProvider>
       </QueryClientProvider>
     </AuthProvider>

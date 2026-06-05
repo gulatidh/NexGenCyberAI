@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import {
   Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -85,6 +86,7 @@ const SCANNERS: ScannerDef[] = [
 const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency"];
 
 export default function Scans() {
+  const { canAct } = useViewMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -226,14 +228,18 @@ export default function Scans() {
           <Button variant="outlined" startIcon={<Refresh />}
             onClick={() => refetchTiles()}
             sx={{ borderColor: "divider", color: "text.secondary" }}>Refresh</Button>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            disabled={clients.length === 0}
-            onClick={() => setOpen(true)}
-          >
-            New Assessment
-          </Button>
+          <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to run scans." : ""}>
+            <span>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                disabled={clients.length === 0 || !canAct}
+                onClick={() => setOpen(true)}
+              >
+                New Assessment
+              </Button>
+            </span>
+          </Tooltip>
         </Box>
       </Box>
 

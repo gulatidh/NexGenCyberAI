@@ -9,6 +9,7 @@
  * Polls every 4s while the model is in pending/generating state.
  */
 import React, { useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
@@ -112,6 +113,7 @@ function prettyCat(s: string): string {
 }
 
 export default function ThreatModelDetail() {
+  const { canAct } = useViewMode();
   const { modelId } = useParams<{ modelId: string }>();
   const [search] = useSearchParams();
   const clientId = search.get("client") || "";
@@ -311,9 +313,9 @@ export default function ThreatModelDetail() {
           Threat Models
         </Button>
         <Box sx={{ flex: 1 }} />
-        <Tooltip title={inFlight ? "Re-model disabled while generating" : "Re-model — keeps history"}>
+        <Tooltip title={!canAct ? "Read-only in Executive mode" : inFlight ? "Re-model disabled while generating" : "Re-model — keeps history"}>
           <span>
-            <Button startIcon={<Replay />} size="small" disabled={inFlight || rescanMutation.isPending}
+            <Button startIcon={<Replay />} size="small" disabled={inFlight || rescanMutation.isPending || !canAct}
               onClick={() => rescanMutation.mutate()}
               sx={{ color: "text.secondary" }}>
               Re-model
@@ -738,8 +740,8 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">STRIDE Coverage Matrix</Typography>}
           <CoverageMatrixView
             data={data}
-            onFillGaps={() => fillGapsMutation.mutate(undefined)}
-            onFillCells={(cells) => fillGapsMutation.mutate(cells)}
+            onFillGaps={canAct ? () => fillGapsMutation.mutate(undefined) : undefined}
+            onFillCells={canAct ? (cells) => fillGapsMutation.mutate(cells) : undefined}
             onThreatClick={(tid) => {
               const t = (data.threats || []).find((x) => x.id === tid);
               if (t) setThreatPopup(t);

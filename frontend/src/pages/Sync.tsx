@@ -10,6 +10,7 @@
  * (matches the Admin page guard).
  */
 import React, { useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import {
   Box, Typography, Card, CardContent, Button, Chip, Alert,
   CircularProgress, Grid, LinearProgress, Tooltip,
@@ -74,6 +75,7 @@ function FeedTile({
   onView: () => void;
   lastResult?: FeedResult;
 }) {
+  const { canAct } = useViewMode();
   const color = CATEGORY_COLOR[feed.category] || "#4285F4";
   const synced = !!feed.last_synced_at;
   const hasError = lastResult && !lastResult.ok;
@@ -175,7 +177,7 @@ function FeedTile({
             variant="outlined"
             size="small"
             startIcon={syncing ? <CircularProgress size={14} sx={{ color }} /> : <Sync />}
-            disabled={syncing}
+            disabled={syncing || !canAct}
             onClick={onSync}
             sx={{
               flex: 1, color, borderColor: `${color}60`, textTransform: "none", fontWeight: 600,
@@ -266,6 +268,7 @@ function SyncEntriesDrawer({ feed, onClose }: { feed: SyncFeed | null; onClose: 
 }
 
 export default function ThreatIntel() {
+  const { canAct } = useViewMode();
   const qc = useQueryClient();
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [allSyncing, setAllSyncing] = useState(false);
@@ -348,7 +351,7 @@ export default function ThreatIntel() {
           variant="contained"
           size="large"
           startIcon={allSyncing ? <CircularProgress size={18} sx={{ color: "text.primary" }} /> : <Sync />}
-          disabled={allSyncing || !!syncingId}
+          disabled={allSyncing || !!syncingId || !canAct}
           onClick={() => syncAll.mutate()}
           sx={{
             bgcolor: "#4285F4", color: "text.primary", textTransform: "none", fontWeight: 700,

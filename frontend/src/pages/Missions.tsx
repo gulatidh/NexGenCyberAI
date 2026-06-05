@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import {
   Box, Typography, Card, Chip, Button, IconButton, Switch, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -76,6 +77,7 @@ interface Mission {
 
 export default function Missions() {
   const qc = useQueryClient();
+  const { canAct } = useViewMode();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Mission | null>(null);
 
@@ -172,10 +174,14 @@ export default function Missions() {
             Pre-configured security workflows that run on a recurring schedule
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />}
-          onClick={() => { resetForm(); setOpen(true); }}>
-          Schedule Workflow
-        </Button>
+        <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to schedule workflows." : ""}>
+          <span>
+            <Button variant="contained" startIcon={<Add />} disabled={!canAct}
+              onClick={() => { resetForm(); setOpen(true); }}>
+              Schedule Workflow
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {isLoading ? (
@@ -245,12 +251,14 @@ export default function Missions() {
                       </Box>
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Run now">
-                        <IconButton size="small" disabled={runNowMutation.isPending}
-                          onClick={() => runNowMutation.mutate(m.id)}
-                          sx={{ color: "#34A853" }}>
-                          <PlayArrow sx={{ fontSize: 18 }} />
-                        </IconButton>
+                      <Tooltip title={!canAct ? "Read-only in Executive mode" : "Run now"}>
+                        <span>
+                          <IconButton size="small" disabled={runNowMutation.isPending || !canAct}
+                            onClick={() => runNowMutation.mutate(m.id)}
+                            sx={{ color: "#34A853" }}>
+                            <PlayArrow sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                       <Tooltip title="Run history & outputs">
                         <IconButton size="small" onClick={() => setHistoryMission(m)}

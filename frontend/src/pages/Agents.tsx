@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useViewMode } from "../theme/ViewModeContext";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
@@ -243,6 +244,7 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
 
 export default function Agents() {
   const qc = useQueryClient();
+  const { canAct } = useViewMode();
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedScanId, setSelectedScanId] = useState("");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
@@ -397,14 +399,14 @@ export default function Agents() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                           {agent.legacy_orchestrator ? (
                             <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                              disabled={!selectedClientId || runMutation.isPending}
+                              disabled={!selectedClientId || runMutation.isPending || !canAct}
                               onClick={() => runMutation.mutate(agent.key as AgentType)}
                               sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
                               Run
                             </Button>
                           ) : (
                             <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                              disabled={!agent.is_enabled}
+                              disabled={!agent.is_enabled || !canAct}
                               onClick={() => {
                                 setBriefingAgent(agent);
                                 setBriefingPrompt("");
