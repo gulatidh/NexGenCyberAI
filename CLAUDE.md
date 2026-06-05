@@ -297,6 +297,8 @@ On-demand threat models scoped to a client (and optionally a project / asset). F
 
 `progress_json` is a JSON column (idempotent ALTER TABLE in `main.py::_ensure_added_columns`), surfaced on `ThreatModelSummary`/`_summary_from` as `progress`. `_set_step()` uses `flag_modified` so in-place dict mutations are tracked. Orphaned `generating` rows (worker died mid-run) are self-healed by `main.py::_fail_stale_threat_models()` on startup (>20 min → `failed`).
 
+**Scope**: a model is scoped to `client` (default), `project`, `asset`, or **`scans`**. When `scope_type='scans'`, `scope_scan_ids` (JSON column) holds the chosen scan IDs — `_collect_scope` pulls findings from exactly those scans and narrows assets to the connectors those scans ran against, so one model = one environment (avoids messy client-wide aggregates). The create dialog has a multi-scan picker. Stale/deleted assets are excluded from all scopes (except an explicit single-asset scope). DFD: `_build_mermaid` prepends service-type icons to nodes; `DfdDiagram.tsx` colours trust-zone subgraphs at render (Internet=red/DMZ=amber/Private=green/data=purple/mgmt=blue). Coverage matrix supports selective gap-fill (pick cells → "Fill selected") and clicking a threat cell opens the threat.
+
 **Versioning**: `parent_threat_model_id` mirrors the `Scan.parent_scan_id` flat-sibling chain — first ancestor with `parent_threat_model_id IS NULL` is the root. Rescan creates a new row linked to the root; list endpoint collapses to newest sibling per root.
 
 **Library tooltip**: Frontend `ThreatLibraryChip.tsx` lazy-fetches `GET /threat-models/library/{source}/{source_id}` on hover and shows `source_id · name · category · description · CWEs`. Returns 404 with a "run Sync" hint when the entry isn't cached yet.
