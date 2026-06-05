@@ -1,0 +1,174 @@
+name: OWASP Dependency-Check Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Clones a target
+# repo, runs OWASP Dependency-Check (SCA — matches dependencies to known CVEs),
+# then POSTs findings to /api/v1/scans/ingest/.
+#
+# Note: Dependency-Check downloads the NVD CVE database on first run. Supply an
+# NVD API key (config key `nvd_api_key`) to avoid NVD rate-limiting / long waits.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  depcheck:
+    name: Run OWASP Dependency-Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.parse as up
+          c = json.load(open("cfg.json"))
+          repo = c.get("repo_url") or ""
+          user = c.get("git_username") or "x-access-token"
+          tok = c.get("git_token") or ""
+          if repo.startswith("https://") and tok:
+              host_and_path = repo[len("https://"):]
+              repo_auth = f"https://{up.quote(user, safe='')}:{up.quote(tok, safe='')}@{host_and_path}"
+          else:
+              repo_auth = repo
+          print(f"repo_url={repo}")
+          print(f"repo_clone_url={repo_auth}")
+          PY
+          # NVD API key (optional) is read separately so it never lands in an output.
+          python3 -c "import json;print('has_nvd_key=' + ('1' if (json.load(open('cfg.json')).get('nvd_api_key') or '').strip() else '0'))" >> "$GITHUB_OUTPUT"
+
+      - name: Clone target repo
+        if: steps.cfg.outputs.repo_url != ''
+        run: git clone --depth 1 "${{ steps.cfg.outputs.repo_clone_url }}" target
+
+      - name: Install Dependency-Check
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          DC_VERSION=10.0.4
+          wget -q "https://github.com/jeremylong/DependencyCheck/releases/download/v${DC_VERSION}/dependency-check-${DC_VERSION}-release.zip" -O dc.zip
+          unzip -q dc.zip
+          ./dependency-check/bin/dependency-check.sh --version
+
+      - name: Run Dependency-Check
+        if: steps.cfg.outputs.repo_url != ''
+        env:
+          # Pull the NVD key from cfg.json without echoing it.
+          HAS_KEY: ${{ steps.cfg.outputs.has_nvd_key }}
+        run: |
+          set -euo pipefail
+          NVD_ARG=""
+          if [ "$HAS_KEY" = "1" ]; then
+            KEY=$(python3 -c "import json;print(json.load(open('cfg.json')).get('nvd_api_key','').strip())")
+            NVD_ARG="--nvdApiKey $KEY"
+          fi
+          mkdir -p reports
+          ./dependency-check/bin/dependency-check.sh \
+            --scan target --format JSON --prettyPrint --out reports \
+            --project "NexGenCyberAI-SCA" --failOnCVSS 11 $NVD_ARG || true
+          ls -la reports || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          findings = []
+          err = None
+          repo = os.environ.get("REPO_URL", "")
+          report_path = "reports/dependency-check-report.json"
+          SEV_MAP = {"critical": "critical", "high": "high", "medium": "medium",
+                     "moderate": "medium", "low": "low", "info": "info", "informational": "info"}
+
+          if os.path.exists(report_path):
+              try:
+                  data = json.load(open(report_path))
+                  for dep in data.get("dependencies", []) or []:
+                      vulns = dep.get("vulnerabilities") or []
+                      if not vulns:
+                          continue
+                      fname = dep.get("fileName") or dep.get("filePath") or "dependency"
+                      for v in vulns:
+                          cve = v.get("name") or ""
+                          sev = SEV_MAP.get((v.get("severity") or "").strip().lower(), "info")
+                          cvss = None
+                          for k in ("cvssv3", "cvssv4"):
+                              node = v.get(k) or {}
+                              cvss = node.get("baseScore") or node.get("cvssData", {}).get("baseScore")
+                              if cvss:
+                                  break
+                          if not cvss:
+                              cvss = (v.get("cvssv2") or {}).get("score")
+                          findings.append({
+                              "title": f"Vulnerable dependency: {fname} ({cve})" if cve else f"Vulnerable dependency: {fname}",
+                              "description": (v.get("description") or "")[:4000],
+                              "severity": sev,
+                              "resource_id": fname,
+                              "resource_type": "dependency",
+                              "control_id": cve or "OWASP-DC",
+                              "cve_id": cve if cve.upper().startswith("CVE-") else None,
+                              "cvss_score": float(cvss) if cvss else None,
+                              "remediation": "Upgrade the affected dependency to a fixed version; review the CVE advisory for the patched release.",
+                              "evidence": {
+                                  "file": fname,
+                                  "cve": cve,
+                                  "source": (v.get("source") or ""),
+                                  "references": [r.get("url") for r in (v.get("references") or [])][:5],
+                              },
+                              "control_mappings": {},
+                          })
+              except Exception as e:
+                  err = f"Failed to parse Dependency-Check report: {e}"
+          elif not repo:
+              err = "No repo_url configured for scan"
+          else:
+              err = "Dependency-Check produced no report — the scan may have failed (often an NVD download/rate-limit issue; add an NVD API key)."
+
+          payload = {"scan_id": os.environ["SCAN_ID"],
+                     "scan_token": os.environ["SCAN_TOKEN"],
+                     "findings": findings,
+                     "error": err if not findings and err else None}
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}, method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY
