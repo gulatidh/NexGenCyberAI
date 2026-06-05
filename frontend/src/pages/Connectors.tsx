@@ -177,7 +177,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   nmap: "Scan a single host, IP, or CIDR. Requires explicit written authorisation from the network owner. Runs `nmap -Pn -sS -sV --top-ports 1000 --script=default,safe,vuln` inside GitHub Actions and posts findings back.",
   openvas: "Greenbone/OpenVAS scans the target IP/CIDR with the default profile. Workflow coming soon.",
   trivy: "Provide either a container image OR a Git repo URL. Image scans hit the registry; repo scans pull manifests + IaC for misconfigs and CVEs.",
-  owasp_dc: "Scans dependency manifests in the cloned repo. Workflow coming soon.",
+  owasp_dc: "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks: "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets (where TruffleHog can ping the issuer) are flagged critical.",
 };

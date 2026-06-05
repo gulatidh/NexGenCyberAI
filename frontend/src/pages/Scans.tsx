@@ -74,8 +74,8 @@ const SCANNERS: ScannerDef[] = [
   { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
     description: "Container image + filesystem + IaC scanner. Runs in GitHub Actions." },
   // Dependency / Secret
-  { id: "owasp_dc", name: "OWASP Dependency-Check", connectorType: "owasp_dc", category: "dependency", status: "soon",
-    description: "SCA / CVE matching for application dependencies. Workflow coming soon." },
+  { id: "owasp_dc", name: "OWASP Dependency-Check", connectorType: "owasp_dc", category: "dependency", status: "live",
+    description: "SCA / CVE matching for application dependencies. Clones the repo and runs Dependency-Check in GitHub Actions (add an NVD API key to avoid rate-limits)." },
   { id: "gitleaks", name: "Gitleaks", connectorType: "gitleaks", category: "dependency", status: "live",
     description: "Secret scanner for git history. Runs in GitHub Actions." },
   { id: "trufflehog", name: "TruffleHog", connectorType: "trufflehog", category: "dependency", status: "live",
