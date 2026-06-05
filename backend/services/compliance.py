@@ -58,6 +58,22 @@ def derive_status_for_control(
     return ControlStatus.NOT_APPLICABLE
 
 
+def _auto_evidence(status_value: str, n_open: int, n_hist: int, covered: bool) -> str:
+    """Human-readable rationale for an auto-derived control status, so the
+    compliance report shows *why* every control is in its state — not a blank
+    evidence cell for the compliant / not-applicable majority. Prefixed
+    'Auto:' so a later manual/Defender edit is never clobbered."""
+    if status_value == "non_compliant":
+        return f"Auto: {n_open} open finding(s) mapped to this control require remediation."
+    if status_value == "partial":
+        return f"Auto: {n_open} open of {n_hist} mapped finding(s) — partially addressed."
+    if status_value == "compliant":
+        if n_hist:
+            return f"Auto: {n_hist} mapped finding(s), none currently open — control satisfied."
+        return "Auto: exercised by a scan with no failing findings mapped to this control."
+    return "Auto: not evaluated — no scan or finding signal maps to this control yet."
+
+
 def recompute_client_framework(
     db: Session, client_id: str, framework: FrameworkType,
 ) -> Dict[str, int]:
@@ -171,6 +187,7 @@ def recompute_client_framework(
             )
             continue
 
+        ev = _auto_evidence(derived_status.value, len(opens), len(hists), key in covered_set)
         if existing_row is None:
             existing_row = ClientControlStatus(
                 client_id=client_id,
@@ -178,6 +195,7 @@ def recompute_client_framework(
                 status=derived_status,
                 derived=True,
                 derived_finding_ids=hists,
+                evidence=ev,
                 last_evaluated_at=now,
             )
             db.add(existing_row)
@@ -185,6 +203,9 @@ def recompute_client_framework(
             existing_row.status = derived_status
             existing_row.derived = True
             existing_row.derived_finding_ids = hists
+            # Refresh auto-evidence, but never clobber a manual/Defender note.
+            if not existing_row.evidence or str(existing_row.evidence).startswith("Auto:"):
+                existing_row.evidence = ev
             existing_row.last_evaluated_at = now
 
         # Skip categories/functions (weight=0) for counting; they're parents

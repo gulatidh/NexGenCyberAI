@@ -528,10 +528,15 @@ export default function Frameworks() {
                               <TableCell sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
                                 {item.control.control_id}
                               </TableCell>
-                              <TableCell sx={{ color: "text.primary", fontSize: 13, maxWidth: 600 }}>
-                                <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <TableCell sx={{ color: "text.primary", fontSize: 13 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {item.control.title}
                                 </Typography>
+                                {item.control.description && (
+                                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25, whiteSpace: "pre-wrap", lineHeight: 1.4 }}>
+                                    {item.control.description}
+                                  </Typography>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Chip label={STATUS_LABEL[item.status]} size="small"
