@@ -205,6 +205,16 @@ def _ensure_added_columns() -> None:
                 logger.info("Added threat_models.scope_scan_ids column (%s)", dialect)
             except Exception as exc:
                 logger.warning("threat_models.scope_scan_ids ALTER failed: %s", exc)
+        if tm_cols and "source_diagram" not in tm_cols:
+            ddl = ("ALTER TABLE threat_models ADD source_diagram NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE threat_models ADD COLUMN source_diagram TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added threat_models.source_diagram column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("threat_models.source_diagram ALTER failed: %s", exc)
 
         # Add risks.source_threat_model_id + risks.source_threat_id — pin a
         # Risk row back to the threat it was converted from so the UI can

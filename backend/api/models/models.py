@@ -505,6 +505,10 @@ class ThreatModel(Base):
     scope_type = Column(String(32))   # "client" | "project" | "asset" | "scans"
     scope_id = Column(String(36))     # null for client-wide
     scope_scan_ids = Column(JSON)     # list of scan IDs when scope_type == "scans"
+    # Original uploaded diagram image ({mime, b64}) for image uploads, so the
+    # threat step can show the AI the actual diagram (vision), not just the
+    # extracted component list.
+    source_diagram = Column(JSON)
     framework = Column(SAEnum(FrameworkType, values_callable=_ev))
     # Threat modelling methodology — string (not enum) so adding new
     # methodologies later doesn't require a DB migration. Currently

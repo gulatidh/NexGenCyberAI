@@ -29,6 +29,8 @@ from services.threat_modeler import (
 # images we expect to be small. 10 MB is plenty for any reasonable
 # architecture diagram and protects the API from accidental abuse.
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# Cap the diagram image we keep for the vision pass-through (token/cost sane).
+_MAX_DIAGRAM_IMG_BYTES = 4 * 1024 * 1024
 
 
 # Severity → (likelihood, impact, RiskLevel) for the threat→risk mapping.
@@ -396,6 +398,7 @@ async def rescan(
         scope_type=original.scope_type,
         scope_id=original.scope_id,
         scope_scan_ids=original.scope_scan_ids,
+        source_diagram=original.source_diagram,
         framework=original.framework,
         methodology=original.methodology or DEFAULT_METHODOLOGY,
         status="pending",
@@ -594,6 +597,18 @@ async def create_from_diagram(
         except ValueError:
             chosen_framework = None
 
+    # Keep the original image so the threat step can show the AI the actual
+    # diagram (vision), not just the extracted component list. Images only —
+    # drawio is already precise, and PDFs would need rendering. Cap size to
+    # keep the multimodal payload / token cost sane.
+    source_diagram = None
+    if extracted.get("source") == "image" and len(data) <= _MAX_DIAGRAM_IMG_BYTES:
+        import base64 as _b64
+        source_diagram = {
+            "mime": file.content_type or "image/png",
+            "b64": _b64.b64encode(data).decode("ascii"),
+        }
+
     fallback_name = (file.filename or "Diagram upload").rsplit(".", 1)[0]
     tm = ThreatModel(
         client_id=client_id,
@@ -607,6 +622,7 @@ async def create_from_diagram(
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
         components_json=extracted["components"],
         data_flows_json=extracted["data_flows"],
+        source_diagram=source_diagram,
         threats_json=[],
         mitigations_json=[],
         dfd_mermaid=None,

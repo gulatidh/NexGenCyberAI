@@ -1046,6 +1046,7 @@ async def _invoke_llm(
     library: Optional[List[Dict[str, Any]]] = None,
     preset_components: Optional[List[Dict[str, Any]]] = None,
     preset_data_flows: Optional[List[Dict[str, Any]]] = None,
+    diagram_image: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Call configured LLM. Returns the normalised model. Falls back to a
     deterministic skeleton when no provider is available."""
@@ -1061,25 +1062,53 @@ async def _invoke_llm(
         scope, framework, methodology, library=library,
         preset_components=preset_components, preset_data_flows=preset_data_flows,
     )
+
+    # When an uploaded diagram image is available, attach it so a vision model
+    # threat-models from the actual picture, not just the extracted component
+    # list. Built as a multimodal HumanMessage; falls back to text-only if the
+    # provider/model can't accept images.
+    text_message = lambda: [
+        SystemMessage(content=_build_system_prompt(methodology)),
+        HumanMessage(content=user_prompt),
+    ]
+    messages = text_message()
+    if diagram_image and diagram_image.get("b64"):
+        data_uri = f"data:{diagram_image.get('mime', 'image/png')};base64,{diagram_image['b64']}"
+        messages = [
+            SystemMessage(content=_build_system_prompt(methodology)),
+            HumanMessage(content=[
+                {"type": "text", "text": user_prompt + (
+                    "\n\nThe customer's architecture diagram is attached as an image. "
+                    "Treat it as authoritative: validate and enrich the listed components, "
+                    "trace data flows and trust boundaries you can see, and flag exposed "
+                    "entry points — then identify threats grounded in that diagram."
+                )},
+                {"type": "image_url", "image_url": {"url": data_uri}},
+            ]),
+        ]
+
     try:
         # Bound the call so a stalled provider connection can't leave the
-        # threat model wedged in 'generating' forever (the worker would just
-        # await indefinitely with nothing to interrupt it).
-        result = await asyncio.wait_for(
-            llm.ainvoke([
-                SystemMessage(content=_build_system_prompt(methodology)),
-                HumanMessage(content=user_prompt),
-            ]),
-            timeout=LLM_TIMEOUT_SECONDS,
-        )
+        # threat model wedged in 'generating' forever.
+        result = await asyncio.wait_for(llm.ainvoke(messages), timeout=LLM_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         logger.warning("Threat modeler LLM call timed out after %ss", LLM_TIMEOUT_SECONDS)
         return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,
                                                "error": f"LLM call timed out after {LLM_TIMEOUT_SECONDS}s"}
     except Exception as exc:
-        logger.exception("Threat modeler LLM call failed")
-        return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,
-                                               "error": f"{type(exc).__name__}: {exc}"}
+        # A vision-incapable provider rejects the image part — retry text-only.
+        if diagram_image and diagram_image.get("b64"):
+            logger.warning("Vision call failed (%s); retrying text-only", type(exc).__name__)
+            try:
+                result = await asyncio.wait_for(llm.ainvoke(text_message()), timeout=LLM_TIMEOUT_SECONDS)
+            except Exception as exc2:
+                logger.exception("Threat modeler LLM call failed (after vision fallback)")
+                return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,
+                                                       "error": f"{type(exc2).__name__}: {exc2}"}
+        else:
+            logger.exception("Threat modeler LLM call failed")
+            return _skeleton(scope, methodology), {"provider": "fallback", "model": None, "tokens": 0,
+                                                   "error": f"{type(exc).__name__}: {exc}"}
 
     text = result.content if hasattr(result, "content") else str(result)
     if isinstance(text, list):
@@ -1320,6 +1349,7 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         model, meta = await _invoke_llm(
             scope, fw, methodology, library=library,
             preset_components=pinned_components, preset_data_flows=diagram_data_flows,
+            diagram_image=tm.source_diagram,
         )
         threats_out = model.get("threats") or []
         has_arch = bool(pinned_components or model.get("components"))
