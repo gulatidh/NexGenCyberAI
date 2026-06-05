@@ -76,22 +76,32 @@ jobs:
           unzip -q dc.zip
           ./dependency-check/bin/dependency-check.sh --version
 
+      # Persist the NVD CVE database between runs — building it is the slow
+      # part. restore-keys pulls the newest prior cache; a fresh key saves an
+      # updated copy each run.
+      - name: Cache NVD database
+        if: steps.cfg.outputs.repo_url != '' && steps.cfg.outputs.has_nvd_key == '1'
+        uses: actions/cache@v4
+        with:
+          path: dc-data
+          key: dependency-check-nvd-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-nvd-
+
+      # Only runs WITH an NVD API key — keyless NVD updates are throttled to
+      # hours and would hang the job. No key → step is skipped and the post
+      # step reports a clear "add an NVD API key" error so the scan ends.
       - name: Run Dependency-Check
-        if: steps.cfg.outputs.repo_url != ''
-        env:
-          # Pull the NVD key from cfg.json without echoing it.
-          HAS_KEY: ${{ steps.cfg.outputs.has_nvd_key }}
+        if: steps.cfg.outputs.repo_url != '' && steps.cfg.outputs.has_nvd_key == '1'
+        timeout-minutes: 45
         run: |
           set -euo pipefail
-          NVD_ARG=""
-          if [ "$HAS_KEY" = "1" ]; then
-            KEY=$(python3 -c "import json;print(json.load(open('cfg.json')).get('nvd_api_key','').strip())")
-            NVD_ARG="--nvdApiKey $KEY"
-          fi
-          mkdir -p reports
+          KEY=$(python3 -c "import json;print(json.load(open('cfg.json')).get('nvd_api_key','').strip())")
+          mkdir -p reports dc-data
           ./dependency-check/bin/dependency-check.sh \
             --scan target --format JSON --prettyPrint --out reports \
-            --project "NexGenCyberAI-SCA" --failOnCVSS 11 $NVD_ARG || true
+            --project "NexGenCyberAI-SCA" --failOnCVSS 11 \
+            --data dc-data --nvdApiKey "$KEY" --nvdApiDelay 2000 || true
           ls -la reports || true
 
       - name: Post findings to API
@@ -101,6 +111,7 @@ jobs:
           SCAN_ID: ${{ inputs.scan_id }}
           SCAN_TOKEN: ${{ inputs.scan_token }}
           REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+          HAS_KEY: ${{ steps.cfg.outputs.has_nvd_key }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -153,8 +164,13 @@ jobs:
                   err = f"Failed to parse Dependency-Check report: {e}"
           elif not repo:
               err = "No repo_url configured for scan"
+          elif os.environ.get("HAS_KEY") != "1":
+              err = ("OWASP Dependency-Check needs a free NVD API key to download the CVE "
+                     "database (keyless downloads are throttled to hours). Add 'nvd_api_key' "
+                     "to the connector — request one at "
+                     "https://nvd.nist.gov/developers/request-an-api-key — then re-run the scan.")
           else:
-              err = "Dependency-Check produced no report — the scan may have failed (often an NVD download/rate-limit issue; add an NVD API key)."
+              err = "Dependency-Check produced no report — see the GitHub Actions run logs for this scan."
 
           payload = {"scan_id": os.environ["SCAN_ID"],
                      "scan_token": os.environ["SCAN_TOKEN"],

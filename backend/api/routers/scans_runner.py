@@ -68,6 +68,7 @@ async def get_scan_runtime_config(
                 "repo_url", "image", "target",
                 "git_username", "git_token",
                 "sonar_host_url", "sonar_project_key", "sonar_token",
+                "nvd_api_key",
             ):
                 v = cfg.get(key) or creds.get(key)
                 if v:
