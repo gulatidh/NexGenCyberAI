@@ -47,6 +47,14 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
     active_connectors = db.query(func.count(Connector.id)).filter(Connector.status == "active").scalar() or 0
     open_findings = db.query(func.count(Finding.id)).filter(Finding.status == "open").scalar() or 0
     critical_findings = db.query(func.count(Finding.id)).filter(Finding.status == "open", Finding.severity == "critical").scalar() or 0
+    # Open findings grouped by severity — powers the Finding Severity doughnut.
+    findings_by_severity = {s: 0 for s in ["critical", "high", "medium", "low", "info"]}
+    for sev, n in (
+        db.query(Finding.severity, func.count(Finding.id))
+        .filter(Finding.status == "open").group_by(Finding.severity).all()
+    ):
+        key = sev.value if hasattr(sev, "value") else str(sev)
+        findings_by_severity[key] = findings_by_severity.get(key, 0) + int(n or 0)
     risks_open = db.query(func.count(Risk.id)).filter(Risk.status == "open").scalar() or 0
     scans_last_30d = db.query(func.count(Scan.id)).filter(Scan.created_at >= thirty_days_ago).scalar() or 0
     agent_runs_total = db.query(func.count(AgentRun.id)).scalar() or 0
@@ -97,6 +105,7 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
         active_connectors=active_connectors,
         open_findings=open_findings,
         critical_findings=critical_findings,
+        findings_by_severity=findings_by_severity,
         risks_open=risks_open,
         scans_last_30d=scans_last_30d,
         compliance_scores=scores,

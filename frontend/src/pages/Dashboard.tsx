@@ -15,10 +15,18 @@ import { dashboardApi } from "../services/api";
 import { DashboardSummary } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, Label,
 } from "recharts";
 import { fromNow } from "../utils/datetime";
 
+// Finding-severity doughnut — Google brand palette.
+const SEV_DONUT = [
+  { key: "critical", name: "Critical", color: "#EA4335" },
+  { key: "high",     name: "High",     color: "#FBBC05" },
+  { key: "medium",   name: "Medium",   color: "#4285F4" },
+  { key: "low",      name: "Low",      color: "#34A853" },
+  { key: "info",     name: "Info",     color: "#94A3B8" },
+];
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
@@ -89,10 +97,9 @@ export default function Dashboard() {
     score: Math.round(v as number),
   }));
 
-  const findingBreakdown = [
-    { name: "Critical", value: data.critical_findings, color: "#f44336" },
-    { name: "Others", value: Math.max(data.open_findings - data.critical_findings, 0), color: "#ff9800" },
-  ].filter((d) => d.value > 0);
+  const findingBreakdown = SEV_DONUT
+    .map((s) => ({ name: s.name, value: (data.findings_by_severity?.[s.key]) ?? 0, color: s.color }))
+    .filter((d) => d.value > 0);
 
   const postureEntries = Object.entries(data.posture_health || {
     "Vulnerability Management": 50,
@@ -172,10 +179,23 @@ export default function Dashboard() {
               {findingBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
-                    <Pie data={findingBreakdown} cx="50%" cy="50%" outerRadius={70} dataKey="value">
+                    <Pie data={findingBreakdown} cx="50%" cy="50%" innerRadius={48} outerRadius={72}
+                      paddingAngle={2} dataKey="value" stroke="none">
                       {findingBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      <Label content={({ viewBox }: any) => {
+                        const { cx, cy } = viewBox || {};
+                        return (
+                          <g>
+                            <text x={cx} y={cy - 4} textAnchor="middle" fill={theme.palette.text.primary}
+                              style={{ fontSize: 26, fontWeight: 700 }}>{data.open_findings}</text>
+                            <text x={cx} y={cy + 16} textAnchor="middle" fill={theme.palette.text.secondary}
+                              style={{ fontSize: 11 }}>open</text>
+                          </g>
+                        );
+                      }} />
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: "#1e232c", border: "none" }} />
+                    <Tooltip contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
+                      formatter={(v: any, n: any) => [`${v}`, n]} />
                     <Legend iconSize={10} wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>

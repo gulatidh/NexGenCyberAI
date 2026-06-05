@@ -504,6 +504,7 @@ export interface DashboardSummary {
   active_connectors: number;
   open_findings: number;
   critical_findings: number;
+  findings_by_severity?: Record<string, number>;
   risks_open: number;
   scans_last_30d: number;
   compliance_scores: Record<string, number>;

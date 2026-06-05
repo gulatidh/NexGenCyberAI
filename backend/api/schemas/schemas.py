@@ -360,6 +360,7 @@ class DashboardSummary(BaseModel):
     active_connectors: int
     open_findings: int
     critical_findings: int
+    findings_by_severity: Dict[str, int] = {}
     risks_open: int
     scans_last_30d: int
     compliance_scores: Dict[str, float]
