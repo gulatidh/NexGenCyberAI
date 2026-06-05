@@ -25,6 +25,13 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
 };
 
+// Connector types hidden from the "Add connector" picker — their GitHub
+// Actions workflows aren't wired (SonarQube needs a Sonar backend; OpenVAS
+// needs a long-lived scanner host), so selecting them would only produce a
+// failed scan. Icons stay in the map so any pre-existing connector still
+// renders. Remove from here to re-enable once a workflow exists.
+const DISABLED_CONNECTOR_TYPES = new Set<string>(["sonarqube", "openvas"]);
+
 type CredField = {
   key: string; label: string; secret?: boolean;
   placeholder?: string; help?: string;
@@ -427,7 +434,9 @@ export default function Connectors() {
                     setWebTargetUrl(""); setWebAuthMethod("none"); setWebAuth({}); setWebExcludes("");
                   }}
                   label="Type" sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                  {Object.entries(CONNECTOR_ICONS).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
+                  {Object.entries(CONNECTOR_ICONS)
+                    .filter(([k]) => !DISABLED_CONNECTOR_TYPES.has(k))
+                    .map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
