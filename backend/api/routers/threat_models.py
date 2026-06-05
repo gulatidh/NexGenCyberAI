@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -854,6 +854,7 @@ def _categories_for(methodology: str) -> List[str]:
 async def fill_coverage_gaps(
     client_id: str,
     model_id: str,
+    payload: Optional[Dict[str, Any]] = Body(default=None),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -876,8 +877,13 @@ async def fill_coverage_gaps(
 
     decisions = list(tm.coverage_decisions or [])
     missing = [d for d in decisions if d.get("state") == "missing"]
+    # Selective fill: if the caller passed specific cells, only resolve those.
+    requested = (payload or {}).get("cells") if isinstance(payload, dict) else None
+    if requested:
+        want = {(c.get("component_id"), c.get("category")) for c in requested}
+        missing = [d for d in missing if (d.get("component_id"), d.get("category")) in want]
     if not missing:
-        return {"filled": 0, "threats_added": 0, "decisions_updated": 0, "message": "Nothing missing"}
+        return {"filled": 0, "threats_added": 0, "decisions_updated": 0, "message": "Nothing to fill"}
 
     try:
         from services.threat_modeler_gapfill import fill_gaps

@@ -14,6 +14,7 @@ import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
+  Dialog, DialogTitle, DialogContent,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
@@ -200,13 +201,17 @@ export default function ThreatModelDetail() {
   });
 
   const fillGapsMutation = useMutation({
-    mutationFn: () => threatModelsApi.fillGaps(clientId, modelId!),
+    mutationFn: (cells?: { component_id: string; category: string }[]) =>
+      threatModelsApi.fillGaps(clientId, modelId!, cells),
     onSuccess: (resp: any) => {
       qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
       toast.success(resp?.message || `Filled ${resp?.filled ?? 0} cells`);
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Gap-fill failed"),
   });
+
+  // Threat popup opened from a coverage-matrix 'threat' cell.
+  const [threatPopup, setThreatPopup] = useState<Threat | null>(null);
 
   const startModelingMutation = useMutation({
     mutationFn: () => threatModelsApi.startModeling(clientId, modelId!, {}),
@@ -733,11 +738,51 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">STRIDE Coverage Matrix</Typography>}
           <CoverageMatrixView
             data={data}
-            onFillGaps={() => fillGapsMutation.mutate()}
+            onFillGaps={() => fillGapsMutation.mutate(undefined)}
+            onFillCells={(cells) => fillGapsMutation.mutate(cells)}
+            onThreatClick={(tid) => {
+              const t = (data.threats || []).find((x) => x.id === tid);
+              if (t) setThreatPopup(t);
+            }}
             filling={fillGapsMutation.isPending}
           />
         </Box>
       )}
+
+      {/* Threat popup — opened from a coverage-matrix threat cell */}
+      <Dialog open={!!threatPopup} onClose={() => setThreatPopup(null)} maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
+        {threatPopup && (
+          <>
+            <DialogTitle sx={{ color: "text.primary", display: "flex", alignItems: "center", gap: 1 }}>
+              <Chip label={(threatPopup.severity || "").toUpperCase()} size="small"
+                sx={{ bgcolor: `${SEV_COLOR[threatPopup.severity] || "#888"}22`, color: SEV_COLOR[threatPopup.severity] || "#888", fontWeight: 700 }} />
+              <span>{threatPopup.title}</span>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                {(threatPopup.category || "").replace(/_/g, " ")} · target {threatPopup.asset_id || "—"}
+              </Typography>
+              {threatPopup.rationale && (
+                <Typography variant="body2" sx={{ color: "text.primary", mt: 1.5, whiteSpace: "pre-wrap" }}>
+                  {threatPopup.rationale}
+                </Typography>
+              )}
+              {threatPopup.attack_narrative && (
+                <Typography variant="body2" sx={{ color: "text.secondary", mt: 1.5, whiteSpace: "pre-wrap" }}>
+                  {threatPopup.attack_narrative}
+                </Typography>
+              )}
+              {(threatPopup.capec_refs?.length || threatPopup.attack_techniques?.length) ? (
+                <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 2 }}>
+                  {(threatPopup.capec_refs || []).map((r) => <ThreatLibraryChip key={r} source="capec" sourceId={r} />)}
+                  {(threatPopup.attack_techniques || []).map((r) => <ThreatLibraryChip key={r} source="attack" sourceId={r} />)}
+                </Box>
+              ) : null}
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
 
       {/* MATURITY radar */}
       {(tab === "maturity" || printing) && (
@@ -806,7 +851,17 @@ const STATE_STYLE: Record<string, { bg: string; fg: string; label: string }> = {
   missing:         { bg: "rgba(251,188,4,0.15)",  fg: "#FBBC04", label: "Missing" },
 };
 
-function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDetailData; onFillGaps?: () => void; filling?: boolean }) {
+function CoverageMatrixView({ data, onFillGaps, onFillCells, onThreatClick, filling }: {
+  data: ThreatModelDetailData;
+  onFillGaps?: () => void;
+  onFillCells?: (cells: { component_id: string; category: string }[]) => void;
+  onThreatClick?: (threatId: string) => void;
+  filling?: boolean;
+}) {
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const toggleCell = (key: string) => setSelected((prev) => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n;
+  });
   const decisions = data.coverage_decisions || [];
   const components = data.components || [];
   // Distinct categories
@@ -828,20 +883,40 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
           <Chip label={`${pct}% covered`} sx={{ bgcolor: pct >= 80 ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)", color: pct >= 80 ? "#34A853" : "#FBBC04", fontWeight: 700, height: 22, fontSize: 11 }} />
           <Chip label={`${threatCells} threats`} sx={{ bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700, height: 22, fontSize: 11 }} />
           <Chip label={`${missing} missing`} sx={{ bgcolor: missing > 0 ? "rgba(251,188,4,0.18)" : "rgba(255,255,255,0.04)", color: missing > 0 ? "#FBBC04" : "text.secondary", fontWeight: 700, height: 22, fontSize: 11 }} />
+          {missing > 0 && selected.size > 0 && onFillCells && (
+            <Button
+              size="small" variant="contained" className="no-print"
+              startIcon={filling ? <CircularProgress size={14} sx={{ color: "#1A1A1A" }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
+              disabled={filling}
+              onClick={() => {
+                const cells = Array.from(selected).map((k) => {
+                  const [component_id, category] = k.split("|");
+                  return { component_id, category };
+                });
+                onFillCells(cells);
+                setSelected(new Set());
+              }}
+              sx={{ bgcolor: "#4285F4", color: "#fff", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26,
+                "&:hover": { bgcolor: "#5B9CFF" } }}
+            >
+              {filling ? "Filling…" : `Fill selected (${selected.size})`}
+            </Button>
+          )}
           {missing > 0 && onFillGaps && (
-            <Tooltip title={`Run a targeted LLM call against the ${missing} missing cells — each one resolves to either a threat or a 'considered' decision.`}>
+            <Tooltip title={`Resolve all ${missing} missing cells in one LLM pass. To do a few, click the missing cells to select them, then "Fill selected".`}>
               <span>
                 <Button
                   size="small"
-                  variant="contained"
+                  variant={selected.size > 0 ? "outlined" : "contained"}
                   className="no-print"
                   startIcon={filling ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
                   disabled={filling}
                   onClick={onFillGaps}
-                  sx={{ bgcolor: "#FBBC04", color: "#1A1A1A", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26,
-                    "&:hover": { bgcolor: "#FFC53D" } }}
+                  sx={selected.size > 0
+                    ? { color: "#FBBC04", borderColor: "rgba(251,188,4,0.5)", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26 }
+                    : { bgcolor: "#FBBC04", color: "#1A1A1A", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26, "&:hover": { bgcolor: "#FFC53D" } }}
                 >
-                  {filling ? "Filling…" : `Fill ${missing} gap${missing === 1 ? "" : "s"}`}
+                  {filling ? "Filling…" : `Fill all ${missing} gap${missing === 1 ? "" : "s"}`}
                 </Button>
               </span>
             </Tooltip>
@@ -879,12 +954,32 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
                     return <Box key={cat} sx={{ p: 1, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1, fontSize: 10, color: "text.secondary" }}>—</Box>;
                   }
                   const style = STATE_STYLE[d.state] || STATE_STYLE.missing;
+                  const cellKey = `${comp.id}|${cat}`;
+                  const isMissing = d.state === "missing";
+                  const isThreat = d.state === "threat" && !!d.threat_id;
+                  const sel = selected.has(cellKey);
+                  const clickable = isMissing || isThreat;
+                  const tip = isMissing
+                    ? (sel ? "Selected — click to deselect" : "Click to select for targeted fill")
+                    : (isThreat ? "Click to view the threat" : (d.rationale || style.label));
                   return (
-                    <Tooltip key={cat} title={d.rationale || (d.state === "threat" ? `Threat ${d.threat_id}` : style.label)}>
-                      <Box sx={{ p: 1, bgcolor: style.bg, borderRadius: 1, cursor: "default", minHeight: 50 }}>
-                        <Typography variant="caption" sx={{ color: style.fg, fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, display: "block" }}>
-                          {style.label}
-                        </Typography>
+                    <Tooltip key={cat} title={tip}>
+                      <Box
+                        onClick={() => {
+                          if (isMissing) toggleCell(cellKey);
+                          else if (isThreat && onThreatClick) onThreatClick(d.threat_id as string);
+                        }}
+                        sx={{ p: 1, bgcolor: style.bg, borderRadius: 1, minHeight: 50,
+                          cursor: clickable ? "pointer" : "default",
+                          outline: sel ? "2px solid #FBBC04" : "none", outlineOffset: "-2px",
+                          "&:hover": clickable ? { filter: "brightness(1.18)" } : {} }}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <Typography variant="caption" sx={{ color: style.fg, fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            {style.label}
+                          </Typography>
+                          {isMissing && sel && <Box component="span" sx={{ color: "#FBBC04", fontSize: 12, fontWeight: 700 }}>✓</Box>}
+                          {isThreat && <Box component="span" sx={{ color: style.fg, fontSize: 11 }}>↗</Box>}
+                        </Box>
                         {d.rationale && (
                           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10.5, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                             {d.rationale}

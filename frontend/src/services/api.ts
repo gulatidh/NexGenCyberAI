@@ -223,8 +223,9 @@ export const threatModelsApi = {
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/dfd`, { params: { view } }).then((r) => r.data),
   coverage: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/coverage`).then((r) => r.data),
-  fillGaps: (clientId: string, modelId: string) =>
-    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/coverage/fill-gaps`).then((r) => r.data),
+  fillGaps: (clientId: string, modelId: string, cells?: { component_id: string; category: string }[]) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/coverage/fill-gaps`,
+      cells && cells.length ? { cells } : {}).then((r) => r.data),
   maturity: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/maturity`).then((r) => r.data),
   diff: (clientId: string, modelId: string, prevId: string) =>
