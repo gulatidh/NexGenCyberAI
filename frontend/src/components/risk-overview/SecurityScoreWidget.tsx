@@ -27,7 +27,7 @@ export default function SecurityScoreWidget({ data, loading }: Props) {
   return (
     <Card sx={cardSx}>
       <CardContent sx={{ p: 2.5 }}>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, fontSize: 11, letterSpacing: 0.5 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, fontSize: 11, letterSpacing: 0.5 }}>
           OVERALL SECURITY SCORE
         </Typography>
         <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", mt: 1, gap: 2 }}>
@@ -36,14 +36,14 @@ export default function SecurityScoreWidget({ data, loading }: Props) {
               <Typography sx={{ color, fontSize: 56, fontWeight: 700, lineHeight: 1 }}>
                 {data.current.toFixed(0)}
               </Typography>
-              <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: 18 }}>/ 100</Typography>
+              <Typography sx={{ color: "text.secondary", fontSize: 18 }}>/ 100</Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
               <TrendIcon sx={{ fontSize: 16, color: trendColor }} />
               <Typography variant="body2" sx={{ color: trendColor, fontWeight: 600 }}>
                 {data.delta > 0 ? "+" : ""}{data.delta.toFixed(1)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", ml: 0.5 }}>vs 7d ago</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", ml: 0.5 }}>vs 7d ago</Typography>
             </Box>
           </Box>
           <Box sx={{ width: 180, height: 60 }}>

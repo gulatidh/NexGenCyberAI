@@ -20,7 +20,7 @@ export default function BreakdownByCategory({ data, loading, selected, onSelect 
   return (
     <Card sx={{ ...cardSx, height: "100%" }}>
       <CardContent>
-        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
           Breakdown by Category
         </Typography>
         {loading ? (
@@ -28,7 +28,7 @@ export default function BreakdownByCategory({ data, loading, selected, onSelect 
             <Skeleton key={i} variant="rectangular" height={36} sx={{ mb: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1 }} />
           ))
         ) : data.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 3 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 3 }}>
             No categories yet — sync assets to populate.
           </Typography>
         ) : (
@@ -47,7 +47,7 @@ export default function BreakdownByCategory({ data, loading, selected, onSelect 
                     "&:hover": { bgcolor: `${c.color}10` },
                   }}>
                   <IconFor name={c.icon} color={c.color} />
-                  <Typography variant="body2" sx={{ color: "white", flex: 1, fontSize: 13 }}>
+                  <Typography variant="body2" sx={{ color: "text.primary", flex: 1, fontSize: 13 }}>
                     {c.name}
                   </Typography>
                   <Typography variant="body2" sx={{ color: c.color, fontWeight: 600 }}>

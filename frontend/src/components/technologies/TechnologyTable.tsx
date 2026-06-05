@@ -87,21 +87,21 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
   const renderCell = (row: TechnologyRow, key: string) => {
     switch (key) {
       case "name":
-        return <Typography variant="body2" sx={{ color: "white", fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{row.name}</Typography>;
+        return <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 280 }}>{row.name}</Typography>;
       case "resources_count":
-        return <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{row.resources_count}</Typography>;
+        return <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{row.resources_count}</Typography>;
       case "type":
       case "category":
       case "subcategory":
       case "owner":
-        return <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>{(row as any)[key]}</Typography>;
+        return <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{(row as any)[key]}</Typography>;
       case "organization_usage_pct":
         return (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 110 }}>
             <LinearProgress variant="determinate" value={row.organization_usage_pct}
               sx={{ flex: 1, height: 5, borderRadius: 2, bgcolor: "rgba(255,255,255,0.06)",
                 "& .MuiLinearProgress-bar": { bgcolor: "#4285F4", borderRadius: 2 } }} />
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, minWidth: 28 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, minWidth: 28 }}>
               {row.organization_usage_pct}%
             </Typography>
           </Box>
@@ -119,12 +119,12 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
       case "cve_count":
         return <Typography variant="caption" sx={{ color: row.cve_count > 0 ? STATUS_COLOR.critical : "rgba(255,255,255,0.4)", fontWeight: 600 }}>{row.cve_count}</Typography>;
       case "last_seen":
-        return <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{fromNow(row.last_seen)}</Typography>;
+        return <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{fromNow(row.last_seen)}</Typography>;
       case "environments":
         return (
           <Box sx={{ display: "flex", gap: 0.25, flexWrap: "wrap" }}>
             {(row.environments || []).slice(0, 3).map((e) => (
-              <Chip key={e} label={e} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 9, height: 16 }} />
+              <Chip key={e} label={e} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 9, height: 16 }} />
             ))}
           </Box>
         );
@@ -139,18 +139,18 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
     <Card sx={cardSx}>
       <CardContent sx={{ "&:last-child": { pb: 1 } }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1, flexWrap: "wrap", gap: 1 }}>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
             Technology Inventory
           </Typography>
           <Box sx={{ display: "flex", gap: 0.5 }}>
             <Tooltip title="Toggle columns">
               <IconButton size="small" onClick={(e) => setColMenuAnchor(e.currentTarget)}
-                sx={{ color: "rgba(255,255,255,0.6)" }}>
+                sx={{ color: "text.secondary" }}>
                 <ViewColumn fontSize="small" />
               </IconButton>
             </Tooltip>
             <Button size="small" startIcon={<Download />} onClick={exportCsv}
-              sx={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>
+              sx={{ color: "text.secondary", fontSize: 11 }}>
               Export CSV
             </Button>
           </Box>
@@ -177,7 +177,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
             <TableContainer sx={{ maxHeight: 540 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
-                  <TableRow sx={{ "& th": { bgcolor: "#1E1E1E", color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { bgcolor: "background.paper", color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     {visibleColumnDefs.map((c) => (
                       <TableCell key={c.key} align={c.numeric ? "right" : "left"}>
                         <TableSortLabel active={sortKey === c.key} direction={sortDir} onClick={() => setSort(c.key)}
@@ -190,14 +190,14 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
                 </TableHead>
                 <TableBody>
                   {pageRows.length === 0 ? (
-                    <TableRow><TableCell colSpan={visibleColumnDefs.length} align="center" sx={{ color: "rgba(255,255,255,0.4)", py: 4 }}>
+                    <TableRow><TableCell colSpan={visibleColumnDefs.length} align="center" sx={{ color: "text.secondary", py: 4 }}>
                       No technologies match the current filters.
                     </TableCell></TableRow>
                   ) : pageRows.map((row) => (
                     <TableRow key={row.id} hover
                       onClick={() => onRowClick?.(row)}
                       sx={{ cursor: onRowClick ? "pointer" : "default",
-                        "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)", py: 0.75 },
+                        "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 0.75 },
                         "&:hover": { bgcolor: "rgba(255,255,255,0.03)" } }}>
                       {visibleColumnDefs.map((c) => (
                         <TableCell key={c.key} align={c.numeric ? "right" : "left"}>{renderCell(row, c.key)}</TableCell>
@@ -213,7 +213,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
               rowsPerPage={perPage}
               onRowsPerPageChange={(e) => { setPerPage(parseInt(e.target.value, 10)); setPage(0); }}
               rowsPerPageOptions={[10, 25, 50, 100]}
-              sx={{ color: "rgba(255,255,255,0.6)", "& .MuiTablePagination-actions svg": { color: "rgba(255,255,255,0.6)" } }}
+              sx={{ color: "text.secondary", "& .MuiTablePagination-actions svg": { color: "text.secondary" } }}
             />
           </>
         )}

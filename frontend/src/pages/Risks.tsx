@@ -51,8 +51,8 @@ function SeverityDonut({ counts, size = 140 }: { counts: Record<string, number>;
         })}
       </svg>
       <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-        <Typography sx={{ color: "white", fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{total}</Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Risks</Typography>
+        <Typography sx={{ color: "text.primary", fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{total}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Risks</Typography>
       </Box>
     </Box>
   );
@@ -62,14 +62,14 @@ function KpiCard({ label, value, sublabel, color = "#4285F4" }: {
   label: string; value: string | number; sublabel?: string; color?: string;
 }) {
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
           {label}
         </Typography>
         <Typography sx={{ color, fontSize: 32, fontWeight: 700, lineHeight: 1.1, mt: 0.5 }}>{value}</Typography>
         {sublabel && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>{sublabel}</Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{sublabel}</Typography>
         )}
       </CardContent>
     </Card>
@@ -196,23 +196,23 @@ export default function Risks() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Risk Register</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Register</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Prioritised risks with AI-generated insights
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
@@ -221,13 +221,13 @@ export default function Risks() {
       </Box>
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view the risk register.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>Select a client to view the risk register.</Alert>
       ) : isLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
       ) : risks.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <Warning sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <Warning sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>
             No risks yet. Run an AI risk assessment from the Agents page.
           </Typography>
         </Card>
@@ -258,17 +258,17 @@ export default function Risks() {
           {/* Charts row */}
           <Grid container spacing={2} sx={{ mb: 2 }}>
             <Grid size={{ xs: 12, md: 4 }}>
-              <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+              <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
                 <CardContent>
-                  <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, mb: 1.5 }}>Severity</Typography>
+                  <Typography variant="subtitle2" sx={{ color: "text.secondary", fontWeight: 700, mb: 1.5 }}>Severity</Typography>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                     <SeverityDonut counts={counts.perLevel} />
                     <Box sx={{ flex: 1, minWidth: 120 }}>
                       {["critical","high","medium","low"].map((k) => (
                         <Box key={k} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                           <Box sx={{ width: 10, height: 10, bgcolor: LEVEL_COLOR[k], borderRadius: 0.5 }} />
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", textTransform: "capitalize", flex: 1 }}>{k}</Typography>
-                          <Typography variant="caption" sx={{ color: "white", fontWeight: 600 }}>{counts.perLevel[k]}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "capitalize", flex: 1 }}>{k}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 600 }}>{counts.perLevel[k]}</Typography>
                         </Box>
                       ))}
                     </Box>
@@ -277,11 +277,11 @@ export default function Risks() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 8 }}>
-              <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+              <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
                 <CardContent>
-                  <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, mb: 1.5 }}>Top 5 Risks</Typography>
+                  <Typography variant="subtitle2" sx={{ color: "text.secondary", fontWeight: 700, mb: 1.5 }}>Top 5 Risks</Typography>
                   {topRisks.length === 0 ? (
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>No risks scored yet.</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>No risks scored yet.</Typography>
                   ) : topRisks.map((r) => {
                     const lv = lvOf(r);
                     const sc = r.risk_score ?? 0;
@@ -290,7 +290,7 @@ export default function Risks() {
                         onClick={() => setSelected(r)}>
                         <Chip label={lv} size="small"
                           sx={{ bgcolor: `${LEVEL_COLOR[lv]}25`, color: LEVEL_COLOR[lv], fontSize: 10, height: 18, minWidth: 64 }} />
-                        <Typography variant="body2" sx={{ color: "white", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13 }}>
+                        <Typography variant="body2" sx={{ color: "text.primary", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13 }}>
                           {r.title}
                         </Typography>
                         <Box sx={{ width: 160 }}>
@@ -310,9 +310,9 @@ export default function Risks() {
           </Grid>
 
           {/* Slicer chips — multi-select filters */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>SEVERITY</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>SEVERITY</Typography>
               {["critical","high","medium","low"].map((k) => (
                 <Chip key={k} size="small" label={`${k.charAt(0).toUpperCase() + k.slice(1)}${counts.perLevel[k] ? ` · ${counts.perLevel[k]}` : ""}`}
                   onClick={() => toggle(levelFilters, setLevelFilters, k)}
@@ -325,7 +325,7 @@ export default function Risks() {
                   }} />
               ))}
               <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>STATUS</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>STATUS</Typography>
               {["open","mitigated","accepted","closed"].map((s) => (
                 <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
                   onClick={() => toggle(statusFilters, setStatusFilters, s)}
@@ -340,7 +340,7 @@ export default function Risks() {
               {counts.categories.length > 0 && (
                 <>
                   <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>CATEGORY</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>CATEGORY</Typography>
                   {counts.categories.map(([cat, n]) => (
                     <Chip key={cat} size="small" label={`${cat} · ${n}`}
                       onClick={() => toggle(categoryFilters, setCategoryFilters, cat)}
@@ -355,7 +355,7 @@ export default function Risks() {
                 </>
               )}
               {(levelFilters.size + statusFilters.size + categoryFilters.size > 0) && (
-                <Button size="small" sx={{ ml: 1, color: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                <Button size="small" sx={{ ml: 1, color: "text.secondary", fontSize: 11 }}
                   onClick={() => { setLevelFilters(new Set()); setStatusFilters(new Set()); setCategoryFilters(new Set()); }}>
                   Clear filters
                 </Button>
@@ -364,11 +364,11 @@ export default function Risks() {
           </Card>
 
           {/* Filtered risk table */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>LEVEL</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell>SCORE</TableCell>
@@ -385,13 +385,13 @@ export default function Risks() {
                     return (
                       <TableRow key={r.id}
                         sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                          "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                          "& td": { borderColor: "divider", py: 1 } }}
                         onClick={() => setSelected(r)}>
                         <TableCell>
                           <Chip label={lv} size="small"
                             sx={{ bgcolor: `${LEVEL_COLOR[lv] || "#888"}25`, color: LEVEL_COLOR[lv] || "#888", fontSize: 10, height: 18 }} />
                         </TableCell>
-                        <TableCell sx={{ color: "white", maxWidth: 320 }}>
+                        <TableCell sx={{ color: "text.primary", maxWidth: 320 }}>
                           <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {r.title}
                           </Typography>
@@ -406,14 +406,14 @@ export default function Risks() {
                                 "& .MuiLinearProgress-bar": { bgcolor: LEVEL_COLOR[lv] || "#888", borderRadius: 2 } }} />
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{r.category || "—"}</TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{r.likelihood ?? "—"} / {r.impact ?? "—"}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.category || "—"}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.likelihood ?? "—"} / {r.impact ?? "—"}</TableCell>
                         <TableCell>
                           <Chip label={r.status || "open"} size="small"
                             sx={{ bgcolor: `${STATUS_COLOR[r.status || "open"] || "#888"}25`,
                               color: STATUS_COLOR[r.status || "open"] || "#888", fontSize: 10, height: 18 }} />
                         </TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>{fromNow(r.created_at)}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{fromNow(r.created_at)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -425,7 +425,7 @@ export default function Risks() {
           {/* AI Agent Risk Analysis — one tile per run, only one expanded at a time */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, mt: 1 }}>
             <SmartToy sx={{ color: "#4285F4", fontSize: 18 }} />
-            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
+            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>
               AI Agent Risk Analysis
             </Typography>
             <Chip label={riskRuns.length} size="small"
@@ -433,17 +433,17 @@ export default function Risks() {
             <Box sx={{ flex: 1 }} />
             {expandedRunId && (
               <Button size="small" onClick={() => setExpandedRunId(null)}
-                sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, textTransform: "none" }}>
+                sx={{ color: "text.secondary", fontSize: 11, textTransform: "none" }}>
                 Collapse all
               </Button>
             )}
           </Box>
-          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.4)", mb: 1.5 }}>
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 1.5 }}>
             Risk-focused agents only (Risk Manager, Threat Intel, Remediation). Click any tile to read the full analysis.
           </Typography>
           {latestRuns.length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 3, textAlign: "center" }}>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 3, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 No risk-related agent runs yet. Run Risk Manager / Threat Intel / Remediation from the Agents page.
               </Typography>
             </Card>
@@ -499,7 +499,7 @@ export default function Risks() {
 
       {/* Detail dialog */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         {selected && (() => {
           const lv = lvOf(selected);
           return (
@@ -512,25 +512,25 @@ export default function Risks() {
               </DialogTitle>
               <DialogContent sx={{ mt: 1 }}>
                 {selected.description && (
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>{selected.description}</Typography>
+                  <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>{selected.description}</Typography>
                 )}
                 <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
                   <Box sx={{ flex: 1, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, p: 1.5, textAlign: "center" }}>
                     <Typography variant="h5" sx={{ color: LEVEL_COLOR[lv] || "#ff9800", fontWeight: 700 }}>
                       {(selected.risk_score ?? 0).toFixed(1)}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Risk Score</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>Risk Score</Typography>
                   </Box>
                   <Box sx={{ flex: 1, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, p: 1.5, textAlign: "center" }}>
-                    <Typography variant="h6" sx={{ color: "white" }}>{selected.likelihood ?? "—"} / {selected.impact ?? "—"}</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Likelihood / Impact</Typography>
+                    <Typography variant="h6" sx={{ color: "text.primary" }}>{selected.likelihood ?? "—"} / {selected.impact ?? "—"}</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>Likelihood / Impact</Typography>
                   </Box>
                 </Box>
                 <FormControl size="small" fullWidth>
-                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Status</InputLabel>
+                  <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
                   <Select value={selected.status || "open"} label="Status"
                     onChange={(e) => updateMutation.mutate({ id: selected.id, data: { status: e.target.value } })}
-                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                     <MenuItem value="open">Open</MenuItem>
                     <MenuItem value="mitigated">Mitigated</MenuItem>
                     <MenuItem value="accepted">Accepted</MenuItem>
@@ -539,7 +539,7 @@ export default function Risks() {
                 </FormControl>
               </DialogContent>
               <DialogActions>
-                <Button onClick={() => setSelected(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+                <Button onClick={() => setSelected(null)} sx={{ color: "text.secondary" }}>Close</Button>
               </DialogActions>
             </>
           );
@@ -548,7 +548,7 @@ export default function Risks() {
 
       {/* Version history — older runs for a given agent type */}
       <Dialog open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <History sx={{ color: "#FBBC04" }} />
@@ -564,7 +564,7 @@ export default function Risks() {
             const allVersions = current ? [current, ...older] : older;
             return (
               <Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.5 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
                   {allVersions.length} total version{allVersions.length === 1 ? "" : "s"}. v{allVersions.length} is the latest and currently shown on the tile; older versions are below.
                 </Typography>
                 {allVersions.map((r: any, idx: number) => {
@@ -595,10 +595,10 @@ export default function Risks() {
                           minWidth: 76,
                         }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>
                           {r.started_at ? new Date(r.started_at).toLocaleString() : "—"}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {r.started_at ? fromNow(r.started_at) : ""}
                         </Typography>
                       </Box>
@@ -614,7 +614,7 @@ export default function Risks() {
                           size="small"
                           onClick={() => { setViewVersion(r); }}
                           sx={{
-                            color: "rgba(255,255,255,0.5)",
+                            color: "text.secondary",
                             "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
                           }}
                         >
@@ -627,7 +627,7 @@ export default function Risks() {
                             size="small"
                             onClick={() => setPendingDeleteRun(r)}
                             sx={{
-                              color: "rgba(255,255,255,0.4)",
+                              color: "text.secondary",
                               "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                             }}
                           >
@@ -643,13 +643,13 @@ export default function Risks() {
           })()}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setHistoryOpenFor(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+          <Button onClick={() => setHistoryOpenFor(null)} sx={{ color: "text.secondary" }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* View a single historical version's full output */}
       <Dialog open={!!viewVersion} onClose={() => setViewVersion(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <SmartToy sx={{ color: "#4285F4" }} />
@@ -657,7 +657,7 @@ export default function Risks() {
               {viewVersion ? (viewVersion.agent_type || "").replace(/_/g, " ") : ""}
             </Typography>
             {viewVersion?.started_at && (
-              <Typography component="span" variant="caption" sx={{ color: "rgba(255,255,255,0.5)", ml: 1 }}>
+              <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 1 }}>
                 {new Date(viewVersion.started_at).toLocaleString()}
               </Typography>
             )}
@@ -673,26 +673,26 @@ export default function Risks() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setViewVersion(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+          <Button onClick={() => setViewVersion(null)} sx={{ color: "text.secondary" }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Confirm delete of an AI agent risk analysis run */}
       <Dialog open={!!pendingDeleteRun} onClose={() => setPendingDeleteRun(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           Delete risk analysis?
         </DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This removes the agent run and its output from the Risk Register feed. The risks that were created from this run (in the table above) stay — only the agent narrative is deleted.
           </Typography>
           {pendingDeleteRun && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600, textTransform: "capitalize" }}>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, textTransform: "capitalize" }}>
                 {(pendingDeleteRun.agent_type || "").replace(/_/g, " ")}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Status: {pendingDeleteRun.status}
                 {pendingDeleteRun.started_at ? ` · started ${fromNow(pendingDeleteRun.started_at)}` : ""}
               </Typography>
@@ -700,7 +700,7 @@ export default function Risks() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDeleteRun(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDeleteRun(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button
             variant="contained"
             disabled={deleteRunMutation.isPending}

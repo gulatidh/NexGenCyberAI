@@ -47,8 +47,8 @@ export default function OpenIssuesSummary({ data, loading }: Props) {
                     </Typography>
                   </Box>
                 </Box>
-                <Typography sx={{ color: "white", fontSize: 32, fontWeight: 700, lineHeight: 1.1 }}>{count}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+                <Typography sx={{ color: "text.primary", fontSize: 32, fontWeight: 700, lineHeight: 1.1 }}>{count}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                   open · vs prev 7d
                 </Typography>
               </CardContent>

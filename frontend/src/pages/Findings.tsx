@@ -77,7 +77,7 @@ function CategoryTile({ cat, active, onClick }: {
             {cat.count}
           </Typography>
         </Box>
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)",
+        <Typography variant="body2" sx={{ color: "text.secondary",
           fontSize: 12, fontWeight: 500, lineHeight: 1.25 }}>
           {cat.label}
         </Typography>
@@ -178,31 +178,31 @@ export default function Findings() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Findings</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Findings</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             All security findings across scans
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Severity</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Severity</InputLabel>
             <Select value={sevFilter} onChange={(e) => setSevFilter(e.target.value)} label="Severity"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All</MenuItem>
               {["critical","high","medium","low","info"].map((s) => (
                 <MenuItem key={s} value={s} sx={{ color: SEV_COLOR[s] }}>{s.charAt(0).toUpperCase() + s.slice(1)}</MenuItem>
@@ -210,9 +210,9 @@ export default function Findings() {
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Status</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All</MenuItem>
               <MenuItem value="open">Open</MenuItem>
               <MenuItem value="remediated">Remediated</MenuItem>
@@ -228,7 +228,7 @@ export default function Findings() {
           {/* Section tabs */}
           <Tabs value={section} onChange={(_, v) => { setSection(v); setCategory(""); }}
             sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 1.5,
-              "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
+              "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 500 },
               "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
             {(catData?.sections || []).map((s) => (
               <Tab key={s.key} value={s.key} label={`${s.label} (${s.total})`} />
@@ -237,7 +237,7 @@ export default function Findings() {
 
           {/* Category tile grid */}
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
               CATEGORIES — CLICK TO FILTER
             </Typography>
             {category && (
@@ -274,7 +274,7 @@ export default function Findings() {
                   sx={{ bgcolor: `${SEV_COLOR[s]}${sevFilter === s ? "40" : "20"}`, color: SEV_COLOR[s],
                     border: sevFilter === s ? `1px solid ${SEV_COLOR[s]}` : "none", cursor: "pointer" }} />
               ))}
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", alignSelf: "center", ml: 1 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", alignSelf: "center", ml: 1 }}>
                 {findings.length} matching
               </Typography>
               <Box sx={{ flex: 1 }} />
@@ -289,8 +289,8 @@ export default function Findings() {
                   }
                 }}
                 sx={{
-                  color: "rgba(255,255,255,0.7)",
-                  borderColor: "rgba(255,255,255,0.15)",
+                  color: "text.secondary",
+                  borderColor: "divider",
                   textTransform: "none",
                   "&:hover": { borderColor: "#EA4335", color: "#EA4335", bgcolor: "rgba(234,67,53,0.05)" },
                 }}
@@ -303,22 +303,22 @@ export default function Findings() {
       )}
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view findings.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>Select a client to view findings.</Alert>
       ) : isLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
       ) : findings.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <BugReport sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <BugReport sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>
             No findings found. Run a scan to discover security issues.
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell><TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
                     sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>SEVERITY</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "title"} direction={sortDir} onClick={() => setSort("title")}
@@ -341,13 +341,13 @@ export default function Findings() {
                   return (
                     <TableRow key={f.id}
                       sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                        "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                        "& td": { borderColor: "divider", py: 1 } }}
                       onClick={() => setSelected(f)}>
                       <TableCell>
                         <Chip label={sev} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "white", maxWidth: 300 }}>
+                      <TableCell sx={{ color: "text.primary", maxWidth: 300 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                           <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.title}
@@ -366,7 +366,7 @@ export default function Findings() {
                       <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)", fontSize: 12 }}>
                         {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12, maxWidth: 160 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 160 }}>
                         <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                           {f.resource_id || f.resource_type || "—"}
                         </Typography>
@@ -376,7 +376,7 @@ export default function Findings() {
                           sx={{ bgcolor: `${STATUS_COLOR[f.status || "open"] || "#888"}20`,
                             color: STATUS_COLOR[f.status || "open"] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                         {(() => {
                           const ts = f.first_seen_at || f.created_at;
                           return fromNow(ts);
@@ -388,7 +388,7 @@ export default function Findings() {
                             size="small"
                             onClick={(e) => { e.stopPropagation(); setPendingDelete(f); }}
                             sx={{
-                              color: "rgba(255,255,255,0.4)",
+                              color: "text.secondary",
                               "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                             }}
                           >
@@ -407,7 +407,7 @@ export default function Findings() {
 
       {/* Detail / status update dialog */}
       <Dialog open={!!selected} onClose={() => setSelected(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         {selected && (() => {
           const sev = typeof selected.severity === "object" ? (selected.severity as any).value ?? selected.severity : selected.severity;
           return (
@@ -420,26 +420,26 @@ export default function Findings() {
               </DialogTitle>
               <DialogContent sx={{ mt: 1 }}>
                 {selected.description && (
-                  <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>{selected.description}</Typography>
+                  <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>{selected.description}</Typography>
                 )}
                 <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
                   {selected.cve_id && <Chip label={selected.cve_id} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4" }} />}
-                  {selected.cvss_score != null && <Chip label={`CVSS ${selected.cvss_score.toFixed(1)}`} size="small" sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "white" }} />}
+                  {selected.cvss_score != null && <Chip label={`CVSS ${selected.cvss_score.toFixed(1)}`} size="small" sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary" }} />}
                   {selected.control_id && <Chip label={selected.control_id} size="small" sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#34A853" }} />}
                 </Box>
                 {selected.resource_id && (
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                     Resource: {selected.resource_id} {selected.resource_type ? `(${selected.resource_type})` : ""}
                   </Typography>
                 )}
                 {selected.remediation && (
                   <Box sx={{ bgcolor: "rgba(0,230,118,0.08)", border: "1px solid rgba(0,230,118,0.2)", borderRadius: 1, p: 1.5, mb: 2 }}>
                     <Typography variant="caption" sx={{ color: "#00e676", fontWeight: 600, display: "block", mb: 0.5 }}>Remediation</Typography>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>{selected.remediation}</Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>{selected.remediation}</Typography>
                   </Box>
                 )}
                 <Box>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 1, display: "block" }}>Update Status</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>Update Status</Typography>
                   <Box sx={{ display: "flex", gap: 1 }}>
                     {["open","remediated","accepted","false_positive"].map((s) => (
                       <Chip key={s} label={s.replace("_", " ")} size="small" clickable
@@ -463,7 +463,7 @@ export default function Findings() {
                   Delete
                 </Button>
                 <Box sx={{ flex: 1 }} />
-                <Button onClick={() => setSelected(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+                <Button onClick={() => setSelected(null)} sx={{ color: "text.secondary" }}>Close</Button>
               </DialogActions>
             </>
           );
@@ -472,23 +472,23 @@ export default function Findings() {
 
       {/* Confirm delete */}
       <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This permanently removes the finding from the database. If the same issue is detected again on the next scan it will be re-created.
           </Typography>
           {pendingDelete && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
               {pendingDelete.resource_id && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDelete.resource_id}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{pendingDelete.resource_id}</Typography>
               )}
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDelete(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button
             variant="contained"
             color="error"

@@ -142,7 +142,7 @@ function ArtifactRow({ runId, kind, artifact, idx, clientId, accent }: RowProps)
         {kind === "finding_triage" && <FindingTriagePreview artifact={artifact} />}
 
         {/* Action row */}
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.06)", my: 1.5 }} />
+        <Divider sx={{ borderColor: "divider", my: 1.5 }} />
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, flexWrap: "wrap" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {isApplied ? (
@@ -175,7 +175,7 @@ function ArtifactRow({ runId, kind, artifact, idx, clientId, accent }: RowProps)
                 )}
               </>
             ) : (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                 Buddy-drafted · review before applying
               </Typography>
             )}
@@ -196,7 +196,7 @@ function ArtifactRow({ runId, kind, artifact, idx, clientId, accent }: RowProps)
                 <Button
                   size="small"
                   variant="contained"
-                  startIcon={applyMutation.isPending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <AddTask />}
+                  startIcon={applyMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <AddTask />}
                   onClick={() => applyMutation.mutate()}
                   disabled={applyMutation.isPending}
                   sx={{ bgcolor: accent, textTransform: "none", fontSize: 12, "&:hover": { bgcolor: accent, filter: "brightness(1.15)" } }}
@@ -225,15 +225,15 @@ function RiskDraftPreview({ artifact: a }: { artifact: Artifact }) {
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.75 }}>
         <Chip label={a.severity} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase", bgcolor: `${sevColor}25`, color: sevColor }} />
         {a.category && (
-          <Chip label={a.category} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />
+          <Chip label={a.category} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
         )}
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
           L{a.likelihood} · I{a.impact}
         </Typography>
       </Box>
-      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.title}</Typography>
+      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.title}</Typography>
       {a.rationale && (
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, lineHeight: 1.5 }}>{a.rationale}</Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5 }}>{a.rationale}</Typography>
       )}
       {Array.isArray(a.control_refs) && a.control_refs.length > 0 && (
         <Box sx={{ mt: 1, display: "flex", gap: 0.5, flexWrap: "wrap" }}>
@@ -251,12 +251,12 @@ function JiraDraftPreview({ artifact: a }: { artifact: Artifact }) {
     <>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.75 }}>
         <Chip label={a.project_key} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
-        <Chip label={a.issue_type} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />
+        <Chip label={a.issue_type} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
         <Chip label={a.priority} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04" }} />
       </Box>
-      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.summary}</Typography>
+      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.summary}</Typography>
       {a.description_md && (
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
           {a.description_md.slice(0, 240)}{a.description_md.length > 240 ? "…" : ""}
         </Typography>
       )}
@@ -272,11 +272,11 @@ function ControlMappingPreview({ artifact: a }: { artifact: Artifact }) {
     <>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.5 }}>
         <Chip label={a.framework} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "rgba(156,39,176,0.15)", color: "#CE93D8" }} />
-        <Chip label={a.control_id} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "white", fontFamily: "monospace" }} />
+        <Chip label={a.control_id} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.primary", fontFamily: "monospace" }} />
         <Chip label={(a.status || "").replace(/_/g, " ")} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase", bgcolor: `${statusColor}25`, color: statusColor }} />
       </Box>
       {a.evidence && (
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, lineHeight: 1.5, mt: 0.5 }}>{a.evidence}</Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5, mt: 0.5 }}>{a.evidence}</Typography>
       )}
     </>
   );
@@ -285,21 +285,21 @@ function ControlMappingPreview({ artifact: a }: { artifact: Artifact }) {
 function RunbookPreview({ artifact: a }: { artifact: Artifact }) {
   return (
     <>
-      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.title}</Typography>
+      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 13.5, mb: 0.5 }}>{a.title}</Typography>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 0.75 }}>
         {a.trigger && <Chip label={`Trigger: ${a.trigger}`} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04" }} />}
-        {a.audience && <Chip label={a.audience} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />}
+        {a.audience && <Chip label={a.audience} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />}
       </Box>
       {Array.isArray(a.steps) && a.steps.length > 0 && (
         <Box sx={{ pl: 1.5, mt: 0.5 }}>
           {a.steps.slice(0, 5).map((s: any, i: number) => (
-            <Typography key={i} variant="body2" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, lineHeight: 1.6 }}>
+            <Typography key={i} variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.6 }}>
               <Box component="span" sx={{ color: "#34A853", fontWeight: 700, mr: 0.5 }}>{s.order || (i + 1)}.</Box>
               {s.action}
             </Typography>
           ))}
           {a.steps.length > 5 && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
               + {a.steps.length - 5} more steps
             </Typography>
           )}
@@ -315,13 +315,13 @@ function FindingTriagePreview({ artifact: a }: { artifact: Artifact }) {
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mb: 0.5 }}>
         <Chip label={`Finding ${(a.finding_id || "").slice(0, 8)}`} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontFamily: "monospace" }} />
         <Chip label={(a.recommended_status || "").replace(/_/g, " ")} size="small" sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase", bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04" }} />
-        <Chip label={a.recommended_owner_role} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+        <Chip label={a.recommended_owner_role} size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
           priority {(a.priority_score ?? 0).toFixed(2)}
         </Typography>
       </Box>
       {a.rationale && (
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, lineHeight: 1.5, mt: 0.5 }}>{a.rationale}</Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5, mt: 0.5 }}>{a.rationale}</Typography>
       )}
     </>
   );

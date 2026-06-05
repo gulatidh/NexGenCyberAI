@@ -37,8 +37,8 @@ export default function GlobalFilters({ clients, options, state, onChange }: Pro
 
   const filterSx = {
     minWidth: 130,
-    "& .MuiOutlinedInput-root": { color: "white", fontSize: 13, "& fieldset": { borderColor: "rgba(255,255,255,0.15)" } },
-    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" },
+    "& .MuiOutlinedInput-root": { color: "text.primary", fontSize: 13, "& fieldset": { borderColor: "divider" } },
+    "& .MuiInputLabel-root": { color: "text.secondary" },
   };
 
   return (

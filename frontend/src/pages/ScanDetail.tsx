@@ -84,15 +84,15 @@ function SectionCard({ title, subtitle, icon, children, accent = "#4285F4" }: {
   title: string; subtitle?: string; icon?: React.ReactNode; children: React.ReactNode; accent?: string;
 }) {
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: subtitle ? 0.25 : 1.5 }}>
           {icon}
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>{title}</Typography>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>{title}</Typography>
           <Box sx={{ flex: 1 }} />
         </Box>
         {subtitle && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.5 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
             {subtitle}
           </Typography>
         )}
@@ -115,10 +115,10 @@ function VerdictHeadline({ verdict }: { verdict: Verdict }) {
             The Verdict
           </Typography>
         </Box>
-        <Typography sx={{ color: "white", fontWeight: 700, fontSize: 20, lineHeight: 1.3 }}>
+        <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 20, lineHeight: 1.3 }}>
           {verdict.verdict}
         </Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 1 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
           Generated {fromNow(verdict.generated_at)} · {verdict.category} for {verdict.client_name}
         </Typography>
       </CardContent>
@@ -138,7 +138,7 @@ function CapabilityGaps({ gaps }: { gaps: Verdict["capability_gaps"] }) {
           <Typography variant="body2" sx={{ color: "#FF7043", fontWeight: 600, mb: 0.25 }}>
             {g.gap}
           </Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.8)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             → {g.recommendation}
           </Typography>
         </Box>
@@ -153,7 +153,7 @@ function SignalCoverage({ rows }: { rows: Verdict["signal_coverage"] }) {
       {rows.map((r, i) => (
         <Box key={i} sx={{ mb: 1.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-            <Typography variant="body2" sx={{ color: "white", fontWeight: 600, flex: 1 }}>{r.signal}</Typography>
+            <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, flex: 1 }}>{r.signal}</Typography>
             <Typography variant="caption" sx={{ color: r.coverage_pct >= 80 ? "#34A853" : r.coverage_pct >= 40 ? "#FBBC04" : "#EA4335", fontWeight: 700 }}>
               {r.coverage_pct}%
             </Typography>
@@ -161,7 +161,7 @@ function SignalCoverage({ rows }: { rows: Verdict["signal_coverage"] }) {
           <LinearProgress variant="determinate" value={r.coverage_pct}
             sx={{ height: 6, borderRadius: 3, bgcolor: "rgba(255,255,255,0.06)",
               "& .MuiLinearProgress-bar": { bgcolor: r.coverage_pct >= 80 ? "#34A853" : r.coverage_pct >= 40 ? "#FBBC04" : "#EA4335", borderRadius: 3 } }} />
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.5 }}>{r.notes}</Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>{r.notes}</Typography>
         </Box>
       ))}
     </Box>
@@ -171,7 +171,7 @@ function SignalCoverage({ rows }: { rows: Verdict["signal_coverage"] }) {
 function AttackPaths({ rows }: { rows: Verdict["attack_paths"] }) {
   if (rows.length === 0) {
     return (
-      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+      <Typography variant="body2" sx={{ color: "text.secondary" }}>
         No multi-finding chains detected on a single resource in this scan.
       </Typography>
     );
@@ -183,10 +183,10 @@ function AttackPaths({ rows }: { rows: Verdict["attack_paths"] }) {
           <Typography variant="body2" sx={{ color: "#EA4335", fontWeight: 600, mb: 0.5 }}>
             {p.path}
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
             <strong>Resource:</strong> <code style={{ color: "#FBBC04" }}>{p.resource}</code>
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
             <strong>Evidence chain:</strong> {p.evidence}
           </Typography>
         </Box>
@@ -200,7 +200,7 @@ function VendorScorecard({ rows }: { rows: Verdict["vendor_scorecard"] }) {
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
             <TableCell>VENDOR</TableCell>
             <TableCell align="right">SCORE</TableCell>
             <TableCell align="right">EVIDENCE HITS</TableCell>
@@ -211,7 +211,7 @@ function VendorScorecard({ rows }: { rows: Verdict["vendor_scorecard"] }) {
           {rows.map((r) => {
             const scoreColor = r.score >= 7 ? "#34A853" : r.score >= 4 ? "#FBBC04" : r.score > 0 ? "#FF7043" : "rgba(255,255,255,0.3)";
             return (
-              <TableRow key={r.vendor} sx={{ "& td": { borderColor: "rgba(255,255,255,0.04)", color: "white", py: 1 } }}>
+              <TableRow key={r.vendor} sx={{ "& td": { borderColor: "divider", color: "text.primary", py: 1 } }}>
                 <TableCell sx={{ fontWeight: 600 }}>{r.vendor}</TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "flex-end" }}>
@@ -223,8 +223,8 @@ function VendorScorecard({ rows }: { rows: Verdict["vendor_scorecard"] }) {
                         "& .MuiLinearProgress-bar": { bgcolor: scoreColor, borderRadius: 2 } }} />
                   </Box>
                 </TableCell>
-                <TableCell align="right" sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{r.evidence_hits}</TableCell>
-                <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, maxWidth: 320 }}>{r.notes}</TableCell>
+                <TableCell align="right" sx={{ color: "text.secondary", fontSize: 12 }}>{r.evidence_hits}</TableCell>
+                <TableCell sx={{ color: "text.secondary", fontSize: 11, maxWidth: 320 }}>{r.notes}</TableCell>
               </TableRow>
             );
           })}
@@ -241,11 +241,11 @@ function AutomationOpps({ rows }: { rows: Verdict["automation_opportunities"] })
         <Grid size={{ xs: 12, md: 4 }} key={i}>
           <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.02)", height: "100%" }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 700, flex: 1 }}>{r.title}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 700, flex: 1 }}>{r.title}</Typography>
               <Chip label={r.estimated_effort} size="small"
                 sx={{ height: 18, fontSize: 10, bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontWeight: 700 }} />
             </Box>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)" }}>{r.description}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>{r.description}</Typography>
           </Box>
         </Grid>
       ))}
@@ -273,9 +273,9 @@ function DataCompleteness({ dc }: { dc: Verdict["data_completeness"] }) {
         <Chip size="small" icon={<Help sx={{ fontSize: 14 }} />} label={`Estimated ${dc.estimated_pct}%`}
           sx={{ bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04", fontWeight: 700, "& .MuiChip-icon": { color: "#FBBC04" } }} />
         <Chip size="small" icon={<ErrorIcon sx={{ fontSize: 14 }} />} label={`Unknown ${dc.unknown_pct}%`}
-          sx={{ bgcolor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", fontWeight: 700 }} />
+          sx={{ bgcolor: "rgba(255,255,255,0.04)", color: "text.secondary", fontWeight: 700 }} />
       </Box>
-      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{dc.notes}</Typography>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>{dc.notes}</Typography>
     </Box>
   );
 }
@@ -283,12 +283,12 @@ function DataCompleteness({ dc }: { dc: Verdict["data_completeness"] }) {
 function RpsFactorTable({ findings }: { findings: Finding[] }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const sorted = [...findings].sort((a, b) => (b.rps?.rps || 0) - (a.rps?.rps || 0));
-  if (sorted.length === 0) return <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>No findings yet.</Typography>;
+  if (sorted.length === 0) return <Typography variant="body2" sx={{ color: "text.secondary" }}>No findings yet.</Typography>;
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
             <TableCell />
             <TableCell>FINDING</TableCell>
             <TableCell align="right">RPS</TableCell>
@@ -310,10 +310,10 @@ function RpsFactorTable({ findings }: { findings: Finding[] }) {
             const lowConf = r.low_confidence;
             return (
               <React.Fragment key={f.id}>
-                <TableRow hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", py: 0.75 } }}>
+                <TableRow hover sx={{ "& td": { borderColor: "divider", color: "text.primary", py: 0.75 } }}>
                   <TableCell sx={{ width: 32 }}>
                     <IconButton size="small" onClick={() => setOpenId(isOpen ? null : f.id)}>
-                      {isOpen ? <ExpandLess sx={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }} /> : <ExpandMore sx={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }} />}
+                      {isOpen ? <ExpandLess sx={{ fontSize: 16, color: "text.secondary" }} /> : <ExpandMore sx={{ fontSize: 16, color: "text.secondary" }} />}
                     </IconButton>
                   </TableCell>
                   <TableCell sx={{ maxWidth: 280 }}>
@@ -337,7 +337,7 @@ function RpsFactorTable({ findings }: { findings: Finding[] }) {
                       <TableCell key={k} align="right">
                         <Tooltip title={`${fac.source.toUpperCase()}: ${fac.rationale}`}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, justifyContent: "flex-end" }}>
-                            <Typography variant="caption" sx={{ color: "white", fontSize: 11 }}>
+                            <Typography variant="caption" sx={{ color: "text.primary", fontSize: 11 }}>
                               {typeof fac.value === "number" ? (Number.isInteger(fac.value) ? fac.value : fac.value.toFixed(2)) : "—"}
                             </Typography>
                             <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: SOURCE_COLOR[fac.source] }} />
@@ -356,14 +356,14 @@ function RpsFactorTable({ findings }: { findings: Finding[] }) {
                           <Box key={k} sx={{ mb: 0.75, display: "flex", gap: 1, alignItems: "flex-start" }}>
                             <Box sx={{ minWidth: 130, display: "flex", alignItems: "center", gap: 0.5 }}>
                               <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: SOURCE_COLOR[fac.source] }} />
-                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", textTransform: "capitalize", fontWeight: 600 }}>
+                              <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "capitalize", fontWeight: 600 }}>
                                 {k.replace(/_/g, " ")}
                               </Typography>
                             </Box>
                             <Typography variant="caption" sx={{ color: SOURCE_COLOR[fac.source], fontWeight: 700, minWidth: 70, textTransform: "uppercase", fontSize: 10 }}>
                               {fac.source}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", flex: 1 }}>
+                            <Typography variant="caption" sx={{ color: "text.secondary", flex: 1 }}>
                               {fac.rationale}
                             </Typography>
                           </Box>
@@ -382,12 +382,12 @@ function RpsFactorTable({ findings }: { findings: Finding[] }) {
 }
 
 function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?: (f: Finding) => void }) {
-  if (findings.length === 0) return <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>No findings recorded for this scan.</Typography>;
+  if (findings.length === 0) return <Typography variant="body2" sx={{ color: "text.secondary" }}>No findings recorded for this scan.</Typography>;
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
             <TableCell>SEVERITY</TableCell>
             <TableCell>TITLE</TableCell>
             <TableCell>RESOURCE</TableCell>
@@ -398,20 +398,20 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
         </TableHead>
         <TableBody>
           {findings.map((f) => (
-            <TableRow key={f.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", py: 1 } }}>
+            <TableRow key={f.id} hover sx={{ "& td": { borderColor: "divider", color: "text.primary", py: 1 } }}>
               <TableCell>
                 <Chip label={f.severity} size="small"
                   sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}25`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18, textTransform: "uppercase", fontWeight: 700 }} />
               </TableCell>
               <TableCell sx={{ maxWidth: 360 }}>
-                <Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>{f.title}</Typography>
+                <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>{f.title}</Typography>
                 {f.description && (
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.25 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
                     {f.description.slice(0, 160)}{f.description.length > 160 ? "…" : ""}
                   </Typography>
                 )}
               </TableCell>
-              <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
+              <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
               <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
               <TableCell align="right" sx={{ color: f.cvss_score && f.cvss_score >= 7 ? "#EA4335" : "white", fontSize: 12 }}>
                 {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
@@ -423,7 +423,7 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
                       size="small"
                       onClick={(e) => { e.stopPropagation(); onDelete(f); }}
                       sx={{
-                        color: "rgba(255,255,255,0.4)",
+                        color: "text.secondary",
                         "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                       }}
                     >
@@ -540,14 +540,14 @@ export default function ScanDetail() {
       <Box className="no-print" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
         <Button startIcon={<ArrowBack />} size="small"
           onClick={() => navigate("/scans")}
-          sx={{ color: "rgba(255,255,255,0.6)" }}>
+          sx={{ color: "text.secondary" }}>
           Assessments
         </Button>
       </Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>{data.tile_name}</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>{data.tile_name}</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {data.name || `${data.scan_type} scan`}
             {data.framework ? ` · ${data.framework}` : ""}
             {data.started_at ? ` · started ${fromNow(data.started_at)}` : ""}
@@ -561,12 +561,12 @@ export default function ScanDetail() {
           }} />
           <Button variant="outlined" startIcon={<Refresh />} onClick={() => refetch()}
             className="no-print"
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>
+            sx={{ borderColor: "divider", color: "text.secondary" }}>
             Refresh
           </Button>
           <Button variant="outlined" startIcon={<Print />} onClick={() => window.print()}
             className="no-print"
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)",
+            sx={{ borderColor: "divider", color: "text.secondary",
               "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
             Print / PDF
           </Button>
@@ -583,7 +583,7 @@ export default function ScanDetail() {
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
         className="no-print"
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
+          "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
           "& .Mui-selected": { color: "#4285F4" },
           "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab icon={<AutoAwesome sx={{ fontSize: 16 }} />} iconPosition="start" value="verdict" label="AI Verdict" />
@@ -640,9 +640,9 @@ export default function ScanDetail() {
             </SectionCard>
           </Box>
         ) : (
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <AutoAwesome sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-            <Typography sx={{ color: "rgba(255,255,255,0.6)", mb: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <AutoAwesome sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+            <Typography sx={{ color: "text.secondary", mb: 2 }}>
               No AI verdict yet. Verdicts auto-generate when a scan completes; if this scan finished before that hook landed, click below to generate now.
             </Typography>
             <Button variant="contained" startIcon={<AutoAwesome />}
@@ -655,7 +655,7 @@ export default function ScanDetail() {
 
       {/* Findings tab */}
       {(tab === "findings" || printing) && (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <FindingsTable
               findings={data.findings}
@@ -667,10 +667,10 @@ export default function ScanDetail() {
 
       {/* Per-agent run tabs */}
       {data.agent_runs.map((ar) => (tab === `agent-${ar.id}` || printing) && (
-        <Card key={ar.id} sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card key={ar.id} sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, textTransform: "capitalize" }}>
+              <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700, textTransform: "capitalize" }}>
                 {agentLabel(ar)}
               </Typography>
               <Chip label={ar.status} size="small"
@@ -680,11 +680,11 @@ export default function ScanDetail() {
                   color: ar.status === "completed" ? "#34A853" : ar.status === "failed" ? "#EA4335" : "#FBBC04",
                 }} />
               <Box sx={{ flex: 1 }} />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {ar.started_at ? fromNow(ar.started_at) : ""}{ar.tokens_used ? ` · ${ar.tokens_used} tokens` : ""}
               </Typography>
             </Box>
-            <Divider sx={{ borderColor: "rgba(255,255,255,0.06)", mb: 1.5 }} />
+            <Divider sx={{ borderColor: "divider", mb: 1.5 }} />
             {ar.error_message && (
               <Alert severity="error" sx={{ mb: 1.5 }}>{ar.error_message}</Alert>
             )}
@@ -695,23 +695,23 @@ export default function ScanDetail() {
 
       {/* Confirm delete dialog */}
       <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This permanently removes the finding. If the same issue is detected on the next scan it will be re-created.
           </Typography>
           {pendingDelete && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{pendingDelete.title || "(no title)"}</Typography>
               {pendingDelete.resource_id && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDelete.resource_id}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{pendingDelete.resource_id}</Typography>
               )}
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDelete(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button
             variant="contained"
             disabled={deleteFinding.isPending}

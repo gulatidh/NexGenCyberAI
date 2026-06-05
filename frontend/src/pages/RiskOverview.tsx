@@ -74,10 +74,10 @@ function KpiCard({ label, value, sublabel, color = "#4285F4", progress }: {
   label: string; value: string; sublabel?: React.ReactNode; color?: string; progress?: number;
 }) {
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
         <Typography variant="caption"
-          sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
+          sx={{ color: "text.secondary", fontSize: 11, textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>
           {label}
         </Typography>
         <Typography sx={{ color, fontSize: 30, fontWeight: 700, lineHeight: 1.15, mt: 0.5 }}>{value}</Typography>
@@ -87,7 +87,7 @@ function KpiCard({ label, value, sublabel, color = "#4285F4", progress }: {
               "& .MuiLinearProgress-bar": { bgcolor: color, borderRadius: 3 } }} />
         )}
         {sublabel && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", mt: 0.5 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, display: "block", mt: 0.5 }}>
             {sublabel}
           </Typography>
         )}
@@ -98,7 +98,7 @@ function KpiCard({ label, value, sublabel, color = "#4285F4", progress }: {
 
 function RemediationChip({ value }: { value: string }) {
   const def = REMEDIATION_STATUSES.find((s) => s.value === value)
-    || { value, label: value.replace(/_/g, " "), color: "rgba(255,255,255,0.4)" };
+    || { value, label: value.replace(/_/g, " "), color: "text.secondary" };
   return (
     <Chip label={def.label} size="small"
       sx={{ bgcolor: `${def.color}20`, color: def.color, fontSize: 10, height: 20, textTransform: "capitalize", fontWeight: 600 }} />
@@ -110,7 +110,7 @@ function DomainBar({ rows, total }: { rows: DomainRow[]; total: number }) {
   return (
     <Box>
       {rows.length === 0 ? (
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           No domain breakdown yet — categorise risks to populate this chart.
         </Typography>
       ) : rows.map((r) => {
@@ -119,13 +119,13 @@ function DomainBar({ rows, total }: { rows: DomainRow[]; total: number }) {
         return (
           <Box key={r.domain} sx={{ mb: 1.25 }}>
             <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 0.25 }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600, flex: 1, fontSize: 13 }}>{r.domain}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, flex: 1, fontSize: 13 }}>{r.domain}</Typography>
               <Chip label={`${r.count} risk${r.count === 1 ? "" : "s"}`} size="small"
-                sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }} />
+                sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
               <Typography variant="caption" sx={{ color: "#EA4335", fontWeight: 700, minWidth: 70, textAlign: "right" }}>
                 {fmtCurrency(r.exposure)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", minWidth: 42, textAlign: "right" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", minWidth: 42, textAlign: "right" }}>
                 {sharePct.toFixed(0)}%
               </Typography>
             </Box>
@@ -175,16 +175,16 @@ export default function RiskOverview() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Risk Portfolio</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Portfolio</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Financial exposure, domain breakdown, and remediation status across the risk register
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
@@ -192,7 +192,7 @@ export default function RiskOverview() {
       </Box>
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
           Select a client to load the risk portfolio.
         </Alert>
       ) : isLoading || !portfolio ? (
@@ -200,9 +200,9 @@ export default function RiskOverview() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : portfolio.risks.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <TrendingUp sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <TrendingUp sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>
             No risks yet. Run the Risk Manager agent from the Agents page to generate the portfolio.
           </Typography>
         </Card>
@@ -243,14 +243,14 @@ export default function RiskOverview() {
           </Grid>
 
           {/* Risk by Domain */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>Risk by Domain</Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>Risk by Domain</Typography>
                 <Chip label={`${portfolio.by_domain.length} domains`} size="small"
                   sx={{ height: 18, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 11, fontWeight: 700 }} />
                 <Box sx={{ flex: 1 }} />
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Net exposure per domain
                 </Typography>
               </Box>
@@ -259,9 +259,9 @@ export default function RiskOverview() {
           </Card>
 
           {/* Filter chips */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 1.5, mb: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 1.5, mb: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap" }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>SEVERITY</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>SEVERITY</Typography>
               {["critical", "high", "medium", "low"].map((s) => (
                 <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
                   onClick={() => setSeverityFilter(severityFilter === s ? "" : s)}
@@ -274,7 +274,7 @@ export default function RiskOverview() {
                   }} />
               ))}
               <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>STATUS</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>STATUS</Typography>
               {REMEDIATION_STATUSES.map((rs) => (
                 <Chip key={rs.value} size="small" label={rs.label}
                   onClick={() => setStatusFilter(statusFilter === rs.value ? "" : rs.value)}
@@ -289,7 +289,7 @@ export default function RiskOverview() {
               {portfolio.by_domain.length > 0 && (
                 <>
                   <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mr: 1 }}>DOMAIN</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>DOMAIN</Typography>
                   {portfolio.by_domain.map((d) => (
                     <Chip key={d.domain} size="small" label={`${d.domain} · ${d.count}`}
                       onClick={() => setDomainFilter(domainFilter === d.domain ? "" : d.domain)}
@@ -304,24 +304,24 @@ export default function RiskOverview() {
                 </>
               )}
               {(severityFilter || statusFilter || domainFilter) && (
-                <Button size="small" sx={{ ml: 1, color: "rgba(255,255,255,0.5)", fontSize: 11 }}
+                <Button size="small" sx={{ ml: 1, color: "text.secondary", fontSize: 11 }}
                   onClick={() => { setSeverityFilter(""); setStatusFilter(""); setDomainFilter(""); }}>
                   Clear filters
                 </Button>
               )}
               <Box sx={{ flex: 1 }} />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Showing {filteredRisks.length} of {portfolio.risks.length} risks
               </Typography>
             </Box>
           </Card>
 
           {/* Risk table */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>SEVERITY</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell align="center">FINDINGS</TableCell>
@@ -337,7 +337,7 @@ export default function RiskOverview() {
                 <TableBody>
                   {filteredRisks.map((r) => (
                     <TableRow key={r.id} hover
-                      sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1, color: "white" } }}>
+                      sx={{ "& td": { borderColor: "divider", py: 1, color: "text.primary" } }}>
                       <TableCell>
                         <Chip label={r.severity} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[r.severity] || "#888"}25`, color: SEV_COLOR[r.severity] || "#888", fontSize: 10, height: 18, textTransform: "capitalize" }} />
@@ -352,10 +352,10 @@ export default function RiskOverview() {
                           <Chip label={r.finding_count} size="small"
                             sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
                         ) : (
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)" }}>—</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>—</Typography>
                         )}
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{r.domain}</TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.domain}</TableCell>
                       <TableCell align="center" sx={{ fontSize: 12 }}>{r.impact}/5</TableCell>
                       <TableCell align="center" sx={{ fontSize: 12 }}>{r.likelihood}/5</TableCell>
                       <TableCell align="right">
@@ -363,10 +363,10 @@ export default function RiskOverview() {
                           {r.risk_score.toFixed(1)}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right" sx={{ color: "rgba(255,255,255,0.8)", fontSize: 12, whiteSpace: "nowrap" }}>
+                      <TableCell align="right" sx={{ color: "text.secondary", fontSize: 12, whiteSpace: "nowrap" }}>
                         <Tooltip title={`Point estimate ${fmtCurrency(r.ale)} · ${fmtCurrency(r.net_ale)} after mitigation`}>
                           <Box>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>{fmtCurrency(r.ale_low)}</Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>{fmtCurrency(r.ale_low)}</Typography>
                             {" – "}
                             <Typography variant="caption" sx={{ color: "#EA4335", fontWeight: 700 }}>{fmtCurrency(r.ale_high)}</Typography>
                           </Box>
@@ -383,7 +383,7 @@ export default function RiskOverview() {
                             </Button>
                           </Tooltip>
                         ) : (
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)" }}>—</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>—</Typography>
                         )}
                       </TableCell>
                     </TableRow>

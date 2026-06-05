@@ -63,19 +63,19 @@ export default function ThreatLibraryChip({ source, sourceId, label, sx }: Props
             {data.source_id} · {data.name}
           </Typography>
           {data.category && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block", mb: 0.5, textTransform: "capitalize" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5, textTransform: "capitalize" }}>
               {data.category.replace(/_/g, " ")}
             </Typography>
           )}
           {data.description && (
-            <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.85)", lineHeight: 1.4, mb: 0.5 }}>
+            <Typography variant="caption" sx={{ display: "block", color: "text.secondary", lineHeight: 1.4, mb: 0.5 }}>
               {data.description.length > 320
                 ? `${data.description.slice(0, 320)}…`
                 : data.description}
             </Typography>
           )}
           {!!(data.related_cwes && data.related_cwes.length) && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
               CWEs: {data.related_cwes.join(", ")}
             </Typography>
           )}
@@ -98,7 +98,7 @@ export default function ThreatLibraryChip({ source, sourceId, label, sx }: Props
         sx={{
           height: 16, fontSize: 9.5, cursor: "help",
           ...(source === "capec"
-            ? { bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)" }
+            ? { bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }
             : { bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }),
           ...sx,
         }}

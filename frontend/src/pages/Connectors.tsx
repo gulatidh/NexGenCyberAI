@@ -201,7 +201,7 @@ const STATUS_PROPS: Record<string, any> = {
   active: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#00e676", label: "Active" },
   error: { icon: <Error sx={{ fontSize: 16 }} />, color: "#f44336", label: "Error" },
   pending: { icon: <HourglassEmpty sx={{ fontSize: 16 }} />, color: "#ff9800", label: "Pending" },
-  inactive: { icon: <Cable sx={{ fontSize: 16 }} />, color: "rgba(255,255,255,0.3)", label: "Inactive" },
+  inactive: { icon: <Cable sx={{ fontSize: 16 }} />, color: "text.secondary", label: "Inactive" },
 };
 
 export default function Connectors() {
@@ -279,21 +279,21 @@ export default function Connectors() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Connectors</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>Connect cloud platforms, identity providers, and SaaS tools</Typography>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Connectors</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>Connect cloud platforms, identity providers, and SaaS tools</Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Select Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Select Client</InputLabel>
             <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Select Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
@@ -325,13 +325,13 @@ export default function Connectors() {
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>Select a client to view and manage its connectors.</Alert>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>Select a client to view and manage its connectors.</Alert>
       ) : isLoading ? (
         <CircularProgress sx={{ color: "#4285F4" }} />
       ) : connectors.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-          <Cable sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No connectors. Add one to start scanning.</Typography>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+          <Cable sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>No connectors. Add one to start scanning.</Typography>
         </Card>
       ) : (
         <Box>
@@ -341,7 +341,7 @@ export default function Connectors() {
             return (
               <Box key={cat} sx={{ mb: 3 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-                  <Typography sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1 }}>
+                  <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1 }}>
                     {CATEGORY_LABEL[cat]}
                   </Typography>
                   <Chip
@@ -360,14 +360,14 @@ export default function Connectors() {
                     const tr = testResults[conn.id];
                     return (
                       <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
-                        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
                           <CardContent>
                             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                              <Typography sx={{ color: "white", fontWeight: 600 }}>{conn.name}</Typography>
+                              <Typography sx={{ color: "text.primary", fontWeight: 600 }}>{conn.name}</Typography>
                               <Chip size="small" icon={sp.icon} label={sp.label}
                                 sx={{ bgcolor: `${sp.color}20`, color: sp.color, fontSize: 11 }} />
                             </Box>
-                            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)", mb: 1.5 }}>
+                            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
                               {CONNECTOR_ICONS[conn.connector_type] || conn.connector_type}
                             </Typography>
                             {conn.error_message && (
@@ -385,7 +385,7 @@ export default function Connectors() {
                               </Button>
                               <Button size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}
                                 onClick={() => openEdit(conn)}
-                                sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)", fontSize: 11,
+                                sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11,
                                   "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" } }}>
                                 Edit
                               </Button>
@@ -414,19 +414,19 @@ export default function Connectors() {
       )}
 
       {/* Add Connector Dialog */}
-      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white", minWidth: 520 } } }}>
+      <Dialog open={open} onClose={() => { setOpen(false); setEditing(null); }} slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary", minWidth: 520 } } }}>
         <DialogTitle>{editing ? `Edit Connector — ${editing.name}` : "Add Connector"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Type</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Type</InputLabel>
                 <Select value={connectorType} onChange={(e) => {
                     setConnectorType(e.target.value as ConnectorType);
                     setCredentials({});
                     setWebTargetUrl(""); setWebAuthMethod("none"); setWebAuth({}); setWebExcludes("");
                   }}
-                  label="Type" sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  label="Type" sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {Object.entries(CONNECTOR_ICONS).map(([k, v]) => <MenuItem key={k} value={k}>{v}</MenuItem>)}
                 </Select>
               </FormControl>
@@ -434,13 +434,13 @@ export default function Connectors() {
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth size="small" label="Connector Name" value={connName} onChange={(e) => setConnName(e.target.value)}
                 slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
             </Grid>
             <Grid size={{ xs: 12 }}>
               <FormControl fullWidth size="small" required>
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
                 <Select value={connProjectId} onChange={(e) => setConnProjectId(e.target.value)} label="Project"
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                 </Select>
               </FormControl>
@@ -448,7 +448,7 @@ export default function Connectors() {
             {connectorType !== "web" && TYPE_HELP[connectorType] && (
               <Grid size={{ xs: 12 }}>
                 <Alert severity="info"
-                  sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.85)",
+                  sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary",
                     border: "1px solid rgba(66,133,244,0.25)",
                     "& .MuiAlert-icon": { color: "#4285F4" } }}>
                   {TYPE_HELP[connectorType]}
@@ -464,9 +464,9 @@ export default function Connectors() {
                   slotProps={{
                     inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } },
                     htmlInput: { style: { color: 'white' } },
-                    formHelperText: { sx: { color: "rgba(255,255,255,0.45)", fontSize: 11 } },
+                    formHelperText: { sx: { color: "text.secondary", fontSize: 11 } },
                   }}
-                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
               </Grid>
             ))}
 
@@ -476,15 +476,15 @@ export default function Connectors() {
                   <TextField fullWidth size="small" label="Target URL"
                     placeholder="https://app.example.com"
                     value={webTargetUrl} onChange={(e) => setWebTargetUrl(e.target.value)}
-                    slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Default scan profile</InputLabel>
+                    <InputLabel sx={{ color: "text.secondary" }}>Default scan profile</InputLabel>
                     <Select value={webProfile} label="Default scan profile"
                       onChange={(e) => setWebProfile(e.target.value as "baseline" | "active")}
-                      sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                      sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                       <MenuItem value="baseline">Baseline — passive crawl (~5 min, safe)</MenuItem>
                       <MenuItem value="active">Active — attack scan (~30 min, intrusive)</MenuItem>
                     </Select>
@@ -492,10 +492,10 @@ export default function Connectors() {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <FormControl fullWidth size="small">
-                    <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Authentication</InputLabel>
+                    <InputLabel sx={{ color: "text.secondary" }}>Authentication</InputLabel>
                     <Select value={webAuthMethod} label="Authentication"
                       onChange={(e) => { setWebAuthMethod(e.target.value as any); setWebAuth({}); }}
-                      sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                      sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                       <MenuItem value="none">None — unauthenticated scan</MenuItem>
                       <MenuItem value="bearer">Bearer token (API)</MenuItem>
                       <MenuItem value="cookie">Cookie</MenuItem>
@@ -509,8 +509,8 @@ export default function Connectors() {
                   <Grid size={{ xs: 12 }}>
                     <TextField fullWidth size="small" type="password" label="Bearer token"
                       value={webAuth.token || ""} onChange={(e) => setWebAuth({ ...webAuth, token: e.target.value })}
-                      slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                      slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                   </Grid>
                 )}
 
@@ -519,14 +519,14 @@ export default function Connectors() {
                     <Grid size={{ xs: 12, sm: 5 }}>
                       <TextField fullWidth size="small" label="Cookie name" placeholder="sessionid"
                         value={webAuth.cookie_name || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_name: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 7 }}>
                       <TextField fullWidth size="small" type="password" label="Cookie value"
                         value={webAuth.cookie_value || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_value: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                   </>
                 )}
@@ -536,32 +536,32 @@ export default function Connectors() {
                     <Grid size={{ xs: 12 }}>
                       <TextField fullWidth size="small" label="Login URL" placeholder="https://app.example.com/login"
                         value={webAuth.login_url || ""} onChange={(e) => setWebAuth({ ...webAuth, login_url: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" label="Username"
                         value={webAuth.username || ""} onChange={(e) => setWebAuth({ ...webAuth, username: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" type="password" label="Password"
                         value={webAuth.password || ""} onChange={(e) => setWebAuth({ ...webAuth, password: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" label="Username field name" placeholder="username"
                         value={webAuth.username_field || ""} onChange={(e) => setWebAuth({ ...webAuth, username_field: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" label="Password field name" placeholder="password"
                         value={webAuth.password_field || ""} onChange={(e) => setWebAuth({ ...webAuth, password_field: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                   </>
                 )}
@@ -572,26 +572,26 @@ export default function Connectors() {
                       <TextField fullWidth size="small" label="Token endpoint URL"
                         placeholder="https://login.example.com/oauth/token"
                         value={webAuth.token_url || ""} onChange={(e) => setWebAuth({ ...webAuth, token_url: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" label="Client ID"
                         value={webAuth.client_id || ""} onChange={(e) => setWebAuth({ ...webAuth, client_id: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }}>
                       <TextField fullWidth size="small" type="password" label="Client secret"
                         value={webAuth.client_secret || ""} onChange={(e) => setWebAuth({ ...webAuth, client_secret: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                     <Grid size={{ xs: 12 }}>
                       <TextField fullWidth size="small" label="Scope (optional)" placeholder="api:read"
                         value={webAuth.scope || ""} onChange={(e) => setWebAuth({ ...webAuth, scope: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                        sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                     </Grid>
                   </>
                 )}
@@ -601,15 +601,15 @@ export default function Connectors() {
                     label="Exclude paths (one per line, optional)"
                     placeholder={"/logout\n/payment"}
                     value={webExcludes} onChange={(e) => setWebExcludes(e.target.value)}
-                    slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                 </Grid>
               </>
             )}
           </Grid>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained"
             disabled={!connName || !connProjectId || createMutation.isPending
               || (connectorType === "web" && !webTargetUrl.trim())}

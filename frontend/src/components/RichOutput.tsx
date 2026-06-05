@@ -68,10 +68,10 @@ function isPlainObject(v: any): boolean {
 
 const mdComponents = {
   h1: ({ children }: any) => (
-    <Typography variant="h6" sx={{ color: "white", fontWeight: 700, mt: 2, mb: 1 }}>{children}</Typography>
+    <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700, mt: 2, mb: 1 }}>{children}</Typography>
   ),
   h2: ({ children }: any) => (
-    <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mt: 1.5, mb: 0.75 }}>{children}</Typography>
+    <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700, mt: 1.5, mb: 0.75 }}>{children}</Typography>
   ),
   h3: ({ children }: any) => (
     <Typography variant="subtitle2" sx={{ color: "#4285F4", fontWeight: 700, mt: 1.25, mb: 0.5, textTransform: "uppercase", fontSize: 12, letterSpacing: 1 }}>
@@ -79,31 +79,31 @@ const mdComponents = {
     </Typography>
   ),
   h4: ({ children }: any) => (
-    <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, mt: 1, mb: 0.5 }}>{children}</Typography>
+    <Typography variant="subtitle2" sx={{ color: "text.secondary", fontWeight: 700, mt: 1, mb: 0.5 }}>{children}</Typography>
   ),
   p: ({ children }: any) => (
-    <Typography sx={{ color: "rgba(255,255,255,0.88)", fontSize: 13.5, lineHeight: 1.6, mb: 1 }}>{children}</Typography>
+    <Typography sx={{ color: "text.secondary", fontSize: 13.5, lineHeight: 1.6, mb: 1 }}>{children}</Typography>
   ),
   ul: ({ children }: any) => (
-    <Box component="ul" sx={{ pl: 3, my: 0.5, color: "rgba(255,255,255,0.88)", "& li::marker": { color: "#4285F4" } }}>{children}</Box>
+    <Box component="ul" sx={{ pl: 3, my: 0.5, color: "text.secondary", "& li::marker": { color: "#4285F4" } }}>{children}</Box>
   ),
   ol: ({ children }: any) => (
-    <Box component="ol" sx={{ pl: 3, my: 0.5, color: "rgba(255,255,255,0.88)", "& li::marker": { color: "#4285F4", fontWeight: 700 } }}>{children}</Box>
+    <Box component="ol" sx={{ pl: 3, my: 0.5, color: "text.secondary", "& li::marker": { color: "#4285F4", fontWeight: 700 } }}>{children}</Box>
   ),
   li: ({ children }: any) => (
     <Box component="li" sx={{ fontSize: 13.5, lineHeight: 1.6, mb: 0.5 }}>{children}</Box>
   ),
   strong: ({ children }: any) => (
-    <Box component="strong" sx={{ color: "white", fontWeight: 700 }}>{children}</Box>
+    <Box component="strong" sx={{ color: "text.primary", fontWeight: 700 }}>{children}</Box>
   ),
   em: ({ children }: any) => (
-    <Box component="em" sx={{ color: "rgba(255,255,255,0.9)", fontStyle: "italic" }}>{children}</Box>
+    <Box component="em" sx={{ color: "text.secondary", fontStyle: "italic" }}>{children}</Box>
   ),
   blockquote: ({ children }: any) => (
     <Box sx={{
       borderLeft: "3px solid #4285F4", pl: 1.5, ml: 0, my: 1, py: 0.5,
       bgcolor: "rgba(66,133,244,0.06)", borderRadius: "0 4px 4px 0",
-      color: "rgba(255,255,255,0.8)", fontStyle: "italic",
+      color: "text.secondary", fontStyle: "italic",
     }}>{children}</Box>
   ),
   code: ({ inline, children }: any) =>
@@ -117,7 +117,7 @@ const mdComponents = {
       <Box component="pre" sx={{
         bgcolor: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.08)",
         borderRadius: 1.5, p: 1.25, my: 1, overflow: "auto",
-        fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.85)", lineHeight: 1.5,
+        fontFamily: "monospace", fontSize: 12, color: "text.secondary", lineHeight: 1.5,
       }}>
         <code>{children}</code>
       </Box>
@@ -126,13 +126,13 @@ const mdComponents = {
     <MuiLink href={href} target="_blank" rel="noreferrer"
       sx={{ color: "#4285F4", textDecorationColor: "rgba(66,133,244,0.4)" }}>{children}</MuiLink>
   ),
-  hr: () => <Divider sx={{ my: 1.5, borderColor: "rgba(255,255,255,0.08)" }} />,
+  hr: () => <Divider sx={{ my: 1.5, borderColor: "divider" }} />,
   table: ({ children }: any) => (
     <Box component="table" sx={{
       width: "100%", borderCollapse: "collapse", my: 1,
       "& th, & td": { borderBottom: "1px solid rgba(255,255,255,0.08)", px: 1, py: 0.75, fontSize: 12.5, textAlign: "left" },
-      "& th": { color: "rgba(255,255,255,0.55)", fontWeight: 700, textTransform: "uppercase", fontSize: 11, letterSpacing: 0.5 },
-      "& td": { color: "rgba(255,255,255,0.88)" },
+      "& th": { color: "text.secondary", fontWeight: 700, textTransform: "uppercase", fontSize: 11, letterSpacing: 0.5 },
+      "& td": { color: "text.secondary" },
     }}>{children}</Box>
   ),
 } as const;
@@ -216,8 +216,8 @@ function RiskRegisterTable({ rows }: { rows: RiskRow[] }) {
       <Box component="table" sx={{
         width: "100%", borderCollapse: "collapse",
         "& th, & td": { borderBottom: "1px solid rgba(255,255,255,0.08)", px: 1, py: 0.6, fontSize: 12, textAlign: "left", verticalAlign: "top" },
-        "& th": { color: "rgba(255,255,255,0.55)", fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: 0.5 },
-        "& td": { color: "rgba(255,255,255,0.88)" },
+        "& th": { color: "text.secondary", fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: 0.5 },
+        "& td": { color: "text.secondary" },
       }}>
         <thead>
           <tr>
@@ -250,7 +250,7 @@ function RiskRegisterTable({ rows }: { rows: RiskRow[] }) {
                   )}
                 </td>
                 <td>
-                  <Typography variant="body2" sx={{ color: "white", fontSize: 12.5, fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12.5, fontWeight: 500 }}>
                     {r.title || "—"}
                   </Typography>
                 </td>
@@ -278,10 +278,10 @@ function MetadataList({ data }: { data: Record<string, any> }) {
       <Box sx={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 1.5, rowGap: 0.5, mt: 0.5 }}>
         {entries.map(([k, v]) => (
           <React.Fragment key={k}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontWeight: 600, textTransform: "capitalize" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, textTransform: "capitalize" }}>
               {k.replace(/_/g, " ")}
             </Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", wordBreak: "break-word" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", wordBreak: "break-word" }}>
               {Array.isArray(v) ? v.join(", ")
                 : isPlainObject(v) ? JSON.stringify(v)
                 : String(v)}
@@ -295,7 +295,7 @@ function MetadataList({ data }: { data: Record<string, any> }) {
 
 export default function RichOutput({ value, maxHeight }: { value: any; maxHeight?: number | string }) {
   if (value === null || value === undefined) {
-    return <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>No output yet.</Typography>;
+    return <Typography variant="caption" sx={{ color: "text.secondary" }}>No output yet.</Typography>;
   }
   const { text, rest } = pickNarrative(value);
 

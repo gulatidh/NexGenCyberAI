@@ -63,8 +63,8 @@ export default function Account() {
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
         <AccountCircle sx={{ color: "#4285F4", fontSize: 32 }} />
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Account</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Account</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Profile, preferences, and access
           </Typography>
         </Box>
@@ -73,9 +73,9 @@ export default function Account() {
       <Grid container spacing={2}>
         {/* Profile */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
             <CardContent>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mb: 2 }}>Profile</Typography>
+              <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700, mb: 2 }}>Profile</Typography>
               <Field label="Display name" value={userName} />
               <Field label="Email / UPN" value={upn || "—"} mono />
               <Field label="Tenant ID" value={tenantId || "—"} mono small />
@@ -88,20 +88,20 @@ export default function Account() {
 
         {/* Preferences */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%" }}>
             <CardContent>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <Schedule sx={{ color: "#4285F4", fontSize: 20 }} />
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>Timezone</Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>Timezone</Typography>
               </Box>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                 Backend stores timestamps in UTC. Pick your timezone to control how dates render across the app.
               </Typography>
 
               <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Timezone</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Timezone</InputLabel>
                 <Select value={tz} label="Timezone" onChange={(e) => { setTz(e.target.value); setSaved(false); }}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {TZ_OPTIONS.map((o) => (
                     <MenuItem key={o.value || "auto"} value={o.value}>
                       {o.label}{o.value === "" ? ` — currently ${detectedTz}` : ""}
@@ -112,16 +112,16 @@ export default function Account() {
 
               <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: "rgba(66,133,244,0.05)", border: "1px solid rgba(66,133,244,0.2)", mb: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>ACTIVE TIMEZONE</Typography>
-                  <Tooltip title="Detected from browser if not overridden"><Public sx={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }} /></Tooltip>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>ACTIVE TIMEZONE</Typography>
+                  <Tooltip title="Detected from browser if not overridden"><Public sx={{ color: "text.secondary", fontSize: 14 }} /></Tooltip>
                 </Box>
                 <Typography sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 14 }}>{activeTz}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.5 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
                   Now: {fmt(now, "YYYY-MM-DD HH:mm:ss")} · UTC: {dayjs.utc(now).format("YYYY-MM-DD HH:mm:ss")}
                 </Typography>
               </Box>
 
-              {saved && <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "white" }}>
+              {saved && <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "text.primary" }}>
                 Saved. Reloading…
               </Alert>}
 
@@ -131,7 +131,7 @@ export default function Account() {
                   Save
                 </Button>
                 <Button variant="outlined" startIcon={<RestartAlt />} onClick={handleReset}
-                  sx={{ color: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.2)" }}>
+                  sx={{ color: "text.secondary", borderColor: "divider" }}>
                   Reset to auto
                 </Button>
               </Box>
@@ -141,13 +141,13 @@ export default function Account() {
 
         {/* Access summary */}
         <Grid size={{ xs: 12 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mb: 2 }}>Your access</Typography>
+              <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700, mb: 2 }}>Your access</Typography>
               {!me ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Loading…</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Loading…</Typography>
               ) : (me.grants || []).length === 0 ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   No grants assigned yet. Ask an administrator for access.
                 </Typography>
               ) : (
@@ -159,8 +159,8 @@ export default function Account() {
                   ))}
                 </Box>
               )}
-              <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+              <Divider sx={{ borderColor: "divider", my: 2 }} />
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Roles: <b>reader</b> (view), <b>editor</b> (read + write), <b>admin</b> (manage user access).
                 Scopes: <b>global</b>, <b>client</b>, <b>project</b>.
               </Typography>
@@ -177,9 +177,9 @@ function Field({ label, value, mono = false, small = false }: {
 }) {
   return (
     <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block" }}>{label}</Typography>
+      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, display: "block" }}>{label}</Typography>
       <Typography sx={{
-        color: "white",
+        color: "text.primary",
         fontFamily: mono ? "monospace" : undefined,
         fontSize: small ? 11 : 13,
         wordBreak: "break-all",

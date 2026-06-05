@@ -64,7 +64,7 @@ export default function DrawioDiagram({ xml, className, height = 620 }: Props) {
       <Box className={className} sx={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 1,
         p: 4, border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2,
-        color: "rgba(255,255,255,0.5)",
+        color: "text.secondary",
       }}>
         <Warning sx={{ fontSize: 24 }} />
         <Typography variant="body2">{error}</Typography>
@@ -80,13 +80,13 @@ export default function DrawioDiagram({ xml, className, height = 620 }: Props) {
         border: "1px solid rgba(255,255,255,0.06)",
         borderRadius: 2,
         overflow: "hidden",
-        bgcolor: "#1E1E1E",
+        bgcolor: "background.paper",
       }}
     >
       {!loaded && (
         <Box sx={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center",
-          justifyContent: "center", zIndex: 1, color: "rgba(255,255,255,0.6)",
+          justifyContent: "center", zIndex: 1, color: "text.secondary",
           gap: 1.5,
         }}>
           <CircularProgress size={20} sx={{ color: "#4285F4" }} />

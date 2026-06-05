@@ -123,23 +123,23 @@ export default function Assets() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Asset Inventory</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Asset Inventory</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             All cloud resources discovered by your connectors
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => (
                 <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
@@ -147,9 +147,9 @@ export default function Assets() {
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>
             <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All</MenuItem>
               {connectors.map((c) => (
                 <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
@@ -158,7 +158,7 @@ export default function Assets() {
           </FormControl>
           <Button
             variant="contained"
-            startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}
+            startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
             disabled={!clientId || syncMutation.isPending}
             onClick={() => syncMutation.mutate()}
             sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
@@ -172,7 +172,7 @@ export default function Assets() {
         <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
           <Chip label={`All: ${assets.length}`} size="small" clickable
             onClick={() => setAssetClass("")}
-            sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "white", border: assetClass ? "none" : "1px solid #4285F4" }} />
+            sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass ? "none" : "1px solid #4285F4" }} />
           {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
             <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
               onClick={() => setAssetClass(assetClass === c ? "" : c)}
@@ -184,9 +184,9 @@ export default function Assets() {
           ))}
           <Box sx={{ flexGrow: 1 }} />
           <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Resource Group</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Resource Group</InputLabel>
             <Select value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} label="Resource Group"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All</MenuItem>
               {(facets.resource_group || []).map((rg: string) => (
                 <MenuItem key={rg} value={rg}>{rg}</MenuItem>
@@ -194,9 +194,9 @@ export default function Assets() {
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Region</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Region</InputLabel>
             <Select value={region} onChange={(e) => setRegion(e.target.value)} label="Region"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All</MenuItem>
               {(facets.region || []).map((r: string) => (
                 <MenuItem key={r} value={r}>{r}</MenuItem>
@@ -204,9 +204,9 @@ export default function Assets() {
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Status</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="all">All (incl. stale)</MenuItem>
             </Select>
@@ -214,8 +214,8 @@ export default function Assets() {
           <TextField size="small" placeholder="Search name…" value={search}
             onChange={(e) => setSearch(e.target.value)}
             sx={{ minWidth: 180,
-              "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-              "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+              "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+              "& input::placeholder": { color: "text.secondary" } }} />
           <Tooltip title="Stale assets (not seen in the latest sync) — excluded from assessments & reports">
             <Button variant="outlined" size="small" onClick={() => navigate("/stale-assets")}
               sx={{ color: "#ff9800", borderColor: "rgba(255,152,0,0.5)", whiteSpace: "nowrap" }}>
@@ -226,7 +226,7 @@ export default function Assets() {
       )}
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
           Select a client to view its asset inventory.
         </Alert>
       ) : isLoading ? (
@@ -234,18 +234,18 @@ export default function Assets() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : assets.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <Storage sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <Storage sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>
             No assets discovered yet. Click <b>Sync Now</b> to pull inventory from your connectors.
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell><TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
                     sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>NAME</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "asset_type"} direction={sortDir} onClick={() => setSort("asset_type")}
@@ -275,14 +275,14 @@ export default function Assets() {
                   return (
                     <TableRow key={a.id}
                       sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                        "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                        "& td": { borderColor: "divider", py: 1 } }}
                       onClick={() => navigate(`/assets/${a.id}`)}>
-                      <TableCell sx={{ color: "white", maxWidth: 240 }}>
+                      <TableCell sx={{ color: "text.primary", maxWidth: 240 }}>
                         <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {a.name}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12, maxWidth: 200 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 200 }}>
                         <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                           {a.asset_type || "—"}
                         </Typography>
@@ -291,12 +291,12 @@ export default function Assets() {
                         <Chip label={klass} size="small"
                           sx={{ bgcolor: `${CLASS_COLOR[klass] || "#888"}20`, color: CLASS_COLOR[klass] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12, maxWidth: 200 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 200 }}>
                         <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                           {accountColumn(a)}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
                         {groupColumn(a)}
                       </TableCell>
                       <TableCell align="right" sx={{ color: findingColor, fontWeight: 600 }}>
@@ -309,7 +309,7 @@ export default function Assets() {
                         <Chip label={a.status} size="small"
                           sx={{ bgcolor: `${STATUS_COLOR[a.status] || "#888"}20`, color: STATUS_COLOR[a.status] || "#888", fontSize: 10, height: 18 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                         {fromNow(a.last_synced_at)}
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>

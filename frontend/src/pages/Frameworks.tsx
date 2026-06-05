@@ -63,8 +63,8 @@ function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </svg>
       <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column" }}>
-        <Typography sx={{ color: "white", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{score.toFixed(0)}</Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>SCORE</Typography>
+        <Typography sx={{ color: "text.primary", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{score.toFixed(0)}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>SCORE</Typography>
       </Box>
     </Box>
   );
@@ -275,31 +275,31 @@ export default function Frameworks() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Frameworks</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Frameworks</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Compliance posture against industry frameworks
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 240 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
             <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {filteredCatalog.map((f) => (
                 <MenuItem key={f.framework} value={f.framework}>
                   {f.name} ({f.total_controls})
@@ -353,7 +353,7 @@ export default function Frameworks() {
             textColor="inherit"
             indicatorColor="primary"
             sx={{
-              "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
+              "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
               "& .Mui-selected": { color: "#4285F4" },
             }}
           >
@@ -384,7 +384,7 @@ export default function Frameworks() {
       )}
 
       {importMutation.isSuccess && importMutation.data && (
-        <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "white" }}
+        <Alert severity="success" sx={{ mb: 2, bgcolor: "rgba(0,230,118,0.1)", color: "text.primary" }}
           onClose={() => importMutation.reset()}>
           Imported {importMutation.data.total_uploaded} rows ({importMutation.data.created} new, {importMutation.data.updated} updated).
         </Alert>
@@ -396,7 +396,7 @@ export default function Frameworks() {
       )}
 
       {!clientId || !framework ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
           Select a client and a framework to view the control catalog and compliance status.
         </Alert>
       ) : isLoading ? (
@@ -404,7 +404,7 @@ export default function Frameworks() {
       ) : summary ? (
         <>
           {/* Summary banner */}
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
             display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
             <ScoreDonut score={summary.score} />
             <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
@@ -413,22 +413,22 @@ export default function Frameworks() {
                   <Typography variant="caption" sx={{ color: STATUS_COLOR[s], fontSize: 11, fontWeight: 600 }}>
                     {STATUS_LABEL[s].toUpperCase()}
                   </Typography>
-                  <Typography sx={{ color: "white", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
+                  <Typography sx={{ color: "text.primary", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
                     {summary[s as keyof typeof summary] as number}
                   </Typography>
                 </Box>
               ))}
               <Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, fontWeight: 600 }}>
                   TOTAL
                 </Typography>
-                <Typography sx={{ color: "white", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
+                <Typography sx={{ color: "text.primary", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
                   {summary.total}
                 </Typography>
               </Box>
             </Box>
             {summary.last_evaluated_at && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", ml: "auto" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", ml: "auto" }}>
                 Last evaluated {fromNow(summary.last_evaluated_at)}
               </Typography>
             )}
@@ -439,7 +439,7 @@ export default function Frameworks() {
             <Chip label={`All`} size="small" clickable
               onClick={() => setStatusFilter("")}
               sx={{ bgcolor: !statusFilter ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.05)",
-                color: "white", border: !statusFilter ? "1px solid #4285F4" : "none" }} />
+                color: "text.primary", border: !statusFilter ? "1px solid #4285F4" : "none" }} />
             {STATUS_ORDER.map((s) => (
               <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
                 onClick={() => setStatusFilter(statusFilter === s ? "" : s)}
@@ -452,8 +452,8 @@ export default function Frameworks() {
             <TextField size="small" placeholder="Search controls…" value={search}
               onChange={(e) => setSearch(e.target.value)}
               sx={{ minWidth: 220, ml: "auto",
-                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+                "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                "& input::placeholder": { color: "text.secondary" } }} />
           </Box>
 
           {/* Selection toolbar — appears when at least one row is ticked */}
@@ -465,7 +465,7 @@ export default function Frameworks() {
               </Typography>
               <Box sx={{ flex: 1 }} />
               <Button size="small" onClick={() => setSelectedControlIds(new Set())}
-                sx={{ color: "rgba(255,255,255,0.6)" }}>Clear</Button>
+                sx={{ color: "text.secondary" }}>Clear</Button>
               <Button size="small" variant="contained" startIcon={<PlayArrow />}
                 onClick={openScanForSelected}
                 sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
@@ -476,8 +476,8 @@ export default function Frameworks() {
 
           {/* Grouped accordions */}
           {Array.from(grouped.entries()).length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No controls match the current filters.</Typography>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary" }}>No controls match the current filters.</Typography>
             </Card>
           ) : (
             Array.from(grouped.entries()).map(([domain, items]) => {
@@ -487,24 +487,24 @@ export default function Frameworks() {
               const someDomainSelected = domainSelectedCount > 0 && !allDomainSelected;
               return (
                 <Accordion key={domain} defaultExpanded
-                  sx={{ bgcolor: "#1E1E1E", color: "white", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
-                  <AccordionSummary expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}>
+                  sx={{ bgcolor: "background.paper", color: "text.primary", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
+                  <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />}>
                     <Typography sx={{ flexGrow: 1, fontWeight: 600 }}>{domain}</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mr: 2 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", mr: 2 }}>
                       {compl}/{items.length} compliant
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails sx={{ p: 0 }}>
                     <Table size="small">
                       <TableHead>
-                        <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                        <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                           <TableCell sx={{ width: 42, p: 0, pl: 1 }}>
                             <Checkbox size="small"
                               checked={allDomainSelected}
                               indeterminate={someDomainSelected}
                               onChange={() => toggleDomain(items, allDomainSelected)}
                               onClick={(e) => e.stopPropagation()}
-                              sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }} />
+                              sx={{ color: "text.secondary", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }} />
                           </TableCell>
                           <TableCell sx={{ width: 110 }}>CONTROL</TableCell>
                           <TableCell>TITLE</TableCell>
@@ -519,16 +519,16 @@ export default function Frameworks() {
                             <TableRow key={item.control.id}
                               sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
                                 bgcolor: checked ? "rgba(66,133,244,0.06)" : "transparent",
-                                "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}
+                                "& td": { borderColor: "divider", py: 1 } }}
                               onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
                               <TableCell sx={{ p: 0, pl: 1 }} onClick={(e) => { e.stopPropagation(); toggleControl(item.control.control_id); }}>
                                 <Checkbox size="small" checked={checked}
-                                  sx={{ color: "rgba(255,255,255,0.4)", "&.Mui-checked": { color: "#4285F4" } }} />
+                                  sx={{ color: "text.secondary", "&.Mui-checked": { color: "#4285F4" } }} />
                               </TableCell>
                               <TableCell sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
                                 {item.control.control_id}
                               </TableCell>
-                              <TableCell sx={{ color: "white", fontSize: 13, maxWidth: 600 }}>
+                              <TableCell sx={{ color: "text.primary", fontSize: 13, maxWidth: 600 }}>
                                 <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {item.control.title}
                                 </Typography>
@@ -538,7 +538,7 @@ export default function Frameworks() {
                                   sx={{ bgcolor: `${STATUS_COLOR[item.status]}20`, color: STATUS_COLOR[item.status],
                                     fontSize: 10, height: 18 }} />
                               </TableCell>
-                              <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                              <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                                 {item.derived ? "auto" : "override"}
                               </TableCell>
                             </TableRow>
@@ -555,7 +555,7 @@ export default function Frameworks() {
       ) : null}
 
       {scanMutation.isSuccess && (
-        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "white" }}
+        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}
           onClose={() => scanMutation.reset()}>
           Scan started. Compliance status will refresh automatically when it completes.
         </Alert>
@@ -563,19 +563,19 @@ export default function Frameworks() {
 
       {/* Scan dialog */}
       <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           Scan against framework
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
             Run a connector scan and update compliance for {framework ? framework.replace(/_/g, " ").toUpperCase() : ""}.
           </Typography>
 
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>
             <Select value={scanConnectorId} onChange={(e) => setScanConnectorId(e.target.value)} label="Connector"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {connectors.length === 0 && <MenuItem value="" disabled>No connectors configured</MenuItem>}
               {connectors.map((c) => (
                 <MenuItem key={c.id} value={c.id}>{c.name} ({c.connector_type})</MenuItem>
@@ -583,21 +583,21 @@ export default function Frameworks() {
             </Select>
           </FormControl>
 
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
             Scope
           </Typography>
           <RadioGroup value={scanScope} onChange={(e) => setScanScope(e.target.value as any)} sx={{ mb: 1 }}>
-            <FormControlLabel value="full" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+            <FormControlLabel value="full" control={<Radio sx={{ color: "text.secondary" }} />}
               label={<span style={{ color: "white" }}>Full framework — every control in the catalog</span>} />
-            <FormControlLabel value="selected" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+            <FormControlLabel value="selected" control={<Radio sx={{ color: "text.secondary" }} />}
               label={<span style={{ color: "white" }}>
                 Selected rows — re-scan the {selectedControlIds.size} control{selectedControlIds.size === 1 ? "" : "s"} ticked in the table
               </span>}
               disabled={selectedControlIds.size === 0} />
-            <FormControlLabel value="failing" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+            <FormControlLabel value="failing" control={<Radio sx={{ color: "text.secondary" }} />}
               label={<span style={{ color: "white" }}>Failing only — re-scan the {failingControlIds.length} non-compliant / partial controls</span>}
               disabled={failingControlIds.length === 0} />
-            <FormControlLabel value="custom" control={<Radio sx={{ color: "rgba(255,255,255,0.5)" }} />}
+            <FormControlLabel value="custom" control={<Radio sx={{ color: "text.secondary" }} />}
               label={<span style={{ color: "white" }}>Custom — specific control IDs</span>} />
           </RadioGroup>
 
@@ -606,8 +606,8 @@ export default function Frameworks() {
               onChange={(e) => setScanCustomIds(e.target.value)}
               placeholder="e.g. 1.1.1, 3.5, 6.2  (comma, space, or newline separated)"
               sx={{
-                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                "& textarea::placeholder": { color: "rgba(255,255,255,0.4)" },
+                "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                "& textarea::placeholder": { color: "text.secondary" },
               }} />
           )}
 
@@ -618,7 +618,7 @@ export default function Frameworks() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          <Button onClick={() => setScanOpen(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>Cancel</Button>
+          <Button onClick={() => setScanOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button onClick={submitScan}
             variant="contained"
             disabled={!scanConnectorId || scanMutation.isPending ||
@@ -634,32 +634,32 @@ export default function Frameworks() {
 
       {/* Detail drawer */}
       <Drawer anchor="right" open={!!selected} onClose={() => setSelected(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#0F0F0F", color: "white", width: { xs: "100%", sm: 480 }, p: 3 } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.default", color: "text.primary", width: { xs: "100%", sm: 480 }, p: 3 } } }}>
         {selected && (
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
               <Typography variant="caption" sx={{ color: "#4285F4", fontFamily: "monospace" }}>
                 {selected.control.control_id}
               </Typography>
-              <IconButton onClick={() => setSelected(null)} size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <IconButton onClick={() => setSelected(null)} size="small" sx={{ color: "text.secondary" }}>
                 <Close />
               </IconButton>
             </Box>
-            <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mb: 1 }}>
+            <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 600, mb: 1 }}>
               {selected.control.title}
             </Typography>
             <Chip label={selected.control.domain || "—"} size="small"
               sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#34A853", mb: 2 }} />
 
             {selected.control.description && (
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 3, whiteSpace: "pre-wrap" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", mb: 3, whiteSpace: "pre-wrap" }}>
                 {selected.control.description}
               </Typography>
             )}
 
-            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+            <Divider sx={{ borderColor: "divider", my: 2 }} />
 
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
               Status {selected.derived ? (
                 selected.evidence?.startsWith("Verified by Microsoft Defender") ? "(Microsoft Defender for Cloud)" : "(auto-derived)"
               ) : "(manual override)"}
@@ -683,26 +683,26 @@ export default function Frameworks() {
               ))}
             </Box>
 
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
               Evidence / notes
             </Typography>
             <TextField multiline rows={4} fullWidth value={evidenceDraft}
               onChange={(e) => setEvidenceDraft(e.target.value)}
               placeholder="Link to runbook, ticket #, audit evidence, last attestation date, etc."
               sx={{ mb: 2,
-                "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                "& textarea::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+                "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                "& textarea::placeholder": { color: "text.secondary" } }} />
 
             {!selected.derived && (
               <Button startIcon={<RestartAlt />} size="small"
                 onClick={() => resetOverrideMutation.mutate(selected.control.control_id)}
-                sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>
+                sx={{ color: "text.secondary", mb: 2 }}>
                 Reset to auto-derived
               </Button>
             )}
 
             {selected.overridden_by && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mb: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                 Overridden by {selected.overridden_by}
                 {selected.overridden_at ? ` ${fromNow(selected.overridden_at)}` : ""}
               </Typography>
@@ -710,8 +710,8 @@ export default function Frameworks() {
 
             {((selected.findings && selected.findings.length) || selected.finding_ids?.length) ? (
               <Box>
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1 }}>
+                <Divider sx={{ borderColor: "divider", my: 2 }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
                   Linked findings ({(selected.findings || selected.finding_ids || []).length})
                 </Typography>
                 {selected.findings && selected.findings.length > 0 ? (
@@ -724,7 +724,7 @@ export default function Frameworks() {
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888",
                             fontSize: 9, height: 16, flexShrink: 0, mt: "2px" }} />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ color: "white", fontSize: 12, lineHeight: 1.3,
+                          <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12, lineHeight: 1.3,
                             overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box",
                             WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                             {f.title}
@@ -737,7 +737,7 @@ export default function Frameworks() {
                               {f.asset_name || f.resource_id} →
                             </Typography>
                           ) : (
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11,
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11,
                               fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis",
                               whiteSpace: "nowrap", display: "block" }}>
                               {f.resource_id || "—"}
@@ -749,7 +749,7 @@ export default function Frameworks() {
                   })
                 ) : (
                   (selected.finding_ids || []).slice(0, 8).map((fid) => (
-                    <Typography key={fid} variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", fontFamily: "monospace", fontSize: 11 }}>
+                    <Typography key={fid} variant="caption" sx={{ display: "block", color: "text.secondary", fontFamily: "monospace", fontSize: 11 }}>
                       {fid.slice(0, 8)}…
                     </Typography>
                   ))

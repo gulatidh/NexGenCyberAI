@@ -62,8 +62,17 @@ function buildComponents(mode: "dark" | "light"): ThemeOptions["components"] {
     MuiCard: {
       styleOverrides: {
         root: {
+          // Rich tile treatment: a layered elevation shadow + crisp hairline
+          // border gives depth in both modes instead of a flat slab. (No
+          // background gradient here — it would fight MuiPaper's reset below,
+          // since a Card is also a Paper.)
           backgroundImage: "none",
-          border: isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(15,23,42,0.08)",
+          border: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid rgba(15,23,42,0.08)",
+          borderRadius: 14,
+          boxShadow: isDark
+            ? "0 1px 2px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.30)"
+            : "0 1px 2px rgba(15,23,42,0.06), 0 10px 28px rgba(15,23,42,0.10)",
+          transition: "box-shadow .2s ease, border-color .2s ease, transform .2s ease",
         },
       },
     },

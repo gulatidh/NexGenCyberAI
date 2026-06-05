@@ -23,7 +23,7 @@ export default function ComplianceOverview({ data, loading, onClick }: Props) {
   if (!data.length) {
     return (
       <Card sx={{ ...cardSx, p: 3, textAlign: "center" }}>
-        <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Typography sx={{ color: "text.secondary" }}>
           No framework data yet. Run a scan with a framework selected to populate compliance.
         </Typography>
       </Card>
@@ -42,14 +42,14 @@ export default function ComplianceOverview({ data, loading, onClick }: Props) {
               transition: "border-color .15s",
               "&:hover": { borderColor: onClick ? color : "rgba(255,255,255,0.08)" } }}>
             <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>
                 {(FRAMEWORK_LABEL[c.framework] || c.framework).toUpperCase()}
               </Typography>
               <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mt: 0.5, mb: 1 }}>
                 <Typography sx={{ color, fontSize: 30, fontWeight: 700, lineHeight: 1 }}>
                   {c.score.toFixed(0)}
                 </Typography>
-                <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>/ 100</Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: 14 }}>/ 100</Typography>
               </Box>
               <LinearProgress
                 variant="determinate"
@@ -60,7 +60,7 @@ export default function ComplianceOverview({ data, loading, onClick }: Props) {
                   "& .MuiLinearProgress-bar": { bgcolor: color, borderRadius: 3 },
                 }}
               />
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                 {c.compliant} / {c.total - c.not_applicable} compliant · {c.non_compliant} failing
               </Typography>
             </CardContent>

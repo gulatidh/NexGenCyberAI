@@ -103,32 +103,32 @@ export default function AssetDetailPage() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        <IconButton onClick={() => navigate("/assets")} sx={{ color: "rgba(255,255,255,0.7)" }}>
+        <IconButton onClick={() => navigate("/assets")} sx={{ color: "text.secondary" }}>
           <ArrowBack />
         </IconButton>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>Asset Inventory</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>Asset Inventory</Typography>
       </Box>
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
-            <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>{asset.name}</Typography>
+            <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>{asset.name}</Typography>
             <Chip label={klass} size="small"
               sx={{ bgcolor: `${CLASS_COLOR[klass] || "#888"}20`, color: CLASS_COLOR[klass] || "#888", fontSize: 11 }} />
             <Chip label={asset.status} size="small"
               sx={{ bgcolor: `${STATUS_COLOR[asset.status] || "#888"}20`, color: STATUS_COLOR[asset.status] || "#888", fontSize: 11 }} />
           </Box>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
             {asset.external_id}
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Tooltip title="Refresh inventory for this connector">
             <span>
-              <Button startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}
+              <Button startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
                 onClick={() => syncMutation.mutate()}
                 disabled={syncMutation.isPending}
-                sx={{ color: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.2)" }}
+                sx={{ color: "text.secondary", borderColor: "divider" }}
                 variant="outlined">
                 Refresh
               </Button>
@@ -149,7 +149,7 @@ export default function AssetDetailPage() {
       </Box>
 
       {scanMutation.isSuccess && (
-        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
           Scan started. Findings will appear here once it completes.
         </Alert>
       )}
@@ -157,34 +157,34 @@ export default function AssetDetailPage() {
       {/* Summary cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Open Findings</Typography>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>Open Findings</Typography>
             <Typography variant="h4" sx={{ color: openFindings > 0 ? "#f44336" : "white", fontWeight: 700 }}>
               {openFindings}
             </Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               of {findings.length} total
             </Typography>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Linked Risks</Typography>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>Linked Risks</Typography>
             <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "white", fontWeight: 700 }}>
               {risks.length}
             </Typography>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>Tags</Typography>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>Tags</Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
               {Object.keys(asset.tags || {}).length === 0 ? (
-                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)" }}>None</Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>None</Typography>
               ) : (
                 Object.entries(asset.tags || {}).map(([k, v]) => (
                   <Chip key={k} label={`${k}: ${v}`} size="small"
-                    sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 18 }} />
+                    sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 10, height: 18 }} />
                 ))
               )}
             </Box>
@@ -193,12 +193,12 @@ export default function AssetDetailPage() {
       </Grid>
 
       {/* Metadata grid */}
-      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
         <Grid container spacing={2}>
           {metaItems.map((m) => (
             <Grid key={m.label} size={{ xs: 6, sm: 4, md: 3 }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block" }}>{m.label}</Typography>
-              <Typography variant="body2" sx={{ color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{m.label}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {m.value}
               </Typography>
             </Grid>
@@ -209,7 +209,7 @@ export default function AssetDetailPage() {
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none" },
+          "& .MuiTab-root": { color: "text.secondary", textTransform: "none" },
           "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab label={`Findings (${findings.length})`} />
         <Tab label={`Risks (${risks.length})`} />
@@ -218,15 +218,15 @@ export default function AssetDetailPage() {
 
       {tab === 0 && (
         findings.length === 0 ? (
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No findings linked to this asset.</Typography>
+          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Typography sx={{ color: "text.secondary" }}>No findings linked to this asset.</Typography>
           </Card>
         ) : (
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>SEVERITY</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell>CVE</TableCell>
@@ -239,12 +239,12 @@ export default function AssetDetailPage() {
                   {findings.map((f) => {
                     const sev = (typeof f.severity === "object" ? (f.severity as any).value : f.severity) || "info";
                     return (
-                      <TableRow key={f.id} sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                      <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
                         <TableCell>
                           <Chip label={sev} size="small"
                             sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
                         </TableCell>
-                        <TableCell sx={{ color: "white", maxWidth: 400 }}>
+                        <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
                           <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.title}
                           </Typography>
@@ -253,8 +253,8 @@ export default function AssetDetailPage() {
                         <TableCell sx={{ fontSize: 12, color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
                           {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
                         </TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{f.status || "open"}</TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f.status || "open"}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                           {fromNow(f.created_at)}
                         </TableCell>
                       </TableRow>
@@ -269,15 +269,15 @@ export default function AssetDetailPage() {
 
       {tab === 1 && (
         risks.length === 0 ? (
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No risks linked to this asset.</Typography>
+          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Typography sx={{ color: "text.secondary" }}>No risks linked to this asset.</Typography>
           </Card>
         ) : (
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>LEVEL</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell>SCORE</TableCell>
@@ -289,17 +289,17 @@ export default function AssetDetailPage() {
                   {risks.map((r) => {
                     const lvl = (typeof r.risk_level === "object" ? (r.risk_level as any).value : r.risk_level) || "low";
                     return (
-                      <TableRow key={r.id} sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                      <TableRow key={r.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
                         <TableCell>
                           <Chip label={lvl} size="small"
                             sx={{ bgcolor: `${RISK_COLOR[lvl] || "#888"}20`, color: RISK_COLOR[lvl] || "#888", fontSize: 10, height: 18 }} />
                         </TableCell>
-                        <TableCell sx={{ color: "white" }}>{r.title}</TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>
+                        <TableCell sx={{ color: "text.primary" }}>{r.title}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
                           {r.risk_score != null ? r.risk_score.toFixed(1) : "—"}
                         </TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{r.owner || "—"}</TableCell>
-                        <TableCell sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}>{r.status}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.owner || "—"}</TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.status}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -311,8 +311,8 @@ export default function AssetDetailPage() {
       )}
 
       {tab === 2 && (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-          <Box component="pre" sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Box component="pre" sx={{ color: "text.secondary", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
             {JSON.stringify(asset.provider_metadata || {}, null, 2)}
           </Box>
         </Card>

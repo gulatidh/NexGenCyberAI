@@ -302,7 +302,7 @@ export default function ThreatModelDetail() {
       <Box className="no-print" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
         <Button startIcon={<ArrowBack />} size="small"
           onClick={() => navigate("/threat-models")}
-          sx={{ color: "rgba(255,255,255,0.6)" }}>
+          sx={{ color: "text.secondary" }}>
           Threat Models
         </Button>
         <Box sx={{ flex: 1 }} />
@@ -310,7 +310,7 @@ export default function ThreatModelDetail() {
           <span>
             <Button startIcon={<Replay />} size="small" disabled={inFlight || rescanMutation.isPending}
               onClick={() => rescanMutation.mutate()}
-              sx={{ color: "rgba(255,255,255,0.6)" }}>
+              sx={{ color: "text.secondary" }}>
               Re-model
             </Button>
           </span>
@@ -323,7 +323,7 @@ export default function ThreatModelDetail() {
             const w = window.open(threatModelsApi.pdfUrl(clientId, modelId!), "_blank");
             if (!w) window.print();
           }}
-          sx={{ color: "rgba(255,255,255,0.6)" }}
+          sx={{ color: "text.secondary" }}
         >
           Print / PDF
         </Button>
@@ -332,7 +332,7 @@ export default function ThreatModelDetail() {
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, mb: 2 }}>
         <Hub sx={{ color: "#4285F4", fontSize: 36, mt: 0.25 }} />
         <Box sx={{ flex: 1 }}>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>
             {data.name || `Threat Model · ${data.methodology.toUpperCase()}`}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 0.5 }}>
@@ -346,7 +346,7 @@ export default function ThreatModelDetail() {
               }} />
             {data.framework && <Chip label={data.framework} size="small"
               sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0", fontSize: 10, height: 20 }} />}
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", alignSelf: "center", ml: 1 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", alignSelf: "center", ml: 1 }}>
               {data.generated_at ? `Generated ${fromNow(data.generated_at)}` : data.created_at ? `Created ${fromNow(data.created_at)}` : ""}
               {data.ai_provider ? ` · ${data.ai_provider}${data.ai_model ? ` (${data.ai_model})` : ""}` : ""}
             </Typography>
@@ -355,15 +355,15 @@ export default function ThreatModelDetail() {
       </Box>
 
       {inFlight && (
-        <Card className="no-print" sx={{ mb: 2, bgcolor: "#1E1E1E", border: "1px solid rgba(66,133,244,0.3)" }}>
+        <Card className="no-print" sx={{ mb: 2, bgcolor: "background.paper", border: "1px solid rgba(66,133,244,0.3)" }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
               <CircularProgress size={18} sx={{ color: "#4285F4" }} />
-              <Typography variant="subtitle2" sx={{ color: "#fff", fontWeight: 600 }}>
+              <Typography variant="subtitle2" sx={{ color: "text.primary", fontWeight: 600 }}>
                 {data.progress?.current || "Building threat model…"}
               </Typography>
               {typeof data.progress?.pct === "number" && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", ml: "auto" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", ml: "auto" }}>
                   {data.progress.pct}%
                 </Typography>
               )}
@@ -400,7 +400,7 @@ export default function ThreatModelDetail() {
                         {s.label}
                       </Typography>
                       {s.detail && (
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", ml: 0.5 }}>
                           — {s.detail}
                         </Typography>
                       )}
@@ -409,7 +409,7 @@ export default function ThreatModelDetail() {
                 })}
               </Box>
             ) : (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 AI is producing the model — polling every 4 seconds.
               </Typography>
             )}
@@ -431,7 +431,7 @@ export default function ThreatModelDetail() {
               <Typography sx={{ color: "#CE93D8", fontWeight: 700, fontSize: 13, mb: 0.5 }}>
                 Diagram extracted · review before AI threat modelling
               </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.5 }}>
                 We pulled {data.component_count} component{data.component_count === 1 ? "" : "s"} and {data.data_flows.length} data flow{data.data_flows.length === 1 ? "" : "s"} from your uploaded file.
                 Check the <strong>Diagram</strong> and <strong>Components</strong> tabs below — when it looks right, click <em>Start AI threat modelling</em>.
                 Anything wrong? Delete this model and re-upload a cleaner diagram.
@@ -443,19 +443,19 @@ export default function ThreatModelDetail() {
               onClick={() => startModelingMutation.mutate()}
               sx={{ bgcolor: "#9C27B0", "&:hover": { bgcolor: "#7B1FA2" } }}
             >
-              {startModelingMutation.isPending ? <CircularProgress size={18} sx={{ color: "white" }} /> : "Start AI threat modelling"}
+              {startModelingMutation.isPending ? <CircularProgress size={18} sx={{ color: "text.primary" }} /> : "Start AI threat modelling"}
             </Button>
           </CardContent>
         </Card>
       )}
 
       {data.executive_summary && (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
           <CardContent>
             <Typography variant="caption" sx={{ color: "#4285F4", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", display: "block", mb: 1 }}>
               Executive summary
             </Typography>
-            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.88)", lineHeight: 1.6 }}>
+            <Typography variant="body2" sx={{ color: "text.secondary", lineHeight: 1.6 }}>
               {data.executive_summary}
             </Typography>
           </CardContent>
@@ -466,7 +466,7 @@ export default function ThreatModelDetail() {
         className="no-print"
         sx={{
           borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600 },
+          "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
           "& .Mui-selected": { color: "#4285F4" },
           "& .MuiTabs-indicator": { backgroundColor: "#4285F4" },
         }}>
@@ -482,7 +482,7 @@ export default function ThreatModelDetail() {
       {(tab === "diagram" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Data Flow Diagram</Typography>}
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
               <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
@@ -546,9 +546,9 @@ export default function ThreatModelDetail() {
                   disabled={data.status !== "completed"}
                   sx={{
                     textTransform: "none", fontSize: 12, fontWeight: 600,
-                    color: "rgba(255,255,255,0.75)",
+                    color: "text.secondary",
                     border: "1px solid rgba(255,255,255,0.12)",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.2)" },
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "divider" },
                   }}
                 >Download .drawio</Button>
               </Box>
@@ -562,36 +562,36 @@ export default function ThreatModelDetail() {
                 }
               />
             ) : drawioQuery.isLoading ? (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, gap: 1.5, color: "rgba(255,255,255,0.55)" }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, gap: 1.5, color: "text.secondary" }}>
                 <CircularProgress size={20} sx={{ color: "#4285F4" }} />
                 <Typography variant="body2">Rendering draw.io diagram…</Typography>
               </Box>
             ) : drawioQuery.data ? (
               <DrawioDiagram xml={drawioQuery.data.xml} />
             ) : (
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.55)", py: 4, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", py: 4, textAlign: "center" }}>
                 draw.io view unavailable.
               </Typography>
             )}
             {data.data_flows.length > 0 && (
               <>
-                <Divider sx={{ my: 2, borderColor: "rgba(255,255,255,0.06)" }} />
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1, display: "block" }}>
+                <Divider sx={{ my: 2, borderColor: "divider" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1, display: "block" }}>
                   Data flows
                 </Typography>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.06)" } }}>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                       <TableCell>FROM</TableCell><TableCell>TO</TableCell>
                       <TableCell>PROTOCOL</TableCell><TableCell>DATA</TableCell><TableCell>ENCRYPTED</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {data.data_flows.map((d, i) => (
-                      <TableRow key={i} sx={{ "& td": { color: "white", fontSize: 12.5, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                      <TableRow key={i} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
                         <TableCell>{compName.get(d.from) || d.from}</TableCell>
                         <TableCell>{compName.get(d.to) || d.to}</TableCell>
-                        <TableCell><Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)" }} /></TableCell>
+                        <TableCell><Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} /></TableCell>
                         <TableCell>{d.data}</TableCell>
                         <TableCell>
                           <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
@@ -614,11 +614,11 @@ export default function ThreatModelDetail() {
       {(tab === "components" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Components ({data.component_count})</Typography>}
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.06)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>ID</TableCell><TableCell>NAME</TableCell><TableCell>TYPE</TableCell>
                   <TableCell>TRUST ZONE</TableCell><TableCell>CRITICALITY</TableCell><TableCell>NOTES</TableCell>
                 </TableRow>
@@ -627,10 +627,10 @@ export default function ThreatModelDetail() {
                 {data.components.map((c) => {
                   const zc = ZONE_COLOR[c.trust_zone] || "rgba(255,255,255,0.4)";
                   return (
-                    <TableRow key={c.id} sx={{ "& td": { color: "white", fontSize: 12.5, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
-                      <TableCell sx={{ fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{c.id}</TableCell>
+                    <TableRow key={c.id} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
+                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{c.id}</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{c.name}</TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.7)" }}>{c.type}</TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{c.type}</TableCell>
                       <TableCell>
                         <Chip label={c.trust_zone} size="small"
                           sx={{ bgcolor: `${zc}20`, color: zc, height: 18, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }} />
@@ -640,14 +640,14 @@ export default function ThreatModelDetail() {
                           sx={{ bgcolor: `${SEV_COLOR[c.criticality] || "#888"}20`,
                             color: SEV_COLOR[c.criticality] || "#888", height: 18, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.6)" }}>{c.notes || "—"}</TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{c.notes || "—"}</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
             {data.components.length === 0 && (
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
                 No components yet.
               </Typography>
             )}
@@ -662,7 +662,7 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">Threats ({data.threat_count})</Typography>}
           {data.threats.length > 0 && (
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, mb: 1.5 }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {convertedSet.size > 0
                   ? `${convertedSet.size} of ${data.threats.length} already in Risk Register`
                   : "Convert threats into trackable Risk Register entries"}
@@ -688,17 +688,17 @@ export default function ThreatModelDetail() {
             </Box>
           )}
           {Object.keys(threatsByCat).length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 No threats produced yet.
               </Typography>
             </Card>
           ) : (
             Object.entries(threatsByCat).map(([cat, list]) => (
-              <Card key={cat} sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 1.5 }}>
+              <Card key={cat} sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 1.5 }}>
                 <CardContent>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-                    <Typography sx={{ color: "white", fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    <Typography sx={{ color: "text.primary", fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
                       {prettyCat(cat)}
                     </Typography>
                     <Chip label={list.length} size="small" sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
@@ -751,11 +751,11 @@ export default function ThreatModelDetail() {
       {(tab === "mitigations" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Mitigations ({data.mitigation_count})</Typography>}
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.06)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>ID</TableCell>
                   <TableCell>THREAT</TableCell>
                   <TableCell>ACTION</TableCell>
@@ -768,23 +768,23 @@ export default function ThreatModelDetail() {
                 {data.mitigations.map((m) => {
                   const st = STATUS_COLOR[m.status] || "rgba(255,255,255,0.4)";
                   return (
-                    <TableRow key={m.id} sx={{ "& td": { color: "white", fontSize: 12.5, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
-                      <TableCell sx={{ fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{m.id}</TableCell>
-                      <TableCell sx={{ fontFamily: "monospace", color: "rgba(255,255,255,0.6)" }}>{m.threat_id}</TableCell>
+                    <TableRow key={m.id} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
+                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{m.id}</TableCell>
+                      <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{m.threat_id}</TableCell>
                       <TableCell sx={{ maxWidth: 420 }}>{m.action}</TableCell>
                       <TableCell>{m.control_id ? <Chip label={m.control_id} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} /> : "—"}</TableCell>
                       <TableCell>
                         <Chip label={m.status.replace(/_/g, " ")} size="small"
                           sx={{ bgcolor: `${st}20`, color: st, height: 18, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }} />
                       </TableCell>
-                      <TableCell sx={{ color: "rgba(255,255,255,0.7)" }}>{m.owner || "—"}</TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{m.owner || "—"}</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
             {data.mitigations.length === 0 && (
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
                 No mitigations yet.
               </Typography>
             )}
@@ -819,10 +819,10 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
   const threatCells = decisions.filter((d) => d.state === "threat").length;
   const pct = total === 0 ? 0 : Math.round(((total - missing) / total) * 100);
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
-          <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>
+          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>
             Coverage Matrix
           </Typography>
           <Chip label={`${pct}% covered`} sx={{ bgcolor: pct >= 80 ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)", color: pct >= 80 ? "#34A853" : "#FBBC04", fontWeight: 700, height: 22, fontSize: 11 }} />
@@ -835,7 +835,7 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
                   size="small"
                   variant="contained"
                   className="no-print"
-                  startIcon={filling ? <CircularProgress size={14} sx={{ color: "white" }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
+                  startIcon={filling ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
                   disabled={filling}
                   onClick={onFillGaps}
                   sx={{ bgcolor: "#FBBC04", color: "#1A1A1A", textTransform: "none", fontWeight: 700, fontSize: 11, height: 26,
@@ -846,12 +846,12 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
               </span>
             </Tooltip>
           )}
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: "auto" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", ml: "auto" }}>
             Critical &amp; High components get full STRIDE; Medium gets applicable categories; Low only where surface exists.
           </Typography>
         </Box>
         {decisions.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
             No coverage decisions yet. Re-generate this model to populate the matrix.
           </Typography>
         ) : (
@@ -861,22 +861,22 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
             gap: 0.5,
             overflowX: "auto",
           }}>
-            <Box sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>Component</Box>
+            <Box sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>Component</Box>
             {categories.map((c) => (
-              <Box key={c} sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              <Box key={c} sx={{ p: 1, fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 {c.replace(/_/g, " ")}
               </Box>
             ))}
             {components.map((comp) => (
               <React.Fragment key={comp.id}>
-                <Box sx={{ p: 1, color: "white", fontWeight: 600, fontSize: 12.5, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1 }}>
+                <Box sx={{ p: 1, color: "text.primary", fontWeight: 600, fontSize: 12.5, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1 }}>
                   {comp.name}
-                  <Box sx={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 400, mt: 0.25 }}>{comp.criticality}</Box>
+                  <Box sx={{ fontSize: 10, color: "text.secondary", fontWeight: 400, mt: 0.25 }}>{comp.criticality}</Box>
                 </Box>
                 {categories.map((cat) => {
                   const d = cellMap.get(`${comp.id}|${cat}`);
                   if (!d) {
-                    return <Box key={cat} sx={{ p: 1, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1, fontSize: 10, color: "rgba(255,255,255,0.3)" }}>—</Box>;
+                    return <Box key={cat} sx={{ p: 1, bgcolor: "rgba(255,255,255,0.02)", borderRadius: 1, fontSize: 10, color: "text.secondary" }}>—</Box>;
                   }
                   const style = STATE_STYLE[d.state] || STATE_STYLE.missing;
                   return (
@@ -886,7 +886,7 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
                           {style.label}
                         </Typography>
                         {d.rationale && (
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: 10.5, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10.5, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                             {d.rationale}
                           </Typography>
                         )}
@@ -908,10 +908,10 @@ function MaturityView({ data }: { data: ThreatModelDetailData }) {
   const entries = Object.entries(scores).sort();
   if (entries.length === 0) {
     return (
-      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
         <CardContent>
-          <Typography variant="h6" sx={{ color: "white" }}>Maturity by Category</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+          <Typography variant="h6" sx={{ color: "text.primary" }}>Maturity by Category</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
             No maturity scores yet — generate or re-model to populate.
           </Typography>
         </CardContent>
@@ -920,12 +920,12 @@ function MaturityView({ data }: { data: ThreatModelDetailData }) {
   }
   const avg = entries.reduce((s, [, v]) => s + v, 0) / entries.length;
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
-          <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>Maturity by Category</Typography>
+          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>Maturity by Category</Typography>
           <Chip label={`avg ${avg.toFixed(2)} / 5.0`} sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", fontWeight: 700, height: 22, fontSize: 11 }} />
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", ml: "auto" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", ml: "auto" }}>
             Score = (mitigated×2 + detected×1.2 + closed-evidence×0.8 + grounded×0.5) − unmitigated-critical×1
           </Typography>
         </Box>
@@ -935,12 +935,12 @@ function MaturityView({ data }: { data: ThreatModelDetailData }) {
             const color = score >= 3.5 ? "#34A853" : score >= 2 ? "#FBBC04" : "#EA4335";
             return (
               <Box key={cat} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1.5, border: "1px solid rgba(255,255,255,0.06)" }}>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
                   {cat.replace(/_/g, " ")}
                 </Typography>
                 <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5, mt: 0.5 }}>
                   <Typography sx={{ color, fontWeight: 700, fontSize: 22, lineHeight: 1 }}>{score.toFixed(1)}</Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>/ 5.0</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>/ 5.0</Typography>
                 </Box>
                 <Box sx={{ mt: 1, height: 6, bgcolor: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
                   <Box sx={{ width: `${pct * 100}%`, height: "100%", bgcolor: color }} />
@@ -995,7 +995,7 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
   return (
     <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
-        <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontFamily: "monospace", minWidth: 40 }}>{t.id}</Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: 11, fontFamily: "monospace", minWidth: 40 }}>{t.id}</Typography>
         <Chip label={t.severity} size="small"
           sx={{ bgcolor: `${sc}20`, color: sc, height: 18, fontSize: 10, textTransform: "uppercase", fontWeight: 700 }} />
         {typeof t.priority_score === "number" && (
@@ -1004,7 +1004,7 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
         )}
         {(typeof t.likelihood === "number" && typeof t.impact === "number") && (
           <Chip label={`L${t.likelihood}·I${t.impact}`} size="small"
-            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", height: 18, fontSize: 10 }} />
+            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", height: 18, fontSize: 10 }} />
         )}
         <Tooltip title={detection === "detected" ? "SOC rule named" : detection === "gap" ? "No detection in place" : "Detection not applicable"}>
           <Chip label={`Detection: ${detection}`} size="small"
@@ -1016,8 +1016,8 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
               sx={{ bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />
           </Tooltip>
         )}
-        <Typography sx={{ color: "white", fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 200 }}>{t.title}</Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)" }}>
+        <Typography sx={{ color: "text.primary", fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 200 }}>{t.title}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           on <b>{compName}</b>
         </Typography>
         {/* Status menu (workshop mode) */}
@@ -1064,12 +1064,12 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
             </IconButton>
           </span>
         </Tooltip>
-        <IconButton size="small" className="no-print" onClick={() => setExpanded((x) => !x)} sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <IconButton size="small" className="no-print" onClick={() => setExpanded((x) => !x)} sx={{ color: "text.secondary" }}>
           {expanded ? <KeyboardArrowUp fontSize="small" /> : <KeyboardArrowDown fontSize="small" />}
         </IconButton>
       </Box>
       {t.rationale && (
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", lineHeight: 1.5, mb: 0.75 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.5, mb: 0.75 }}>
           {t.rationale}
         </Typography>
       )}
@@ -1103,7 +1103,7 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
               <Typography variant="caption" sx={{ color: "#4285F4", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
                 Attack narrative
               </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", fontSize: 12.5, lineHeight: 1.5 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5 }}>
                 {t.attack_narrative}
               </Typography>
             </Box>
@@ -1122,22 +1122,22 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
           )}
           {t.owner_role && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Owner</Typography>
-              <Chip label={t.owner_role} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Owner</Typography>
+              <Chip label={t.owner_role} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
             </Box>
           )}
           {t.decision_notes && (
             <Box sx={{ mt: 0.5 }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.25 }}>Decision notes</Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", fontSize: 12 }}>{t.decision_notes}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.25 }}>Decision notes</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 12 }}>{t.decision_notes}</Typography>
             </Box>
           )}
           {t.residual_severity && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Residual</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>Residual</Typography>
               <Chip label={t.residual_severity} size="small" sx={{ height: 18, fontSize: 10, bgcolor: `${SEV_COLOR[t.residual_severity] || "rgba(255,255,255,0.3)"}25`, color: SEV_COLOR[t.residual_severity] || "rgba(255,255,255,0.5)", fontWeight: 700 }} />
               {t.residual_rationale && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.65)", fontSize: 11.5 }}>{t.residual_rationale}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11.5 }}>{t.residual_rationale}</Typography>
               )}
             </Box>
           )}
@@ -1149,7 +1149,7 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
             <Box key={m.id} sx={{ mb: 0.25 }}>
               <Typography variant="caption" sx={{ color: "#34A853", fontWeight: 700 }}>
                 {m.id}: </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>{m.action}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>{m.action}</Typography>
               {(m.control_refs || []).map((r: any, i: number) => (
                 <Chip key={i} label={`${r.framework || "ctrl"}:${r.control_id}`} size="small" sx={{ ml: 0.75, height: 14, fontSize: 9, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
               ))}

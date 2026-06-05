@@ -2,7 +2,7 @@ import React from "react";
 import {
   Grid, Card, CardContent, Typography, Box,
   LinearProgress, CircularProgress, Chip, Avatar,
-  Button,
+  Button, useTheme,
 } from "@mui/material";
 import {
   BugReport, Security, Warning,
@@ -32,16 +32,16 @@ const FRAMEWORK_COLORS = ["#4285F4", "#34A853", "#ff6d00", "#00e676", "#ff4081"]
 
 function StatCard({ title, value, icon, color, subtitle, onClick }: any) {
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%",
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, height: "100%",
       cursor: onClick ? "pointer" : "default", "&:hover": onClick ? { borderColor: color } : {} }}
       onClick={onClick}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)" }}>{title}</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>{title}</Typography>
           <Box sx={{ color, opacity: 0.8 }}>{icon}</Box>
         </Box>
         <Typography variant="h4" sx={{ color, fontWeight: 700 }}>{value}</Typography>
-        {subtitle && <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>{subtitle}</Typography>}
+        {subtitle && <Typography variant="caption" sx={{ color: "text.secondary" }}>{subtitle}</Typography>}
       </CardContent>
     </Card>
   );
@@ -67,6 +67,7 @@ interface ActivityEvent {
 }
 
 export default function Dashboard() {
+  const theme = useTheme();
   const navigate = useNavigate();
   const [activityFilter, setActivityFilter] = React.useState<string>("all");
   const { data, isLoading } = useQuery<DashboardSummary>({
@@ -103,12 +104,12 @@ export default function Dashboard() {
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Security Posture Overview</Typography>
+        <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Security Posture Overview</Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button variant="outlined" size="small" startIcon={<BugReport />} onClick={() => navigate("/scans")}
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)", fontSize: 12 }}>New Scan</Button>
+            sx={{ borderColor: "divider", color: "text.secondary", fontSize: 12 }}>New Scan</Button>
           <Button variant="outlined" size="small" startIcon={<SmartToy />} onClick={() => navigate("/agents")}
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)", fontSize: 12 }}>Run Agent</Button>
+            sx={{ borderColor: "divider", color: "text.secondary", fontSize: 12 }}>Run Agent</Button>
         </Box>
       </Box>
 
@@ -133,10 +134,10 @@ export default function Dashboard() {
       <Grid container spacing={2} sx={{ mb: 2 }}>
         {/* Compliance Scores */}
         <Grid size={{ xs: 12, md: 7 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                <Typography variant="h6" sx={{ color: "white" }}>Framework Compliance Scores</Typography>
+                <Typography variant="h6" sx={{ color: "text.primary" }}>Framework Compliance Scores</Typography>
                 <Button size="small" endIcon={<ArrowForward sx={{ fontSize: 12 }} />} onClick={() => navigate("/frameworks")}
                   sx={{ color: "#4285F4", fontSize: 11 }}>Browse controls</Button>
               </Box>
@@ -154,9 +155,9 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ height: 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
-                  <Typography sx={{ color: "rgba(255,255,255,0.3)" }}>No compliance data yet</Typography>
+                  <Typography sx={{ color: "text.secondary" }}>No compliance data yet</Typography>
                   <Button variant="outlined" size="small" onClick={() => navigate("/scans")}
-                    sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.5)", fontSize: 11 }}>Run a scan →</Button>
+                    sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11 }}>Run a scan →</Button>
                 </Box>
               )}
             </CardContent>
@@ -165,9 +166,9 @@ export default function Dashboard() {
 
         {/* Finding Breakdown */}
         <Grid size={{ xs: 12, md: 5 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Finding Severity</Typography>
+              <Typography variant="h6" sx={{ color: "text.primary", mb: 2 }}>Finding Severity</Typography>
               {findingBreakdown.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
@@ -175,12 +176,12 @@ export default function Dashboard() {
                       {findingBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: "#1e232c", border: "none" }} />
-                    <Legend iconSize={10} wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }} />
+                    <Legend iconSize={10} wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
                 <Box sx={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Typography sx={{ color: "rgba(255,255,255,0.3)" }}>No open findings</Typography>
+                  <Typography sx={{ color: "text.secondary" }}>No open findings</Typography>
                 </Box>
               )}
             </CardContent>
@@ -191,16 +192,16 @@ export default function Dashboard() {
       {/* Posture Health */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid size={{ xs: 12 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Posture Health</Typography>
+              <Typography variant="h6" sx={{ color: "text.primary", mb: 2 }}>Posture Health</Typography>
               <Grid container spacing={2}>
                 {postureEntries.map(([label, value], i) => {
                   const v = Math.round(value as number);
                   const color = v >= 70 ? "#00e676" : v >= 40 ? "#ff9800" : "#f44336";
                   return (
                     <Grid size={{ xs: 12, sm: 6, md: 3 }} key={label}>
-                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 0.5 }}>{label}</Typography>
+                      <Typography variant="body2" sx={{ color: "text.secondary", mb: 0.5 }}>{label}</Typography>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <LinearProgress variant="determinate" value={v}
                           sx={{ flexGrow: 1, height: 8, borderRadius: 4, bgcolor: "rgba(255,255,255,0.1)",
@@ -219,12 +220,12 @@ export default function Dashboard() {
       {/* Unified Activity Feed (last 3 days) */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid size={{ xs: 12 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Bolt sx={{ color: "#FBBC04", fontSize: 22 }} />
-                  <Typography variant="h6" sx={{ color: "white" }}>Activity Feed</Typography>
+                  <Typography variant="h6" sx={{ color: "text.primary" }}>Activity Feed</Typography>
                   <Chip label="LAST 3 DAYS" size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", letterSpacing: 0.5 }} />
                 </Box>
                 <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
@@ -253,7 +254,7 @@ export default function Dashboard() {
                 const events = (activityResp?.events || []).filter((e) => activityFilter === "all" || e.kind === activityFilter);
                 if (!events.length) {
                   return (
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+                    <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
                       No activity in the last 3 days {activityFilter !== "all" ? `for ${ACTIVITY_META[activityFilter]?.label || activityFilter}` : ""}.
                     </Typography>
                   );
@@ -261,7 +262,7 @@ export default function Dashboard() {
                 return (
                   <Box sx={{ maxHeight: 360, overflowY: "auto", pr: 0.5 }}>
                     {events.map((e, idx) => {
-                      const meta = ACTIVITY_META[e.kind] || { color: "rgba(255,255,255,0.4)", icon: <Bolt sx={{ fontSize: 16 }} />, label: e.kind };
+                      const meta = ACTIVITY_META[e.kind] || { color: "text.secondary", icon: <Bolt sx={{ fontSize: 16 }} />, label: e.kind };
                       const clickable = !!e.link;
                       return (
                         <Box
@@ -282,13 +283,13 @@ export default function Dashboard() {
                             {meta.icon}
                           </Box>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
+                            <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, fontSize: 13, lineHeight: 1.3 }}>
                               {e.label}
                               {e.target && (
-                                <Box component="span" sx={{ color: "rgba(255,255,255,0.55)", fontWeight: 400, ml: 0.75 }}>· {e.target}</Box>
+                                <Box component="span" sx={{ color: "text.secondary", fontWeight: 400, ml: 0.75 }}>· {e.target}</Box>
                               )}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                               {e.client_name} · {fromNow(e.when_iso)}
                             </Typography>
                           </Box>
@@ -318,23 +319,23 @@ export default function Dashboard() {
       <Grid container spacing={2}>
         {/* Recent Scans */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Recent Scans</Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>Recent Scans</Typography>
                 <Button size="small" endIcon={<ArrowForward sx={{ fontSize: 12 }} />} onClick={() => navigate("/scans")}
                   sx={{ color: "#4285F4", fontSize: 11 }}>View All</Button>
               </Box>
               {((data as any).recent_scans || []).length === 0 ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)" }}>No scans yet.</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>No scans yet.</Typography>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   {((data as any).recent_scans || []).map((s: any) => (
                     <Box key={s.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                       p: 1, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1 }}>
                       <Box>
-                        <Typography variant="caption" sx={{ color: "white", display: "block" }}>{s.scan_type}</Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+                        <Typography variant="caption" sx={{ color: "text.primary", display: "block" }}>{s.scan_type}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
                           {fromNow(s.created_at)}
                         </Typography>
                       </Box>
@@ -350,15 +351,15 @@ export default function Dashboard() {
 
         {/* Recent Critical Findings */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Critical Findings</Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>Critical Findings</Typography>
                 <Button size="small" endIcon={<ArrowForward sx={{ fontSize: 12 }} />} onClick={() => navigate("/findings")}
                   sx={{ color: "#f44336", fontSize: 11 }}>View All</Button>
               </Box>
               {((data as any).recent_findings || []).length === 0 ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)" }}>No critical findings.</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>No critical findings.</Typography>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   {((data as any).recent_findings || []).map((f: any) => (
@@ -366,7 +367,7 @@ export default function Dashboard() {
                       p: 1, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1 }}>
                       <Chip label={f.severity} size="small"
                         sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 9, height: 16, flexShrink: 0 }} />
-                      <Typography variant="caption" sx={{ color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <Typography variant="caption" sx={{ color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {f.title}
                       </Typography>
                     </Box>
@@ -379,15 +380,15 @@ export default function Dashboard() {
 
         {/* Recent Risks */}
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Open Risks</Typography>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>Open Risks</Typography>
                 <Button size="small" endIcon={<ArrowForward sx={{ fontSize: 12 }} />} onClick={() => navigate("/risks")}
                   sx={{ color: "#ffeb3b", fontSize: 11 }}>View All</Button>
               </Box>
               {((data as any).recent_risks || []).length === 0 ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)" }}>No open risks.</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>No open risks.</Typography>
               ) : (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   {((data as any).recent_risks || []).map((r: any) => (
@@ -397,7 +398,7 @@ export default function Dashboard() {
                         {(r.risk_score || 0).toFixed(0)}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="caption" sx={{ color: "white", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <Typography variant="caption" sx={{ color: "text.primary", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {r.title}
                         </Typography>
                         <Chip label={r.risk_level} size="small"

@@ -31,8 +31,9 @@ export const SCORE_COLOR = (score: number): string => {
 };
 
 export const cardSx = {
-  bgcolor: "#1E1E1E",
-  border: "1px solid rgba(255,255,255,0.08)",
+  bgcolor: "background.paper",
+  border: "1px solid",
+  borderColor: "divider",
   borderRadius: 2,
 };
 

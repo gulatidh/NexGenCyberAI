@@ -28,23 +28,23 @@ function SectionBlock({ section }: { section: Section }) {
   return (
     <Box sx={{ py: 1, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
       <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 0.5 }}>
-        <Typography sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 600, fontSize: 13 }}>{name}</Typography>
+        <Typography sx={{ color: "text.secondary", fontWeight: 600, fontSize: 13 }}>{name}</Typography>
         {section_type === "disclaimer" && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>{body.chars || 0} chars</Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>{body.chars || 0} chars</Typography>
         )}
         {(section_type === "items" || section_type === "applicability") && Array.isArray(body.items || body.keys) && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {(body.items || body.keys).length} items
           </Typography>
         )}
         {section_type === "matrix" && body.keys && (
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {Object.keys(body.keys).length} capabilities
           </Typography>
         )}
       </Box>
       {section_type === "disclaimer" && body.text && (
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", fontStyle: "italic" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontStyle: "italic" }}>
           {body.text}
         </Typography>
       )}
@@ -52,11 +52,11 @@ function SectionBlock({ section }: { section: Section }) {
         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
           {(body.items || body.keys || []).slice(0, 30).map((item: string, i: number) => (
             <Chip key={i} label={item} size="small"
-              sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.8)", fontSize: 11, height: 22 }} />
+              sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 11, height: 22 }} />
           ))}
           {(body.items || body.keys || []).length > 30 && (
             <Chip label={`+${(body.items || body.keys).length - 30} more`} size="small"
-              sx={{ bgcolor: "transparent", color: "rgba(255,255,255,0.4)", fontSize: 11, height: 22 }} />
+              sx={{ bgcolor: "transparent", color: "text.secondary", fontSize: 11, height: 22 }} />
           )}
         </Box>
       )}
@@ -75,7 +75,7 @@ function SectionBlock({ section }: { section: Section }) {
 function KnowledgeCard({ file }: { file: KFile }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 1.5 }}>
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 1.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", p: 1.5, cursor: "pointer" }}
         onClick={() => setExpanded((v) => !v)}>
         <Box sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: "rgba(66,133,244,0.1)",
@@ -83,29 +83,29 @@ function KnowledgeCard({ file }: { file: KFile }) {
           <Storage sx={{ color: "#4285F4", fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14 }}>{file.name}</Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14 }}>{file.name}</Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {file.description}
           </Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 1 }}>
           <Chip label={`${file.section_count} sections`} size="small"
-            sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)", fontSize: 11, height: 20 }} />
+            sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 11, height: 20 }} />
           <Chip label={`${file.size_kb} KB`} size="small"
-            sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)", fontSize: 11, height: 20 }} />
+            sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 11, height: 20 }} />
           {file.version && (
             <Chip label={file.version} size="small"
               sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 11, height: 20, fontWeight: 700 }} />
           )}
         </Box>
-        <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <IconButton size="small" sx={{ color: "text.secondary" }}>
           {expanded ? <ExpandLess /> : <ExpandMore />}
         </IconButton>
       </Box>
       <Collapse in={expanded}>
         <Box sx={{ px: 2, pb: 1.5, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {file.used_by.length > 0 && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", py: 1 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", py: 1 }}>
               Powers agents: {file.used_by.join(", ")}
             </Typography>
           )}
@@ -146,8 +146,8 @@ export default function KnowledgeBase() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Knowledge Base</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Knowledge Base</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {stats
               ? `${stats.file_count} knowledge file${stats.file_count === 1 ? "" : "s"} powering ${stats.agent_count} specialist agent${stats.agent_count === 1 ? "" : "s"}`
               : "Loading…"}
@@ -167,24 +167,24 @@ export default function KnowledgeBase() {
         value={search} onChange={(e) => setSearch(e.target.value)}
         slotProps={{
           input: {
-            startAdornment: <InputAdornment position="start"><Search sx={{ color: "rgba(255,255,255,0.4)" }} /></InputAdornment>,
+            startAdornment: <InputAdornment position="start"><Search sx={{ color: "text.secondary" }} /></InputAdornment>,
           },
-          htmlInput: { style: { color: "white" } },
+          htmlInput: { style: { color: "text.primary" } },
         }}
-        sx={{ mb: 3, "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" } }}
+        sx={{ mb: 3, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
       />
 
       {isLoading ? (
         <CircularProgress sx={{ color: "#4285F4" }} />
       ) : visibleCategories.length === 0 ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.primary" }}>
           {search.trim().length >= 2 ? `No matches for "${search}"` : "No knowledge files loaded yet."}
         </Alert>
       ) : (
         visibleCategories.map((cat) => (
           <Box key={cat.key} sx={{ mb: 4 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-              <Typography sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
+              <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5 }}>
                 {cat.label}
               </Typography>
               <Chip label={cat.count} size="small"

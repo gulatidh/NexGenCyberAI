@@ -78,7 +78,7 @@ function FeedTile({
 
   return (
     <Card sx={{
-      bgcolor: "#1E1E1E",
+      bgcolor: "background.paper",
       border: `1px solid ${hasError ? "#EA433580" : synced ? `${color}40` : "rgba(255,255,255,0.08)"}`,
       borderRadius: 2, height: "100%",
     }}>
@@ -99,13 +99,13 @@ function FeedTile({
                 height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
                 letterSpacing: 0.5, bgcolor: `${color}20`, color, mb: 0.5,
               }} />
-            <Typography sx={{ color: "white", fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>
+            <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>
               {feed.name}
             </Typography>
             <Tooltip title={feed.source_url}>
               <Typography component="a" href={feed.source_url} target="_blank" rel="noreferrer"
                 sx={{
-                  color: "rgba(255,255,255,0.45)", fontSize: 11, textDecoration: "none",
+                  color: "text.secondary", fontSize: 11, textDecoration: "none",
                   display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   "&:hover": { color },
                 }}>
@@ -130,7 +130,7 @@ function FeedTile({
             }} />
         </Box>
 
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12.5, lineHeight: 1.5, mb: 1.5 }}>
+        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.5, mb: 1.5 }}>
           {feed.description}
         </Typography>
 
@@ -140,20 +140,20 @@ function FeedTile({
           <Typography sx={{ color, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>
             {feed.count.toLocaleString()}
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {feed.item_label}
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
           {feed.last_synced_at ? `Last sync ${fromNow(feed.last_synced_at)}` : "Never synced"}
         </Typography>
         {feed.schedule_label && (
           <Tooltip title={feed.next_run_at ? `Next run ${fromNow(feed.next_run_at)}` : feed.schedule_label}>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "flex", alignItems: "center", gap: 0.5, mb: 1.5 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "flex", alignItems: "center", gap: 0.5, mb: 1.5 }}>
               <ScheduleOutlined sx={{ fontSize: 12 }} />
               {feed.schedule_label}
               {feed.next_run_at && (
-                <Box component="span" sx={{ color: "rgba(255,255,255,0.55)" }}>
+                <Box component="span" sx={{ color: "text.secondary" }}>
                   · next {fromNow(feed.next_run_at)}
                 </Box>
               )}
@@ -246,7 +246,7 @@ export default function ThreatIntel() {
     return (
       <Box sx={{ maxWidth: 640, mx: "auto", mt: 6 }}>
         <Alert severity="warning" icon={<AdminPanelSettings />}
-          sx={{ bgcolor: "rgba(255,152,0,0.08)", color: "white", border: "1px solid rgba(255,152,0,0.3)" }}>
+          sx={{ bgcolor: "rgba(255,152,0,0.08)", color: "text.primary", border: "1px solid rgba(255,152,0,0.3)" }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Admin access required</Typography>
           External feed sync is restricted to administrators.
         </Alert>
@@ -260,21 +260,21 @@ export default function ThreatIntel() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Sync</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Sync</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             On-demand sync for external CVEs, threat intel, and framework catalogs
           </Typography>
         </Box>
         <Button
           variant="contained"
           size="large"
-          startIcon={allSyncing ? <CircularProgress size={18} sx={{ color: "white" }} /> : <Sync />}
+          startIcon={allSyncing ? <CircularProgress size={18} sx={{ color: "text.primary" }} /> : <Sync />}
           disabled={allSyncing || !!syncingId}
           onClick={() => syncAll.mutate()}
           sx={{
-            bgcolor: "#4285F4", color: "white", textTransform: "none", fontWeight: 700,
+            bgcolor: "#4285F4", color: "text.primary", textTransform: "none", fontWeight: 700,
             "&:hover": { bgcolor: "#1a73e8" },
-            "&.Mui-disabled": { bgcolor: "rgba(66,133,244,0.4)", color: "rgba(255,255,255,0.7)" },
+            "&.Mui-disabled": { bgcolor: "rgba(66,133,244,0.4)", color: "text.secondary" },
           }}
         >
           {allSyncing ? "Syncing all…" : anySynced ? "Sync all feeds" : "Run first sync"}
@@ -287,16 +287,16 @@ export default function ThreatIntel() {
             bgcolor: "rgba(66,133,244,0.1)",
             "& .MuiLinearProgress-bar": { bgcolor: "#4285F4" },
           }} />
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 0.5, display: "block" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
             Running every feed sequentially. EPSS download is the longest (~10MB compressed).
           </Typography>
         </Box>
       )}
 
       {!anySynced && !allSyncing && (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "white", border: "1px solid rgba(66,133,244,0.3)", mb: 2 }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.primary", border: "1px solid rgba(66,133,244,0.3)", mb: 2 }}>
           <Typography sx={{ fontWeight: 600, mb: 0.25 }}>No external data synced yet</Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Until you run the first sync, EPSS and KEV factors in the Risk Priority Score are marked <code>unknown</code> and dropped from the multiplication. Click <i>Sync all feeds</i> or use the per-tile <i>Sync</i> button to populate each cache.
           </Typography>
         </Alert>
@@ -321,12 +321,12 @@ export default function ThreatIntel() {
         </Grid>
       )}
 
-      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 3 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 3 }}>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700, mb: 1 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700, mb: 1 }}>
             How sync works
           </Typography>
-          <Box component="ul" sx={{ pl: 2.5, color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 1.7, m: 0 }}>
+          <Box component="ul" sx={{ pl: 2.5, color: "text.secondary", fontSize: 13, lineHeight: 1.7, m: 0 }}>
             <li><b>Auto-scheduled in the background</b> via APScheduler on the API process (EPSS/KEV daily, NVD every 6h, ATT&CK/CAPEC weekly). The "Sync" button on each tile still works for an immediate refresh — useful when an upstream feed has just published an update.</li>
             <li><b>Outbound HTTPS</b> to public feeds (FIRST.org, cisa.gov, nvd.nist.gov, github.com/mitre). No credentials required.</li>
             <li><b>Cached on disk</b> at <code>backend/data/</code> (and the <code>threat_library</code> table for ATT&CK/CAPEC) so a process restart doesn't require re-downloading.</li>

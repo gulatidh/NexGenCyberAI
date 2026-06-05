@@ -40,14 +40,14 @@ export default function SearchAndFilters({ state, options, onChange }: Props) {
   const update = (patch: Partial<FilterState>) => onChange({ ...state, ...patch });
 
   const inputSx = {
-    "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.15)" } },
-    "& input::placeholder": { color: "rgba(255,255,255,0.4)" },
-    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" },
+    "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+    "& input::placeholder": { color: "text.secondary" },
+    "& .MuiInputLabel-root": { color: "text.secondary" },
   };
   const filterSx = {
     minWidth: 140,
-    "& .MuiOutlinedInput-root": { color: "white", fontSize: 13, "& fieldset": { borderColor: "rgba(255,255,255,0.15)" } },
-    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" },
+    "& .MuiOutlinedInput-root": { color: "text.primary", fontSize: 13, "& fieldset": { borderColor: "divider" } },
+    "& .MuiInputLabel-root": { color: "text.secondary" },
   };
 
   return (
@@ -63,7 +63,7 @@ export default function SearchAndFilters({ state, options, onChange }: Props) {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: "rgba(255,255,255,0.4)", fontSize: 18 }} />
+                  <Search sx={{ color: "text.secondary", fontSize: 18 }} />
                 </InputAdornment>
               ),
             },
@@ -125,7 +125,7 @@ export default function SearchAndFilters({ state, options, onChange }: Props) {
           </Select>
         </FormControl>
         <Button size="small" onClick={() => setAdvanced((v) => !v)}
-          sx={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+          sx={{ color: "text.secondary", fontSize: 12 }}>
           {advanced ? "Hide" : "More filters"}
         </Button>
       </Box>

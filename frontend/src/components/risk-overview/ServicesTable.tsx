@@ -33,20 +33,20 @@ export default function ServicesTable({ data, loading }: Props) {
   return (
     <Card sx={cardSx}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
           Services with Most Issues
         </Typography>
         {loading ? (
           <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.04)" }} />
         ) : data.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 3 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 3 }}>
             No service data — sync assets to populate this table.
           </Typography>
         ) : (
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>
                     <TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
                       sx={{ color: "rgba(255,255,255,0.5) !important" }}>SERVICE</TableSortLabel>
@@ -73,7 +73,7 @@ export default function ServicesTable({ data, loading }: Props) {
               </TableHead>
               <TableBody>
                 {sorted.map((s) => (
-                  <TableRow key={s.name} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                  <TableRow key={s.name} sx={{ "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 1 } }}>
                     <TableCell sx={{ textTransform: "capitalize" }}>{s.name}</TableCell>
                     <TableCell sx={{ color: "rgba(255,255,255,0.5) !important", fontSize: 11 }}>{s.owner}</TableCell>
                     <TableCell align="right" sx={{ color: "rgba(255,255,255,0.7) !important" }}>{s.asset_count}</TableCell>

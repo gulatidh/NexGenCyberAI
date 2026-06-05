@@ -65,35 +65,35 @@ export default function Technologies() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2.5, flexWrap: "wrap", gap: 1 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Technology Inventory</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Technology Inventory</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Discover, classify, and assess technologies running across your environment
           </Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
           {inventory?.as_of && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               as of {fmt(inventory.as_of, "MMM D, HH:mm")}
             </Typography>
           )}
-          <Button size="small" startIcon={isFetching ? <CircularProgress size={14} sx={{ color: "white" }} /> : <Refresh />}
+          <Button size="small" startIcon={isFetching ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
             onClick={() => refetch()} disabled={isFetching}
-            sx={{ color: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.2)" }} variant="outlined">
+            sx={{ color: "text.secondary", borderColor: "divider" }} variant="outlined">
             Refresh
           </Button>
         </Box>
@@ -103,7 +103,7 @@ export default function Technologies() {
 
       {/* Total + status counts */}
       <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2, alignItems: "center", gap: 2 }}>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           {filteredTechnologies.length} of {inventory?.summary.total ?? 0} technologies
         </Typography>
       </Box>

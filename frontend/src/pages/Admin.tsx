@@ -117,7 +117,7 @@ export default function Admin() {
     return (
       <Box sx={{ maxWidth: 640, mx: "auto", mt: 6 }}>
         <Alert severity="warning" icon={<AdminPanelSettings />}
-          sx={{ bgcolor: "rgba(255,152,0,0.08)", color: "white", border: "1px solid rgba(255,152,0,0.3)" }}>
+          sx={{ bgcolor: "rgba(255,152,0,0.08)", color: "text.primary", border: "1px solid rgba(255,152,0,0.3)" }}>
           <Typography sx={{ fontWeight: 600, mb: 0.5 }}>Admin access required</Typography>
           You're signed in as <b>{me?.email || "unknown"}</b>. Ask a global or scoped admin
           to grant you the <b>admin</b> role.
@@ -130,8 +130,8 @@ export default function Admin() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 1 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Administration</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Administration</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             User access and RBAC grants
           </Typography>
         </Box>
@@ -141,21 +141,21 @@ export default function Admin() {
         </Button>
       </Box>
 
-      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
         <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
             Users with access ({users.length})
           </Typography>
           {isLoading ? (
             <CircularProgress sx={{ color: "#4285F4" }} />
           ) : users.length === 0 ? (
-            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 4 }}>
+            <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
               No grants yet. Click "Grant access" to add the first user.
             </Typography>
           ) : (
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>USER</TableCell>
                   <TableCell>ROLE</TableCell>
                   <TableCell>SCOPE</TableCell>
@@ -165,14 +165,14 @@ export default function Admin() {
               </TableHead>
               <TableBody>
                 {users.flatMap((u) => u.grants.map((g, idx) => (
-                  <TableRow key={g.id} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                  <TableRow key={g.id} sx={{ "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 1 } }}>
                     <TableCell>
                       {idx === 0 ? (
-                        <Typography variant="body2" sx={{ color: "white", fontFamily: "monospace", fontSize: 12 }}>
+                        <Typography variant="body2" sx={{ color: "text.primary", fontFamily: "monospace", fontSize: 12 }}>
                           {u.email}
                         </Typography>
                       ) : (
-                        <Box sx={{ pl: 1, color: "rgba(255,255,255,0.3)" }}>↳</Box>
+                        <Box sx={{ pl: 1, color: "text.secondary" }}>↳</Box>
                       )}
                     </TableCell>
                     <TableCell>
@@ -184,9 +184,9 @@ export default function Admin() {
                     <TableCell>
                       <Chip icon={SCOPE_ICON[g.scope_type] as any}
                         label={g.scope_label || g.scope_type} size="small"
-                        sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.85)",
+                        sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary",
                           fontSize: 10, height: 20,
-                          "& .MuiChip-icon": { color: "rgba(255,255,255,0.5)" } }} />
+                          "& .MuiChip-icon": { color: "text.secondary" } }} />
                     </TableCell>
                     <TableCell sx={{ color: "rgba(255,255,255,0.5) !important", fontFamily: "monospace", fontSize: 11 }}>
                       {g.granted_by || "—"}
@@ -199,7 +199,7 @@ export default function Admin() {
                               revokeMutation.mutate(g.id);
                             }
                           }}
-                          sx={{ color: "rgba(255,255,255,0.4)", "&:hover": { color: "#f44336" } }}>
+                          sx={{ color: "text.secondary", "&:hover": { color: "#f44336" } }}>
                           <Delete sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
@@ -214,30 +214,30 @@ export default function Admin() {
 
       {/* Grant dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>Grant access</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
             <TextField label="User email / UPN" size="small" value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="user@yourcompany.com"
-              sx={{ "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" } }} />
+              sx={{ "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                "& .MuiInputLabel-root": { color: "text.secondary" } }} />
             <FormControl size="small">
-              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Role</InputLabel>
+              <InputLabel sx={{ color: "text.secondary" }}>Role</InputLabel>
               <Select label="Role" value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value as AccessRole })}
-                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                 <MenuItem value="reader">Reader — read-only access</MenuItem>
                 <MenuItem value="editor">Editor — read, create, update, delete</MenuItem>
                 <MenuItem value="admin">Admin — Editor + manage user access</MenuItem>
               </Select>
             </FormControl>
             <FormControl size="small">
-              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scope</InputLabel>
+              <InputLabel sx={{ color: "text.secondary" }}>Scope</InputLabel>
               <Select label="Scope" value={form.scope_type}
                 onChange={(e) => setForm({ ...form, scope_type: e.target.value as AccessScope, scope_client_id: "", scope_project_id: "" })}
-                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                 <MenuItem value="global" disabled={!isGlobalAdmin}>
                   Global — applies everywhere {!isGlobalAdmin && "(global admin only)"}
                 </MenuItem>
@@ -251,20 +251,20 @@ export default function Admin() {
             </FormControl>
             {(form.scope_type === "client" || form.scope_type === "project") && (
               <FormControl size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
                 <Select label="Client" value={form.scope_client_id}
                   onChange={(e) => setForm({ ...form, scope_client_id: e.target.value, scope_project_id: "" })}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                 </Select>
               </FormControl>
             )}
             {form.scope_type === "project" && form.scope_client_id && (
               <FormControl size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
                 <Select label="Project" value={form.scope_project_id}
                   onChange={(e) => setForm({ ...form, scope_project_id: e.target.value })}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {visibleProjects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                 </Select>
               </FormControl>
@@ -278,7 +278,7 @@ export default function Admin() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>Cancel</Button>
+          <Button onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained" disabled={grantMutation.isPending || !form.email
             || (form.scope_type === "client" && !form.scope_client_id)
             || (form.scope_type === "project" && !form.scope_project_id)}
@@ -290,14 +290,14 @@ export default function Admin() {
       </Dialog>
 
       <Box sx={{ mt: 3 }}>
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
-            <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.7)", mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 1 }}>
               Your effective access
             </Typography>
             <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
               {(me.grants || []).length === 0 ? (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>None.</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>None.</Typography>
               ) : (
                 me.grants.map((g) => (
                   <Chip key={g.id}

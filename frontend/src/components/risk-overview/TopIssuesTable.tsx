@@ -47,14 +47,14 @@ export default function TopIssuesTable({ data, loading }: Props) {
     <Card sx={cardSx}>
       <CardContent sx={{ "&:last-child": { pb: 1 } }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
             Top Issues
           </Typography>
           <TextField size="small" placeholder="Search issue or framework…"
             value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             sx={{ minWidth: 240,
-              "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.15)" } },
-              "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+              "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+              "& input::placeholder": { color: "text.secondary" } }} />
         </Box>
         {loading ? (
           <Skeleton variant="rectangular" height={300} sx={{ bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1 }} />
@@ -63,7 +63,7 @@ export default function TopIssuesTable({ data, loading }: Props) {
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>
                       <TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
                         sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>
@@ -93,12 +93,12 @@ export default function TopIssuesTable({ data, loading }: Props) {
                 </TableHead>
                 <TableBody>
                   {pageRows.length === 0 && (
-                    <TableRow><TableCell colSpan={5} align="center" sx={{ color: "rgba(255,255,255,0.4)", py: 3 }}>
+                    <TableRow><TableCell colSpan={5} align="center" sx={{ color: "text.secondary", py: 3 }}>
                       No matching issues
                     </TableCell></TableRow>
                   )}
                   {pageRows.map((r, i) => (
-                    <TableRow key={`${r.title}-${i}`} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                    <TableRow key={`${r.title}-${i}`} sx={{ "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 1 } }}>
                       <TableCell>
                         <Chip label={r.severity} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[r.severity]}20`, color: SEV_COLOR[r.severity], fontSize: 10, height: 18 }} />
@@ -126,7 +126,7 @@ export default function TopIssuesTable({ data, loading }: Props) {
               rowsPerPage={perPage}
               onRowsPerPageChange={(e) => { setPerPage(parseInt(e.target.value, 10)); setPage(0); }}
               rowsPerPageOptions={[5, 10, 25]}
-              sx={{ color: "rgba(255,255,255,0.6)", "& .MuiTablePagination-actions svg": { color: "rgba(255,255,255,0.6)" } }}
+              sx={{ color: "text.secondary", "& .MuiTablePagination-actions svg": { color: "text.secondary" } }}
             />
           </>
         )}

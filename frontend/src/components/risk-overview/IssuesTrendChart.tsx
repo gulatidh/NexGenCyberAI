@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardContent, Typography, Box, Skeleton } from "@mui/material";
+import { Card, CardContent, Typography, Box, Skeleton, useTheme } from "@mui/material";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
@@ -13,14 +13,15 @@ interface Props {
 }
 
 export default function IssuesTrendChart({ data, loading }: Props) {
+  const theme = useTheme();
   return (
     <Card sx={cardSx}>
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
             Issues by severity — last {data.length} days
           </Typography>
-          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             new findings per day
           </Typography>
         </Box>
@@ -42,9 +43,9 @@ export default function IssuesTrendChart({ data, loading }: Props) {
               <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 11 }} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#1e232c", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6 }}
-                labelStyle={{ color: "white" }}
+                labelStyle={{ color: theme.palette.text.primary }}
               />
-              <Legend wrapperStyle={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }} iconSize={10} />
+              <Legend wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 11 }} iconSize={10} />
               {(["low", "medium", "high", "critical"] as const).map(sev => (
                 <Area key={sev} type="monotone" dataKey={sev} stackId="1"
                   stroke={SEV_COLOR[sev]} strokeWidth={1.5}

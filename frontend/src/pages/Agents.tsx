@@ -75,70 +75,70 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
-      slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+      slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
       <DialogTitle>
         {readOnly ? "Agent Configuration" : "Edit Agent Configuration"}
-        <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+        <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
           {agent.name} · {agent.group_label}{agent.is_builtin && " · Built-in"}
         </Typography>
       </DialogTitle>
-      <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <DialogContent dividers sx={{ borderColor: "divider" }}>
         <Grid container spacing={2} sx={{ mt: 0.5 }}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth size="small" label="Name" disabled={readOnly}
               value={form.name || ""} onChange={(e) => set("name", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth size="small" label="Domain" disabled={readOnly}
               value={form.domain || ""} onChange={(e) => set("domain", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth size="small" label="Description" disabled={readOnly}
               value={form.description || ""} onChange={(e) => set("description", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth size="small" label="Objective" disabled={readOnly}
               value={form.objective || ""} onChange={(e) => set("objective", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth size="small" label="System Prompt" multiline minRows={6} disabled={readOnly}
               value={form.system_prompt || ""} onChange={(e) => set("system_prompt", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace", fontSize: 12 } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" label="Provider" disabled={readOnly}
               placeholder="inherit"
               value={form.provider || ""} onChange={(e) => set("provider", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" label="Model" disabled={readOnly}
               placeholder="inherit"
               value={form.model || ""} onChange={(e) => set("model", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="number" label="Temperature" disabled={readOnly}
               value={form.temperature ?? 0.1} onChange={(e) => set("temperature", parseFloat(e.target.value))}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { step: 0.1, min: 0, max: 2, style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { step: 0.1, min: 0, max: 2, style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" type="number" label="Max Tokens" disabled={readOnly}
               value={form.max_tokens ?? 4096} onChange={(e) => set("max_tokens", parseInt(e.target.value, 10))}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -149,7 +149,7 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
           </Grid>
           {readOnly && (
             <Grid size={{ xs: 12 }}>
-              <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "white" }}>
+              <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.primary" }}>
                 Read-only view. Only administrators can edit the agent catalog.
               </Alert>
             </Grid>
@@ -157,7 +157,7 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
         </Grid>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+        <Button onClick={onClose} sx={{ color: "text.secondary" }}>Close</Button>
         {!readOnly && (
           <Button variant="contained" onClick={() => onSave(form)}>Save</Button>
         )}
@@ -187,31 +187,31 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
-      slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+      slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
       <DialogTitle>New Agent</DialogTitle>
-      <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <DialogContent dividers sx={{ borderColor: "divider" }}>
         <Grid container spacing={2} sx={{ mt: 0.5 }}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth size="small" label="Key (slug, unique)" required
               value={data.key} onChange={(e) => setData({ ...data, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth size="small" label="Display Name" required
               value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <FormControl fullWidth size="small">
-              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Group</InputLabel>
+              <InputLabel sx={{ color: "text.secondary" }}>Group</InputLabel>
               <Select value={data.group_key} label="Group"
                 onChange={(e) => {
                   const g = existingGroups.find((x) => x.key === e.target.value);
                   setData({ ...data, group_key: e.target.value, group_label: g?.label || e.target.value });
                 }}
-                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                 {existingGroups.map((g) => <MenuItem key={g.key} value={g.key}>{g.label}</MenuItem>)}
               </Select>
             </FormControl>
@@ -219,19 +219,19 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth size="small" label="Description"
               value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <TextField fullWidth size="small" label="System Prompt" multiline minRows={4}
               value={data.system_prompt} onChange={(e) => setData({ ...data, system_prompt: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white", fontFamily: "monospace", fontSize: 12 } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
         </Grid>
       </DialogContent>
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+        <Button onClick={onClose} sx={{ color: "text.secondary" }}>Cancel</Button>
         <Button variant="contained" disabled={!data.key || !data.name}
           onClick={() => onCreate(data)}>Create</Button>
       </DialogActions>
@@ -308,8 +308,8 @@ export default function Agents() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Buddies</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>AI Buddies</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {groups.length > 0
               ? `${groups.reduce((s, g) => s + g.agents.length, 0)} specialist agents across ${groups.length} groups${isAdmin ? "" : " — admin role required to modify"}`
               : "Loading…"}
@@ -317,17 +317,17 @@ export default function Agents() {
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client (for run)</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client (for run)</InputLabel>
             <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedScanId(""); }} label="Client (for run)"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">None</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan (optional)</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Scan (optional)</InputLabel>
             <Select value={selectedScanId} onChange={(e) => setSelectedScanId(e.target.value)} label="Scan (optional)"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">No scan</MenuItem>
               {scans.map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
             </Select>
@@ -349,7 +349,7 @@ export default function Agents() {
             <Box key={group.key} sx={{ mb: 4 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
                 <Box sx={{ width: 4, height: 18, bgcolor: color, borderRadius: 1 }} />
-                <Typography sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5 }}>
+                <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5 }}>
                   {group.label}
                 </Typography>
                 <Chip label={group.agents.length} size="small"
@@ -360,7 +360,7 @@ export default function Agents() {
                 {group.agents.map((agent) => (
                   <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.id}>
                     <Card sx={{
-                      bgcolor: "#1E1E1E",
+                      bgcolor: "background.paper",
                       border: `1px solid ${agent.is_enabled ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)"}`,
                       borderRadius: 2, opacity: agent.is_enabled ? 1 : 0.5, height: "100%",
                     }}>
@@ -371,16 +371,16 @@ export default function Agents() {
                             <SmartToy sx={{ color, fontSize: 18 }} />
                           </Box>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>
+                            <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>
                               {agent.name}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
                               {agent.domain || agent.group_label}
                             </Typography>
                           </Box>
                           {agent.is_builtin && (
                             <Chip label="Built-in" size="small"
-                              sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }} />
+                              sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
                           )}
                         </Box>
                         {agent.signature_opening && (
@@ -391,7 +391,7 @@ export default function Agents() {
                             “{agent.signature_opening}”
                           </Typography>
                         )}
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block", mb: 1.5, minHeight: 36 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5, minHeight: 36 }}>
                           {agent.description}
                         </Typography>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
@@ -418,7 +418,7 @@ export default function Agents() {
                           <Box sx={{ flex: 1 }} />
                           <Tooltip title={isAdmin ? "Configure" : "View configuration"}>
                             <IconButton size="small" onClick={() => setConfiguring(agent)}
-                              sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color } }}>
+                              sx={{ color: "text.secondary", "&:hover": { color } }}>
                               {isAdmin ? <Edit sx={{ fontSize: 16 }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
                             </IconButton>
                           </Tooltip>
@@ -428,7 +428,7 @@ export default function Agents() {
                                 onClick={() => {
                                   if (window.confirm(`Delete agent "${agent.name}"?`)) deleteMutation.mutate(agent.id);
                                 }}
-                                sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "#EA4335" } }}>
+                                sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
                                 <Delete sx={{ fontSize: 16 }} />
                               </IconButton>
                             </Tooltip>
@@ -460,20 +460,20 @@ export default function Agents() {
 
       {/* Briefing drawer — invoke a catalog agent and view its LLM-generated output */}
       <Drawer anchor="right" open={!!briefingAgent} onClose={() => setBriefingAgent(null)}
-        slotProps={{ paper: { sx: { width: { xs: "100%", sm: 540 }, bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { width: { xs: "100%", sm: 540 }, bgcolor: "background.paper", color: "text.primary" } } }}>
         {briefingAgent && (
           <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{briefingAgent.name}</Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", mb: 2 }}>
               {briefingAgent.group_label} · {briefingAgent.domain || briefingAgent.description}
             </Typography>
-            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
+            <Divider sx={{ borderColor: "divider", mb: 2 }} />
             <TextField
               fullWidth size="small" multiline minRows={3} label="Your instruction (optional)"
               placeholder="Leave blank for a standard briefing on this agent's domain."
               value={briefingPrompt} onChange={(e) => setBriefingPrompt(e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
-              sx={{ mb: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+              sx={{ mb: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
             <Button variant="contained" startIcon={<PlayArrow />}
               disabled={briefingMutation.isPending}
               onClick={() => briefingMutation.mutate({ agentId: briefingAgent.id, prompt: briefingPrompt || undefined })}
@@ -484,7 +484,7 @@ export default function Agents() {
               {briefingMutation.isPending && (
                 <Box sx={{ textAlign: "center", py: 4 }}>
                   <CircularProgress size={28} sx={{ color: "#4285F4" }} />
-                  <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)", mt: 1 }}>
+                  <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 1 }}>
                     Calling the AI engine…
                   </Typography>
                 </Box>
@@ -503,16 +503,16 @@ export default function Agents() {
                     )}
                     {briefingOutput.tokens_used > 0 && (
                       <Chip size="small" label={`${briefingOutput.tokens_used} tokens`}
-                        sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                        sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
                     )}
                     <Chip size="small" label={`${briefingOutput.duration_ms} ms`}
-                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
                   </Box>
                   <RichOutput value={briefingOutput.output} />
                 </>
               )}
               {!briefingMutation.isPending && !briefingOutput && !briefingError && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Click "Generate Briefing" to invoke this agent.
                 </Typography>
               )}

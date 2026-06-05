@@ -152,9 +152,9 @@ export default function AISettings() {
   };
 
   const inputSx = {
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" },
-    "& .MuiInputBase-input": { color: "white" },
-    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" },
+    "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+    "& .MuiInputBase-input": { color: "text.primary" },
+    "& .MuiInputLabel-root": { color: "text.secondary" },
   };
 
   const secretField = (name: SecretField, label: string) => {
@@ -179,7 +179,7 @@ export default function AISettings() {
           input: {
             endAdornment: (
               <IconButton size="small" onClick={() => setShowSecret((s) => ({ ...s, [name]: !s[name] }))}
-                sx={{ color: "rgba(255,255,255,0.4)" }}>
+                sx={{ color: "text.secondary" }}>
                 {showSecret[name] ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
               </IconButton>
             ),
@@ -213,8 +213,8 @@ export default function AISettings() {
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
         <Psychology sx={{ color: "#4285F4", fontSize: 32 }} />
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>AI Provider Settings</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>AI Provider Settings</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Configure and test AI providers — Claude, OpenAI, Gemini, AWS Bedrock, Azure OpenAI
           </Typography>
         </Box>
@@ -226,7 +226,7 @@ export default function AISettings() {
         <Grid container spacing={2}>
           {/* Defaults & Save strip — slim row above the provider tiles */}
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent sx={{ "&:last-child": { pb: 2 } }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                   <Box sx={{ flex: "1 1 auto", minWidth: 220 }}>
@@ -241,7 +241,7 @@ export default function AISettings() {
                             value={fieldVal("default_provider")}
                             onChange={(e) => setField("default_provider", e.target.value)}
                             label="Default Provider"
-                            sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                             <MenuItem value="">— None —</MenuItem>
                             {providers.map((p) => (
                               <MenuItem key={p.provider} value={p.provider}>
@@ -280,7 +280,7 @@ export default function AISettings() {
                   </Box>
                 </Box>
                 {!isAdmin && (
-                  <Alert severity="info" sx={{ mt: 1.5, bgcolor: "rgba(66,133,244,0.08)", color: "white", py: 0.5 }}>
+                  <Alert severity="info" sx={{ mt: 1.5, bgcolor: "rgba(66,133,244,0.08)", color: "text.primary", py: 0.5 }}>
                     Read-only — admin role required to edit provider configuration.
                   </Alert>
                 )}
@@ -306,7 +306,7 @@ export default function AISettings() {
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
-                          <Typography variant="h6" sx={{ color: "white", fontSize: 15, fontWeight: 700 }}>
+                          <Typography variant="h6" sx={{ color: "text.primary", fontSize: 15, fontWeight: 700 }}>
                             {PROVIDER_LOGOS[provider.provider] || provider.provider}
                           </Typography>
                           {provider.available
@@ -335,13 +335,13 @@ export default function AISettings() {
                             />
                           )}
                         </Box>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1 }}>
                           MODELS
                         </Typography>
                         <Box sx={{ mt: 0.5, mb: 0.5 }}>
                           {provider.models.slice(0, expanded ? 6 : 3).map((m) => (
                             <Chip key={m} label={m} size="small"
-                              sx={{ mr: 0.5, mb: 0.5, bgcolor: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+                              sx={{ mr: 0.5, mb: 0.5, bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 10, height: 20 }} />
                           ))}
                         </Box>
                       </Box>
@@ -369,7 +369,7 @@ export default function AISettings() {
                               disabled={!provider.available || tileTesting === provider.provider}
                               onClick={() => handleTileTest(provider.provider)}
                               sx={{
-                                color: "rgba(255,255,255,0.55)",
+                                color: "text.secondary",
                                 "&:hover": { bgcolor: "rgba(52,168,83,0.12)", color: "#34A853" },
                               }}
                             >
@@ -383,7 +383,7 @@ export default function AISettings() {
                     </Box>
 
                     <Collapse in={expanded} unmountOnExit>
-                      <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 1.5 }} />
+                      <Divider sx={{ borderColor: "divider", my: 1.5 }} />
                       <Grid container spacing={1.5}>
                         {provider.provider === "azure_openai" && (
                           <>
@@ -410,13 +410,13 @@ export default function AISettings() {
                           </>
                         )}
                       </Grid>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.45)", display: "block", mt: 1.5 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1.5 }}>
                         Stored values override deployment env vars. API keys are encrypted at rest and never echoed back — leave blank to keep the current value.
                       </Typography>
                       {tres && (
                         <Alert
                           severity={tres.success ? "success" : "error"}
-                          sx={{ mt: 1.5, bgcolor: tres.success ? "rgba(52,168,83,0.08)" : "rgba(244,67,54,0.08)", color: "white" }}
+                          sx={{ mt: 1.5, bgcolor: tres.success ? "rgba(52,168,83,0.08)" : "rgba(244,67,54,0.08)", color: "text.primary" }}
                         >
                           <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 12 }}>
                             {tres.success ? `${provider.provider} responded` : `Error: ${tres.error}`}
@@ -437,14 +437,14 @@ export default function AISettings() {
 
           {/* Learning & Critique (Phase 5) */}
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(156,39,176,0.25)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(156,39,176,0.25)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                   <AutoAwesome sx={{ color: "#CE93D8", fontSize: 22 }} />
-                  <Typography variant="h6" sx={{ color: "white" }}>Learning &amp; Critique</Typography>
+                  <Typography variant="h6" sx={{ color: "text.primary" }}>Learning &amp; Critique</Typography>
                   <Chip label="Phase 5" size="small" sx={{ bgcolor: "rgba(156,39,176,0.18)", color: "#CE93D8", fontWeight: 700, fontSize: 10, height: 18, ml: 1 }} />
                 </Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block", mb: 2 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                   Make agents better over time. Self-critique catches weak answers before they're saved; semantic learning extracts durable lessons from completed engagements and feeds them to future agent runs via cosine-similarity retrieval; the blackboard lets peer agents on the same scan see each other's conclusions.
                 </Typography>
 
@@ -452,52 +452,52 @@ export default function AISettings() {
                 <Grid container spacing={1.5} sx={{ mb: 2 }}>
                   <Grid size={{ xs: 6, sm: 3 }}>
                     <Box sx={{ p: 1.5, bgcolor: "rgba(156,39,176,0.06)", borderRadius: 1.5, border: "1px solid rgba(156,39,176,0.15)" }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
                         Learnings stored
                       </Typography>
-                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
                         {learningStats?.learnings?.total ?? "—"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                         +{learningStats?.learnings?.last_30d ?? 0} in 30d
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
                     <Box sx={{ p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1.5, border: "1px solid rgba(66,133,244,0.15)" }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
                         Embedded
                       </Typography>
-                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
                         {learningStats?.learnings?.with_embeddings ?? "—"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                         retrievable by cosine
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
                     <Box sx={{ p: 1.5, bgcolor: "rgba(52,168,83,0.06)", borderRadius: 1.5, border: "1px solid rgba(52,168,83,0.15)" }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
                         Blackboard
                       </Typography>
-                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
                         {learningStats?.blackboard?.total ?? "—"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                         +{learningStats?.blackboard?.last_30d ?? 0} in 30d
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid size={{ xs: 6, sm: 3 }}>
                     <Box sx={{ p: 1.5, bgcolor: "rgba(251,188,4,0.06)", borderRadius: 1.5, border: "1px solid rgba(251,188,4,0.15)" }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
                         Self-critiqued
                       </Typography>
-                      <Typography sx={{ color: "white", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
+                      <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 24, lineHeight: 1.1, mt: 0.5 }}>
                         {learningStats?.self_critique?.runs_30d ?? "—"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                         agent runs in 30d
                       </Typography>
                     </Box>
@@ -520,8 +520,8 @@ export default function AISettings() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <ManageSearch sx={{ fontSize: 18, color: "#FBBC04" }} />
                           <Box>
-                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Self-critique pass</Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                            <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 13 }}>Self-critique pass</Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                               Each agent reviews its own output before saving. ~2× LLM cost per agent run.
                             </Typography>
                           </Box>
@@ -543,8 +543,8 @@ export default function AISettings() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <AutoAwesome sx={{ fontSize: 18, color: "#CE93D8" }} />
                           <Box>
-                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Semantic learning &amp; retrieval</Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                            <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 13 }}>Semantic learning &amp; retrieval</Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                               Extract durable lessons from every completed agent run / workflow report and inject the top-5 cosine-similar lessons into future agent prompts. Adds an embeddings call per atom (cheap with text-embedding-3-small).
                             </Typography>
                           </Box>
@@ -566,8 +566,8 @@ export default function AISettings() {
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           <Forum sx={{ fontSize: 18, color: "#34A853" }} />
                           <Box>
-                            <Typography sx={{ color: "white", fontWeight: 600, fontSize: 13 }}>Shared scan blackboard</Typography>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11 }}>
+                            <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 13 }}>Shared scan blackboard</Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                               When multiple agents run on the same scan, each reads peer agents' one-paragraph synopses as context. Default on — cost is negligible.
                             </Typography>
                           </Box>
@@ -578,7 +578,7 @@ export default function AISettings() {
                   </Grid>
                 </Grid>
 
-                <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+                <Divider sx={{ borderColor: "divider", my: 2 }} />
                 <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11 }}>
                   EMBEDDING MODEL
                 </Typography>
@@ -590,7 +590,7 @@ export default function AISettings() {
                         value={fieldVal("embedding_provider") || "openai"}
                         onChange={(e) => setField("embedding_provider", e.target.value)}
                         label="Embedding Provider"
-                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       >
                         <MenuItem value="openai">OpenAI</MenuItem>
                         <MenuItem value="azure_openai">Azure OpenAI</MenuItem>
@@ -614,18 +614,18 @@ export default function AISettings() {
 
           {/* Test Console */}
           <Grid size={{ xs: 12 }}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
-                <Typography variant="h6" sx={{ color: "white", mb: 2 }}>Provider Test Console</Typography>
+                <Typography variant="h6" sx={{ color: "text.primary", mb: 2 }}>Provider Test Console</Typography>
                 <Grid container spacing={2} sx={{ alignItems: "flex-end" }}>
                   <Grid size={{ xs: 12, sm: 3 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Provider</InputLabel>
+                      <InputLabel sx={{ color: "text.secondary" }}>Provider</InputLabel>
                       <Select
                         value={selectedProvider}
                         onChange={(e) => { setSelectedProvider(e.target.value); setSelectedModel(""); }}
                         label="Provider"
-                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       >
                         {providers.map((p) => (
                           <MenuItem key={p.provider} value={p.provider} disabled={!p.available}>
@@ -637,13 +637,13 @@ export default function AISettings() {
                   </Grid>
                   <Grid size={{ xs: 12, sm: 3 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Model</InputLabel>
+                      <InputLabel sx={{ color: "text.secondary" }}>Model</InputLabel>
                       <Select
                         value={selectedModel}
                         onChange={(e) => setSelectedModel(e.target.value)}
                         label="Model"
                         disabled={!activeProvider}
-                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       >
                         {activeProvider?.models.map((m) => (
                           <MenuItem key={m} value={m}>{m}</MenuItem>
@@ -659,7 +659,7 @@ export default function AISettings() {
                       value={testPrompt}
                       onChange={(e) => setTestPrompt(e.target.value)}
                       slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 1 }}>
@@ -680,7 +680,7 @@ export default function AISettings() {
                   <Box sx={{ mt: 2 }}>
                     <Alert
                       severity={testResult.success ? "success" : "error"}
-                      sx={{ bgcolor: testResult.success ? "rgba(0,230,118,0.1)" : "rgba(244,67,54,0.1)", color: "white" }}
+                      sx={{ bgcolor: testResult.success ? "rgba(0,230,118,0.1)" : "rgba(244,67,54,0.1)", color: "text.primary" }}
                     >
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
                         {testResult.success ? `${testResult.provider} responded successfully` : `Error: ${testResult.error}`}

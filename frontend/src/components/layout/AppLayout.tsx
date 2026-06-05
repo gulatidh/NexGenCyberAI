@@ -19,6 +19,8 @@ import NotificationBell from "./NotificationBell";
 import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
 import { useThemeMode } from "../../theme/ThemeModeContext";
+import { ThemeProvider } from "@mui/material/styles";
+import { buildTheme } from "../../theme";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -99,6 +101,10 @@ export default function AppLayout() {
   const expanded = !collapsed || hovering;
   // Expand/collapse state for parent nav items with children (e.g. Assets).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // The sidebar chrome stays dark in BOTH app modes, so render it under a
+  // fixed dark theme — its text.*/divider tokens then always resolve to
+  // light-on-dark values (otherwise they'd go dark-on-dark in light mode).
+  const chromeTheme = React.useMemo(() => buildTheme("dark"), []);
 
   // Active-route test. "/assets" must NOT light up for /assets/technologies
   // (that's its own leaf) but should for the asset-detail route /assets/:id.
@@ -162,11 +168,12 @@ export default function AppLayout() {
   };
 
   const drawer = (
+    <ThemeProvider theme={chromeTheme}>
     <Box
       sx={{
         height: "100%",
         bgcolor: mode === "light" ? "#0F172A" : "background.paper",
-        color: "white",
+        color: "text.primary",
         overflowX: "hidden",
       }}
       onMouseEnter={() => collapsed && setHovering(true)}
@@ -185,7 +192,7 @@ export default function AppLayout() {
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
                 Aegis<span style={{ color: "#FFFFFF" }}>&nbsp;AI</span>
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
                 AI Security Posture
               </Typography>
             </Box>
@@ -196,7 +203,7 @@ export default function AppLayout() {
             <IconButton
               size="small"
               onClick={() => setCollapsed((c) => !c)}
-              sx={{ color: "rgba(255,255,255,0.6)" }}
+              sx={{ color: "text.secondary" }}
             >
               {collapsed ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
             </IconButton>
@@ -209,7 +216,7 @@ export default function AppLayout() {
       {!expanded && (
         <Box sx={{ display: "flex", justifyContent: "center", py: 0.5 }}>
           <Tooltip title="Expand navigation" placement="right">
-            <IconButton size="small" onClick={() => setCollapsed(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>
+            <IconButton size="small" onClick={() => setCollapsed(false)} sx={{ color: "text.secondary" }}>
               <ChevronRight fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -226,7 +233,7 @@ export default function AppLayout() {
                 <Typography
                   variant="caption"
                   sx={{
-                    display: "block", color: "rgba(255,255,255,0.4)", fontSize: 10,
+                    display: "block", color: "text.secondary", fontSize: 10,
                     fontWeight: 700, letterSpacing: 1, mt: gi === 0 ? 1 : 1.5, mb: 0.5, mx: 2.5,
                     textTransform: "uppercase",
                   }}
@@ -237,7 +244,7 @@ export default function AppLayout() {
               {/* Group divider rail when collapsed — keeps visual grouping
                   even without section labels. Skip for first group. */}
               {!expanded && gi > 0 && (
-                <Divider sx={{ mx: 1.5, my: 0.75, borderColor: "rgba(255,255,255,0.08)" }} />
+                <Divider sx={{ mx: 1.5, my: 0.75, borderColor: "divider" }} />
               )}
               {items.map((item) => {
                 if (item.children) {
@@ -272,8 +279,8 @@ export default function AppLayout() {
                           fontSize: 13, fontWeight: childActive ? 600 : 500,
                           color: childActive ? "#4285F4" : "rgba(255,255,255,0.8)", whiteSpace: "nowrap",
                         } } }} />
-                        {open ? <ExpandLess sx={{ color: "rgba(255,255,255,0.5)" }} />
-                              : <ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}
+                        {open ? <ExpandLess sx={{ color: "text.secondary" }} />
+                              : <ExpandMore sx={{ color: "text.secondary" }} />}
                       </ListItemButton>
                       <Collapse in={open} timeout="auto" unmountOnExit>
                         {item.children.map((c) => renderLeaf(c, true))}
@@ -288,6 +295,7 @@ export default function AppLayout() {
         })}
       </List>
     </Box>
+    </ThemeProvider>
   );
 
   const effectiveWidth = collapsed ? DRAWER_RAIL_WIDTH : DRAWER_WIDTH;
@@ -370,7 +378,7 @@ export default function AppLayout() {
             />
             <NotificationBell />
             <Tooltip title="Theme">
-              <IconButton onClick={(e) => setThemeAnchor(e.currentTarget)} sx={{ color: "rgba(255,255,255,0.75)" }}>
+              <IconButton onClick={(e) => setThemeAnchor(e.currentTarget)} sx={{ color: "text.secondary" }}>
                 {mode === "light" ? <LightMode /> : mode === "custom" ? <Palette /> : <DarkMode />}
               </IconButton>
             </Tooltip>
@@ -397,7 +405,7 @@ export default function AppLayout() {
               </MenuItem>
               {mode === "custom" && (
                 <Box sx={{ px: 2, py: 1, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
                     PRIMARY ACCENT
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.5, mb: 1 }}>
@@ -412,7 +420,7 @@ export default function AppLayout() {
                       />
                     ))}
                   </Box>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
                     BACKGROUND
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.5 }}>

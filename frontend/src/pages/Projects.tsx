@@ -29,24 +29,24 @@ function ProjectCard({ project, onEdit, onDelete, clientId }: ProjectCardProps) 
   });
   const isDefault = project.name === "Default";
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
       transition: "border-color .15s", "&:hover": { borderColor: "rgba(66,133,244,0.3)" } }}>
       <CardContent>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
           <Box>
-            <Typography variant="h6" sx={{ color: "white", fontWeight: 600, lineHeight: 1.2 }}>{project.name}</Typography>
+            <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 600, lineHeight: 1.2 }}>{project.name}</Typography>
             {project.description && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
                 {project.description}
               </Typography>
             )}
           </Box>
           <Box sx={{ display: "flex", gap: 0.5 }}>
-            <IconButton size="small" onClick={onEdit} sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <IconButton size="small" onClick={onEdit} sx={{ color: "text.secondary" }}>
               <Edit fontSize="small" />
             </IconButton>
             {!isDefault && (
-              <IconButton size="small" onClick={onDelete} sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <IconButton size="small" onClick={onDelete} sx={{ color: "text.secondary" }}>
                 <Delete fontSize="small" />
               </IconButton>
             )}
@@ -60,7 +60,7 @@ function ProjectCard({ project, onEdit, onDelete, clientId }: ProjectCardProps) 
           )}
           {project.cloud_provider && (
             <Chip label={project.cloud_provider.toUpperCase()} size="small"
-              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10, height: 20 }} />
+              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
           )}
         </Box>
         <Grid container spacing={1}>
@@ -70,10 +70,10 @@ function ProjectCard({ project, onEdit, onDelete, clientId }: ProjectCardProps) 
             ["Scans", summary?.scan_count],
           ].map(([label, val]) => (
             <Grid key={label as string} size={4}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", fontSize: 10, fontWeight: 600 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 10, fontWeight: 600 }}>
                 {(label as string).toUpperCase()}
               </Typography>
-              <Typography sx={{ color: "white", fontSize: 18, fontWeight: 600 }}>
+              <Typography sx={{ color: "text.primary", fontSize: 18, fontWeight: 600 }}>
                 {val == null ? "…" : val}
               </Typography>
             </Grid>
@@ -136,16 +136,16 @@ export default function Projects() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Projects</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Projects</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Logical grouping of connectors, assets, and scans within a client
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
@@ -169,8 +169,8 @@ export default function Projects() {
           ))
         ) : projects.length === 0 && clientId ? (
           <Grid size={12}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary" }}>
                 No projects yet. Create one to organize your connectors.
               </Typography>
             </Card>
@@ -191,27 +191,27 @@ export default function Projects() {
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>{editing ? `Edit Project — ${editing.name}` : "New Project"}</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={12}>
               <TextField fullWidth size="small" label="Name" value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                sx={{ "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" } }} />
+                sx={{ "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                  "& .MuiInputLabel-root": { color: "text.secondary" } }} />
             </Grid>
             <Grid size={12}>
               <TextField fullWidth size="small" label="Description" multiline rows={2} value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
-                sx={{ "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
-                  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.5)" } }} />
+                sx={{ "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                  "& .MuiInputLabel-root": { color: "text.secondary" } }} />
             </Grid>
             <Grid size={6}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Environment</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Environment</InputLabel>
                 <Select label="Environment" value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   <MenuItem value="">—</MenuItem>
                   {ENV_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
                 </Select>
@@ -219,9 +219,9 @@ export default function Projects() {
             </Grid>
             <Grid size={6}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Cloud</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Cloud</InputLabel>
                 <Select label="Cloud" value={form.cloud_provider} onChange={(e) => setForm({ ...form, cloud_provider: e.target.value })}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   <MenuItem value="">—</MenuItem>
                   {CLOUD_OPTIONS.map((o) => <MenuItem key={o} value={o}>{o.toUpperCase()}</MenuItem>)}
                 </Select>
@@ -235,7 +235,7 @@ export default function Projects() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.6)" }}>Cancel</Button>
+          <Button onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained" disabled={!form.name || createMutation.isPending}
             onClick={() => createMutation.mutate({
               name: form.name,

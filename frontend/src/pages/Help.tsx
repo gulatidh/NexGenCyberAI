@@ -419,10 +419,10 @@ function StepList({ steps }: { steps: Step[] }) {
       "& li::marker": { color: "#4285F4", fontWeight: 700 },
     }}>
       {steps.map((s, i) => (
-        <Box component="li" key={i} sx={{ color: "rgba(255,255,255,0.85)", fontSize: 13.5, lineHeight: 1.6, mb: 1 }}>
+        <Box component="li" key={i} sx={{ color: "text.secondary", fontSize: 13.5, lineHeight: 1.6, mb: 1 }}>
           <Box component="span">{s.text}</Box>
           {s.detail && (
-            <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.55)", mt: 0.25 }}>
+            <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.25 }}>
               {s.detail}
             </Typography>
           )}
@@ -445,7 +445,7 @@ function CalloutList({ items, kind }: { items?: string[]; kind: "tip" | "warning
       {items.map((s, i) => (
         <Box key={i} sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: i === items.length - 1 ? 0 : 0.75 }}>
           <Icon sx={{ color, fontSize: 16, mt: 0.25, flexShrink: 0 }} />
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", fontSize: 13, lineHeight: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 13, lineHeight: 1.5 }}>
             <Box component="span" sx={{ color, fontWeight: 700 }}>{label}: </Box>
             {s}
           </Typography>
@@ -469,13 +469,13 @@ function TopicBlock({ topic, color }: { topic: Topic; color: string }) {
       }}
     >
       <AccordionSummary
-        expandIcon={<ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}
+        expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />}
         sx={{ "& .MuiAccordionSummary-content": { my: 1.25, gap: 0.5, flexDirection: "column" } }}
       >
-        <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14 }}>
+        <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14 }}>
           {topic.title}
         </Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 12 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 12 }}>
           {topic.summary}
         </Typography>
       </AccordionSummary>
@@ -517,9 +517,9 @@ export default function Help() {
         <Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
             <MenuBook sx={{ color: "#4285F4", fontSize: 28 }} />
-            <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Platform Guide</Typography>
+            <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Platform Guide</Typography>
           </Box>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Step-by-step walkthroughs for every workflow on the platform
           </Typography>
         </Box>
@@ -532,7 +532,7 @@ export default function Help() {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: "rgba(255,255,255,0.4)", fontSize: 18 }} />
+                  <Search sx={{ color: "text.secondary", fontSize: 18 }} />
                 </InputAdornment>
               ),
             },
@@ -540,9 +540,9 @@ export default function Help() {
           sx={{
             minWidth: 280,
             "& .MuiOutlinedInput-root": {
-              color: "white",
-              "& fieldset": { borderColor: "rgba(255,255,255,0.15)" },
-              "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+              color: "text.primary",
+              "& fieldset": { borderColor: "divider" },
+              "&:hover fieldset": { borderColor: "divider" },
               "&.Mui-focused fieldset": { borderColor: "#4285F4" },
             },
           }}
@@ -554,7 +554,7 @@ export default function Help() {
           severity={totalMatches > 0 ? "info" : "warning"}
           sx={{
             bgcolor: totalMatches > 0 ? "rgba(66,133,244,0.08)" : "rgba(251,188,4,0.08)",
-            color: "white", mb: 2,
+            color: "text.primary", mb: 2,
             border: totalMatches > 0 ? "1px solid rgba(66,133,244,0.3)" : "1px solid rgba(251,188,4,0.3)",
           }}
         >
@@ -566,9 +566,9 @@ export default function Help() {
 
       {/* Topic-group quick links */}
       {!query && (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
           <CardContent>
-            <Typography variant="subtitle2" sx={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1.5 }}>
               Jump to a topic
             </Typography>
             <Grid container spacing={1}>
@@ -582,7 +582,7 @@ export default function Help() {
                     clickable
                     sx={{
                       width: "100%", justifyContent: "flex-start",
-                      bgcolor: `${g.color}10`, color: "white",
+                      bgcolor: `${g.color}10`, color: "text.primary",
                       border: `1px solid ${g.color}30`,
                       fontWeight: 500, fontSize: 12.5, height: 32,
                       textDecoration: "none",
@@ -601,7 +601,7 @@ export default function Help() {
           key={g.id}
           id={`group-${g.id}`}
           sx={{
-            bgcolor: "#1E1E1E",
+            bgcolor: "background.paper",
             border: `1px solid ${g.color}30`,
             borderRadius: 2, mb: 2,
             scrollMarginTop: 16,
@@ -616,8 +616,8 @@ export default function Help() {
                 {g.icon}
               </Box>
               <Box>
-                <Typography sx={{ color: "white", fontWeight: 700, fontSize: 16 }}>{g.title}</Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 16 }}>{g.title}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {g.topics.length} topic{g.topics.length === 1 ? "" : "s"}
                 </Typography>
               </Box>
@@ -635,13 +635,13 @@ export default function Help() {
         icon={<SettingsSuggest />}
         sx={{
           bgcolor: "rgba(66,133,244,0.08)",
-          color: "white",
+          color: "text.primary",
           border: "1px solid rgba(66,133,244,0.3)",
           mt: 2,
         }}
       >
         <Typography sx={{ fontWeight: 600, mb: 0.25 }}>Need something deeper?</Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Operational config (AI provider, threat-intel sync, RBAC grants) lives under <b>Settings</b>.
           API reference is at <code>/api/docs</code> on the backend host.
           File a feature request on the project's GitHub repository.

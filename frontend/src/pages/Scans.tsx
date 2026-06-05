@@ -209,23 +209,23 @@ export default function Scans() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Assessments</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Assessments</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Every scan across all clients · click a tile for the AI verdict, findings, and agent runs
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client (filter)</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client (filter)</InputLabel>
             <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client (filter)"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All clients</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
           <Button variant="outlined" startIcon={<Refresh />}
             onClick={() => refetchTiles()}
-            sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}>Refresh</Button>
+            sx={{ borderColor: "divider", color: "text.secondary" }}>Refresh</Button>
           <Button
             variant="contained"
             startIcon={<Add />}
@@ -239,7 +239,7 @@ export default function Scans() {
 
       {/* Tile filter chips */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>STATUS</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>STATUS</Typography>
         {["completed", "running", "failed", "pending", "cancelled"].map((s) => (
           <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
             onClick={() => setTileStatusFilter(tileStatusFilter === s ? "" : s)}
@@ -252,7 +252,7 @@ export default function Scans() {
             }} />
         ))}
         <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>CATEGORY</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>CATEGORY</Typography>
         {["DAST", "SAST", "Network", "Dependency", "Cloud", "Other"].map((c) => (
           <Chip key={c} size="small" label={c}
             onClick={() => setTileCategoryFilter(tileCategoryFilter === c ? "" : c)}
@@ -265,13 +265,13 @@ export default function Scans() {
             }} />
         ))}
         {(tileStatusFilter || tileCategoryFilter) && (
-          <Button size="small" sx={{ ml: 0.5, color: "rgba(255,255,255,0.5)", fontSize: 11 }}
+          <Button size="small" sx={{ ml: 0.5, color: "text.secondary", fontSize: 11 }}
             onClick={() => { setTileStatusFilter(""); setTileCategoryFilter(""); }}>
             Clear
           </Button>
         )}
         <Box sx={{ flex: 1 }} />
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Showing {tiles.length} of {tilesData?.scans?.length || 0} assessments
         </Typography>
       </Box>
@@ -281,32 +281,32 @@ export default function Scans() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : tiles.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <Visibility sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <Visibility sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
           {clients.length === 0 ? (
             <>
-              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
                 No accessible clients
               </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Your account has no RBAC grants yet. Ask a global admin to grant you reader / editor / admin access from <b>Settings → Administration → Grant access</b>.
               </Typography>
             </>
           ) : (tilesData?.scans?.length || 0) === 0 ? (
             <>
-              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
                 No assessments yet
               </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Click "New Assessment" to run your first scan.
               </Typography>
             </>
           ) : (
             <>
-              <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>
+              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
                 No assessments match the current filters
               </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {tilesData?.scans?.length} assessment{(tilesData?.scans?.length || 0) === 1 ? "" : "s"} exist for clients you have access to — clear the Client / Status / Category filters above to see them.
               </Typography>
             </>
@@ -337,7 +337,7 @@ export default function Scans() {
                 <Card
                   onClick={() => navigate(`/scans/${tile.id}`)}
                   sx={{
-                    bgcolor: "#1E1E1E",
+                    bgcolor: "background.paper",
                     border: `1px solid ${statusColor}40`,
                     borderRadius: 2,
                     cursor: "pointer",
@@ -362,7 +362,7 @@ export default function Scans() {
                               onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
                               sx={{
                                 position: "absolute", top: 6, right: 6,
-                                color: "rgba(255,255,255,0.35)",
+                                color: "text.secondary",
                                 "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                               }}
                             >
@@ -377,9 +377,9 @@ export default function Scans() {
                                 onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
                                 sx={{
                                   position: "absolute", top: 6, right: 32,
-                                  color: "rgba(255,255,255,0.35)",
+                                  color: "text.secondary",
                                   "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-                                  "&.Mui-disabled": { color: "rgba(255,255,255,0.15)" },
+                                  "&.Mui-disabled": { color: "text.secondary" },
                                 }}
                               >
                                 <Replay sx={{ fontSize: 16 }} />
@@ -427,13 +427,13 @@ export default function Scans() {
                         {cat}
                       </Typography>
                     </Box>
-                    <Typography sx={{ color: "white", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>
+                    <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>
                       {tile.tile_name}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.25 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.25 }}>
                       {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
                       {tile.name || `${tile.scan_type} scan`}
                       {tile.findings_count > 0 ? ` · ${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}` : ""}
                       {tile.framework ? ` · ${tile.framework}` : ""}
@@ -477,18 +477,18 @@ export default function Scans() {
 
       {/* Start scan dialog — category → scanner cascade */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>
           Start New Scan
-          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
             Pick a category, choose a scanner, then point it at a connector.
           </Typography>
         </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <DialogContent dividers sx={{ borderColor: "divider" }}>
           {/* Client picker — required first step. Allows starting a scan
               from this dialog even when no tile-grid client filter is set. */}
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select
               value={selectedClientId}
               onChange={(e) => {
@@ -498,7 +498,7 @@ export default function Scans() {
                 setScannerId("");
               }}
               label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
             >
               {clients.map((c) => (
                 <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
@@ -512,7 +512,7 @@ export default function Scans() {
           {!selectedClientId ? (
             <Box sx={{
               p: 3, textAlign: "center", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 1.5,
-              color: "rgba(255,255,255,0.55)",
+              color: "text.secondary",
             }}>
               <Typography variant="body2">Pick a client above to continue.</Typography>
             </Box>
@@ -525,7 +525,7 @@ export default function Scans() {
             sx={{
               mb: 2,
               borderBottom: "1px solid rgba(255,255,255,0.08)",
-              "& .MuiTab-root": { color: "rgba(255,255,255,0.6)", textTransform: "none", fontWeight: 600, minHeight: 40 },
+              "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600, minHeight: 40 },
               "& .Mui-selected": { color: CATEGORY_COLOR[category] },
               "& .MuiTabs-indicator": { backgroundColor: CATEGORY_COLOR[category] },
             }}
@@ -543,13 +543,13 @@ export default function Scans() {
                   value={scanName} onChange={(e) => setScanName(e.target.value)}
                   placeholder='e.g. "Weekly Azure prod compliance"'
                   slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Scan Type</InputLabel>
+                  <InputLabel sx={{ color: "text.secondary" }}>Scan Type</InputLabel>
                   <Select value={scanType} onChange={(e) => setScanType(e.target.value as ScanType)} label="Scan Type"
-                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                     <MenuItem value="vulnerability">Vulnerability Assessment</MenuItem>
                     <MenuItem value="configuration">Configuration Review</MenuItem>
                     <MenuItem value="compliance">Compliance Assessment</MenuItem>
@@ -559,9 +559,9 @@ export default function Scans() {
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector (optional)</InputLabel>
+                  <InputLabel sx={{ color: "text.secondary" }}>Connector (optional)</InputLabel>
                   <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                     <MenuItem value="">All connectors</MenuItem>
                     {connectors
                       .filter((c) => !SCANNERS.some((s) => s.connectorType === c.connector_type))
@@ -571,9 +571,9 @@ export default function Scans() {
               </Grid>
               <Grid size={{ xs: 12 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+                  <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
                   <Select value={framework} onChange={(e) => setFramework(e.target.value as FrameworkType)} label="Framework"
-                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                     <MenuItem value="">None</MenuItem>
                     {frameworkCatalog.map((f) => (
                       <MenuItem key={f.framework} value={f.framework}>
@@ -606,7 +606,7 @@ export default function Scans() {
                       }}
                     >
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
-                        <Typography sx={{ fontWeight: 600, fontSize: 14, color: "white" }}>{s.name}</Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: 14, color: "text.primary" }}>{s.name}</Typography>
                         <Chip
                           label={isLive ? "Live" : "Coming soon"}
                           size="small"
@@ -617,7 +617,7 @@ export default function Scans() {
                           }}
                         />
                       </Box>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
                         {s.description}
                       </Typography>
                     </Card>
@@ -632,13 +632,13 @@ export default function Scans() {
                     <TextField fullWidth size="small" label="Scan name (optional)"
                       value={scanName} onChange={(e) => setScanName(e.target.value)}
                       slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                   </Grid>
                   <Grid size={{ xs: 12 }}>
                     <FormControl fullWidth size="small">
-                      <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Connector</InputLabel>
+                      <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>
                       <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-                        sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                         {(() => {
                           const def = SCANNERS.find((s) => s.id === scannerId);
                           const matching = connectors.filter((c) => c.connector_type === def?.connectorType);
@@ -654,7 +654,7 @@ export default function Scans() {
                   {scannerId === "codeql" && (
                     <>
                       <Grid size={{ xs: 12 }}>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
                           SCAN MODE
                         </Typography>
                         <Box sx={{ display: "flex", gap: 1 }}>
@@ -675,8 +675,8 @@ export default function Scans() {
                                     "&:hover": { borderColor: "#4285F4" },
                                   }}
                                 >
-                                  <Typography sx={{ color: "white", fontSize: 13, fontWeight: 600 }}>{opt.label}</Typography>
-                                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.55)", display: "block", mt: 0.25 }}>
+                                  <Typography sx={{ color: "text.primary", fontSize: 13, fontWeight: 600 }}>{opt.label}</Typography>
+                                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
                                     {opt.hint}
                                   </Typography>
                                 </Card>
@@ -692,7 +692,7 @@ export default function Scans() {
                               component="label"
                               size="small"
                               variant="outlined"
-                              sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)" }}
+                              sx={{ borderColor: "divider", color: "text.secondary" }}
                             >
                               {binaryFile ? "Change file" : "Choose binary archive"}
                               <input
@@ -703,12 +703,12 @@ export default function Scans() {
                               />
                             </Button>
                             {binaryFile && (
-                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.7)", display: "block", mt: 1 }}>
+                              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 <b>{binaryFile.name}</b> · {(binaryFile.size / 1024 / 1024).toFixed(2)} MB
                               </Typography>
                             )}
                             {!binaryFile && (
-                              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mt: 1 }}>
+                              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 Accepts JAR / WAR / EAR / ZIP / tar.gz / DLL / EXE up to 500 MB.
                               </Typography>
                             )}
@@ -725,7 +725,7 @@ export default function Scans() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={
               startMutation.isPending ||
@@ -774,12 +774,12 @@ export default function Scans() {
 
       {/* Findings dialog */}
       <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Box>
             <Typography variant="h6">Scan Findings</Typography>
             {viewScan && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {viewScan.scan_type} · {viewScan.framework || "No framework"} · {fromNow(viewScan.started_at)}
               </Typography>
             )}
@@ -789,20 +789,20 @@ export default function Scans() {
               sx={{ bgcolor: `${STATUS_COLOR[viewScan.status]}20`, color: STATUS_COLOR[viewScan.status] }} />
           )}
         </DialogTitle>
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+        <Divider sx={{ borderColor: "divider" }} />
         <DialogContent sx={{ p: 0 }}>
           {findingsLoading ? (
             <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
               <CircularProgress sx={{ color: "#4285F4" }} />
             </Box>
           ) : findings.length === 0 ? (
-            <Box sx={{ p: 4, textAlign: "center", color: "rgba(255,255,255,0.4)" }}>
+            <Box sx={{ p: 4, textAlign: "center", color: "text.secondary" }}>
               No findings recorded for this scan.
             </Box>
           ) : (
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600 } }}>
+                <TableRow sx={{ "& th": { borderColor: "divider", color: "text.secondary", fontSize: 11, fontWeight: 600 } }}>
                   <TableCell>Severity</TableCell>
                   <TableCell>Title</TableCell>
                   <TableCell>Resource</TableCell>
@@ -813,7 +813,7 @@ export default function Scans() {
               </TableHead>
               <TableBody>
                 {findings.map((f: any) => (
-                  <TableRow key={f.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", fontSize: 12 } }}>
+                  <TableRow key={f.id} hover sx={{ "& td": { borderColor: "divider", color: "text.primary", fontSize: 12 } }}>
                     <TableCell>
                       <Chip label={f.severity} size="small"
                         sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18 }} />
@@ -821,12 +821,12 @@ export default function Scans() {
                     <TableCell sx={{ maxWidth: 300 }}>
                       <Typography variant="caption" sx={{ display: "block", fontWeight: 600 }}>{f.title}</Typography>
                       {f.description && (
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.3 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.3 }}>
                           {f.description.slice(0, 120)}{f.description.length > 120 ? "…" : ""}
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{f.resource_id || "—"}</Typography></TableCell>
+                    <TableCell><Typography variant="caption" sx={{ color: "text.secondary" }}>{f.resource_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography></TableCell>
                     <TableCell><Typography variant="caption">{f.cvss_score ?? "—"}</Typography></TableCell>
                     <TableCell align="right" sx={{ width: 44 }}>
@@ -835,7 +835,7 @@ export default function Scans() {
                           size="small"
                           onClick={(e) => { e.stopPropagation(); setPendingDeleteFinding(f); }}
                           sx={{
-                            color: "rgba(255,255,255,0.4)",
+                            color: "text.secondary",
                             "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                           }}
                         >
@@ -850,13 +850,13 @@ export default function Scans() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setViewScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+          <Button onClick={() => setViewScan(null)} sx={{ color: "text.secondary" }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Version history — all rescans of the same assessment, newest first */}
       <Dialog open={!!historyOpenForRoot} onClose={() => setHistoryOpenForRoot(null)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <History sx={{ color: "#FBBC04" }} />
@@ -868,7 +868,7 @@ export default function Scans() {
             const versions = versionMap.get(historyOpenForRoot) || [];
             return (
               <Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.5 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
                   {versions.length} run{versions.length === 1 ? "" : "s"} for this assessment, newest first. v{versions.length} is the live tile; older runs stay queryable for comparison.
                 </Typography>
                 {versions.map((v: any, idx: number) => {
@@ -897,10 +897,10 @@ export default function Scans() {
                           color: isLatest ? "#4285F4" : "rgba(255,255,255,0.65)",
                         }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ color: "white", fontSize: 13, fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>
                           {v.started_at ? new Date(v.started_at).toLocaleString() : (v.created_at ? new Date(v.created_at).toLocaleString() : "—")}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {v.findings_count || 0} finding{(v.findings_count || 0) === 1 ? "" : "s"}
                           {v.duration_seconds != null
                             ? ` · ${v.duration_seconds >= 60 ? Math.round(v.duration_seconds / 60) + " min" : v.duration_seconds + "s"}`
@@ -918,22 +918,22 @@ export default function Scans() {
           })()}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setHistoryOpenForRoot(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Close</Button>
+          <Button onClick={() => setHistoryOpenForRoot(null)} sx={{ color: "text.secondary" }}>Close</Button>
         </DialogActions>
       </Dialog>
 
       {/* Confirm assessment (scan) delete */}
       <Dialog open={!!pendingDeleteScan} onClose={() => setPendingDeleteScan(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete assessment?</DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This permanently removes the scan and every finding, agent run, and AI verdict tied to it. It does NOT delete the connector or affect future scans.
           </Typography>
           {pendingDeleteScan && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDeleteScan.tile_name}</Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{pendingDeleteScan.tile_name}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {pendingDeleteScan.scan_type} · {pendingDeleteScan.findings_count ?? 0} finding{pendingDeleteScan.findings_count === 1 ? "" : "s"}
                 {pendingDeleteScan.framework ? ` · ${pendingDeleteScan.framework}` : ""}
               </Typography>
@@ -941,7 +941,7 @@ export default function Scans() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDeleteScan(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDeleteScan(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button
             variant="contained"
             disabled={deleteScanMutation.isPending}
@@ -955,23 +955,23 @@ export default function Scans() {
 
       {/* Confirm finding delete */}
       <Dialog open={!!pendingDeleteFinding} onClose={() => setPendingDeleteFinding(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This permanently removes the finding. If the same issue is detected on the next scan it will be re-created.
           </Typography>
           {pendingDeleteFinding && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>{pendingDeleteFinding.title || "(no title)"}</Typography>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{pendingDeleteFinding.title || "(no title)"}</Typography>
               {pendingDeleteFinding.resource_id && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{pendingDeleteFinding.resource_id}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{pendingDeleteFinding.resource_id}</Typography>
               )}
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDeleteFinding(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDeleteFinding(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button
             variant="contained"
             disabled={deleteFindingMutation.isPending}

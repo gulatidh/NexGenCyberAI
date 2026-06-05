@@ -40,20 +40,20 @@ function ProjectCardCompact({ project, clientId, onDelete }: {
   });
   const isDefault = project.name === "Default";
   return (
-    <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2,
       transition: "border-color .15s", "&:hover": { borderColor: "rgba(66,133,244,0.3)" } }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
           <Box>
-            <Typography variant="subtitle2" sx={{ color: "white", fontWeight: 600 }}>{project.name}</Typography>
+            <Typography variant="subtitle2" sx={{ color: "text.primary", fontWeight: 600 }}>{project.name}</Typography>
             {project.description && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
                 {project.description}
               </Typography>
             )}
           </Box>
           {!isDefault && (
-            <IconButton size="small" onClick={onDelete} sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <IconButton size="small" onClick={onDelete} sx={{ color: "text.secondary" }}>
               <Delete fontSize="small" />
             </IconButton>
           )}
@@ -66,7 +66,7 @@ function ProjectCardCompact({ project, clientId, onDelete }: {
           )}
           {project.cloud_provider && (
             <Chip label={project.cloud_provider.toUpperCase()} size="small"
-              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 9, height: 18 }} />
+              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 9, height: 18 }} />
           )}
         </Box>
         <Grid container spacing={1}>
@@ -76,10 +76,10 @@ function ProjectCardCompact({ project, clientId, onDelete }: {
             ["Scans", summary?.scan_count],
           ].map(([label, val]) => (
             <Grid key={label as string} size={4}>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 9, fontWeight: 600 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 9, fontWeight: 600 }}>
                 {(label as string).toUpperCase()}
               </Typography>
-              <Typography sx={{ color: "white", fontSize: 16, fontWeight: 600 }}>
+              <Typography sx={{ color: "text.primary", fontSize: 16, fontWeight: 600 }}>
                 {val == null ? "…" : val}
               </Typography>
             </Grid>
@@ -148,7 +148,7 @@ export default function ClientDetail() {
     return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   }
   if (!client) {
-    return <Box sx={{ color: "rgba(255,255,255,0.5)", p: 4 }}>Client not found.</Box>;
+    return <Box sx={{ color: "text.secondary", p: 4 }}>Client not found.</Box>;
   }
 
   const totalFindings = scans.reduce((acc, s) => acc + (s.summary?.total || 0), 0);
@@ -159,27 +159,27 @@ export default function ClientDetail() {
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
         <Button startIcon={<ArrowBack />} onClick={() => navigate("/clients")}
-          sx={{ color: "rgba(255,255,255,0.5)", textTransform: "none", minWidth: 0 }}>
+          sx={{ color: "text.secondary", textTransform: "none", minWidth: 0 }}>
           Clients
         </Button>
-        <Typography sx={{ color: "rgba(255,255,255,0.3)" }}>/</Typography>
-        <Typography sx={{ color: "white", fontWeight: 600 }}>{client.name}</Typography>
+        <Typography sx={{ color: "text.secondary" }}>/</Typography>
+        <Typography sx={{ color: "text.primary", fontWeight: 600 }}>{client.name}</Typography>
       </Box>
 
       {/* Header */}
-      <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
         <CardContent>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Avatar sx={{ bgcolor: "#4285F4", color: "#000", width: 56, height: 56, fontSize: 24, fontWeight: 700 }}>
               {client.name.charAt(0)}
             </Avatar>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>{client.name}</Typography>
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>{client.name}</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 {[client.industry, client.country].filter(Boolean).join(" · ")}
               </Typography>
               {client.contact_email && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>{client.contact_email}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{client.contact_email}</Typography>
               )}
             </Box>
             <Chip label={client.is_active ? "Active" : "Inactive"} size="small"
@@ -187,7 +187,7 @@ export default function ClientDetail() {
                 color: client.is_active ? "#00e676" : "#f44336" }} />
           </Box>
 
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", my: 2 }} />
+          <Divider sx={{ borderColor: "divider", my: 2 }} />
 
           <Grid container spacing={3}>
             {[
@@ -201,8 +201,8 @@ export default function ClientDetail() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   {icon}
                   <Box>
-                    <Typography variant="h6" sx={{ color: "white", fontWeight: 700, lineHeight: 1 }}>{value}</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{label}</Typography>
+                    <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700, lineHeight: 1 }}>{value}</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>{label}</Typography>
                   </Box>
                 </Box>
               </Grid>
@@ -214,7 +214,7 @@ export default function ClientDetail() {
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)}
         sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontWeight: 500 },
+          "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 500 },
           "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab label="Overview" value="overview" />
         <Tab label={`Projects (${projects.length})`} value="projects" />
@@ -227,23 +227,23 @@ export default function ClientDetail() {
       {tab === "overview" && (
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                  <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Connectors</Typography>
+                  <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>Connectors</Typography>
                   <Button size="small" onClick={() => setTab("connectors")} sx={{ color: "#4285F4", fontSize: 11 }}>
                     Manage
                   </Button>
                 </Box>
                 {connectors.length === 0 ? (
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>No connectors configured.</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>No connectors configured.</Typography>
                 ) : (
                   <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                     {connectors.slice(0, 5).map((c) => (
                       <Box key={c.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                         p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.06)" }}>
                         <Box>
-                          <Typography variant="body2" sx={{ color: "white", fontWeight: 500 }}>{c.name}</Typography>
+                          <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 500 }}>{c.name}</Typography>
                           <Typography variant="caption" sx={{ color: CONNECTOR_COLOR[c.connector_type] || "#888" }}>
                             {c.connector_type}
                             {c.project_id && projectMap.has(c.project_id) && ` · ${projectMap.get(c.project_id)}`}
@@ -259,20 +259,20 @@ export default function ClientDetail() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, md: 6 }}>
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <CardContent>
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                  <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>Recent Scans</Typography>
+                  <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>Recent Scans</Typography>
                   <Button size="small" onClick={() => setTab("scans")} sx={{ color: "#4285F4", fontSize: 11 }}>
                     View All
                   </Button>
                 </Box>
                 {scans.length === 0 ? (
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>No scans yet.</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>No scans yet.</Typography>
                 ) : (
                   <Table size="small">
                     <TableHead>
-                      <TableRow sx={{ "& th": { borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)", fontSize: 11, pb: 0.5 } }}>
+                      <TableRow sx={{ "& th": { borderColor: "divider", color: "text.secondary", fontSize: 11, pb: 0.5 } }}>
                         <TableCell>Type</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Findings</TableCell>
@@ -281,12 +281,12 @@ export default function ClientDetail() {
                     </TableHead>
                     <TableBody>
                       {scans.slice(0, 5).map((s) => (
-                        <TableRow key={s.id} sx={{ "& td": { borderColor: "rgba(255,255,255,0.05)", color: "white", fontSize: 12 } }}>
+                        <TableRow key={s.id} sx={{ "& td": { borderColor: "divider", color: "text.primary", fontSize: 12 } }}>
                           <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 10, height: 18 }} /></TableCell>
                           <TableCell><Chip label={s.status} size="small"
                             sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>
                           <TableCell>{s.summary?.total ?? "—"}</TableCell>
-                          <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>{fromNow(s.started_at)}</Typography></TableCell>
+                          <TableCell><Typography variant="caption" sx={{ color: "text.secondary" }}>{fromNow(s.started_at)}</Typography></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -302,7 +302,7 @@ export default function ClientDetail() {
       {tab === "projects" && (
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
               {projects.length} project{projects.length === 1 ? "" : "s"}
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
@@ -328,7 +328,7 @@ export default function ClientDetail() {
       {tab === "connectors" && (
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
               {connectors.length} connector{connectors.length === 1 ? "" : "s"}
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
@@ -338,19 +338,19 @@ export default function ClientDetail() {
             </Button>
           </Box>
           {connectors.length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <Cable sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No connectors yet.</Typography>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Cable sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>No connectors yet.</Typography>
             </Card>
           ) : (
             <Grid container spacing={2}>
               {connectors.map((c) => (
                 <Grid key={c.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                  <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
                     <CardContent>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
                         <Box>
-                          <Typography variant="subtitle2" sx={{ color: "white", fontWeight: 600 }}>{c.name}</Typography>
+                          <Typography variant="subtitle2" sx={{ color: "text.primary", fontWeight: 600 }}>{c.name}</Typography>
                           <Typography variant="caption" sx={{ color: CONNECTOR_COLOR[c.connector_type] || "#888", textTransform: "uppercase", fontSize: 10 }}>
                             {c.connector_type}
                           </Typography>
@@ -364,7 +364,7 @@ export default function ClientDetail() {
                           sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#34A853", fontSize: 10, height: 18, mt: 0.5 }} />
                       )}
                       {c.last_synced_at && (
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", display: "block", mt: 1, fontSize: 10 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1, fontSize: 10 }}>
                           Last synced {fromNow(c.last_synced_at)}
                         </Typography>
                       )}
@@ -372,7 +372,7 @@ export default function ClientDetail() {
                         <Button
                           size="small" variant="outlined" startIcon={<OpenInNew sx={{ fontSize: 14 }} />}
                           onClick={() => navigate(`/connectors?clientId=${clientId}`)}
-                          sx={{ borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)", fontSize: 11,
+                          sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11,
                             "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
                           Manage
                         </Button>
@@ -403,7 +403,7 @@ export default function ClientDetail() {
       {tab === "assets" && (
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
               {assets.length} asset{assets.length === 1 ? "" : "s"} discovered
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
@@ -413,17 +413,17 @@ export default function ClientDetail() {
             </Button>
           </Box>
           {assets.length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <StorageIcon sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <StorageIcon sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>
                 No assets discovered yet. Trigger a connector sync to populate.
               </Typography>
             </Card>
           ) : (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>NAME</TableCell>
                     <TableCell>TYPE</TableCell>
                     <TableCell>PROJECT</TableCell>
@@ -433,7 +433,7 @@ export default function ClientDetail() {
                 </TableHead>
                 <TableBody>
                   {assets.slice(0, 50).map((a) => (
-                    <TableRow key={a.id} hover sx={{ cursor: "pointer", "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)" } }}
+                    <TableRow key={a.id} hover sx={{ cursor: "pointer", "& td": { color: "text.primary", fontSize: 12, borderColor: "divider" } }}
                       onClick={() => navigate(`/assets/${a.id}`)}>
                       <TableCell sx={{ maxWidth: 280 }}>
                         <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -455,7 +455,7 @@ export default function ClientDetail() {
               </Table>
               {assets.length > 50 && (
                 <Box sx={{ p: 1.5, textAlign: "center", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     Showing 50 of {assets.length}. Open the full Asset Inventory for filtering and search.
                   </Typography>
                 </Box>
@@ -469,7 +469,7 @@ export default function ClientDetail() {
       {tab === "scans" && (
         <>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600 }}>
               {scans.length} scan{scans.length === 1 ? "" : "s"}
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
@@ -479,15 +479,15 @@ export default function ClientDetail() {
             </Button>
           </Box>
           {scans.length === 0 ? (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-              <Scanner sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No scans yet for this client.</Typography>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Scanner sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>No scans yet for this client.</Typography>
             </Card>
           ) : (
-            <Card sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                     <TableCell>TYPE</TableCell>
                     <TableCell>FRAMEWORK</TableCell>
                     <TableCell>STATUS</TableCell>
@@ -502,13 +502,13 @@ export default function ClientDetail() {
                       ? `${Math.round((new Date(s.completed_at).getTime() - new Date(s.started_at).getTime()) / 1000)}s`
                       : s.status === "running" ? "Running…" : "—";
                     return (
-                      <TableRow key={s.id} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)" } }}>
+                      <TableRow key={s.id} sx={{ "& td": { color: "text.primary", fontSize: 12, borderColor: "divider" } }}>
                         <TableCell><Chip label={s.scan_type} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 10, height: 18 }} /></TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{s.framework || "—"}</TableCell>
                         <TableCell><Chip label={s.status} size="small"
                           sx={{ bgcolor: `${STATUS_COLOR[s.status]}20`, color: STATUS_COLOR[s.status], fontSize: 10, height: 18 }} /></TableCell>
                         <TableCell>{s.summary?.total ?? "—"}</TableCell>
-                        <TableCell><Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                        <TableCell><Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {fromNow(s.started_at)}
                         </Typography></TableCell>
                         <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{dur}</TableCell>

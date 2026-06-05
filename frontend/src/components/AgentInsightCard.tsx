@@ -119,7 +119,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
   return (
     <Card
       sx={{
-        bgcolor: "#1A1A1A",
+        bgcolor: "background.paper",
         border: expanded ? "1px solid #4285F4" : "1px solid rgba(255,255,255,0.08)",
         borderRadius: 2,
         transition: "border-color .15s, background-color .15s",
@@ -145,7 +145,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-            <Typography sx={{ color: "white", fontSize: 14, fontWeight: 700, textTransform: "capitalize" }}>
+            <Typography sx={{ color: "text.primary", fontSize: 14, fontWeight: 700, textTransform: "capitalize" }}>
               {label}
             </Typography>
             <Chip
@@ -173,7 +173,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
                   bgcolor: `${accent}1A`, color: accent }} />
             )}
             {run.started_at && (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                 {fromNow(run.started_at)}
               </Typography>
             )}
@@ -182,7 +182,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
             <Typography
               variant="caption"
               sx={{
-                color: "rgba(255,255,255,0.7)", fontSize: 12.5, lineHeight: 1.45, mt: 0.5,
+                color: "text.secondary", fontSize: 12.5, lineHeight: 1.45, mt: 0.5,
                 display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
                 overflow: "hidden",
               }}
@@ -191,7 +191,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
             </Typography>
           )}
           {!expanded && !summary && !run.error_message && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 12, fontStyle: "italic" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 12, fontStyle: "italic" }}>
               No narrative output captured for this run.
             </Typography>
           )}
@@ -202,7 +202,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
               size="small"
               onClick={(e) => { e.stopPropagation(); onDelete(); }}
               sx={{
-                color: "rgba(255,255,255,0.4)",
+                color: "text.secondary",
                 "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
               }}
             >
@@ -210,7 +210,7 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
             </IconButton>
           </Tooltip>
         )}
-        <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }} aria-label={expanded ? "Collapse" : "Expand"}>
+        <IconButton size="small" sx={{ color: "text.secondary" }} aria-label={expanded ? "Collapse" : "Expand"}>
           {expanded ? <ExpandLess /> : <ExpandMore />}
         </IconButton>
       </Box>

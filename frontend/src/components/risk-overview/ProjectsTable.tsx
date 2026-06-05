@@ -33,20 +33,20 @@ export default function ProjectsTable({ data, loading }: Props) {
   return (
     <Card sx={cardSx}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
           Projects with Most Issues
         </Typography>
         {loading ? (
           <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.04)" }} />
         ) : data.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 3 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 3 }}>
             No project data — assets without subscription/account/project IDs aren't grouped yet.
           </Typography>
         ) : (
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11, fontWeight: 600, borderColor: "rgba(255,255,255,0.08)" } }}>
+                <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>
                     <TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
                       sx={{ color: "rgba(255,255,255,0.5) !important" }}>PROJECT</TableSortLabel>
@@ -72,7 +72,7 @@ export default function ProjectsTable({ data, loading }: Props) {
               </TableHead>
               <TableBody>
                 {sorted.map((p) => (
-                  <TableRow key={p.name} sx={{ "& td": { color: "white", fontSize: 12, borderColor: "rgba(255,255,255,0.05)", py: 1 } }}>
+                  <TableRow key={p.name} sx={{ "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 1 } }}>
                     <TableCell sx={{ maxWidth: 260 }}>
                       <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "monospace", fontSize: 11 }}>
                         {p.name}

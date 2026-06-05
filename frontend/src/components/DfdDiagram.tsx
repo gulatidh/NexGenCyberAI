@@ -31,7 +31,7 @@ async function loadMermaid(): Promise<any> {
           primaryBorderColor: "#4285F4",
           lineColor: "rgba(255,255,255,0.55)",
           tertiaryColor: "#161b22",
-          background: "#1E1E1E",
+          backgroundColor: "background.paper",
           mainBkg: "#1E1E1E",
           clusterBkg: "rgba(66,133,244,0.06)",
           clusterBorder: "rgba(66,133,244,0.5)",
@@ -96,7 +96,7 @@ export default function DfdDiagram({ source, className }: Props) {
       <Box className={className} sx={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 1,
         p: 4, border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2,
-        color: "rgba(255,255,255,0.5)",
+        color: "text.secondary",
       }}>
         <ImageNotSupported sx={{ fontSize: 24 }} />
         <Typography variant="body2">{error}</Typography>
@@ -109,7 +109,7 @@ export default function DfdDiagram({ source, className }: Props) {
       className={className}
       sx={{
         position: "relative", overflow: "auto",
-        bgcolor: "#1E1E1E",
+        bgcolor: "background.paper",
         borderRadius: 2,
         border: "1px solid rgba(255,255,255,0.06)",
         p: 2, minHeight: 200,

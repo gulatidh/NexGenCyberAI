@@ -233,8 +233,8 @@ export default function Reports() {
 
       <Box className="no-print" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Reports</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Reports</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Printable + exportable views over your security posture data
           </Typography>
         </Box>
@@ -252,15 +252,15 @@ export default function Reports() {
         </Box>
       </Box>
 
-      <Card className="no-print" sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+      <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
         <CardContent>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, sm: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Report Type</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Report Type</InputLabel>
                 <Select value={reportType} label="Report Type"
                   onChange={(e) => setReportType(e.target.value as ReportType)}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   <MenuItem value="executive">Executive Summary</MenuItem>
                   <MenuItem value="compliance">Compliance Report</MenuItem>
                   <MenuItem value="findings">Findings Report</MenuItem>
@@ -271,19 +271,19 @@ export default function Reports() {
             </Grid>
             <Grid size={{ xs: 12, sm: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
                 <Select value={clientId} label="Client"
                   onChange={(e) => { setClientId(e.target.value); setProjectId(""); }}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                 </Select>
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 3 }}>
               <FormControl fullWidth size="small" disabled={!clientId}>
-                <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Project</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
                 <Select value={projectId} label="Project" onChange={(e) => setProjectId(e.target.value)}
-                  sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   <MenuItem value="">All projects</MenuItem>
                   {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
                 </Select>
@@ -292,9 +292,9 @@ export default function Reports() {
             {reportType === "compliance" && (
               <Grid size={{ xs: 12, sm: 3 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Framework</InputLabel>
+                  <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
                   <Select value={framework} label="Framework" onChange={(e) => setFramework(e.target.value)}
-                    sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                     {catalog.map((f) => (
                       <MenuItem key={f.framework} value={f.framework}>{f.name}</MenuItem>
                     ))}
@@ -307,21 +307,21 @@ export default function Reports() {
       </Card>
 
       {!clientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "white" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
           Pick a client to generate a report.
         </Alert>
       ) : (
         <Card className="print-area" ref={printRef as any}
-          sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
               <Description sx={{ color: "#4285F4" }} />
-              <Typography variant="h6" sx={{ color: "white", fontWeight: 700 }}>{reportTitle}</Typography>
+              <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>{reportTitle}</Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
               {client?.name} {project ? `· ${project.name}` : ""} · Generated {fmt(new Date().toISOString())}
             </Typography>
-            <Divider sx={{ borderColor: "rgba(255,255,255,0.08)", mb: 2 }} />
+            <Divider sx={{ borderColor: "divider", mb: 2 }} />
 
             {reportType === "executive" && (
               overviewLoading ? <CircularProgress sx={{ color: "#4285F4" }} /> :
@@ -366,17 +366,17 @@ function WorkflowOutputsSection() {
     queryFn: () => missionsApi.recentRuns(50),
   });
   return (
-    <Card className="no-print" sx={{ bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 2 }}>
+    <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 2 }}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, cursor: "pointer" }}
           onClick={() => setExpanded((v) => !v)}>
-          <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 700 }}>
+          <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>
             Workflow Outputs
           </Typography>
           <Chip label={runs.length} size="small"
             sx={{ height: 18, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, fontWeight: 700 }} />
           <Box sx={{ flex: 1 }} />
-          <Button size="small" sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11 }}>
+          <Button size="small" sx={{ color: "text.secondary", fontSize: 11 }}>
             {expanded ? "Hide" : "Show recent runs"}
           </Button>
         </Box>
@@ -385,14 +385,14 @@ function WorkflowOutputsSection() {
             {isLoading ? (
               <CircularProgress size={20} sx={{ color: "#4285F4" }} />
             ) : runs.length === 0 ? (
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 No workflow runs yet — schedule one and click Run Now.
               </Typography>
             ) : (
               runs.map((run) => (
                 <Box key={run.id} sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", py: 1.25 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
-                    <Typography variant="body2" sx={{ color: "white", fontWeight: 600 }}>
+                    <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>
                       {run.mission_name}
                     </Typography>
                     <Chip label={run.mission_type.replace(/_/g, " ")} size="small"
@@ -402,13 +402,13 @@ function WorkflowOutputsSection() {
                         bgcolor: run.status === "success" ? "rgba(52,168,83,0.15)" : run.status === "failed" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
                         color: run.status === "success" ? "#34A853" : run.status === "failed" ? "#EA4335" : "#FBBC04" }} />
                     <Box sx={{ flex: 1 }} />
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
                       {run.started_at ? fmtDate(run.started_at) : ""}
                     </Typography>
                   </Box>
                   {run.output && (
                     <Typography component="pre" sx={{
-                      color: "rgba(255,255,255,0.8)", fontSize: 12, whiteSpace: "pre-wrap",
+                      color: "text.secondary", fontSize: 12, whiteSpace: "pre-wrap",
                       wordBreak: "break-word", fontFamily: "inherit", m: 0, lineHeight: 1.4,
                     }}>
                       {run.output}
@@ -435,7 +435,7 @@ function StatTile({ label, value, color = "#4285F4" }: { label: string; value: s
   return (
     <Card sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{label}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{label}</Typography>
         <Typography variant="h4" sx={{ color, fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
       </CardContent>
     </Card>
@@ -458,10 +458,10 @@ function ExecutiveBlock({ overview, fwSummaries }: { overview: RiskOverview; fwS
         <Grid size={{ xs: 6, sm: 2 }}><StatTile label="Low" value={oi.low ?? 0} color={SEV_COLOR.low} /></Grid>
       </Grid>
 
-      <Typography variant="subtitle2" sx={{ color: "white", fontWeight: 700, mb: 1 }}>Framework Compliance</Typography>
+      <Typography variant="subtitle2" sx={{ color: "text.primary", fontWeight: 700, mb: 1 }}>Framework Compliance</Typography>
       <TableContainer sx={{ mb: 3 }}>
         <Table size="small">
-          <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+          <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
             <TableCell>FRAMEWORK</TableCell>
             <TableCell align="right">SCORE</TableCell>
             <TableCell align="right">COMPLIANT</TableCell>
@@ -471,7 +471,7 @@ function ExecutiveBlock({ overview, fwSummaries }: { overview: RiskOverview; fwS
           </TableRow></TableHead>
           <TableBody>
             {fwSummaries.map((fs) => (
-              <TableRow key={fs.framework} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
+              <TableRow key={fs.framework} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
                 <TableCell>{fs.framework}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700, color: fs.score >= 80 ? "#00e676" : fs.score >= 60 ? "#ff9800" : "#f44336" }}>
                   {fs.score}%
@@ -486,10 +486,10 @@ function ExecutiveBlock({ overview, fwSummaries }: { overview: RiskOverview; fwS
         </Table>
       </TableContainer>
 
-      <Typography variant="subtitle2" sx={{ color: "white", fontWeight: 700, mb: 1 }}>Top Issues (by frequency)</Typography>
+      <Typography variant="subtitle2" sx={{ color: "text.primary", fontWeight: 700, mb: 1 }}>Top Issues (by frequency)</Typography>
       <TableContainer>
         <Table size="small">
-          <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+          <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
             <TableCell>TITLE</TableCell>
             <TableCell>SEVERITY</TableCell>
             <TableCell align="right">COUNT</TableCell>
@@ -497,7 +497,7 @@ function ExecutiveBlock({ overview, fwSummaries }: { overview: RiskOverview; fwS
           </TableRow></TableHead>
           <TableBody>
             {(overview.top_issues || []).slice(0, 10).map((t, i) => (
-              <TableRow key={i} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
+              <TableRow key={i} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
                 <TableCell>{t.title}</TableCell>
                 <TableCell>
                   <Chip label={t.severity} size="small" sx={{ bgcolor: `${SEV_COLOR[t.severity]}20`, color: SEV_COLOR[t.severity], height: 18, fontSize: 10 }} />
@@ -529,7 +529,7 @@ function ComplianceBlock({ detail }: { detail: FrameworkDetail }) {
 
       <TableContainer>
         <Table size="small">
-          <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+          <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
             <TableCell>CONTROL</TableCell>
             <TableCell>TITLE</TableCell>
             <TableCell>STATUS</TableCell>
@@ -538,7 +538,7 @@ function ComplianceBlock({ detail }: { detail: FrameworkDetail }) {
           </TableRow></TableHead>
           <TableBody>
             {(detail.controls || []).map((c) => (
-              <TableRow key={c.control.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)", verticalAlign: "top", py: 0.75 } }}>
+              <TableRow key={c.control.id} sx={{ "& td": { color: "text.primary", borderColor: "divider", verticalAlign: "top", py: 0.75 } }}>
                 <TableCell sx={{ fontFamily: "monospace", fontSize: 11, whiteSpace: "nowrap" }}>{c.control.control_id}</TableCell>
                 <TableCell sx={{ fontSize: 12, maxWidth: 360 }}>{c.control.title}</TableCell>
                 <TableCell>
@@ -546,7 +546,7 @@ function ComplianceBlock({ detail }: { detail: FrameworkDetail }) {
                     sx={{ bgcolor: `${STATUS_COLOR[c.status]}25`, color: STATUS_COLOR[c.status], height: 18, fontSize: 10 }} />
                 </TableCell>
                 <TableCell align="right">{c.finding_ids?.length ?? 0}</TableCell>
-                <TableCell sx={{ fontSize: 11, color: "rgba(255,255,255,0.6)", maxWidth: 280 }}>{c.evidence || ""}</TableCell>
+                <TableCell sx={{ fontSize: 11, color: "text.secondary", maxWidth: 280 }}>{c.evidence || ""}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -570,13 +570,13 @@ function FindingsBlock({ rows }: { rows: Finding[] }) {
           <Chip key={s} label={`${s}: ${sevCount[s]}`} size="small"
             sx={{ bgcolor: `${SEV_COLOR[s]}20`, color: SEV_COLOR[s] }} />
         ))}
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", alignSelf: "center", ml: 1 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", alignSelf: "center", ml: 1 }}>
           {rows.length} total
         </Typography>
       </Box>
       <TableContainer>
         <Table size="small">
-          <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+          <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
             <TableCell>SEV</TableCell>
             <TableCell>TITLE</TableCell>
             <TableCell>CVE</TableCell>
@@ -589,17 +589,17 @@ function FindingsBlock({ rows }: { rows: Finding[] }) {
               const sev = typeof f.severity === "object" ? (f.severity as any).value : f.severity;
               const ts = f.first_seen_at || f.created_at;
               return (
-                <TableRow key={f.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
+                <TableRow key={f.id} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
                   <TableCell><Chip label={sev} size="small" sx={{ bgcolor: `${SEV_COLOR[sev]}20`, color: SEV_COLOR[sev], height: 18, fontSize: 10 }} /></TableCell>
                   <TableCell sx={{ maxWidth: 320, fontSize: 12 }}>{f.title}</TableCell>
                   <TableCell sx={{ color: "#4285F4", fontSize: 11 }}>{f.cve_id || "—"}</TableCell>
-                  <TableCell sx={{ color: "rgba(255,255,255,0.6)", fontSize: 11, maxWidth: 200 }}>
+                  <TableCell sx={{ color: "text.secondary", fontSize: 11, maxWidth: 200 }}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                       {f.resource_id || "—"}
                     </span>
                   </TableCell>
                   <TableCell sx={{ fontSize: 11 }}>{f.status}</TableCell>
-                  <TableCell sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{fmtDate(ts)}</TableCell>
+                  <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{fmtDate(ts)}</TableCell>
                 </TableRow>
               );
             })}
@@ -615,7 +615,7 @@ function RisksBlock({ rows }: { rows: Risk[] }) {
   return (
     <TableContainer>
       <Table size="small">
-        <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+        <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
           <TableCell>LEVEL</TableCell>
           <TableCell>TITLE</TableCell>
           <TableCell>CATEGORY</TableCell>
@@ -626,7 +626,7 @@ function RisksBlock({ rows }: { rows: Risk[] }) {
         </TableRow></TableHead>
         <TableBody>
           {rows.map((r) => (
-            <TableRow key={r.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
+            <TableRow key={r.id} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
               <TableCell><Chip label={r.risk_level} size="small" sx={{ bgcolor: `${SEV_COLOR[r.risk_level]}20`, color: SEV_COLOR[r.risk_level], height: 18, fontSize: 10 }} /></TableCell>
               <TableCell sx={{ maxWidth: 320, fontSize: 12 }}>{r.title}</TableCell>
               <TableCell sx={{ fontSize: 11 }}>{r.category || "—"}</TableCell>
@@ -647,7 +647,7 @@ function AssetsBlock({ rows }: { rows: Asset[] }) {
   return (
     <TableContainer>
       <Table size="small">
-        <TableHead><TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 11 } }}>
+        <TableHead><TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11 } }}>
           <TableCell>NAME</TableCell>
           <TableCell>TYPE</TableCell>
           <TableCell>CLASS</TableCell>
@@ -659,7 +659,7 @@ function AssetsBlock({ rows }: { rows: Asset[] }) {
         </TableRow></TableHead>
         <TableBody>
           {rows.map((a) => (
-            <TableRow key={a.id} sx={{ "& td": { color: "white", borderColor: "rgba(255,255,255,0.05)" } }}>
+            <TableRow key={a.id} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
               <TableCell sx={{ fontSize: 12, maxWidth: 240 }}>{a.name}</TableCell>
               <TableCell sx={{ fontSize: 11, maxWidth: 200 }}>{a.asset_type || "—"}</TableCell>
               <TableCell sx={{ fontSize: 11 }}>{a.asset_class || "—"}</TableCell>

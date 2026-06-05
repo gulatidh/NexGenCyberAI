@@ -50,7 +50,7 @@ export default function NotificationBell() {
           <Badge badgeContent={count} color="error" max={99}>
             {count > 0
               ? <Notifications sx={{ color: "#4285F4", fontSize: 22 }} />
-              : <NotificationsNone sx={{ color: "rgba(255,255,255,0.5)", fontSize: 22 }} />}
+              : <NotificationsNone sx={{ color: "text.secondary", fontSize: 22 }} />}
           </Badge>
         </IconButton>
       </Tooltip>
@@ -61,18 +61,18 @@ export default function NotificationBell() {
         onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 2, width: 400, maxHeight: 520 } } }}
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 2, width: 400, maxHeight: 520 } } }}
       >
         <Box sx={{ p: 1.5, display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <Typography sx={{ color: "white", fontWeight: 600, fontSize: 14 }}>
+          <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14 }}>
             Activity Log
           </Typography>
           <Box sx={{ display: "flex", gap: 0.5 }}>
             <Chip label={`${notifications.length} events`} size="small"
-              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)", fontSize: 10, height: 20 }} />
+              sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
             {notifications.length > 0 && (
               <Tooltip title="Clear all">
-                <IconButton size="small" onClick={() => { clearNotifications(); }} sx={{ color: "rgba(255,255,255,0.4)" }}>
+                <IconButton size="small" onClick={() => { clearNotifications(); }} sx={{ color: "text.secondary" }}>
                   <Delete sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
@@ -82,8 +82,8 @@ export default function NotificationBell() {
 
         {notifications.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center" }}>
-            <NotificationsNone sx={{ fontSize: 40, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+            <NotificationsNone sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               No activity yet. Operations will appear here.
             </Typography>
           </Box>
@@ -95,22 +95,22 @@ export default function NotificationBell() {
                   bgcolor: n.read ? "transparent" : "rgba(66,133,244,0.03)" }}>
                   <Box sx={{ mt: 0.2, flexShrink: 0 }}>{TYPE_ICON[n.type] || TYPE_ICON.info}</Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ color: "white", fontSize: 12, fontWeight: 500, wordBreak: "break-word" }}>
+                    <Typography sx={{ color: "text.primary", fontSize: 12, fontWeight: 500, wordBreak: "break-word" }}>
                       {n.message}
                     </Typography>
                     {n.detail && (
-                      <Typography sx={{ color: "rgba(255,255,255,0.5)", fontSize: 11, mt: 0.2, wordBreak: "break-word" }}>
+                      <Typography sx={{ color: "text.secondary", fontSize: 11, mt: 0.2, wordBreak: "break-word" }}>
                         {n.detail}
                       </Typography>
                     )}
-                    <Typography sx={{ color: "rgba(255,255,255,0.3)", fontSize: 10, mt: 0.3 }}>
+                    <Typography sx={{ color: "text.secondary", fontSize: 10, mt: 0.3 }}>
                       {fromNow(n.timestamp)}
                     </Typography>
                   </Box>
                   <Chip label={n.type} size="small"
                     sx={{ bgcolor: `${TYPE_COLOR[n.type]}15`, color: TYPE_COLOR[n.type], fontSize: 9, height: 16, flexShrink: 0 }} />
                 </ListItem>
-                {i < notifications.length - 1 && <Divider sx={{ borderColor: "rgba(255,255,255,0.05)" }} />}
+                {i < notifications.length - 1 && <Divider sx={{ borderColor: "divider" }} />}
               </React.Fragment>
             ))}
           </List>

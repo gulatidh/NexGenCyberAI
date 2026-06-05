@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, CardContent, Typography, Box, Skeleton } from "@mui/material";
+import { Card, CardContent, Typography, Box, Skeleton, useTheme } from "@mui/material";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { TypeBreakdown } from "../../types";
 import { cardSx, TYPE_COLORS } from "./tokens";
@@ -12,18 +12,19 @@ interface Props {
 }
 
 export default function BreakdownByType({ data, loading, selected, onSelect }: Props) {
+  const theme = useTheme();
   const total = data.reduce((acc, d) => acc + d.count, 0);
 
   return (
     <Card sx={{ ...cardSx, height: "100%" }}>
       <CardContent>
-        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
           Breakdown by Type
         </Typography>
         {loading ? (
           <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.04)" }} />
         ) : data.length === 0 ? (
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.4)", textAlign: "center", py: 6 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center", py: 6 }}>
             No type data — sync assets to populate.
           </Typography>
         ) : (
@@ -50,7 +51,7 @@ export default function BreakdownByType({ data, loading, selected, onSelect }: P
                   </Pie>
                   <Tooltip
                     contentStyle={{ backgroundColor: "#1e232c", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6 }}
-                    labelStyle={{ color: "white" }}
+                    labelStyle={{ color: theme.palette.text.primary }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -58,10 +59,10 @@ export default function BreakdownByType({ data, loading, selected, onSelect }: P
                 position: "absolute", inset: 0, display: "flex", alignItems: "center",
                 justifyContent: "center", flexDirection: "column", pointerEvents: "none",
               }}>
-                <Typography sx={{ color: "white", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
+                <Typography sx={{ color: "text.primary", fontSize: 28, fontWeight: 700, lineHeight: 1 }}>
                   {total}
                 </Typography>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
                   TOTAL
                 </Typography>
               </Box>
@@ -77,10 +78,10 @@ export default function BreakdownByType({ data, loading, selected, onSelect }: P
                     "&:hover": { bgcolor: "rgba(255,255,255,0.04)" },
                   }}>
                   <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: TYPE_COLORS[i % TYPE_COLORS.length], flexShrink: 0 }} />
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", flex: 1, fontSize: 11 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", flex: 1, fontSize: 11 }}>
                     {d.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
                     {d.count}
                   </Typography>
                 </Box>

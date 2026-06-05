@@ -30,20 +30,20 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
 
   return (
     <Drawer anchor="right" open={!!technologyName} onClose={onClose}
-      slotProps={{ paper: { sx: { bgcolor: "#0F0F0F", color: "white", width: { xs: "100%", sm: 560 }, p: 0 } } }}>
+      slotProps={{ paper: { sx: { bgcolor: "background.default", color: "text.primary", width: { xs: "100%", sm: 560 }, p: 0 } } }}>
       {!technologyName ? null : (
         <Box>
           <Box sx={{ p: 2.5, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
               <Box>
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
                   TECHNOLOGY
                 </Typography>
-                <Typography variant="h6" sx={{ color: "white", fontWeight: 600, mt: 0.5, wordBreak: "break-word" }}>
+                <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 600, mt: 0.5, wordBreak: "break-word" }}>
                   {technologyName}
                 </Typography>
               </Box>
-              <IconButton size="small" onClick={onClose} sx={{ color: "rgba(255,255,255,0.5)" }}>
+              <IconButton size="small" onClick={onClose} sx={{ color: "text.secondary" }}>
                 <Close />
               </IconButton>
             </Box>
@@ -51,7 +51,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                 <Chip label={data.category} size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontSize: 10 }} />
                 <Chip label={data.subcategory} size="small" sx={{ bgcolor: "rgba(124,77,255,0.15)", color: "#34A853", fontSize: 10 }} />
-                <Chip label={data.type} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: 10 }} />
+                <Chip label={data.type} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10 }} />
               </Box>
             )}
           </Box>
@@ -62,7 +62,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
             </Box>
           ) : !data ? (
             <Box sx={{ p: 3 }}>
-              <Typography sx={{ color: "rgba(255,255,255,0.5)" }}>No data available.</Typography>
+              <Typography sx={{ color: "text.secondary" }}>No data available.</Typography>
             </Box>
           ) : (
             <>
@@ -75,10 +75,10 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                   ["Exposure", data.exposure_level],
                 ].map(([label, val]) => (
                   <Box key={label as string} sx={{ flex: 1, p: 2, textAlign: "center", borderRight: "1px solid rgba(255,255,255,0.08)", "&:last-child": { borderRight: 0 } }}>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 600 }}>
                       {(label as string).toUpperCase()}
                     </Typography>
-                    <Typography sx={{ color: "white", fontSize: 18, fontWeight: 700, mt: 0.5, textTransform: "capitalize" }}>
+                    <Typography sx={{ color: "text.primary", fontSize: 18, fontWeight: 700, mt: 0.5, textTransform: "capitalize" }}>
                       {val}
                     </Typography>
                   </Box>
@@ -88,7 +88,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
               {/* Tabs */}
               <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth"
                 sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)",
-                  "& .MuiTab-root": { color: "rgba(255,255,255,0.5)", textTransform: "none", fontSize: 12 },
+                  "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontSize: 12 },
                   "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
                 <Tab label="Overview" />
                 <Tab label="Findings" />
@@ -100,33 +100,33 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                 {tab === 0 && (
                   <Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>OWNER</Typography>
-                      <Typography variant="body2" sx={{ color: "white", mt: 0.5 }}>{data.owner}</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>OWNER</Typography>
+                      <Typography variant="body2" sx={{ color: "text.primary", mt: 0.5 }}>{data.owner}</Typography>
                     </Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>VERSIONS DETECTED</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>VERSIONS DETECTED</Typography>
                       <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
                         {data.versions_detected.map((v) => (
                           <Chip key={v.version} label={`${v.version} (${v.asset_count})`} size="small"
-                            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 11 }} />
+                            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.primary", fontSize: 11 }} />
                         ))}
                       </Box>
                     </Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>REGIONS</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>REGIONS</Typography>
                       <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
-                        {data.regions.length === 0 ? <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>—</Typography> :
+                        {data.regions.length === 0 ? <Typography variant="caption" sx={{ color: "text.secondary" }}>—</Typography> :
                           data.regions.map((r) => (
-                            <Chip key={r} label={r} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 10 }} />
+                            <Chip key={r} label={r} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.primary", fontSize: 10 }} />
                           ))}
                       </Box>
                     </Box>
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600 }}>SUBSCRIPTIONS</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>SUBSCRIPTIONS</Typography>
                       <Box sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
-                        {data.subscriptions.length === 0 ? <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>—</Typography> :
+                        {data.subscriptions.length === 0 ? <Typography variant="caption" sx={{ color: "text.secondary" }}>—</Typography> :
                           data.subscriptions.map((s) => (
-                            <Chip key={s} label={s} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 10, fontFamily: "monospace" }} />
+                            <Chip key={s} label={s} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.primary", fontSize: 10, fontFamily: "monospace" }} />
                           ))}
                       </Box>
                     </Box>
@@ -136,7 +136,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                 {tab === 1 && (
                   <Box>
                     {data.open_findings.length === 0 ? (
-                      <Typography sx={{ color: "rgba(255,255,255,0.5)", textAlign: "center", py: 4 }}>
+                      <Typography sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
                         No open findings.
                       </Typography>
                     ) : (
@@ -145,7 +145,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                           <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
                             <Chip label={f.severity} size="small"
                               sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 9, height: 18, flexShrink: 0 }} />
-                            <Typography variant="body2" sx={{ color: "white", fontSize: 12.5 }}>{f.title}</Typography>
+                            <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12.5 }}>{f.title}</Typography>
                           </Box>
                           {f.cve_id && (
                             <Typography variant="caption" sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 11, ml: 1, mt: 0.5, display: "block" }}>
@@ -160,12 +160,12 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
 
                 {tab === 2 && (
                   <Box>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
                       Active ({data.assets.length})
                     </Typography>
                     <Table size="small">
                       <TableHead>
-                        <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 10, borderColor: "rgba(255,255,255,0.08)" } }}>
+                        <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 10, borderColor: "divider" } }}>
                           <TableCell>NAME</TableCell>
                           <TableCell>REGION</TableCell>
                           <TableCell>STATUS</TableCell>
@@ -173,7 +173,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                       </TableHead>
                       <TableBody>
                         {data.assets.map((a) => (
-                          <TableRow key={a.id} sx={{ "& td": { color: "white", fontSize: 11, borderColor: "rgba(255,255,255,0.05)" } }}>
+                          <TableRow key={a.id} sx={{ "& td": { color: "text.primary", fontSize: 11, borderColor: "divider" } }}>
                             <TableCell sx={{ maxWidth: 220 }}>
                               <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                                 {a.name}
@@ -181,7 +181,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                             </TableCell>
                             <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{a.region || "—"}</TableCell>
                             <TableCell>
-                              <Chip label={a.status} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 9, height: 16 }} />
+                              <Chip label={a.status} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.primary", fontSize: 9, height: 16 }} />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -196,7 +196,7 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                         <Table size="small">
                           <TableBody>
                             {data.stale_assets.map((a) => (
-                              <TableRow key={a.id} sx={{ "& td": { color: "rgba(255,255,255,0.55)", fontSize: 11, borderColor: "rgba(255,255,255,0.05)" } }}>
+                              <TableRow key={a.id} sx={{ "& td": { color: "text.secondary", fontSize: 11, borderColor: "divider" } }}>
                                 <TableCell sx={{ maxWidth: 220 }}>
                                   <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                                     {a.name}
@@ -218,19 +218,19 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                 {tab === 3 && (
                   <Box>
                     {data.policies.length === 0 ? (
-                      <Typography sx={{ color: "rgba(255,255,255,0.5)", textAlign: "center", py: 4 }}>
+                      <Typography sx={{ color: "text.secondary", textAlign: "center", py: 4 }}>
                         No related policies.
                       </Typography>
                     ) : (
                       data.policies.map((p, i) => (
                         <Box key={i} sx={{ p: 1.5, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", mb: 1 }}>
                           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-                            <Typography variant="body2" sx={{ color: "white", fontSize: 12.5 }}>{p.name}</Typography>
+                            <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12.5 }}>{p.name}</Typography>
                             <Chip label={p.status} size="small"
                               sx={{ bgcolor: p.status === "passing" ? "rgba(0,230,118,0.15)" : "rgba(244,67,54,0.15)",
                                 color: p.status === "passing" ? "#00e676" : "#f44336", fontSize: 9, height: 18 }} />
                           </Box>
-                          <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
+                          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
                             {p.framework.replace(/_/g, " ").toUpperCase()} · {p.control_id}
                           </Typography>
                         </Box>

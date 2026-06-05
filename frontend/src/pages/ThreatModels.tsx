@@ -153,17 +153,17 @@ export default function ThreatModels() {
         <Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
             <Hub sx={{ color: "#4285F4", fontSize: 28 }} />
-            <Typography variant="h5" sx={{ color: "white", fontWeight: 700 }}>Threat Models</Typography>
+            <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Threat Models</Typography>
           </Box>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             On-demand STRIDE / PASTA / LINDDUN / MITRE ATT&CK / Kill Chain models grounded in your asset inventory + findings
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Client</InputLabel>
+            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Client"
-              sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
           </FormControl>
@@ -171,8 +171,8 @@ export default function ThreatModels() {
             disabled={!selectedClientId}
             onClick={() => setOpenUpload(true)}
             sx={{
-              color: "rgba(255,255,255,0.8)",
-              borderColor: "rgba(255,255,255,0.2)",
+              color: "text.secondary",
+              borderColor: "divider",
               "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
             }}>
             Upload Diagram
@@ -186,7 +186,7 @@ export default function ThreatModels() {
       </Box>
 
       {!selectedClientId ? (
-        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "white", border: "1px solid rgba(66,133,244,0.3)" }}>
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.primary", border: "1px solid rgba(66,133,244,0.3)" }}>
           Pick a client to see its threat models or generate a new one.
         </Alert>
       ) : isLoading ? (
@@ -194,10 +194,10 @@ export default function ThreatModels() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : models.length === 0 ? (
-        <Card sx={{ bgcolor: "#1E1E1E", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <Hub sx={{ fontSize: 48, color: "rgba(255,255,255,0.2)", mb: 1 }} />
-          <Typography sx={{ color: "rgba(255,255,255,0.7)", fontWeight: 600, mb: 0.5 }}>No threat models yet</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.5)" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+          <Hub sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>No threat models yet</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Click "New Threat Model" to generate one on demand.
           </Typography>
         </Card>
@@ -211,7 +211,7 @@ export default function ThreatModels() {
                 <Card
                   onClick={() => navigate(`/threat-models/${m.id}?client=${m.client_id}`)}
                   sx={{
-                    bgcolor: "#1E1E1E",
+                    bgcolor: "background.paper",
                     border: `1px solid ${sc}40`,
                     borderRadius: 2,
                     cursor: "pointer",
@@ -226,7 +226,7 @@ export default function ThreatModels() {
                       <IconButton size="small"
                         onClick={(e) => { e.stopPropagation(); setPendingDelete(m); }}
                         sx={{
-                          color: "rgba(255,255,255,0.35)",
+                          color: "text.secondary",
                           "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                         }}>
                         <DeleteOutlined sx={{ fontSize: 16 }} />
@@ -237,9 +237,9 @@ export default function ThreatModels() {
                         <IconButton size="small" disabled={inFlight || rescanMutation.isPending}
                           onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(m); }}
                           sx={{
-                            color: "rgba(255,255,255,0.35)",
+                            color: "text.secondary",
                             "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-                            "&.Mui-disabled": { color: "rgba(255,255,255,0.15)" },
+                            "&.Mui-disabled": { color: "text.secondary" },
                           }}>
                           <Replay sx={{ fontSize: 16 }} />
                         </IconButton>
@@ -253,10 +253,10 @@ export default function ThreatModels() {
                       <Chip label={m.status} size="small"
                         sx={{ bgcolor: `${sc}20`, color: sc, fontWeight: 700, fontSize: 10, height: 20, textTransform: "uppercase", letterSpacing: 0.5 }} />
                     </Box>
-                    <Typography sx={{ color: "white", fontWeight: 700, fontSize: 16, mb: 0.5 }}>
+                    <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 16, mb: 0.5 }}>
                       {m.name || `Threat Model · ${methodologyLabel(m.methodology)}`}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 1.5 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
                       Scope: {m.scope_type}{m.framework ? ` · ${m.framework}` : ""}
                       {m.generated_at ? ` · generated ${fromNow(m.generated_at)}` : (m.created_at ? ` · created ${fromNow(m.created_at)}` : "")}
                     </Typography>
@@ -265,7 +265,7 @@ export default function ThreatModels() {
                     )}
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <Chip label={`${m.component_count} component${m.component_count === 1 ? "" : "s"}`}
-                        size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.75)" }} />
+                        size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
                       <Chip label={`${m.threat_count} threat${m.threat_count === 1 ? "" : "s"}`}
                         size="small" sx={{ height: 20, fontSize: 10, bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335", fontWeight: 700 }} />
                       <Chip label={`${m.mitigation_count} mitigation${m.mitigation_count === 1 ? "" : "s"}`}
@@ -286,23 +286,23 @@ export default function ThreatModels() {
 
       {/* Create dialog */}
       <Dialog open={openCreate} onClose={() => setOpenCreate(false)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>
           Generate a new threat model
-          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
             On-demand AI generation grounded in {clients.find((c) => c.id === selectedClientId)?.name || "the client"}'s asset inventory + recent findings.
           </Typography>
         </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <DialogContent dividers sx={{ borderColor: "divider" }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <TextField size="small" label="Name (optional)" value={tmName}
               onChange={(e) => setTmName(e.target.value)}
               placeholder='e.g. "Q2 2026 review"'
               slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
 
             <Box>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mb: 1, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
                 METHODOLOGY
               </Typography>
               <Grid container spacing={1}>
@@ -320,8 +320,8 @@ export default function ThreatModels() {
                           "&:hover": { borderColor: "#4285F4" },
                         }}
                       >
-                        <Typography sx={{ color: "white", fontWeight: 700, fontSize: 13, mb: 0.5 }}>{m.label}</Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)", display: "block", lineHeight: 1.4 }}>
+                        <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 13, mb: 0.5 }}>{m.label}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.4 }}>
                           {m.description}
                         </Typography>
                       </Card>
@@ -330,19 +330,19 @@ export default function ThreatModels() {
                 })}
               </Grid>
               {!methodologies.length && (
-                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Loading methodologies…
                 </Typography>
               )}
             </Box>
 
-            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(66,133,244,0.2)" }}>
+            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)" }}>
               Generation runs on demand and typically takes 20–60 seconds. The model uses the configured AI provider (Settings → AI Settings). If no provider is configured, a deterministic skeleton is returned.
             </Alert>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenCreate(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setOpenCreate(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained"
             disabled={createMutation.isPending || !methodology}
             onClick={() => createMutation.mutate()}>
@@ -353,17 +353,17 @@ export default function ThreatModels() {
 
       {/* Upload dialog */}
       <Dialog open={openUpload} onClose={() => setOpenUpload(false)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>
           Upload an architecture diagram
-          <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.5)" }}>
+          <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
             Upload a .drawio / .xml / .pdf / .jpg / .png. We'll extract components and data flows, then you review before AI threat modelling runs.
           </Typography>
         </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <DialogContent dividers sx={{ borderColor: "divider" }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <Box>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", fontWeight: 600, mb: 1, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
                 DIAGRAM FILE
               </Typography>
               <Box
@@ -380,15 +380,15 @@ export default function ThreatModels() {
                   bgcolor: "rgba(255,255,255,0.02)",
                 }}
               >
-                <UploadFile sx={{ fontSize: 32, color: "rgba(255,255,255,0.4)", mb: 0.5 }} />
-                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", mb: 1.5 }}>
+                <UploadFile sx={{ fontSize: 32, color: "text.secondary", mb: 0.5 }} />
+                <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
                   {uploadFile ? uploadFile.name : "Drop file here or pick one below"}
                 </Typography>
                 <Button
                   component="label"
                   size="small"
                   variant="outlined"
-                  sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.85)" }}
+                  sx={{ textTransform: "none", borderColor: "divider", color: "text.secondary" }}
                 >
                   Choose file
                   <input
@@ -399,7 +399,7 @@ export default function ThreatModels() {
                   />
                 </Button>
                 {uploadFile && (
-                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "rgba(255,255,255,0.5)" }}>
+                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
                     {(uploadFile.size / 1024).toFixed(1)} KB · {uploadFile.type || "unknown"}
                   </Typography>
                 )}
@@ -410,17 +410,17 @@ export default function ThreatModels() {
               onChange={(e) => setUploadName(e.target.value)}
               placeholder='e.g. "Payment platform architecture"'
               slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }} />
+              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
 
             <FormControl size="small">
-              <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Methodology</InputLabel>
+              <InputLabel sx={{ color: "text.secondary" }}>Methodology</InputLabel>
               <Select value={uploadMethodology} onChange={(e) => setUploadMethodology(e.target.value)} label="Methodology"
-                sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                 {methodologies.map((m) => <MenuItem key={m.id} value={m.id}>{m.label}</MenuItem>)}
               </Select>
             </FormControl>
 
-            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(66,133,244,0.2)" }}>
+            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)" }}>
               <strong>How extraction works:</strong> .drawio files are parsed deterministically.
               PDFs use text extraction; if text is sparse the file is rejected — re-upload as PNG/JPG instead.
               Images are read by the configured vision LLM (OpenAI GPT-4o, Claude, Gemini all supported).
@@ -428,7 +428,7 @@ export default function ThreatModels() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenUpload(false)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setOpenUpload(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained"
             disabled={!uploadFile || uploadMutation.isPending}
             onClick={() => uploadMutation.mutate()}>
@@ -439,15 +439,15 @@ export default function ThreatModels() {
 
       {/* Confirm delete */}
       <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}
-        slotProps={{ paper: { sx: { bgcolor: "#1E1E1E", color: "white" } } }}>
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>Delete threat model?</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             This removes the model and its components / threats / mitigations. Findings and risks that informed the model are not affected.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDelete(null)} sx={{ color: "rgba(255,255,255,0.5)" }}>Cancel</Button>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained"
             disabled={deleteMutation.isPending}
             onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete)}

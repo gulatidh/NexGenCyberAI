@@ -16,10 +16,10 @@ export default function AverageIssueAge({ data, loading }: Props) {
   return (
     <Card sx={cardSx}>
       <CardContent>
-        <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600, mb: 1 }}>
+        <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1 }}>
           Average Issue Age
         </Typography>
-        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mb: 2, display: "block" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", mb: 2, display: "block" }}>
           Days open vs SLA threshold
         </Typography>
         <Grid container spacing={2}>
@@ -53,12 +53,12 @@ export default function AverageIssueAge({ data, loading }: Props) {
                     <Typography sx={{ color: breached ? "#f44336" : "white", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
                       {age.toFixed(0)}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)" }}>days</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>days</Typography>
                   </Box>
                   <LinearProgress variant="determinate" value={pct}
                     sx={{ height: 4, borderRadius: 2, bgcolor: "rgba(255,255,255,0.06)",
                       "& .MuiLinearProgress-bar": { bgcolor: color } }} />
-                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10, mt: 0.5, display: "block" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, mt: 0.5, display: "block" }}>
                     SLA: {sla}d
                   </Typography>
                 </Box>
