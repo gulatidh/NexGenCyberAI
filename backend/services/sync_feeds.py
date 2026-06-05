@@ -657,3 +657,62 @@ def sync_feed(feed_id: str) -> Dict[str, Any]:
     except Exception as exc:
         logger.exception("Sync failed for feed %s", feed_id)
         return {"ok": False, "id": feed_id, "error": str(exc)}
+
+
+def feed_entries(feed_id: str, db, limit: int = 100, q: Optional[str] = None) -> Dict[str, Any]:
+    """Return a sample of the actual entries a feed has synced, for the Sync
+    page 'view entries' drawer. Shape: {id, total, rows[], note?}. `rows` are
+    dicts; the UI derives columns from the keys."""
+    fid = (feed_id or "").lower()
+
+    if fid in ("attack", "capec"):
+        from api.models.models import ThreatLibrary
+        base = db.query(ThreatLibrary).filter(ThreatLibrary.source == fid)
+        total = base.count()
+        if q:
+            like = f"%{q}%"
+            base = base.filter(
+                (ThreatLibrary.source_id.ilike(like)) | (ThreatLibrary.name.ilike(like))
+            )
+        rows = base.order_by(ThreatLibrary.source_id).limit(limit).all()
+        def _cwes(r):
+            v = r.related_cwes
+            return ", ".join(v) if isinstance(v, list) else (v or "")
+        return {
+            "id": fid, "total": total,
+            "rows": [{
+                "id": r.source_id, "name": r.name,
+                "category": r.category or "", "cwes": _cwes(r),
+                "description": (r.description or "")[:200],
+            } for r in rows],
+        }
+
+    if fid == "epss":
+        from services.threat_intel import sample_epss, epss_total
+        return {"id": fid, "total": epss_total(), "rows": sample_epss(limit, q)}
+
+    if fid == "kev":
+        from services.threat_intel import sample_kev, kev_total
+        return {"id": fid, "total": kev_total(), "rows": sample_kev(limit, q)}
+
+    if fid in ("nvd_recent", "nvd"):
+        cache_path = _CACHE_DIR / "nvd_cve_cache.json"
+        if not cache_path.exists():
+            return {"id": fid, "total": 0, "rows": []}
+        try:
+            data = json.loads(cache_path.read_text())
+        except Exception:
+            return {"id": fid, "total": 0, "rows": []}
+        items = list(data.items())
+        if q:
+            ql = q.upper()
+            items = [(k, v) for k, v in items if ql in k.upper()]
+        rows = [{
+            "cve": k, "cvss_v3": v.get("cvss_v3"),
+            "cwes": ", ".join(v.get("cwes") or []),
+            "description": (v.get("description") or "")[:200],
+        } for k, v in items[:limit]]
+        return {"id": fid, "total": len(data), "rows": rows}
+
+    return {"id": fid, "total": 0, "rows": [],
+            "note": "This feed recomputes compliance and has no row-level entries to list."}

@@ -259,6 +259,8 @@ export const adminApi = {
     apiClient.post(`/admin/sync/feeds/${feedId}/refresh`).then((r) => r.data),
   refreshAllSyncFeeds: () =>
     apiClient.post("/admin/sync/feeds/refresh-all").then((r) => r.data),
+  syncFeedEntries: (feedId: string, params?: { limit?: number; q?: string }) =>
+    apiClient.get(`/admin/sync/feeds/${feedId}/entries`, { params }).then((r) => r.data),
 };
 
 export const technologiesApi = {

@@ -13,10 +13,11 @@ import React, { useState } from "react";
 import {
   Box, Typography, Card, CardContent, Button, Chip, Alert,
   CircularProgress, Grid, LinearProgress, Tooltip,
+  Drawer, IconButton, TextField, Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
 } from "@mui/material";
 import {
   Sync, AdminPanelSettings, CheckCircleOutlined, ScheduleOutlined,
-  ShieldOutlined, CloudDownload, Policy, ErrorOutlined,
+  ShieldOutlined, CloudDownload, Policy, ErrorOutlined, Visibility, Close,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "../services/api";
@@ -65,11 +66,12 @@ const CATEGORY_ICON: Record<string, React.ReactNode> = {
 };
 
 function FeedTile({
-  feed, syncing, onSync, lastResult,
+  feed, syncing, onSync, onView, lastResult,
 }: {
   feed: SyncFeed;
   syncing: boolean;
   onSync: () => void;
+  onView: () => void;
   lastResult?: FeedResult;
 }) {
   const color = CATEGORY_COLOR[feed.category] || "#4285F4";
@@ -168,22 +170,98 @@ function FeedTile({
           </Typography>
         )}
 
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={syncing ? <CircularProgress size={14} sx={{ color }} /> : <Sync />}
-          disabled={syncing}
-          onClick={onSync}
-          sx={{
-            color, borderColor: `${color}60`, textTransform: "none", fontWeight: 600,
-            "&:hover": { borderColor: color, bgcolor: `${color}10` },
-            "&.Mui-disabled": { borderColor: `${color}30`, color: `${color}80` },
-          }}
-        >
-          {syncing ? "Syncing…" : "Sync"}
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={syncing ? <CircularProgress size={14} sx={{ color }} /> : <Sync />}
+            disabled={syncing}
+            onClick={onSync}
+            sx={{
+              flex: 1, color, borderColor: `${color}60`, textTransform: "none", fontWeight: 600,
+              "&:hover": { borderColor: color, bgcolor: `${color}10` },
+              "&.Mui-disabled": { borderColor: `${color}30`, color: `${color}80` },
+            }}
+          >
+            {syncing ? "Syncing…" : "Sync"}
+          </Button>
+          <Button
+            variant="text"
+            size="small"
+            startIcon={<Visibility sx={{ fontSize: 16 }} />}
+            disabled={!feed.count}
+            onClick={onView}
+            sx={{ color: "text.secondary", textTransform: "none", fontWeight: 600 }}
+          >
+            View
+          </Button>
+        </Box>
       </CardContent>
     </Card>
+  );
+}
+
+function SyncEntriesDrawer({ feed, onClose }: { feed: SyncFeed | null; onClose: () => void }) {
+  const [q, setQ] = useState("");
+  React.useEffect(() => { setQ(""); }, [feed?.id]);
+  const { data, isFetching } = useQuery<{ id: string; total: number; rows: any[]; note?: string }>({
+    queryKey: ["sync-entries", feed?.id, q],
+    queryFn: () => adminApi.syncFeedEntries(feed!.id, { limit: 200, q: q || undefined }),
+    enabled: !!feed,
+  });
+  const rows = data?.rows || [];
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  return (
+    <Drawer anchor="right" open={!!feed} onClose={onClose}
+      slotProps={{ paper: { sx: { width: { xs: "100%", md: 740 }, bgcolor: "background.default", p: 2 } } }}>
+      {feed && (
+        <>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+            <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700, flex: 1 }}>
+              {feed.name} — synced entries
+            </Typography>
+            <IconButton onClick={onClose} sx={{ color: "text.secondary" }}><Close /></IconButton>
+          </Box>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Showing {rows.length} of {(data?.total ?? feed.count).toLocaleString()} {feed.item_label}
+          </Typography>
+          <TextField fullWidth size="small" placeholder="Filter…" value={q}
+            onChange={(e) => setQ(e.target.value)} sx={{ my: 1.5 }} />
+          {data?.note ? (
+            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)" }}>{data.note}</Alert>
+          ) : isFetching ? (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
+          ) : rows.length === 0 ? (
+            <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)" }}>No entries — run a sync first.</Alert>
+          ) : (
+            <TableContainer component={Card} sx={{ bgcolor: "background.paper", maxHeight: "calc(100vh - 160px)" }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    {cols.map((c) => (
+                      <TableCell key={c} sx={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: "text.secondary", bgcolor: "background.paper" }}>
+                        {c.replace(/_/g, " ")}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows.map((r, i) => (
+                    <TableRow key={i} hover>
+                      {cols.map((c) => (
+                        <TableCell key={c} sx={{ fontSize: 12, color: "text.primary", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {typeof r[c] === "boolean" ? (r[c] ? "yes" : "—") : (r[c] ?? "—")}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </>
+      )}
+    </Drawer>
   );
 }
 
@@ -192,6 +270,7 @@ export default function ThreatIntel() {
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [allSyncing, setAllSyncing] = useState(false);
   const [results, setResults] = useState<Record<string, FeedResult>>({});
+  const [viewFeed, setViewFeed] = useState<SyncFeed | null>(null);
 
   const { data: me, isLoading: meLoading } = useQuery<MyAccess>({
     queryKey: ["my-access"],
@@ -314,12 +393,15 @@ export default function ThreatIntel() {
                 feed={feed}
                 syncing={syncingId === feed.id || allSyncing}
                 onSync={() => syncOne.mutate(feed.id)}
+                onView={() => setViewFeed(feed)}
                 lastResult={results[feed.id]}
               />
             </Grid>
           ))}
         </Grid>
       )}
+
+      <SyncEntriesDrawer feed={viewFeed} onClose={() => setViewFeed(null)} />
 
       <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mt: 3 }}>
         <CardContent>

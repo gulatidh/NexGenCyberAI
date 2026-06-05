@@ -36,6 +36,20 @@ async def refresh_sync_feed(feed_id: str, _=Depends(get_current_user)):
     return sync_feed(feed_id)
 
 
+@router.get("/sync/feeds/{feed_id}/entries")
+async def list_sync_feed_entries(
+    feed_id: str,
+    limit: int = 100,
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """A sample of the actual entries a feed has synced (powers the Sync page
+    'view entries' drawer). Returns {id, total, rows[], note?}."""
+    from services.sync_feeds import feed_entries
+    return feed_entries(feed_id, db, limit=min(max(limit, 1), 500), q=q)
+
+
 @router.post("/scan-binaries/cleanup")
 async def cleanup_scan_binaries(days: int = 30, _=Depends(get_current_user)):
     """Manually purge uploaded scan binaries older than `days` days.
