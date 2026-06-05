@@ -19,6 +19,7 @@ import AISettings from "./pages/AISettings";
 import Findings from "./pages/Findings";
 import Risks from "./pages/Risks";
 import Assets from "./pages/Assets";
+import StaleAssets from "./pages/StaleAssets";
 import AssetDetail from "./pages/AssetDetail";
 import Frameworks from "./pages/Frameworks";
 import RiskOverviewPage from "./pages/RiskOverview";
@@ -161,6 +162,7 @@ export default function App() {
                   <Route path="/findings" element={<Findings />} />
                   <Route path="/risks" element={<Risks />} />
                   <Route path="/assets" element={<Assets />} />
+                  <Route path="/stale-assets" element={<StaleAssets />} />
                   <Route path="/assets/technologies" element={<Technologies />} />
                   <Route path="/assets/:assetId" element={<AssetDetail />} />
                   <Route path="/frameworks" element={<Frameworks />} />

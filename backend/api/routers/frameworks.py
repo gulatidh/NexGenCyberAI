@@ -12,7 +12,7 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 from api.models.models import (
-    Asset, Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
+    Asset, AssetStatus, Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
 )
 from api.schemas.schemas import (
     ControlStatusResponse, ControlStatusUpdate, FrameworkCatalogEntry,
@@ -196,7 +196,11 @@ async def client_framework_detail(
     if referenced_resource_ids:
         for a in (
             db.query(Asset)
-            .filter(Asset.client_id == client_id, Asset.external_id.in_(referenced_resource_ids))
+            .filter(
+                Asset.client_id == client_id,
+                Asset.external_id.in_(referenced_resource_ids),
+                Asset.status == AssetStatus.ACTIVE.value,
+            )
             .all()
         ):
             asset_by_ext_id[a.external_id] = a

@@ -10,7 +10,7 @@ import {
   SmartToy, Assessment, Logout, AccountCircle, Shield,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
-  ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check,
+  ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +43,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Clients",         icon: <People />,   path: "/clients" },
       { label: "Asset Inventory", icon: <Storage />,  path: "/assets" },
+      { label: "Stale Assets",    icon: <History />,  path: "/stale-assets" },
       { label: "Technologies",    icon: <Apps />,     path: "/assets/technologies" },
       { label: "Frameworks",      icon: <Policy />,   path: "/frameworks" },
     ],

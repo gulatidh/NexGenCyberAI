@@ -102,8 +102,17 @@ async def list_assets(
         query = query.filter(Asset.resource_group == resource_group)
     if region:
         query = query.filter(Asset.region == region)
-    if status:
-        query = query.filter(Asset.status == status)
+    # Inventory defaults to LIVE assets. Stale/deleted are kept for audit but
+    # excluded from the main list (and from all analysis/assessments/reports);
+    # the dedicated Stale Assets view requests them via status=archived.
+    #   active (default) | stale | deleted | archived (stale+deleted) | all
+    status_norm = (status or "active").lower()
+    if status_norm == "all":
+        pass
+    elif status_norm == "archived":
+        query = query.filter(Asset.status.in_([AssetStatus.STALE.value, AssetStatus.DELETED.value]))
+    else:
+        query = query.filter(Asset.status == status_norm)
     if q:
         query = query.filter(Asset.name.ilike(f"%{q}%"))
     assets = query.order_by(Asset.name.asc()).limit(500).all()
@@ -147,7 +156,11 @@ async def get_facets(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    base = db.query(Asset).filter(Asset.client_id == client_id)
+    # Facets describe the LIVE inventory (the default list view), so exclude
+    # stale/deleted to keep the filter counts honest.
+    base = db.query(Asset).filter(
+        Asset.client_id == client_id, Asset.status == AssetStatus.ACTIVE.value,
+    )
     return {
         "asset_class": [r[0] for r in base.with_entities(distinct(Asset.asset_class)).all() if r[0]],
         "region": [r[0] for r in base.with_entities(distinct(Asset.region)).all() if r[0]],

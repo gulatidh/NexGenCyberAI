@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from api.models.models import Asset, Client, Connector, Finding, Project, Scan
+from api.models.models import Asset, AssetStatus, Client, Connector, Finding, Project, Scan
 from db.database import get_db
 from core.security import get_current_user
 
@@ -154,7 +154,9 @@ def _build_technology_payload(
     if not db.query(Client).filter(Client.id == client_id).first():
         raise HTTPException(status_code=404, detail="Client not found")
 
-    asset_q = db.query(Asset).filter(Asset.client_id == client_id)
+    asset_q = db.query(Asset).filter(
+        Asset.client_id == client_id, Asset.status == AssetStatus.ACTIVE.value,
+    )
     if project_id:
         asset_q = asset_q.filter(Asset.project_id == project_id)
     assets = asset_q.all()
@@ -309,7 +311,10 @@ async def get_technology_detail(
     _=Depends(get_current_user),
 ):
     """Detail drawer payload for a single technology (asset_type)."""
-    items = db.query(Asset).filter(Asset.client_id == client_id, Asset.asset_type == technology_name).all()
+    items = db.query(Asset).filter(
+        Asset.client_id == client_id, Asset.asset_type == technology_name,
+        Asset.status == AssetStatus.ACTIVE.value,
+    ).all()
     if not items:
         raise HTTPException(status_code=404, detail="Technology not found in this client's inventory")
 

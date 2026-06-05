@@ -39,7 +39,7 @@ export default function Assets() {
   const [assetClass, setAssetClass] = useState("");
   const [resourceGroup, setResourceGroup] = useState("");
   const [region, setRegion] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [search, setSearch] = useState("");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
@@ -207,9 +207,8 @@ export default function Assets() {
             <InputLabel sx={{ color: "rgba(255,255,255,0.5)" }}>Status</InputLabel>
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status"
               sx={{ color: "white", "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.2)" } }}>
-              <MenuItem value="">All</MenuItem>
               <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="stale">Stale</MenuItem>
+              <MenuItem value="all">All (incl. stale)</MenuItem>
             </Select>
           </FormControl>
           <TextField size="small" placeholder="Search name…" value={search}
@@ -217,6 +216,12 @@ export default function Assets() {
             sx={{ minWidth: 180,
               "& .MuiOutlinedInput-root": { color: "white", "& fieldset": { borderColor: "rgba(255,255,255,0.2)" } },
               "& input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+          <Tooltip title="Stale assets (not seen in the latest sync) — excluded from assessments & reports">
+            <Button variant="outlined" size="small" onClick={() => navigate("/stale-assets")}
+              sx={{ color: "#ff9800", borderColor: "rgba(255,152,0,0.5)", whiteSpace: "nowrap" }}>
+              Stale assets →
+            </Button>
+          </Tooltip>
         </Box>
       )}
 

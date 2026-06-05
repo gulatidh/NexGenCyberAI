@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List
 
-from api.models.models import Asset, Client, Connector, Project, Scan
+from api.models.models import Asset, AssetStatus, Client, Connector, Project, Scan
 from api.schemas.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from db.database import get_db
 from core.security import get_current_user
@@ -106,6 +106,8 @@ async def project_summary(
         "id": p.id,
         "name": p.name,
         "connector_count": db.query(Connector).filter(Connector.project_id == project_id).count(),
-        "asset_count": db.query(Asset).filter(Asset.project_id == project_id).count(),
+        "asset_count": db.query(Asset).filter(
+            Asset.project_id == project_id, Asset.status == AssetStatus.ACTIVE.value,
+        ).count(),
         "scan_count": db.query(Scan).filter(Scan.project_id == project_id).count(),
     }

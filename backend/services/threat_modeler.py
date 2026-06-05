@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from api.models.models import (
-    Asset, Client, Connector, Finding, Project, Risk, Scan, ThreatLibrary, ThreatModel,
+    Asset, AssetStatus, Client, Connector, Finding, Project, Risk, Scan, ThreatLibrary, ThreatModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,11 @@ def _collect_scope(
         assets_q = assets_q.filter(Asset.project_id == scope_id)
     elif scope_type == "asset" and scope_id:
         assets_q = assets_q.filter(Asset.id == scope_id)
+    # Exclude stale/deleted assets from analysis — they're decommissioned /
+    # out of the current footprint and would inflate the model. The only
+    # exception is an explicit single-asset scope (model exactly what's asked).
+    if not (scope_type == "asset" and scope_id):
+        assets_q = assets_q.filter(Asset.status == AssetStatus.ACTIVE.value)
     assets = assets_q.limit(120).all()
     asset_rows = []
     for a in assets:
@@ -1098,6 +1103,8 @@ def _scope_asset_count(db: Session, tm: ThreatModel) -> int:
         q = q.filter(Asset.project_id == tm.scope_id)
     elif tm.scope_type == "asset" and tm.scope_id:
         q = q.filter(Asset.id == tm.scope_id)
+    if not (tm.scope_type == "asset" and tm.scope_id):
+        q = q.filter(Asset.status == AssetStatus.ACTIVE.value)
     return q.count()
 
 
