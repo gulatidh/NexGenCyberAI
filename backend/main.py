@@ -620,6 +620,45 @@ def _fail_stale_threat_models() -> None:
         logger.warning("Stale threat-model reconcile failed: %s", exc)
 
 
+def _fail_stale_scans() -> None:
+    """Fail scans stuck in pending/running past the longest plausible scanner
+    runtime. A workflow-driven scan that's cancelled, times out, or fails to
+    dispatch never calls /scans/ingest, so the scan would otherwise sit
+    'running' forever. Age-gated well beyond the slowest job (OWASP DC ~60m)
+    so an in-flight scan is never killed."""
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy.orm import Session
+    from api.models.models import Scan, ScanStatus
+
+    STALE_AFTER = timedelta(minutes=90)
+    now = datetime.now(timezone.utc)
+    cutoff = now - STALE_AFTER
+    try:
+        with Session(engine) as db:
+            stuck = db.query(Scan).filter(
+                Scan.status.in_([ScanStatus.PENDING.value, ScanStatus.RUNNING.value])
+            ).all()
+            n = 0
+            for s in stuck:
+                ref = s.started_at or s.created_at
+                if ref is not None and ref.tzinfo is None:
+                    ref = ref.replace(tzinfo=timezone.utc)
+                if ref is not None and ref > cutoff:
+                    continue  # still within the grace window — leave it running
+                s.status = ScanStatus.FAILED
+                s.error_message = (
+                    "Scan timed out — the scanner workflow didn't report back "
+                    "(cancelled, timed out, or failed to dispatch). Re-run the scan."
+                )
+                s.completed_at = now
+                n += 1
+            if n:
+                db.commit()
+                logger.info("Reconciled %d stuck scan(s) to 'failed'", n)
+    except Exception as exc:
+        logger.warning("Stuck-scan reconcile failed: %s", exc)
+
+
 _ensure_added_columns()
 _ensure_projects_schema()
 _normalize_enum_case()
@@ -628,6 +667,7 @@ _provision_azure_connector()
 _seed_framework_controls()
 _bootstrap_initial_admin()
 _fail_stale_threat_models()
+_fail_stale_scans()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -743,6 +783,29 @@ async def _start_scan_binary_cleanup() -> None:
         asyncio.create_task(_loop())
     except Exception:
         log.exception("Failed to schedule scan binary cleanup")
+
+
+@app.on_event("startup")
+async def _start_stuck_scan_watchdog() -> None:
+    """Periodically fail scans whose workflow never reported back, so they
+    don't sit 'running' forever (startup already does one pass)."""
+    import asyncio
+    import logging
+    log = logging.getLogger(__name__)
+
+    async def _loop() -> None:
+        await asyncio.sleep(300)  # first periodic pass 5 min after boot
+        while True:
+            try:
+                await asyncio.to_thread(_fail_stale_scans)
+            except Exception:
+                log.exception("Stuck-scan watchdog pass failed")
+            await asyncio.sleep(20 * 60)  # every 20 minutes
+
+    try:
+        asyncio.create_task(_loop())
+    except Exception:
+        log.exception("Failed to schedule stuck-scan watchdog")
 
 
 @app.on_event("startup")
