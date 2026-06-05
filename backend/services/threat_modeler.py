@@ -640,6 +640,65 @@ def _svc_icon(text: str) -> str:
     return "⚙️"
 
 
+def _component_type(text: str) -> str:
+    """Map an asset's type/name to a DFD component type vocabulary."""
+    t = (text or "").lower()
+    table = [
+        (("database", "db", "sql", "postgres", "mysql", "mongo", "rds", "cosmos", "dynamo", "aurora"), "database"),
+        (("storage", "bucket", "blob", "s3", "object", "datalake", "data lake", "gcs"), "storage"),
+        (("queue", "topic", "kafka", "sqs", "sns", "event", "bus", "pubsub", "service bus"), "queue"),
+        (("secret", "vault", "kms", "keyvault"), "secret-store"),
+        (("identity", "iam", "auth", "entra", "active directory", "okta", "cognito"), "identity"),
+        (("api", "gateway", "apim", "endpoint", "rest", "graphql"), "api"),
+        (("repo", "git", "source", "codeql", "sonar"), "repo"),
+        (("vm", "compute", "server", "ec2", "instance", "host", "vmss", "function", "lambda",
+          "container", "aks", "eks", "gke", "webapp", "app service", "web", "frontend", "cdn"), "endpoint"),
+    ]
+    for keys, typ in table:
+        if any(k in t for k in keys):
+            return typ
+    return "other"
+
+
+def _infer_zone(text: str) -> str:
+    """Heuristic trust zone for an asset — deterministic so the same asset
+    lands in the same zone across every methodology / rerun."""
+    t = (text or "").lower()
+    if any(k in t for k in ("public", "internet", "cdn", "frontend", "web", "waf",
+                            "gateway", "load balancer", "ingress", "edge", "dmz", "front door")):
+        return "public"
+    if any(k in t for k in ("database", "db", "sql", "storage", "bucket", "blob",
+                            "data", "warehouse", "lake")):
+        return "data-tier"
+    if any(k in t for k in ("identity", "iam", "auth", "entra", "secret", "vault",
+                            "kms", "admin", "manage", "mgmt", "bastion")):
+        return "management"
+    return "private"
+
+
+def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    """Deterministically derive DFD components from the scoped asset inventory,
+    so the architecture is identical for STRIDE / MITRE / any rerun of the same
+    scope — only the threat lens changes. Empty when the scope has no assets
+    (the caller then falls back to LLM-inferred architecture)."""
+    comps: List[Dict[str, Any]] = []
+    for i, a in enumerate(list(assets or [])[:60]):
+        name = _str(a.get("name")) or _str(a.get("id")) or f"component {i+1}"
+        hay = f"{a.get('name', '')} {a.get('type', '')} {a.get('provider', '')}"
+        comps.append({
+            # Short, stable IDs (c1, c2, …) the LLM can echo reliably when
+            # keying threats/flows/coverage back to a component — asset UUIDs
+            # don't survive an LLM round-trip.
+            "id": f"c{i+1}",
+            "name": name,
+            "type": _component_type(hay),
+            "trust_zone": _infer_zone(hay),
+            "criticality": _str(a.get("criticality")) or "medium",
+            "notes": "",
+        })
+    return comps
+
+
 def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, Any]]) -> str:
     """Deterministically render a valid Mermaid `flowchart TD` from the
     structured DFD. Nodes are grouped into trust-zone subgraphs; edge labels
@@ -1216,14 +1275,14 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
     db.commit()
 
     try:
-        # If created from an uploaded diagram, the user already reviewed the
-        # architecture — treat it as authoritative and skip live discovery.
-        preset_components = tm.components_json if tm.components_json else None
-        preset_data_flows = tm.data_flows_json if tm.data_flows_json else None
+        # Diagram-upload models carry a user-reviewed architecture; treat it
+        # as authoritative and skip live discovery.
+        diagram_components = tm.components_json if tm.components_json else None
+        diagram_data_flows = tm.data_flows_json if tm.data_flows_json else None
 
         # Step 1 — assets
-        if preset_components:
-            _set_step(db, tm, "assets", "done", f"{len(preset_components)} components from uploaded diagram")
+        if diagram_components:
+            _set_step(db, tm, "assets", "done", f"{len(diagram_components)} components from uploaded diagram")
         else:
             await _ensure_assets(db, tm)
 
@@ -1235,6 +1294,13 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
                   f"{scope['asset_count']} assets · {scope['finding_count']} findings · "
                   f"{scope.get('risk_count', 0)} risks")
 
+        # Pin the architecture so methodology / reruns don't change the
+        # component set: derive components deterministically from the scoped
+        # asset inventory. Only when the scope has no assets do we fall back to
+        # letting the LLM invent the architecture.
+        derived_components = None if diagram_components else (_components_from_assets(scope.get("assets")) or None)
+        pinned_components = diagram_components or derived_components
+
         fw = tm.framework.value if hasattr(tm.framework, "value") else (tm.framework or None)
 
         # Step 3 — threat library
@@ -1242,37 +1308,44 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         library = _library_sample(db, methodology)
         _set_step(db, tm, "library", "done", f"{len(library)} reference patterns")
 
-        # Step 4 — LLM analysis
+        # Step 4 — LLM analysis (architecture pinned when we have one, so the
+        # LLM keys threats/flows to those exact component IDs).
         _set_step(db, tm, "model", "active", f"calling {label} model")
         model, meta = await _invoke_llm(
             scope, fw, methodology, library=library,
-            preset_components=preset_components, preset_data_flows=preset_data_flows,
+            preset_components=pinned_components, preset_data_flows=diagram_data_flows,
         )
-        # If the LLM produced nothing usable (e.g. unparseable/truncated JSON),
-        # don't quietly save an empty "completed" model — surface it as failed
-        # with the reason so the user knows to rescan rather than seeing a
-        # blank deliverable.
-        comps_out = model.get("components") or []
         threats_out = model.get("threats") or []
-        if not preset_components and not comps_out and not threats_out:
+        has_arch = bool(pinned_components or model.get("components"))
+        if not has_arch and not threats_out:
             reason = meta.get("error") or "The model returned an empty threat model. Please rescan."
             _set_step(db, tm, "model", "error", reason)
             raise RuntimeError(reason)
         _set_step(db, tm, "model", "done", f"{len(threats_out)} threats identified")
 
-        # Step 5 — finalize. When the user supplied the architecture, keep
-        # their components + flows verbatim; only threats / mitigations / dfd /
-        # summary come from the LLM, so it can't drop or rename a reviewed one.
+        # Step 5 — finalize the architecture.
         _set_step(db, tm, "finalize", "active")
-        if preset_components:
-            tm.components_json = preset_components
-            tm.data_flows_json = preset_data_flows or []
+        if diagram_components:
+            tm.components_json = diagram_components
+            tm.data_flows_json = diagram_data_flows or []
+        elif derived_components:
+            # Fixed component set (consistent across methodologies); keep only
+            # LLM-proposed flows that connect two known components.
+            known = {c["id"] for c in derived_components}
+            tm.components_json = derived_components
+            tm.data_flows_json = [
+                f for f in (model.get("data_flows") or [])
+                if _str(f.get("from")) in known and _str(f.get("to")) in known
+            ]
         else:
-            tm.components_json = model["components"]
-            tm.data_flows_json = model["data_flows"]
+            # No assets in scope — the LLM's inferred architecture stands.
+            tm.components_json = model.get("components") or []
+            tm.data_flows_json = model.get("data_flows") or []
         tm.threats_json = model["threats"]
         tm.mitigations_json = model["mitigations"]
-        tm.dfd_mermaid = model["dfd_mermaid"]
+        # Rebuild the diagram from the FINAL (pinned) components/flows so it
+        # matches the stored architecture rather than the LLM's raw component set.
+        tm.dfd_mermaid = _build_mermaid(tm.components_json or [], tm.data_flows_json or [])
         tm.executive_summary = model["executive_summary"]
         # Phase 8 — persist the completeness + coverage fields.
         tm.trust_boundaries_json = model.get("trust_boundaries") or []
