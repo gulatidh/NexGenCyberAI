@@ -593,6 +593,36 @@ def _mm_label(text: Any) -> str:
     return s[:80]
 
 
+# Service-type glyphs prepended to DFD nodes so each component reads as an
+# icon + name. Matched on name+type keywords (covers the common cloud
+# services across AWS/Azure/GCP without a heavyweight icon set).
+_SVC_ICONS = [
+    (("database", "db", "sql", "postgres", "mysql", "mongo", "rds", "cosmos", "dynamo", "aurora", "spanner"), "🗄️"),
+    (("storage", "bucket", "blob", "s3", "object store", "gcs", "datalake", "data lake"), "🪣"),
+    (("queue", "topic", "kafka", "sqs", "sns", "event", "bus", "pubsub", "service bus", "kinesis"), "📨"),
+    (("secret", "key vault", "keyvault", "kms", "vault", "secrets manager"), "🔑"),
+    (("identity", "iam", "auth", "entra", "azure ad", "active directory", "okta", "cognito", "sso", "oauth"), "👤"),
+    (("function", "lambda", "serverless", "cloud function", "azure function"), "⚡"),
+    (("container", "kubernetes", "k8s", "pod", "aks", "eks", "gke", "docker", "fargate", "ecs"), "📦"),
+    (("api", "gateway", "apim", "endpoint", "rest", "graphql", "app gateway"), "🔌"),
+    (("cache", "redis", "memcache", "elasticache"), "🧠"),
+    (("cdn", "frontend", "web", "spa", "website", "app service", "webapp", "cloudfront"), "🌐"),
+    (("firewall", "waf", "nsg", "security group", "shield"), "🧱"),
+    (("load balancer", "load-balancer", "lb", "ingress", "traffic manager", "front door", "elb", "alb"), "🔀"),
+    (("vm", "compute", "server", "ec2", "virtual machine", "instance", "host", "vmss", "gce"), "🖥️"),
+    (("monitor", "log", "siem", "sentinel", "cloudwatch", "stackdriver"), "📊"),
+    (("user", "client", "browser", "customer", "actor", "external", "internet"), "👥"),
+]
+
+
+def _svc_icon(text: str) -> str:
+    t = (text or "").lower()
+    for keys, icon in _SVC_ICONS:
+        if any(k in t for k in keys):
+            return icon
+    return "⚙️"
+
+
 def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, Any]]) -> str:
     """Deterministically render a valid Mermaid `flowchart TD` from the
     structured DFD. Nodes are grouped into trust-zone subgraphs; edge labels
@@ -615,7 +645,9 @@ def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, 
         for nid, c in comps:
             name = _mm_label(c.get("name") or c.get("id") or "?")
             ctype = _mm_label(c.get("type") or "")
-            label = f"{name}<br/><small>{ctype}</small>" if ctype else name
+            icon = _svc_icon(f"{c.get('name','')} {c.get('type','')}")
+            label = (f"{icon} {name}<br/><small>{ctype}</small>" if ctype
+                     else f"{icon} {name}")
             lines.append(f'    {nid}["{label}"]')
         lines.append("  end")
 

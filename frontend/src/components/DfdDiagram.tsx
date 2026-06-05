@@ -15,6 +15,36 @@ import { ImageNotSupported } from "@mui/icons-material";
 let _mermaidInstance: any = null;
 let _initPromise: Promise<any> | null = null;
 
+// Colour each trust-zone subgraph by what the zone *is* (matched on its id +
+// label), so Internet/DMZ/Private read at a glance instead of all rendering
+// the same colour. Fills use 8-digit hex (no rgba — mermaid splits style
+// props on commas). Applied at render time, so it colours existing diagrams
+// too without a re-model.
+const ZONE_RULES: { test: RegExp; fill: string; stroke: string }[] = [
+  { test: /(public|internet|external|untrust|wan)/, fill: "#EA433528", stroke: "#EA4335" }, // red
+  { test: /(dmz|perimeter|edge|public-facing|public facing)/, fill: "#F9AB0028", stroke: "#F9AB00" }, // amber
+  { test: /(private|internal|trusted|corp|lan|intranet)/, fill: "#34A85328", stroke: "#34A853" }, // green
+  { test: /(data|database|storage|tier|backend)/, fill: "#9C27B028", stroke: "#9C27B0" }, // purple
+  { test: /(manage|mgmt|admin|control plane)/, fill: "#4285F428", stroke: "#4285F4" }, // blue
+];
+
+function colorizeZones(src: string): string {
+  if (!src) return src;
+  const re = /subgraph\s+([A-Za-z0-9_-]+)\s*(?:\[\s*"?([^"\]]*)"?\s*\])?/g;
+  const styles: string[] = [];
+  const seen = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    const id = m[1];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const hay = `${id} ${m[2] || ""}`.toLowerCase();
+    const rule = ZONE_RULES.find((r) => r.test.test(hay));
+    if (rule) styles.push(`style ${id} fill:${rule.fill},stroke:${rule.stroke},stroke-width:1.5px,color:#ffffff`);
+  }
+  return styles.length ? `${src}\n${styles.join("\n")}` : src;
+}
+
 async function loadMermaid(): Promise<any> {
   if (_mermaidInstance) return _mermaidInstance;
   if (!_initPromise) {
@@ -75,7 +105,7 @@ export default function DfdDiagram({ source, className }: Props) {
         setError(null);
         const mermaid = await loadMermaid();
         const id = `dfd-${Math.random().toString(36).slice(2)}`;
-        const { svg } = await mermaid.render(id, source);
+        const { svg } = await mermaid.render(id, colorizeZones(source));
         if (!cancelled && ref.current) {
           ref.current.innerHTML = svg;
           setLoading(false);
