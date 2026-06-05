@@ -107,55 +107,78 @@ def _stats_kev() -> Dict[str, Any]:
 
 
 def _sync_nvd_recent() -> Dict[str, Any]:
-    """Download NVD's 'modified' CVE feed — recent CVE additions and updates
-    from the last 8 days. Small (~1MB compressed), good for keeping the CVE
-    description / CVSS / CWE cache fresh. We don't store full payloads
-    (would balloon the repo); just the CVE IDs + key metadata used to
-    enrich findings on render."""
-    import gzip
-    import io
+    """Pull CVEs modified in the last 8 days from the NVD 2.0 REST API and
+    cache CVE IDs + key metadata (CVSS / CWE / description) for finding
+    enrichment. (The old 1.1 JSON data feeds were retired by NVD in Dec 2023,
+    so this uses the 2.0 API — much faster with an NVD API key.)"""
+    import time
     import httpx
+    from datetime import datetime, timezone, timedelta
+    from core.config import get_settings
 
-    url = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz"
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        resp = client.get(url)
-        resp.raise_for_status()
-    with gzip.GzipFile(fileobj=io.BytesIO(resp.content)) as gz:
-        data = json.loads(gz.read().decode("utf-8", errors="replace"))
+    key = (get_settings().NVD_API_KEY or "").strip()
+    headers = {"apiKey": key} if key else {}
+    delay = 0.7 if key else 6.5  # NVD: 50 req/30s with a key, 5 without
 
-    items = data.get("CVE_Items", []) or []
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=8)
+    fmt = "%Y-%m-%dT%H:%M:%S.000"  # NVD 2.0 ISO-8601 (UTC assumed)
+    base = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+
     cves: Dict[str, Dict[str, Any]] = {}
-    for it in items:
-        cve_meta = ((it.get("cve") or {}).get("CVE_data_meta") or {})
-        cve_id = (cve_meta.get("ID") or "").upper()
-        if not cve_id:
-            continue
-        # CVSS v3 base
-        cvss = None
-        impact = it.get("impact") or {}
-        bm3 = ((impact.get("baseMetricV3") or {}).get("cvssV3") or {})
-        if bm3:
-            cvss = bm3.get("baseScore")
-        # CWE list
-        cwes = []
-        for p in ((it.get("cve") or {}).get("problemtype") or {}).get("problemtype_data", []) or []:
-            for d in p.get("description") or []:
-                v = d.get("value")
-                if v and v.startswith("CWE-"):
-                    cwes.append(v)
-        # Description (English)
-        desc = ""
-        for d in ((it.get("cve") or {}).get("description") or {}).get("description_data", []) or []:
-            if d.get("lang") == "en":
-                desc = d.get("value") or ""
+    start_index, total, page = 0, None, 0
+    with httpx.Client(timeout=60.0, follow_redirects=True, headers=headers) as client:
+        while page < 6:  # cap pages — the 8-day window is small
+            params = {
+                "lastModStartDate": start.strftime(fmt),
+                "lastModEndDate": end.strftime(fmt),
+                "resultsPerPage": 2000,
+                "startIndex": start_index,
+            }
+            resp = client.get(base, params=params)
+            if resp.status_code in (403, 429):
+                time.sleep(delay * 3)
+                resp = client.get(base, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            vulns = data.get("vulnerabilities", []) or []
+            for v in vulns:
+                cve = v.get("cve") or {}
+                cid = (cve.get("id") or "").upper()
+                if not cid:
+                    continue
+                desc = ""
+                for d in cve.get("descriptions") or []:
+                    if d.get("lang") == "en":
+                        desc = d.get("value") or ""
+                        break
+                cvss = None
+                metrics = cve.get("metrics") or {}
+                for mk in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
+                    arr = metrics.get(mk) or []
+                    if arr:
+                        cvss = (arr[0].get("cvssData") or {}).get("baseScore")
+                        if cvss is not None:
+                            break
+                cwes = []
+                for w in cve.get("weaknesses") or []:
+                    for d in w.get("description") or []:
+                        val = d.get("value")
+                        if val and val.startswith("CWE-"):
+                            cwes.append(val)
+                cves[cid] = {
+                    "cvss_v3": cvss,
+                    "cwes": cwes,
+                    "description": desc[:500],
+                    "published": cve.get("published"),
+                    "last_modified": cve.get("lastModified"),
+                }
+            total = data.get("totalResults", 0)
+            start_index += data.get("resultsPerPage", 0) or 2000
+            page += 1
+            if start_index >= (total or 0):
                 break
-        cves[cve_id] = {
-            "cvss_v3": cvss,
-            "cwes": cwes,
-            "description": desc[:500],
-            "published": it.get("publishedDate"),
-            "last_modified": it.get("lastModifiedDate"),
-        }
+            time.sleep(delay)
 
     # Persist alongside the threat-intel cache so RPS enrichers can find it.
     cache_path = _CACHE_DIR / "nvd_cve_cache.json"
@@ -470,13 +493,13 @@ REGISTRY: Dict[str, SyncFeed] = {
     ),
     "nvd_recent": SyncFeed(
         id="nvd_recent",
-        name="NVD — Recent CVEs (8-day modified feed)",
+        name="NVD — Recent CVEs (last 8 days)",
         category="cve",
         description=(
-            "NIST National Vulnerability Database modified feed — recent CVE additions and "
-            "updates. Used to enrich findings with CVSS v3, CWE list, and a short description."
+            "NIST NVD 2.0 API — CVEs modified in the last 8 days. Enriches findings with "
+            "CVSS, CWE list, and a short description. Faster with a platform NVD API key."
         ),
-        source_url="https://nvd.nist.gov/vuln/data-feeds",
+        source_url="https://services.nvd.nist.gov/rest/json/cves/2.0",
         sync_fn=_sync_nvd_recent,
         stats_fn=_stats_nvd_recent,
         item_label="CVE entries cached",
