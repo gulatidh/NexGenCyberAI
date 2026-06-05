@@ -319,7 +319,7 @@ export default function Risks() {
                   sx={{
                     cursor: "pointer",
                     bgcolor: levelFilters.has(k) ? `${LEVEL_COLOR[k]}25` : "rgba(255,255,255,0.04)",
-                    color: levelFilters.has(k) ? LEVEL_COLOR[k] : "rgba(255,255,255,0.7)",
+                    color: levelFilters.has(k) ? LEVEL_COLOR[k] : "text.secondary",
                     border: levelFilters.has(k) ? `1px solid ${LEVEL_COLOR[k]}` : "1px solid transparent",
                     fontWeight: levelFilters.has(k) ? 700 : 400,
                   }} />
@@ -332,7 +332,7 @@ export default function Risks() {
                   sx={{
                     cursor: "pointer",
                     bgcolor: statusFilters.has(s) ? `${STATUS_COLOR[s]}25` : "rgba(255,255,255,0.04)",
-                    color: statusFilters.has(s) ? STATUS_COLOR[s] : "rgba(255,255,255,0.7)",
+                    color: statusFilters.has(s) ? STATUS_COLOR[s] : "text.secondary",
                     border: statusFilters.has(s) ? `1px solid ${STATUS_COLOR[s]}` : "1px solid transparent",
                     fontWeight: statusFilters.has(s) ? 700 : 400,
                   }} />
@@ -347,7 +347,7 @@ export default function Risks() {
                       sx={{
                         cursor: "pointer",
                         bgcolor: categoryFilters.has(cat) ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.04)",
-                        color: categoryFilters.has(cat) ? "#4285F4" : "rgba(255,255,255,0.7)",
+                        color: categoryFilters.has(cat) ? "#4285F4" : "text.secondary",
                         border: categoryFilters.has(cat) ? "1px solid #4285F4" : "1px solid transparent",
                         fontWeight: categoryFilters.has(cat) ? 700 : 400,
                       }} />
@@ -591,7 +591,7 @@ export default function Risks() {
                         sx={{
                           height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
                           bgcolor: isCurrent ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.06)",
-                          color: isCurrent ? "#4285F4" : "rgba(255,255,255,0.65)",
+                          color: isCurrent ? "#4285F4" : "text.secondary",
                           minWidth: 76,
                         }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>

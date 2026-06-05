@@ -115,9 +115,9 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
         return <Chip label={row.risk_level} size="small"
           sx={{ bgcolor: `${RISK_COLOR[row.risk_level]}20`, color: RISK_COLOR[row.risk_level], fontSize: 10, height: 18, textTransform: "capitalize" }} />;
       case "open_findings":
-        return <Typography variant="caption" sx={{ color: row.open_findings > 0 ? STATUS_COLOR.warning : "rgba(255,255,255,0.4)", fontWeight: 600 }}>{row.open_findings}</Typography>;
+        return <Typography variant="caption" sx={{ color: row.open_findings > 0 ? STATUS_COLOR.warning : "text.secondary", fontWeight: 600 }}>{row.open_findings}</Typography>;
       case "cve_count":
-        return <Typography variant="caption" sx={{ color: row.cve_count > 0 ? STATUS_COLOR.critical : "rgba(255,255,255,0.4)", fontWeight: 600 }}>{row.cve_count}</Typography>;
+        return <Typography variant="caption" sx={{ color: row.cve_count > 0 ? STATUS_COLOR.critical : "text.secondary", fontWeight: 600 }}>{row.cve_count}</Typography>;
       case "last_seen":
         return <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{fromNow(row.last_seen)}</Typography>;
       case "environments":

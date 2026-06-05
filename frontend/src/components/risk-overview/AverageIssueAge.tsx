@@ -50,7 +50,7 @@ export default function AverageIssueAge({ data, loading }: Props) {
                     )}
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5, mb: 0.5 }}>
-                    <Typography sx={{ color: breached ? "#f44336" : "white", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
+                    <Typography sx={{ color: breached ? "#f44336" : "text.secondary", fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
                       {age.toFixed(0)}
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>days</Typography>

@@ -372,7 +372,7 @@ export default function Frameworks() {
                         fontSize: 10,
                         fontWeight: 700,
                         bgcolor: family === f ? "rgba(66,133,244,0.15)" : "rgba(255,255,255,0.08)",
-                        color: family === f ? "#4285F4" : "rgba(255,255,255,0.7)",
+                        color: family === f ? "#4285F4" : "text.secondary",
                       }}
                     />
                   </Box>

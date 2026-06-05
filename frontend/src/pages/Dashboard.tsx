@@ -241,7 +241,7 @@ export default function Dashboard() {
                         sx={{
                           height: 22, fontSize: 11, fontWeight: 600, cursor: "pointer",
                           bgcolor: active ? (meta ? `${meta.color}25` : "rgba(255,255,255,0.12)") : "rgba(255,255,255,0.04)",
-                          color: active ? (meta?.color || "white") : "rgba(255,255,255,0.65)",
+                          color: active ? (meta?.color || "white") : "text.secondary",
                           border: active ? `1px solid ${meta ? `${meta.color}80` : "rgba(255,255,255,0.3)"}` : "1px solid transparent",
                           "&:hover": { bgcolor: meta ? `${meta.color}15` : "rgba(255,255,255,0.08)" },
                         }}

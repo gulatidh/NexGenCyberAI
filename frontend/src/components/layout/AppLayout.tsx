@@ -19,8 +19,6 @@ import NotificationBell from "./NotificationBell";
 import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
 import { useThemeMode } from "../../theme/ThemeModeContext";
-import { ThemeProvider } from "@mui/material/styles";
-import { buildTheme } from "../../theme";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -101,10 +99,6 @@ export default function AppLayout() {
   const expanded = !collapsed || hovering;
   // Expand/collapse state for parent nav items with children (e.g. Assets).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  // The sidebar chrome stays dark in BOTH app modes, so render it under a
-  // fixed dark theme — its text.*/divider tokens then always resolve to
-  // light-on-dark values (otherwise they'd go dark-on-dark in light mode).
-  const chromeTheme = React.useMemo(() => buildTheme("dark"), []);
 
   // Active-route test. "/assets" must NOT light up for /assets/technologies
   // (that's its own leaf) but should for the asset-detail route /assets/:id.
@@ -125,11 +119,11 @@ export default function AppLayout() {
           px: expanded ? 1.5 : 1,
           pl: expanded && indented ? 4 : undefined,
           bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
-          "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+          "&:hover": { bgcolor: "action.hover" },
         }}
       >
         <ListItemIcon sx={{
-          color: active ? "#4285F4" : "rgba(255,255,255,0.6)",
+          color: active ? "#4285F4" : "text.secondary",
           minWidth: expanded ? 36 : 0, justifyContent: "center",
         }}>
           {item.icon}
@@ -137,7 +131,7 @@ export default function AppLayout() {
         {expanded && (
           <ListItemText primary={item.label} slotProps={{ primary: { style: {
             fontSize: 13, fontWeight: active ? 600 : 400,
-            color: active ? "#4285F4" : "rgba(255,255,255,0.8)", whiteSpace: "nowrap",
+            color: active ? "#4285F4" : (mode === "light" ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.8)"), whiteSpace: "nowrap",
           } } }} />
         )}
       </ListItemButton>
@@ -168,11 +162,10 @@ export default function AppLayout() {
   };
 
   const drawer = (
-    <ThemeProvider theme={chromeTheme}>
     <Box
       sx={{
         height: "100%",
-        bgcolor: mode === "light" ? "#0F172A" : "background.paper",
+        bgcolor: "background.paper",
         color: "text.primary",
         overflowX: "hidden",
       }}
@@ -183,7 +176,7 @@ export default function AppLayout() {
       <Box sx={{
         p: expanded ? 2 : 1, display: "flex", alignItems: "center",
         gap: 1, justifyContent: expanded ? "space-between" : "center",
-        borderBottom: "1px solid rgba(255,255,255,0.1)", minHeight: 64,
+        borderBottom: "1px solid", borderColor: "divider", minHeight: 64,
       }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
           <Shield sx={{ color: "#4285F4", fontSize: 32, flexShrink: 0 }} />
@@ -266,18 +259,18 @@ export default function AppLayout() {
                         sx={{
                           mx: 1, my: 0.3, borderRadius: 1, minHeight: 42, px: 1.5,
                           bgcolor: childActive ? "rgba(66,133,244,0.08)" : "transparent",
-                          "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                          "&:hover": { bgcolor: "action.hover" },
                         }}
                       >
                         <ListItemIcon sx={{
-                          color: childActive ? "#4285F4" : "rgba(255,255,255,0.6)",
+                          color: childActive ? "#4285F4" : "text.secondary",
                           minWidth: 36, justifyContent: "center",
                         }}>
                           {item.icon}
                         </ListItemIcon>
                         <ListItemText primary={item.label} slotProps={{ primary: { style: {
                           fontSize: 13, fontWeight: childActive ? 600 : 500,
-                          color: childActive ? "#4285F4" : "rgba(255,255,255,0.8)", whiteSpace: "nowrap",
+                          color: childActive ? "#4285F4" : (mode === "light" ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.8)"), whiteSpace: "nowrap",
                         } } }} />
                         {open ? <ExpandLess sx={{ color: "text.secondary" }} />
                               : <ExpandMore sx={{ color: "text.secondary" }} />}
@@ -295,7 +288,6 @@ export default function AppLayout() {
         })}
       </List>
     </Box>
-    </ThemeProvider>
   );
 
   const effectiveWidth = collapsed ? DRAWER_RAIL_WIDTH : DRAWER_WIDTH;
@@ -404,7 +396,7 @@ export default function AppLayout() {
                 {mode === "custom" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
               </MenuItem>
               {mode === "custom" && (
-                <Box sx={{ px: 2, py: 1, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <Box sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
                   <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 1, display: "block", mb: 0.5 }}>
                     PRIMARY ACCENT
                   </Typography>

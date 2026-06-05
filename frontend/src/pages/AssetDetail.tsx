@@ -159,7 +159,7 @@ export default function AssetDetailPage() {
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>Open Findings</Typography>
-            <Typography variant="h4" sx={{ color: openFindings > 0 ? "#f44336" : "white", fontWeight: 700 }}>
+            <Typography variant="h4" sx={{ color: openFindings > 0 ? "#f44336" : "text.secondary", fontWeight: 700 }}>
               {openFindings}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
@@ -170,7 +170,7 @@ export default function AssetDetailPage() {
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>Linked Risks</Typography>
-            <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "white", fontWeight: 700 }}>
+            <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "text.secondary", fontWeight: 700 }}>
               {risks.length}
             </Typography>
           </Card>
@@ -249,7 +249,7 @@ export default function AssetDetailPage() {
                             {f.title}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
+                        <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
                         <TableCell sx={{ fontSize: 12, color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
                           {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
                         </TableCell>

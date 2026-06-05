@@ -30,7 +30,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-_CACHE_DIR = Path(__file__).resolve().parent.parent / "data"
+from core.paths import data_dir
+# Persistent, worker-shared cache dir (/home/data on Azure). The old in-repo
+# path made sync counts vanish on reload — each gunicorn worker had its own
+# ephemeral copy of wwwroot. See core/paths.py.
+_CACHE_DIR = data_dir()
 _GENERIC_STATS_FILE = _CACHE_DIR / "sync_feed_stats.json"
 
 

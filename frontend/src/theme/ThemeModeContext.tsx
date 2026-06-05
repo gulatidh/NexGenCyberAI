@@ -36,7 +36,7 @@ function loadInitialMode(): ThemeMode {
     const v = window.localStorage.getItem(MODE_KEY);
     if (v === "dark" || v === "light" || v === "custom") return v;
   } catch { /* SSR / private mode */ }
-  return "dark";
+  return "light";
 }
 
 function loadInitialCustom(): CustomPalette {

@@ -72,7 +72,7 @@ function CategoryTile({ cat, active, onClick }: {
             display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CatIcon name={cat.icon} sx={{ fontSize: 18, color }} />
           </Box>
-          <Typography sx={{ color: empty ? "rgba(255,255,255,0.5)" : "white",
+          <Typography sx={{ color: empty ? "rgba(255,255,255,0.5)" : "text.secondary",
             fontSize: 26, fontWeight: 700, lineHeight: 1, ml: "auto" }}>
             {cat.count}
           </Typography>
@@ -360,7 +360,7 @@ export default function Findings() {
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>
+                      <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>
                         {f.cve_id || "—"}
                       </TableCell>
                       <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)", fontSize: 12 }}>

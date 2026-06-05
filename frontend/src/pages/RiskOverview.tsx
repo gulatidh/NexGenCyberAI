@@ -268,7 +268,7 @@ export default function RiskOverview() {
                   sx={{
                     cursor: "pointer",
                     bgcolor: severityFilter === s ? `${SEV_COLOR[s]}25` : "rgba(255,255,255,0.04)",
-                    color: severityFilter === s ? SEV_COLOR[s] : "rgba(255,255,255,0.7)",
+                    color: severityFilter === s ? SEV_COLOR[s] : "text.secondary",
                     border: severityFilter === s ? `1px solid ${SEV_COLOR[s]}` : "1px solid transparent",
                     fontWeight: severityFilter === s ? 700 : 400,
                   }} />
@@ -281,7 +281,7 @@ export default function RiskOverview() {
                   sx={{
                     cursor: "pointer",
                     bgcolor: statusFilter === rs.value ? `${rs.color}25` : "rgba(255,255,255,0.04)",
-                    color: statusFilter === rs.value ? rs.color : "rgba(255,255,255,0.7)",
+                    color: statusFilter === rs.value ? rs.color : "text.secondary",
                     border: statusFilter === rs.value ? `1px solid ${rs.color}` : "1px solid transparent",
                     fontWeight: statusFilter === rs.value ? 700 : 400,
                   }} />
@@ -296,7 +296,7 @@ export default function RiskOverview() {
                       sx={{
                         cursor: "pointer",
                         bgcolor: domainFilter === d.domain ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.04)",
-                        color: domainFilter === d.domain ? "#4285F4" : "rgba(255,255,255,0.7)",
+                        color: domainFilter === d.domain ? "#4285F4" : "text.secondary",
                         border: domainFilter === d.domain ? "1px solid #4285F4" : "1px solid transparent",
                         fontWeight: domainFilter === d.domain ? 700 : 400,
                       }} />

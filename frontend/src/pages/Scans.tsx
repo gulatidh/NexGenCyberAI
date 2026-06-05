@@ -246,7 +246,7 @@ export default function Scans() {
             sx={{
               cursor: "pointer",
               bgcolor: tileStatusFilter === s ? `${STATUS_COLOR[s] || "#888"}25` : "rgba(255,255,255,0.04)",
-              color: tileStatusFilter === s ? (STATUS_COLOR[s] || "#888") : "rgba(255,255,255,0.7)",
+              color: tileStatusFilter === s ? (STATUS_COLOR[s] || "#888") : "text.secondary",
               border: tileStatusFilter === s ? `1px solid ${STATUS_COLOR[s] || "#888"}` : "1px solid transparent",
               fontWeight: tileStatusFilter === s ? 700 : 400,
             }} />
@@ -259,7 +259,7 @@ export default function Scans() {
             sx={{
               cursor: "pointer",
               bgcolor: tileCategoryFilter === c ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.04)",
-              color: tileCategoryFilter === c ? "#4285F4" : "rgba(255,255,255,0.7)",
+              color: tileCategoryFilter === c ? "#4285F4" : "text.secondary",
               border: tileCategoryFilter === c ? "1px solid #4285F4" : "1px solid transparent",
               fontWeight: tileCategoryFilter === c ? 700 : 400,
             }} />
@@ -612,7 +612,7 @@ export default function Scans() {
                           size="small"
                           sx={{
                             bgcolor: isLive ? "rgba(52,168,83,0.15)" : "rgba(255,255,255,0.06)",
-                            color: isLive ? "#34A853" : "rgba(255,255,255,0.5)",
+                            color: isLive ? "#34A853" : "text.secondary",
                             fontWeight: 700, fontSize: 10, height: 20,
                           }}
                         />
@@ -894,7 +894,7 @@ export default function Scans() {
                         sx={{
                           height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, minWidth: 78,
                           bgcolor: isLatest ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.06)",
-                          color: isLatest ? "#4285F4" : "rgba(255,255,255,0.65)",
+                          color: isLatest ? "#4285F4" : "text.secondary",
                         }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>

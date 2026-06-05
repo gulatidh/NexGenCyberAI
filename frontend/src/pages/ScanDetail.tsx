@@ -412,8 +412,8 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
                 )}
               </TableCell>
               <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
-              <TableCell sx={{ color: f.cve_id ? "#4285F4" : "rgba(255,255,255,0.3)", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
-              <TableCell align="right" sx={{ color: f.cvss_score && f.cvss_score >= 7 ? "#EA4335" : "white", fontSize: 12 }}>
+              <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
+              <TableCell align="right" sx={{ color: f.cvss_score && f.cvss_score >= 7 ? "#EA4335" : "text.secondary", fontSize: 12 }}>
                 {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
               </TableCell>
               {onDelete && (

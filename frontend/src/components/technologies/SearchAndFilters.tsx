@@ -90,7 +90,7 @@ export default function SearchAndFilters({ state, options, onChange }: Props) {
             />
           </Tooltip>
         ))}
-        <IconButton onClick={() => setAdvanced((v) => !v)} sx={{ color: advanced ? "#4285F4" : "rgba(255,255,255,0.5)" }}>
+        <IconButton onClick={() => setAdvanced((v) => !v)} sx={{ color: advanced ? "#4285F4" : "text.secondary" }}>
           <FilterList />
         </IconButton>
       </Box>

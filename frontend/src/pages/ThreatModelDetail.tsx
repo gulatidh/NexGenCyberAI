@@ -528,7 +528,7 @@ export default function ThreatModelDetail() {
                           size="small"
                           onClick={() => setDiagramView(opt.v)}
                           sx={{
-                            minWidth: 102, color: active ? "white" : "rgba(255,255,255,0.55)",
+                            minWidth: 102, color: active ? "white" : "text.secondary",
                             bgcolor: active ? `${opt.color}33` : "transparent",
                             border: active ? `1px solid ${opt.color}` : "1px solid transparent",
                             textTransform: "none", fontSize: 11.5, fontWeight: 600,
@@ -827,7 +827,7 @@ function CoverageMatrixView({ data, onFillGaps, filling }: { data: ThreatModelDe
           </Typography>
           <Chip label={`${pct}% covered`} sx={{ bgcolor: pct >= 80 ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)", color: pct >= 80 ? "#34A853" : "#FBBC04", fontWeight: 700, height: 22, fontSize: 11 }} />
           <Chip label={`${threatCells} threats`} sx={{ bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700, height: 22, fontSize: 11 }} />
-          <Chip label={`${missing} missing`} sx={{ bgcolor: missing > 0 ? "rgba(251,188,4,0.18)" : "rgba(255,255,255,0.04)", color: missing > 0 ? "#FBBC04" : "rgba(255,255,255,0.5)", fontWeight: 700, height: 22, fontSize: 11 }} />
+          <Chip label={`${missing} missing`} sx={{ bgcolor: missing > 0 ? "rgba(251,188,4,0.18)" : "rgba(255,255,255,0.04)", color: missing > 0 ? "#FBBC04" : "text.secondary", fontWeight: 700, height: 22, fontSize: 11 }} />
           {missing > 0 && onFillGaps && (
             <Tooltip title={`Run a targeted LLM call against the ${missing} missing cells — each one resolves to either a threat or a 'considered' decision.`}>
               <span>

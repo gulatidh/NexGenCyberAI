@@ -40,7 +40,9 @@ logger = logging.getLogger(__name__)
 EPSS_URL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 
-_CACHE_DIR = Path(__file__).resolve().parent.parent / "data"
+from core.paths import data_dir
+# Persistent, worker-shared cache dir (/home/data on Azure). See core/paths.py.
+_CACHE_DIR = data_dir()
 _CACHE_FILE = _CACHE_DIR / "threat_intel_cache.json"
 
 # In-memory caches. Read under _lock; the dicts themselves are replaced
@@ -52,6 +54,7 @@ _kev: Dict[str, Dict[str, Any]] = {}
 _epss_fetched_at: Optional[datetime] = None
 _kev_fetched_at: Optional[datetime] = None
 _loaded_from_disk = False
+_loaded_mtime: Optional[float] = None  # mtime of the cache file we last loaded
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -121,15 +124,24 @@ def refresh_all(force: bool = False) -> Dict[str, Any]:
 
 
 def _ensure_loaded() -> None:
-    """Lazy-load the on-disk cache once per process. Cheap after first call."""
-    global _loaded_from_disk
-    if _loaded_from_disk:
+    """Load the on-disk cache, re-reading if another worker has refreshed it
+    since (the file lives on the shared /home mount). Only re-parses when the
+    file's mtime changes, so steady-state calls are a cheap stat()."""
+    global _loaded_from_disk, _loaded_mtime
+    def _mtime():
+        try:
+            return _CACHE_FILE.stat().st_mtime if _CACHE_FILE.exists() else None
+        except Exception:
+            return None
+    if _loaded_from_disk and _mtime() == _loaded_mtime:
         return
     with _lock:
-        if _loaded_from_disk:
+        m = _mtime()
+        if _loaded_from_disk and m == _loaded_mtime:
             return
         _load_from_disk()
         _loaded_from_disk = True
+        _loaded_mtime = m
 
 
 def _load_from_disk() -> None:
@@ -164,6 +176,14 @@ def _persist_to_disk() -> None:
                 "kev_fetched_at": _kev_fetched_at.isoformat() if _kev_fetched_at else None,
             }, f)
         os.replace(tmp, _CACHE_FILE)
+        # Record the mtime we just wrote so this worker doesn't needlessly
+        # re-read its own write on the next _ensure_loaded().
+        global _loaded_mtime, _loaded_from_disk
+        try:
+            _loaded_mtime = _CACHE_FILE.stat().st_mtime
+            _loaded_from_disk = True
+        except Exception:
+            pass
     except Exception:
         logger.exception("Failed to persist threat-intel cache to %s", _CACHE_FILE)
 

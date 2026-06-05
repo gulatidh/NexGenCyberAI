@@ -353,7 +353,7 @@ export default function AISettings() {
                               disabled={!isAdmin}
                               onClick={() => setExpandedTile(expanded ? null : provider.provider)}
                               sx={{
-                                color: expanded ? "#4285F4" : "rgba(255,255,255,0.55)",
+                                color: expanded ? "#4285F4" : "text.secondary",
                                 bgcolor: expanded ? "rgba(66,133,244,0.1)" : "transparent",
                                 "&:hover": { bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" },
                               }}

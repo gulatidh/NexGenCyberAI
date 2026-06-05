@@ -666,7 +666,7 @@ function AssetsBlock({ rows }: { rows: Asset[] }) {
               <TableCell sx={{ fontSize: 11 }}>{a.subscription_id || a.account_id || a.project_id || "—"}</TableCell>
               <TableCell sx={{ fontSize: 11 }}>{a.region || "—"}</TableCell>
               <TableCell sx={{ fontSize: 11 }}>{a.status}</TableCell>
-              <TableCell align="right" sx={{ color: a.open_findings_count > 0 ? "#f44336" : "white" }}>{a.open_findings_count}</TableCell>
+              <TableCell align="right" sx={{ color: a.open_findings_count > 0 ? "#f44336" : "text.secondary" }}>{a.open_findings_count}</TableCell>
               <TableCell align="right">{a.risks_count}</TableCell>
             </TableRow>
           ))}
