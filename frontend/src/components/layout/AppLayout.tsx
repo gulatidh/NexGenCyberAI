@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
-  IconButton, Chip, Tooltip,
+  IconButton, Chip, Tooltip, Collapse,
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
@@ -11,6 +11,7 @@ import {
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
+  ExpandLess, ExpandMore,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +24,7 @@ const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
 const COLLAPSE_KEY = "nav-collapsed";
 
-type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean };
+type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean; children?: NavItem[] };
 type NavGroup = { section?: string; items: NavItem[] };
 
 // Grouped navigation. Sections collapse into a small icon-rail when the
@@ -42,9 +43,11 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Foundation",
     items: [
       { label: "Clients",         icon: <People />,   path: "/clients" },
-      { label: "Asset Inventory", icon: <Storage />,  path: "/assets" },
-      { label: "Stale Assets",    icon: <History />,  path: "/stale-assets" },
-      { label: "Technologies",    icon: <Apps />,     path: "/assets/technologies" },
+      { label: "Assets", icon: <Storage />, path: "/assets", children: [
+        { label: "Asset Inventory", icon: <Storage />, path: "/assets" },
+        { label: "Technologies",    icon: <Apps />,    path: "/assets/technologies" },
+        { label: "Stale Assets",    icon: <History />, path: "/stale-assets" },
+      ] },
       { label: "Frameworks",      icon: <Policy />,   path: "/frameworks" },
     ],
   },
@@ -94,6 +97,50 @@ export default function AppLayout() {
   // user can read labels without un-pinning.
   const [hovering, setHovering] = useState(false);
   const expanded = !collapsed || hovering;
+  // Expand/collapse state for parent nav items with children (e.g. Assets).
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  // Active-route test. "/assets" must NOT light up for /assets/technologies
+  // (that's its own leaf) but should for the asset-detail route /assets/:id.
+  const isActive = (p: string) =>
+    p === "/assets"
+      ? pathname === "/assets" || /^\/assets\/(?!technologies)[^/]+$/.test(pathname)
+      : pathname === p || pathname.startsWith(p + "/");
+
+  const renderLeaf = (item: NavItem, indented: boolean) => {
+    const active = isActive(item.path);
+    const button = (
+      <ListItemButton
+        key={item.path}
+        onClick={() => navigate(item.path)}
+        sx={{
+          mx: 1, my: 0.3, borderRadius: 1, minHeight: 42,
+          justifyContent: expanded ? "flex-start" : "center",
+          px: expanded ? 1.5 : 1,
+          pl: expanded && indented ? 4 : undefined,
+          bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+        }}
+      >
+        <ListItemIcon sx={{
+          color: active ? "#4285F4" : "rgba(255,255,255,0.6)",
+          minWidth: expanded ? 36 : 0, justifyContent: "center",
+        }}>
+          {item.icon}
+        </ListItemIcon>
+        {expanded && (
+          <ListItemText primary={item.label} slotProps={{ primary: { style: {
+            fontSize: 13, fontWeight: active ? 600 : 400,
+            color: active ? "#4285F4" : "rgba(255,255,255,0.8)", whiteSpace: "nowrap",
+          } } }} />
+        )}
+      </ListItemButton>
+    );
+    if (!expanded) {
+      return <Tooltip key={item.path} title={item.label} placement="right">{button}</Tooltip>;
+    }
+    return button;
+  };
 
   useEffect(() => {
     window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
@@ -193,56 +240,48 @@ export default function AppLayout() {
                 <Divider sx={{ mx: 1.5, my: 0.75, borderColor: "rgba(255,255,255,0.08)" }} />
               )}
               {items.map((item) => {
-                const active = item.path === "/assets"
-                  ? pathname === "/assets" || /^\/assets\/[^/]+$/.test(pathname)
-                  : pathname.startsWith(item.path);
-                const button = (
-                  <ListItemButton
-                    key={item.path}
-                    onClick={() => navigate(item.path)}
-                    sx={{
-                      mx: 1, my: 0.3, borderRadius: 1,
-                      minHeight: 42,
-                      justifyContent: expanded ? "flex-start" : "center",
-                      px: expanded ? 1.5 : 1,
-                      bgcolor: active ? "rgba(66,133,244,0.15)" : "transparent",
-                      "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
-                    }}
-                  >
-                    <ListItemIcon sx={{
-                      color: active ? "#4285F4" : "rgba(255,255,255,0.6)",
-                      minWidth: expanded ? 36 : 0,
-                      justifyContent: "center",
-                    }}>
-                      {item.icon}
-                    </ListItemIcon>
-                    {expanded && (
-                      <ListItemText
-                        primary={item.label}
-                        slotProps={{
-                          primary: {
-                            style: {
-                              fontSize: 13,
-                              fontWeight: active ? 600 : 400,
-                              color: active ? "#4285F4" : "rgba(255,255,255,0.8)",
-                              whiteSpace: "nowrap",
-                            },
-                          },
-                        }}
-                      />
-                    )}
-                  </ListItemButton>
-                );
-                // Tooltip only when collapsed-and-not-hovering — otherwise
-                // labels are visible and tooltips would just add noise.
-                if (!expanded) {
+                if (item.children) {
+                  // Collapsed rail: flatten children to individual icons so
+                  // every destination stays one click away.
+                  if (!expanded) {
+                    return (
+                      <React.Fragment key={item.path}>
+                        {item.children.map((c) => renderLeaf(c, false))}
+                      </React.Fragment>
+                    );
+                  }
+                  const childActive = item.children.some((c) => isActive(c.path));
+                  const open = openGroups[item.path] ?? childActive;
                   return (
-                    <Tooltip key={item.path} title={item.label} placement="right">
-                      {button}
-                    </Tooltip>
+                    <React.Fragment key={item.path}>
+                      <ListItemButton
+                        onClick={() => setOpenGroups((s) => ({ ...s, [item.path]: !(s[item.path] ?? childActive) }))}
+                        sx={{
+                          mx: 1, my: 0.3, borderRadius: 1, minHeight: 42, px: 1.5,
+                          bgcolor: childActive ? "rgba(66,133,244,0.08)" : "transparent",
+                          "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
+                        }}
+                      >
+                        <ListItemIcon sx={{
+                          color: childActive ? "#4285F4" : "rgba(255,255,255,0.6)",
+                          minWidth: 36, justifyContent: "center",
+                        }}>
+                          {item.icon}
+                        </ListItemIcon>
+                        <ListItemText primary={item.label} slotProps={{ primary: { style: {
+                          fontSize: 13, fontWeight: childActive ? 600 : 500,
+                          color: childActive ? "#4285F4" : "rgba(255,255,255,0.8)", whiteSpace: "nowrap",
+                        } } }} />
+                        {open ? <ExpandLess sx={{ color: "rgba(255,255,255,0.5)" }} />
+                              : <ExpandMore sx={{ color: "rgba(255,255,255,0.5)" }} />}
+                      </ListItemButton>
+                      <Collapse in={open} timeout="auto" unmountOnExit>
+                        {item.children.map((c) => renderLeaf(c, true))}
+                      </Collapse>
+                    </React.Fragment>
                   );
                 }
-                return button;
+                return renderLeaf(item, false);
               })}
             </React.Fragment>
           );

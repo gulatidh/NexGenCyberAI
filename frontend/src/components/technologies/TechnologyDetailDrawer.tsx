@@ -159,30 +159,60 @@ export default function TechnologyDetailDrawer({ clientId, technologyName, onClo
                 )}
 
                 {tab === 2 && (
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 10, borderColor: "rgba(255,255,255,0.08)" } }}>
-                        <TableCell>NAME</TableCell>
-                        <TableCell>REGION</TableCell>
-                        <TableCell>STATUS</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.assets.map((a) => (
-                        <TableRow key={a.id} sx={{ "& td": { color: "white", fontSize: 11, borderColor: "rgba(255,255,255,0.05)" } }}>
-                          <TableCell sx={{ maxWidth: 220 }}>
-                            <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
-                              {a.name}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{a.region || "—"}</TableCell>
-                          <TableCell>
-                            <Chip label={a.status} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 9, height: 16 }} />
-                          </TableCell>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", display: "block", mb: 0.5 }}>
+                      Active ({data.assets.length})
+                    </Typography>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ "& th": { color: "rgba(255,255,255,0.5)", fontSize: 10, borderColor: "rgba(255,255,255,0.08)" } }}>
+                          <TableCell>NAME</TableCell>
+                          <TableCell>REGION</TableCell>
+                          <TableCell>STATUS</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHead>
+                      <TableBody>
+                        {data.assets.map((a) => (
+                          <TableRow key={a.id} sx={{ "& td": { color: "white", fontSize: 11, borderColor: "rgba(255,255,255,0.05)" } }}>
+                            <TableCell sx={{ maxWidth: 220 }}>
+                              <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                                {a.name}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ color: "rgba(255,255,255,0.6) !important", fontSize: 11 }}>{a.region || "—"}</TableCell>
+                            <TableCell>
+                              <Chip label={a.status} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "white", fontSize: 9, height: 16 }} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+
+                    {data.stale_assets && data.stale_assets.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="caption" sx={{ color: "#ff9800", display: "block", mb: 0.5, fontWeight: 600 }}>
+                          Stale / decommissioned ({data.stale_count ?? data.stale_assets.length}) — excluded from analysis
+                        </Typography>
+                        <Table size="small">
+                          <TableBody>
+                            {data.stale_assets.map((a) => (
+                              <TableRow key={a.id} sx={{ "& td": { color: "rgba(255,255,255,0.55)", fontSize: 11, borderColor: "rgba(255,255,255,0.05)" } }}>
+                                <TableCell sx={{ maxWidth: 220 }}>
+                                  <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                                    {a.name}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell sx={{ color: "rgba(255,255,255,0.45) !important", fontSize: 11 }}>{a.region || "—"}</TableCell>
+                                <TableCell>
+                                  <Chip label={a.status} size="small" sx={{ bgcolor: "transparent", color: "#ff9800", border: "1px solid rgba(255,152,0,0.4)", fontSize: 9, height: 16 }} />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </Box>
+                    )}
+                  </Box>
                 )}
 
                 {tab === 3 && (

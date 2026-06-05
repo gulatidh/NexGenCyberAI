@@ -315,7 +315,13 @@ async def get_technology_detail(
         Asset.client_id == client_id, Asset.asset_type == technology_name,
         Asset.status == AssetStatus.ACTIVE.value,
     ).all()
-    if not items:
+    # Stale/deleted assets of this technology are listed SEPARATELY (not mixed
+    # into the active counts) so they don't inflate the footprint.
+    stale_items = db.query(Asset).filter(
+        Asset.client_id == client_id, Asset.asset_type == technology_name,
+        Asset.status.in_([AssetStatus.STALE.value, AssetStatus.DELETED.value]),
+    ).all()
+    if not items and not stale_items:
         raise HTTPException(status_code=404, detail="Technology not found in this client's inventory")
 
     classes = [i.asset_class for i in items if i.asset_class]
@@ -359,6 +365,14 @@ async def get_technology_detail(
              "subscription_id": a.subscription_id, "resource_group": a.resource_group,
              "status": a.status.value if hasattr(a.status, "value") else str(a.status)}
             for a in items[:100]
+        ],
+        # Listed separately in the UI — kept out of the active footprint.
+        "stale_count": len(stale_items),
+        "stale_assets": [
+            {"id": a.id, "name": a.name, "external_id": a.external_id, "region": a.region,
+             "subscription_id": a.subscription_id, "resource_group": a.resource_group,
+             "status": a.status.value if hasattr(a.status, "value") else str(a.status)}
+            for a in stale_items[:100]
         ],
         "owner": ["platform-team", "security-team", "data-team", "iam-team"][_seeded_random_int(f"own:{technology_name}", 0, 3)],
         "exposure_level": ["internal", "limited", "public"][_seeded_random_int(f"exp:{technology_name}", 0, 2)],

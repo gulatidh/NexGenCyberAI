@@ -433,6 +433,11 @@ export interface TechnologyDetail {
     id: string; name: string; external_id: string; region?: string;
     subscription_id?: string; resource_group?: string; status: string;
   }[];
+  stale_count?: number;
+  stale_assets?: {
+    id: string; name: string; external_id: string; region?: string;
+    subscription_id?: string; resource_group?: string; status: string;
+  }[];
   owner: string;
   exposure_level: string;
   policies: { name: string; framework: string; control_id: string; status: string }[];
