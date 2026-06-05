@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
-  SmartToy, Assessment, Logout, AccountCircle, Shield,
+  SmartToy, Assessment, Logout, AccountCircle,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
@@ -179,7 +179,8 @@ export default function AppLayout() {
         borderBottom: "1px solid", borderColor: "divider", minHeight: 64,
       }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
-          <Shield sx={{ color: "#4285F4", fontSize: 32, flexShrink: 0 }} />
+          <Box component="img" src={`${process.env.PUBLIC_URL}/aegis-mark.svg`} alt="Aegis AI"
+            sx={{ width: 30, height: 35, flexShrink: 0 }} />
           {expanded && (
             <Box sx={{ whiteSpace: "nowrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
