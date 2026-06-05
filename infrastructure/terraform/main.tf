@@ -191,6 +191,19 @@ resource "azurerm_key_vault_secret" "redis_connection" {
   depends_on   = [azurerm_role_assignment.deployer_kv]
 }
 
+# Platform-wide NVD API key for OWASP Dependency-Check scans. Value from
+# TF_VAR_nvd_api_key (or set out-of-band via `az keyvault secret set`); the
+# ignore_changes keeps Terraform from clobbering an az-managed value.
+resource "azurerm_key_vault_secret" "nvd_api_key" {
+  name         = "NvdApiKey"
+  value        = var.nvd_api_key
+  key_vault_id = azurerm_key_vault.main.id
+  depends_on   = [azurerm_role_assignment.deployer_kv]
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
 # ── App Service Plan ──────────────────────────────────────────────────────────
 
 resource "azurerm_service_plan" "main" {
@@ -242,6 +255,7 @@ resource "azurerm_linux_web_app" "backend" {
     "DATABASE_URL"                          = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=DatabaseUrl)"
     "REDIS_URL"                             = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
     "CELERY_BROKER_URL"                     = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=RedisUrl)"
+    "NVD_API_KEY"                           = "@Microsoft.KeyVault(VaultName=${azurerm_key_vault.main.name};SecretName=NvdApiKey)"
   }
 
   logs {

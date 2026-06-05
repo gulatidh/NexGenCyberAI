@@ -69,6 +69,13 @@ variable "default_ai_provider" {
   default     = "azure_openai"
 }
 
+variable "nvd_api_key" {
+  description = "Platform-wide NVD API key for OWASP Dependency-Check (free from nvd.nist.gov). Stored in Key Vault; value ignored after first set."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "use_containers" {
   description = "Create Azure Container Registry"
   type        = bool

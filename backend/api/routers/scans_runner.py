@@ -74,6 +74,15 @@ async def get_scan_runtime_config(
                 if v:
                     connector_fields[key] = v
 
+    # Fall back to the platform-wide NVD API key (Key Vault-backed) when the
+    # connector doesn't carry its own — so OWASP DC works without re-entering
+    # the key per connector.
+    if not connector_fields.get("nvd_api_key"):
+        from core.config import get_settings
+        platform_key = get_settings().NVD_API_KEY
+        if platform_key:
+            connector_fields["nvd_api_key"] = platform_key
+
     # Surface uploaded-binary metadata if any (CodeQL --mode=none mode).
     # Workflow uses these fields to decide whether to fetch the binary
     # from /scans/binary/{scan_id} instead of cloning a repo.

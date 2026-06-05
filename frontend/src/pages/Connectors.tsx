@@ -149,8 +149,8 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
       help: "OWASP Dependency-Check runs against the cloned repo's manifests (pom.xml, package.json, etc.)." },
     { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
     { key: "git_token", label: "Git Personal Access Token", secret: true },
-    { key: "nvd_api_key", label: "NVD API Key (required)", secret: true,
-      help: "Required — Dependency-Check downloads the NVD CVE database; without a key it's throttled to hours. Free key: https://nvd.nist.gov/developers/request-an-api-key" },
+    { key: "nvd_api_key", label: "NVD API Key (optional)", secret: true,
+      help: "Optional override — falls back to the platform NVD key if set. Dependency-Check needs an NVD key to download the CVE DB. Free key: https://nvd.nist.gov/developers/request-an-api-key" },
   ],
   gitleaks: [
     { key: "repo_url", label: "Git Repo URL",

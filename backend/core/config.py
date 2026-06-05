@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     AWS_DEFAULT_REGION: str = "us-east-1"
     GCP_PROJECT_ID: str = ""
     ARM_SUBSCRIPTION_ID: str = ""
+    # Platform-wide NVD API key (free, from nvd.nist.gov). Used by OWASP
+    # Dependency-Check scans when a connector doesn't carry its own key.
+    # Set as a Key Vault-referenced App Service setting in prod.
+    NVD_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
