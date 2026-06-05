@@ -14,14 +14,14 @@ import {
   Box, Typography, Card, CardContent, Button, Chip, Grid, IconButton,
   Tooltip, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, CircularProgress, Alert,
-  LinearProgress,
+  LinearProgress, Checkbox, ListItemText,
 } from "@mui/material";
 import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { clientsApi, threatModelsApi } from "../services/api";
-import { Client } from "../types";
+import { clientsApi, threatModelsApi, scansApi } from "../services/api";
+import { Client, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
 interface ThreatModelSummary {
@@ -30,6 +30,7 @@ interface ThreatModelSummary {
   name?: string | null;
   scope_type: string;
   scope_id?: string | null;
+  scope_scan_ids?: string[] | null;
   framework?: string | null;
   methodology: string;
   status: string;
@@ -70,6 +71,7 @@ export default function ThreatModels() {
   // ── Create-dialog form state
   const [tmName, setTmName] = useState("");
   const [methodology, setMethodology] = useState<string>("stride");
+  const [scanIds, setScanIds] = useState<string[]>([]);
 
   // ── Upload-dialog form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -92,16 +94,25 @@ export default function ThreatModels() {
       ((q.state.data as any) || []).some((m: any) => m.status === "pending" || m.status === "generating") ? 4000 : false,
   });
 
+  // Completed scans for the selected client — choices for scan-scoped models.
+  const { data: clientScans = [] } = useQuery<Scan[]>({
+    queryKey: ["tm-scans", selectedClientId],
+    queryFn: () => scansApi.list(selectedClientId),
+    enabled: !!selectedClientId && openCreate,
+  });
+
   const createMutation = useMutation({
     mutationFn: () => threatModelsApi.create(selectedClientId, {
       name: tmName || undefined,
-      scope_type: "client",
+      scope_type: scanIds.length ? "scans" : "client",
+      scan_ids: scanIds.length ? scanIds : undefined,
       methodology,
     }),
     onSuccess: (created: ThreatModelSummary) => {
       qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
       setOpenCreate(false);
       setTmName("");
+      setScanIds([]);
       toast.success("Threat model generation started");
       // Auto-open detail so the user sees the generating state.
       setTimeout(() => navigate(`/threat-models/${created.id}?client=${selectedClientId}`), 200);
@@ -257,7 +268,7 @@ export default function ThreatModels() {
                       {m.name || `Threat Model · ${methodologyLabel(m.methodology)}`}
                     </Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-                      Scope: {m.scope_type}{m.framework ? ` · ${m.framework}` : ""}
+                      Scope: {m.scope_type === "scans" ? `${m.scope_scan_ids?.length || 0} scan${(m.scope_scan_ids?.length || 0) === 1 ? "" : "s"}` : m.scope_type}{m.framework ? ` · ${m.framework}` : ""}
                       {m.generated_at ? ` · generated ${fromNow(m.generated_at)}` : (m.created_at ? ` · created ${fromNow(m.created_at)}` : "")}
                     </Typography>
                     {inFlight && (
@@ -334,6 +345,42 @@ export default function ThreatModels() {
                   Loading methodologies…
                 </Typography>
               )}
+            </Box>
+
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
+                SCOPE (optional)
+              </Typography>
+              <FormControl size="small" fullWidth>
+                <InputLabel sx={{ color: "text.secondary" }}>Scans to combine</InputLabel>
+                <Select
+                  multiple
+                  value={scanIds}
+                  onChange={(e) => setScanIds(typeof e.target.value === "string" ? e.target.value.split(",") : (e.target.value as string[]))}
+                  label="Scans to combine"
+                  renderValue={(sel) => (sel as string[]).length ? `${(sel as string[]).length} scan(s) selected` : ""}
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                  MenuProps={{ slotProps: { paper: { sx: { maxHeight: 340, bgcolor: "background.paper" } } } }}
+                >
+                  {clientScans.length === 0 && <MenuItem disabled>No scans for this client</MenuItem>}
+                  {clientScans.map((s) => {
+                    const label = s.name || (s.scan_type as any) || s.id.slice(0, 8);
+                    const total = s.summary?.total ?? 0;
+                    return (
+                      <MenuItem key={s.id} value={s.id} sx={{ color: "text.primary" }}>
+                        <Checkbox size="small" checked={scanIds.indexOf(s.id) > -1} sx={{ color: "#4285F4" }} />
+                        <ListItemText
+                          primary={`${label} · ${s.status}`}
+                          secondary={`${total} finding${total === 1 ? "" : "s"}${s.completed_at ? " · " + fromNow(s.completed_at) : ""}`}
+                        />
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                Leave empty for a client-wide model, or pick one or more scans to scope the model to just those environments — avoids mixing unrelated systems into one messy diagram.
+              </Typography>
             </Box>
 
             <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)" }}>

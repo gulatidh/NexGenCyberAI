@@ -144,22 +144,36 @@ def _collect_scope(
     client_id: str,
     scope_type: str,
     scope_id: Optional[str],
+    scan_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Build the context dict that gets injected into the LLM prompt."""
+    """Build the context dict that gets injected into the LLM prompt.
+
+    When `scan_ids` is given (scope_type='scans'), findings come from exactly
+    those scans and assets are narrowed to the connectors those scans ran
+    against — so the model reflects one environment instead of a messy
+    client-wide aggregate."""
     client = db.query(Client).filter(Client.id == client_id).first()
     client_name = client.name if client else "Unknown Client"
 
+    scan_ids = [s for s in (scan_ids or []) if s] or None
+    # Connectors exercised by the selected scans — used to scope assets.
+    scan_connector_ids: List[str] = []
+    if scan_ids:
+        scan_connector_ids = [
+            cid for (cid,) in db.query(Scan.connector_id).filter(Scan.id.in_(scan_ids)).all() if cid
+        ]
+
     # ── Assets in scope ────
     assets_q = db.query(Asset).filter(Asset.client_id == client_id)
-    if scope_type == "project" and scope_id:
-        assets_q = assets_q.filter(Asset.project_id == scope_id)
-    elif scope_type == "asset" and scope_id:
+    if scope_type == "asset" and scope_id:
+        # Explicit single-asset scope — model exactly that, stale or not.
         assets_q = assets_q.filter(Asset.id == scope_id)
-    # Exclude stale/deleted assets from analysis — they're decommissioned /
-    # out of the current footprint and would inflate the model. The only
-    # exception is an explicit single-asset scope (model exactly what's asked).
-    if not (scope_type == "asset" and scope_id):
+    else:
         assets_q = assets_q.filter(Asset.status == AssetStatus.ACTIVE.value)
+        if scan_ids and scan_connector_ids:
+            assets_q = assets_q.filter(Asset.connector_id.in_(scan_connector_ids))
+        elif scope_type == "project" and scope_id:
+            assets_q = assets_q.filter(Asset.project_id == scope_id)
     assets = assets_q.limit(120).all()
     asset_rows = []
     for a in assets:
@@ -182,9 +196,12 @@ def _collect_scope(
         db.query(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .filter(Scan.client_id == client_id)
-        .order_by(Finding.cvss_score.desc(), Finding.created_at.desc())
-        .limit(50)
     )
+    if scan_ids:
+        findings_q = findings_q.filter(Finding.scan_id.in_(scan_ids))
+    findings_q = findings_q.order_by(
+        Finding.cvss_score.desc(), Finding.created_at.desc()
+    ).limit(50)
     findings = findings_q.all()
     finding_rows = []
     sev_counts: Counter = Counter()
@@ -1131,12 +1148,17 @@ def _set_step(db: Session, tm: ThreatModel, key: str, status: str, detail: str =
 
 def _scope_asset_count(db: Session, tm: ThreatModel) -> int:
     q = db.query(Asset).filter(Asset.client_id == tm.client_id)
-    if tm.scope_type == "project" and tm.scope_id:
-        q = q.filter(Asset.project_id == tm.scope_id)
-    elif tm.scope_type == "asset" and tm.scope_id:
+    scan_ids = [s for s in (tm.scope_scan_ids or []) if s]
+    if tm.scope_type == "asset" and tm.scope_id:
         q = q.filter(Asset.id == tm.scope_id)
-    if not (tm.scope_type == "asset" and tm.scope_id):
-        q = q.filter(Asset.status == AssetStatus.ACTIVE.value)
+        return q.count()
+    q = q.filter(Asset.status == AssetStatus.ACTIVE.value)
+    if scan_ids:
+        conn_ids = [cid for (cid,) in db.query(Scan.connector_id).filter(Scan.id.in_(scan_ids)).all() if cid]
+        if conn_ids:
+            q = q.filter(Asset.connector_id.in_(conn_ids))
+    elif tm.scope_type == "project" and tm.scope_id:
+        q = q.filter(Asset.project_id == tm.scope_id)
     return q.count()
 
 
@@ -1207,7 +1229,8 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
 
         # Step 2 — context (assets + findings + risk register + connectors)
         _set_step(db, tm, "context", "active")
-        scope = _collect_scope(db, tm.client_id, tm.scope_type or "client", tm.scope_id)
+        scope = _collect_scope(db, tm.client_id, tm.scope_type or "client", tm.scope_id,
+                               scan_ids=tm.scope_scan_ids)
         _set_step(db, tm, "context", "done",
                   f"{scope['asset_count']} assets · {scope['finding_count']} findings · "
                   f"{scope.get('risk_count', 0)} risks")

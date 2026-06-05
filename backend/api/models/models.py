@@ -502,8 +502,9 @@ class ThreatModel(Base):
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
     project_id = Column(String(36), ForeignKey("projects.id"), index=True)
     name = Column(String(200))
-    scope_type = Column(String(32))   # "client" | "project" | "asset"
+    scope_type = Column(String(32))   # "client" | "project" | "asset" | "scans"
     scope_id = Column(String(36))     # null for client-wide
+    scope_scan_ids = Column(JSON)     # list of scan IDs when scope_type == "scans"
     framework = Column(SAEnum(FrameworkType, values_callable=_ev))
     # Threat modelling methodology — string (not enum) so adding new
     # methodologies later doesn't require a DB migration. Currently

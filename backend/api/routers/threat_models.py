@@ -98,9 +98,10 @@ async def get_library_entry(
 
 class ThreatModelCreate(BaseModel):
     name: Optional[str] = None
-    scope_type: str = "client"   # client | project | asset
+    scope_type: str = "client"   # client | project | asset | scans
     scope_id: Optional[str] = None
     project_id: Optional[str] = None
+    scan_ids: Optional[List[str]] = None  # when set, model is scoped to these scans
     framework: Optional[FrameworkType] = None
     methodology: Optional[str] = None  # stride | pasta | linddun | mitre_attack | kill_chain
 
@@ -112,6 +113,7 @@ class ThreatModelSummary(BaseModel):
     name: Optional[str] = None
     scope_type: str
     scope_id: Optional[str] = None
+    scope_scan_ids: Optional[List[str]] = None
     framework: Optional[str] = None
     methodology: str = "stride"
     status: str
@@ -163,6 +165,7 @@ def _summary_from(tm: ThreatModel) -> Dict[str, Any]:
         "name": tm.name,
         "scope_type": tm.scope_type or "client",
         "scope_id": tm.scope_id,
+        "scope_scan_ids": tm.scope_scan_ids or None,
         "framework": tm.framework.value if hasattr(tm.framework, "value") else tm.framework,
         "methodology": tm.methodology or "stride",
         "status": tm.status or "pending",
@@ -283,12 +286,17 @@ async def create_threat_model(
             status_code=400,
             detail=f"Unknown methodology '{methodology}'. Pick one of: {', '.join(METHODOLOGIES)}",
         )
+    # Scan-scoped model: narrows the analysis to the environment(s) those
+    # scans cover, instead of a messy client-wide aggregate.
+    scan_ids = [s for s in (payload.scan_ids or []) if s]
+    scope_type = "scans" if scan_ids else (payload.scope_type or "client")
     tm = ThreatModel(
         client_id=client_id,
         project_id=proj_id,
         name=(payload.name or "").strip() or None,
-        scope_type=payload.scope_type or "client",
+        scope_type=scope_type,
         scope_id=payload.scope_id,
+        scope_scan_ids=scan_ids or None,
         framework=payload.framework,
         methodology=methodology,
         status="pending",
@@ -387,6 +395,7 @@ async def rescan(
         name=original.name,
         scope_type=original.scope_type,
         scope_id=original.scope_id,
+        scope_scan_ids=original.scope_scan_ids,
         framework=original.framework,
         methodology=original.methodology or DEFAULT_METHODOLOGY,
         status="pending",

@@ -195,6 +195,16 @@ def _ensure_added_columns() -> None:
                 logger.info("Added threat_models.progress_json column (%s)", dialect)
             except Exception as exc:
                 logger.warning("threat_models.progress_json ALTER failed: %s", exc)
+        if tm_cols and "scope_scan_ids" not in tm_cols:
+            ddl = ("ALTER TABLE threat_models ADD scope_scan_ids NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE threat_models ADD COLUMN scope_scan_ids TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added threat_models.scope_scan_ids column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("threat_models.scope_scan_ids ALTER failed: %s", exc)
 
         # Add risks.source_threat_model_id + risks.source_threat_id — pin a
         # Risk row back to the threat it was converted from so the UI can
