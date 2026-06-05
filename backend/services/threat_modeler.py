@@ -170,6 +170,9 @@ def _collect_scope(
         assets_q = assets_q.filter(Asset.id == scope_id)
     else:
         assets_q = assets_q.filter(Asset.status == AssetStatus.ACTIVE.value)
+        # Exclude the 'other' catch-all class — generic/uncategorised assets
+        # only add noise to the model. (NULL/untyped assets are kept.)
+        assets_q = assets_q.filter((Asset.asset_class != "other") | (Asset.asset_class.is_(None)))
         if scan_ids and scan_connector_ids:
             assets_q = assets_q.filter(Asset.connector_id.in_(scan_connector_ids))
         elif scope_type == "project" and scope_id:
@@ -1212,6 +1215,7 @@ def _scope_asset_count(db: Session, tm: ThreatModel) -> int:
         q = q.filter(Asset.id == tm.scope_id)
         return q.count()
     q = q.filter(Asset.status == AssetStatus.ACTIVE.value)
+    q = q.filter((Asset.asset_class != "other") | (Asset.asset_class.is_(None)))
     if scan_ids:
         conn_ids = [cid for (cid,) in db.query(Scan.connector_id).filter(Scan.id.in_(scan_ids)).all() if cid]
         if conn_ids:
