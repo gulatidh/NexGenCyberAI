@@ -1,13 +1,169 @@
 import React, { useMemo, useState } from "react";
 import {
   Box, Typography, Card, Chip, TextField, Collapse, IconButton,
-  CircularProgress, InputAdornment, Alert,
+  CircularProgress, InputAdornment, Alert, Tabs, Tab,
+  ToggleButton, ToggleButtonGroup, FormControl, InputLabel, Select, MenuItem,
+  FormControlLabel, Switch, Table, TableHead, TableRow, TableCell, TableBody,
+  TableContainer, Tooltip,
 } from "@mui/material";
 import {
-  Search, ExpandMore, ExpandLess, Storage, AutoStories,
+  Search, ExpandMore, ExpandLess, Storage, AutoStories, OpenInNew, Hub,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { knowledgeApi } from "../services/api";
+import { knowledgeApi, adminApi } from "../services/api";
+
+// ── Threat Intelligence browser (synced feeds) ───────────────────────────────
+
+const TI_SOURCES = [
+  { id: "attack", label: "MITRE ATT&CK" },
+  { id: "capec", label: "MITRE CAPEC" },
+  { id: "kev", label: "CISA KEV" },
+  { id: "nvd_recent", label: "NVD CVEs" },
+  { id: "epss", label: "EPSS" },
+];
+
+function ThreatIntelBrowser() {
+  const [source, setSource] = useState<string>("attack");
+  const [q, setQ] = useState("");
+  const [category, setCategory] = useState("");
+  const [cwe, setCwe] = useState("");
+  const [minCvss, setMinCvss] = useState<string>("");
+  const [minScore, setMinScore] = useState<string>("");
+  const [ransomware, setRansomware] = useState(false);
+
+  const isLib = source === "attack" || source === "capec";
+  const isNvd = source === "nvd_recent";
+  const isEpss = source === "epss";
+  const isKev = source === "kev";
+
+  const { data, isFetching } = useQuery<{ id: string; total: number; rows: any[]; facets?: { categories?: string[] }; note?: string }>({
+    queryKey: ["ti-entries", source, q, category, cwe, minCvss, minScore, ransomware],
+    queryFn: () => adminApi.syncFeedEntries(source, {
+      limit: 300,
+      q: q || undefined,
+      category: isLib && category ? category : undefined,
+      cwe: (isLib || isNvd) && cwe ? cwe : undefined,
+      min_cvss: isNvd && minCvss ? Number(minCvss) : undefined,
+      min_score: isEpss && minScore ? Number(minScore) : undefined,
+      ransomware: isKev ? ransomware : undefined,
+    }),
+  });
+
+  const rows = data?.rows || [];
+  const cols = rows.length ? Object.keys(rows[0]).filter((k) => k !== "ref") : [];
+  const cats = data?.facets?.categories || [];
+
+  const resetFilters = () => { setQ(""); setCategory(""); setCwe(""); setMinCvss(""); setMinScore(""); setRansomware(false); };
+
+  return (
+    <Box>
+      {/* Source selector */}
+      <ToggleButtonGroup
+        size="small" exclusive value={source}
+        onChange={(_, v) => { if (v) { setSource(v); resetFilters(); } }}
+        sx={{ mb: 2, flexWrap: "wrap",
+          "& .MuiToggleButton-root": { textTransform: "none", color: "text.secondary", borderColor: "divider", px: 1.5 },
+          "& .Mui-selected": { color: "#4285F4 !important", bgcolor: "rgba(66,133,244,0.12) !important" } }}
+      >
+        {TI_SOURCES.map((s) => <ToggleButton key={s.id} value={s.id}>{s.label}</ToggleButton>)}
+      </ToggleButtonGroup>
+
+      {/* Filters */}
+      <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+        <TextField size="small" placeholder={isLib ? "Search id / name / description…" : "Search CVE…"}
+          value={q} onChange={(e) => setQ(e.target.value)} sx={{ minWidth: 240 }}
+          slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ color: "text.secondary", fontSize: 18 }} /></InputAdornment> } }} />
+
+        {isLib && (
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Category</InputLabel>
+            <Select label="Category" value={category} onChange={(e) => setCategory(e.target.value)}
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value="">All categories</MenuItem>
+              {cats.map((c) => <MenuItem key={c} value={c} sx={{ textTransform: "capitalize" }}>{c.replace(/_/g, " ")}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+        {(isLib || isNvd) && (
+          <TextField size="small" label="CWE" placeholder="CWE-79" value={cwe}
+            onChange={(e) => setCwe(e.target.value)} sx={{ width: 130 }} />
+        )}
+        {isNvd && (
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Min CVSS</InputLabel>
+            <Select label="Min CVSS" value={minCvss} onChange={(e) => setMinCvss(e.target.value)}
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              {["", "4", "7", "9"].map((v) => <MenuItem key={v} value={v}>{v ? `≥ ${v}` : "Any"}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+        {isEpss && (
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Min EPSS</InputLabel>
+            <Select label="Min EPSS" value={minScore} onChange={(e) => setMinScore(e.target.value)}
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              {["", "0.1", "0.5", "0.9"].map((v) => <MenuItem key={v} value={v}>{v ? `≥ ${v}` : "Any"}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+        {isKev && (
+          <FormControlLabel sx={{ color: "text.secondary" }}
+            control={<Switch size="small" checked={ransomware} onChange={(e) => setRansomware(e.target.checked)} />}
+            label="Ransomware-linked only" />
+        )}
+      </Box>
+
+      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
+        Showing {rows.length} of {(data?.total ?? 0).toLocaleString()} · click a row to open the authoritative source ↗
+      </Typography>
+
+      {data?.note ? (
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)" }}>{data.note}</Alert>
+      ) : isFetching ? (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>
+      ) : rows.length === 0 ? (
+        <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)" }}>
+          No entries — adjust filters, or run a Sync for this feed first.
+        </Alert>
+      ) : (
+        <TableContainer component={Card} sx={{ bgcolor: "background.paper", maxHeight: "62vh" }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {cols.map((c) => (
+                  <TableCell key={c} sx={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: "text.secondary", bgcolor: "background.paper" }}>
+                    {c.replace(/_/g, " ")}
+                  </TableCell>
+                ))}
+                <TableCell sx={{ bgcolor: "background.paper", width: 36 }} />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} hover
+                  onClick={() => { if (r.ref) window.open(r.ref, "_blank", "noopener"); }}
+                  sx={{ cursor: r.ref ? "pointer" : "default", "&:hover": r.ref ? { bgcolor: "rgba(66,133,244,0.06)" } : {} }}>
+                  {cols.map((c) => (
+                    <TableCell key={c} sx={{ fontSize: 12, color: "text.primary", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c === "description" ? "normal" : "nowrap" }}>
+                      {typeof r[c] === "boolean" ? (r[c] ? "yes" : "—") : (r[c] ?? "—")}
+                    </TableCell>
+                  ))}
+                  <TableCell sx={{ width: 36 }}>
+                    {r.ref && (
+                      <Tooltip title="Open authoritative source">
+                        <OpenInNew sx={{ fontSize: 15, color: "text.secondary" }} />
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Box>
+  );
+}
 
 interface Section {
   id: string; position: number; name: string; section_type: string;
@@ -120,6 +276,7 @@ function KnowledgeCard({ file }: { file: KFile }) {
 
 export default function KnowledgeBase() {
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState(0);
 
   const { data, isLoading } = useQuery<{ categories: KCategory[] }>({
     queryKey: ["knowledge-list"], queryFn: knowledgeApi.list,
@@ -162,6 +319,14 @@ export default function KnowledgeBase() {
         )}
       </Box>
 
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2,
+        "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600, minHeight: 42 },
+        "& .Mui-selected": { color: "#4285F4 !important" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
+        <Tab icon={<AutoStories sx={{ fontSize: 16 }} />} iconPosition="start" label="Knowledge Files" />
+        <Tab icon={<Hub sx={{ fontSize: 16 }} />} iconPosition="start" label="Threat Intelligence" />
+      </Tabs>
+
+      {tab === 1 ? <ThreatIntelBrowser /> : (<>
       <TextField
         fullWidth size="small" placeholder="Search files, sections, frameworks, capabilities…"
         value={search} onChange={(e) => setSearch(e.target.value)}
@@ -195,6 +360,7 @@ export default function KnowledgeBase() {
           </Box>
         ))
       )}
+      </>)}
     </Box>
   );
 }

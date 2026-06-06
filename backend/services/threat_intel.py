@@ -88,21 +88,22 @@ def stats() -> Dict[str, Any]:
     }
 
 
-def sample_epss(limit: int = 100, q: Optional[str] = None) -> list:
-    """Top EPSS entries by score (or filtered by CVE substring) for the
-    Sync page 'view entries' drawer."""
+def sample_epss(limit: int = 100, q: Optional[str] = None, min_score: Optional[float] = None) -> list:
+    """Top EPSS entries by score (filterable by CVE substring / min score)."""
     _ensure_loaded()
     rows = [{"cve": k, "score": v.get("score"), "percentile": v.get("percentile")}
             for k, v in _epss.items()]
     if q:
         ql = q.upper()
         rows = [r for r in rows if ql in r["cve"]]
+    if min_score is not None:
+        rows = [r for r in rows if (r.get("score") or 0) >= min_score]
     rows.sort(key=lambda r: (r.get("score") or 0), reverse=True)
     return rows[:limit]
 
 
-def sample_kev(limit: int = 100, q: Optional[str] = None) -> list:
-    """Most-recently-added KEV entries (or filtered) for the Sync drawer."""
+def sample_kev(limit: int = 100, q: Optional[str] = None, ransomware_only: bool = False) -> list:
+    """Most-recently-added KEV entries (filterable by text / ransomware use)."""
     _ensure_loaded()
     rows = [{"cve": k, "vendor": v.get("vendorProject"), "product": v.get("product"),
              "name": v.get("vulnerabilityName"), "date_added": v.get("dateAdded"),
@@ -113,6 +114,8 @@ def sample_kev(limit: int = 100, q: Optional[str] = None) -> list:
         rows = [r for r in rows if ql in r["cve"]
                 or ql in (r.get("vendor") or "").upper()
                 or ql in (r.get("product") or "").upper()]
+    if ransomware_only:
+        rows = [r for r in rows if r.get("ransomware")]
     rows.sort(key=lambda r: (r.get("date_added") or ""), reverse=True)
     return rows[:limit]
 

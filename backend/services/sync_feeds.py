@@ -682,41 +682,75 @@ def sync_feed(feed_id: str) -> Dict[str, Any]:
         return {"ok": False, "id": feed_id, "error": str(exc)}
 
 
-def feed_entries(feed_id: str, db, limit: int = 100, q: Optional[str] = None) -> Dict[str, Any]:
-    """Return a sample of the actual entries a feed has synced, for the Sync
-    page 'view entries' drawer. Shape: {id, total, rows[], note?}. `rows` are
-    dicts; the UI derives columns from the keys."""
+def _ref_url(kind: str, ident: str) -> str:
+    """Authoritative external link for a synced entry."""
+    ident = (ident or "").strip()
+    if not ident:
+        return ""
+    if kind == "attack":
+        # T1190 / T1190.001 → /techniques/T1190 or /techniques/T1190/001
+        return "https://attack.mitre.org/techniques/" + ident.replace(".", "/")
+    if kind == "capec":
+        num = ident.upper().replace("CAPEC-", "")
+        return f"https://capec.mitre.org/data/definitions/{num}.html"
+    if kind == "cve":
+        return f"https://nvd.nist.gov/vuln/detail/{ident}"
+    return ""
+
+
+def feed_entries(feed_id: str, db, limit: int = 200, q: Optional[str] = None,
+                 category: Optional[str] = None, cwe: Optional[str] = None,
+                 min_cvss: Optional[float] = None, min_score: Optional[float] = None,
+                 ransomware: bool = False) -> Dict[str, Any]:
+    """Filterable view of a synced feed's entries for the Knowledge Base
+    Threat Intelligence browser. Shape: {id, total, rows[], facets?, note?}.
+    Each row carries a `ref` (authoritative external URL)."""
     fid = (feed_id or "").lower()
 
     if fid in ("attack", "capec"):
+        from sqlalchemy import distinct as _distinct
         from api.models.models import ThreatLibrary
         base = db.query(ThreatLibrary).filter(ThreatLibrary.source == fid)
         total = base.count()
+        cats = sorted(c for (c,) in db.query(_distinct(ThreatLibrary.category))
+                      .filter(ThreatLibrary.source == fid).all() if c)
+        qry = base
         if q:
             like = f"%{q}%"
-            base = base.filter(
+            qry = qry.filter(
                 (ThreatLibrary.source_id.ilike(like)) | (ThreatLibrary.name.ilike(like))
+                | (ThreatLibrary.description.ilike(like))
             )
-        rows = base.order_by(ThreatLibrary.source_id).limit(limit).all()
-        def _cwes(r):
-            v = r.related_cwes
-            return ", ".join(v) if isinstance(v, list) else (v or "")
-        return {
-            "id": fid, "total": total,
-            "rows": [{
-                "id": r.source_id, "name": r.name,
-                "category": r.category or "", "cwes": _cwes(r),
-                "description": (r.description or "")[:200],
-            } for r in rows],
-        }
+        if category:
+            qry = qry.filter(ThreatLibrary.category == category)
+        fetched = qry.order_by(ThreatLibrary.source_id).limit(max(limit, 1) * (4 if cwe else 1)).all()
+        rows = []
+        for r in fetched:
+            cl = r.related_cwes if isinstance(r.related_cwes, list) else ([r.related_cwes] if r.related_cwes else [])
+            if cwe and not any(cwe.upper() in (c or "").upper() for c in cl):
+                continue
+            rows.append({
+                "id": r.source_id, "name": r.name, "category": r.category or "",
+                "cwes": ", ".join(cl), "description": (r.description or "")[:240],
+                "ref": _ref_url(fid, r.source_id),
+            })
+            if len(rows) >= limit:
+                break
+        return {"id": fid, "total": total, "rows": rows, "facets": {"categories": cats}}
 
     if fid == "epss":
         from services.threat_intel import sample_epss, epss_total
-        return {"id": fid, "total": epss_total(), "rows": sample_epss(limit, q)}
+        rows = sample_epss(limit, q, min_score=min_score)
+        for r in rows:
+            r["ref"] = _ref_url("cve", r["cve"])
+        return {"id": fid, "total": epss_total(), "rows": rows}
 
     if fid == "kev":
         from services.threat_intel import sample_kev, kev_total
-        return {"id": fid, "total": kev_total(), "rows": sample_kev(limit, q)}
+        rows = sample_kev(limit, q, ransomware_only=ransomware)
+        for r in rows:
+            r["ref"] = _ref_url("cve", r["cve"])
+        return {"id": fid, "total": kev_total(), "rows": rows}
 
     if fid in ("nvd_recent", "nvd"):
         cache_path = _CACHE_DIR / "nvd_cve_cache.json"
@@ -726,15 +760,23 @@ def feed_entries(feed_id: str, db, limit: int = 100, q: Optional[str] = None) ->
             data = json.loads(cache_path.read_text())
         except Exception:
             return {"id": fid, "total": 0, "rows": []}
-        items = list(data.items())
-        if q:
-            ql = q.upper()
-            items = [(k, v) for k, v in items if ql in k.upper()]
-        rows = [{
-            "cve": k, "cvss_v3": v.get("cvss_v3"),
-            "cwes": ", ".join(v.get("cwes") or []),
-            "description": (v.get("description") or "")[:200],
-        } for k, v in items[:limit]]
+        ql = q.upper() if q else None
+        rows = []
+        for k, v in data.items():
+            if ql and ql not in k.upper():
+                continue
+            cv = v.get("cvss_v3")
+            if min_cvss is not None and (cv is None or cv < min_cvss):
+                continue
+            cws = v.get("cwes") or []
+            if cwe and not any(cwe.upper() in (c or "").upper() for c in cws):
+                continue
+            rows.append({
+                "cve": k, "cvss_v3": cv, "cwes": ", ".join(cws),
+                "description": (v.get("description") or "")[:240], "ref": _ref_url("cve", k),
+            })
+            if len(rows) >= limit:
+                break
         return {"id": fid, "total": len(data), "rows": rows}
 
     return {"id": fid, "total": 0, "rows": [],

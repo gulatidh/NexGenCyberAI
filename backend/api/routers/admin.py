@@ -39,15 +39,24 @@ async def refresh_sync_feed(feed_id: str, _=Depends(get_current_user)):
 @router.get("/sync/feeds/{feed_id}/entries")
 async def list_sync_feed_entries(
     feed_id: str,
-    limit: int = 100,
+    limit: int = 200,
     q: Optional[str] = None,
+    category: Optional[str] = None,
+    cwe: Optional[str] = None,
+    min_cvss: Optional[float] = None,
+    min_score: Optional[float] = None,
+    ransomware: bool = False,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """A sample of the actual entries a feed has synced (powers the Sync page
-    'view entries' drawer). Returns {id, total, rows[], note?}."""
+    """Filterable entries for a synced feed (Knowledge Base → Threat
+    Intelligence). Returns {id, total, rows[], facets?, note?}; rows carry a
+    `ref` external link."""
     from services.sync_feeds import feed_entries
-    return feed_entries(feed_id, db, limit=min(max(limit, 1), 500), q=q)
+    return feed_entries(
+        feed_id, db, limit=min(max(limit, 1), 500), q=q,
+        category=category, cwe=cwe, min_cvss=min_cvss, min_score=min_score, ransomware=ransomware,
+    )
 
 
 @router.post("/scan-binaries/cleanup")
