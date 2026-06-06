@@ -15,7 +15,7 @@ from db.database import get_db
 from core.security import get_current_user
 from core.authz import (
     _normalize_email, _user_email, effective_role, get_user_grants, require_role,
-    is_admin_anywhere, can_manage_scope, manageable_scope_ids,
+    is_admin_anywhere, can_manage_scope, manageable_scope_ids, require_editor_anywhere,
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -29,7 +29,7 @@ async def list_sync_feeds(_=Depends(get_current_user)):
     return list_feeds()
 
 
-@router.post("/sync/feeds/{feed_id}/refresh")
+@router.post("/sync/feeds/{feed_id}/refresh", dependencies=[Depends(require_editor_anywhere)])
 async def refresh_sync_feed(feed_id: str, _=Depends(get_current_user)):
     """Manually sync one feed (EPSS / KEV / NVD / Frameworks)."""
     from services.sync_feeds import sync_feed
@@ -58,7 +58,7 @@ async def cleanup_scan_binaries(days: int = 30, _=Depends(get_current_user)):
     return cleanup_old_binaries(days=days)
 
 
-@router.post("/sync/feeds/refresh-all")
+@router.post("/sync/feeds/refresh-all", dependencies=[Depends(require_editor_anywhere)])
 async def refresh_all_sync_feeds(_=Depends(get_current_user)):
     """Sync every feed sequentially. Returns per-feed results."""
     from services.sync_feeds import REGISTRY, sync_feed
@@ -75,7 +75,7 @@ async def threat_intel_stats(_=Depends(get_current_user)):
     return stats()
 
 
-@router.post("/threat-intel/refresh")
+@router.post("/threat-intel/refresh", dependencies=[Depends(require_editor_anywhere)])
 async def threat_intel_refresh(force: bool = True, _=Depends(get_current_user)):
     from services.threat_intel import refresh_all
     return refresh_all(force=force)

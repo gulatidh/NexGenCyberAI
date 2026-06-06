@@ -7,6 +7,7 @@ from api.models.models import AgentRun, AgentType, Scan, Finding, Risk, RiskLeve
 from api.schemas.schemas import AgentRunRequest, AgentRunResponse
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere
 
 router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
 _orchestrator = None
@@ -20,7 +21,7 @@ def _get_orchestrator():
     return _orchestrator
 
 
-@router.post("/run/", response_model=AgentRunResponse)
+@router.post("/run/", response_model=AgentRunResponse, dependencies=[Depends(require_editor_anywhere)])
 async def run_agent(
     client_id: str,
     payload: AgentRunRequest,

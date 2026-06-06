@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere
 from api.models.models import (
     MissionType, MissionRunStatus, ScheduledMission, ScheduledMissionRun, Client,
 )
@@ -116,7 +117,7 @@ async def list_missions(
     return [_to_response(m, db) for m in rows]
 
 
-@router.post("/", response_model=MissionResponse)
+@router.post("/", response_model=MissionResponse, dependencies=[Depends(require_editor_anywhere)])
 async def create_mission(
     payload: MissionCreate,
     db: Session = Depends(get_db),
@@ -185,7 +186,7 @@ async def delete_mission(
     return {"deleted": True}
 
 
-@router.post("/{mission_id}/run", response_model=MissionRunResponse)
+@router.post("/{mission_id}/run", response_model=MissionRunResponse, dependencies=[Depends(require_editor_anywhere)])
 async def run_now(
     mission_id: str,
     db: Session = Depends(get_db),

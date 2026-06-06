@@ -133,6 +133,29 @@ def is_admin_anywhere(grants: Iterable[UserAccess]) -> bool:
     return any(g.role == AccessRole.ADMIN for g in grants)
 
 
+def is_editor_anywhere(grants: Iterable[UserAccess]) -> bool:
+    """True if the caller can write somewhere (editor or admin at any scope).
+    Readers (and ungranted users) are read-only — this backs the Executive
+    view mode and gates job-initiating endpoints."""
+    return any(g.role in (AccessRole.EDITOR, AccessRole.ADMIN) for g in grants)
+
+
+def require_editor_anywhere(user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    """FastAPI dependency: reject read-only callers (no editor/admin grant
+    anywhere) from job-initiating / write endpoints. Mirrors the Executive
+    (read-only) vs Analyst view mode in the UI."""
+    email = _user_email(user)
+    if not email:
+        raise HTTPException(status_code=401, detail="Could not identify user")
+    grants = get_user_grants(db, email)
+    if not is_editor_anywhere(grants):
+        raise HTTPException(
+            status_code=403,
+            detail="Read-only access — an editor or admin role is required to run this action.",
+        )
+    return user
+
+
 def can_manage_scope(
     grants: Iterable[UserAccess],
     target_scope_type: AccessScope,

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from api.models.models import Client, FrameworkType, Project, Risk, RiskLevel, ThreatModel
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere
 from services.diagram_extractor import SUPPORTED_EXTENSIONS, extract as extract_diagram
 from services.drawio_renderer import render_drawio_xml
 from services.threat_modeler import (
@@ -265,7 +266,7 @@ def _threat_to_risk(
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 
-@router.post("/", response_model=ThreatModelSummary, status_code=201)
+@router.post("/", response_model=ThreatModelSummary, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def create_threat_model(
     client_id: str,
     payload: ThreatModelCreate,
@@ -375,7 +376,7 @@ async def list_versions(
     return [_summary_from(s) for s in siblings]
 
 
-@router.post("/{model_id}/rescan", response_model=ThreatModelSummary, status_code=201)
+@router.post("/{model_id}/rescan", response_model=ThreatModelSummary, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def rescan(
     client_id: str,
     model_id: str,
@@ -412,7 +413,7 @@ async def rescan(
     return _summary_from(new)
 
 
-@router.post("/{model_id}/threats/{threat_id}/convert-to-risk", status_code=201)
+@router.post("/{model_id}/threats/{threat_id}/convert-to-risk", status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def convert_threat_to_risk(
     client_id: str,
     model_id: str,
@@ -451,7 +452,7 @@ async def convert_threat_to_risk(
     return {"risk_id": risk.id, "created": True}
 
 
-@router.post("/{model_id}/convert-all-to-risks", response_model=ConvertResult)
+@router.post("/{model_id}/convert-all-to-risks", response_model=ConvertResult, dependencies=[Depends(require_editor_anywhere)])
 async def convert_all_threats_to_risks(
     client_id: str,
     model_id: str,
@@ -542,7 +543,7 @@ class FromDiagramResponse(BaseModel):
     warnings: List[str] = []
 
 
-@router.post("/from-diagram", response_model=FromDiagramResponse, status_code=201)
+@router.post("/from-diagram", response_model=FromDiagramResponse, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def create_from_diagram(
     client_id: str,
     file: UploadFile = File(...),
@@ -651,7 +652,7 @@ class ReviewedDfd(BaseModel):
     methodology: Optional[str] = None
 
 
-@router.post("/{model_id}/start-modeling", response_model=ThreatModelSummary, status_code=202)
+@router.post("/{model_id}/start-modeling", response_model=ThreatModelSummary, status_code=202, dependencies=[Depends(require_editor_anywhere)])
 async def start_modeling_from_diagram(
     client_id: str,
     model_id: str,
@@ -875,7 +876,7 @@ def _categories_for(methodology: str) -> List[str]:
     return list(spec["categories"])
 
 
-@router.post("/{model_id}/coverage/fill-gaps")
+@router.post("/{model_id}/coverage/fill-gaps", dependencies=[Depends(require_editor_anywhere)])
 async def fill_coverage_gaps(
     client_id: str,
     model_id: str,

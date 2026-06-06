@@ -14,7 +14,11 @@ interface ViewModeCtx {
   mode: ViewMode;
   setMode: (m: ViewMode) => void;
   isExecutive: boolean;
-  canAct: boolean; // true in analyst mode — gate write/initiate actions on this
+  canAct: boolean; // true in analyst mode AND not RBAC-read-only
+  // RBAC binding: users with no editor/admin grant anywhere are forced
+  // read-only (locked to Executive). Set by AppLayout from /admin/me.
+  readOnly: boolean;
+  setReadOnly: (v: boolean) => void;
 }
 
 const MODE_KEY = "ui-view-mode";
@@ -24,6 +28,8 @@ const Ctx = createContext<ViewModeCtx>({
   setMode: () => {},
   isExecutive: false,
   canAct: true,
+  readOnly: false,
+  setReadOnly: () => {},
 });
 
 export function useViewMode(): ViewModeCtx {
@@ -40,16 +46,22 @@ function loadInitial(): ViewMode {
 
 export function ViewModeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ViewMode>(loadInitial);
+  const [readOnly, setReadOnly] = useState(false);
 
   useEffect(() => {
     try { window.localStorage.setItem(MODE_KEY, mode); } catch { /* ignore */ }
   }, [mode]);
 
+  // Read-only (reader) users are always Executive and can never act, no
+  // matter what the persisted preference says; the backend enforces this too.
+  const effectiveExecutive = mode === "executive" || readOnly;
   const value: ViewModeCtx = {
     mode,
     setMode: setModeState,
-    isExecutive: mode === "executive",
-    canAct: mode === "analyst",
+    isExecutive: effectiveExecutive,
+    canAct: !effectiveExecutive,
+    readOnly,
+    setReadOnly,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

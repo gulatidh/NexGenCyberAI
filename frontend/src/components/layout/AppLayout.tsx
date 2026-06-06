@@ -88,7 +88,7 @@ export default function AppLayout() {
   const [themeAnchor, setThemeAnchor] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode, setMode, customPalette, setCustomPalette } = useThemeMode();
-  const { mode: viewMode, setMode: setViewMode } = useViewMode();
+  const { mode: viewMode, setMode: setViewMode, readOnly, setReadOnly } = useViewMode();
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -154,6 +154,12 @@ export default function AppLayout() {
     retry: 0,
     staleTime: 60_000,
   });
+
+  // RBAC binding: a user with no editor/admin grant anywhere is read-only,
+  // so lock them to Executive mode (the backend enforces this on writes too).
+  useEffect(() => {
+    if (me) setReadOnly(!me.is_editor_anywhere);
+  }, [me, setReadOnly]);
 
   const account = accounts[0];
   const userName = account?.name || account?.username || "User";
@@ -352,12 +358,14 @@ export default function AppLayout() {
               </IconButton>
             </Tooltip>
             <Box sx={{ flexGrow: 1 }} />
-            <Tooltip title={viewMode === "executive"
-              ? "Executive — read-only: dashboards & reports. Switch to Analyst to run jobs."
-              : "Analyst — full access: initiate scans, agents, threat models, syncs."}>
+            <Tooltip title={readOnly
+              ? "Your access is read-only (reader role) — ask an admin for editor access to run jobs."
+              : viewMode === "executive"
+                ? "Executive — read-only: dashboards & reports. Switch to Analyst to run jobs."
+                : "Analyst — full access: initiate scans, agents, threat models, syncs."}>
               <ToggleButtonGroup
-                size="small" exclusive value={viewMode}
-                onChange={(_, v) => { if (v) setViewMode(v); }}
+                size="small" exclusive value={readOnly ? "executive" : viewMode}
+                onChange={(_, v) => { if (v && !readOnly) setViewMode(v); }}
                 sx={{
                   mr: 2,
                   "& .MuiToggleButton-root": {
@@ -368,7 +376,7 @@ export default function AppLayout() {
                 }}
               >
                 <ToggleButton value="executive"><VisibilityOutlined sx={{ fontSize: 15, mr: 0.5 }} />Executive</ToggleButton>
-                <ToggleButton value="analyst"><Engineering sx={{ fontSize: 16, mr: 0.5 }} />Analyst</ToggleButton>
+                <ToggleButton value="analyst" disabled={readOnly}><Engineering sx={{ fontSize: 16, mr: 0.5 }} />Analyst</ToggleButton>
               </ToggleButtonGroup>
             </Tooltip>
             <Typography

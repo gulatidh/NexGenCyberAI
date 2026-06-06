@@ -8,6 +8,7 @@ from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAss
 from api.schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere
 from core.encryption import decrypt
 from connectors.factory import get_connector
 from connectors.sync import sync_connector_assets
@@ -311,7 +312,7 @@ async def _execute_scan(
         db.close()
 
 
-@router.post("/", response_model=ScanResponse, status_code=201)
+@router.post("/", response_model=ScanResponse, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def start_scan(
     client_id: str,
     payload: ScanCreate,
@@ -395,7 +396,7 @@ async def delete_scan(
     db.commit()
 
 
-@router.post("/{scan_id}/rescan", response_model=ScanResponse, status_code=201)
+@router.post("/{scan_id}/rescan", response_model=ScanResponse, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def rescan(
     client_id: str,
     scan_id: str,
@@ -461,7 +462,7 @@ async def list_scan_versions(
     )
 
 
-@router.post("/{scan_id}/upload-binary", status_code=201)
+@router.post("/{scan_id}/upload-binary", status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def upload_scan_binary(
     client_id: str,
     scan_id: str,
