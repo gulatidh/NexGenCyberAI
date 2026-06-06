@@ -477,7 +477,8 @@ def _library_sample(db: Session, methodology: str, limit: int = 25) -> List[Dict
 def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodology: str,
                        library: Optional[List[Dict[str, Any]]] = None,
                        preset_components: Optional[List[Dict[str, Any]]] = None,
-                       preset_data_flows: Optional[List[Dict[str, Any]]] = None) -> str:
+                       preset_data_flows: Optional[List[Dict[str, Any]]] = None,
+                       analyst_notes: Optional[str] = None) -> str:
     spec = METHODOLOGIES.get(methodology) or METHODOLOGIES[DEFAULT_METHODOLOGY]
     parts: List[str] = [
         "## Scope",
@@ -487,6 +488,12 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
         f"Framework target: {framework or 'NIST CSF (default)'}",
         f"Methodology: {spec['label']}",
     ]
+
+    # Analyst guidance — authoritative context the user wants the model to honour.
+    if analyst_notes and analyst_notes.strip():
+        parts.append("")
+        parts.append("## Analyst guidance (AUTHORITATIVE — incorporate this into the analysis)")
+        parts.append(analyst_notes.strip()[:4000])
 
     # When the model was created from an uploaded diagram, the components +
     # data flows are already extracted. Treat them as authoritative
@@ -1047,6 +1054,7 @@ async def _invoke_llm(
     preset_components: Optional[List[Dict[str, Any]]] = None,
     preset_data_flows: Optional[List[Dict[str, Any]]] = None,
     diagram_image: Optional[Dict[str, Any]] = None,
+    analyst_notes: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Call configured LLM. Returns the normalised model. Falls back to a
     deterministic skeleton when no provider is available."""
@@ -1061,6 +1069,7 @@ async def _invoke_llm(
     user_prompt = _build_user_prompt(
         scope, framework, methodology, library=library,
         preset_components=preset_components, preset_data_flows=preset_data_flows,
+        analyst_notes=analyst_notes,
     )
 
     # When an uploaded diagram image is available, attach it so a vision model
@@ -1310,14 +1319,20 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
     db.commit()
 
     try:
-        # Diagram-upload models carry a user-reviewed architecture; treat it
-        # as authoritative and skip live discovery.
-        diagram_components = tm.components_json if tm.components_json else None
-        diagram_data_flows = tm.data_flows_json if tm.data_flows_json else None
+        # Architecture source:
+        #  - diagram upload (scope_type 'diagram') → user-reviewed components
+        #  - components_pinned → analyst-curated set (edit & re-model)
+        #  - else → derive deterministically from the scoped assets
+        orig_components = tm.components_json or None
+        orig_data_flows = tm.data_flows_json or None
+        is_diagram = (tm.scope_type == "diagram")
+        use_pinned = bool(orig_components) and (is_diagram or bool(tm.components_pinned))
+        pinned = orig_components if use_pinned else None
 
         # Step 1 — assets
-        if diagram_components:
-            _set_step(db, tm, "assets", "done", f"{len(diagram_components)} components from uploaded diagram")
+        if pinned:
+            src = "uploaded diagram" if is_diagram else "analyst-curated set"
+            _set_step(db, tm, "assets", "done", f"{len(pinned)} components from {src}")
         else:
             await _ensure_assets(db, tm)
 
@@ -1329,12 +1344,11 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
                   f"{scope['asset_count']} assets · {scope['finding_count']} findings · "
                   f"{scope.get('risk_count', 0)} risks")
 
-        # Pin the architecture so methodology / reruns don't change the
-        # component set: derive components deterministically from the scoped
-        # asset inventory. Only when the scope has no assets do we fall back to
-        # letting the LLM invent the architecture.
-        derived_components = None if diagram_components else (_components_from_assets(scope.get("assets")) or None)
-        pinned_components = diagram_components or derived_components
+        # When not pinned, derive components deterministically from the scoped
+        # assets (consistent across methodologies / reruns); fall back to
+        # LLM-invented architecture only when there are no assets at all.
+        derived_components = None if (pinned or is_diagram) else (_components_from_assets(scope.get("assets")) or None)
+        pinned_components = pinned or derived_components
 
         fw = tm.framework.value if hasattr(tm.framework, "value") else (tm.framework or None)
 
@@ -1348,8 +1362,8 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         _set_step(db, tm, "model", "active", f"calling {label} model")
         model, meta = await _invoke_llm(
             scope, fw, methodology, library=library,
-            preset_components=pinned_components, preset_data_flows=diagram_data_flows,
-            diagram_image=tm.source_diagram,
+            preset_components=pinned_components, preset_data_flows=orig_data_flows,
+            diagram_image=tm.source_diagram, analyst_notes=tm.analyst_notes,
         )
         threats_out = model.get("threats") or []
         has_arch = bool(pinned_components or model.get("components"))
@@ -1361,14 +1375,15 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
 
         # Step 5 — finalize the architecture.
         _set_step(db, tm, "finalize", "active")
-        if diagram_components:
-            tm.components_json = diagram_components
-            tm.data_flows_json = diagram_data_flows or []
-        elif derived_components:
-            # Fixed component set (consistent across methodologies); keep only
+        if is_diagram and use_pinned:
+            # Uploaded diagram: components AND the user-reviewed flows are authoritative.
+            tm.components_json = pinned
+            tm.data_flows_json = orig_data_flows or []
+        elif pinned_components:
+            # Analyst-curated or asset-derived: fixed component set; keep only
             # LLM-proposed flows that connect two known components.
-            known = {c["id"] for c in derived_components}
-            tm.components_json = derived_components
+            known = {c["id"] for c in pinned_components}
+            tm.components_json = pinned_components
             tm.data_flows_json = [
                 f for f in (model.get("data_flows") or [])
                 if _str(f.get("from")) in known and _str(f.get("to")) in known

@@ -15,11 +15,11 @@ import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
-  Dialog, DialogTitle, DialogContent,
+  Dialog, DialogTitle, DialogContent, TextField, Select, FormControl, InputLabel,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
-  KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh,
+  KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -89,6 +89,7 @@ interface ThreatModelDetailData {
   converted_threat_ids?: string[];
   parent_threat_model_id?: string | null;
   progress?: GenerationProgress | null;
+  analyst_notes?: string | null;
   // Phase 8
   trust_boundaries?: any[];
   entry_points?: any[];
@@ -110,6 +111,110 @@ const ZONE_COLOR: Record<string, string> = {
 
 function prettyCat(s: string): string {
   return (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function ComponentsEditor({ clientId, modelId, components, notes }: {
+  clientId: string; modelId: string; components: Component[]; notes?: string | null;
+}) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<Component[]>(components);
+  const [noteText, setNoteText] = useState(notes || "");
+  const [nName, setNName] = useState("");
+  const [nType, setNType] = useState("endpoint");
+  const [nZone, setNZone] = useState("private");
+  const [nCrit, setNCrit] = useState("medium");
+  React.useEffect(() => { setRows(components); setNoteText(notes || ""); }, [components, notes]);
+
+  const TYPES = ["endpoint", "api", "database", "storage", "identity", "queue", "secret-store", "repo", "vm", "other"];
+  const ZONES = ["public", "dmz", "private", "data-tier", "management"];
+  const CRITS = ["critical", "high", "medium", "low"];
+
+  const addRow = () => {
+    if (!nName.trim()) return;
+    setRows([...rows, { id: `c${rows.length + 1}`, name: nName.trim(), type: nType, trust_zone: nZone, criticality: nCrit, notes: "" } as Component]);
+    setNName("");
+  };
+
+  const remodel = useMutation({
+    mutationFn: () => threatModelsApi.remodel(clientId, modelId, {
+      components: rows.map((r) => ({ id: r.id, name: r.name, type: r.type, trust_zone: r.trust_zone, criticality: r.criticality, notes: r.notes || "" })),
+      analyst_notes: noteText.trim() || undefined,
+    }),
+    onSuccess: (created: any) => {
+      toast.success("Re-modelling with your component set…");
+      qc.invalidateQueries({ queryKey: ["threat-models"] });
+      if (created?.id) navigate(`/threat-models/${created.id}`);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Re-model failed"),
+  });
+
+  if (!open) {
+    return (
+      <Box className="no-print" sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+        <Button size="small" startIcon={<EditOutlined sx={{ fontSize: 16 }} />} onClick={() => setOpen(true)}
+          sx={{ color: "text.secondary", textTransform: "none" }}>
+          Edit components & re-model
+        </Button>
+      </Box>
+    );
+  }
+  return (
+    <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(66,133,244,0.3)", borderRadius: 2, mb: 2 }}>
+      <CardContent>
+        <Typography sx={{ color: "text.primary", fontWeight: 700, mb: 0.5 }}>Curate components & re-model</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", mb: 1.5, display: "block" }}>
+          Remove components that aren't relevant and add missing ones, then re-model. Your set is pinned (the AI keeps it verbatim and regenerates threats). Creates a new version — history is kept.
+        </Typography>
+
+        <Box sx={{ maxHeight: 260, overflow: "auto", mb: 1.5 }}>
+          {rows.map((r) => (
+            <Box key={r.id} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5, borderBottom: "1px solid rgba(127,127,127,0.12)" }}>
+              <Typography sx={{ fontFamily: "monospace", color: "text.secondary", width: 40, fontSize: 12 }}>{r.id}</Typography>
+              <Typography sx={{ color: "text.primary", flex: 1, fontSize: 13 }}>{r.name}</Typography>
+              <Chip label={r.type} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(127,127,127,0.12)", color: "text.secondary" }} />
+              <Chip label={r.trust_zone} size="small" sx={{ height: 18, fontSize: 10, bgcolor: `${ZONE_COLOR[r.trust_zone] || "#888"}20`, color: ZONE_COLOR[r.trust_zone] || "#888" }} />
+              <IconButton size="small" onClick={() => setRows(rows.filter((x) => x.id !== r.id))}
+                sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
+                <DeleteOutlined sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
+          ))}
+          {rows.length === 0 && <Typography variant="caption" sx={{ color: "text.secondary" }}>No components — add some below.</Typography>}
+        </Box>
+
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 1.5 }}>
+          <TextField size="small" placeholder="New component name" value={nName} onChange={(e) => setNName(e.target.value)} sx={{ minWidth: 200 }} />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Type</InputLabel>
+            <Select label="Type" value={nType} onChange={(e) => setNType(e.target.value)}>{TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}</Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Zone</InputLabel>
+            <Select label="Zone" value={nZone} onChange={(e) => setNZone(e.target.value)}>{ZONES.map((z) => <MenuItem key={z} value={z}>{z}</MenuItem>)}</Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Criticality</InputLabel>
+            <Select label="Criticality" value={nCrit} onChange={(e) => setNCrit(e.target.value)}>{CRITS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}</Select>
+          </FormControl>
+          <Button size="small" startIcon={<Add />} onClick={addRow} sx={{ textTransform: "none" }}>Add</Button>
+        </Box>
+
+        <TextField fullWidth multiline minRows={2} size="small" label="Analyst notes / guidance"
+          value={noteText} onChange={(e) => setNoteText(e.target.value)} sx={{ mb: 1.5 }} />
+
+        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+          <Button size="small" onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button size="small" variant="contained" disabled={remodel.isPending || rows.length === 0}
+            startIcon={remodel.isPending ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : <Replay sx={{ fontSize: 16 }} />}
+            onClick={() => remodel.mutate()}>
+            {remodel.isPending ? "Re-modelling…" : "Re-model with these"}
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ThreatModelDetail() {
@@ -621,6 +726,9 @@ export default function ThreatModelDetail() {
       {(tab === "components" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Components ({data.component_count})</Typography>}
+          {!printing && canAct && data.status !== "extracted_review" && (
+            <ComponentsEditor clientId={clientId} modelId={modelId!} components={data.components} notes={data.analyst_notes} />
+          )}
         <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Table size="small">

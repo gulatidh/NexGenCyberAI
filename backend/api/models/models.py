@@ -509,6 +509,12 @@ class ThreatModel(Base):
     # threat step can show the AI the actual diagram (vision), not just the
     # extracted component list.
     source_diagram = Column(JSON)
+    # Free-text analyst guidance injected into the modelling prompt (e.g.
+    # "this API is internet-facing", "ignore the legacy batch job").
+    analyst_notes = Column(Text)
+    # When True, components_json is a user-curated set the generator must keep
+    # verbatim (add/remove handled by the analyst), not re-derive from assets.
+    components_pinned = Column(Boolean, default=False)
     framework = Column(SAEnum(FrameworkType, values_callable=_ev))
     # Threat modelling methodology — string (not enum) so adding new
     # methodologies later doesn't require a DB migration. Currently

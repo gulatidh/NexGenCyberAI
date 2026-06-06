@@ -215,6 +215,26 @@ def _ensure_added_columns() -> None:
                 logger.info("Added threat_models.source_diagram column (%s)", dialect)
             except Exception as exc:
                 logger.warning("threat_models.source_diagram ALTER failed: %s", exc)
+        if tm_cols and "analyst_notes" not in tm_cols:
+            ddl = ("ALTER TABLE threat_models ADD analyst_notes NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE threat_models ADD COLUMN analyst_notes TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added threat_models.analyst_notes column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("threat_models.analyst_notes ALTER failed: %s", exc)
+        if tm_cols and "components_pinned" not in tm_cols:
+            ddl = ("ALTER TABLE threat_models ADD components_pinned BIT NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE threat_models ADD COLUMN components_pinned BOOLEAN")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added threat_models.components_pinned column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("threat_models.components_pinned ALTER failed: %s", exc)
 
         # Add risks.source_threat_model_id + risks.source_threat_id — pin a
         # Risk row back to the threat it was converted from so the UI can

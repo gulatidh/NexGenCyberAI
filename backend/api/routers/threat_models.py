@@ -107,6 +107,8 @@ class ThreatModelCreate(BaseModel):
     scan_ids: Optional[List[str]] = None  # when set, model is scoped to these scans
     framework: Optional[FrameworkType] = None
     methodology: Optional[str] = None  # stride | pasta | linddun | mitre_attack | kill_chain
+    analyst_notes: Optional[str] = None  # free-text guidance for the model
+    components: Optional[List[Dict[str, Any]]] = None  # optional curated component set (pinned)
 
 
 class ThreatModelSummary(BaseModel):
@@ -152,6 +154,8 @@ class ThreatModelDetail(ThreatModelSummary):
     entry_points: List[Dict[str, Any]] = []
     coverage_decisions: List[Dict[str, Any]] = []
     maturity_scores: Dict[str, float] = {}
+    analyst_notes: Optional[str] = None
+    components_pinned: bool = False
 
 
 class ConvertResult(BaseModel):
@@ -208,6 +212,8 @@ def _detail_from(tm: ThreatModel, db: Optional[Session] = None) -> Dict[str, Any
         "entry_points": tm.entry_points_json or [],
         "coverage_decisions": tm.coverage_decisions or [],
         "maturity_scores": tm.maturity_scores or {},
+        "analyst_notes": tm.analyst_notes,
+        "components_pinned": bool(tm.components_pinned),
     }
 
 
@@ -293,6 +299,7 @@ async def create_threat_model(
     # scans cover, instead of a messy client-wide aggregate.
     scan_ids = [s for s in (payload.scan_ids or []) if s]
     scope_type = "scans" if scan_ids else (payload.scope_type or "client")
+    curated = payload.components or None
     tm = ThreatModel(
         client_id=client_id,
         project_id=proj_id,
@@ -302,6 +309,9 @@ async def create_threat_model(
         scope_scan_ids=scan_ids or None,
         framework=payload.framework,
         methodology=methodology,
+        analyst_notes=(payload.analyst_notes or "").strip() or None,
+        components_json=curated,
+        components_pinned=bool(curated),
         status="pending",
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
     )
@@ -400,6 +410,64 @@ async def rescan(
         scope_id=original.scope_id,
         scope_scan_ids=original.scope_scan_ids,
         source_diagram=original.source_diagram,
+        analyst_notes=original.analyst_notes,
+        # Carry a pinned/curated component set forward so a rescan re-models
+        # the same architecture; unpinned models re-derive from current assets.
+        components_pinned=bool(original.components_pinned),
+        components_json=(original.components_json if original.components_pinned else None),
+        framework=original.framework,
+        methodology=original.methodology or DEFAULT_METHODOLOGY,
+        status="pending",
+        initiated_by=user.get("upn", user.get("preferred_username", "system")),
+        parent_threat_model_id=root,
+    )
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    background_tasks.add_task(generate_threat_model_bg, new.id)
+    return _summary_from(new)
+
+
+class RemodelRequest(BaseModel):
+    components: Optional[List[Dict[str, Any]]] = None   # curated set (pinned)
+    data_flows: Optional[List[Dict[str, Any]]] = None
+    analyst_notes: Optional[str] = None
+
+
+@router.post("/{model_id}/remodel", response_model=ThreatModelSummary, status_code=201,
+             dependencies=[Depends(require_editor_anywhere)])
+async def remodel_with_components(
+    client_id: str,
+    model_id: str,
+    payload: RemodelRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
+    """Re-generate a threat model against an analyst-curated component set
+    and/or updated guidance notes. Creates a new version (history kept); the
+    provided components are pinned — the AI keeps them verbatim and only
+    (re)derives threats, flows, and mitigations."""
+    original = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    root = original.parent_threat_model_id or original.id
+    curated = payload.components if payload.components is not None else original.components_json
+    notes = payload.analyst_notes if payload.analyst_notes is not None else original.analyst_notes
+    new = ThreatModel(
+        client_id=client_id,
+        project_id=original.project_id,
+        name=original.name,
+        scope_type=original.scope_type,
+        scope_id=original.scope_id,
+        scope_scan_ids=original.scope_scan_ids,
+        source_diagram=original.source_diagram,
+        analyst_notes=(notes or "").strip() or None,
+        components_json=curated or None,
+        data_flows_json=(payload.data_flows if payload.data_flows is not None else original.data_flows_json) or [],
+        components_pinned=bool(curated),
         framework=original.framework,
         methodology=original.methodology or DEFAULT_METHODOLOGY,
         status="pending",

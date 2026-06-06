@@ -74,6 +74,7 @@ export default function ThreatModels() {
   const [tmName, setTmName] = useState("");
   const [methodology, setMethodology] = useState<string>("stride");
   const [scanIds, setScanIds] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
 
   // ── Upload-dialog form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -109,12 +110,14 @@ export default function ThreatModels() {
       scope_type: scanIds.length ? "scans" : "client",
       scan_ids: scanIds.length ? scanIds : undefined,
       methodology,
+      analyst_notes: notes.trim() || undefined,
     }),
     onSuccess: (created: ThreatModelSummary) => {
       qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
       setOpenCreate(false);
       setTmName("");
       setScanIds([]);
+      setNotes("");
       toast.success("Threat model generation started");
       // Auto-open detail so the user sees the generating state.
       setTimeout(() => navigate(`/threat-models/${created.id}?client=${selectedClientId}`), 200);
@@ -389,8 +392,19 @@ export default function ThreatModels() {
               </Typography>
             </Box>
 
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
+                ANALYST NOTES (optional)
+              </Typography>
+              <TextField fullWidth multiline minRows={2} size="small" value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Guidance for the AI — e.g. 'the payments API is internet-facing', 'ignore the legacy batch job', 'focus on data exfiltration paths'."
+                slotProps={{ htmlInput: { style: { color: "white" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Box>
+
             <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)" }}>
-              Generation runs on demand and typically takes 20–60 seconds. The model uses the configured AI provider (Settings → AI Settings). If no provider is configured, a deterministic skeleton is returned.
+              Generation runs on demand and typically takes 20–60 seconds. You can also add/remove components and refine notes afterward on the model's Components tab, then re-model.
             </Alert>
           </Box>
         </DialogContent>
