@@ -149,15 +149,20 @@ export default function Dashboard() {
                   sx={{ color: "#4285F4", fontSize: 11 }}>Browse controls</Button>
               </Box>
               {complianceData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={complianceData} barSize={36}>
-                    <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 10 }} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }} unit="%" />
-                    <Tooltip contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
+                <ResponsiveContainer width="100%" height={Math.max(200, complianceData.length * 46)}>
+                  <BarChart data={complianceData} layout="vertical" barSize={26} margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+                    <XAxis type="number" domain={[0, 100]} unit="%"
+                      tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
+                    <YAxis type="category" dataKey="name" width={150}
+                      tick={{ fill: theme.palette.text.secondary, fontSize: 11 }} />
+                    <Tooltip cursor={{ fill: "rgba(127,127,127,0.08)" }}
+                      contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
                       formatter={(v: any) => [`${v}%`, "Score"]} />
-                    {complianceData.map((entry, i) => (
-                      <Bar key={entry.name} dataKey="score" fill={FRAMEWORK_COLORS[i % FRAMEWORK_COLORS.length]} radius={[4, 4, 0, 0]} />
-                    ))}
+                    <Bar dataKey="score" radius={[0, 4, 4, 0]}>
+                      {complianceData.map((entry, i) => (
+                        <Cell key={entry.name} fill={FRAMEWORK_COLORS[i % FRAMEWORK_COLORS.length]} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

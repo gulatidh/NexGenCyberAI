@@ -326,11 +326,15 @@ async def start_scan(
         c = db.query(Connector).filter(Connector.id == payload.connector_id).first()
         if c:
             proj_id = c.project_id
+    # Default the name to "<scan_type>_<date>_<time>" so unnamed scans are
+    # distinguishable instead of all reading as just "full".
+    _st = payload.scan_type.value if hasattr(payload.scan_type, "value") else str(payload.scan_type or "scan")
+    _default_name = f"{_st}_{datetime.now(timezone.utc):%Y%m%d_%H%M}"
     scan = Scan(
         client_id=client_id,
         project_id=proj_id,
         connector_id=payload.connector_id,
-        name=(payload.name or "").strip() or None,
+        name=(payload.name or "").strip() or _default_name,
         scan_type=payload.scan_type,
         framework=payload.framework,
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
