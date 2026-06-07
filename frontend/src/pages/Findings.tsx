@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
@@ -114,6 +114,18 @@ export default function Findings() {
   });
 
   const sectionData = (catData?.sections || []).find((s) => s.key === section);
+  // Only surface sections that actually have findings — empty ones (e.g. Threat
+  // Detection with no runtime source, Secure Development with no code scans) are
+  // hidden so the page doesn't show blank tabs.
+  const visibleSections = (catData?.sections || []).filter((s) => s.total > 0);
+  // If the active section has no findings, jump to the first populated one.
+  useEffect(() => {
+    if (visibleSections.length && !visibleSections.some((s) => s.key === section)) {
+      setSection(visibleSections[0].key);
+      setCategory("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catData]);
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
@@ -230,7 +242,7 @@ export default function Findings() {
             sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 1.5,
               "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 500 },
               "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
-            {(catData?.sections || []).map((s) => (
+            {visibleSections.map((s) => (
               <Tab key={s.key} value={s.key} label={`${s.label} (${s.total})`} />
             ))}
           </Tabs>
