@@ -171,26 +171,27 @@ for f in findings_raw:
           remediation, dt(days_ago=5)))
 
 # ── Risks ────────────────────────────────────────────────────────────────────
+# likelihood + impact are on a 1-10 scale; risk_score = likelihood × impact / 10.
 risks_raw = [
-    (c0, "Ransomware Attack on Financial Systems", "critical", 4, 5, 20.0, "Cyber Threat",
+    (c0, "Ransomware Attack on Financial Systems", "critical", 8, 9, 7.2, "Cyber Threat",
      "Block lateral movement via microsegmentation; deploy EDR on all endpoints; test offline backups monthly."),
-    (c0, "Regulatory Non-Compliance with FCA Cyber Rules", "high", 3, 4, 12.0, "Compliance",
+    (c0, "Regulatory Non-Compliance with FCA Cyber Rules", "high", 6, 7, 4.2, "Compliance",
      "Complete gap assessment against PS21/3; appoint CISO; complete NIST CSF assessment by Q3."),
-    (c0, "Privileged Account Compromise", "high", 3, 5, 15.0, "Identity",
+    (c0, "Privileged Account Compromise", "high", 7, 9, 6.3, "Identity",
      "Enforce MFA and PAM solution for all privileged accounts; review admin access quarterly."),
-    (c1, "Data Breach via Exposed AWS Credentials", "critical", 5, 5, 25.0, "Cloud Security",
+    (c1, "Data Breach via Exposed AWS Credentials", "critical", 9, 10, 9.0, "Cloud Security",
      "Implement secrets scanning in CI/CD pipelines; rotate all exposed keys; enable GuardDuty."),
-    (c1, "Supply Chain Attack through Third-Party Dependencies", "high", 3, 4, 12.0, "Supply Chain",
+    (c1, "Supply Chain Attack through Third-Party Dependencies", "high", 6, 8, 4.8, "Supply Chain",
      "Implement SCA tooling (Dependabot); pin dependency versions; conduct vendor security reviews."),
-    (c2, "Patient Data Breach (GDPR Article 83)", "critical", 4, 5, 20.0, "Data Privacy",
+    (c2, "Patient Data Breach (GDPR Article 83)", "critical", 8, 10, 8.0, "Data Privacy",
      "Encrypt all PHI at rest and in transit; implement DLP controls; conduct DPIA for new processing activities."),
-    (c2, "HIPAA Non-Compliance Audit Finding", "high", 3, 4, 12.0, "Compliance",
+    (c2, "HIPAA Non-Compliance Audit Finding", "high", 6, 7, 4.2, "Compliance",
      "Implement access logging for all PHI access; conduct annual security training; complete BAA with all vendors."),
-    (c2, "Critical Vulnerability Exploitation (Log4Shell)", "critical", 5, 5, 25.0, "Vulnerability",
+    (c2, "Critical Vulnerability Exploitation (Log4Shell)", "critical", 10, 9, 9.0, "Vulnerability",
      "Patch Log4j immediately; conduct full asset inventory; implement virtual patching via WAF."),
-    (c3, "PCI DSS Non-Compliance (Cardholder Data)", "high", 4, 5, 20.0, "Compliance",
+    (c3, "PCI DSS Non-Compliance (Cardholder Data)", "high", 7, 9, 6.3, "Compliance",
      "Scope reduction: move card processing to third-party PCI-compliant provider; complete SAQ-D by Q2."),
-    (c3, "Container Escape in Production Kubernetes", "medium", 2, 4, 8.0, "Infrastructure",
+    (c3, "Container Escape in Production Kubernetes", "medium", 4, 7, 2.8, "Infrastructure",
      "Update container runtime; implement Pod Security Standards; restrict privileged container usage."),
 ]
 

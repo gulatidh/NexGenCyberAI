@@ -174,8 +174,8 @@ class RiskCreate(BaseModel):
     title: str
     description: Optional[str] = None
     risk_level: RiskLevel
-    likelihood: int = 3
-    impact: int = 3
+    likelihood: int = 5      # 1-10 scale
+    impact: int = 5          # 1-10 scale
     category: Optional[str] = None
     owner: Optional[str] = None
     due_date: Optional[datetime] = None

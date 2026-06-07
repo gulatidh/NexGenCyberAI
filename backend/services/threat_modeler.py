@@ -309,8 +309,8 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "asset_id": "<component id this threat targets>",
       "title": "<short threat statement>",
       "severity": "<critical|high|medium|low>",
-      "likelihood": <1-5>,
-      "impact": <1-5>,
+      "likelihood": <1-10: how probable exploitation is>,
+      "impact": <1-10: damage if exploited>,
       "evidence_refs": [
         {{ "kind": "asset|finding|cve|capec|attack", "id": "<id>", "label": "<short>" }}
       ],
@@ -398,8 +398,10 @@ CRITICAL rules (these are gates, not preferences):
 9. NO HALLUCINATED IDs — CAPEC, ATT&CK, CWE, and finding references must exist in the supplied lists.
    If you can't ground a threat in supplied evidence, leave its refs empty rather than inventing them.
 
-10. PRIORITY — likelihood and impact are 1-5 integers. Severity tier is your overall call. The platform
-    computes priority_score = severity_weight × likelihood × impact × asset_criticality_weight.
+10. PRIORITY — likelihood and impact are 1-10 integers (rate each threat independently so they vary;
+    do NOT give every threat of the same severity the same numbers). Severity tier is your overall call.
+    The platform computes priority_score = severity_weight × likelihood × impact × asset_criticality_weight,
+    and the Risk Register score = likelihood × impact / 10.
 
 11. Use category values ONLY from this set for {label}: {categories_csv}.
 
@@ -863,8 +865,8 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
         owner_role = _str(t.get("owner_role")).lower()
         if owner_role not in _VALID_OWNER_ROLE:
             owner_role = "security"
-        likelihood = _clip(t.get("likelihood"), 1, 5, 3)
-        impact = _clip(t.get("impact"), 1, 5, 3)
+        likelihood = _clip(t.get("likelihood"), 1, 10, 5)
+        impact = _clip(t.get("impact"), 1, 10, 5)
         # Priority score: severity_weight × likelihood × impact × asset_criticality_weight.
         # Lands roughly in 1 .. 150 range; UI just sorts by it.
         asset_id = _str(t.get("asset_id"))

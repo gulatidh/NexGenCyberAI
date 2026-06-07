@@ -523,7 +523,7 @@ export default function Risks() {
                   </Box>
                   <Box sx={{ flex: 1, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, p: 1.5, textAlign: "center" }}>
                     <Typography variant="h6" sx={{ color: "text.primary" }}>{selected.likelihood ?? "—"} / {selected.impact ?? "—"}</Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary" }}>Likelihood / Impact</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>Likelihood / Impact (1–10)</Typography>
                   </Box>
                 </Box>
                 <FormControl size="small" fullWidth>

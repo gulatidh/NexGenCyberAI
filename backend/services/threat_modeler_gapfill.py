@@ -58,7 +58,7 @@ Output STRICT JSON only — no prose, no markdown fences:
         "asset_id": "<component_id>",
         "title": "...",
         "severity": "critical|high|medium|low",
-        "likelihood": 1-5, "impact": 1-5,
+        "likelihood": 1-10, "impact": 1-10,
         "evidence_refs": [{"kind":"asset|finding|cve|capec|attack","id":"...","label":"..."}],
         "capec_refs": [], "attack_techniques": [], "cwe_refs": [],
         "rationale": "...", "attack_narrative": "...",

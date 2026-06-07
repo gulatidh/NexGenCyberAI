@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -560,6 +560,101 @@ def _seed_framework_controls() -> None:
         lf.close()
 
 
+def _migrate_risk_scale_v2() -> None:
+    """One-time: migrate Risk likelihood/impact from the legacy 1-5 scale to
+    1-10 and recompute risk_score = L×I/10.
+
+    Threat-model-sourced risks are re-derived from each source threat's OWN
+    likelihood/impact (recovering the per-threat variation the old
+    severity-fixed conversion discarded, so two 'high' risks no longer look
+    identical); all other legacy rows are rescaled ×2. Guarded by both a
+    marker file (runs once) AND a 1-5 heuristic (only touches rows where both
+    factors are ≤5) so a freshly-seeded 1-10 DB is never double-scaled."""
+    import os, fcntl
+    from sqlalchemy.orm import Session
+    from core.paths import data_dir
+    from api.models.models import Risk, ThreatModel
+    from services.risk_scoring import clamp_scale, compute_risk_score, from_finding, sev_baseline
+
+    base = str(data_dir())
+    marker = os.path.join(base, ".risk_scale_v2.done")
+    if os.path.exists(marker):
+        return
+
+    def _is_num(v):
+        try:
+            return v is not None and float(v) > 0
+        except (TypeError, ValueError):
+            return False
+
+    lf = None
+    try:
+        lf = open(os.path.join(base, ".risk_scale_v2.lock"), "a")
+        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        if lf is not None:
+            lf.close()
+        return
+    try:
+        if os.path.exists(marker):
+            return
+        with Session(engine) as db:
+            tm_cache: dict = {}
+            migrated = 0
+            for risk in db.query(Risk).all():
+                old_l = int(risk.likelihood or 3)
+                old_i = int(risk.impact or 3)
+                # Skip rows already on the 1-10 scale (e.g. freshly seeded).
+                if old_l > 5 or old_i > 5:
+                    continue
+                sev = (
+                    risk.risk_level.value if hasattr(risk.risk_level, "value")
+                    else str(risk.risk_level or "medium")
+                ).lower()
+                new_l = new_i = None
+                # Threat-model-sourced risks: prefer the source threat's OWN
+                # likelihood/impact (old 1-5 scale → ×2), recovering per-threat
+                # variation the old severity-fixed conversion discarded.
+                if risk.source_threat_model_id and risk.source_threat_id:
+                    if risk.source_threat_model_id not in tm_cache:
+                        tm_cache[risk.source_threat_model_id] = (
+                            db.query(ThreatModel)
+                            .filter(ThreatModel.id == risk.source_threat_model_id)
+                            .first()
+                        )
+                    tm = tm_cache[risk.source_threat_model_id]
+                    if tm is not None:
+                        threat = next(
+                            (t for t in (tm.threats_json or [])
+                             if str(t.get("id")) == str(risk.source_threat_id)),
+                            None,
+                        )
+                        if threat is not None and (_is_num(threat.get("likelihood")) or _is_num(threat.get("impact"))):
+                            base_l, base_i = sev_baseline(threat.get("severity"))
+                            tl, ti = threat.get("likelihood"), threat.get("impact")
+                            new_l = clamp_scale(int(tl) * 2, base_l) if _is_num(tl) else base_l
+                            new_i = clamp_scale(int(ti) * 2, base_i) if _is_num(ti) else base_i
+                # Everything else (findings/agent-derived): re-derive distinct
+                # likelihood vs impact from severity + the risk's text signals,
+                # so the legacy all-equal pairs (4/4, 5/5) become differentiated.
+                if new_l is None:
+                    text = f"{risk.title or ''} {risk.description or ''} {risk.category or ''}"
+                    new_l, new_i, _ = from_finding(sev, text=text)
+                risk.likelihood = new_l
+                risk.impact = new_i
+                risk.risk_score = compute_risk_score(new_l, new_i)
+                migrated += 1
+            db.commit()
+        with open(marker, "w") as mf:
+            mf.write("done")
+        logger.info("Risk scale v2 migration complete: %d legacy risks rescaled to 1-10", migrated)
+    except Exception:
+        logger.exception("Risk scale v2 migration failed")
+    finally:
+        fcntl.flock(lf, fcntl.LOCK_UN)
+        lf.close()
+
+
 def _bootstrap_initial_admin() -> None:
     """Ensure the UPN configured in INITIAL_ADMIN_UPN always has a global
     admin grant. Idempotent — checks per-UPN, not "any global admin
@@ -685,6 +780,7 @@ _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
 _seed_framework_controls()
+_migrate_risk_scale_v2()
 _bootstrap_initial_admin()
 _fail_stale_threat_models()
 _fail_stale_scans()
@@ -733,6 +829,7 @@ app.include_router(technologies.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(ai_settings.router, prefix="/api/v1")
+app.include_router(email.router, prefix="/api/v1")
 app.include_router(missions.router, prefix="/api/v1")
 app.include_router(knowledge.router, prefix="/api/v1")
 app.include_router(agent_catalog.router, prefix="/api/v1")

@@ -303,9 +303,9 @@ class Risk(Base):
     title = Column(String(500), nullable=False)
     description = Column(Text)
     risk_level = Column(SAEnum(RiskLevel, values_callable=_ev), nullable=False)
-    likelihood = Column(Integer, default=3)     # 1-5
-    impact = Column(Integer, default=3)         # 1-5
-    risk_score = Column(Float)
+    likelihood = Column(Integer, default=5)     # 1-10
+    impact = Column(Integer, default=5)         # 1-10
+    risk_score = Column(Float)                  # likelihood × impact / 10  (0-10)
     category = Column(String(100))
     owner = Column(String(200))
     due_date = Column(DateTime(timezone=True))
@@ -593,6 +593,31 @@ class AISettings(Base):
     semantic_learning_enabled = Column(Boolean, default=False)        # 5B/C/E — extraction + retrieval
     blackboard_enabled = Column(Boolean, default=True)                # 5D — cheap, on by default
 
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String(255))
+
+
+class EmailSettings(Base):
+    """Single-row table holding tenant-wide outbound-email (SMTP) configuration.
+
+    Lets admins point the platform at an SMTP relay — including Office 365
+    (smtp.office365.com:587, STARTTLS) — so report emails can be sent without
+    redeploying. The SMTP password is stored encrypted via
+    core.encryption.encrypt (same scheme as AISettings secrets)."""
+    __tablename__ = "email_settings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    enabled = Column(Boolean, default=False, nullable=False)
+    # "office365" | "smtp" | "gmail" — purely cosmetic preset hint for the UI.
+    provider = Column(String(32), default="office365")
+    smtp_host = Column(String(255))
+    smtp_port = Column(Integer, default=587)
+    smtp_username = Column(String(320))
+    smtp_password_enc = Column(Text)
+    # Transport security: "starttls" (port 587, default for O365) | "ssl" (465) | "none"
+    smtp_security = Column(String(16), default="starttls")
+    from_address = Column(String(320))
+    from_name = Column(String(255), default="NexGenCyberAI Reports")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     updated_by = Column(String(255))
 

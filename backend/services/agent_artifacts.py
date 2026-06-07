@@ -45,8 +45,8 @@ _SCHEMA_RISK_DRAFTS = """{
     {
       "title": "<short risk title>",
       "severity": "<critical|high|medium|low>",
-      "likelihood": <1-5>,
-      "impact": <1-5>,
+      "likelihood": <1-10>,
+      "impact": <1-10>,
       "category": "<short category, e.g. Identity, Patching, Data Protection>",
       "rationale": "<2-3 sentences justifying severity grounded in evidence>",
       "control_refs": ["NIST-...", "CIS-..."],
@@ -233,8 +233,8 @@ def _clean_artifact(kind: str, a: Any) -> Optional[Dict[str, Any]]:
         return {
             "title": _str(a.get("title"), 200) or "(untitled risk)",
             "severity": sev,
-            "likelihood": _clip(a.get("likelihood"), 1, 5, 3),
-            "impact": _clip(a.get("impact"), 1, 5, 3),
+            "likelihood": _clip(a.get("likelihood"), 1, 10, 5),
+            "impact": _clip(a.get("impact"), 1, 10, 5),
             "category": _str(a.get("category"), 80),
             "rationale": _str(a.get("rationale"), 2000),
             "control_refs": [_str(r, 64) for r in refs][:10],

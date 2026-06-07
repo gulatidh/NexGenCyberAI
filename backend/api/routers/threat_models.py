@@ -20,6 +20,7 @@ from api.models.models import Client, FrameworkType, Project, Risk, RiskLevel, T
 from db.database import get_db
 from core.security import get_current_user
 from core.authz import require_editor_anywhere
+from services.risk_scoring import clamp_scale, compute_risk_score, sev_baseline
 from services.diagram_extractor import SUPPORTED_EXTENSIONS, extract as extract_diagram
 from services.drawio_renderer import render_drawio_xml
 from services.threat_modeler import (
@@ -34,16 +35,16 @@ _MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 _MAX_DIAGRAM_IMG_BYTES = 4 * 1024 * 1024
 
 
-# Severity → (likelihood, impact, RiskLevel) for the threat→risk mapping.
-# Keep the dimensions modest: a single high-severity threat shouldn't
-# necessarily mean catastrophe — likelihood / impact get tuned in the
-# Risk Register afterwards.
-_SEV_TO_RISK: Dict[str, tuple[int, int, RiskLevel]] = {
-    "critical": (5, 5, RiskLevel.CRITICAL),
-    "high": (4, 4, RiskLevel.HIGH),
-    "medium": (3, 3, RiskLevel.MEDIUM),
-    "low": (2, 2, RiskLevel.LOW),
-    "info": (1, 2, RiskLevel.LOW),
+# Severity → RiskLevel for the threat→risk mapping. The numeric likelihood /
+# impact (1-10) come from each threat's OWN values (see _threat_to_risk), with
+# the severity baseline in services.risk_scoring as the fallback — so two "high"
+# threats no longer collapse to identical scores.
+_SEV_TO_LEVEL: Dict[str, RiskLevel] = {
+    "critical": RiskLevel.CRITICAL,
+    "high": RiskLevel.HIGH,
+    "medium": RiskLevel.MEDIUM,
+    "low": RiskLevel.LOW,
+    "info": RiskLevel.LOW,
 }
 
 router = APIRouter(prefix="/clients/{client_id}/threat-models", tags=["threat-models"])
@@ -226,7 +227,12 @@ def _threat_to_risk(
 ) -> Risk:
     """Build a Risk ORM object from a single threat + its mitigations."""
     sev = (threat.get("severity") or "medium").lower()
-    likelihood, impact, level = _SEV_TO_RISK.get(sev, _SEV_TO_RISK["medium"])
+    level = _SEV_TO_LEVEL.get(sev, RiskLevel.MEDIUM)
+    base_l, base_i = sev_baseline(sev)
+    # Prefer the threat's own likelihood/impact (1-10) so risks differ within a
+    # severity; fall back to the severity baseline when the modeller omitted them.
+    likelihood = clamp_scale(threat.get("likelihood"), base_l)
+    impact = clamp_scale(threat.get("impact"), base_i)
 
     desc_parts: List[str] = []
     if threat.get("rationale"):
@@ -258,7 +264,7 @@ def _threat_to_risk(
         risk_level=level,
         likelihood=likelihood,
         impact=impact,
-        risk_score=round(likelihood * impact / 2.5, 1),
+        risk_score=compute_risk_score(likelihood, impact),
         category=(threat.get("category") or "").replace("_", " ").title() or None,
         owner=user.get("upn") or user.get("preferred_username"),
         status="open",

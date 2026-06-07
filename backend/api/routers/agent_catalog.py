@@ -21,6 +21,7 @@ from db.database import get_db
 from core.security import get_current_user
 from api.models.models import AIAgent, AgentRun, Risk, RiskLevel
 from core.authz import get_user_grants, is_admin_anywhere
+from services.risk_scoring import clamp_scale, compute_risk_score
 
 router = APIRouter(prefix="/agents/catalog", tags=["agent_catalog"])
 
@@ -544,8 +545,8 @@ def _apply_risk_draft(db: Session, run: AgentRun, artifact: Dict[str, Any], user
     """Create a Risk Register row from a risk_drafts artifact."""
     title = (artifact.get("title") or "(untitled)").strip()[:500]
     sev = (artifact.get("severity") or "medium").lower()
-    likelihood = int(artifact.get("likelihood") or 3)
-    impact = int(artifact.get("impact") or 3)
+    likelihood = clamp_scale(artifact.get("likelihood"), 5)
+    impact = clamp_scale(artifact.get("impact"), 5)
     rationale = (artifact.get("rationale") or "").strip()
     refs = artifact.get("control_refs") or []
     if isinstance(refs, list) and refs:
@@ -555,9 +556,9 @@ def _apply_risk_draft(db: Session, run: AgentRun, artifact: Dict[str, Any], user
         title=title,
         description=rationale,
         risk_level=_risk_level_from(sev),
-        likelihood=max(1, min(5, likelihood)),
-        impact=max(1, min(5, impact)),
-        risk_score=round(likelihood * impact / 2.5, 1),
+        likelihood=likelihood,
+        impact=impact,
+        risk_score=compute_risk_score(likelihood, impact),
         category=(artifact.get("category") or "").strip()[:100] or None,
         owner=user.get("upn") or user.get("preferred_username"),
         status="open",

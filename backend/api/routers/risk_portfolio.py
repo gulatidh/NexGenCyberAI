@@ -5,8 +5,8 @@ shape suitable for the risk-focused dashboard. This is *not* the legacy
 issues-flavoured /risk-overview endpoint — that one stays untouched.
 
 ALE model (FAIR-lite):
-  magnitude = BASE_PER_SEV[level] * (impact / 5)
-  frequency = likelihood / 5         (annual events)
+  magnitude = BASE_PER_SEV[level] * (impact / 10)
+  frequency = likelihood / 10        (annual events; likelihood/impact are 1-10)
   ale       = magnitude * frequency
   ale range = [ale * 0.5, ale * 2.0]  (10th-90th percentile band)
 
@@ -87,10 +87,10 @@ def _lvl(r: Risk) -> str:
 
 def _ale_for(risk: Risk) -> float:
     base = BASE_PER_SEV.get(_lvl(risk), 50_000)
-    impact = max(1, min(5, int(risk.impact or 3)))
-    likelihood = max(1, min(5, int(risk.likelihood or 3)))
-    magnitude = base * (impact / 5.0)
-    frequency = likelihood / 5.0
+    impact = max(1, min(10, int(risk.impact or 5)))
+    likelihood = max(1, min(10, int(risk.likelihood or 5)))
+    magnitude = base * (impact / 10.0)
+    frequency = likelihood / 10.0
     return round(magnitude * frequency, 2)
 
 
@@ -142,7 +142,7 @@ async def get_risk_portfolio(
             # Each open critical/high contributes its likelihood-derived rate.
             # Critical risks carry 3x weight to reflect blast radius.
             weight = 3.0 if lv == "critical" else 1.0
-            annual_event_rate += (max(1, min(5, int(r.likelihood or 3))) / 5.0) * weight
+            annual_event_rate += (max(1, min(10, int(r.likelihood or 5))) / 10.0) * weight
 
         rows.append({
             "id": r.id,
@@ -150,8 +150,8 @@ async def get_risk_portfolio(
             "severity": lv,
             "domain": domain,
             "category": r.category,
-            "impact": int(r.impact or 3),
-            "likelihood": int(r.likelihood or 3),
+            "impact": int(r.impact or 5),
+            "likelihood": int(r.likelihood or 5),
             "risk_score": round(float(r.risk_score or 0), 2),
             "ale": round(ale, 2),
             "ale_low": round(ale * 0.5, 2),

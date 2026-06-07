@@ -8,9 +8,7 @@ from typing import Any, Dict, List
 from agents.base_agent import BaseAgent
 
 
-def _calculate_risk_score(likelihood: int, impact: int) -> float:
-    """NIST SP 800-30 risk score matrix (1-25 scale → 0-10)."""
-    return round((likelihood * impact) / 2.5, 1)
+from services.risk_scoring import from_finding
 
 
 def _risk_level(score: float) -> str:
@@ -55,9 +53,10 @@ def _map_to_risk_register(findings_json: str) -> str:
     risks = []
     for i, f in enumerate(findings[:20], 1):
         sev = f.get("severity", "low")
-        likelihood = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
-        impact = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
-        score = _calculate_risk_score(likelihood, impact)
+        _, _, score = from_finding(
+            sev, cvss=f.get("cvss_score"), epss=f.get("epss"), cve=f.get("cve_id"),
+            text=f"{f.get('title','')} {f.get('description','')} {f.get('resource_type','')}",
+        )
         risks.append(
             f"R{i:03d}: {f.get('title', 'Unknown')} | "
             f"Level={_risk_level(score)} | Score={score} | "
@@ -71,9 +70,10 @@ def map_to_risk_register_structured(findings: list) -> list:
     result = []
     for f in findings[:20]:
         sev = f.get("severity", "low")
-        likelihood = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
-        impact = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(sev, 2)
-        score = _calculate_risk_score(likelihood, impact)
+        likelihood, impact, score = from_finding(
+            sev, cvss=f.get("cvss_score"), epss=f.get("epss"), cve=f.get("cve_id"),
+            text=f"{f.get('title','')} {f.get('description','')} {f.get('resource_type','')}",
+        )
         result.append({
             "title": f.get("title", "Unknown Risk"),
             "description": f.get("description", ""),

@@ -356,8 +356,8 @@ export default function RiskOverview() {
                         )}
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.domain}</TableCell>
-                      <TableCell align="center" sx={{ fontSize: 12 }}>{r.impact}/5</TableCell>
-                      <TableCell align="center" sx={{ fontSize: 12 }}>{r.likelihood}/5</TableCell>
+                      <TableCell align="center" sx={{ fontSize: 12 }}>{r.impact}/10</TableCell>
+                      <TableCell align="center" sx={{ fontSize: 12 }}>{r.likelihood}/10</TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" sx={{ color: SEV_COLOR[r.severity] || "white", fontWeight: 700, fontSize: 13 }}>
                           {r.risk_score.toFixed(1)}

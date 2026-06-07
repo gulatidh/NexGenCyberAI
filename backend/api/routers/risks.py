@@ -6,6 +6,7 @@ from api.models.models import Finding, Risk, Scan
 from api.schemas.schemas import RiskCreate, RiskResponse
 from db.database import get_db
 from core.security import get_current_user
+from services.risk_scoring import clamp_scale, compute_risk_score
 
 router = APIRouter(prefix="/clients/{client_id}/risks", tags=["risks"])
 
@@ -38,10 +39,13 @@ async def list_risks(
 
 @router.post("/", response_model=RiskResponse, status_code=201)
 async def create_risk(client_id: str, payload: RiskCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    data = payload.model_dump()
+    data["likelihood"] = clamp_scale(data.get("likelihood"), 5)
+    data["impact"] = clamp_scale(data.get("impact"), 5)
     risk = Risk(
         client_id=client_id,
-        **payload.model_dump(),
-        risk_score=round(payload.likelihood * payload.impact / 2.5, 1),
+        **data,
+        risk_score=compute_risk_score(data["likelihood"], data["impact"]),
     )
     db.add(risk)
     db.commit()
