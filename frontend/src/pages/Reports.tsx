@@ -15,12 +15,15 @@ import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Divider,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  FormControlLabel, Checkbox,
 } from "@mui/material";
-import { Print, Download, Description } from "@mui/icons-material";
-import { useQuery } from "@tanstack/react-query";
+import { Print, Download, Description, Email, Send } from "@mui/icons-material";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 import {
   clientsApi, projectsApi, findingsApi, risksApi, assetsApi,
-  frameworksApi, riskOverviewApi, missionsApi,
+  frameworksApi, riskOverviewApi, missionsApi, emailApi,
 } from "../services/api";
 import {
   Client, Project, Finding, Risk, Asset, FrameworkSummary,
@@ -119,6 +122,76 @@ export default function Reports() {
   });
 
   const handlePrint = () => window.print();
+
+  // ── Email this report ────────────────────────────────────────────────────
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailCc, setEmailCc] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [attachReport, setAttachReport] = useState(true);
+
+  const openEmailDialog = () => {
+    const title = reportTitle;
+    setEmailSubject(`${title}${client?.name ? ` — ${client.name}` : ""}`);
+    setEmailBody(
+      `Hi,\n\nPlease find ${attachReport ? "attached " : ""}the ${title}` +
+      `${client?.name ? ` for ${client.name}` : ""}${project ? ` (${project.name})` : ""}.\n\n` +
+      `Generated ${dayjs().format("DD MMM YYYY, HH:mm")}.\n\nRegards,`
+    );
+    setEmailOpen(true);
+  };
+
+  // Self-contained HTML snapshot of the rendered report, for the attachment.
+  // Reuses the live DOM (inline sx styles carry severity/brand colours) and
+  // wraps it in a light, paper-friendly stylesheet so it opens cleanly.
+  const buildReportHtml = (): string => {
+    const inner = printRef.current?.innerHTML || "";
+    return (
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${reportTitle}</title>` +
+      `<style>` +
+      `body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;background:#fff;margin:24px;}` +
+      `table{border-collapse:collapse;width:100%;margin:8px 0;}` +
+      `th,td{border:1px solid #e0e0e0;padding:6px 8px;text-align:left;font-size:13px;}` +
+      `h1,h2,h3,h4,h5,h6{color:#111;margin:8px 0;}` +
+      `.MuiChip-root{display:inline-block;padding:2px 10px;border-radius:11px;font-size:11px;font-weight:700;}` +
+      `svg{vertical-align:middle;}` +
+      `</style></head><body>${inner}</body></html>`
+    );
+  };
+
+  const utf8ToBase64 = (s: string) => btoa(unescape(encodeURIComponent(s)));
+
+  const sendMutation = useMutation({
+    mutationFn: () => {
+      const stamp = dayjs().format("YYYYMMDD-HHmm");
+      const slug = (client?.slug || client?.name || "client").replace(/\W+/g, "-");
+      const attachments = attachReport
+        ? [{
+            filename: `${slug}-${reportType}-${stamp}.html`,
+            content_base64: utf8ToBase64(buildReportHtml()),
+            mime: "text/html",
+          }]
+        : [];
+      const bodyHtml =
+        `<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;white-space:pre-wrap">` +
+        `${emailBody.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+      return emailApi.send({
+        to: emailTo,
+        cc: emailCc || undefined,
+        subject: emailSubject,
+        body_text: emailBody,
+        body_html: bodyHtml,
+        attachments,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Report emailed");
+      setEmailOpen(false);
+    },
+    onError: (e: any) =>
+      toast.error(e?.response?.data?.detail || "Failed to send email"),
+  });
 
   const handleExportCSV = () => {
     const stamp = dayjs().format("YYYYMMDD-HHmm");
@@ -220,14 +293,36 @@ export default function Reports() {
       {/* Print-only stylesheet — hides chrome, shows ref'd report cleanly */}
       <style>{`
         @media print {
-          body { background: white !important; }
+          @page { size: A4; margin: 12mm; }
+          body { background: #fff !important; }
           .no-print { display: none !important; }
+
+          /* Print brand/severity colours instead of letting the browser drop backgrounds */
           .print-area, .print-area * {
-            color: #111 !important;
-            background: white !important;
-            border-color: #ddd !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          .print-area { padding: 0 !important; }
+          .print-area { padding: 0 !important; max-width: 100% !important; color: #1a1a1a !important; }
+
+          /* Paper-white surfaces (the portal canvas is dark) */
+          .print-area .MuiCard-root, .print-area .MuiCardContent-root,
+          .print-area .MuiPaper-root, .print-area .MuiTableContainer-root,
+          .print-area .MuiTable-root {
+            background: #fff !important;
+            box-shadow: none !important;
+            border-color: #e0e0e0 !important;
+          }
+          .print-area .MuiTableCell-root { border-color: #e0e0e0 !important; }
+
+          /* Legible dark body text — the dark theme's light text would vanish on
+             white. Chips, charts and .keep-color brand values are excluded so they
+             keep their portal colours. */
+          .print-area .MuiTypography-root:not(.keep-color),
+          .print-area .MuiTableCell-root:not(.keep-color) {
+            color: #1a1a1a !important;
+          }
+
+          .print-area .MuiCard-root { page-break-inside: avoid; }
         }
       `}</style>
 
@@ -243,6 +338,11 @@ export default function Reports() {
             onClick={handleExportCSV}
             sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}>
             Export CSV
+          </Button>
+          <Button variant="outlined" startIcon={<Email />} disabled={!clientId}
+            onClick={openEmailDialog}
+            sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}>
+            Email Report
           </Button>
           <Button variant="contained" startIcon={<Print />} disabled={!clientId}
             onClick={handlePrint}
@@ -311,6 +411,39 @@ export default function Reports() {
           Pick a client to generate a report.
         </Alert>
       ) : (
+        <>
+        <Dialog open={emailOpen} onClose={() => setEmailOpen(false)} fullWidth maxWidth="sm" className="no-print">
+          <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Email sx={{ color: "#4285F4" }} /> Email Report
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+              <TextField label="To" size="small" fullWidth value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)} autoFocus
+                placeholder="ana@contoso.com, ciso@contoso.com"
+                helperText="One or more addresses, comma or semicolon separated." />
+              <TextField label="Cc (optional)" size="small" fullWidth value={emailCc}
+                onChange={(e) => setEmailCc(e.target.value)} />
+              <TextField label="Subject" size="small" fullWidth value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)} />
+              <TextField label="Message" size="small" fullWidth multiline minRows={5} value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)} />
+              <FormControlLabel
+                control={<Checkbox checked={attachReport} onChange={(e) => setAttachReport(e.target.checked)} />}
+                label={`Attach the ${reportTitle} (HTML)`} />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setEmailOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+            <Button variant="contained" startIcon={<Send />}
+              disabled={!emailTo.trim() || sendMutation.isPending}
+              onClick={() => sendMutation.mutate()}
+              sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
+              {sendMutation.isPending ? "Sending…" : "Send"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Card className="print-area" ref={printRef as any}
           sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
@@ -351,6 +484,7 @@ export default function Reports() {
             )}
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* Workflow Outputs — recent runs across all scheduled workflows */}
@@ -436,7 +570,7 @@ function StatTile({ label, value, color = "#4285F4" }: { label: string; value: s
     <Card sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, height: "100%" }}>
       <CardContent sx={{ "&:last-child": { pb: 2 } }}>
         <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>{label}</Typography>
-        <Typography variant="h4" sx={{ color, fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
+        <Typography className="keep-color" variant="h4" sx={{ color, fontWeight: 700, lineHeight: 1.2 }}>{value}</Typography>
       </CardContent>
     </Card>
   );
@@ -473,7 +607,7 @@ function ExecutiveBlock({ overview, fwSummaries }: { overview: RiskOverview; fwS
             {fwSummaries.map((fs) => (
               <TableRow key={fs.framework} sx={{ "& td": { color: "text.primary", borderColor: "divider" } }}>
                 <TableCell>{fs.framework}</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, color: fs.score >= 80 ? "#00e676" : fs.score >= 60 ? "#ff9800" : "#f44336" }}>
+                <TableCell className="keep-color" align="right" sx={{ fontWeight: 700, color: fs.score >= 80 ? "#00e676" : fs.score >= 60 ? "#ff9800" : "#f44336" }}>
                   {fs.score}%
                 </TableCell>
                 <TableCell align="right">{fs.compliant}</TableCell>

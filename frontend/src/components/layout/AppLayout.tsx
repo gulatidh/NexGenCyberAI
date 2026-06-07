@@ -11,7 +11,7 @@ import {
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
-  ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
+  ExpandLess, ExpandMore, VisibilityOutlined, Engineering, MarkEmailRead,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -73,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Settings",
     items: [
       { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
+      { label: "Email Settings", icon: <MarkEmailRead />,      path: "/email-settings" },
       { label: "Sync",           icon: <GppMaybe />,           path: "/sync", adminOnly: true },
       { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
       { label: "Help",           icon: <MenuBook />,           path: "/help" },

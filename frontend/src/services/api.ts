@@ -183,6 +183,21 @@ export const aiApi = {
   learningStats: () => apiClient.get("/ai/learning-stats/").then((r) => r.data),
 };
 
+export const emailApi = {
+  getConfig: () => apiClient.get("/email/config/").then((r) => r.data),
+  updateConfig: (data: Record<string, any>) =>
+    apiClient.patch("/email/config/", data).then((r) => r.data),
+  test: (to: string) => apiClient.post("/email/test/", { to }).then((r) => r.data),
+  send: (data: {
+    to: string | string[];
+    cc?: string | string[];
+    subject: string;
+    body_html?: string;
+    body_text?: string;
+    attachments?: { filename: string; content_base64: string; mime?: string }[];
+  }) => apiClient.post("/email/send/", data).then((r) => r.data),
+};
+
 export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
   activity: (days: number = 3) =>

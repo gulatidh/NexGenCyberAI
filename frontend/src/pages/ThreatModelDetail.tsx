@@ -379,20 +379,33 @@ export default function ThreatModelDetail() {
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
-          body { background: white !important; color: black !important; }
+          body { background: #fff !important; }
           .MuiDrawer-root, .MuiAppBar-root, .no-print { display: none !important; }
-          .tm-print-area, .tm-print-area * { color: #1a1a1a !important; background: white !important;
-            border-color: rgba(0,0,0,0.15) !important; box-shadow: none !important; }
-          .tm-print-area .MuiCard-root,
-          .tm-print-area .MuiCardContent-root { background: white !important; }
-          .tm-print-area .MuiChip-root {
-            background: rgba(0,0,0,0.05) !important;
-            color: #1a1a1a !important;
-            border: 1px solid rgba(0,0,0,0.1) !important;
+
+          /* Print brand/severity colours instead of letting the browser drop backgrounds */
+          .tm-print-area, .tm-print-area * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          /* Mermaid SVG ships with inline fills — let it render in its own
-             palette instead of being washed out by the global * { background:
-             white } rule above. */
+          .tm-print-area { color: #1a1a1a !important; }
+
+          /* Paper-white surfaces (the portal canvas is dark) */
+          .tm-print-area .MuiCard-root, .tm-print-area .MuiCardContent-root,
+          .tm-print-area .MuiPaper-root, .tm-print-area .MuiTableContainer-root {
+            background: #fff !important;
+            box-shadow: none !important;
+            border-color: #e0e0e0 !important;
+          }
+          .tm-print-area .MuiTableCell-root { border-color: #e0e0e0 !important; }
+
+          /* Legible dark body text — chips (criticality/status), charts and
+             .keep-color brand values keep their portal colours. */
+          .tm-print-area .MuiTypography-root:not(.keep-color),
+          .tm-print-area .MuiTableCell-root:not(.keep-color) {
+            color: #1a1a1a !important;
+          }
+
+          /* Mermaid SVG ships with inline fills — keep its own palette. */
           .tm-print-area svg, .tm-print-area svg * {
             background: transparent !important;
           }

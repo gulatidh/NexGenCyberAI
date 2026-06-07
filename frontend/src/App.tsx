@@ -17,6 +17,7 @@ import Connectors from "./pages/Connectors";
 import Scans from "./pages/Scans";
 import Agents from "./pages/Agents";
 import AISettings from "./pages/AISettings";
+import EmailSettings from "./pages/EmailSettings";
 import Findings from "./pages/Findings";
 import Risks from "./pages/Risks";
 import Assets from "./pages/Assets";
@@ -172,6 +173,7 @@ export default function App() {
                   <Route path="/agents" element={<Agents />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/ai-settings" element={<AISettings />} />
+                  <Route path="/email-settings" element={<EmailSettings />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/sync" element={<SyncPage />} />
                   <Route path="/help" element={<Help />} />

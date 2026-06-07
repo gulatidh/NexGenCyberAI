@@ -512,24 +512,34 @@ export default function ScanDetail() {
       <style>{`
         @media print {
           @page { size: A4; margin: 12mm; }
-          body { background: white !important; color: black !important; }
+          body { background: #fff !important; }
           .MuiDrawer-root, .MuiAppBar-root, .no-print { display: none !important; }
-          .scan-detail-print-area { padding: 0 !important; max-width: 100% !important; }
+          .scan-detail-print-area { padding: 0 !important; max-width: 100% !important; color: #1a1a1a !important; }
+
+          /* Print brand/severity colours instead of letting the browser drop backgrounds */
           .scan-detail-print-area, .scan-detail-print-area * {
-            color: #1a1a1a !important;
-            background: white !important;
-            border-color: rgba(0,0,0,0.15) !important;
-            box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
+
+          /* Paper-white surfaces (the portal canvas is dark) */
           .scan-detail-print-area .MuiCard-root,
-          .scan-detail-print-area .MuiCardContent-root { background: white !important; }
-          .scan-detail-print-area .MuiChip-root {
-            background: rgba(0,0,0,0.05) !important;
-            color: #1a1a1a !important;
-            border: 1px solid rgba(0,0,0,0.1) !important;
+          .scan-detail-print-area .MuiCardContent-root,
+          .scan-detail-print-area .MuiPaper-root,
+          .scan-detail-print-area .MuiTableContainer-root {
+            background: #fff !important;
+            box-shadow: none !important;
+            border-color: #e0e0e0 !important;
           }
-          /* Keep severity / status chip colours legible on paper */
-          .scan-detail-print-area .MuiLinearProgress-bar { background: #1a73e8 !important; }
+          .scan-detail-print-area .MuiTableCell-root { border-color: #e0e0e0 !important; }
+
+          /* Legible dark body text — chips, charts and .keep-color brand values
+             keep their portal colours (severity chips, status, progress, etc.) */
+          .scan-detail-print-area .MuiTypography-root:not(.keep-color),
+          .scan-detail-print-area .MuiTableCell-root:not(.keep-color) {
+            color: #1a1a1a !important;
+          }
+
           .scan-detail-print-area h6, .scan-detail-print-area .MuiTypography-h5 {
             page-break-after: avoid;
           }

@@ -486,18 +486,36 @@ function MissionReportDialog({ run, mission, onClose }: {
       <style>{`
         @media print {
           @page { size: A4; margin: 14mm; }
-          body { background: white !important; color: black !important; }
+          body { background: #fff !important; }
           .MuiDialog-root, .MuiDialog-container, .MuiPaper-root {
             position: static !important; max-width: 100% !important;
             box-shadow: none !important;
           }
           .no-print { display: none !important; }
+
+          /* Print brand/severity colours instead of letting the browser drop backgrounds */
           .mission-report-print, .mission-report-print * {
-            color: #1a1a1a !important;
-            background: white !important;
-            border-color: rgba(0,0,0,0.15) !important;
-            box-shadow: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
+          .mission-report-print { color: #1a1a1a !important; }
+
+          /* Paper-white surfaces (the portal canvas is dark) */
+          .mission-report-print .MuiCard-root, .mission-report-print .MuiCardContent-root,
+          .mission-report-print .MuiPaper-root, .mission-report-print .MuiTableContainer-root {
+            background: #fff !important;
+            box-shadow: none !important;
+            border-color: #e0e0e0 !important;
+          }
+          .mission-report-print .MuiTableCell-root { border-color: #e0e0e0 !important; }
+
+          /* Legible dark body text — chips, charts and .keep-color brand values
+             keep their portal colours. */
+          .mission-report-print .MuiTypography-root:not(.keep-color),
+          .mission-report-print .MuiTableCell-root:not(.keep-color) {
+            color: #1a1a1a !important;
+          }
+
           .mission-report-print .report-section { page-break-inside: avoid; }
           .mission-report-print h1, .mission-report-print h2, .mission-report-print h3 {
             page-break-after: avoid;
