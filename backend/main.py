@@ -655,6 +655,23 @@ def _migrate_risk_scale_v2() -> None:
         lf.close()
 
 
+def _prune_access_logs(retention_days: int = 90) -> None:
+    """Delete access_logs rows older than the retention window. Runs at
+    startup (workers recycle periodically, so this fires often enough)."""
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy.orm import Session
+    from api.models.models import AccessLog
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    try:
+        with Session(engine) as db:
+            deleted = db.query(AccessLog).filter(AccessLog.created_at < cutoff).delete(synchronize_session=False)
+            db.commit()
+            if deleted:
+                logger.info("Pruned %d access_logs rows older than %d days", deleted, retention_days)
+    except Exception:
+        logger.exception("Access-log prune failed")
+
+
 def _bootstrap_initial_admin() -> None:
     """Ensure the UPN configured in INITIAL_ADMIN_UPN always has a global
     admin grant. Idempotent — checks per-UPN, not "any global admin
@@ -784,6 +801,7 @@ _migrate_risk_scale_v2()
 _bootstrap_initial_admin()
 _fail_stale_threat_models()
 _fail_stale_scans()
+_prune_access_logs()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -804,12 +822,75 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Latency logging middleware
+def _record_access(token: str | None, method: str, path: str, status: int, ip: str | None, ua: str | None) -> None:
+    """Best-effort: persist one access_logs row for an authenticated request.
+
+    Runs in a threadpool (off the event loop) and swallows all errors so audit
+    logging can never break or slow a request. Skips requests with no valid
+    bearer token (anonymous / pre-auth) since the point is *who* accessed."""
+    if not token:
+        return
+    try:
+        from core.security import decode_azure_token
+        from core.authz import _user_email
+        from api.models.models import AccessLog
+        from sqlalchemy.orm import Session
+
+        try:
+            claims = decode_azure_token(token)
+        except Exception:
+            return  # invalid/expired token → not a successful access
+        email = _user_email(claims)
+        if not email:
+            return
+        with Session(engine) as db:
+            db.add(AccessLog(
+                user_email=email,
+                user_name=(claims.get("name") or "")[:255] or None,
+                method=method[:8],
+                path=path[:512],
+                status_code=status,
+                ip_address=(ip or "")[:64] or None,
+                user_agent=(ua or "")[:512] or None,
+            ))
+            db.commit()
+    except Exception:
+        pass
+
+
+# Paths excluded from access logging (noise / unauthenticated / self-polling).
+_ACCESS_LOG_SKIP_PREFIXES = ("/api/health", "/api/docs", "/api/openapi", "/api/redoc")
+
+
+# Latency + access-logging middleware
 @app.middleware("http")
 async def add_latency_header(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
     response.headers["X-Response-Time"] = f"{(time.time() - start)*1000:.1f}ms"
+
+    # Audit who accessed the portal — fire-and-forget so it never adds latency.
+    try:
+        path = request.url.path
+        if (
+            request.method != "OPTIONS"
+            and path.startswith("/api/")
+            and not path.endswith("/admin/access-logs/")
+            and not any(path.startswith(p) for p in _ACCESS_LOG_SKIP_PREFIXES)
+        ):
+            auth = request.headers.get("authorization") or ""
+            token = auth[7:] if auth.lower().startswith("bearer ") else None
+            if token:
+                xff = request.headers.get("x-forwarded-for")
+                ip = (xff.split(",")[0].strip() if xff else None) or (request.client.host if request.client else None)
+                import asyncio
+                from starlette.concurrency import run_in_threadpool
+                asyncio.create_task(run_in_threadpool(
+                    _record_access, token, request.method, path,
+                    response.status_code, ip, request.headers.get("user-agent"),
+                ))
+    except Exception:
+        pass
     return response
 
 

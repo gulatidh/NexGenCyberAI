@@ -282,6 +282,11 @@ export const adminApi = {
     min_cvss?: number; min_score?: number; ransomware?: boolean;
   }) =>
     apiClient.get(`/admin/sync/feeds/${feedId}/entries`, { params }).then((r) => r.data),
+  accessLogs: (params?: {
+    user_email?: string; method?: string; path?: string;
+    since_hours?: number; limit?: number; offset?: number;
+  }) =>
+    apiClient.get("/admin/access-logs/", { params }).then((r) => r.data),
 };
 
 export const technologiesApi = {

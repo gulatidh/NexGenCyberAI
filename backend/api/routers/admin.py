@@ -1,6 +1,6 @@
 """Admin endpoints: list users, manage RBAC grants, expose caller's effective access."""
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -267,3 +267,46 @@ async def delete_grant(
             )
     db.delete(g)
     db.commit()
+
+
+@router.get("/access-logs/")
+async def list_access_logs(
+    user_email: Optional[str] = None,
+    method: Optional[str] = None,
+    path: Optional[str] = None,
+    since_hours: Optional[int] = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _=Depends(require_role(AccessRole.ADMIN)),
+):
+    """Global-admin-only audit trail of authenticated portal access — one row
+    per API request (who, when, from where, what path + status)."""
+    from api.models.models import AccessLog
+    q = db.query(AccessLog)
+    if user_email:
+        q = q.filter(AccessLog.user_email.ilike(f"%{user_email}%"))
+    if method:
+        q = q.filter(AccessLog.method == method.upper())
+    if path:
+        q = q.filter(AccessLog.path.ilike(f"%{path}%"))
+    if since_hours:
+        q = q.filter(AccessLog.created_at >= datetime.now(timezone.utc) - timedelta(hours=int(since_hours)))
+    total = q.count()
+    limit = max(1, min(int(limit or 100), 500))
+    offset = max(0, int(offset or 0))
+    rows = q.order_by(AccessLog.created_at.desc()).offset(offset).limit(limit).all()
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": r.id, "user_email": r.user_email, "user_name": r.user_name,
+                "method": r.method, "path": r.path, "status_code": r.status_code,
+                "ip_address": r.ip_address, "user_agent": r.user_agent,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }

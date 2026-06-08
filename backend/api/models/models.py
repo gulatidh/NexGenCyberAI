@@ -622,6 +622,25 @@ class EmailSettings(Base):
     updated_by = Column(String(255))
 
 
+class AccessLog(Base):
+    """Audit trail of authenticated portal access — one row per API request.
+
+    Populated best-effort by the access-logging HTTP middleware in main.py and
+    surfaced (admin-only) on the Access Logs page. Time-pruned on startup so it
+    doesn't grow unbounded."""
+    __tablename__ = "access_logs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    user_email = Column(String(320), index=True)
+    user_name = Column(String(255))
+    method = Column(String(8))
+    path = Column(String(512))
+    status_code = Column(Integer)
+    ip_address = Column(String(64), index=True)
+    user_agent = Column(String(512))
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class MissionLearning(Base):
     """A single atomic learning extracted from a completed engagement —
     either an AgentRun (per-agent) or a ScheduledMissionRun (per-workflow).

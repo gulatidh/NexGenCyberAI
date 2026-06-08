@@ -75,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
       { label: "Email Settings", icon: <MarkEmailRead />,      path: "/email-settings" },
       { label: "Sync",           icon: <GppMaybe />,           path: "/sync", adminOnly: true },
+      { label: "Access Logs",    icon: <History />,            path: "/access-logs", adminOnly: true },
       { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
       { label: "Help",           icon: <MenuBook />,           path: "/help" },
     ],
