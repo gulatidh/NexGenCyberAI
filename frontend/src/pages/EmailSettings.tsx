@@ -174,14 +174,16 @@ export default function EmailSettings() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={pwConfigured ? "•••••••• (unchanged)" : "app password"}
                 helperText={pwConfigured ? "A password is saved. Type to replace it; leave blank to keep." : "For Office 365 with MFA, use an app password."}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowPassword((s) => !s)} edge="end">
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setShowPassword((s) => !s)} edge="end">
+                          {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  },
                 }} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>

@@ -36,6 +36,9 @@
     "web-vitals": "^2.1.4",
     "zustand": "^5.0.13"
   },
+  "overrides": {
+    "@types/d3-dispatch": "3.0.6"
+  },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
