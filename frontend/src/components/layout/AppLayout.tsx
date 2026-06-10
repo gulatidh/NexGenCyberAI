@@ -189,8 +189,8 @@ export default function AppLayout() {
         borderBottom: "1px solid", borderColor: "divider", minHeight: 64,
       }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
-          <Box component="img" src={`${process.env.PUBLIC_URL}/aegis-mark.svg`} alt="Aegis AI"
-            sx={{ width: 30, height: 35, flexShrink: 0 }} />
+          <Box component="img" src={`${process.env.PUBLIC_URL}/aegis-logo.jpg`} alt="Aegis AI"
+            sx={{ width: 32, height: 32, flexShrink: 0 }} />
           {expanded && (
             <Box sx={{ whiteSpace: "nowrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>

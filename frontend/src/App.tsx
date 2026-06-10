@@ -49,8 +49,8 @@ function LoginPage() {
       height: "100vh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
-      <img src={`${process.env.PUBLIC_URL}/aegis-mark.svg`} alt="Aegis AI"
-        style={{ width: 84, height: 98, marginBottom: 16 }} />
+      <img src={`${process.env.PUBLIC_URL}/aegis-logo.jpg`} alt="Aegis AI"
+        style={{ width: 90, height: 90, marginBottom: 16 }} />
       <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 36, margin: 0, letterSpacing: "-0.02em", fontWeight: 800 }}>
         <span style={{ color: "#4285F4" }}>A</span>
         <span style={{ color: "#EA4335" }}>e</span>
