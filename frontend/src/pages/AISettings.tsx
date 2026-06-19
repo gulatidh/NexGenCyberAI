@@ -201,13 +201,20 @@ export default function AISettings() {
     />
   );
 
-  // Phase 5 toggles — staged through the same `form` object as everything
-  // else but stored as 'true'/'false' strings; converted on save.
+  // Phase 5 toggles — auto-saved immediately on toggle so navigation doesn't
+  // lose the change. form state still updated for instant visual feedback.
   const boolVal = (name: string): boolean => {
     if (name in form) return form[name] === "true";
     return !!config?.[name];
   };
-  const setBool = (name: string, v: boolean) => setForm((f) => ({ ...f, [name]: v ? "true" : "false" }));
+  const setBool = (name: string, v: boolean) => {
+    setForm((f) => ({ ...f, [name]: v ? "true" : "false" }));
+    if (isAdmin) {
+      aiApi.updateConfig({ [name]: v })
+        .then(() => qc.invalidateQueries({ queryKey: ["ai-config"] }))
+        .catch((e: any) => toast.error(`Could not save: ${e?.response?.data?.detail || e.message}`));
+    }
+  };
 
   const dirty = Object.values(form).some((v) => v !== null);
 
@@ -234,10 +241,10 @@ export default function AISettings() {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
                   <Box sx={{ flex: "1 1 auto", minWidth: 220 }}>
                     <Typography variant="caption" sx={{ color: "#4285F4", fontWeight: 700, letterSpacing: 0.5, fontSize: 11, display: "block", mb: 0.5 }}>
-                      DEFAULTS — APPLIED WHEN AN AGENT DOESN'T OVERRIDE PROVIDER/MODEL
+                      DEFAULT AI PROVIDER — USED WHEN AN AGENT DOESN'T SPECIFY ONE
                     </Typography>
                     <Grid container spacing={1.5}>
-                      <Grid size={{ xs: 12, sm: 4 }}>
+                      <Grid size={{ xs: 12, sm: 6 }}>
                         <FormControl fullWidth size="small" sx={inputSx} disabled={!isAdmin}>
                           <InputLabel>Default Provider</InputLabel>
                           <Select
@@ -253,14 +260,6 @@ export default function AISettings() {
                             ))}
                           </Select>
                         </FormControl>
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 4 }}>{plainField("default_model", "Default Model")}</Grid>
-                      <Grid size={{ xs: 12, sm: 4 }}>
-                        <TextField fullWidth size="small" type="number" label="Default Temperature"
-                          value={fieldVal("default_temperature")}
-                          onChange={(e) => setField("default_temperature", e.target.value)}
-                          slotProps={{ htmlInput: { step: 0.1, min: 0, max: 2 } }}
-                          sx={inputSx} disabled={!isAdmin} />
                       </Grid>
                     </Grid>
                   </Box>

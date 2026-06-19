@@ -12,6 +12,7 @@ import {
   AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering, MarkEmailRead,
+  Cable,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Foundation",
     items: [
       { label: "Clients",         icon: <People />,   path: "/clients" },
+      { label: "Connections",      icon: <Cable />,    path: "/connections" },
       { label: "Assets", icon: <Storage />, path: "/assets", children: [
         { label: "Asset Inventory", icon: <Storage />, path: "/assets" },
         { label: "Technologies",    icon: <Apps />,    path: "/assets/technologies" },

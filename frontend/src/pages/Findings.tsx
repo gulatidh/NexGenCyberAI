@@ -88,7 +88,7 @@ function CategoryTile({ cat, active, onClick }: {
 
 export default function Findings() {
   const qc = useQueryClient();
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
   const [projectId, setProjectId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -198,7 +198,7 @@ export default function Findings() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setProjectId(""); }} label="Client"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>

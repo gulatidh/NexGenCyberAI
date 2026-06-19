@@ -245,7 +245,7 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
 export default function Agents() {
   const qc = useQueryClient();
   const { canAct } = useViewMode();
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
   const [selectedScanId, setSelectedScanId] = useState("");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -320,7 +320,7 @@ export default function Agents() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client (for run)</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedScanId(""); }} label="Client (for run)"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setSelectedScanId(""); }} label="Client (for run)"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">None</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}

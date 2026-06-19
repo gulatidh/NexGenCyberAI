@@ -213,9 +213,11 @@ const STATUS_PROPS: Record<string, any> = {
   inactive: { icon: <Cable sx={{ fontSize: 16 }} />, color: "text.secondary", label: "Inactive" },
 };
 
+const ACTIVE_CLIENT_KEY = "aegis-active-client";
+
 export default function Connectors() {
   const qc = useQueryClient();
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem(ACTIVE_CLIENT_KEY) || "");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   const [connectorType, setConnectorType] = useState<ConnectorType>("azure");
@@ -294,7 +296,7 @@ export default function Connectors() {
         <Box sx={{ display: "flex", gap: 1 }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Select Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Select Client"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem(ACTIVE_CLIENT_KEY, e.target.value); }} label="Select Client"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>

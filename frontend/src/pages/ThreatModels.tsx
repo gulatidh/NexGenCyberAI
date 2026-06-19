@@ -65,7 +65,7 @@ export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { canAct } = useViewMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedClientId, setSelectedClientId] = useState<string>(() => localStorage.getItem("aegis-active-client") || "");
   const [openCreate, setOpenCreate] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ThreatModelSummary | null>(null);
@@ -178,7 +178,7 @@ export default function ThreatModels() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} label="Client"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); }} label="Client"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>

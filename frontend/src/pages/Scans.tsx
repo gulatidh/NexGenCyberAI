@@ -89,7 +89,7 @@ export default function Scans() {
   const { canAct } = useViewMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   // Tile filter state
@@ -219,7 +219,7 @@ export default function Scans() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client (filter)</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); setSelectedProjectId(""); }} label="Client (filter)"
+            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setSelectedProjectId(""); }} label="Client (filter)"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All clients</MenuItem>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
@@ -499,6 +499,7 @@ export default function Scans() {
               value={selectedClientId}
               onChange={(e) => {
                 setSelectedClientId(e.target.value);
+                localStorage.setItem("aegis-active-client", e.target.value);
                 setSelectedProjectId("");
                 setConnectorId("");
                 setScannerId("");

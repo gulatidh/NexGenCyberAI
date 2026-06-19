@@ -14,6 +14,7 @@ import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import Connectors from "./pages/Connectors";
+import Connections from "./pages/Connections";
 import Scans from "./pages/Scans";
 import Agents from "./pages/Agents";
 import AISettings from "./pages/AISettings";
@@ -161,6 +162,7 @@ export default function App() {
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/clients/:clientId" element={<ClientDetail />} />
                   <Route path="/projects" element={<Projects />} />
+                  <Route path="/connections" element={<Connections />} />
                   <Route path="/connectors" element={<Connectors />} />
                   <Route path="/scans" element={<Scans />} />
                   <Route path="/scans/:scanId" element={<ScanDetail />} />
