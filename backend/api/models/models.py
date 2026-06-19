@@ -47,6 +47,8 @@ class ConnectorType(str, enum.Enum):
     OWASP_DC = "owasp_dc"
     GITLEAKS = "gitleaks"
     TRUFFLEHOG = "trufflehog"
+    # AI-powered local code review (runs in-process, no GitHub Actions)
+    AI_CODE_REVIEW = "ai_code_review"
 
 
 class ScannerCategory(str, enum.Enum):
@@ -71,6 +73,7 @@ CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
     ConnectorType.OWASP_DC: ScannerCategory.DEPENDENCY,
     ConnectorType.GITLEAKS: ScannerCategory.DEPENDENCY,
     ConnectorType.TRUFFLEHOG: ScannerCategory.DEPENDENCY,
+    ConnectorType.AI_CODE_REVIEW: ScannerCategory.SAST,
 }
 
 class ConnectorStatus(str, enum.Enum):

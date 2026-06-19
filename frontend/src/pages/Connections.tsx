@@ -48,6 +48,7 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   semgrep: "sast", codeql: "sast", sonarqube: "sast",
   nmap: "network", openvas: "network", trivy: "network",
   owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
+  ai_code_review: "sast",
 };
 
 const CONNECTOR_ICONS: Record<ConnectorType, string> = {
@@ -59,6 +60,7 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   semgrep: "🔍 Semgrep", codeql: "🧬 CodeQL", sonarqube: "📊 SonarQube",
   nmap: "📡 NMAP", openvas: "🛰️ OpenVAS", trivy: "🏷️ Trivy",
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
+  ai_code_review: "🤖 AI Code Review",
 };
 
 const DISABLED_CONNECTOR_TYPES = new Set<string>(["sonarqube", "openvas"]);
@@ -194,6 +196,15 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "git_username", label: "Git Username", placeholder: "x-access-token" },
     { key: "git_token",    label: "Git Personal Access Token", secret: true, placeholder: "ghp_…" },
   ],
+  ai_code_review: [
+    { key: "repo_url",     label: "Git Repo URL (optional if uploading archive)",
+      placeholder: "https://github.com/org/repo",
+      help: "HTTPS clone URL. Leave blank if you will upload a zip archive when starting the scan." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token",
+      help: "For GitHub PATs use 'x-access-token'. Leave blank for public repos." },
+    { key: "git_token",    label: "Git Personal Access Token", secret: true, placeholder: "ghp_…",
+      help: "Required for private repos. Scope 'repo' (read)." },
+  ],
 };
 
 // ── Type help banners ─────────────────────────────────────────────────────────
@@ -208,6 +219,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   owasp_dc:   "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks:   "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets are flagged critical.",
+  ai_code_review: "LLM-powered code security review — no GitHub Actions required. Point at a Git repo or upload a zip archive when starting a scan. The AI triages files by risk, reviews each function for vulnerabilities, runs a self-critique pass to remove false positives, and traces cross-file taint flows.",
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────

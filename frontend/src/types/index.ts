@@ -8,7 +8,9 @@ export type ConnectorType =
   // Network & Infrastructure
   | "nmap" | "openvas" | "trivy"
   // Dependency & Secret
-  | "owasp_dc" | "gitleaks" | "trufflehog";
+  | "owasp_dc" | "gitleaks" | "trufflehog"
+  // AI-powered local code review
+  | "ai_code_review";
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 export type ScanType = "vulnerability" | "configuration" | "compliance" | "full";
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";

@@ -105,6 +105,27 @@ async def _execute_scan(
                 except Exception:
                     conn_obj = None
 
+                # AI Code Review — runs fully local, no GitHub Actions needed
+                if ctype_value == _CT.AI_CODE_REVIEW.value:
+                    from core.config import get_settings as _gs
+                    from services.code_review import run_ai_code_review
+                    creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                    cfg = connector_db.config or {}
+                    repo_url = creds.get("repo_url") or cfg.get("repo_url") or ""
+                    git_username = creds.get("git_username") or cfg.get("git_username") or ""
+                    git_token = creds.get("git_token") or cfg.get("git_token") or ""
+                    archive_path = (scan.summary or {}).get("code_archive") or ""
+                    import asyncio as _aio
+                    await run_ai_code_review(
+                        scan_id=scan.id,
+                        db_url=_gs().DATABASE_URL,
+                        repo_url=repo_url or None,
+                        archive_path=archive_path or None,
+                        git_username=git_username,
+                        git_token=git_token,
+                    )
+                    return
+
                 if isinstance(conn_obj, WorkflowConnector) and conn_obj.WORKFLOW_FILE:
                     from core.scan_tokens import mint_scan_token
                     from core.github_dispatch import dispatch_workflow
@@ -370,6 +391,65 @@ async def get_scan(client_id: str, scan_id: str, db: Session = Depends(get_db), 
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
     return scan
+
+
+@router.post("/{scan_id}/upload-code/", dependencies=[Depends(require_editor_anywhere)])
+async def upload_code_archive(
+    client_id: str,
+    scan_id: str,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """
+    Upload a zip or tar.gz code archive for an AI Code Review scan.
+    Stores the file, records its path on the scan, then fires the review
+    pipeline as a background task.
+    """
+    import os
+    import aiofiles
+
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    fname = file.filename or "archive.zip"
+    if fname.endswith(".zip"):
+        ext = ".zip"
+    elif fname.endswith(".tar.gz") or fname.endswith(".tgz"):
+        ext = ".tar.gz"
+    elif fname.endswith(".tar"):
+        ext = ".tar"
+    else:
+        raise HTTPException(status_code=400, detail="Only .zip, .tar.gz, and .tar archives are supported")
+
+    os.makedirs("/tmp/code_review", exist_ok=True)
+    dest = f"/tmp/code_review/{scan_id}{ext}"
+
+    try:
+        async with aiofiles.open(dest, "wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                await out.write(chunk)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+
+    existing_summary = scan.summary or {}
+    scan.summary = {**existing_summary, "code_archive": dest}
+    db.commit()
+
+    # Fire the AI code review pipeline
+    from core.config import get_settings as _gs
+    from services.code_review import run_ai_code_review
+    background_tasks.add_task(
+        run_ai_code_review,
+        scan_id=scan_id,
+        db_url=_gs().DATABASE_URL,
+        repo_url=None,
+        archive_path=dest,
+    )
+
+    return {"status": "uploaded", "path": dest, "scan_id": scan_id}
 
 
 @router.get("/{scan_id}/findings/", response_model=List[FindingResponse])

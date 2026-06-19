@@ -23,6 +23,8 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   nmap: "📡 NMAP", openvas: "🛰️ OpenVAS", trivy: "🏷️ Trivy",
   // Dependency & Secret
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
+  // AI-powered local code review
+  ai_code_review: "🤖 AI Code Review",
 };
 
 // Connector types hidden from the "Add connector" picker — their GitHub
@@ -169,6 +171,16 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "git_token", label: "Git Personal Access Token", secret: true,
       placeholder: "ghp_…" },
   ],
+  ai_code_review: [
+    { key: "repo_url", label: "Git Repo URL (optional if uploading archive)",
+      placeholder: "https://github.com/org/repo",
+      help: "HTTPS clone URL for the codebase to analyse. Leave blank if you will upload a zip archive when starting the scan." },
+    { key: "git_username", label: "Git Username", placeholder: "x-access-token",
+      help: "For GitHub PATs use 'x-access-token'. Leave blank for public repos." },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…",
+      help: "Required for private repos. Scope 'repo' (read)." },
+  ],
 };
 
 // Top-of-dialog quick-setup guidance per connector type. Shown above the form.
@@ -182,6 +194,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   owasp_dc: "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks: "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets (where TruffleHog can ping the issuer) are flagged critical.",
+  ai_code_review: "LLM-powered code security review. Point at a Git repo or upload a zip archive. The AI triages files, chunks them by function, runs multi-pass vulnerability analysis (review → self-critique → cross-file taint tracing), and writes findings directly — no GitHub Actions required.",
 };
 
 // Connector → category mapping (mirrors backend CONNECTOR_CATEGORY).
@@ -194,6 +207,7 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   semgrep: "sast", codeql: "sast", sonarqube: "sast",
   nmap: "network", openvas: "network", trivy: "network",
   owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
+  ai_code_review: "sast",
 };
 
 const CATEGORY_LABEL: Record<string, string> = {

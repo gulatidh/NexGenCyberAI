@@ -65,6 +65,8 @@ const SCANNERS: ScannerDef[] = [
     description: "Open-source static analysis with curated rule packs. Runs in GitHub Actions via semgrep/semgrep image." },
   { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "live",
     description: "GitHub's semantic code analysis. Auto-detects language; runs the security-and-quality query suite in GitHub Actions." },
+  { id: "ai_code_review", name: "AI Code Review", connectorType: "ai_code_review", category: "sast", status: "live",
+    description: "LLM-powered vulnerability discovery — triage, per-function analysis, self-critique, and cross-file taint tracing. Runs fully in-process; no GitHub Actions required." },
   { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
     description: "Community Edition (self-hosted) or Enterprise (SonarCloud via Action). Workflow coming soon." },
   // Network
@@ -105,6 +107,9 @@ export default function Scans() {
   // CodeQL binary-mode upload state
   const [codeqlMode, setCodeqlMode] = useState<"source" | "binary">("source");
   const [binaryFile, setBinaryFile] = useState<File | null>(null);
+  // AI Code Review source mode: git repo vs zip archive upload
+  const [acrMode, setAcrMode] = useState<"repo" | "archive">("repo");
+  const [codeArchive, setCodeArchive] = useState<File | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
@@ -657,6 +662,73 @@ export default function Scans() {
                       </Select>
                     </FormControl>
                   </Grid>
+                  {/* AI Code Review — pick git repo mode vs archive upload. */}
+                  {scannerId === "ai_code_review" && (
+                    <>
+                      <Grid size={{ xs: 12 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
+                          SOURCE MODE
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          {([
+                            { id: "repo",    label: "Git repo",       hint: "The connector's repo_url is cloned and analysed. Best for CI/CD integration." },
+                            { id: "archive", label: "Upload archive",  hint: "Upload a .zip or .tar.gz of your source code. No git credentials needed." },
+                          ] as const).map((opt) => {
+                            const picked = acrMode === opt.id;
+                            return (
+                              <Tooltip key={opt.id} title={opt.hint}>
+                                <Card
+                                  onClick={() => { setAcrMode(opt.id); if (opt.id === "repo") setCodeArchive(null); }}
+                                  sx={{
+                                    flex: 1, p: 1.25, cursor: "pointer",
+                                    bgcolor: picked ? "rgba(66,133,244,0.08)" : "transparent",
+                                    border: `1px solid ${picked ? "#4285F4" : "rgba(255,255,255,0.1)"}`,
+                                    borderRadius: 1.5,
+                                    "&:hover": { borderColor: "#4285F4" },
+                                  }}
+                                >
+                                  <Typography sx={{ color: "text.primary", fontSize: 13, fontWeight: 600 }}>{opt.label}</Typography>
+                                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+                                    {opt.hint}
+                                  </Typography>
+                                </Card>
+                              </Tooltip>
+                            );
+                          })}
+                        </Box>
+                      </Grid>
+                      {acrMode === "archive" && (
+                        <Grid size={{ xs: 12 }}>
+                          <Box sx={{ p: 1.5, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 1.5 }}>
+                            <Button
+                              component="label"
+                              size="small"
+                              variant="outlined"
+                              sx={{ borderColor: "divider", color: "text.secondary" }}
+                            >
+                              {codeArchive ? "Change archive" : "Choose code archive"}
+                              <input
+                                hidden
+                                type="file"
+                                accept=".zip,.tar.gz,.tgz,.tar"
+                                onChange={(e) => setCodeArchive(e.target.files?.[0] || null)}
+                              />
+                            </Button>
+                            {codeArchive && (
+                              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
+                                <b>{codeArchive.name}</b> · {(codeArchive.size / 1024 / 1024).toFixed(2)} MB
+                              </Typography>
+                            )}
+                            {!codeArchive && (
+                              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
+                                Accepts .zip, .tar.gz, or .tar archives of your source code.
+                              </Typography>
+                            )}
+                          </Box>
+                        </Grid>
+                      )}
+                    </>
+                  )}
                   {/* CodeQL-only: pick source-repo mode vs upload-binary mode. */}
                   {scannerId === "codeql" && (
                     <>
@@ -737,10 +809,12 @@ export default function Scans() {
             disabled={
               startMutation.isPending ||
               (category !== "cloud" && (!scannerId || !connectorId)) ||
-              (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile)
+              (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile) ||
+              (scannerId === "ai_code_review" && acrMode === "archive" && !codeArchive)
             }
             onClick={async () => {
               const isBinary = scannerId === "codeql" && codeqlMode === "binary" && binaryFile;
+              const isAcrArchive = scannerId === "ai_code_review" && acrMode === "archive" && codeArchive;
               if (isBinary) {
                 try {
                   // Two-step: create scan with defer_dispatch=true so the
@@ -764,6 +838,30 @@ export default function Scans() {
                   toast.success(`Uploaded ${binaryFile.name} — scan starting`);
                 } catch (e: any) {
                   toast.error(e?.response?.data?.detail || "Binary upload failed");
+                }
+              } else if (isAcrArchive) {
+                try {
+                  // Two-step: create scan (deferred), then upload archive which
+                  // fires the AI review pipeline as a background task.
+                  const created = await scansApi.start(selectedClientId, {
+                    scan_type: scanType,
+                    connector_id: connectorId || undefined,
+                    framework: framework || undefined,
+                    name: scanName || undefined,
+                    defer_dispatch: true,
+                  });
+                  const fd = new FormData();
+                  fd.append("file", codeArchive);
+                  await apiClient.post(
+                    `/clients/${selectedClientId}/scans/${created.id}/upload-code/`,
+                    fd,
+                    { headers: { "Content-Type": "multipart/form-data" } }
+                  );
+                  qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+                  setOpen(false); setScanName(""); setCodeArchive(null); setAcrMode("repo");
+                  toast.success(`Uploaded ${codeArchive.name} — AI code review starting`);
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.detail || "Code archive upload failed");
                 }
               } else {
                 startMutation.mutate({
