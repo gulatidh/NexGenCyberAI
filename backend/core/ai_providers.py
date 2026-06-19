@@ -36,6 +36,7 @@ class AIProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GOOGLE_GEMINI = "google_gemini"
     AWS_BEDROCK = "aws_bedrock"
+    CUSTOM_OPENAI = "custom_openai"   # any OpenAI-compatible endpoint: Ollama, Azure AI Foundry, Together AI …
 
 
 class ProviderUnavailableError(RuntimeError):
@@ -54,6 +55,29 @@ class ProviderUnavailableError(RuntimeError):
         )
 
 
+def _build_custom_openai(model: str = None, **kwargs) -> BaseChatModel:
+    """Any OpenAI-compatible endpoint: Ollama on a VM, Azure AI Foundry,
+    Together AI, Groq, etc.  Only the base_url differs between them."""
+    from langchain_openai import ChatOpenAI
+    base_url = _resolved("custom_openai_base_url") or settings.CUSTOM_OPENAI_BASE_URL
+    if not base_url:
+        raise ValueError(
+            "custom_openai_base_url is not configured — set it to your endpoint, "
+            "e.g. http://gpu-vm:11434/v1 for Ollama or "
+            "https://<name>.inference.ai.azure.com/v1 for Azure AI Foundry"
+        )
+    model_name = model or _resolved("custom_openai_model") or settings.CUSTOM_OPENAI_MODEL
+    # Ollama accepts any non-empty string as the API key; real services need a real key.
+    api_key = _resolved("custom_openai_api_key") or settings.CUSTOM_OPENAI_API_KEY or "ollama"
+    return ChatOpenAI(
+        base_url=base_url,
+        model=model_name,
+        api_key=api_key,
+        temperature=kwargs.get("temperature", 0.1),
+        max_tokens=kwargs.get("max_tokens", 4096),
+    )
+
+
 # Failover priority when the primary provider is unavailable.
 # The configured primary is always tried first; this list determines the order
 # of the remaining candidates.  Azure OpenAI leads because it is sovereign to
@@ -65,6 +89,7 @@ _FALLBACK_ORDER: list[AIProvider] = [
     AIProvider.GOOGLE_GEMINI,
     AIProvider.AWS_BEDROCK,
     AIProvider.ANTHROPIC,
+    AIProvider.CUSTOM_OPENAI,   # last resort — fully sovereign but requires extra infra
 ]
 
 
@@ -150,6 +175,8 @@ def _is_configured(provider: AIProvider) -> bool:
         return bool(_resolved("google_api_key") or settings.GOOGLE_API_KEY)
     if provider == AIProvider.AWS_BEDROCK:
         return bool(_resolved("aws_bedrock_region") or settings.AWS_BEDROCK_REGION)
+    if provider == AIProvider.CUSTOM_OPENAI:
+        return bool(_resolved("custom_openai_base_url") or settings.CUSTOM_OPENAI_BASE_URL)
     return False
 
 
@@ -161,6 +188,7 @@ _BUILDERS = {
     AIProvider.ANTHROPIC: _build_anthropic,
     AIProvider.GOOGLE_GEMINI: _build_gemini,
     AIProvider.AWS_BEDROCK: _build_bedrock,
+    AIProvider.CUSTOM_OPENAI: _build_custom_openai,
 }
 
 
@@ -258,12 +286,15 @@ def list_providers() -> list[dict]:
     """Return all providers with their availability status."""
     azure_endpoint = _resolved("azure_openai_endpoint") or settings.AZURE_OPENAI_ENDPOINT
     azure_deploy = _resolved("azure_openai_deployment") or settings.AZURE_OPENAI_DEPLOYMENT
+    custom_base = _resolved("custom_openai_base_url") or settings.CUSTOM_OPENAI_BASE_URL
+    custom_model = _resolved("custom_openai_model") or settings.CUSTOM_OPENAI_MODEL
     availability = {
         AIProvider.OPENAI: bool(_resolved("openai_api_key") or settings.OPENAI_API_KEY),
         AIProvider.AZURE_OPENAI: bool((_resolved("azure_openai_api_key") or settings.AZURE_OPENAI_API_KEY) and azure_endpoint),
         AIProvider.ANTHROPIC: bool(_resolved("anthropic_api_key") or settings.ANTHROPIC_API_KEY),
         AIProvider.GOOGLE_GEMINI: bool(_resolved("google_api_key") or settings.GOOGLE_API_KEY),
         AIProvider.AWS_BEDROCK: bool(_resolved("aws_bedrock_region") or settings.AWS_BEDROCK_REGION),
+        AIProvider.CUSTOM_OPENAI: bool(custom_base),
     }
     models = {
         AIProvider.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
@@ -279,6 +310,14 @@ def list_providers() -> list[dict]:
             "meta.llama3-70b-instruct-v1:0",
             "mistral.mistral-large-2402-v1:0",
         ],
+        AIProvider.CUSTOM_OPENAI: list({
+            custom_model,
+            "qwen2.5-coder:72b",
+            "qwen2.5-coder:32b",
+            "llama3.3:70b",
+            "deepseek-r1:70b",
+            "mistral:7b",
+        }) if custom_base else ["qwen2.5-coder:72b", "llama3.3:70b", "deepseek-r1:70b"],
     }
     return [
         {

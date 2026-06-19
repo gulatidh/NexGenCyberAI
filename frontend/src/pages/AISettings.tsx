@@ -25,15 +25,18 @@ const PROVIDER_LOGOS: Record<string, string> = {
   azure_openai: "🔵 Azure OpenAI",
   google_gemini: "🟡 Google Gemini",
   aws_bedrock: "🟠 AWS Bedrock",
+  custom_openai: "⚫ Custom / Ollama",
 };
 
 type SecretField =
   | "openai_api_key" | "azure_openai_api_key" | "anthropic_api_key"
-  | "google_api_key" | "aws_bedrock_access_key" | "aws_bedrock_secret_key";
+  | "google_api_key" | "aws_bedrock_access_key" | "aws_bedrock_secret_key"
+  | "custom_openai_api_key";
 
 const SECRET_FIELDS: SecretField[] = [
   "openai_api_key", "azure_openai_api_key", "anthropic_api_key",
   "google_api_key", "aws_bedrock_access_key", "aws_bedrock_secret_key",
+  "custom_openai_api_key",
 ];
 
 export default function AISettings() {
@@ -215,7 +218,7 @@ export default function AISettings() {
         <Box>
           <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>AI Provider Settings</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Configure and test AI providers — Claude, OpenAI, Gemini, AWS Bedrock, Azure OpenAI
+            Configure and test AI providers — Claude, OpenAI, Gemini, AWS Bedrock, Azure OpenAI, Ollama / Custom
           </Typography>
         </Box>
       </Box>
@@ -407,6 +410,23 @@ export default function AISettings() {
                             <Grid size={{ xs: 12, sm: 4 }}>{plainField("aws_bedrock_region", "Region")}</Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_access_key", "Access Key ID")}</Grid>
                             <Grid size={{ xs: 12, sm: 4 }}>{secretField("aws_bedrock_secret_key", "Secret Access Key")}</Grid>
+                          </>
+                        )}
+                        {provider.provider === "custom_openai" && (
+                          <>
+                            <Grid size={{ xs: 12, sm: 6 }}>
+                              {plainField("custom_openai_base_url", "Base URL")}
+                              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                                Ollama on VM: <code>http://10.0.0.5:11434/v1</code> · Azure AI Foundry: <code>https://&lt;name&gt;.inference.ai.azure.com/v1</code> · Together AI: <code>https://api.together.xyz/v1</code>
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 12, sm: 3 }}>{plainField("custom_openai_model", "Model Name")}</Grid>
+                            <Grid size={{ xs: 12, sm: 3 }}>
+                              {secretField("custom_openai_api_key", "API Key")}
+                              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                                Leave blank for Ollama (uses "ollama" default). Required for Azure AI Foundry / Together AI.
+                              </Typography>
+                            </Grid>
                           </>
                         )}
                       </Grid>

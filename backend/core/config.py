@@ -63,6 +63,16 @@ class Settings(BaseSettings):
     AWS_BEDROCK_ACCESS_KEY: str = ""
     AWS_BEDROCK_SECRET_KEY: str = ""
 
+    # Custom / OpenAI-compatible endpoint (Ollama on VM, Azure AI Foundry,
+    # Together AI, Groq, or any OpenAI-spec server).
+    # Base URL examples:
+    #   Ollama on VM:         http://10.0.0.5:11434/v1
+    #   Azure AI Foundry:     https://<name>.inference.ai.azure.com/v1
+    #   Together AI:          https://api.together.xyz/v1
+    CUSTOM_OPENAI_BASE_URL: str = ""
+    CUSTOM_OPENAI_API_KEY: str = "ollama"   # Ollama accepts any non-empty string
+    CUSTOM_OPENAI_MODEL: str = "qwen2.5-coder:72b"
+
     # ── Connector defaults ─────────────────────────────────────────────────────
     ENCRYPTION_KEY: str = ""
     AWS_DEFAULT_REGION: str = "us-east-1"
