@@ -1,16 +1,23 @@
 """
 NexGenCyberAI - Multi-Provider AI Abstraction Layer
-Supports: Anthropic Claude, OpenAI GPT, Google Gemini, AWS Bedrock.
+Supports: Anthropic Claude, OpenAI GPT, Google Gemini, AWS Bedrock, Azure OpenAI.
 Agents call get_llm() to get a LangChain-compatible LLM regardless of provider.
 Provider and model are configurable per-client or globally via settings.
+
+Automatic failover: if the primary provider fails to initialise (missing credentials,
+external shutdown, export-control action, rate limit), get_llm() walks a priority
+chain of all configured providers until one succeeds.  The fallback is logged at
+WARNING level so it is always visible in App Service logs / Azure Monitor.
 """
 from __future__ import annotations
+import logging
 from enum import Enum
 from typing import Optional, Any
 from langchain_core.language_models.chat_models import BaseChatModel
 from core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def _resolved(name: str) -> Optional[str]:
@@ -29,6 +36,36 @@ class AIProvider(str, Enum):
     ANTHROPIC = "anthropic"
     GOOGLE_GEMINI = "google_gemini"
     AWS_BEDROCK = "aws_bedrock"
+
+
+class ProviderUnavailableError(RuntimeError):
+    """Raised when every configured AI provider fails to initialise.
+
+    Attributes:
+        primary   – the provider that was originally requested
+        attempts  – ordered list of (provider_name, reason) tried before giving up
+    """
+    def __init__(self, primary: str, attempts: list[tuple[str, str]]) -> None:
+        self.primary = primary
+        self.attempts = attempts
+        detail = "\n".join(f"  {p}: {reason}" for p, reason in attempts)
+        super().__init__(
+            f"All AI providers unavailable (primary was '{primary}'):\n{detail}"
+        )
+
+
+# Failover priority when the primary provider is unavailable.
+# The configured primary is always tried first; this list determines the order
+# of the remaining candidates.  Azure OpenAI leads because it is sovereign to
+# the tenant's own Azure subscription and unaffected by US export-control orders
+# that target the Anthropic / OpenAI consumer APIs.
+_FALLBACK_ORDER: list[AIProvider] = [
+    AIProvider.AZURE_OPENAI,
+    AIProvider.OPENAI,
+    AIProvider.GOOGLE_GEMINI,
+    AIProvider.AWS_BEDROCK,
+    AIProvider.ANTHROPIC,
+]
 
 
 # ── Provider builders ──────────────────────────────────────────────────────────
@@ -91,6 +128,31 @@ def _build_bedrock(model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0", **k
     )
 
 
+# ── Credential check (fast path — no network) ─────────────────────────────────
+
+def _is_configured(provider: AIProvider) -> bool:
+    """Return True only if the minimum required credentials are present.
+
+    This is a local check only — it does not make any network call.  It lets
+    the failover loop skip providers that are obviously unconfigured rather than
+    incurring a slow connection timeout.
+    """
+    if provider == AIProvider.AZURE_OPENAI:
+        return bool(
+            (_resolved("azure_openai_api_key") or settings.AZURE_OPENAI_API_KEY)
+            and (_resolved("azure_openai_endpoint") or settings.AZURE_OPENAI_ENDPOINT)
+        )
+    if provider == AIProvider.OPENAI:
+        return bool(_resolved("openai_api_key") or settings.OPENAI_API_KEY)
+    if provider == AIProvider.ANTHROPIC:
+        return bool(_resolved("anthropic_api_key") or settings.ANTHROPIC_API_KEY)
+    if provider == AIProvider.GOOGLE_GEMINI:
+        return bool(_resolved("google_api_key") or settings.GOOGLE_API_KEY)
+    if provider == AIProvider.AWS_BEDROCK:
+        return bool(_resolved("aws_bedrock_region") or settings.AWS_BEDROCK_REGION)
+    return False
+
+
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 _BUILDERS = {
@@ -108,18 +170,53 @@ def get_llm(
     temperature: float = 0.1,
     max_tokens: int = 4096,
 ) -> BaseChatModel:
+    """Return a LangChain-compatible LLM, with automatic failover.
+
+    Tries the requested provider first (or DEFAULT_AI_PROVIDER when none is
+    given).  If it is unconfigured or raises on initialisation, walks
+    _FALLBACK_ORDER until a provider succeeds.  Every fallover step is logged
+    at WARNING level so it is visible in Azure Monitor / App Service logs.
+
+    Raises:
+        ProviderUnavailableError – all configured providers failed.
     """
-    Return a LangChain-compatible LLM for the requested provider.
-    Falls back to settings.DEFAULT_AI_PROVIDER if provider is None.
-    """
-    resolved_provider = AIProvider(provider or _resolved("default_provider") or settings.DEFAULT_AI_PROVIDER)
-    builder = _BUILDERS.get(resolved_provider)
-    if builder is None:
-        raise ValueError(f"Unsupported AI provider: {resolved_provider}")
-    try:
-        return builder(model=model, temperature=temperature, max_tokens=max_tokens)
-    except Exception as exc:
-        raise RuntimeError(f"Failed to initialise {resolved_provider} LLM: {exc}") from exc
+    primary = AIProvider(provider or _resolved("default_provider") or settings.DEFAULT_AI_PROVIDER)
+
+    # Primary first, then the rest of the fallback chain (excluding primary)
+    candidates = [primary] + [p for p in _FALLBACK_ORDER if p != primary]
+
+    attempts: list[tuple[str, str]] = []
+
+    for candidate in candidates:
+        builder = _BUILDERS.get(candidate)
+        if builder is None:
+            continue
+
+        if not _is_configured(candidate):
+            attempts.append((candidate.value, "not configured (missing credentials)"))
+            continue
+
+        # When failing over to a different provider don't forward a model name
+        # that belongs to the original provider (e.g. "claude-opus-4-7" to Azure).
+        effective_model = model if candidate == primary else None
+
+        try:
+            llm = builder(model=effective_model, temperature=temperature, max_tokens=max_tokens)
+            if candidate != primary:
+                logger.warning(
+                    "AI provider failover: primary '%s' unavailable, using '%s'. "
+                    "Attempts before success: %s",
+                    primary.value, candidate.value, attempts,
+                )
+            return llm
+        except Exception as exc:
+            attempts.append((candidate.value, str(exc)))
+            logger.warning(
+                "AI provider '%s' failed to initialise: %s — trying next provider",
+                candidate.value, exc,
+            )
+
+    raise ProviderUnavailableError(primary.value, attempts)
 
 
 def get_embeddings(
