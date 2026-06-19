@@ -135,14 +135,22 @@ async def run_ai_code_review(
     """
     from api.models.models import Scan, ScanStatus
     from .chunker import get_file_tree, chunk_files
-    from .reviewer import triage_files, review_chunks_parallel, critique_findings, trace_taint_flows
+    from .reviewer import (
+        TokenBudget, DEFAULT_TOKEN_BUDGET,
+        triage_files, review_chunks_parallel, critique_findings, trace_taint_flows,
+    )
 
     db = _build_session(db_url)
     work_dir = tempfile.mkdtemp(prefix=f"acr_{scan_id}_", dir="/tmp")
     repo_dir = work_dir
 
     try:
-        # ── 0. Mark running ───────────────────────────────────────────────────
+        # ── 0. Initialise token budget ────────────────────────────────────────
+        token_limit = int(os.environ.get("CODE_REVIEW_MAX_TOKENS", DEFAULT_TOKEN_BUDGET))
+        budget = TokenBudget(limit=token_limit)
+        logger.info("AI code review [%s]: token budget = %d", scan_id, token_limit)
+
+        # ── Mark running ──────────────────────────────────────────────────────
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
         if not scan:
             logger.error("AI code review: scan %s not found", scan_id)
@@ -173,36 +181,44 @@ async def run_ai_code_review(
 
         # ── 3. Triage ─────────────────────────────────────────────────────────
         logger.info("AI code review [%s]: triaging files …", scan_id)
-        top_files = await triage_files(all_files, top_n=25)
-        logger.info("AI code review [%s]: selected %d files for deep review", scan_id, len(top_files))
+        top_files = await triage_files(all_files, top_n=25, budget=budget)
+        logger.info("AI code review [%s]: selected %d files for deep review (budget used: %d/%d tokens)",
+                    scan_id, len(top_files), budget.used, budget.limit)
 
         # ── 4. Chunk ──────────────────────────────────────────────────────────
         chunks = chunk_files(repo_dir, top_files)
-        logger.info("AI code review [%s]: %d chunks to review", scan_id, len(chunks))
+        logger.info("AI code review [%s]: %d raw chunks produced", scan_id, len(chunks))
 
-        # Cap chunks to avoid extremely large LLM bills on huge repos
+        # Hard cap then budget-aware trim (drops chunks that would bust the limit)
         MAX_CHUNKS = 200
         if len(chunks) > MAX_CHUNKS:
             logger.warning("AI code review [%s]: capping at %d chunks (had %d)", scan_id, MAX_CHUNKS, len(chunks))
             chunks = chunks[:MAX_CHUNKS]
+        chunks = budget.trim_chunks(chunks)
 
         if not chunks:
-            raise ValueError("No code chunks produced — check that the repo contains supported source files")
+            raise ValueError("No code chunks fit within the token budget — raise CODE_REVIEW_MAX_TOKENS or reduce repo size")
+
+        estimated_tokens = sum(c.token_estimate for c in chunks)
+        logger.info("AI code review [%s]: reviewing %d chunks (~%d tokens)", scan_id, len(chunks), estimated_tokens)
 
         # ── 5. Review ─────────────────────────────────────────────────────────
         logger.info("AI code review [%s]: reviewing chunks (parallel) …", scan_id)
-        raw_findings = await review_chunks_parallel(chunks)
-        logger.info("AI code review [%s]: %d raw findings before critique", scan_id, len(raw_findings))
+        raw_findings = await review_chunks_parallel(chunks, budget=budget)
+        logger.info("AI code review [%s]: %d raw findings before critique (budget used: %d/%d)",
+                    scan_id, len(raw_findings), budget.used, budget.limit)
 
         # ── 6. Critique ───────────────────────────────────────────────────────
         logger.info("AI code review [%s]: running self-critique pass …", scan_id)
-        vetted_findings = await critique_findings(raw_findings)
-        logger.info("AI code review [%s]: %d findings after critique", scan_id, len(vetted_findings))
+        vetted_findings = await critique_findings(raw_findings, budget=budget)
+        logger.info("AI code review [%s]: %d findings after critique (budget used: %d/%d)",
+                    scan_id, len(vetted_findings), budget.used, budget.limit)
 
         # ── 7. Taint trace (optional — enriches cross-file chains) ────────────
         logger.info("AI code review [%s]: tracing cross-file taint flows …", scan_id)
-        taint_findings = await trace_taint_flows(chunks, vetted_findings)
-        logger.info("AI code review [%s]: %d taint findings", scan_id, len(taint_findings))
+        taint_findings = await trace_taint_flows(chunks, vetted_findings, budget=budget)
+        logger.info("AI code review [%s]: %d taint findings (budget used: %d/%d)",
+                    scan_id, len(taint_findings), budget.used, budget.limit)
 
         all_findings = vetted_findings + taint_findings
 
@@ -221,6 +237,9 @@ async def run_ai_code_review(
             "files_triaged": len(top_files),
             "chunks_reviewed": len(chunks),
             "taint_findings": len(taint_findings),
+            "tokens_used": budget.used,
+            "token_budget": budget.limit,
+            "budget_pct": round(budget.used / budget.limit * 100, 1),
         }
         scan.status = ScanStatus.COMPLETED
         scan.completed_at = datetime.now(timezone.utc)

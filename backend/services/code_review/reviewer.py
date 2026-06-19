@@ -22,6 +22,61 @@ logger = logging.getLogger(__name__)
 MAX_PARALLEL = 6          # LLM calls in flight simultaneously
 TRIAGE_TOP_N = 25         # files to deeply review after triage
 
+# Default token budget per scan. Each token ≈ 4 chars; rough call cost:
+#   triage: ~2 000 tokens, per-chunk review: ~2 500, critique: ~1 200, taint: ~4 000/pair
+# 400 000 tokens ≈ ~120 chunks reviewed end-to-end ≈ $2–3 on most providers.
+DEFAULT_TOKEN_BUDGET = 400_000
+
+
+# ── Token budget ──────────────────────────────────────────────────────────────
+
+class TokenBudget:
+    """Tracks estimated LLM token consumption across all review phases.
+
+    Uses len(text) // 4 as the token estimate (same as CodeChunk.token_estimate).
+    Each _call_llm() call deducts both prompt and a fixed response estimate so
+    the budget stays conservative without requiring tiktoken.
+    """
+    AVG_RESPONSE_TOKENS = 600  # conservative per-call response estimate
+
+    def __init__(self, limit: int = DEFAULT_TOKEN_BUDGET):
+        self.limit = limit
+        self.used = 0
+
+    def consume(self, prompt_tokens: int) -> bool:
+        """Attempt to deduct prompt + response estimate. Returns False if budget is exhausted."""
+        cost = prompt_tokens + self.AVG_RESPONSE_TOKENS
+        if self.used + cost > self.limit:
+            return False
+        self.used += cost
+        return True
+
+    @property
+    def remaining(self) -> int:
+        return max(0, self.limit - self.used)
+
+    @property
+    def exhausted(self) -> bool:
+        return self.used >= self.limit
+
+    def trim_chunks(self, chunks: list) -> list:
+        """Return the largest prefix of chunks that fits within the remaining budget.
+        Logs how many chunks were dropped if any were trimmed.
+        """
+        kept, dropped = [], 0
+        for c in chunks:
+            prompt_cost = c.token_estimate + len(_REVIEW_USER) // 4 + self.AVG_RESPONSE_TOKENS
+            if self.used + prompt_cost > self.limit:
+                dropped += 1
+            else:
+                kept.append(c)
+        if dropped:
+            logger.warning(
+                "TokenBudget: dropped %d chunk(s) to stay within %d-token limit (%d used so far)",
+                dropped, self.limit, self.used,
+            )
+        return kept
+
 
 # ── Finding dataclass ─────────────────────────────────────────────────────────
 
@@ -171,13 +226,32 @@ Return ONE JSON object:
 
 # ── LLM helpers ───────────────────────────────────────────────────────────────
 
-async def _call_llm(system: str, user: str, *, json_mode: bool = True) -> str:
-    """Call the configured LLM asynchronously; returns the text response."""
+async def _call_llm(
+    system: str,
+    user: str,
+    *,
+    budget: TokenBudget | None = None,
+    json_mode: bool = True,
+) -> str:
+    """Call the configured LLM asynchronously; returns the text response.
+
+    If a TokenBudget is supplied and the call would exceed it, raises
+    BudgetExceededError instead of making the API call.
+    """
     from langchain_core.messages import HumanMessage, SystemMessage
+    prompt_tokens = (len(system) + len(user)) // 4
+    if budget is not None and not budget.consume(prompt_tokens):
+        raise BudgetExceededError(
+            f"Token budget exhausted ({budget.used}/{budget.limit}) — skipping LLM call"
+        )
     llm = get_llm(temperature=0.05, max_tokens=4096)
     msgs = [SystemMessage(content=system), HumanMessage(content=user)]
     result = await llm.ainvoke(msgs)
     return result.content if hasattr(result, "content") else str(result)
+
+
+class BudgetExceededError(Exception):
+    """Raised when a token budget limit is hit before an LLM call."""
 
 
 def _parse_json(text: str) -> Any:
@@ -201,7 +275,11 @@ def _parse_json(text: str) -> Any:
 
 # ── Phase 1: Triage ───────────────────────────────────────────────────────────
 
-async def triage_files(file_list: list[str], top_n: int = TRIAGE_TOP_N) -> list[str]:
+async def triage_files(
+    file_list: list[str],
+    top_n: int = TRIAGE_TOP_N,
+    budget: TokenBudget | None = None,
+) -> list[str]:
     """
     Ask the LLM to rank all repo files by security risk.
     Returns ordered list of relative paths (highest risk first).
@@ -220,6 +298,7 @@ async def triage_files(file_list: list[str], top_n: int = TRIAGE_TOP_N) -> list[
         raw = await _call_llm(
             _TRIAGE_SYSTEM,
             _TRIAGE_USER.format(file_tree=file_tree, top_n=top_n),
+            budget=budget,
         )
         items = _parse_json(raw)
         if isinstance(items, list):
@@ -227,6 +306,8 @@ async def triage_files(file_list: list[str], top_n: int = TRIAGE_TOP_N) -> list[
             if ranked:
                 logger.info("Triage selected %d files for deep review", len(ranked))
                 return ranked[:top_n]
+    except BudgetExceededError:
+        logger.warning("Triage skipped — token budget exhausted; using heuristic order")
     except Exception as exc:
         logger.warning("Triage LLM call failed (%s) — falling back to heuristic order", exc)
 
@@ -235,7 +316,7 @@ async def triage_files(file_list: list[str], top_n: int = TRIAGE_TOP_N) -> list[
 
 # ── Phase 2: Per-chunk review ─────────────────────────────────────────────────
 
-async def review_chunk(chunk) -> list[ReviewFinding]:
+async def review_chunk(chunk, budget: TokenBudget | None = None) -> list[ReviewFinding]:
     """Review a single CodeChunk; returns list of findings (may be empty)."""
     prompt = _REVIEW_USER.format(
         language=chunk.language,
@@ -247,7 +328,7 @@ async def review_chunk(chunk) -> list[ReviewFinding]:
         code=chunk.code,
     )
     try:
-        raw = await _call_llm(_REVIEW_SYSTEM, prompt)
+        raw = await _call_llm(_REVIEW_SYSTEM, prompt, budget=budget)
         items = _parse_json(raw)
         if not isinstance(items, list):
             return []
@@ -278,19 +359,25 @@ async def review_chunk(chunk) -> list[ReviewFinding]:
                 },
             ))
         return findings
+    except BudgetExceededError as exc:
+        logger.info("Chunk review skipped (budget): %s/%s — %s", chunk.file_path, chunk.function_name, exc)
+        return []
     except Exception as exc:
         logger.warning("Chunk review failed for %s/%s: %s", chunk.file_path, chunk.function_name, exc)
         return []
 
 
-async def review_chunks_parallel(chunks: list) -> list[ReviewFinding]:
+async def review_chunks_parallel(
+    chunks: list,
+    budget: TokenBudget | None = None,
+) -> list[ReviewFinding]:
     """Review all chunks with capped parallelism."""
     sem = asyncio.Semaphore(MAX_PARALLEL)
     all_findings: list[ReviewFinding] = []
 
     async def _bounded(chunk):
         async with sem:
-            return await review_chunk(chunk)
+            return await review_chunk(chunk, budget=budget)
 
     results = await asyncio.gather(*[_bounded(c) for c in chunks], return_exceptions=True)
     for res in results:
@@ -303,7 +390,10 @@ async def review_chunks_parallel(chunks: list) -> list[ReviewFinding]:
 
 # ── Phase 3: Self-critique (filter false positives) ──────────────────────────
 
-async def critique_findings(findings: list[ReviewFinding]) -> list[ReviewFinding]:
+async def critique_findings(
+    findings: list[ReviewFinding],
+    budget: TokenBudget | None = None,
+) -> list[ReviewFinding]:
     """
     Group findings by (file, function) and run a critique pass.
     Drops findings rated low-confidence by the critic.
@@ -337,6 +427,7 @@ async def critique_findings(findings: list[ReviewFinding]) -> list[ReviewFinding
                         file_path=file_path, function_name=func_name,
                         findings_json=json.dumps(items, indent=2),
                     ),
+                    budget=budget,
                 )
                 reviewed = _parse_json(raw)
                 if not isinstance(reviewed, list):
@@ -357,6 +448,9 @@ async def critique_findings(findings: list[ReviewFinding]) -> list[ReviewFinding
                         orig.confidence = conf
                         result.append(orig)
                 return result
+            except BudgetExceededError:
+                logger.info("Critique skipped for %s/%s — token budget exhausted; keeping findings as-is", file_path, func_name)
+                return group  # keep all when budget is gone
             except Exception as exc:
                 logger.warning("Critique failed for %s/%s: %s", file_path, func_name, exc)
                 return group  # keep all on failure
@@ -389,6 +483,7 @@ _SINK_KEYWORDS = re.compile(
 async def trace_taint_flows(
     chunks: list,
     findings: list[ReviewFinding],
+    budget: TokenBudget | None = None,
 ) -> list[ReviewFinding]:
     """
     For high/critical findings that involve sources and sinks across different
@@ -427,6 +522,7 @@ async def trace_taint_flows(
                         sink_line=snk.start_line, sink_code=snk.code[:1500],
                         intermediate="(not available — review files separately)",
                     ),
+                    budget=budget,
                 )
                 result = _parse_json(raw)
                 if not isinstance(result, dict):
@@ -455,9 +551,16 @@ async def trace_taint_flows(
                         "sink": f"{snk.file_path}:{snk.start_line}",
                     },
                 )
+            except BudgetExceededError:
+                logger.info("Taint trace skipped — token budget exhausted")
+                return None
             except Exception as exc:
                 logger.debug("Taint trace failed: %s", exc)
                 return None
+
+    if budget and budget.exhausted:
+        logger.info("Taint tracing skipped entirely — token budget exhausted before phase 4")
+        return []
 
     results = await asyncio.gather(*[_trace(s, k) for s, k in pairs], return_exceptions=True)
     for res in results:
