@@ -466,6 +466,21 @@ export default function Scans() {
                         <Chip size="small" label="AI verdict"
                           sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
                       )}
+                      {tile.summary?.tokens_used != null && (() => {
+                        const used = tile.summary.tokens_used as number;
+                        const budget = tile.summary.token_budget as number;
+                        const pct = tile.summary.budget_pct as number;
+                        const label = `${(used / 1000).toFixed(0)}k tokens`;
+                        const tipText = `${used.toLocaleString()} / ${budget.toLocaleString()} tokens used (${pct}% of budget)`;
+                        const color = pct >= 90 ? "#EA4335" : pct >= 70 ? "#FBBC04" : "#34A853";
+                        const bg = pct >= 90 ? "rgba(234,67,53,0.15)" : pct >= 70 ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)";
+                        return (
+                          <Tooltip title={tipText}>
+                            <Chip size="small" label={label}
+                              sx={{ bgcolor: bg, color, height: 18, fontSize: 10, fontWeight: 700 }} />
+                          </Tooltip>
+                        );
+                      })()}
                       <Box sx={{ flex: 1 }} />
                       {agentNames.length > 0 && (
                         <Tooltip title={`${anyAgentFailed ? "Some agent runs failed. " : ""}Agents that ran: ${agentNames.join(", ")}`}>
