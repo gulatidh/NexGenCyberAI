@@ -261,10 +261,11 @@ export default function Connections() {
     enabled: !!selectedClientId,
   });
 
-  const { data: aiProviders = [] } = useQuery<AIProvider[]>({
+  const { data: aiData } = useQuery({
     queryKey: ["ai-providers"],
     queryFn: aiApi.listProviders,
   });
+  const aiProviders: AIProvider[] = (aiData as any)?.providers || [];
 
   const { data: aiConfig } = useQuery({
     queryKey: ["ai-config"],

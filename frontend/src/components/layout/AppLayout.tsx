@@ -44,8 +44,11 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Foundation",
     items: [
-      { label: "Clients",         icon: <People />,   path: "/clients" },
-      { label: "Connections",      icon: <Cable />,    path: "/connections" },
+      { label: "Clients",          icon: <People />,   path: "/clients" },
+      { label: "Connections",      icon: <Cable />,    path: "/connections", children: [
+        { label: "All Connections", icon: <Cable />,          path: "/connections" },
+        { label: "AI Settings",     icon: <SettingsSuggest />, path: "/ai-settings" },
+      ] },
       { label: "Assets", icon: <Storage />, path: "/assets", children: [
         { label: "Asset Inventory", icon: <Storage />, path: "/assets" },
         { label: "Technologies",    icon: <Apps />,    path: "/assets/technologies" },
@@ -74,7 +77,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Settings",
     items: [
-      { label: "AI Settings",    icon: <SettingsSuggest />,    path: "/ai-settings" },
       { label: "Email Settings", icon: <MarkEmailRead />,      path: "/email-settings" },
       { label: "Sync",           icon: <GppMaybe />,           path: "/sync", adminOnly: true },
       { label: "Access Logs",    icon: <History />,            path: "/access-logs", adminOnly: true },
