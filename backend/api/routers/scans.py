@@ -503,6 +503,13 @@ async def rescan(
     # previous one. Simpler to render N versions when they're all siblings.
     root_id = original.parent_scan_id or original.id
 
+    # For archive-upload scans (ai_code_review) carry the archive path forward
+    # so the rescan has a source to work from.
+    inherited_summary: dict = {}
+    orig_summary = original.summary or {}
+    if orig_summary.get("code_archive"):
+        inherited_summary["code_archive"] = orig_summary["code_archive"]
+
     new = Scan(
         client_id=client_id,
         project_id=original.project_id,
@@ -513,6 +520,7 @@ async def rescan(
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
         status=ScanStatus.PENDING,
         parent_scan_id=root_id,
+        summary=inherited_summary or None,
     )
     db.add(new)
     db.commit()
