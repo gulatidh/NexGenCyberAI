@@ -17,15 +17,14 @@ import {
   Tooltip, Grid, Select, MenuItem, FormControl, InputLabel,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Dialog, DialogTitle, DialogContent, DialogActions, Pagination,
-  LinearProgress, Drawer,
+  Drawer,
 } from "@mui/material";
 import {
   Settings as SettingsIcon, MarkEmailRead, Security, Sync as SyncIcon,
-  History, AdminPanelSettings, Save, CheckCircle, ErrorOutlined,
-  Visibility, VisibilityOff, LinkOutlined, LinkOffOutlined,
+  History, AdminPanelSettings, Save, CheckCircle,
+  Visibility, VisibilityOff, LinkOutlined,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
-  CloudDownload, Policy, ScheduleOutlined, CheckCircleOutlined,
-  Close, ShieldOutlined, GppMaybe, Send,
+  Close, Send,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -231,13 +230,6 @@ function SsoTab({ isAdmin }: { isAdmin: boolean }) {
     if (cfg) setForm({ ...cfg });
   }, [cfg]);
 
-  // Auto-compute authority from tenant_id
-  useEffect(() => {
-    if (form.tenant_id && !form.authority) {
-      setForm((f) => ({ ...f, authority: `https://login.microsoftonline.com/${f.tenant_id}` }));
-    }
-  }, [form.tenant_id]);
-
   const save = useMutation({
     mutationFn: (d: any) => ssoApi.updateConfig(d),
     onSuccess: () => { toast.success("SSO settings saved"); qc.invalidateQueries({ queryKey: ["sso-config"] }); setSecret(null); },
@@ -355,7 +347,6 @@ function SsoTab({ isAdmin }: { isAdmin: boolean }) {
 
 // ── Sync tab ─────────────────────────────────────────────────────────────────
 function SyncTab({ isAdmin }: { isAdmin: boolean }) {
-  const qc = useQueryClient();
   const [syncing, setSyncing] = useState<string | null>(null);
   const [drawerFeed, setDrawerFeed] = useState<any>(null);
 

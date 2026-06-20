@@ -9,7 +9,7 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings, Schedule, AutoStories, MenuBook, Hub,
+  Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings,
