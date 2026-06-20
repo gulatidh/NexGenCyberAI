@@ -424,8 +424,9 @@ async def upload_code_archive(
     else:
         raise HTTPException(status_code=400, detail="Only .zip, .tar.gz, and .tar archives are supported")
 
-    os.makedirs("/tmp/code_review", exist_ok=True)
-    dest = f"/tmp/code_review/{scan_id}{ext}"
+    # /home persists across container restarts on App Service; /tmp is wiped.
+    os.makedirs("/home/code_review", exist_ok=True)
+    dest = f"/home/code_review/{scan_id}{ext}"
 
     try:
         async with aiofiles.open(dest, "wb") as out:

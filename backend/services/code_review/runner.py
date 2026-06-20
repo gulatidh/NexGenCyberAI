@@ -26,7 +26,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-CODE_REVIEW_TMP = "/tmp/code_review"
+CODE_REVIEW_TMP = "/home/code_review"
 
 
 # ── Source acquisition ────────────────────────────────────────────────────────
@@ -267,9 +267,4 @@ async def run_ai_code_review(
             shutil.rmtree(work_dir, ignore_errors=True)
         except Exception:
             pass
-        # Clean up archive if it was an upload
-        if archive_path and os.path.exists(archive_path):
-            try:
-                os.unlink(archive_path)
-            except Exception:
-                pass
+        # Archive is kept in /home/code_review/ so rescans can reuse it.
