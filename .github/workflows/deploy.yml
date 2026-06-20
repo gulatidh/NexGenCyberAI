@@ -214,8 +214,8 @@ jobs:
               sleep 20
               continue
             fi
-            ST=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
-            PR=$(echo "$RESP" | python -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])" 2>/dev/null || echo "")
+            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:120])" 2>/dev/null || echo "")
             echo "[$i] status=$ST progress=$PR"
             if [ "$ST" = "4" ]; then echo "Build & deploy succeeded"; exit 0; fi
             if [ "$ST" = "3" ]; then echo "Build & deploy failed"; exit 1; fi
