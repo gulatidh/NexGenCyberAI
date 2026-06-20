@@ -31,23 +31,82 @@ CODE_REVIEW_TMP = "/home/code_review"
 
 # ── Source acquisition ────────────────────────────────────────────────────────
 
-def _clone_repo(repo_url: str, dest_dir: str, git_username: str = "", git_token: str = "") -> None:
-    """Clone a git repo into dest_dir. Injects credentials for private repos."""
+def _fetch_repo(repo_url: str, dest_dir: str, git_username: str = "", git_token: str = "") -> None:
+    """Download a repository into dest_dir.
+
+    Strategy (in order):
+    1. GitHub / GitLab HTTPS archive download — no git binary required.
+       Downloads the default-branch zip via the hosting API.
+    2. git clone via subprocess — fallback for self-hosted or other hosts
+       where a zip API is not available.
+    """
+    import httpx
+    from urllib.parse import urlparse
+
+    parsed = urlparse(repo_url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.rstrip("/")
+
+    headers: dict = {}
+    if git_token:
+        headers["Authorization"] = f"token {git_token}"
+    elif git_username and git_token:
+        import base64
+        creds = base64.b64encode(f"{git_username}:{git_token}".encode()).decode()
+        headers["Authorization"] = f"Basic {creds}"
+
+    zip_url: str | None = None
+
+    if "github.com" in host:
+        # e.g. https://github.com/owner/repo  →  owner/repo
+        parts = [p for p in path.split("/") if p]
+        if len(parts) >= 2:
+            zip_url = f"https://api.github.com/repos/{parts[0]}/{parts[1]}/zipball"
+            if git_token:
+                headers["Authorization"] = f"Bearer {git_token}"
+    elif "gitlab.com" in host or "gitlab" in host:
+        # GitLab archive: /api/v4/projects/{url-encoded-path}/repository/archive.zip
+        import urllib.parse
+        project_path = urllib.parse.quote(path.lstrip("/"), safe="")
+        zip_url = f"{parsed.scheme}://{parsed.netloc}/api/v4/projects/{project_path}/repository/archive.zip"
+        if git_token:
+            headers["PRIVATE-TOKEN"] = git_token
+            headers.pop("Authorization", None)
+
+    if zip_url:
+        try:
+            zip_path = os.path.join(dest_dir, "_repo.zip")
+            with httpx.Client(timeout=300, follow_redirects=True) as client:
+                resp = client.get(zip_url, headers=headers)
+                resp.raise_for_status()
+                with open(zip_path, "wb") as f:
+                    f.write(resp.content)
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(dest_dir)
+            os.unlink(zip_path)
+            logger.info("Fetched repo via archive download: %s", zip_url)
+            return
+        except Exception as exc:
+            logger.warning("Archive download failed (%s), falling back to git clone: %s", zip_url, exc)
+
+    # Fallback: git clone
+    from urllib.parse import urlunparse
     if git_username and git_token:
-        # Inject credentials into URL for private repos
-        from urllib.parse import urlparse, urlunparse
-        parsed = urlparse(repo_url)
-        authed = parsed._replace(netloc=f"{git_username}:{git_token}@{parsed.netloc}")
-        clone_url = urlunparse(authed)
+        clone_url = urlunparse(parsed._replace(netloc=f"{git_username}:{git_token}@{parsed.netloc}"))
     else:
         clone_url = repo_url
-
-    result = subprocess.run(
-        ["git", "clone", "--depth=1", "--single-branch", clone_url, dest_dir],
-        capture_output=True, text=True, timeout=300,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"git clone failed: {result.stderr[:500]}")
+    try:
+        result = subprocess.run(
+            ["git", "clone", "--depth=1", "--single-branch", clone_url, dest_dir],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"git clone failed: {result.stderr[:500]}")
+    except FileNotFoundError:
+        raise RuntimeError(
+            "git is not installed on this server and the archive download also failed. "
+            "Use archive-upload mode instead: download your repo as a .zip and upload it."
+        )
 
 
 def _extract_archive(archive_path: str, dest_dir: str) -> None:
@@ -166,9 +225,10 @@ async def run_ai_code_review(
             if result != work_dir:
                 repo_dir = result
         elif repo_url:
-            logger.info("AI code review [%s]: cloning %s", scan_id, repo_url)
+            logger.info("AI code review [%s]: fetching %s", scan_id, repo_url)
             clone_dir = os.path.join(work_dir, "repo")
-            _clone_repo(repo_url, clone_dir, git_username, git_token)
+            os.makedirs(clone_dir, exist_ok=True)
+            _fetch_repo(repo_url, clone_dir, git_username, git_token)
             repo_dir = clone_dir
         else:
             raise ValueError("No source provided — supply a repo_url or upload a code archive")
