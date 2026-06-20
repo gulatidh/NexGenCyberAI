@@ -111,7 +111,7 @@ async def _execute_scan(
                     from services.code_review import run_ai_code_review
                     creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
                     cfg = connector_db.config or {}
-                    repo_url = creds.get("repo_url") or cfg.get("repo_url") or ""
+                    repo_url = (scan.summary or {}).get("repo_url") or creds.get("repo_url") or cfg.get("repo_url") or ""
                     git_username = creds.get("git_username") or cfg.get("git_username") or ""
                     git_token = creds.get("git_token") or cfg.get("git_token") or ""
                     archive_path = (scan.summary or {}).get("code_archive") or ""
@@ -351,6 +351,9 @@ async def start_scan(
     # distinguishable instead of all reading as just "full".
     _st = payload.scan_type.value if hasattr(payload.scan_type, "value") else str(payload.scan_type or "scan")
     _default_name = f"{_st}_{datetime.now(timezone.utc):%Y%m%d_%H%M}"
+    initial_summary: dict | None = None
+    if payload.repo_url:
+        initial_summary = {"repo_url": payload.repo_url}
     scan = Scan(
         client_id=client_id,
         project_id=proj_id,
@@ -360,6 +363,7 @@ async def start_scan(
         framework=payload.framework,
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
         status=ScanStatus.PENDING,
+        summary=initial_summary,
     )
     db.add(scan)
     db.commit()
@@ -510,6 +514,8 @@ async def rescan(
     orig_summary = original.summary or {}
     if orig_summary.get("code_archive"):
         inherited_summary["code_archive"] = orig_summary["code_archive"]
+    if orig_summary.get("repo_url"):
+        inherited_summary["repo_url"] = orig_summary["repo_url"]
 
     new = Scan(
         client_id=client_id,

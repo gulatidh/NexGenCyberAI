@@ -109,6 +109,7 @@ export default function Scans() {
   const [binaryFile, setBinaryFile] = useState<File | null>(null);
   // AI Code Review source mode: git repo vs zip archive upload
   const [acrMode, setAcrMode] = useState<"repo" | "archive">("repo");
+  const [acrRepoUrl, setAcrRepoUrl] = useState("");
   const [codeArchive, setCodeArchive] = useState<File | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
@@ -194,7 +195,7 @@ export default function Scans() {
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
-      setOpen(false); setScanName("");
+      setOpen(false); setScanName(""); setAcrRepoUrl(""); setAcrMode("repo");
       toast.success("Assessment started");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
@@ -712,6 +713,20 @@ export default function Scans() {
                           })}
                         </Box>
                       </Grid>
+                      {acrMode === "repo" && (
+                        <Grid size={{ xs: 12 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Repository URL"
+                            placeholder="https://github.com/owner/repo"
+                            value={acrRepoUrl}
+                            onChange={(e) => setAcrRepoUrl(e.target.value)}
+                            helperText="GitHub or GitLab HTTPS URL. For private repos, configure credentials in the connector."
+                            slotProps={{ input: { sx: { color: "text.primary" } } }}
+                          />
+                        </Grid>
+                      )}
                       {acrMode === "archive" && (
                         <Grid size={{ xs: 12 }}>
                           <Box sx={{ p: 1.5, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 1.5 }}>
@@ -819,13 +834,14 @@ export default function Scans() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button onClick={() => { setOpen(false); setAcrRepoUrl(""); setAcrMode("repo"); }} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={
               startMutation.isPending ||
               (category !== "cloud" && (!scannerId || !connectorId)) ||
               (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile) ||
-              (scannerId === "ai_code_review" && acrMode === "archive" && !codeArchive)
+              (scannerId === "ai_code_review" && acrMode === "archive" && !codeArchive) ||
+              (scannerId === "ai_code_review" && acrMode === "repo" && !acrRepoUrl.trim())
             }
             onClick={async () => {
               const isBinary = scannerId === "codeql" && codeqlMode === "binary" && binaryFile;
@@ -884,6 +900,9 @@ export default function Scans() {
                   connector_id: connectorId || undefined,
                   framework: framework || undefined,
                   name: scanName || undefined,
+                  ...(scannerId === "ai_code_review" && acrMode === "repo" && acrRepoUrl.trim()
+                    ? { repo_url: acrRepoUrl.trim() }
+                    : {}),
                 });
               }
             }}>
