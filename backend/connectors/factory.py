@@ -23,6 +23,7 @@ from connectors.scanners.trivy import TrivyConnector
 from connectors.scanners.owasp_dc import OwaspDependencyCheckConnector
 from connectors.scanners.gitleaks import GitleaksConnector
 from connectors.scanners.trufflehog import TruffleHogConnector
+from connectors.scanners.ai_code_review import AICodeReviewConnector
 
 
 _REGISTRY = {
@@ -47,6 +48,8 @@ _REGISTRY = {
     ConnectorType.OWASP_DC: OwaspDependencyCheckConnector,
     ConnectorType.GITLEAKS: GitleaksConnector,
     ConnectorType.TRUFFLEHOG: TruffleHogConnector,
+    # AI-powered local code review (runs in-process, not via GitHub Actions)
+    ConnectorType.AI_CODE_REVIEW: AICodeReviewConnector,
 }
 
 
