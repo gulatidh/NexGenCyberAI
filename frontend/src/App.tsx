@@ -39,6 +39,7 @@ import Account from "./pages/Account";
 import Missions from "./pages/Missions";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -186,6 +187,7 @@ export default function App() {
                   <Route path="/account" element={<Account />} />
                   <Route path="/missions" element={<Missions />} />
                   <Route path="/knowledge" element={<KnowledgeBase />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Route>
               </Routes>
             </BrowserRouter>

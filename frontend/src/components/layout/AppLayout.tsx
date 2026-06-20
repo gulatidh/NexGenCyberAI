@@ -9,10 +9,10 @@ import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle,
   BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
-  AdminPanelSettings, Schedule, AutoStories, GppMaybe, MenuBook, Hub,
+  AdminPanelSettings, Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
-  ExpandLess, ExpandMore, VisibilityOutlined, Engineering, MarkEmailRead,
-  Cable,
+  ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
+  Cable, Settings,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -77,11 +77,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Settings",
     items: [
-      { label: "Email Settings", icon: <MarkEmailRead />,      path: "/email-settings" },
-      { label: "Sync",           icon: <GppMaybe />,           path: "/sync", adminOnly: true },
-      { label: "Access Logs",    icon: <History />,            path: "/access-logs", adminOnly: true },
-      { label: "Administration", icon: <AdminPanelSettings />, path: "/admin", adminOnly: true },
-      { label: "Help",           icon: <MenuBook />,           path: "/help" },
+      { label: "Settings", icon: <Settings />, path: "/settings" },
+      { label: "Help",     icon: <MenuBook />, path: "/help" },
     ],
   },
 ];

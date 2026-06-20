@@ -198,6 +198,13 @@ export const emailApi = {
   }) => apiClient.post("/email/send/", data).then((r) => r.data),
 };
 
+export const ssoApi = {
+  getConfig: () => apiClient.get("/sso/config/").then((r) => r.data),
+  updateConfig: (data: Record<string, any>) =>
+    apiClient.patch("/sso/config/", data).then((r) => r.data),
+  test: () => apiClient.post("/sso/test/").then((r) => r.data),
+};
+
 export const dashboardApi = {
   summary: () => apiClient.get("/dashboard/").then((r) => r.data),
   activity: (days: number = 3) =>

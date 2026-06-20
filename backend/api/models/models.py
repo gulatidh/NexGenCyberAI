@@ -625,6 +625,25 @@ class EmailSettings(Base):
     updated_by = Column(String(255))
 
 
+class SsoSettings(Base):
+    """Single-row table holding tenant-wide SSO / Entra ID configuration.
+
+    Stores the Azure AD tenant and app-registration details needed for MSAL.
+    The client secret is stored encrypted; the UI receives only a
+    `client_secret_configured` boolean."""
+    __tablename__ = "sso_settings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    enabled = Column(Boolean, default=False, nullable=False)
+    tenant_id = Column(String(255))
+    client_id = Column(String(255))
+    client_secret_enc = Column(Text)
+    redirect_uri = Column(String(512))
+    authority = Column(String(512))
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_by = Column(String(255))
+
+
 class AccessLog(Base):
     """Audit trail of authenticated portal access — one row per API request.
 
