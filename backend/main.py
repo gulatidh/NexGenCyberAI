@@ -1057,6 +1057,42 @@ _seed_knowledge_base()
 _seed_agents()
 
 
+@app.post("/api/internal/ai-review-test")
+async def internal_ai_review_test(request: Request, background_tasks: BackgroundTasks):
+    """Temporary internal endpoint — trigger an AI code review scan without browser auth."""
+    from fastapi import HTTPException as _HTTPException
+    secret = settings.SCAN_INGEST_SECRET
+    if not secret or request.headers.get("X-Internal-Secret") != secret:
+        raise _HTTPException(status_code=403, detail="Forbidden")
+    data = await request.json()
+    repo_url = data.get("repo_url", "")
+    client_id = data.get("client_id", "")
+    if not repo_url or not client_id:
+        raise _HTTPException(status_code=400, detail="repo_url and client_id required")
+    from db.database import SessionLocal as _SL
+    from api.models.models import Scan, ScanStatus, ScanType
+    from api.routers.scans import _execute_scan
+    from core.encryption import encrypt as _enc
+    _db = _SL()
+    try:
+        import uuid as _uuid
+        _scan = Scan(
+            id=str(_uuid.uuid4()),
+            client_id=client_id,
+            scan_type=ScanType.FULL,
+            status=ScanStatus.PENDING,
+            initiated_by="internal-test",
+            summary={"repo_url": repo_url},
+        )
+        _db.add(_scan)
+        _db.commit()
+        _scan_id = _scan.id
+    finally:
+        _db.close()
+    background_tasks.add_task(_execute_scan, _scan_id, settings.DATABASE_URL, None, None)
+    return {"scan_id": _scan_id, "repo_url": repo_url, "status": "triggered"}
+
+
 @app.get("/api/health")
 async def health():
     db_status = "ok"
