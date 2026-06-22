@@ -229,7 +229,13 @@ async def run_ai_code_review(
             clone_dir = os.path.join(work_dir, "repo")
             os.makedirs(clone_dir, exist_ok=True)
             _fetch_repo(repo_url, clone_dir, git_username, git_token)
-            repo_dir = clone_dir
+            # GitHub/GitLab zipballs extract into a single top-level dir; unwrap it
+            # so repo_dir is the actual code root and paths stay prefix-free.
+            _entries = [e for e in os.listdir(clone_dir) if not e.startswith(".")]
+            if len(_entries) == 1 and os.path.isdir(os.path.join(clone_dir, _entries[0])):
+                repo_dir = os.path.join(clone_dir, _entries[0])
+            else:
+                repo_dir = clone_dir
         else:
             raise ValueError("No source provided — supply a repo_url or upload a code archive")
 

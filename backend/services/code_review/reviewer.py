@@ -304,8 +304,14 @@ async def triage_files(
         if isinstance(items, list):
             ranked = [item["path"] for item in items if isinstance(item, dict) and "path" in item]
             if ranked:
-                logger.info("Triage selected %d files for deep review", len(ranked))
-                return ranked[:top_n]
+                # Validate returned paths exist in the actual file tree to guard
+                # against the LLM inventing or normalising paths.
+                file_set = set(file_list)
+                valid = [p for p in ranked if p in file_set]
+                if valid:
+                    logger.info("Triage selected %d files for deep review", len(valid))
+                    return valid[:top_n]
+                logger.warning("Triage returned %d paths but none matched file tree — using heuristic order", len(ranked))
     except BudgetExceededError:
         logger.warning("Triage skipped — token budget exhausted; using heuristic order")
     except Exception as exc:
