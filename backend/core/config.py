@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     # Dependency-Check scans when a connector doesn't carry its own key.
     # Set as a Key Vault-referenced App Service setting in prod.
     NVD_API_KEY: str = ""
+    SCAN_INGEST_SECRET: str = ""
 
     class Config:
         env_file = ".env"
