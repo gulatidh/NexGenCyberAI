@@ -855,7 +855,7 @@ export default function Scans() {
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={
               startMutation.isPending ||
-              (category !== "cloud" && (!scannerId || !connectorId)) ||
+              (category !== "cloud" && scannerId !== "ai_code_review" && (!scannerId || !connectorId)) ||
               (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile) ||
               (scannerId === "ai_code_review" && acrMode === "archive" && !codeArchive) ||
               (scannerId === "ai_code_review" && acrMode === "repo" && !acrRepoUrl.trim())
