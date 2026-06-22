@@ -52,6 +52,31 @@ async def _execute_scan(
 
         all_findings = []
 
+        # AI Code Review with no connector — repo URL + optional token supplied
+        # inline at scan-creation time (stored in scan.summary).
+        _summary = scan.summary or {}
+        if not scan.connector_id and (_summary.get("repo_url") or _summary.get("code_archive")):
+            from core.config import get_settings as _gs
+            from core.encryption import decrypt as _dec
+            from services.code_review import run_ai_code_review
+            _repo_url = _summary.get("repo_url") or ""
+            _archive = _summary.get("code_archive") or ""
+            _git_token_enc = _summary.get("git_token_enc") or ""
+            _git_token = ""
+            if _git_token_enc:
+                try:
+                    _git_token = _dec(_git_token_enc)
+                except Exception:
+                    pass
+            await run_ai_code_review(
+                scan_id=scan.id,
+                db_url=_gs().DATABASE_URL,
+                repo_url=_repo_url or None,
+                archive_path=_archive or None,
+                git_token=_git_token,
+            )
+            return
+
         if scan.connector_id:
             connector_db = db.query(Connector).filter(Connector.id == scan.connector_id).first()
             if connector_db:
@@ -352,8 +377,13 @@ async def start_scan(
     _st = payload.scan_type.value if hasattr(payload.scan_type, "value") else str(payload.scan_type or "scan")
     _default_name = f"{_st}_{datetime.now(timezone.utc):%Y%m%d_%H%M}"
     initial_summary: dict | None = None
-    if payload.repo_url:
-        initial_summary = {"repo_url": payload.repo_url}
+    if payload.repo_url or payload.git_token:
+        from core.encryption import encrypt as _enc
+        initial_summary = {}
+        if payload.repo_url:
+            initial_summary["repo_url"] = payload.repo_url
+        if payload.git_token:
+            initial_summary["git_token_enc"] = _enc(payload.git_token)
     scan = Scan(
         client_id=client_id,
         project_id=proj_id,
@@ -516,6 +546,8 @@ async def rescan(
         inherited_summary["code_archive"] = orig_summary["code_archive"]
     if orig_summary.get("repo_url"):
         inherited_summary["repo_url"] = orig_summary["repo_url"]
+    if orig_summary.get("git_token_enc"):
+        inherited_summary["git_token_enc"] = orig_summary["git_token_enc"]
 
     new = Scan(
         client_id=client_id,

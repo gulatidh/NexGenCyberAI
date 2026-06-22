@@ -110,6 +110,7 @@ export default function Scans() {
   // AI Code Review source mode: git repo vs zip archive upload
   const [acrMode, setAcrMode] = useState<"repo" | "archive">("repo");
   const [acrRepoUrl, setAcrRepoUrl] = useState("");
+  const [acrGitToken, setAcrGitToken] = useState("");
   const [codeArchive, setCodeArchive] = useState<File | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
@@ -195,7 +196,7 @@ export default function Scans() {
     mutationFn: (data: any) => scansApi.start(selectedClientId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
-      setOpen(false); setScanName(""); setAcrRepoUrl(""); setAcrMode("repo");
+      setOpen(false); setScanName(""); setAcrRepoUrl(""); setAcrGitToken(""); setAcrMode("repo");
       toast.success("Assessment started");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
@@ -662,22 +663,24 @@ export default function Scans() {
                       slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
                       sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                   </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>
-                      <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
-                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                        {(() => {
-                          const def = SCANNERS.find((s) => s.id === scannerId);
-                          const matching = connectors.filter((c) => c.connector_type === def?.connectorType);
-                          if (matching.length === 0) {
-                            return <MenuItem disabled value="">No {def?.name} connector configured — create one under Connectors first</MenuItem>;
-                          }
-                          return matching.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>);
-                        })()}
-                      </Select>
-                    </FormControl>
-                  </Grid>
+                  {scannerId !== "ai_code_review" && (
+                    <Grid size={{ xs: 12 }}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>
+                        <Select value={connectorId} onChange={(e) => setConnectorId(e.target.value)} label="Connector"
+                          sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                          {(() => {
+                            const def = SCANNERS.find((s) => s.id === scannerId);
+                            const matching = connectors.filter((c) => c.connector_type === def?.connectorType);
+                            if (matching.length === 0) {
+                              return <MenuItem disabled value="">No {def?.name} connector configured — create one under Connectors first</MenuItem>;
+                            }
+                            return matching.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>);
+                          })()}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  )}
                   {/* AI Code Review — pick git repo mode vs archive upload. */}
                   {scannerId === "ai_code_review" && (
                     <>
@@ -714,18 +717,32 @@ export default function Scans() {
                         </Box>
                       </Grid>
                       {acrMode === "repo" && (
-                        <Grid size={{ xs: 12 }}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Repository URL"
-                            placeholder="https://github.com/owner/repo"
-                            value={acrRepoUrl}
-                            onChange={(e) => setAcrRepoUrl(e.target.value)}
-                            helperText="GitHub or GitLab HTTPS URL. For private repos, configure credentials in the connector."
-                            slotProps={{ input: { sx: { color: "text.primary" } } }}
-                          />
-                        </Grid>
+                        <>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              label="Repository URL"
+                              placeholder="https://github.com/owner/repo"
+                              value={acrRepoUrl}
+                              onChange={(e) => setAcrRepoUrl(e.target.value)}
+                              slotProps={{ input: { sx: { color: "text.primary" } } }}
+                            />
+                          </Grid>
+                          <Grid size={{ xs: 12 }}>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              type="password"
+                              label="Access Token (optional — required for private repos)"
+                              placeholder="ghp_xxxxxxxxxxxx"
+                              value={acrGitToken}
+                              onChange={(e) => setAcrGitToken(e.target.value)}
+                              helperText="GitHub PAT or GitLab token with repo read access. Not stored after the scan runs."
+                              slotProps={{ input: { sx: { color: "text.primary" } } }}
+                            />
+                          </Grid>
+                        </>
                       )}
                       {acrMode === "archive" && (
                         <Grid size={{ xs: 12 }}>
@@ -834,7 +851,7 @@ export default function Scans() {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => { setOpen(false); setAcrRepoUrl(""); setAcrMode("repo"); }} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button onClick={() => { setOpen(false); setAcrRepoUrl(""); setAcrGitToken(""); setAcrMode("repo"); }} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={
               startMutation.isPending ||
@@ -895,14 +912,14 @@ export default function Scans() {
                   toast.error(e?.response?.data?.detail || "Code archive upload failed");
                 }
               } else {
+                const isAcrRepo = scannerId === "ai_code_review" && acrMode === "repo";
                 startMutation.mutate({
                   scan_type: scanType,
-                  connector_id: connectorId || undefined,
+                  connector_id: isAcrRepo ? undefined : (connectorId || undefined),
                   framework: framework || undefined,
                   name: scanName || undefined,
-                  ...(scannerId === "ai_code_review" && acrMode === "repo" && acrRepoUrl.trim()
-                    ? { repo_url: acrRepoUrl.trim() }
-                    : {}),
+                  ...(isAcrRepo && acrRepoUrl.trim() ? { repo_url: acrRepoUrl.trim() } : {}),
+                  ...(isAcrRepo && acrGitToken.trim() ? { git_token: acrGitToken.trim() } : {}),
                 });
               }
             }}>

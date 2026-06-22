@@ -120,9 +120,11 @@ class ScanCreate(BaseModel):
     # queued — caller must follow up with another call (e.g. upload-binary)
     # that fires the workflow once the prerequisite is ready.
     defer_dispatch: Optional[bool] = False
-    # Git repo URL for AI code review scans launched in "repo" mode.
-    # Takes precedence over the connector's stored repo_url.
+    # Git repo URL + optional PAT for connector-less AI code review scans.
+    # repo_url takes precedence over the connector's stored repo_url.
+    # git_token is stored encrypted in scan.summary; never returned to the client.
     repo_url: Optional[str] = None
+    git_token: Optional[str] = None
 
 class ScanResponse(BaseModel):
     id: str
