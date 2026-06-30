@@ -97,6 +97,7 @@ jobs:
         with:
           name: frontend-build
           path: frontend/build/
+          retention-days: 90
 
   # ── 3. Terraform Plan ────────────────────────────────────────────────────
   terraform-plan:
@@ -236,3 +237,56 @@ jobs:
           app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_DEV }}
           package: ./frontend/build
           startup-command: "npx --yes serve -s . -l 8080"
+
+  # ── 5. Artifact Retention — keep latest 20 ───────────────────────────────
+  cleanup-artifacts:
+    name: Cleanup — Keep Latest 20 Artifacts
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      actions: write
+    steps:
+      - name: Delete artifacts beyond latest 20
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, json, urllib.request, ssl
+
+          token = os.environ["GH_TOKEN"]
+          repo  = os.environ["REPO"]
+          ctx   = ssl.create_default_context()
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+
+          def gh(method, path, **kw):
+              req = urllib.request.Request(
+                  f"https://api.github.com{path}", method=method,
+                  headers=headers, **kw)
+              with urllib.request.urlopen(req, context=ctx) as r:
+                  return json.loads(r.read()) if r.length else None
+
+          artifacts, page = [], 1
+          while True:
+              batch = gh("GET", f"/repos/{repo}/actions/artifacts?per_page=100&page={page}").get("artifacts", [])
+              artifacts.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+
+          artifacts.sort(key=lambda a: a["created_at"], reverse=True)
+          to_delete = artifacts[20:]
+          print(f"Total: {len(artifacts)}, keeping 20, deleting {len(to_delete)}")
+
+          for a in to_delete:
+              try:
+                  gh("DELETE", f"/repos/{repo}/actions/artifacts/{a['id']}")
+                  print(f"  Deleted {a['id']}: {a['name']} ({a['created_at'][:10]})")
+              except Exception as e:
+                  print(f"  Failed {a['id']}: {e}")
+          PYEOF
