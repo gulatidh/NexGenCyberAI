@@ -40,6 +40,7 @@ import Missions from "./pages/Missions";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
 import Settings from "./pages/Settings";
+import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -72,127 +73,100 @@ function LoginPage() {
   );
 }
 
+function AuthError({ error }: { error: any }) {
+  const code = error?.errorCode || error?.name || "unknown";
+  const msg = error?.errorMessage || error?.message || String(error || "");
+  const isInteractionInProgress = code === "interaction_in_progress" || /interaction.in.progress/i.test(msg);
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, fontFamily: "Inter, sans-serif", color: "white", background: "#0d1117" }}>
+      <div style={{ maxWidth: 640, width: "100%", background: "#1E1E1E", border: "1px solid rgba(234,67,53,0.4)", borderRadius: 12, padding: 32 }}>
+        <h2 style={{ color: "#EA4335", marginTop: 0 }}>Sign-in failed</h2>
+        <p style={{ color: "rgba(255,255,255,0.85)", marginBottom: 24 }}>Microsoft Entra ID returned an error during the sign-in flow.</p>
+        <div style={{ background: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 8, padding: 16, marginBottom: 24, fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.85)", wordBreak: "break-word" }}>
+          <div style={{ color: "#FBBC04", marginBottom: 6, fontWeight: 700 }}>Error code: {code}</div>
+          <div>{msg || "(no error message)"}</div>
+        </div>
+        {isInteractionInProgress && (
+          <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 1.5 }}>
+            A previous sign-in attempt is still in progress. Clearing browser session storage usually resolves this.
+          </p>
+        )}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button onClick={() => { try { sessionStorage.clear(); localStorage.clear(); } catch {} window.location.href = "/"; }} style={{ background: "#4285F4", color: "white", border: "none", padding: "10px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
+            Clear session and retry
+          </button>
+          <button onClick={() => window.location.reload()} style={{ background: "transparent", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.2)", padding: "10px 18px", borderRadius: 6, cursor: "pointer", fontSize: 14 }}>
+            Just retry
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProtectedApp() {
+  return (
+    <MsalAuthenticationTemplate
+      interactionType={InteractionType.Redirect}
+      authenticationRequest={loginRequest}
+      loadingComponent={LoginPage}
+      errorComponent={AuthError}
+    >
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/risk-overview" element={<RiskOverviewPage />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/clients/:clientId" element={<ClientDetail />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/connectors" element={<Connectors />} />
+          <Route path="/scans" element={<Scans />} />
+          <Route path="/scans/:scanId" element={<ScanDetail />} />
+          <Route path="/findings" element={<Findings />} />
+          <Route path="/risks" element={<Risks />} />
+          <Route path="/assets" element={<Assets />} />
+          <Route path="/stale-assets" element={<StaleAssets />} />
+          <Route path="/assets/technologies" element={<Technologies />} />
+          <Route path="/assets/:assetId" element={<AssetDetail />} />
+          <Route path="/frameworks" element={<Frameworks />} />
+          <Route path="/agents" element={<Agents />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/ai-settings" element={<AISettings />} />
+          <Route path="/email-settings" element={<EmailSettings />} />
+          <Route path="/access-logs" element={<AccessLogs />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/sync" element={<SyncPage />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/threat-models" element={<ThreatModels />} />
+          <Route path="/threat-models/:modelId" element={<ThreatModelDetail />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/missions" element={<Missions />} />
+          <Route path="/knowledge" element={<KnowledgeBase />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+      </Routes>
+    </MsalAuthenticationTemplate>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
-         <ViewModeProvider>
-          <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
-          <MsalAuthenticationTemplate
-            interactionType={InteractionType.Redirect}
-            authenticationRequest={loginRequest}
-            loadingComponent={LoginPage}
-            errorComponent={({ error }: any) => {
-              const code = error?.errorCode || error?.name || "unknown";
-              const msg = error?.errorMessage || error?.message || String(error || "");
-              const isInteractionInProgress =
-                code === "interaction_in_progress" ||
-                /interaction.in.progress/i.test(msg);
-              return (
-                <div style={{
-                  minHeight: "100vh", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", padding: 40,
-                  fontFamily: "Inter, sans-serif", color: "white",
-                  background: "#0d1117",
-                }}>
-                  <div style={{
-                    maxWidth: 640, width: "100%",
-                    background: "#1E1E1E", border: "1px solid rgba(234,67,53,0.4)",
-                    borderRadius: 12, padding: 32,
-                  }}>
-                    <h2 style={{ color: "#EA4335", marginTop: 0 }}>Sign-in failed</h2>
-                    <p style={{ color: "rgba(255,255,255,0.85)", marginBottom: 24 }}>
-                      Microsoft Entra ID returned an error during the sign-in flow.
-                    </p>
-                    <div style={{
-                      background: "rgba(234,67,53,0.08)",
-                      border: "1px solid rgba(234,67,53,0.3)",
-                      borderRadius: 8, padding: 16, marginBottom: 24,
-                      fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.85)",
-                      wordBreak: "break-word",
-                    }}>
-                      <div style={{ color: "#FBBC04", marginBottom: 6, fontWeight: 700 }}>
-                        Error code: {code}
-                      </div>
-                      <div>{msg || "(no error message)"}</div>
-                    </div>
-                    {isInteractionInProgress && (
-                      <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13, lineHeight: 1.5 }}>
-                        A previous sign-in attempt is still in progress. Clearing browser
-                        session storage usually resolves this.
-                      </p>
-                    )}
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => {
-                          try { sessionStorage.clear(); localStorage.clear(); } catch {}
-                          window.location.href = "/";
-                        }}
-                        style={{
-                          background: "#4285F4", color: "white", border: "none",
-                          padding: "10px 18px", borderRadius: 6, cursor: "pointer",
-                          fontWeight: 600, fontSize: 14,
-                        }}
-                      >
-                        Clear session and retry
-                      </button>
-                      <button
-                        onClick={() => window.location.reload()}
-                        style={{
-                          background: "transparent", color: "rgba(255,255,255,0.8)",
-                          border: "1px solid rgba(255,255,255,0.2)",
-                          padding: "10px 18px", borderRadius: 6, cursor: "pointer",
-                          fontSize: 14,
-                        }}
-                      >
-                        Just retry
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }}
-          >
+          <ViewModeProvider>
+            <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
             <BrowserRouter>
               <Routes>
-                <Route element={<AppLayout />}>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/risk-overview" element={<RiskOverviewPage />} />
-                  <Route path="/clients" element={<Clients />} />
-                  <Route path="/clients/:clientId" element={<ClientDetail />} />
-                  <Route path="/projects" element={<Projects />} />
-                  <Route path="/connections" element={<Connections />} />
-                  <Route path="/connectors" element={<Connectors />} />
-                  <Route path="/scans" element={<Scans />} />
-                  <Route path="/scans/:scanId" element={<ScanDetail />} />
-                  <Route path="/findings" element={<Findings />} />
-                  <Route path="/risks" element={<Risks />} />
-                  <Route path="/assets" element={<Assets />} />
-                  <Route path="/stale-assets" element={<StaleAssets />} />
-                  <Route path="/assets/technologies" element={<Technologies />} />
-                  <Route path="/assets/:assetId" element={<AssetDetail />} />
-                  <Route path="/frameworks" element={<Frameworks />} />
-                  <Route path="/agents" element={<Agents />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/ai-settings" element={<AISettings />} />
-                  <Route path="/email-settings" element={<EmailSettings />} />
-                  <Route path="/access-logs" element={<AccessLogs />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/sync" element={<SyncPage />} />
-                  <Route path="/help" element={<Help />} />
-                  <Route path="/threat-models" element={<ThreatModels />} />
-                  <Route path="/threat-models/:modelId" element={<ThreatModelDetail />} />
-                  <Route path="/account" element={<Account />} />
-                  <Route path="/missions" element={<Missions />} />
-                  <Route path="/knowledge" element={<KnowledgeBase />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Route>
+                {/* Public landing page — no auth required */}
+                <Route path="/" element={<LandingPage />} />
+                {/* All other routes require Microsoft Entra ID sign-in */}
+                <Route path="/*" element={<ProtectedApp />} />
               </Routes>
             </BrowserRouter>
-          </MsalAuthenticationTemplate>
-         </ViewModeProvider>
+          </ViewModeProvider>
         </ThemeModeProvider>
       </QueryClientProvider>
     </AuthProvider>
