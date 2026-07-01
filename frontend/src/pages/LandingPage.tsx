@@ -95,7 +95,11 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  const signIn = () => instance.loginRedirect(loginRequest).catch(() => {});
+  const signIn = () =>
+    instance.loginRedirect({
+      ...loginRequest,
+      redirectStartPage: `${window.location.origin}/dashboard`,
+    }).catch(() => {});
 
   return (
     <Box sx={{ bgcolor: BG, minHeight: "100vh", color: "white", fontFamily: "Inter, sans-serif", overflowX: "hidden" }}>
