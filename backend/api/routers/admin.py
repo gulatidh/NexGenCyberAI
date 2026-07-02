@@ -137,6 +137,43 @@ async def get_my_access(
     )
 
 
+@router.post("/bootstrap-admin", response_model=MyAccessResponse)
+async def bootstrap_admin(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """First-run helper: if there are no global admins in the DB at all, grant
+    the caller global admin. Returns 409 if any global admin already exists.
+    This lets the first authenticated user self-bootstrap without needing
+    INITIAL_ADMIN_UPN to be set."""
+    existing_admins = db.query(UserAccess).filter(
+        UserAccess.scope_type == AccessScope.GLOBAL,
+        UserAccess.role == AccessRole.ADMIN,
+    ).count()
+    if existing_admins > 0:
+        raise HTTPException(status_code=409, detail="Global admin already exists — contact your administrator.")
+    email = _user_email(user)
+    if not email:
+        raise HTTPException(status_code=401, detail="Could not identify user email from token")
+    db.add(UserAccess(
+        email=email,
+        role=AccessRole.ADMIN,
+        scope_type=AccessScope.GLOBAL,
+        scope_id=None,
+        granted_by="bootstrap-admin",
+    ))
+    db.commit()
+    grants = get_user_grants(db, email)
+    return MyAccessResponse(
+        email=email,
+        grants=[_grant_response(g, db) for g in grants],
+        is_admin=True,
+        is_admin_anywhere=True,
+        is_editor_anywhere=True,
+        manageable_scopes=[],
+    )
+
+
 def _require_admin_anywhere(user: dict = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     """Allow any user holding admin role at *any* scope — used to gate access
     management endpoints that scoped admins also need (with per-target checks

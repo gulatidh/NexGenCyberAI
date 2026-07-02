@@ -20,6 +20,7 @@ async def list_findings(
     severity: Optional[str] = None,
     status: Optional[str] = None,
     project_id: Optional[str] = None,
+    scan_id: Optional[str] = None,
     section: Optional[str] = None,
     category: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -36,6 +37,8 @@ async def list_findings(
         q = q.filter(Finding.status == status)
     if project_id:
         q = q.filter(Scan.project_id == project_id)
+    if scan_id:
+        q = q.filter(Finding.scan_id == scan_id)
     rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(2000).all()
 
     # Section/category filters happen in Python (heuristic-driven)
@@ -44,6 +47,15 @@ async def list_findings(
             (not section or classify(f)[0] == section)
             and (not category or classify(f)[1] == category)
         )]
+
+    # When filtering to a single scan, skip cross-scan deduplication — the
+    # user wants to see every raw finding from that specific run.
+    if scan_id:
+        for f in rows:
+            f.seen_count = 1
+            f.first_seen_at = f.created_at
+        rows.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)
+        return rows[:300]
 
     # Dedupe by (resource_id, title) — pick the latest detection as the
     # representative, set first_seen_at to the earliest, and seen_count to

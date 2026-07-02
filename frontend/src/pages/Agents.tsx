@@ -398,24 +398,32 @@ export default function Agents() {
                         </Typography>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                           {agent.legacy_orchestrator ? (
-                            <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                              disabled={!selectedClientId || runMutation.isPending || !canAct}
-                              onClick={() => runMutation.mutate(agent.key as AgentType)}
-                              sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
-                              Run
-                            </Button>
+                            <Tooltip title={!canAct ? "Switch to Analyst mode (top-right toggle) to run agents" : !selectedClientId ? "Select a client from the dropdown above first" : ""}>
+                              <span>
+                                <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
+                                  disabled={!selectedClientId || runMutation.isPending || !canAct}
+                                  onClick={() => runMutation.mutate(agent.key as AgentType)}
+                                  sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
+                                  Run
+                                </Button>
+                              </span>
+                            </Tooltip>
                           ) : (
-                            <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                              disabled={!agent.is_enabled || !canAct}
-                              onClick={() => {
-                                setBriefingAgent(agent);
-                                setBriefingPrompt("");
-                                setBriefingOutput(null);
-                                setBriefingError("");
-                              }}
-                              sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
-                              Run
-                            </Button>
+                            <Tooltip title={!canAct ? "Switch to Analyst mode (top-right toggle) to run agents" : !agent.is_enabled ? "Agent is disabled — enable it via the configure button" : ""}>
+                              <span>
+                                <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
+                                  disabled={!agent.is_enabled || !canAct}
+                                  onClick={() => {
+                                    setBriefingAgent(agent);
+                                    setBriefingPrompt("");
+                                    setBriefingOutput(null);
+                                    setBriefingError("");
+                                  }}
+                                  sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
+                                  Run
+                                </Button>
+                              </span>
+                            </Tooltip>
                           )}
                           <Box sx={{ flex: 1 }} />
                           <Tooltip title={isAdmin ? "Configure" : "View configuration"}>

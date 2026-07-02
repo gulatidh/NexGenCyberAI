@@ -139,9 +139,9 @@ export const scansApi = {
 };
 
 export const findingsApi = {
-  listAll: (clientId: string, severity?: string, status?: string, projectId?: string, section?: string, category?: string) =>
+  listAll: (clientId: string, severity?: string, status?: string, projectId?: string, section?: string, category?: string, scanId?: string) =>
     apiClient.get(`/clients/${clientId}/findings/`, {
-      params: { severity, status, project_id: projectId || undefined, section: section || undefined, category: category || undefined },
+      params: { severity, status, project_id: projectId || undefined, section: section || undefined, category: category || undefined, scan_id: scanId || undefined },
     }).then((r) => r.data),
   categories: (clientId: string, projectId?: string, status?: string) =>
     apiClient.get(`/clients/${clientId}/findings/categories`, {
@@ -276,6 +276,7 @@ export const threatModelsApi = {
 
 export const adminApi = {
   me: () => apiClient.get("/admin/me").then((r) => r.data),
+  bootstrapAdmin: () => apiClient.post("/admin/bootstrap-admin").then((r) => r.data),
   listUsers: () => apiClient.get("/admin/users").then((r) => r.data),
   createGrant: (data: any) => apiClient.post("/admin/grants", data).then((r) => r.data),
   deleteGrant: (grantId: string) => apiClient.delete(`/admin/grants/${grantId}`),

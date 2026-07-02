@@ -4,6 +4,7 @@ import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
   IconButton, Chip, Tooltip, Collapse, ToggleButton, ToggleButtonGroup,
+  Button, Alert, Snackbar,
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
@@ -15,7 +16,7 @@ import {
   Cable, Settings,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
 import { adminApi } from "../../services/api";
 import { MyAccess } from "../../types";
@@ -58,9 +59,9 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    section: "Assessments",
+    section: "Security",
     items: [
-      { label: "Assessments",   icon: <BugReport />, path: "/scans" },
+      { label: "Scans",         icon: <BugReport />, path: "/scans" },
       { label: "Findings",      icon: <Security />,  path: "/findings" },
       { label: "Threat Models", icon: <Hub />,       path: "/threat-models" },
       { label: "Risk Register", icon: <Assessment />, path: "/risks" },
@@ -151,6 +152,7 @@ export default function AppLayout() {
     window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
+  const qc = useQueryClient();
   const { data: me } = useQuery<MyAccess>({
     queryKey: ["my-access"],
     queryFn: adminApi.me,
@@ -158,11 +160,29 @@ export default function AppLayout() {
     staleTime: 60_000,
   });
 
+  const [bootstrapSnack, setBootstrapSnack] = useState("");
+  const bootstrapMutation = useMutation({
+    mutationFn: adminApi.bootstrapAdmin,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-access"] });
+      setBootstrapSnack("You are now a global admin. Welcome to Aegis!");
+    },
+    onError: () => setBootstrapSnack("An admin already exists — contact them for access."),
+  });
+
   // RBAC binding: a user with no editor/admin grant anywhere is read-only,
   // so lock them to Executive mode (the backend enforces this on writes too).
+  // When there are zero grants in the system (fresh install), auto-trigger
+  // the bootstrap so the first user self-elevates to admin.
   useEffect(() => {
-    if (me) setReadOnly(!me.is_editor_anywhere);
-  }, [me, setReadOnly]);
+    if (me) {
+      setReadOnly(!me.is_editor_anywhere);
+      if (!me.is_editor_anywhere && me.grants.length === 0) {
+        bootstrapMutation.mutate();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.is_editor_anywhere]);
 
   const account = accounts[0];
   const userName = account?.name || account?.username || "User";
@@ -494,6 +514,10 @@ export default function AppLayout() {
           <Outlet />
         </Box>
       </Box>
+      <Snackbar open={!!bootstrapSnack} autoHideDuration={6000} onClose={() => setBootstrapSnack("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="success" onClose={() => setBootstrapSnack("")}>{bootstrapSnack}</Alert>
+      </Snackbar>
     </Box>
   );
 }

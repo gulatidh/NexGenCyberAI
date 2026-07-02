@@ -9,8 +9,8 @@ import {
 import { BugReport, DeleteOutlined, CleaningServices } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, findingsApi, projectsApi } from "../services/api";
-import { Client, Finding, Project, FindingCategoriesResponse } from "../types";
+import { clientsApi, findingsApi, projectsApi, scansApi } from "../services/api";
+import { Client, Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
@@ -90,6 +90,7 @@ export default function Findings() {
   const qc = useQueryClient();
   const [clientId, setClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
   const [projectId, setProjectId] = useState("");
+  const [scanId, setScanId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [section, setSection] = useState("security_posture");
@@ -102,14 +103,19 @@ export default function Findings() {
     queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
+  const { data: scans = [] } = useQuery<Scan[]>({
+    queryKey: ["scans-for-findings", clientId],
+    queryFn: () => scansApi.list(clientId),
+    enabled: !!clientId,
+  });
   const { data: catData } = useQuery<FindingCategoriesResponse>({
     queryKey: ["findings-categories", clientId, projectId, statusFilter],
     queryFn: () => findingsApi.categories(clientId, projectId || undefined, statusFilter || "open"),
     enabled: !!clientId,
   });
   const { data: findings = [], isLoading } = useQuery<Finding[]>({
-    queryKey: ["findings-all", clientId, projectId, sevFilter, statusFilter, section, category],
-    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined, section, category || undefined),
+    queryKey: ["findings-all", clientId, projectId, scanId, sevFilter, statusFilter, section, category],
+    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined, section, category || undefined, scanId || undefined),
     enabled: !!clientId,
   });
 
@@ -192,7 +198,7 @@ export default function Findings() {
         <Box>
           <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Findings</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            All security findings across scans
+            {scanId ? "Findings for selected scan (no deduplication)" : "Consolidated findings across all scans — deduplicated by vulnerability"}
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -205,10 +211,23 @@ export default function Findings() {
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
-            <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
+            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setScanId(""); }} label="Project"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 180 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "text.secondary" }}>Scan</InputLabel>
+            <Select value={scanId} onChange={(e) => setScanId(e.target.value)} label="Scan"
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value="">All scans</MenuItem>
+              {scans.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {(s as any).name || (s as any).scan_type || s.id.slice(0, 8)}
+                  {(s as any).findings_count ? ` (${(s as any).findings_count})` : ""}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>
