@@ -1,96 +1,218 @@
 """
 NexGenCyberAI - Threat Intelligence Agent
-Queries open-source threat intelligence feeds (AlienVault OTX, MITRE ATT&CK).
-Identifies TTPs, threat actors, and indicators of compromise.
+Senior threat intelligence analyst persona.
+Maps findings to MITRE ATT&CK, assesses threat actor relevance, and identifies detection gaps.
 """
-from langchain_core.tools import Tool
-from typing import Any, Dict, List
-import httpx
+from __future__ import annotations
+
+import json
+import logging
+from collections import Counter
+from typing import Any, Dict, List, Optional
+
 from agents.base_agent import BaseAgent
 
-
-async def _fetch_otx_pulse(indicator: str) -> str:
-    """Query AlienVault OTX for threat indicators."""
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                f"https://otx.alienvault.com/api/v1/indicators/domain/{indicator}/general",
-                headers={"X-OTX-API-KEY": ""},
-            )
-        if resp.status_code == 200:
-            data = resp.json()
-            pulse_count = data.get("pulse_info", {}).get("count", 0)
-            return f"OTX: {indicator} found in {pulse_count} threat pulses"
-        return f"OTX: No results for {indicator}"
-    except Exception as exc:
-        return f"OTX query failed: {exc}"
-
-
-def _map_to_mitre_attack(finding_title: str) -> str:
-    """Map a finding title to MITRE ATT&CK technique (local lookup)."""
-    MITRE_MAP = {
-        "MFA": "T1078 — Valid Accounts",
-        "privilege": "T1078.003 — Local Accounts",
-        "lateral": "T1021 — Remote Services",
-        "phishing": "T1566 — Phishing",
-        "ransomware": "T1486 — Data Encrypted for Impact",
-        "credential": "T1003 — OS Credential Dumping",
-        "exfiltration": "T1041 — Exfiltration Over C2 Channel",
-        "persistence": "T1053 — Scheduled Task/Job",
-        "discovery": "T1082 — System Information Discovery",
-        "injection": "T1055 — Process Injection",
-    }
-    title_lower = finding_title.lower()
-    for keyword, technique in MITRE_MAP.items():
-        if keyword in title_lower:
-            return technique
-    return "Unknown technique"
-
-
-def _mitre_lookup_tool(finding_title: str) -> str:
-    return f"ATT&CK: {_map_to_mitre_attack(finding_title)}"
+logger = logging.getLogger(__name__)
 
 
 class ThreatIntelAgent(BaseAgent):
+    """Threat Intelligence Agent.
+
+    Correlates security findings with MITRE ATT&CK techniques, assesses threat
+    actor profiles, identifies detection gaps, and produces Sigma rule stubs.
+    """
+
     agent_name = "ThreatIntelAgent"
     domain = "threat intelligence and MITRE ATT&CK"
     objective = (
         "Correlate security findings with threat actor TTPs using MITRE ATT&CK. "
-        "Query threat intelligence feeds to identify known IOCs and active threats."
+        "Identify detection gaps and produce actionable intelligence for the SOC."
     )
 
-    def _default_tools(self) -> List[Tool]:
-        return [
-            Tool(
-                name="mitre_attack_lookup",
-                func=_mitre_lookup_tool,
-                description="Map a finding title to a MITRE ATT&CK technique. Input: finding title string.",
-            ),
-        ]
+    def system_prompt(self) -> str:
+        return """## Role: Senior Threat Intelligence Analyst & SOC Architect
 
-    async def enrich_findings(self, findings: List[Dict], client_name: str) -> Dict[str, Any]:
-        import json
-        enriched = []
-        for f in findings:
-            technique = _map_to_mitre_attack(f.get("title", ""))
-            enriched.append({**f, "mitre_technique": technique})
-        technique_counts: Dict[str, int] = {}
-        for f in enriched:
-            t = f.get("mitre_technique", "")
-            if t != "Unknown technique":
-                technique_counts[t] = technique_counts.get(t, 0) + 1
-        result = await self.run({
-            "input": json.dumps({
-                "task": "threat_intel",
-                "client": client_name,
-                "top_techniques": sorted(technique_counts.items(), key=lambda x: -x[1])[:5],
-                "instructions": (
-                    "1. Identify which threat actors use these TTPs. "
-                    "2. Assess whether this pattern matches a known campaign. "
-                    "3. Recommend detection rules (Sigma/YARA)."
-                ),
+You are a senior threat intelligence analyst with 12 years of experience supporting
+Security Operations Centres at financial sector, government, and critical infrastructure
+organisations. You also design CTI programs and detection engineering frameworks.
+
+### Technical Expertise
+You are an expert in:
+- MITRE ATT&CK framework v15 — Tactics (14), Techniques (700+), Sub-techniques (400+),
+  Procedures, and Data Sources
+- Threat actor profiling using the Diamond Model (adversary, infrastructure, capability, victim)
+- Pyramid of Pain — understanding which IOC types are most costly for adversaries to change
+- CTI program design: strategic, operational, and tactical intelligence tiers
+- Detection engineering: Sigma rules (YAML-format generic detection), YARA patterns,
+  Suricata/Snort IDS signatures
+- IOC lifecycle management and threat hunting hypothesis generation
+
+### Verified Threat Actor Reference (cite only when evidence supports attribution)
+The following threat groups are verified and documented in ATT&CK. You may reference them
+ONLY when the findings data provides contextual evidence linking to their TTPs:
+- APT38 (G0082) — North Korea-nexus, financial sector targeting, SWIFT fraud, T1059/T1071
+- Lazarus Group (G0032) — North Korea-nexus, cryptocurrency theft, supply chain
+- FIN7 (G0046) — financially motivated cybercrime, retail/hospitality, T1566/T1055
+- Carbanak (G0008) — financially motivated cybercrime, banking sector
+- APT29 / Cozy Bear (G0016) — Russia-nexus, government/diplomatic targeting, T1078/T1021
+- ALPHV/BlackCat — ransomware-as-a-service, T1486, triple extortion
+- Cl0p — ransomware-as-a-service, MOVEit-style mass exploitation
+IMPORTANT: Never attribute findings to a specific threat actor without clear contextual
+evidence in the provided data. Vague similarities are insufficient for attribution.
+
+### MITRE ATT&CK Technique Mapping Methodology
+You map findings to ATT&CK techniques using CONTEXTUAL ANALYSIS — not keyword matching.
+A finding about "excessive admin privileges" maps to T1078 (Valid Accounts) because the
+control failure enables that technique — not simply because the word matches. A missing
+EDR maps to a Detection Gap across DE.AE-01 through DE.CM-09 because the absence of
+telemetry means those techniques go undetected.
+
+### Detection Engineering
+For each identified technique, you produce Sigma rule stubs in correct YAML format:
+```yaml
+title: [Descriptive title]
+status: experimental
+logsource:
+    category: [windows/linux/network/cloud]
+    product: [windows/linux/azure/aws]
+detection:
+    selection:
+        [field]: [value]
+    condition: selection
+falsepositives: [list]
+level: [low/medium/high/critical]
+```
+
+### CTI Program Design
+You design intelligence requirements using the Priority Intelligence Requirements (PIR)
+framework. You identify intelligence gaps and recommend collection strategies.
+
+### Conduct
+You write in a precise, third-person analyst report tone. You ground all threat actor
+attributions in evidence from the provided findings. You never speculate beyond what the
+data supports. You distinguish clearly between observed TTPs (high confidence), inferred
+TTPs (medium confidence), and possible TTPs (low confidence)."""
+
+    async def enrich_findings(
+        self,
+        findings: List[Dict],
+        client_name: str,
+    ) -> Dict[str, Any]:
+        """Enrich findings with threat intelligence and MITRE ATT&CK mapping.
+
+        Args:
+            findings:    List of finding dicts from the scan pipeline.
+            client_name: Client organisation name.
+
+        Returns:
+            Structured dict with technique_mapping and enriched_findings added
+            for backward compatibility with the orchestrator.
+        """
+        if not self._has_provider():
+            result = self._fallback_analysis(findings)
+            result["technique_mapping"] = {}
+            result["enriched_findings"] = findings
+            return result
+
+        # ── Pre-compute deterministic metrics ──────────────────────────────────
+        confidence, pct = self._compute_data_completeness(findings)
+        sev_counts = _count_severities(findings)
+        cves = [f.get("cve_id") for f in findings if f.get("cve_id")]
+        unique_cves = sorted(set(cves))
+        control_ids = sorted({f.get("control_id") for f in findings if f.get("control_id")})
+
+        # Build finding titles/descriptions for TTP contextual analysis
+        finding_contexts = []
+        for f in findings[:50]:  # cap at 50 for prompt size
+            finding_contexts.append({
+                "title": f.get("title", ""),
+                "description": (f.get("description") or "")[:200],
+                "severity": f.get("severity", ""),
+                "resource_type": f.get("resource_type", ""),
+                "control_id": f.get("control_id", ""),
             })
-        })
-        result["technique_mapping"] = technique_counts
-        result["enriched_findings"] = enriched
+
+        # ── Build prompts ──────────────────────────────────────────────────────
+        system = (
+            self.system_prompt()
+            + "\n\n"
+            + self.anti_hallucination_directive()
+            + "\n\n"
+            + self.consulting_packaging_directive()
+        )
+
+        user = f"""## Threat Intelligence Enrichment Input: {client_name}
+
+### Dataset Overview
+- **Client:** {client_name}
+- **Total findings:** {len(findings)}
+- **Data confidence:** {confidence} ({pct}% completeness)
+
+### Severity Distribution
+| Severity | Count |
+|----------|-------|
+| CRITICAL | {sev_counts['critical']} |
+| HIGH     | {sev_counts['high']} |
+| MEDIUM   | {sev_counts['medium']} |
+| LOW      | {sev_counts['low']} |
+| INFO     | {sev_counts['info']} |
+
+### CVEs Present in Findings (only these may be cited)
+{', '.join(unique_cves) if unique_cves else 'None'}
+
+### Unique Control IDs Breached
+{', '.join(control_ids[:30]) if control_ids else 'None'}
+
+### Finding Contexts for TTP Mapping (top 50)
+{json.dumps(finding_contexts, indent=2)}
+
+### Instructions
+Produce a threat intelligence assessment for {client_name}.
+
+The `output` field must contain 400-800 words of markdown covering:
+1. **Threat Landscape Assessment** — what attacker profiles are suggested by this control
+   failure pattern (ground in actual findings data above)
+2. **MITRE ATT&CK Technique Mapping** — map specific findings to specific techniques with
+   confidence levels (observed/inferred/possible)
+3. **Detection Gap Analysis** — which techniques have no detection coverage based on
+   missing controls in the findings
+4. **Sigma Rule Stubs** — at least 2 YAML Sigma rule stubs for the highest-priority
+   detected techniques
+5. **Priority Intelligence Requirements** — 3-5 PIRs the client SOC should pursue
+
+Finding IDs must use prefix CTI with sub-domains:
+- CTI-TL-NNN: Threat Landscape
+- CTI-CP-NNN: Collection & Processing
+- CTI-IR-NNN: Intelligence Requirements
+- CTI-FD-NNN: Finished Intelligence
+- SOC-DG-NNN: Detection Gaps
+
+In each finding entry, add a "technique_id" and "tactic" field showing the ATT&CK mapping.
+
+maturity_indicators sub_domains must include: threat_intelligence_program,
+detection_coverage, incident_response_readiness, threat_hunting_capability.
+
+Use data_confidence="{confidence}" and data_completeness_pct={pct} exactly as given."""
+
+        try:
+            result = await self._call_llm(system, user)
+        except Exception as exc:
+            logger.error(f"ThreatIntelAgent LLM error: {exc}")
+            result = self._fallback_analysis(findings)
+
+        # ── Backward compatibility additions for orchestrator ──────────────────
+        # technique_mapping: simplified dict for orchestrator's use
+        result["technique_mapping"] = {}
+        # enriched_findings: pass through original findings (orchestrator reads this)
+        result["enriched_findings"] = findings
         return result
+
+
+# ── Module-level helpers ───────────────────────────────────────────────────────
+
+def _count_severities(findings: List[Dict]) -> Dict[str, int]:
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+    for f in findings:
+        sev = (f.get("severity") or "info").lower()
+        counts[sev] = counts.get(sev, 0) + 1
+    return counts
