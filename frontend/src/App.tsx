@@ -46,6 +46,8 @@ import ThreatRegister from "./pages/ThreatRegister";
 import ControlDeficiencies from "./pages/ControlDeficiencies";
 import RemediationTracker from "./pages/RemediationTracker";
 import CustomFrameworks from "./pages/CustomFrameworks";
+import VAPTReports from "./pages/VAPTReports";
+import VAPTReportDetail from "./pages/VAPTReportDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -154,6 +156,8 @@ function ProtectedApp() {
           <Route path="/missions" element={<Missions />} />
           <Route path="/knowledge" element={<KnowledgeBase />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/vapt-reports" element={<VAPTReports />} />
+          <Route path="/vapt-reports/:reportId" element={<VAPTReportDetail />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>

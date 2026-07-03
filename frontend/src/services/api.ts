@@ -439,6 +439,29 @@ export const assistantApi = {
     apiClient.post("/assistant/chat", data).then((r) => r.data),
 };
 
+export const vaptApi = {
+  list: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/vapt-reports/`).then((r) => r.data),
+  create: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/vapt-reports/`, data).then((r) => r.data),
+  get: (clientId: string, reportId: string) =>
+    apiClient.get(`/clients/${clientId}/vapt-reports/${reportId}/`).then((r) => r.data),
+  update: (clientId: string, reportId: string, data: any) =>
+    apiClient.patch(`/clients/${clientId}/vapt-reports/${reportId}/`, data).then((r) => r.data),
+  delete: (clientId: string, reportId: string) =>
+    apiClient.delete(`/clients/${clientId}/vapt-reports/${reportId}/`),
+  createRetest: (clientId: string, reportId: string) =>
+    apiClient.post(`/clients/${clientId}/vapt-reports/${reportId}/retest/`).then((r) => r.data),
+  addFinding: (clientId: string, reportId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/vapt-reports/${reportId}/findings/`, data).then((r) => r.data),
+  updateFinding: (clientId: string, reportId: string, findingId: string, data: any) =>
+    apiClient.patch(`/clients/${clientId}/vapt-reports/${reportId}/findings/${findingId}/`, data).then((r) => r.data),
+  deleteFinding: (clientId: string, reportId: string, findingId: string) =>
+    apiClient.delete(`/clients/${clientId}/vapt-reports/${reportId}/findings/${findingId}/`),
+  exportUrl: (clientId: string, reportId: string, format: string) =>
+    `/api/v1/clients/${clientId}/vapt-reports/${reportId}/export/${format}`,
+};
+
 export const customFrameworksApi = {
   list: () => apiClient.get("/frameworks/custom/").then((r) => r.data),
   create: (data: { name: string; description?: string }) =>

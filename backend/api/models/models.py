@@ -1021,3 +1021,60 @@ class KnowledgeFileSection(Base):
     body = Column(JSON, default={})
 
     file = relationship("KnowledgeFile", back_populates="sections")
+
+
+# ── VAPT Report Models ─────────────────────────────────────────────────────────
+
+class VAPTReport(Base):
+    """Full VAPT engagement report with version and retest tracking."""
+    __tablename__ = "vapt_reports"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    parent_report_id = Column(String(36), nullable=True)   # set on retest versions
+    title = Column(String(500), nullable=False)
+    version = Column(String(20), default="1.0")
+    classification = Column(String(50), default="Confidential")
+    prepared_by = Column(String(255))
+    reviewed_by = Column(String(255))
+    report_date = Column(DateTime(timezone=True))
+    retest_date = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), default="draft")           # draft | final
+    executive_summary = Column(Text)
+    scope_json = Column(Text)     # JSON: {engagement_type, period_start, period_end, in_scope:[], out_of_scope:[]}
+    methodology_json = Column(Text)  # JSON: {phases:[{name,description}], tools:[], standards:[]}
+    conclusion = Column(Text)
+    appendices = Column(Text)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    findings = relationship(
+        "VAPTFinding",
+        back_populates="report",
+        cascade="all, delete-orphan",
+        order_by="VAPTFinding.order_index",
+    )
+
+
+class VAPTFinding(Base):
+    """Individual vulnerability finding within a VAPT report."""
+    __tablename__ = "vapt_findings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    report_id = Column(String(36), ForeignKey("vapt_reports.id"), nullable=False, index=True)
+    finding_id = Column(String(20))          # F-01, F-02 …
+    title = Column(String(500), nullable=False)
+    severity = Column(String(20), nullable=False)  # critical|high|medium|low|informational
+    affected_asset = Column(String(500))
+    description = Column(Text)
+    impact = Column(Text)
+    evidence = Column(Text)
+    reproduction_steps = Column(Text)
+    recommendation = Column(Text)
+    references = Column(Text)               # CVE/CWE/OWASP refs
+    retest_status = Column(String(20), default="pending")  # pending|passed|failed|not_applicable
+    retest_notes = Column(Text, nullable=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    report = relationship("VAPTReport", back_populates="findings")
