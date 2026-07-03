@@ -339,6 +339,23 @@ def _ensure_added_columns() -> None:
                     logger.info("Added ai_settings.%s column (%s)", col, dialect)
                 except Exception as exc:
                     logger.warning("ai_settings.%s ALTER failed: %s", col, exc)
+
+        # clients.deleted_at — soft-delete timestamp (NULL = active)
+        try:
+            client_cols = {c["name"] for c in inspector.get_columns("clients")}
+        except Exception:
+            client_cols = set()
+        if client_cols and "deleted_at" not in client_cols:
+            ddl = ("ALTER TABLE clients ADD deleted_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE clients ADD COLUMN deleted_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added clients.deleted_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("clients.deleted_at ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
