@@ -25,6 +25,64 @@ function CatIcon({ name, sx }: { name: string; sx?: any }) {
   return <C sx={sx || { fontSize: 14 }} />;
 }
 
+// Mirror of backend services/finding_classifier.py — used to derive
+// per-scan category counts from the already-fetched findings list without
+// an extra API call. Must be kept in sync with the Python original.
+const _SECTIONS_META: [string, string, [string, string, string][]][] = [
+  ["security_posture", "Security Posture", [
+    ["vulnerability",       "Vulnerability Findings",       "BugReport"],
+    ["cloud_configuration", "Cloud Configuration Findings", "CloudQueue"],
+    ["host_configuration",  "Host Configuration Findings",  "Computer"],
+    ["attack_surface",      "Attack Surface Findings",      "Public"],
+    ["data",                "Data Findings",                "Storage"],
+    ["secret",              "Secret Findings",              "VpnKey"],
+    ["end_of_life",         "End of Life Findings",         "EventBusy"],
+    ["sast",                "SAST Findings",                "Code"],
+    ["web",                 "Web Findings",                 "Language"],
+    ["network_exposure",    "Network Exposure",             "Lan"],
+    ["excessive_access",    "Excessive Access Findings",    "GroupAdd"],
+    ["identity_access",     "Identity Access Findings",     "Person"],
+    ["ai_security",         "AI Security Findings",         "Psychology"],
+  ]],
+  ["threat_detection", "Threat Detection", [
+    ["detections", "Detections", "Notifications"],
+  ]],
+  ["secure_development", "Secure Development", [
+    ["code_build_scans",     "Code & Build Scans",           "Build"],
+    ["kubernetes_admission", "Kubernetes Admission Reviews", "AllInbox"],
+  ]],
+];
+const _CAT_TO_SEC: Record<string, string> = {};
+for (const [sec, , cats] of _SECTIONS_META) for (const [cat] of cats) _CAT_TO_SEC[cat] = sec;
+
+function _classifyFinding(f: Finding): [string, string] {
+  const title = (f.title || "").toLowerCase();
+  const rt    = (f.resource_type || "").toLowerCase();
+  const ctrl  = (f.control_id || "").toUpperCase();
+  const sp = "security_posture";
+  if (rt.startsWith("web/") || ctrl.startsWith("ZAP-") || ctrl.startsWith("CWE-")) return [sp, "web"];
+  if (["xss","cross-site scripting","sql injection","csrf","clickjacking","session fixation","open redirect"].some(k => title.includes(k))) return [sp, "web"];
+  if (f.cve_id || (f.cvss_score && f.cvss_score > 0)) return [sp, "vulnerability"];
+  if (["secret","credential leaked","api key exposed","private key"].some(k => title.includes(k))) return [sp, "secret"];
+  if (["end of life","end-of-life","eol","deprecated","out of support","unsupported version"].some(k => title.includes(k))) return [sp, "end_of_life"];
+  if (["sast","code scan","source code"].some(k => title.includes(k))) return [sp, "sast"];
+  if (["prompt injection","ai model","llm","model jailbreak"].some(k => title.includes(k))) return [sp, "ai_security"];
+  if (["alert","detection","anomalous","suspicious activity","runtime threat"].some(k => title.includes(k))) return ["threat_detection", "detections"];
+  if (["admission webhook","podsecuritypolicy","k8s admission"].some(k => title.includes(k))) return ["secure_development", "kubernetes_admission"];
+  if (["ci pipeline","build artifact","container image scan","image scan"].some(k => title.includes(k))) return ["secure_development", "code_build_scans"];
+  if (["nsg","port ","internet","public ip","0.0.0.0/0","exposed"].some(k => title.includes(k))) return [sp, "network_exposure"];
+  if (["SC-7","AC-17"].includes(ctrl) || rt.includes("networksecuritygroups") || rt.includes("securitygroup")) return [sp, "network_exposure"];
+  if (["public dns","exposed endpoint","publicly accessible","front door"].some(k => title.includes(k))) return [sp, "attack_surface"];
+  if (["mfa","multi-factor","password policy","authentication","sign-in"].some(k => title.includes(k))) return [sp, "identity_access"];
+  if (["AC-2","IA-2"].includes(ctrl)) return [sp, "identity_access"];
+  if (["owner role","admin","privilege","rbac"].some(k => title.includes(k))) return [sp, "excessive_access"];
+  if (ctrl === "AC-6") return [sp, "excessive_access"];
+  if (["storage","blob","bucket","encryption","tls","https-only","encrypt"].some(k => title.includes(k))) return [sp, "data"];
+  if (rt.includes("storageaccounts") || rt.includes("::s3::") || rt.includes("buckets")) return [sp, "data"];
+  if (rt.includes("virtualmachines") || rt.includes("ec2") || rt.includes("googleapis.com/instance")) return [sp, "host_configuration"];
+  return [sp, "cloud_configuration"];
+}
+
 // Per-category accent colors — keeps each tile distinct in the grid.
 const CAT_COLOR: Record<string, string> = {
   vulnerability:       "#f44336",
@@ -119,11 +177,36 @@ export default function Findings() {
     enabled: !!clientId,
   });
 
-  const sectionData = (catData?.sections || []).find((s) => s.key === section);
+  // When a specific scan is selected the catData query still returns global
+  // (all-scan) counts. Recompute counts from the already-fetched scan-filtered
+  // findings list so the tiles reflect only that scan's data.
+  const scanFilteredCatData = React.useMemo((): FindingCategoriesResponse | null => {
+    if (!scanId || findings.length === 0) return null;
+    const secCounts: Record<string, Record<string, number>> = {};
+    for (const f of findings) {
+      const [sec, cat] = _classifyFinding(f);
+      if (!secCounts[sec]) secCounts[sec] = {};
+      secCounts[sec][cat] = (secCounts[sec][cat] || 0) + 1;
+    }
+    const sections = _SECTIONS_META.map(([key, label, cats]) => ({
+      key,
+      label,
+      total: Object.values(secCounts[key] || {}).reduce((a, b) => a + b, 0),
+      categories: cats.map(([catKey, catLabel, catIcon]) => ({
+        key: catKey, label: catLabel, icon: catIcon,
+        count: (secCounts[key] || {})[catKey] || 0,
+      })),
+    }));
+    return { sections, grand_total: findings.length };
+  }, [scanId, findings]);
+
+  const effectiveCatData = scanId ? scanFilteredCatData : catData;
+
+  const sectionData = (effectiveCatData?.sections || []).find((s) => s.key === section);
   // Only surface sections that actually have findings — empty ones (e.g. Threat
   // Detection with no runtime source, Secure Development with no code scans) are
   // hidden so the page doesn't show blank tabs.
-  const visibleSections = (catData?.sections || []).filter((s) => s.total > 0);
+  const visibleSections = (effectiveCatData?.sections || []).filter((s) => s.total > 0);
   // If the active section has no findings, jump to the first populated one.
   useEffect(() => {
     if (visibleSections.length && !visibleSections.some((s) => s.key === section)) {
@@ -131,7 +214,7 @@ export default function Findings() {
       setCategory("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catData]);
+  }, [effectiveCatData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => findingsApi.update(clientId, id, data),
@@ -279,7 +362,7 @@ export default function Findings() {
             )}
           </Box>
           <Grid container spacing={1.5} sx={{ mb: 2 }}>
-            {!catData ? (
+            {!effectiveCatData ? (
               [0, 1, 2, 3, 4, 5].map((i) => (
                 <Grid key={i} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
                   <Skeleton variant="rectangular" height={88}
