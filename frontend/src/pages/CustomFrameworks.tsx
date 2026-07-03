@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { alpha } from "@mui/material/styles";
 import {
   Box, Typography, Button, Card, CardContent, IconButton, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -188,9 +189,9 @@ function ControlPickerDialog({
                   display: "flex", alignItems: "flex-start", gap: 1, px: 1, py: 0.75,
                   borderRadius: 1, cursor: alreadyAdded ? "default" : "pointer",
                   opacity: alreadyAdded ? 0.45 : 1,
-                  bgcolor: isSelected ? "primary.main" + "18" : "transparent",
+                  bgcolor: isSelected ? (theme: any) => alpha(theme.palette.primary.main, 0.094) : "transparent",
                   border: isSelected ? "1px solid" : "1px solid transparent",
-                  borderColor: isSelected ? "primary.main" + "40" : "transparent",
+                  borderColor: isSelected ? (theme: any) => alpha(theme.palette.primary.main, 0.25) : "transparent",
                   "&:hover": { bgcolor: alreadyAdded ? undefined : "action.hover" },
                 }}>
                 <Checkbox size="small" checked={isSelected || alreadyAdded} disabled={alreadyAdded}
