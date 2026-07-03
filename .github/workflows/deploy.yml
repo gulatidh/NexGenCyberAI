@@ -147,8 +147,8 @@ jobs:
       - name: Set startup command
         run: |
           az webapp config set \
-            --name "${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}" \
-            --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}'].resourceGroup" -o tsv)" \
+            --name "${{ secrets.AZURE_BACKEND_APP_NAME }}" \
+            --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME }}'].resourceGroup" -o tsv)" \
             --startup-file "gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
       - name: Package backend
@@ -158,7 +158,7 @@ jobs:
 
       - name: Deploy Backend (Kudu zipdeploy + Oryx build)
         env:
-          APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME_DEV }}
+          APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME }}
         run: |
           set -euo pipefail
           RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
@@ -233,6 +233,6 @@ jobs:
       - name: Deploy Frontend to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME_DEV }}
+          app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME }}
           package: ./frontend/build
           startup-command: "npx --yes serve -s . -l 8080"
