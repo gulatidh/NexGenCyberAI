@@ -6,6 +6,7 @@
 # Required GitHub Secrets:
 #   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
 #   AZURE_SUBSCRIPTION_ID       – Azure Subscription ID
+#   AZURE_RESOURCE_GROUP        – Resource group containing both App Services
 #   AZURE_BACKEND_APP_NAME      – App Service name for backend
 #   AZURE_FRONTEND_APP_NAME     – App Service name for frontend
 #   TF_VAR_sql_admin_password   – SQL admin password
@@ -148,7 +149,7 @@ jobs:
         run: |
           az webapp config set \
             --name "${{ secrets.AZURE_BACKEND_APP_NAME }}" \
-            --resource-group "$(az resource list --query "[?name=='${{ secrets.AZURE_BACKEND_APP_NAME }}'].resourceGroup" -o tsv)" \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --startup-file "gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
       - name: Package backend
@@ -159,9 +160,9 @@ jobs:
       - name: Deploy Backend (Kudu zipdeploy + Oryx build)
         env:
           APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME }}
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
         run: |
           set -euo pipefail
-          RG="$(az resource list --query "[?name=='${APP_NAME}'].resourceGroup" -o tsv)"
           USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
           PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
           # Upload with retry on 409 — Kudu only allows one active deploy at a
