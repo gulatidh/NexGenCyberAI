@@ -264,11 +264,229 @@ function RiskRegisterTable({ rows }: { rows: RiskRow[] }) {
   );
 }
 
-// ── Metadata list (cleaned) ──────────────────────────────────────────────────
+// ── Structured agent output sections ────────────────────────────────────────
+
+const SEV_COLOR: Record<string, string> = {
+  critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853", info: "#4285F4",
+};
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <Typography variant="caption" sx={{
+      display: "block", color: "#4285F4", textTransform: "uppercase",
+      letterSpacing: 1, fontWeight: 700, fontSize: 11, mb: 1, mt: 2,
+    }}>
+      {label}
+    </Typography>
+  );
+}
+
+function StructuredExecSummary({ data }: { data: any }) {
+  if (!data || typeof data !== "object") return null;
+  const { posture_verdict, critical_findings_count, top_3_risks, quick_wins_90d } = data;
+  return (
+    <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1.5, border: "1px solid rgba(66,133,244,0.15)" }}>
+      <SectionLabel label="Executive Summary" />
+      {posture_verdict && (
+        <Typography sx={{ color: "text.primary", fontSize: 13.5, fontWeight: 500, mb: 1, lineHeight: 1.5 }}>
+          {posture_verdict}
+        </Typography>
+      )}
+      {critical_findings_count != null && (
+        <Box sx={{ display: "flex", gap: 1, mb: 1, flexWrap: "wrap" }}>
+          <Chip label={`${critical_findings_count} critical`} size="small"
+            sx={{ bgcolor: critical_findings_count > 0 ? "#EA433522" : "rgba(255,255,255,0.06)", color: critical_findings_count > 0 ? "#EA4335" : "text.secondary", fontSize: 11 }} />
+        </Box>
+      )}
+      {Array.isArray(top_3_risks) && top_3_risks.length > 0 && (
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Top Risks</Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5, mt: 0.25 }}>
+            {top_3_risks.map((r: string, i: number) => (
+              <Box component="li" key={i} sx={{ fontSize: 13, color: "text.secondary", lineHeight: 1.5, mb: 0.25 }}>{r}</Box>
+            ))}
+          </Box>
+        </Box>
+      )}
+      {Array.isArray(quick_wins_90d) && quick_wins_90d.length > 0 && (
+        <Box>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>Quick Wins (90d)</Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5, mt: 0.25 }}>
+            {quick_wins_90d.map((q: string, i: number) => (
+              <Box component="li" key={i} sx={{ fontSize: 13, color: "text.secondary", lineHeight: 1.5, mb: 0.25 }}>{q}</Box>
+            ))}
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function StructuredFindings({ rows }: { rows: any[] }) {
+  if (!rows?.length) return null;
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      <SectionLabel label={`Findings (${rows.length})`} />
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        {rows.map((f: any, i: number) => {
+          const sev = (f.severity || "info").toLowerCase();
+          const color = SEV_COLOR[sev] || "rgba(255,255,255,0.5)";
+          return (
+            <Box key={f.finding_id || i} sx={{
+              p: 1.25, borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)",
+              bgcolor: "rgba(255,255,255,0.02)",
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                <Chip label={(f.severity || "INFO").toUpperCase()} size="small"
+                  sx={{ bgcolor: `${color}22`, color, fontSize: 10, height: 18, fontWeight: 700 }} />
+                {f.finding_id && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                    {f.finding_id}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, fontSize: 13 }}>
+                  {f.title}
+                </Typography>
+              </Box>
+              {f.description && (
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
+                  {f.description}
+                </Typography>
+              )}
+              {f.remediation && (
+                <Typography variant="caption" sx={{ color: "#34A853", display: "block" }}>
+                  ↳ {f.remediation}
+                </Typography>
+              )}
+              {Array.isArray(f.framework_references) && f.framework_references.length > 0 && (
+                <Box sx={{ mt: 0.5, display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                  {f.framework_references.map((ref: string, j: number) => (
+                    <Chip key={j} label={ref} size="small"
+                      sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 10, height: 16 }} />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+const BAND_COLOR: Record<string, string> = {
+  "Quick Win (0-30d)": "#34A853",
+  "Near Term (30-90d)": "#4285F4",
+  "Medium Term (90-180d)": "#FBBC04",
+  "Strategic (180d+)": "#9C27B0",
+};
+
+function StructuredRecommendations({ rows }: { rows: any[] }) {
+  if (!rows?.length) return null;
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      <SectionLabel label={`Recommendations (${rows.length})`} />
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+        {rows.map((r: any, i: number) => {
+          const color = BAND_COLOR[r.band] || "#4285F4";
+          return (
+            <Box key={i} sx={{
+              p: 1.25, borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)",
+              bgcolor: "rgba(255,255,255,0.02)", display: "flex", gap: 1.5, alignItems: "flex-start",
+            }}>
+              <Box sx={{ minWidth: 28, height: 28, borderRadius: "50%", bgcolor: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color }}>{r.priority ?? i + 1}</Typography>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: "flex", gap: 0.75, mb: 0.5, flexWrap: "wrap" }}>
+                  {r.band && (
+                    <Chip label={r.band} size="small"
+                      sx={{ bgcolor: `${color}22`, color, fontSize: 10, height: 18 }} />
+                  )}
+                  {r.effort && (
+                    <Chip label={`Effort: ${r.effort}`} size="small"
+                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 18 }} />
+                  )}
+                  {r.impact && (
+                    <Chip label={`Impact: ${r.impact}`} size="small"
+                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 18 }} />
+                  )}
+                </Box>
+                <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, lineHeight: 1.4 }}>
+                  {r.action}
+                </Typography>
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+const TIER_LABEL: Record<number, string> = { 0: "Inactive", 1: "Partial", 2: "Risk Informed", 3: "Repeatable", 4: "Adaptive" };
+const TIER_COLOR = ["#9e9e9e", "#FF7043", "#FBBC04", "#4285F4", "#34A853"];
+
+function StructuredMaturity({ data }: { data: any }) {
+  if (!data || typeof data !== "object") return null;
+  const { overall_tier, sub_domains } = data;
+  const tier = typeof overall_tier === "number" ? overall_tier : parseInt(overall_tier, 10);
+  const color = TIER_COLOR[Math.min(tier, 4)] || "#9e9e9e";
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      <SectionLabel label="Maturity Indicators" />
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+        <Box sx={{ width: 48, height: 48, borderRadius: "50%", bgcolor: `${color}22`, border: `2px solid ${color}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 700, color }}>{isNaN(tier) ? "?" : tier}</Typography>
+        </Box>
+        <Box>
+          <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 700 }}>
+            Tier {isNaN(tier) ? "?" : tier} — {TIER_LABEL[tier] ?? "Unknown"}
+          </Typography>
+          <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
+            {[0, 1, 2, 3, 4].map((t) => (
+              <Box key={t} sx={{ width: 20, height: 6, borderRadius: 1, bgcolor: t <= tier ? color : "rgba(255,255,255,0.1)" }} />
+            ))}
+          </Box>
+        </Box>
+      </Box>
+      {isPlainObject(sub_domains) && Object.keys(sub_domains).length > 0 && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+          {Object.entries(sub_domains).map(([domain, info]: [string, any]) => {
+            const t = typeof info?.tier === "number" ? info.tier : parseInt(info?.tier, 10) || 0;
+            const c = TIER_COLOR[Math.min(t, 4)] || "#9e9e9e";
+            return (
+              <Box key={domain} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", p: 0.75, borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
+                <Chip label={`T${t}`} size="small"
+                  sx={{ bgcolor: `${c}22`, color: c, fontSize: 10, height: 20, fontWeight: 700, minWidth: 32 }} />
+                <Box>
+                  <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 600, textTransform: "capitalize" }}>
+                    {domain.replace(/_/g, " ")}
+                  </Typography>
+                  {info?.evidence && (
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+                      {info.evidence}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+// ── Metadata list (cleaned) — for unknown leftover keys ──────────────────────
+
+// Keys handled by dedicated section renderers — suppress in MetadataList
+const STRUCTURED_KEYS = new Set(["executive_summary_structured", "findings", "recommendations", "maturity_indicators"]);
 
 function MetadataList({ data }: { data: Record<string, any> }) {
   const entries = Object.entries(data).filter(([k, v]) => {
     if (HIDE_KEYS.has(k)) return false;
+    if (STRUCTURED_KEYS.has(k)) return false;
     if (v === null || v === undefined || v === "") return false;
     return true;
   });
@@ -282,7 +500,10 @@ function MetadataList({ data }: { data: Record<string, any> }) {
               {k.replace(/_/g, " ")}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary", wordBreak: "break-word" }}>
-              {Array.isArray(v) ? v.join(", ")
+              {Array.isArray(v)
+                ? v.every((el) => typeof el !== "object" || el === null)
+                  ? v.join(", ")
+                  : JSON.stringify(v)
                 : isPlainObject(v) ? JSON.stringify(v)
                 : String(v)}
             </Typography>
@@ -316,6 +537,12 @@ export default function RichOutput({ value, maxHeight }: { value: any; maxHeight
     : "";
   const renderText = text || fallback || (riskRegisterRows ? "" : "_(empty output)_");
 
+  // Extract well-known structured sections from rest
+  const execSummary = isPlainObject(trimmedRest) ? trimmedRest.executive_summary_structured : undefined;
+  const agentFindings = isPlainObject(trimmedRest) && Array.isArray(trimmedRest.findings) ? trimmedRest.findings : undefined;
+  const agentRecs = isPlainObject(trimmedRest) && Array.isArray(trimmedRest.recommendations) ? trimmedRest.recommendations : undefined;
+  const maturityData = isPlainObject(trimmedRest) ? trimmedRest.maturity_indicators : undefined;
+
   return (
     <Box sx={{
       maxHeight: maxHeight ?? "none",
@@ -328,7 +555,11 @@ export default function RichOutput({ value, maxHeight }: { value: any; maxHeight
         </ReactMarkdown>
       )}
       {riskRegisterRows && <RiskRegisterTable rows={riskRegisterRows} />}
-      {text && Object.keys(trimmedRest).length > 0 && <MetadataList data={trimmedRest} />}
+      {execSummary && <StructuredExecSummary data={execSummary} />}
+      {agentFindings && agentFindings.length > 0 && <StructuredFindings rows={agentFindings} />}
+      {agentRecs && agentRecs.length > 0 && <StructuredRecommendations rows={agentRecs} />}
+      {maturityData && <StructuredMaturity data={maturityData} />}
+      {Object.keys(trimmedRest).length > 0 && <MetadataList data={trimmedRest} />}
     </Box>
   );
 }
