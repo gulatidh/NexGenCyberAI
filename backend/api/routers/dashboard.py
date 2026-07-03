@@ -42,25 +42,58 @@ def _posture_health(open_findings: int, critical_findings: int, total_connectors
 @router.get("/", response_model=DashboardSummary)
 async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_user)):
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    total_clients = db.query(func.count(Client.id)).filter(Client.is_active == True).scalar() or 0
+
+    # Subquery of non-deleted client IDs — used everywhere to exclude soft-deleted clients
+    active_cids = db.query(Client.id).filter(Client.deleted_at.is_(None))
+
+    total_clients = db.query(func.count(Client.id)).filter(
+        Client.is_active == True, Client.deleted_at.is_(None)
+    ).scalar() or 0
     total_connectors = db.query(func.count(Connector.id)).scalar() or 0
     active_connectors = db.query(func.count(Connector.id)).filter(Connector.status == "active").scalar() or 0
-    open_findings = db.query(func.count(Finding.id)).filter(Finding.status == "open").scalar() or 0
-    critical_findings = db.query(func.count(Finding.id)).filter(Finding.status == "open", Finding.severity == "critical").scalar() or 0
-    # Open findings grouped by severity — powers the Finding Severity doughnut.
+
+    # Findings filtered through Scan.client_id to exclude soft-deleted clients
+    open_findings = (
+        db.query(func.count(Finding.id))
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Finding.status == "open", Scan.client_id.in_(active_cids))
+        .scalar() or 0
+    )
+    critical_findings = (
+        db.query(func.count(Finding.id))
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Finding.status == "open", Finding.severity == "critical", Scan.client_id.in_(active_cids))
+        .scalar() or 0
+    )
     findings_by_severity = {s: 0 for s in ["critical", "high", "medium", "low", "info"]}
     for sev, n in (
         db.query(Finding.severity, func.count(Finding.id))
-        .filter(Finding.status == "open").group_by(Finding.severity).all()
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Finding.status == "open", Scan.client_id.in_(active_cids))
+        .group_by(Finding.severity).all()
     ):
         key = sev.value if hasattr(sev, "value") else str(sev)
         findings_by_severity[key] = findings_by_severity.get(key, 0) + int(n or 0)
-    risks_open = db.query(func.count(Risk.id)).filter(Risk.status == "open").scalar() or 0
-    scans_last_30d = db.query(func.count(Scan.id)).filter(Scan.created_at >= thirty_days_ago).scalar() or 0
+
+    risks_open = (
+        db.query(func.count(Risk.id))
+        .filter(Risk.status == "open", Risk.client_id.in_(active_cids))
+        .scalar() or 0
+    )
+    scans_last_30d = (
+        db.query(func.count(Scan.id))
+        .filter(Scan.created_at >= thirty_days_ago, Scan.client_id.in_(active_cids))
+        .scalar() or 0
+    )
     agent_runs_total = db.query(func.count(AgentRun.id)).scalar() or 0
 
-    # Compliance scores per framework
-    assessments = db.query(FrameworkAssessment).order_by(FrameworkAssessment.assessed_at.desc()).limit(20).all()
+    # Compliance scores per framework — active clients only
+    assessments = (
+        db.query(FrameworkAssessment)
+        .filter(FrameworkAssessment.client_id.in_(active_cids))
+        .order_by(FrameworkAssessment.assessed_at.desc())
+        .limit(20).all()
+    )
     scores: Dict[str, float] = {}
     for a in assessments:
         key = a.framework.value if hasattr(a.framework, "value") else str(a.framework)
@@ -68,8 +101,12 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
             scores[key] = a.overall_score or 0.0
     avg_compliance = sum(scores.values()) / len(scores) if scores else 0.0
 
-    # Recent data for activity feeds
-    recent_scans_raw = db.query(Scan).order_by(Scan.created_at.desc()).limit(5).all()
+    # Recent data for activity feeds — active clients only
+    recent_scans_raw = (
+        db.query(Scan)
+        .filter(Scan.client_id.in_(active_cids))
+        .order_by(Scan.created_at.desc()).limit(5).all()
+    )
     recent_scans = [
         {"id": s.id, "client_id": s.client_id, "scan_type": s.scan_type.value if hasattr(s.scan_type, "value") else s.scan_type,
          "status": s.status.value if hasattr(s.status, "value") else s.status,
@@ -79,7 +116,11 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
         for s in recent_scans_raw
     ]
 
-    recent_risks_raw = db.query(Risk).filter(Risk.status == "open").order_by(Risk.created_at.desc()).limit(5).all()
+    recent_risks_raw = (
+        db.query(Risk)
+        .filter(Risk.status == "open", Risk.client_id.in_(active_cids))
+        .order_by(Risk.created_at.desc()).limit(5).all()
+    )
     recent_risks = [
         {"id": r.id, "client_id": r.client_id, "title": r.title,
          "risk_level": r.risk_level.value if hasattr(r.risk_level, "value") else r.risk_level,
@@ -87,9 +128,12 @@ async def get_dashboard(db: Session = Depends(get_db), _=Depends(get_current_use
         for r in recent_risks_raw
     ]
 
-    recent_findings_raw = db.query(Finding).filter(
-        Finding.status == "open", Finding.severity.in_(["critical", "high"])
-    ).order_by(Finding.created_at.desc()).limit(5).all()
+    recent_findings_raw = (
+        db.query(Finding)
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Finding.status == "open", Finding.severity.in_(["critical", "high"]), Scan.client_id.in_(active_cids))
+        .order_by(Finding.created_at.desc()).limit(5).all()
+    )
     recent_findings = [
         {"id": f.id, "scan_id": f.scan_id, "title": f.title,
          "severity": f.severity.value if hasattr(f.severity, "value") else f.severity,

@@ -543,7 +543,7 @@ export default function Findings() {
                 </Box>
                 {selected.resource_id && (
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
-                    Resource: {selected.resource_id} {selected.resource_type ? `(${selected.resource_type})` : ""}
+                    {selected.resource_type === "code_file" ? "File" : selected.resource_type === "host" || selected.resource_type === "ip" ? "Host" : "Resource"}: {selected.resource_id}
                   </Typography>
                 )}
                 {selected.remediation && (

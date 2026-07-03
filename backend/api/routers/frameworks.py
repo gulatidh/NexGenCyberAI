@@ -118,7 +118,7 @@ async def client_framework_summary(
 ):
     """Compliance summary for every framework — powers the dashboard tile."""
     try:
-        client = db.query(Client).filter(Client.id == client_id).first()
+        client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
         if not client:
             raise HTTPException(status_code=404, detail="Client not found")
         out: List[FrameworkSummaryResponse] = []
@@ -159,7 +159,7 @@ async def client_framework_detail(
 ):
     """Full controls-with-status payload for the Frameworks page."""
     fw = _coerce_framework(framework)
-    client = db.query(Client).filter(Client.id == client_id).first()
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
