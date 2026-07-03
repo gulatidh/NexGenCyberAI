@@ -41,6 +41,9 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
+import ThreatRegister from "./pages/ThreatRegister";
+import ControlDeficiencies from "./pages/ControlDeficiencies";
+import RemediationTracker from "./pages/RemediationTracker";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -117,6 +120,9 @@ function ProtectedApp() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/risk-overview" element={<RiskOverviewPage />} />
+          <Route path="/threat-register" element={<ThreatRegister />} />
+          <Route path="/control-deficiencies" element={<ControlDeficiencies />} />
+          <Route path="/remediation-tracker" element={<RemediationTracker />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:clientId" element={<ClientDetail />} />
           <Route path="/projects" element={<Projects />} />

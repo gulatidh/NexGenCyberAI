@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -919,6 +919,9 @@ app.include_router(threat_models.router, prefix="/api/v1")
 app.include_router(threat_models.methodology_router, prefix="/api/v1")
 app.include_router(scans_overview.router, prefix="/api/v1")
 app.include_router(sso.router, prefix="/api/v1")
+app.include_router(threat_register.router, prefix="/api/v1")
+app.include_router(control_deficiencies.router, prefix="/api/v1")
+app.include_router(remediation_tracker.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

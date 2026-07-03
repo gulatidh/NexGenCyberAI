@@ -406,3 +406,30 @@ export const agentCatalogApi = {
   stats: (agentId: string) =>
     apiClient.get(`/agents/catalog/${agentId}/stats`).then((r) => r.data),
 };
+
+export const threatRegisterApi = {
+  list: (clientId: string, params?: { status?: string; severity?: string; scan_id?: string }) =>
+    apiClient.get(`/clients/${clientId}/threat-register/`, { params }).then((r) => r.data),
+  update: (clientId: string, entryId: string, data: { status: string }) =>
+    apiClient.patch(`/clients/${clientId}/threat-register/${entryId}`, data).then((r) => r.data),
+  delete: (clientId: string, entryId: string) =>
+    apiClient.delete(`/clients/${clientId}/threat-register/${entryId}`),
+};
+
+export const controlDeficienciesApi = {
+  list: (clientId: string, params?: { status?: string; severity?: string; framework?: string; scan_id?: string }) =>
+    apiClient.get(`/clients/${clientId}/control-deficiencies/`, { params }).then((r) => r.data),
+  update: (clientId: string, deficiencyId: string, data: { status: string }) =>
+    apiClient.patch(`/clients/${clientId}/control-deficiencies/${deficiencyId}`, data).then((r) => r.data),
+  delete: (clientId: string, deficiencyId: string) =>
+    apiClient.delete(`/clients/${clientId}/control-deficiencies/${deficiencyId}`),
+};
+
+export const remediationTrackerApi = {
+  list: (clientId: string, params?: { status?: string; band?: string; scan_id?: string }) =>
+    apiClient.get(`/clients/${clientId}/remediation-actions/`, { params }).then((r) => r.data),
+  update: (clientId: string, actionId: string, data: { status?: string; assigned_to?: string; due_date?: string; notes?: string }) =>
+    apiClient.patch(`/clients/${clientId}/remediation-actions/${actionId}`, data).then((r) => r.data),
+  delete: (clientId: string, actionId: string) =>
+    apiClient.delete(`/clients/${clientId}/remediation-actions/${actionId}`),
+};

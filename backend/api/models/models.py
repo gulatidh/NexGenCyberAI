@@ -887,6 +887,94 @@ class BuddyTrigger(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class ThreatEntry(Base):
+    """One threat from the Threat Intel agent's structured findings output.
+
+    Populated whenever the threat_intel agent completes a run. Keyed on
+    (client_id, agent_run_id, finding_id) so re-running the agent on the
+    same scan replaces prior entries cleanly if needed.
+    """
+    __tablename__ = "threat_entries"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    agent_run_id = Column(String(36), ForeignKey("agent_runs.id"), nullable=True, index=True)
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    # MITRE ATT&CK mapping (from technique_mapping key in agent output)
+    technique_id = Column(String(20))          # e.g. T1190
+    technique_name = Column(String(200))
+    tactic = Column(String(100))
+    confidence = Column(String(20))            # high / medium / low
+    # Core threat data
+    finding_id = Column(String(100))           # agent-assigned id like TI-THREAT-001
+    severity = Column(String(20), default="medium")
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    remediation = Column(Text)
+    framework_references = Column(JSON, default=list)
+    sigma_rule = Column(Text)                  # Sigma YAML stub if provided
+    # Status lifecycle
+    status = Column(String(50), default="active")  # active / mitigated / false_positive
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ControlDeficiency(Base):
+    """One control gap from the Compliance agent's structured findings output.
+
+    Each finding the compliance agent emits maps to a regulatory / framework
+    control obligation. This table captures those deficiencies so they can be
+    tracked independently from operational vulnerability findings.
+    """
+    __tablename__ = "control_deficiencies"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    agent_run_id = Column(String(36), ForeignKey("agent_runs.id"), nullable=True, index=True)
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    # Control identification
+    finding_id = Column(String(100))           # agent-assigned id like COMP-GDPR-001
+    control_id = Column(String(100))           # extracted from framework_references[0]
+    framework = Column(String(100))            # NIST CSF 2.0 / ISO 27001 / GDPR / PCI DSS
+    # Gap detail
+    severity = Column(String(20), default="medium")
+    title = Column(String(500), nullable=False)
+    gap_description = Column(Text)
+    regulatory_reference = Column(String(500))  # joined framework_references
+    remediation = Column(Text)
+    audit_readiness_score = Column(Integer)     # 0-100, from agent's audit_readiness_score
+    # Status lifecycle
+    status = Column(String(50), default="open")   # open / in_remediation / closed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RemediationAction(Base):
+    """One action item from the Remediation agent's recommendations output.
+
+    Recommendations from the remediation agent are priority-banded playbook
+    steps. This table tracks them as ticketable action items with status.
+    """
+    __tablename__ = "remediation_actions"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    agent_run_id = Column(String(36), ForeignKey("agent_runs.id"), nullable=True, index=True)
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    # Action fields (from recommendations array)
+    title = Column(String(500))                # first 100 chars of action
+    action = Column(Text, nullable=False)
+    band = Column(String(100))                 # Quick Win (0-30d) / Near Term (30-90d) / etc.
+    priority = Column(Integer, default=0)
+    effort = Column(String(20))                # Low / Medium / High
+    impact = Column(String(20))                # Low / Medium / High
+    # Tracking
+    status = Column(String(50), default="open")  # open / in_progress / completed / cancelled
+    assigned_to = Column(String(200))
+    due_date = Column(DateTime(timezone=True))
+    notes = Column(Text)
+    completed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class KnowledgeFileSection(Base):
     """One section inside a KnowledgeFile.
 

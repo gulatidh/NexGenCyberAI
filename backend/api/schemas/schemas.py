@@ -354,6 +354,87 @@ class MyAccessResponse(BaseModel):
     manageable_scopes: Dict[str, Any] = {}  # {global, client_ids[], project_ids[]}
 
 
+# ── Threat Register ────────────────────────────────────────────────────────────
+
+class ThreatEntryResponse(BaseModel):
+    id: str
+    client_id: str
+    agent_run_id: Optional[str] = None
+    scan_id: Optional[str] = None
+    technique_id: Optional[str] = None
+    technique_name: Optional[str] = None
+    tactic: Optional[str] = None
+    confidence: Optional[str] = None
+    finding_id: Optional[str] = None
+    severity: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    remediation: Optional[str] = None
+    framework_references: Optional[List] = []
+    sigma_rule: Optional[str] = None
+    status: str = "active"
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ThreatEntryUpdate(BaseModel):
+    status: Optional[str] = None
+
+
+# ── Control Deficiency Register ─────────────────────────────────────────────────
+
+class ControlDeficiencyResponse(BaseModel):
+    id: str
+    client_id: str
+    agent_run_id: Optional[str] = None
+    scan_id: Optional[str] = None
+    finding_id: Optional[str] = None
+    control_id: Optional[str] = None
+    framework: Optional[str] = None
+    severity: Optional[str] = None
+    title: str
+    gap_description: Optional[str] = None
+    regulatory_reference: Optional[str] = None
+    remediation: Optional[str] = None
+    audit_readiness_score: Optional[int] = None
+    status: str = "open"
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ControlDeficiencyUpdate(BaseModel):
+    status: Optional[str] = None
+
+
+# ── Remediation Action Tracker ──────────────────────────────────────────────────
+
+class RemediationActionResponse(BaseModel):
+    id: str
+    client_id: str
+    agent_run_id: Optional[str] = None
+    scan_id: Optional[str] = None
+    title: Optional[str] = None
+    action: str
+    band: Optional[str] = None
+    priority: Optional[int] = None
+    effort: Optional[str] = None
+    impact: Optional[str] = None
+    status: str = "open"
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+    notes: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class RemediationActionUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
 # ── Misc ───────────────────────────────────────────────────────────────────────
 
 class HealthResponse(BaseModel):
