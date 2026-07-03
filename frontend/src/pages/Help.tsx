@@ -15,7 +15,7 @@ import {
 import {
   ExpandMore, MenuBook, RocketLaunch, Hub, BugReport, Insights,
   SmartToy, Schedule, AutoStories, BarChart, AdminPanelSettings,
-  SettingsSuggest, Search, Lightbulb, Warning,
+  SettingsSuggest, Search, Lightbulb, Warning, Radar,
 } from "@mui/icons-material";
 
 interface Step {
@@ -72,11 +72,16 @@ const GROUPS: Group[] = [
       {
         id: "nav-tour",
         title: "Where to find things in the nav",
-        summary: "The left navigation is split into a main workflow group and a Settings group.",
+        summary: "The left navigation is split into a main workflow group and a Settings group. The active client is selected globally in the top toolbar.",
         steps: [
+          { text: "Top toolbar (always visible): global client selector dropdown (left of the Analyst / Executive toggle). Changing it here updates every page simultaneously — no per-page client picker needed." },
           { text: "Main workflow group (top): Dashboard, Risk Overview, Clients, Assessments, Findings, Risk Register, Asset Inventory, Technologies, Frameworks, AI Buddies, Workflows, Knowledge Base, Reports." },
+          { text: "Security section: Threat Register, Control Deficiencies, Remediation Tracker — each populated by running the matching AI agent." },
           { text: "Settings group (bottom): AI Settings, Sync (admin), Administration (admin), Help." },
           { text: "Connectors and Projects don't have top-level nav — they're tabs inside the Client Detail page." },
+        ],
+        tips: [
+          "Select your client from the top toolbar before navigating to any page — all data views will automatically scope to that client.",
         ],
       },
     ],
@@ -221,12 +226,16 @@ const GROUPS: Group[] = [
       {
         id: "risk-overview",
         title: "Risk Overview — the executive dashboard",
-        summary: "FAIR-lite ALE estimates, 30-day breach probability, and risk-by-domain breakdown.",
+        summary: "FAIR-lite ALE estimates, 30-day breach probability, and risk-by-risk-domain breakdown.",
         steps: [
-          { text: "Open Risk Overview from the left nav and pick a Client." },
+          { text: "Select a client from the top toolbar, then open Risk Overview from the left nav." },
           { text: "Top row: Total Exposure (ALE high), Net Exposure (after controls), Open Critical/High count, 30-Day Breach Probability." },
-          { text: "Risk-by-domain bar chart shows where the exposure concentrates." },
+          { text: "Risk by Domain bar chart groups risks into stable categories (Identity, Cloud Security, AppSec, Network, …). AIDM and 'AWS Application Identity' alerts always map to the Identity domain." },
+          { text: "Filter chips below the chart let you slice by SEVERITY, STATUS, and RISK DOMAIN." },
           { text: "Bottom table lists every risk with its ALE range, remediation status, and source link." },
+        ],
+        tips: [
+          "Risk domains are derived automatically from the risk's category field — run the Risk Manager agent to populate them.",
         ],
       },
       {
@@ -246,6 +255,62 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    id: "registers",
+    title: "Security Registers",
+    icon: <Radar />,
+    color: "#00ACC1",
+    topics: [
+      {
+        id: "threat-register",
+        title: "Threat Register — MITRE ATT&CK–mapped threats",
+        summary: "Populated by the Threat Intel agent. Each entry maps to a MITRE technique, tactic, and confidence level.",
+        steps: [
+          { text: "Select your client in the top toolbar." },
+          { text: "Open Threat Register from the left nav (Security section)." },
+          { text: "Filter by Status (active / mitigated / false positive) or Severity." },
+          { text: "Each row shows the severity chip, finding ID, title, MITRE technique ID + name, tactic, and confidence." },
+          { text: "Use the ⋮ menu on any row to update its status (active → mitigated or false positive)." },
+          { text: "To populate: run the Threat Intel agent from AI Buddies against a completed scan." },
+        ],
+        tips: [
+          "Entries are generated per-finding — one scan can produce multiple threat entries if different techniques are detected.",
+          "Confidence chips are color-coded: green = high, yellow = medium, red = low.",
+        ],
+      },
+      {
+        id: "control-deficiencies",
+        title: "Control Deficiencies — compliance gap register",
+        summary: "Populated by the Compliance Monitor agent. Auditor-ready register of framework control gaps.",
+        steps: [
+          { text: "Select your client in the top toolbar." },
+          { text: "Open Control Deficiencies from the left nav (Security section)." },
+          { text: "Filter by Status, Severity, or Framework (NIST CSF 2.0, ISO 27001, GDPR, PCI DSS, HIPAA, …)." },
+          { text: "KPI strip shows total, open, in-remediation, closed counts plus an Avg Audit Readiness progress bar." },
+          { text: "Each row shows the control ID (monospace), gap description, framework chip, regulatory reference, and status." },
+          { text: "Use the status icon to move a deficiency from open → in_remediation → closed." },
+          { text: "To populate: run the Compliance Monitor agent from AI Buddies against a completed scan." },
+        ],
+      },
+      {
+        id: "remediation-tracker",
+        title: "Remediation Tracker — priority-banded action items",
+        summary: "Populated by the Remediation agent. Actions grouped into Quick Win / Near Term / Medium Term / Strategic bands.",
+        steps: [
+          { text: "Select your client in the top toolbar." },
+          { text: "Open Remediation (Tracker) from the left nav (Security section)." },
+          { text: "Toggle between band-grouped view and flat table using the Assignment icon top-right." },
+          { text: "Filter by Status (open / in progress / completed / cancelled) or Band." },
+          { text: "Completion % progress bar in the KPI strip shows overall closure rate." },
+          { text: "Use the ⋮ menu on any row to update status. Completed actions auto-stamp a completion date." },
+          { text: "To populate: run the Remediation agent from AI Buddies against a completed scan." },
+        ],
+        tips: [
+          "Bands are fixed: Quick Win (0-30d), Near Term (30-90d), Medium Term (90-180d), Strategic (180d+). The Remediation agent assigns the band based on effort and impact estimates.",
+        ],
+      },
+    ],
+  },
+  {
     id: "ai-agents",
     title: "AI Buddies",
     icon: <SmartToy />,
@@ -254,12 +319,14 @@ const GROUPS: Group[] = [
       {
         id: "run-agent",
         title: "Run an AI agent against a scan",
-        summary: "Agents enrich a scan with risk scoring, framework mapping, remediation, threat intel.",
+        summary: "Agents enrich a scan with risk scoring, framework mapping, remediation, threat intel — each writing to its own register.",
         steps: [
+          { text: "Select your client in the top toolbar." },
           { text: "Open the AI Buddies tab from the left nav." },
-          { text: "Pick a Client and the Scan to analyse." },
+          { text: "Pick the Scan to analyse." },
           { text: "Choose which agents to run (Risk Manager, Vulnerability Analysis, Framework Mapping, Threat Intel, Remediation, Compliance) and click 'Run agents'." },
-          { text: "Agents run in parallel; outputs land both on the Scan Detail per-agent tab and on the Risk Register (for risk-related agents)." },
+          { text: "Agents run in parallel. Each writes to its dedicated register:", detail: "Risk Manager / Orchestrator → Risk Register | Threat Intel → Threat Register | Compliance Monitor → Control Deficiencies | Remediation → Remediation Tracker" },
+          { text: "Raw narrative output also appears on the Scan Detail per-agent tabs (structured: Executive Summary, Findings, Recommendations, Maturity Indicators)." },
         ],
         warnings: [
           "If no AI provider is configured (AI Settings), agents fall back to rule-based output. Configure Azure OpenAI / OpenAI / Anthropic / Gemini / Bedrock in AI Settings for full narrative output.",
@@ -366,6 +433,24 @@ const GROUPS: Group[] = [
     icon: <AdminPanelSettings />,
     color: "#F06292",
     topics: [
+      {
+        id: "client-lifecycle",
+        title: "Delete, restore, or permanently remove a client",
+        summary: "Clients use a 30-day soft-delete — data is preserved and restorable until permanently deleted.",
+        steps: [
+          { text: "To soft-delete: open Clients, hover any client card, click the trash icon, then confirm in the dialog. The client moves to trash — its findings, scans, risks, and registers are hidden but not removed." },
+          { text: "To restore: open Settings → Deleted Clients tab (admin only). Find the client and click the restore icon. All data comes back immediately." },
+          { text: "To permanently delete: in the Deleted Clients tab, click the permanent delete icon. A warning dialog confirms the action — this is irreversible and removes ALL related data (scans, findings, risks, threat entries, control deficiencies, remediation actions, agent runs, assessments, etc.)." },
+          { text: "Clients automatically purge after 30 days — the Days Remaining bar turns red when fewer than 3 days remain and yellow under 10 days." },
+        ],
+        tips: [
+          "Soft-deleted clients are completely invisible: they don't appear in any selector, dashboard counts, or activity feeds until restored.",
+          "The Deleted Clients tab also has a 'Purge expired' button to immediately hard-delete all clients past the 30-day window.",
+        ],
+        warnings: [
+          "Permanent delete is truly irreversible — all child data is cascade-deleted from the database. There is no undo.",
+        ],
+      },
       {
         id: "grant-access",
         title: "Grant another user access",
