@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, IconButton, Alert,
@@ -7,8 +8,7 @@ import {
 } from "@mui/material";
 import { Refresh, MoreVert, BugReport } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, threatRegisterApi } from "../services/api";
-import { Client } from "../types";
+import { threatRegisterApi } from "../services/api";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -66,11 +66,9 @@ function StatusMenu({ entry, onUpdate }: { entry: ThreatEntry; onUpdate: (status
 
 export default function ThreatRegister() {
   const qc = useQueryClient();
-  const [clientId, setClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId } = useActiveClient();
   const [filterSev, setFilterSev] = useState("");
   const [filterStatus, setFilterStatus] = useState("active");
-
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
 
   const { data: entries = [], isLoading, refetch } = useQuery<ThreatEntry[]>({
     queryKey: ["threat-register", clientId, filterSev, filterStatus],
@@ -107,15 +105,8 @@ export default function ThreatRegister() {
         <IconButton onClick={() => refetch()}><Refresh /></IconButton>
       </Box>
 
-      {/* Client + filters */}
+      {/* Filters */}
       <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Client</InputLabel>
-          <Select value={clientId} label="Client"
-            onChange={(e) => { setClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); }}>
-            {(clients as Client[]).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
         <FormControl size="small" sx={{ minWidth: 140 }}>
           <InputLabel>Status</InputLabel>
           <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>

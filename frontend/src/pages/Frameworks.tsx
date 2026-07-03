@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, Chip, CircularProgress, Button,
   FormControl, InputLabel, Select, MenuItem, Alert, TextField,
@@ -10,9 +11,9 @@ import {
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { clientsApi, connectorsApi, frameworksApi, projectsApi, scansApi } from "../services/api";
+import { connectorsApi, frameworksApi, projectsApi, scansApi } from "../services/api";
 import {
-  Client, Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
+  Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
   FrameworkDetail, Project,
 } from "../types";
 import { fromNow } from "../utils/datetime";
@@ -73,7 +74,7 @@ function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
 export default function Frameworks() {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [framework, setFramework] = useState("");
   const [family, setFamily] = useState<FrameworkFamily>("CIS");
@@ -114,7 +115,6 @@ export default function Frameworks() {
     });
   };
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId],
     queryFn: () => projectsApi.list(clientId),
@@ -281,13 +281,6 @@ export default function Frameworks() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"

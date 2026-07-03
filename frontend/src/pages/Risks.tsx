@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
@@ -8,8 +9,8 @@ import {
 } from "@mui/material";
 import { Warning, SmartToy, History, DeleteOutlined } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, risksApi, projectsApi, agentsApi } from "../services/api";
-import { Client, Risk, Project } from "../types";
+import { risksApi, projectsApi, agentsApi } from "../services/api";
+import { Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
 import AgentInsightCard from "../components/AgentInsightCard";
 
@@ -80,7 +81,7 @@ function KpiCard({ label, value, sublabel, color = "#4285F4" }: {
 
 export default function Risks() {
   const qc = useQueryClient();
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [selected, setSelected] = useState<Risk | null>(null);
 
@@ -97,7 +98,6 @@ export default function Risks() {
     setter(next);
   };
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId], queryFn: () => projectsApi.list(clientId), enabled: !!clientId,
   });
@@ -202,13 +202,6 @@ export default function Risks() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
