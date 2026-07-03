@@ -5,6 +5,7 @@
  * Section 3: Scanners (DAST / SAST / Network / Dependency — full CRUD)
  */
 import React, { useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -18,8 +19,8 @@ import {
 import { Cancel } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { connectorsApi, clientsApi, projectsApi, aiApi } from "../services/api";
-import { Connector, ConnectorType, Client, Project, AIProvider } from "../types";
+import { connectorsApi, projectsApi, aiApi } from "../services/api";
+import { Connector, ConnectorType, Project, AIProvider } from "../types";
 import { toast } from "react-toastify";
 
 // ── AI provider display map ───────────────────────────────────────────────────
@@ -229,9 +230,7 @@ export default function Connections() {
   const qc = useQueryClient();
 
   // ── Client / project selection ──────────────────────────────────────────────
-  const [selectedClientId, setSelectedClientId] = useState<string>(
-    () => localStorage.getItem("aegis-active-client") || ""
-  );
+  const { clientId: selectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   // ── Dialog state ────────────────────────────────────────────────────────────
@@ -256,11 +255,6 @@ export default function Connections() {
   const [webExcludes, setWebExcludes] = useState("");
 
   // ── Queries ─────────────────────────────────────────────────────────────────
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["clients"],
-    queryFn: clientsApi.list,
-  });
-
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", selectedClientId],
     queryFn: () => projectsApi.list(selectedClientId),
@@ -366,12 +360,6 @@ export default function Connections() {
     setWebAuth({});
     setWebExcludes("");
     setOpen(true);
-  };
-
-  const handleClientChange = (id: string) => {
-    setSelectedClientId(id);
-    localStorage.setItem("aegis-active-client", id);
-    setSelectedProjectId("");
   };
 
   // Filtered type options for the dialog's type picker
@@ -558,21 +546,8 @@ export default function Connections() {
             All integrations in one place — AI providers, cloud platforms, and security scanners
           </Typography>
         </Box>
-        {/* Client / project selectors */}
+        {/* Project selector */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Select Client</InputLabel>
-            <Select
-              value={selectedClientId}
-              onChange={(e) => handleClientChange(e.target.value)}
-              label="Select Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-            >
-              {clients.map((c) => (
-                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select

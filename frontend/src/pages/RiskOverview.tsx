@@ -1,15 +1,15 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Alert, Button,
-  CircularProgress, FormControl, InputLabel, Select, MenuItem,
+  CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   LinearProgress, Tooltip,
 } from "@mui/material";
 import { OpenInNew, TrendingUp } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { clientsApi, riskPortfolioApi } from "../services/api";
-import { Client } from "../types";
+import { riskPortfolioApi } from "../services/api";
+import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,12 +146,11 @@ function DomainBar({ rows, total }: { rows: DomainRow[]; total: number }) {
 
 export default function RiskOverview() {
   const navigate = useNavigate();
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [severityFilter, setSeverityFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [domainFilter, setDomainFilter] = useState<string>("");
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: portfolio, isLoading } = useQuery<Portfolio>({
     queryKey: ["risk-portfolio", clientId],
     queryFn: () => riskPortfolioApi.get(clientId),
@@ -173,22 +172,11 @@ export default function RiskOverview() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Portfolio</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Financial exposure, domain breakdown, and remediation status across the risk register
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-        </Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Portfolio</Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Financial exposure, risk domain breakdown, and remediation status across the risk register
+        </Typography>
       </Box>
 
       {!clientId ? (
@@ -247,11 +235,11 @@ export default function RiskOverview() {
             <CardContent>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>Risk by Domain</Typography>
-                <Chip label={`${portfolio.by_domain.length} domains`} size="small"
+                <Chip label={`${portfolio.by_domain.length} risk domains`} size="small"
                   sx={{ height: 18, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 11, fontWeight: 700 }} />
                 <Box sx={{ flex: 1 }} />
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Net exposure per domain
+                  Net exposure per risk domain
                 </Typography>
               </Box>
               <DomainBar rows={portfolio.by_domain} total={portfolio.net_exposure} />
@@ -289,7 +277,7 @@ export default function RiskOverview() {
               {portfolio.by_domain.length > 0 && (
                 <>
                   <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>DOMAIN</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>RISK DOMAIN</Typography>
                   {portfolio.by_domain.map((d) => (
                     <Chip key={d.domain} size="small" label={`${d.domain} · ${d.count}`}
                       onClick={() => setDomainFilter(domainFilter === d.domain ? "" : d.domain)}
@@ -325,7 +313,7 @@ export default function RiskOverview() {
                     <TableCell>SEVERITY</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell align="center">FINDINGS</TableCell>
-                    <TableCell>DOMAIN</TableCell>
+                    <TableCell>RISK DOMAIN</TableCell>
                     <TableCell align="center">IMPACT</TableCell>
                     <TableCell align="center">LIKELIHOOD</TableCell>
                     <TableCell align="right">RISK SCORE</TableCell>

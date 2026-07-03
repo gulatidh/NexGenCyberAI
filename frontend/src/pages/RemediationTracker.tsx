@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, IconButton, Alert,
@@ -7,8 +8,7 @@ import {
 } from "@mui/material";
 import { Refresh, Assignment } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, remediationTrackerApi } from "../services/api";
-import { Client } from "../types";
+import { remediationTrackerApi } from "../services/api";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -68,12 +68,10 @@ function StatusMenu({ action, onUpdate }: { action: RemediationAction; onUpdate:
 
 export default function RemediationTracker() {
   const qc = useQueryClient();
-  const [clientId, setClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId } = useActiveClient();
   const [filterStatus, setFilterStatus] = useState("open");
   const [filterBand, setFilterBand] = useState("");
   const [groupByBand, setGroupByBand] = useState(true);
-
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
 
   const { data: actions = [], isLoading, refetch } = useQuery<RemediationAction[]>({
     queryKey: ["remediation-actions", clientId, filterStatus, filterBand],
@@ -181,13 +179,6 @@ export default function RemediationTracker() {
       </Box>
 
       <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Client</InputLabel>
-          <Select value={clientId} label="Client"
-            onChange={(e) => { setClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); }}>
-            {(clients as Client[]).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-          </Select>
-        </FormControl>
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel>Status</InputLabel>
           <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>

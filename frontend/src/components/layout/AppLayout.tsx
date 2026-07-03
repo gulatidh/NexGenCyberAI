@@ -4,7 +4,7 @@ import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
   IconButton, Chip, Tooltip, Collapse, ToggleButton, ToggleButtonGroup,
-  Alert, Snackbar,
+  Alert, Snackbar, Select, FormControl,
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
@@ -18,8 +18,9 @@ import {
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
-import { adminApi } from "../../services/api";
-import { MyAccess } from "../../types";
+import { adminApi, clientsApi } from "../../services/api";
+import { MyAccess, Client } from "../../types";
+import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import { useViewMode } from "../../theme/ViewModeContext";
 
@@ -96,6 +97,8 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode, setMode, customPalette, setCustomPalette } = useThemeMode();
   const { mode: viewMode, setMode: setViewMode, readOnly, setReadOnly } = useViewMode();
+  const { clientId, setClientId } = useActiveClient();
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -384,6 +387,32 @@ export default function AppLayout() {
               </IconButton>
             </Tooltip>
             <Box sx={{ flexGrow: 1 }} />
+            {/* Global client selector */}
+            {clients.length > 0 && (
+              <FormControl size="small" sx={{ mr: 2, minWidth: 160 }}>
+                <Select
+                  displayEmpty
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  sx={{
+                    fontSize: 12, height: 30,
+                    color: clientId ? "text.primary" : "text.secondary",
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+                    "& .MuiSelect-select": { py: 0.5, px: 1.5 },
+                  }}
+                  renderValue={(v) => {
+                    if (!v) return <span style={{ color: "#888", fontSize: 12 }}>Select client…</span>;
+                    const c = (clients as Client[]).find((x) => x.id === v);
+                    return <span style={{ fontSize: 12 }}>{c?.name ?? v}</span>;
+                  }}
+                >
+                  <MenuItem value="" sx={{ fontSize: 12, color: "text.secondary" }}>All clients</MenuItem>
+                  {(clients as Client[]).map((c) => (
+                    <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12 }}>{c.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <Tooltip title={readOnly
               ? "Your access is read-only (reader role) — ask an admin for editor access to run jobs."
               : viewMode === "executive"

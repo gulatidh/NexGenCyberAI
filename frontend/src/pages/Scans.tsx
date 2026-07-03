@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Button, Card, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -91,7 +92,7 @@ export default function Scans() {
   const { canAct } = useViewMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId: selectedClientId, setClientId: setSelectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   // Tile filter state
@@ -224,14 +225,6 @@ export default function Scans() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client (filter)</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setSelectedProjectId(""); }} label="Client (filter)"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="">All clients</MenuItem>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <Button variant="outlined" startIcon={<Refresh />}
             onClick={() => refetchTiles()}
             sx={{ borderColor: "divider", color: "text.secondary" }}>Refresh</Button>

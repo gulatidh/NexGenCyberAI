@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
@@ -10,8 +11,8 @@ import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { agentsApi, clientsApi, scansApi, agentCatalogApi, adminApi } from "../services/api";
-import { Client, Scan, AgentType, MyAccess } from "../types";
+import { agentsApi, scansApi, agentCatalogApi, adminApi } from "../services/api";
+import { Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 import RichOutput from "../components/RichOutput";
 
@@ -245,7 +246,7 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
 export default function Agents() {
   const qc = useQueryClient();
   const { canAct } = useViewMode();
-  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId: selectedClientId } = useActiveClient();
   const [selectedScanId, setSelectedScanId] = useState("");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -257,7 +258,6 @@ export default function Agents() {
   const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
   const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: scans = [] } = useQuery<Scan[]>({
     queryKey: ["scans-for-agents", selectedClientId],
     queryFn: () => scansApi.list(selectedClientId),
@@ -318,14 +318,6 @@ export default function Agents() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client (for run)</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setSelectedScanId(""); }} label="Client (for run)"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="">None</MenuItem>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Scan (optional)</InputLabel>
             <Select value={selectedScanId} onChange={(e) => setSelectedScanId(e.target.value)} label="Scan (optional)"

@@ -11,6 +11,7 @@
  */
 import React, { useState } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Button, Chip, Grid, IconButton,
   Tooltip, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle,
@@ -21,8 +22,8 @@ import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-materia
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { clientsApi, threatModelsApi, scansApi } from "../services/api";
-import { Client, Scan } from "../types";
+import { threatModelsApi, scansApi } from "../services/api";
+import { Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
 interface ThreatModelSummary {
@@ -65,7 +66,7 @@ export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { canAct } = useViewMode();
-  const [selectedClientId, setSelectedClientId] = useState<string>(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId: selectedClientId } = useActiveClient();
   const [openCreate, setOpenCreate] = useState(false);
   const [openUpload, setOpenUpload] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ThreatModelSummary | null>(null);
@@ -81,9 +82,6 @@ export default function ThreatModels() {
   const [uploadName, setUploadName] = useState("");
   const [uploadMethodology, setUploadMethodology] = useState<string>("stride");
 
-  const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ["clients"], queryFn: clientsApi.list,
-  });
   const { data: methodologiesResp } = useQuery<{ methodologies: Methodology[]; default: string }>({
     queryKey: ["tm-methodologies"], queryFn: threatModelsApi.methodologies,
   });
@@ -176,13 +174,6 @@ export default function ThreatModels() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <Button variant="outlined" startIcon={<UploadFile />}
             disabled={!selectedClientId || !canAct}
             onClick={() => setOpenUpload(true)}
@@ -310,7 +301,7 @@ export default function ThreatModels() {
         <DialogTitle>
           Generate a new threat model
           <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
-            On-demand AI generation grounded in {clients.find((c) => c.id === selectedClientId)?.name || "the client"}'s asset inventory + recent findings.
+            On-demand AI generation grounded in the selected client's asset inventory + recent findings.
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ borderColor: "divider" }}>

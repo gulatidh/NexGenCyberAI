@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeModeProvider } from "./theme/ThemeModeContext";
 import { ViewModeProvider } from "./theme/ViewModeContext";
+import { ClientProvider } from "./contexts/ClientContext";
 import { MsalAuthenticationTemplate } from "@azure/msal-react";
 import { InteractionType } from "@azure/msal-browser";
 import { ToastContainer } from "react-toastify";
@@ -163,6 +164,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
           <ViewModeProvider>
+            <ClientProvider>
             <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
             <BrowserRouter>
               <Routes>
@@ -172,6 +174,7 @@ export default function App() {
                 <Route path="/*" element={<ProtectedApp />} />
               </Routes>
             </BrowserRouter>
+            </ClientProvider>
           </ViewModeProvider>
         </ThemeModeProvider>
       </QueryClientProvider>

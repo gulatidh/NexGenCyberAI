@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
@@ -9,8 +10,8 @@ import {
 import { BugReport, DeleteOutlined, CleaningServices } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, findingsApi, projectsApi, scansApi } from "../services/api";
-import { Client, Finding, Project, FindingCategoriesResponse, Scan } from "../types";
+import { findingsApi, projectsApi, scansApi } from "../services/api";
+import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
@@ -146,7 +147,7 @@ function CategoryTile({ cat, active, onClick }: {
 
 export default function Findings() {
   const qc = useQueryClient();
-  const [clientId, setClientId] = useState(() => localStorage.getItem("aegis-active-client") || "");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [scanId, setScanId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
@@ -155,7 +156,6 @@ export default function Findings() {
   const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId],
     queryFn: () => projectsApi.list(clientId),
@@ -285,13 +285,6 @@ export default function Findings() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); localStorage.setItem("aegis-active-client", e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setScanId(""); }} label="Project"

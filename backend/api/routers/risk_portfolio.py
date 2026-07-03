@@ -57,7 +57,9 @@ STATUS_FACTOR = {
 # Canonical risk domains — we normalise risk.category onto this set so the
 # domain bar chart has stable labels.
 _DOMAIN_KEYWORDS: List[tuple] = [
-    ("Identity",        ("identity", "iam", "mfa", "access", "auth", "rbac", "okta", "entra")),
+    # Identity is checked first so "AWS Application Identity" → Identity, not Cloud Security
+    ("Identity",        ("identity", "iam", "mfa", "access", "auth", "rbac", "okta", "entra",
+                         "aidm", "privileged", "credential", "password", "permission")),
     ("OT Security",     ("ot ", "ics", "scada", "industrial", "purdue", "operational tech")),
     ("SOC",             ("soc ", "siem", "detection", "incident", "alert", "monitoring")),
     ("Data Protection", ("data", "encryption", "privacy", "dlp", "gdpr", "ccpa", "classification")),
@@ -65,7 +67,7 @@ _DOMAIN_KEYWORDS: List[tuple] = [
     ("Vulnerability",   ("vulnerability", "cve", "patch", "cvss", "exploit")),
     ("Network",         ("network", "firewall", "nsg", "segmentation", "vpn")),
     ("Supply Chain",    ("supply", "sbom", "third-party", "third party", "vendor")),
-    ("AppSec",          ("appsec", "sast", "dast", "sca", "application", "xss", "sqli")),
+    ("AppSec",          ("appsec", "sast", "dast", "sca", "xss", "sqli", "injection")),
     ("Compliance",      ("compliance", "audit", "nist", "iso", "soc2", "pci", "cmmc")),
 ]
 

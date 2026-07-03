@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -7,8 +8,8 @@ import {
 } from "@mui/material";
 import { Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable, Edit, Delete } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { connectorsApi, clientsApi, projectsApi } from "../services/api";
-import { Connector, ConnectorType, Client, Project } from "../types";
+import { connectorsApi, projectsApi } from "../services/api";
+import { Connector, ConnectorType, Project } from "../types";
 import { toast } from "react-toastify";
 
 const CONNECTOR_ICONS: Record<ConnectorType, string> = {
@@ -231,7 +232,7 @@ const ACTIVE_CLIENT_KEY = "aegis-active-client";
 
 export default function Connectors() {
   const qc = useQueryClient();
-  const [selectedClientId, setSelectedClientId] = useState(() => localStorage.getItem(ACTIVE_CLIENT_KEY) || "");
+  const { clientId: selectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
   const [connectorType, setConnectorType] = useState<ConnectorType>("azure");
@@ -248,7 +249,6 @@ export default function Connectors() {
   const [webAuth, setWebAuth] = useState<Record<string, string>>({});
   const [webExcludes, setWebExcludes] = useState("");  // newline-separated
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", selectedClientId],
     queryFn: () => projectsApi.list(selectedClientId),
@@ -308,13 +308,6 @@ export default function Connectors() {
           <Typography variant="body2" sx={{ color: "text.secondary" }}>Connect cloud platforms, identity providers, and SaaS tools</Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Select Client</InputLabel>
-            <Select value={selectedClientId} onChange={(e) => { setSelectedClientId(e.target.value); localStorage.setItem(ACTIVE_CLIENT_KEY, e.target.value); }} label="Select Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} label="Project"
