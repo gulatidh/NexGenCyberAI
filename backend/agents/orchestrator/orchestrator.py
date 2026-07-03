@@ -122,7 +122,7 @@ class AgentOrchestrator:
             "threat_intel": lambda: self.threat_intel.enrich_findings(findings, client_name),
             "risk_manager": lambda: self.risk.analyse_scan(findings, client_name),
             "remediation": lambda: self.remediation.generate_playbook(findings, client_name),
-            "compliance_monitor": lambda: self.compliance.generate_audit_report({}, client_name, framework),
+            "compliance_monitor": lambda: self.compliance.generate_audit_report(findings, client_name, framework),
         }
         runner = agents.get(agent_type)
         if not runner:

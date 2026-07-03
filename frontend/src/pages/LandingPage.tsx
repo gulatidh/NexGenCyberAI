@@ -4,7 +4,8 @@ import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
 import {
   Code, Assessment, AccountTree, TrendingUp, VerifiedUser, SmartToy,
-  ArrowForward, Shield, BugReport, Hub, Lock, CheckCircle,
+  ArrowForward, Shield, Hub, Lock, CheckCircle,
+  Radar,
   Menu as MenuIcon, Close as CloseIcon,
 } from "@mui/icons-material";
 
@@ -26,49 +27,57 @@ const FEATURES = [
   {
     icon: <Assessment sx={{ fontSize: 28 }} />,
     color: "#F59E0B",
-    title: "Multi-Scanner Assessments",
+    title: "AI-Powered VAPT",
     subtitle: "SAST · DAST · Network · Dependencies",
-    desc: "Launch Semgrep, CodeQL, SonarQube, OWASP ZAP, Nmap, OpenVAS, Trivy, Gitleaks, and TruffleHog from a single dashboard. All findings land in one normalised schema.",
-    bullets: ["9 scanner integrations", "GitHub Actions dispatch", "Unified finding schema"],
+    desc: "Launch Semgrep, CodeQL, SonarQube, OWASP ZAP, Nmap, OpenVAS, Trivy, Gitleaks, and TruffleHog from one dashboard. AI agents then enrich every finding — adding MITRE techniques, compliance mappings, and priority-banded remediation plans.",
+    bullets: ["9 scanner integrations", "AI-enriched findings", "Unified finding schema"],
   },
   {
     icon: <AccountTree sx={{ fontSize: 28 }} />,
     color: PURPLE,
     title: "AI Threat Modeling",
     subtitle: "STRIDE · MITRE ATT&CK",
-    desc: "Describe your system and Aegis generates comprehensive threat models in minutes. Threats are automatically mapped to STRIDE categories, MITRE ATT&CK techniques, and your compliance frameworks.",
-    bullets: ["STRIDE taxonomy", "Attack path analysis", "Framework auto-mapping"],
+    desc: "Describe your system and Aegis generates comprehensive threat models in minutes. Threats are mapped to STRIDE categories, MITRE ATT&CK techniques, and compliance controls automatically — with attacker profiles and detection gap analysis.",
+    bullets: ["STRIDE taxonomy", "ATT&CK technique mapping", "Detection gap analysis"],
+  },
+  {
+    icon: <Radar sx={{ fontSize: 28 }} />,
+    color: "#00ACC1",
+    title: "Security Registers",
+    subtitle: "Threat · Control Gaps · Remediation",
+    desc: "Dedicated registers automatically populated by AI agents. The Threat Register tracks MITRE-mapped TTPs, Control Deficiencies captures compliance gaps with regulatory references, and the Remediation Tracker manages priority-banded action items to closure.",
+    bullets: ["Threat Register (MITRE ATT&CK)", "Control Deficiency gaps", "Remediation Tracker with bands"],
   },
   {
     icon: <TrendingUp sx={{ fontSize: 28 }} />,
     color: "#10B981",
     title: "Risk Intelligence",
-    subtitle: "Continuous scoring",
-    desc: "A live risk score built from aggregated findings, asset criticality, and business context. Prioritise remediation by real-world impact — not raw CVSS — so your team fixes what actually matters.",
-    bullets: ["Impact-based prioritisation", "Risk trend tracking", "Executive dashboards"],
+    subtitle: "FAIR-lite · Continuous scoring",
+    desc: "A live risk score built from aggregated findings, asset criticality, and business context using a FAIR-lite ALE model. Risk Domains — Identity, Cloud Security, AppSec — group findings for executive-grade reporting across clients.",
+    bullets: ["FAIR-lite ALE model", "Risk Domain grouping", "Per-client dashboards"],
   },
   {
     icon: <VerifiedUser sx={{ fontSize: 28 }} />,
     color: "#F472B6",
     title: "Compliance Frameworks",
     subtitle: "NIST · SOC 2 · ISO 27001",
-    desc: "Every finding is automatically mapped to one or more compliance controls. Track framework coverage, identify gaps, and generate audit-ready reports with a single click.",
-    bullets: ["Multi-framework mapping", "Gap analysis", "Audit-ready exports"],
+    desc: "Every finding is automatically mapped to one or more compliance controls. Track framework coverage per client, identify control gaps, and generate audit-ready reports. AI agents populate control deficiencies directly from scan findings.",
+    bullets: ["Multi-framework mapping", "AI-populated gap register", "Audit-ready exports"],
   },
   {
     icon: <SmartToy sx={{ fontSize: 28 }} />,
     color: "#FB923C",
-    title: "Security Agents",
-    subtitle: "Autonomous AI workflows",
-    desc: "Deploy AI agents that investigate alerts, correlate findings across the estate, answer security questions in natural language, and run scheduled security missions without manual intervention.",
-    bullets: ["Natural language Q&A", "Scheduled missions", "Cross-finding correlation"],
+    title: "AI Security Agents",
+    subtitle: "60+ specialist advisors",
+    desc: "Deploy AI agents that investigate alerts, run scheduled security missions, and answer security questions in natural language. Operational agents (Threat Intel, Risk Manager, Remediation, Compliance Monitor) populate dedicated registers automatically.",
+    bullets: ["60+ specialist agents", "Scheduled missions", "Register auto-population"],
   },
 ];
 
 const STATS = [
   { value: "9+", label: "Scanner integrations" },
-  { value: "4-phase", label: "AI review pipeline" },
-  { value: "126", label: "Findings on PyGoat" },
+  { value: "60+", label: "AI security agents" },
+  { value: "3", label: "Dedicated registers" },
   { value: "Real-time", label: "Risk scoring" },
 ];
 
@@ -78,10 +87,10 @@ const SCANNERS = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Connect your repo", desc: "Paste a GitHub URL or upload a zip archive. No git binary, no agents, no configuration required." },
-  { n: "02", title: "AI triage & chunking", desc: "Aegis triages files by security risk, chunks code to function-level granularity, and prioritises the highest-risk paths." },
-  { n: "03", title: "Parallel LLM review", desc: "Each chunk is reviewed in parallel for real vulnerabilities — CWE-mapped, with proof-of-exploit and concrete remediation." },
-  { n: "04", title: "Self-critique & taint tracing", desc: "A second LLM pass eliminates false positives. Cross-file taint flows are traced to surface injection chains spanning modules." },
+  { n: "01", title: "Run scanners or submit code", desc: "Launch any of 9 scanners via GitHub Actions, paste a repo URL for AI code review, or upload a zip. All findings land in a unified normalised schema." },
+  { n: "02", title: "AI agents enrich every finding", desc: "Threat Intel maps findings to MITRE ATT&CK techniques. Risk Manager scores likelihood × impact. Compliance Monitor identifies control gaps. Remediation Agent generates priority-banded playbooks." },
+  { n: "03", title: "Registers auto-populate", desc: "Agent outputs route to dedicated registers: Threat Register (TTPs), Control Deficiencies (compliance gaps), and Remediation Tracker (banded action items). No manual triage." },
+  { n: "04", title: "Track to closure", desc: "Risk Domains group findings for executive reporting. Update remediation status, restore soft-deleted clients, and run scheduled AI missions — all from one platform." },
 ];
 
 export default function LandingPage() {
@@ -202,8 +211,8 @@ export default function LandingPage() {
             <br />ship, and run.
           </Typography>
 
-          <Typography sx={{ fontSize: { xs: 16, md: 19 }, color: "rgba(255,255,255,0.5)", maxWidth: 620, mx: "auto", lineHeight: 1.65, mb: 5 }}>
-            Aegis combines AI code review, threat modeling, multi-scanner assessments, and autonomous security agents into one platform — so your team sees risk clearly and fixes what matters.
+          <Typography sx={{ fontSize: { xs: 16, md: 19 }, color: "rgba(255,255,255,0.5)", maxWidth: 640, mx: "auto", lineHeight: 1.65, mb: 5 }}>
+            Aegis combines AI code review, AI-powered VAPT, threat modeling, and autonomous security agents into one platform. AI agents auto-populate dedicated Threat, Control, and Remediation registers — so your team sees risk clearly and fixes what matters.
           </Typography>
 
           <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, justifyContent: "center", alignItems: "center" }}>
@@ -228,7 +237,7 @@ export default function LandingPage() {
             {[
               { icon: <Shield sx={{ fontSize: 14 }} />, text: "SAST · DAST · Network" },
               { icon: <Lock sx={{ fontSize: 14 }} />, text: "NIST · SOC 2 · ISO 27001" },
-              { icon: <BugReport sx={{ fontSize: 14 }} />, text: "126 findings on PyGoat" },
+              { icon: <Radar sx={{ fontSize: 14 }} />, text: "3 dedicated security registers" },
               { icon: <Hub sx={{ fontSize: 14 }} />, text: "9+ scanner integrations" },
             ].map(({ icon, text }) => (
               <Box key={text} sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "rgba(255,255,255,0.35)" }}>
@@ -267,8 +276,8 @@ export default function LandingPage() {
             <Typography sx={{ fontSize: { xs: 28, md: 40 }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2 }}>
               Everything your security team needs
             </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 520, mx: "auto" }}>
-              Built on real scanners and large language models — not just dashboards.
+            <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 580, mx: "auto" }}>
+              Built on real scanners and large language models. AI agents populate dedicated registers — so findings become action.
             </Typography>
           </Box>
 
@@ -326,10 +335,10 @@ export default function LandingPage() {
       <Box id="capabilities" sx={{ py: { xs: 8, md: 12 }, background: "rgba(255,255,255,0.015)", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
         <Container maxWidth="md">
           <Typography sx={{ textAlign: "center", fontSize: { xs: 24, md: 34 }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2 }}>
-            From repo to findings in minutes
+            Full lifecycle — scan to closure
           </Typography>
           <Typography sx={{ textAlign: "center", color: "rgba(255,255,255,0.4)", mb: 8, fontSize: 16 }}>
-            The AI Code Review pipeline runs automatically in the cloud
+            AI agents handle enrichment, routing, and register population automatically
           </Typography>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>

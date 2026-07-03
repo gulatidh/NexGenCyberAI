@@ -16,17 +16,133 @@ router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
 _orchestrator = None
 
 
+def _persist_threat_intel(db, client_id: str, run_id: str, scan_id, threat_result: dict) -> int:
+    technique_map = threat_result.get("technique_mapping") or {}
+    findings_out = threat_result.get("findings") or []
+    for f in findings_out:
+        fid = f.get("finding_id", "")
+        refs = f.get("framework_references") or []
+        technique_id, technique_name, tactic, confidence = None, None, None, None
+        for ref in refs:
+            if "T" in str(ref):
+                tid = str(ref).split()[-1] if " " in str(ref) else str(ref)
+                if tid in technique_map:
+                    tm = technique_map[tid]
+                    technique_id = tid
+                    technique_name = tm.get("name")
+                    tactic = tm.get("tactic")
+                    confidence = tm.get("confidence")
+                break
+        db.add(ThreatEntry(
+            client_id=client_id,
+            agent_run_id=run_id,
+            scan_id=scan_id,
+            finding_id=fid,
+            technique_id=technique_id,
+            technique_name=technique_name,
+            tactic=tactic,
+            confidence=confidence,
+            severity=(f.get("severity") or "medium").lower(),
+            title=f.get("title") or "(untitled)",
+            description=f.get("description"),
+            remediation=f.get("remediation"),
+            framework_references=refs,
+        ))
+    return len(findings_out)
+
+
+def _persist_compliance(db, client_id: str, run_id: str, scan_id, comp_result: dict) -> int:
+    findings_out = comp_result.get("findings") or []
+    audit_score = comp_result.get("audit_readiness_score")
+    for f in findings_out:
+        refs = f.get("framework_references") or []
+        control_id = refs[0] if refs else None
+        framework = None
+        for ref in refs:
+            ref_s = str(ref).upper()
+            if "NIST" in ref_s:
+                framework = "NIST CSF 2.0"
+            elif "ISO" in ref_s:
+                framework = "ISO 27001"
+            elif "GDPR" in ref_s:
+                framework = "GDPR"
+            elif "PCI" in ref_s:
+                framework = "PCI DSS"
+            elif "HIPAA" in ref_s:
+                framework = "HIPAA"
+            if framework:
+                break
+        db.add(ControlDeficiency(
+            client_id=client_id,
+            agent_run_id=run_id,
+            scan_id=scan_id,
+            finding_id=f.get("finding_id"),
+            control_id=control_id,
+            framework=framework,
+            severity=(f.get("severity") or "medium").lower(),
+            title=f.get("title") or "(untitled)",
+            gap_description=f.get("description"),
+            regulatory_reference=", ".join(str(r) for r in refs) if refs else None,
+            remediation=f.get("remediation"),
+            audit_readiness_score=audit_score,
+        ))
+    return len(findings_out)
+
+
+def _persist_remediation(db, client_id: str, run_id: str, scan_id, rem_result: dict) -> int:
+    recs = rem_result.get("recommendations") or []
+    for rec in recs:
+        action_text = rec.get("action") or ""
+        db.add(RemediationAction(
+            client_id=client_id,
+            agent_run_id=run_id,
+            scan_id=scan_id,
+            title=action_text[:120] if action_text else None,
+            action=action_text,
+            band=rec.get("band"),
+            priority=rec.get("priority") or 0,
+            effort=rec.get("effort"),
+            impact=rec.get("impact"),
+        ))
+    return len(recs)
+
+
 def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_id, result: dict, raw_findings: list):
     """Route each agent type's output to the correct dedicated register.
 
     Source → Register mapping:
-      risk_manager / orchestrator → Risk table (likelihood × impact rows)
-      threat_intel                → ThreatEntry table
-      compliance_monitor          → ControlDeficiency table
-      remediation                 → RemediationAction table
+      risk_manager   → Risk table
+      orchestrator   → Risk table + ThreatEntry + ControlDeficiency + RemediationAction
+      threat_intel   → ThreatEntry table
+      compliance_monitor → ControlDeficiency table
+      remediation    → RemediationAction table
       va_scanner / framework_analyst → no register (output_data only)
     """
-    if agent_val in ("risk_manager", "orchestrator") and raw_findings:
+    if agent_val == "orchestrator":
+        # Risk rows from raw scan findings
+        if raw_findings:
+            from agents.risk.risk_agent import map_to_risk_register_structured
+            structured = map_to_risk_register_structured(raw_findings)
+            for r in structured:
+                db.add(Risk(
+                    client_id=client_id,
+                    title=r["title"],
+                    description=r.get("description") or None,
+                    risk_level=RiskLevel(r["risk_level"]),
+                    likelihood=r["likelihood"],
+                    impact=r["impact"],
+                    risk_score=r["risk_score"],
+                    category=r.get("category"),
+                    status="open",
+                    finding_ids=[],
+                ))
+            result["risks_created"] = len(structured)
+        # Sub-agent register rows
+        result["threats_created"] = _persist_threat_intel(db, client_id, run_id, scan_id, result.get("threat_intel") or {})
+        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result.get("framework_analysis") or {})
+        result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result.get("remediation") or {})
+
+    elif agent_val == "risk_manager" and raw_findings:
         from agents.risk.risk_agent import map_to_risk_register_structured
         structured = map_to_risk_register_structured(raw_findings)
         for r in structured:
@@ -45,95 +161,13 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
         result["risks_created"] = len(structured)
 
     elif agent_val == "threat_intel":
-        findings_out = result.get("findings") or []
-        technique_map = result.get("technique_mapping") or {}
-        audit_score = result.get("audit_readiness_score")
-        for f in findings_out:
-            fid = f.get("finding_id", "")
-            refs = f.get("framework_references") or []
-            # Try to match a MITRE technique from refs e.g. ["MITRE T1190"]
-            technique_id, technique_name, tactic, confidence = None, None, None, None
-            for ref in refs:
-                if "T" in str(ref):
-                    tid = str(ref).split()[-1] if " " in str(ref) else str(ref)
-                    if tid in technique_map:
-                        tm = technique_map[tid]
-                        technique_id = tid
-                        technique_name = tm.get("name")
-                        tactic = tm.get("tactic")
-                        confidence = tm.get("confidence")
-                    break
-            db.add(ThreatEntry(
-                client_id=client_id,
-                agent_run_id=run_id,
-                scan_id=scan_id,
-                finding_id=fid,
-                technique_id=technique_id,
-                technique_name=technique_name,
-                tactic=tactic,
-                confidence=confidence,
-                severity=(f.get("severity") or "medium").lower(),
-                title=f.get("title") or "(untitled)",
-                description=f.get("description"),
-                remediation=f.get("remediation"),
-                framework_references=refs,
-            ))
-        result["threats_created"] = len(findings_out)
+        result["threats_created"] = _persist_threat_intel(db, client_id, run_id, scan_id, result)
 
     elif agent_val == "compliance_monitor":
-        findings_out = result.get("findings") or []
-        audit_score = result.get("audit_readiness_score")
-        for f in findings_out:
-            refs = f.get("framework_references") or []
-            control_id = refs[0] if refs else None
-            # Heuristic: detect framework name from control_id or refs
-            framework = None
-            for ref in refs:
-                ref_s = str(ref).upper()
-                if "NIST" in ref_s:
-                    framework = "NIST CSF 2.0"
-                elif "ISO" in ref_s:
-                    framework = "ISO 27001"
-                elif "GDPR" in ref_s:
-                    framework = "GDPR"
-                elif "PCI" in ref_s:
-                    framework = "PCI DSS"
-                elif "HIPAA" in ref_s:
-                    framework = "HIPAA"
-                if framework:
-                    break
-            db.add(ControlDeficiency(
-                client_id=client_id,
-                agent_run_id=run_id,
-                scan_id=scan_id,
-                finding_id=f.get("finding_id"),
-                control_id=control_id,
-                framework=framework,
-                severity=(f.get("severity") or "medium").lower(),
-                title=f.get("title") or "(untitled)",
-                gap_description=f.get("description"),
-                regulatory_reference=", ".join(str(r) for r in refs) if refs else None,
-                remediation=f.get("remediation"),
-                audit_readiness_score=audit_score,
-            ))
-        result["deficiencies_created"] = len(findings_out)
+        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result)
 
     elif agent_val == "remediation":
-        recs = result.get("recommendations") or []
-        for rec in recs:
-            action_text = rec.get("action") or ""
-            db.add(RemediationAction(
-                client_id=client_id,
-                agent_run_id=run_id,
-                scan_id=scan_id,
-                title=action_text[:120] if action_text else None,
-                action=action_text,
-                band=rec.get("band"),
-                priority=rec.get("priority") or 0,
-                effort=rec.get("effort"),
-                impact=rec.get("impact"),
-            ))
-        result["actions_created"] = len(recs)
+        result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result)
 
 
 def _get_orchestrator():
