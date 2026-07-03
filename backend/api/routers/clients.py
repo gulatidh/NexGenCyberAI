@@ -1,4 +1,5 @@
 """Client profile CRUD endpoints."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 
 @router.get("/", response_model=List[ClientResponse])
 async def list_clients(db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(Client).filter(Client.is_active == True).all()
+    return db.query(Client).filter(Client.is_active == True, Client.deleted_at.is_(None)).all()
 
 
 @router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
@@ -28,7 +29,7 @@ async def create_client(payload: ClientCreate, db: Session = Depends(get_db), _=
 
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    client = db.query(Client).filter(Client.id == client_id).first()
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     return client
@@ -36,7 +37,7 @@ async def get_client(client_id: str, db: Session = Depends(get_db), _=Depends(ge
 
 @router.patch("/{client_id}", response_model=ClientResponse)
 async def update_client(client_id: str, payload: ClientUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    client = db.query(Client).filter(Client.id == client_id).first()
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -48,8 +49,9 @@ async def update_client(client_id: str, payload: ClientUpdate, db: Session = Dep
 
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    client = db.query(Client).filter(Client.id == client_id).first()
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
+    client.deleted_at = datetime.now(timezone.utc)
     client.is_active = False
     db.commit()

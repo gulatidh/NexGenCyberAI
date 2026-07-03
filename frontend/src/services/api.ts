@@ -295,6 +295,13 @@ export const adminApi = {
     since_hours?: number; limit?: number; offset?: number;
   }) =>
     apiClient.get("/admin/access-logs/", { params }).then((r) => r.data),
+  listDeletedClients: () => apiClient.get("/admin/clients/deleted").then((r) => r.data),
+  restoreClient: (clientId: string) =>
+    apiClient.post(`/admin/clients/${clientId}/restore`).then((r) => r.data),
+  permanentlyDeleteClient: (clientId: string) =>
+    apiClient.delete(`/admin/clients/${clientId}/permanent`),
+  purgeExpiredClients: () =>
+    apiClient.post("/admin/clients/purge-expired").then((r) => r.data),
 };
 
 export const technologiesApi = {

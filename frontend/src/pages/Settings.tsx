@@ -24,8 +24,9 @@ import {
   History, AdminPanelSettings, Save, CheckCircle,
   Visibility, VisibilityOff, LinkOutlined,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
-  Close, Send,
+  Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
 } from "@mui/icons-material";
+import LinearProgress from "@mui/material/LinearProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { emailApi, ssoApi, adminApi, clientsApi, projectsApi } from "../services/api";
@@ -628,14 +629,210 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ── Deleted Clients tab ──────────────────────────────────────────────────────
+function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [confirmPerm, setConfirmPerm] = useState<any | null>(null);
+
+  const { data: deletedClients = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["admin-deleted-clients"],
+    queryFn: adminApi.listDeletedClients,
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (id: string) => adminApi.restoreClient(id),
+    onSuccess: () => {
+      toast.success("Client restored successfully");
+      qc.invalidateQueries({ queryKey: ["admin-deleted-clients"] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Restore failed"),
+  });
+
+  const permDeleteMut = useMutation({
+    mutationFn: (id: string) => adminApi.permanentlyDeleteClient(id),
+    onSuccess: () => {
+      toast.success("Client permanently deleted");
+      qc.invalidateQueries({ queryKey: ["admin-deleted-clients"] });
+      setConfirmPerm(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
+  });
+
+  const purgeMut = useMutation({
+    mutationFn: adminApi.purgeExpiredClients,
+    onSuccess: (r: any) => {
+      toast.success(`Purged ${r.purged_count ?? 0} expired client(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-deleted-clients"] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: () => toast.error("Purge failed"),
+  });
+
+  if (!isAdmin) return <Alert severity="warning">Admin access required to manage deleted clients.</Alert>;
+
+  function retentionColor(daysRemaining: number): string {
+    if (daysRemaining <= 3) return "#EA4335";
+    if (daysRemaining <= 10) return "#FBBC04";
+    return "#34A853";
+  }
+
+  const expiredCount = deletedClients.filter((c: any) => c.auto_purge_eligible).length;
+
+  return (
+    <Box>
+      <SectionHeader
+        icon={<DeleteSweep />}
+        title="Deleted Clients"
+        subtitle="Soft-deleted clients — restorable within 30 days, then auto-purged"
+      />
+
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {deletedClients.length} client{deletedClients.length !== 1 ? "s" : ""} in trash
+          {expiredCount > 0 && (
+            <Chip label={`${expiredCount} expired`} size="small" sx={{ ml: 1, bgcolor: "#EA433522", color: "#EA4335", fontSize: 10 }} />
+          )}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <IconButton size="small" onClick={() => refetch()}><Refresh fontSize="small" /></IconButton>
+          {expiredCount > 0 && (
+            <Button size="small" variant="outlined" color="error"
+              startIcon={purgeMut.isPending ? <CircularProgress size={12} color="inherit" /> : <DeleteForever fontSize="small" />}
+              onClick={() => purgeMut.mutate()} disabled={purgeMut.isPending}>
+              Purge {expiredCount} expired
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      {isLoading ? (
+        <CircularProgress size={24} />
+      ) : deletedClients.length === 0 ? (
+        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+          <RestoreFromTrash sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>No deleted clients — the trash is empty.</Typography>
+        </Card>
+      ) : (
+        <TableContainer component={Card} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {["Client", "Deleted On", "Days Remaining", "Status", "Actions"].map((h) => (
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {deletedClients.map((c: any) => {
+                const pct = Math.max(0, Math.min(100, (c.days_remaining / 30) * 100));
+                const color = retentionColor(c.days_remaining);
+                const expired = c.auto_purge_eligible;
+                return (
+                  <TableRow key={c.id} hover sx={{ opacity: expired ? 0.7 : 1 }}>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ width: 28, height: 28, borderRadius: "50%", bgcolor: "#4285F422", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#4285F4" }}>{c.name?.charAt(0)}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{c.name}</Typography>
+                          {c.industry && <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.industry}</Typography>}
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{fmt(c.deleted_at)}</TableCell>
+                    <TableCell sx={{ minWidth: 140 }}>
+                      {expired ? (
+                        <Chip label="Expired — eligible for purge" size="small" sx={{ bgcolor: "#EA433522", color: "#EA4335", fontSize: 10 }} />
+                      ) : (
+                        <Box>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                            <Typography variant="caption" sx={{ color, fontWeight: 700 }}>{c.days_remaining}d left</Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>expires {fmt(c.expires_at)}</Typography>
+                          </Box>
+                          <LinearProgress variant="determinate" value={pct}
+                            sx={{ height: 5, borderRadius: 3, bgcolor: "rgba(255,255,255,0.08)",
+                              "& .MuiLinearProgress-bar": { bgcolor: color, borderRadius: 3 } }} />
+                        </Box>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={expired ? "Expired" : "Recoverable"}
+                        size="small"
+                        sx={{ fontSize: 10, height: 20,
+                          bgcolor: expired ? "#EA433522" : "#34A85322",
+                          color: expired ? "#EA4335" : "#34A853" }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", gap: 0.5 }}>
+                        {!expired && (
+                          <Tooltip title="Restore client">
+                            <IconButton size="small" sx={{ color: "#34A853" }}
+                              onClick={() => restoreMut.mutate(c.id)}
+                              disabled={restoreMut.isPending}>
+                              <RestoreFromTrash fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Permanently delete — cannot be undone">
+                          <IconButton size="small" sx={{ color: "#EA4335" }}
+                            onClick={() => setConfirmPerm(c)}>
+                            <DeleteForever fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Permanent delete confirmation */}
+      <Dialog open={Boolean(confirmPerm)} onClose={() => setConfirmPerm(null)}
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", minWidth: 440 } } }}>
+        <DialogTitle sx={{ color: "#EA4335", display: "flex", alignItems: "center", gap: 1 }}>
+          <DeleteForever /> Permanently Delete Client?
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            This action is <strong>irreversible</strong>. All scans, findings, connectors, and risk data for this client will be permanently erased.
+          </Alert>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            You are about to permanently delete <strong style={{ color: "white" }}>{confirmPerm?.name}</strong> and all its associated data.
+            This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setConfirmPerm(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button variant="contained"
+            onClick={() => confirmPerm && permDeleteMut.mutate(confirmPerm.id)}
+            disabled={permDeleteMut.isPending}
+            sx={{ bgcolor: "#EA4335", color: "#fff", "&:hover": { bgcolor: "#c62828" } }}>
+            {permDeleteMut.isPending ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Delete Forever"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 // ── Main Settings page ───────────────────────────────────────────────────────
 const TABS = [
-  { label: "General",      icon: <SettingsIcon fontSize="small" /> },
-  { label: "Email",        icon: <MarkEmailRead fontSize="small" /> },
-  { label: "SSO / Identity", icon: <Security fontSize="small" /> },
-  { label: "Data Sync",    icon: <SyncIcon fontSize="small" />, adminOnly: true },
-  { label: "Access Logs",  icon: <History fontSize="small" />, adminOnly: true },
-  { label: "Users",        icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
+  { label: "General",          icon: <SettingsIcon fontSize="small" /> },
+  { label: "Email",            icon: <MarkEmailRead fontSize="small" /> },
+  { label: "SSO / Identity",   icon: <Security fontSize="small" /> },
+  { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
+  { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
+  { label: "Users",            icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
+  { label: "Deleted Clients",  icon: <DeleteSweep fontSize="small" />, adminOnly: true },
 ];
 
 export default function Settings() {
@@ -693,6 +890,7 @@ export default function Settings() {
       <TabPanel value={tab} index={3}><SyncTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={4}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={5}><UsersTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={6}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

@@ -56,7 +56,7 @@ function ClientCard({ client, onEdit, onDelete }: { client: Client; onEdit: () =
       </CardContent>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
         <MenuItem onClick={(e) => { e.stopPropagation(); setAnchorEl(null); onEdit(); }}><Edit sx={{ mr: 1 }} fontSize="small" />Edit</MenuItem>
-        <MenuItem onClick={(e) => { e.stopPropagation(); setAnchorEl(null); onDelete(); }} sx={{ color: "#f44336" }}><Delete sx={{ mr: 1 }} fontSize="small" />Deactivate</MenuItem>
+        <MenuItem onClick={(e) => { e.stopPropagation(); setAnchorEl(null); onDelete(); }} sx={{ color: "#f44336" }}><Delete sx={{ mr: 1 }} fontSize="small" />Delete</MenuItem>
       </Menu>
     </Card>
   );
@@ -66,6 +66,7 @@ export default function Clients() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", slug: "", industry: "", country: "", contact_name: "", contact_email: "" });
+  const [pendingDelete, setPendingDelete] = useState<Client | null>(null);
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["clients"],
@@ -76,6 +77,16 @@ export default function Clients() {
     mutationFn: (data: any) => clientsApi.create(data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["clients"] }); setOpen(false); toast.success("Client created"); },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => clientsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      setPendingDelete(null);
+      toast.success("Client moved to trash — restorable for 30 days from Settings → Deleted Clients");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
   });
 
   if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
@@ -102,12 +113,33 @@ export default function Clients() {
         <Grid container spacing={2}>
           {clients.map((c) => (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={c.id}>
-              <ClientCard client={c} onEdit={() => {}} onDelete={() => clientsApi.delete(c.id).then(() => qc.invalidateQueries({ queryKey: ["clients"] }))} />
+              <ClientCard client={c} onEdit={() => {}} onDelete={() => setPendingDelete(c)} />
             </Grid>
           ))}
         </Grid>
       )}
 
+      {/* Delete confirmation dialog */}
+      <Dialog open={Boolean(pendingDelete)} onClose={() => setPendingDelete(null)} slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary", minWidth: 420 } } }}>
+        <DialogTitle sx={{ color: "#f44336" }}>Delete Client?</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: "text.secondary" }}>
+            <strong style={{ color: "text.primary" }}>{pendingDelete?.name}</strong> will be moved to the trash.
+            It can be restored within 30 days from <strong>Settings → Deleted Clients</strong>.
+            After 30 days it is permanently deleted.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setPendingDelete(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button variant="contained" onClick={() => pendingDelete && deleteMutation.mutate(pendingDelete.id)}
+            disabled={deleteMutation.isPending}
+            sx={{ bgcolor: "#f44336", color: "#fff", "&:hover": { bgcolor: "#d32f2f" } }}>
+            {deleteMutation.isPending ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Move to Trash"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create client dialog */}
       <Dialog open={open} onClose={() => setOpen(false)} slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary", minWidth: 480 } } }}>
         <DialogTitle>Add New Client</DialogTitle>
         <DialogContent>

@@ -43,6 +43,7 @@ class ClientResponse(BaseModel):
     contact_email: Optional[str]
     logo_url: Optional[str]
     is_active: bool
+    deleted_at: Optional[datetime] = None
     created_at: Optional[datetime]
     model_config = {"from_attributes": True}
 

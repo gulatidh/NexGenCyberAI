@@ -20,6 +20,88 @@ from core.authz import (
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+_SOFT_DELETE_RETENTION_DAYS = 30
+
+
+# ── Deleted client management ─────────────────────────────────────────────────
+
+@router.get("/clients/deleted", dependencies=[Depends(require_role(AccessRole.ADMIN))])
+async def list_deleted_clients(db: Session = Depends(get_db)):
+    """Global-admin-only: list soft-deleted clients with days remaining before purge."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_SOFT_DELETE_RETENTION_DAYS)
+    rows = (
+        db.query(Client)
+        .filter(Client.deleted_at.isnot(None))
+        .order_by(Client.deleted_at.desc())
+        .all()
+    )
+    result = []
+    for c in rows:
+        deleted_at = c.deleted_at
+        if deleted_at.tzinfo is None:
+            deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+        days_remaining = max(0, _SOFT_DELETE_RETENTION_DAYS - (datetime.now(timezone.utc) - deleted_at).days)
+        result.append({
+            "id": c.id,
+            "name": c.name,
+            "slug": c.slug,
+            "industry": c.industry,
+            "deleted_at": c.deleted_at.isoformat() if c.deleted_at else None,
+            "days_remaining": days_remaining,
+            "expires_at": (deleted_at + timedelta(days=_SOFT_DELETE_RETENTION_DAYS)).isoformat(),
+            "auto_purge_eligible": deleted_at <= cutoff,
+        })
+    return result
+
+
+@router.post("/clients/{client_id}/restore", dependencies=[Depends(require_role(AccessRole.ADMIN))])
+async def restore_client(client_id: str, db: Session = Depends(get_db)):
+    """Restore a soft-deleted client (only within the 30-day window)."""
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.isnot(None)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Deleted client not found")
+    deleted_at = client.deleted_at
+    if deleted_at.tzinfo is None:
+        deleted_at = deleted_at.replace(tzinfo=timezone.utc)
+    if (datetime.now(timezone.utc) - deleted_at).days > _SOFT_DELETE_RETENTION_DAYS:
+        raise HTTPException(status_code=410, detail="Retention window expired — client cannot be restored")
+    client.deleted_at = None
+    client.is_active = True
+    db.commit()
+    return {"id": client.id, "name": client.name, "restored": True}
+
+
+@router.delete("/clients/{client_id}/permanent", status_code=204,
+               dependencies=[Depends(require_role(AccessRole.ADMIN))])
+async def permanently_delete_client(client_id: str, db: Session = Depends(get_db)):
+    """Permanently and irreversibly delete a soft-deleted client and ALL its data."""
+    client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.isnot(None)).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Deleted client not found (must be soft-deleted first)")
+    db.delete(client)
+    db.commit()
+
+
+@router.post("/clients/purge-expired", dependencies=[Depends(require_role(AccessRole.ADMIN))])
+async def purge_expired_clients(db: Session = Depends(get_db)):
+    """Manually trigger purge of all clients whose 30-day retention window has expired."""
+    return _purge_expired_deleted_clients(db)
+
+
+def _purge_expired_deleted_clients(db: Session) -> dict:
+    """Hard-delete clients soft-deleted more than 30 days ago. Called by scheduler and manual endpoint."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_SOFT_DELETE_RETENTION_DAYS)
+    expired = db.query(Client).filter(
+        Client.deleted_at.isnot(None),
+        Client.deleted_at <= cutoff,
+    ).all()
+    count = len(expired)
+    for c in expired:
+        db.delete(c)
+    if count:
+        db.commit()
+    return {"purged": count}
+
 
 @router.get("/sync/feeds")
 async def list_sync_feeds(_=Depends(get_current_user)):

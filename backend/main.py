@@ -1008,6 +1008,37 @@ async def _start_stuck_scan_watchdog() -> None:
 
 
 @app.on_event("startup")
+async def _start_deleted_client_purge() -> None:
+    """Daily 03:00 UTC hard-delete of clients soft-deleted more than 30 days ago."""
+    import asyncio
+    import logging
+    log = logging.getLogger(__name__)
+
+    async def _loop() -> None:
+        await asyncio.sleep(120)  # wait 2 min after boot
+        while True:
+            try:
+                from api.routers.admin import _purge_expired_deleted_clients
+                from db.database import SessionLocal
+                db = SessionLocal()
+                try:
+                    result = _purge_expired_deleted_clients(db)
+                    if result["purged"]:
+                        log.info("Auto-purged %d expired soft-deleted client(s)", result["purged"])
+                finally:
+                    db.close()
+            except Exception:
+                log.exception("Deleted-client auto-purge failed")
+            await asyncio.sleep(24 * 3600)
+
+    try:
+        asyncio.create_task(_loop())
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("Failed to schedule deleted-client purge")
+
+
+@app.on_event("startup")
 async def _warm_threat_intel_cache() -> None:
     """Load whatever threat-intel snapshot exists on disk from a prior sync.
 
