@@ -434,6 +434,11 @@ export const remediationTrackerApi = {
     apiClient.delete(`/clients/${clientId}/remediation-actions/${actionId}`),
 };
 
+export const assistantApi = {
+  chat: (data: { message: string; current_page?: string; history?: Array<{ role: string; content: string }> }) =>
+    apiClient.post("/assistant/chat", data).then((r) => r.data),
+};
+
 export const customFrameworksApi = {
   list: () => apiClient.get("/frameworks/custom/").then((r) => r.data),
   create: (data: { name: string; description?: string }) =>

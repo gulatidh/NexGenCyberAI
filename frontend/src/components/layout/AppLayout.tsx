@@ -18,6 +18,7 @@ import {
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import NotificationBell from "./NotificationBell";
+import AssistantWidget from "../AssistantWidget";
 import { adminApi, clientsApi } from "../../services/api";
 import { MyAccess, Client } from "../../types";
 import { useActiveClient } from "../../contexts/ClientContext";
@@ -551,6 +552,7 @@ export default function AppLayout() {
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
         <Alert severity="success" onClose={() => setBootstrapSnack("")}>{bootstrapSnack}</Alert>
       </Snackbar>
+      <AssistantWidget />
     </Box>
   );
 }
