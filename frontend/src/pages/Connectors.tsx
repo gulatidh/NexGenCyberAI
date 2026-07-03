@@ -228,8 +228,6 @@ const STATUS_PROPS: Record<string, any> = {
   inactive: { icon: <Cable sx={{ fontSize: 16 }} />, color: "text.secondary", label: "Inactive" },
 };
 
-const ACTIVE_CLIENT_KEY = "aegis-active-client";
-
 export default function Connectors() {
   const qc = useQueryClient();
   const { clientId: selectedClientId } = useActiveClient();
