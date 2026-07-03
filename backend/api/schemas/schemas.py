@@ -375,7 +375,7 @@ class ThreatEntryResponse(BaseModel):
     status: str = "active"
     created_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {"from_attributes": True}
 
 class ThreatEntryUpdate(BaseModel):
     status: Optional[str] = None
@@ -400,7 +400,7 @@ class ControlDeficiencyResponse(BaseModel):
     status: str = "open"
     created_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {"from_attributes": True}
 
 class ControlDeficiencyUpdate(BaseModel):
     status: Optional[str] = None
@@ -426,7 +426,7 @@ class RemediationActionResponse(BaseModel):
     completed_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {"from_attributes": True}
 
 class RemediationActionUpdate(BaseModel):
     status: Optional[str] = None
