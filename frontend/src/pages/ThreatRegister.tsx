@@ -3,7 +3,7 @@ import {
   Box, Typography, Card, CardContent, Chip, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, IconButton, Alert,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
-  Tooltip, Menu, MenuItem as MuiMenuItem,
+  Menu, MenuItem as MuiMenuItem,
 } from "@mui/material";
 import { Refresh, MoreVert, BugReport } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
