@@ -4,7 +4,7 @@ import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
   IconButton, Chip, Tooltip, Collapse, ToggleButton, ToggleButtonGroup,
-  Button, Alert, Snackbar,
+  Alert, Snackbar,
 } from "@mui/material";
 import {
   Dashboard, People, BugReport, Security, Policy,
