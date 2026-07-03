@@ -6,9 +6,7 @@
 # Required GitHub Secrets:
 #   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
 #   AZURE_SUBSCRIPTION_ID       – Azure Subscription ID
-#   AZURE_RESOURCE_GROUP        – Resource group containing both App Services
-#   AZURE_BACKEND_APP_NAME      – App Service name for backend
-#   AZURE_FRONTEND_APP_NAME     – App Service name for frontend
+#   (resource group + app names are hardcoded as env vars — not secrets)
 #   TF_VAR_sql_admin_password   – SQL admin password
 #   TF_VAR_entra_tenant_id      – Entra ID Tenant ID
 #   TF_VAR_entra_backend_client_id
@@ -37,6 +35,10 @@ env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
   TF_VERSION: "1.7.0"
+  # Infrastructure names — not sensitive, hardcoded to avoid secret misconfiguration
+  AZ_RESOURCE_GROUP: "nexgencyberai-dev-rg"
+  AZ_BACKEND_APP: "nexgencyberai-dev-okxksu-api"
+  AZ_FRONTEND_APP: "nexgencyberai-dev-okxksu-web"
 
 jobs:
   # ── 1. Backend Tests ──────────────────────────────────────────────────────
@@ -148,8 +150,8 @@ jobs:
       - name: Set startup command
         run: |
           az webapp config set \
-            --name "${{ secrets.AZURE_BACKEND_APP_NAME }}" \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --name "$AZ_BACKEND_APP" \
+            --resource-group "$AZ_RESOURCE_GROUP" \
             --startup-file "gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
       - name: Package backend
@@ -158,11 +160,10 @@ jobs:
           zip -qr ../backend.zip . -x "*.pyc" "__pycache__/*" "*/__pycache__/*" "nexgencyberai.db" ".env"
 
       - name: Deploy Backend (Kudu zipdeploy + Oryx build)
-        env:
-          APP_NAME: ${{ secrets.AZURE_BACKEND_APP_NAME }}
-          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
         run: |
           set -euo pipefail
+          APP_NAME="$AZ_BACKEND_APP"
+          RG="$AZ_RESOURCE_GROUP"
           USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
           PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
           # Upload with retry on 409 — Kudu only allows one active deploy at a
@@ -228,12 +229,12 @@ jobs:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-api.azurewebsites.net/api/v1' }}
-          REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://nexgencyberai-dev-web.azurewebsites.net' }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://nexgencyberai-dev-okxksu-web.azurewebsites.net' }}
 
       - name: Deploy Frontend to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ secrets.AZURE_FRONTEND_APP_NAME }}
+          app-name: ${{ env.AZ_FRONTEND_APP }}
           package: ./frontend/build
           startup-command: "npx --yes serve -s . -l 8080"
