@@ -190,7 +190,7 @@ class Client(Base):
     connectors = relationship("Connector", back_populates="client", cascade="all, delete-orphan")
     scans = relationship("Scan", back_populates="client", cascade="all, delete-orphan")
     risks = relationship("Risk", back_populates="client", cascade="all, delete-orphan")
-    framework_assessments = relationship("FrameworkAssessment", back_populates="client")
+    framework_assessments = relationship("FrameworkAssessment", back_populates="client", cascade="all, delete-orphan")
     control_statuses = relationship("ClientControlStatus", back_populates="client", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="client", cascade="all, delete-orphan")
 

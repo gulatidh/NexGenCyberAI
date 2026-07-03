@@ -7,7 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from api.models.models import AccessRole, AccessScope, Client, Project, UserAccess
+from api.models.models import (
+    AccessRole, AccessScope, Client, Project, UserAccess,
+    AgentRun, ThreatModel, ScheduledMission,
+    ThreatEntry, ControlDeficiency, RemediationAction,
+)
 from api.schemas.schemas import (
     GrantCreate, GrantResponse, MyAccessResponse, UserAccessSummary,
 )
@@ -78,6 +82,21 @@ async def permanently_delete_client(client_id: str, db: Session = Depends(get_db
     client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.isnot(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Deleted client not found (must be soft-deleted first)")
+
+    # Delete tables not covered by ORM cascade on Client.
+    # ScheduledMission is deleted via ORM (not bulk) so its cascade to ScheduledMissionRun fires.
+    for sm in db.query(ScheduledMission).filter(ScheduledMission.client_id == client_id).all():
+        db.delete(sm)
+
+    # Leaf tables — bulk delete is safe (no children).
+    for Model in (RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
+        db.query(Model).filter(Model.client_id == client_id).delete(synchronize_session=False)
+
+    # db.delete(client) cascades via ORM:
+    #   connectors → assets   (Connector.assets cascade)
+    #   scans → findings      (Scan.findings cascade)
+    #   framework_assessments (cascade added above)
+    #   risks, control_statuses, projects
     db.delete(client)
     db.commit()
 
@@ -97,6 +116,11 @@ def _purge_expired_deleted_clients(db: Session) -> dict:
     ).all()
     count = len(expired)
     for c in expired:
+        cid = c.id
+        for sm in db.query(ScheduledMission).filter(ScheduledMission.client_id == cid).all():
+            db.delete(sm)
+        for Model in (RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
+            db.query(Model).filter(Model.client_id == cid).delete(synchronize_session=False)
         db.delete(c)
     if count:
         db.commit()
