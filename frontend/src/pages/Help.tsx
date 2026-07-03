@@ -239,6 +239,33 @@ const GROUPS: Group[] = [
         ],
       },
       {
+        id: "how-risk-overview-is-populated",
+        title: "How Risk Overview gets populated",
+        summary: "Risk Overview is built automatically — you don't manually construct it. Here's the exact workflow that feeds it.",
+        steps: [
+          {
+            text: "Run scans first.",
+            detail: "Any scanner works — ZAP, Nmap, Semgrep, Trivy, AI Code Review, etc. Findings from scans are the raw material.",
+          },
+          {
+            text: "Run the Risk Manager AI agent.",
+            detail: "Go to AI Buddies → select Risk Manager. It takes your scan findings and applies the FAIR-lite ALE model (Annual Loss Expectancy), producing structured risk entries with likelihood × impact scoring. These land in the Risk Register.",
+          },
+          {
+            text: "Alternatively, run the Orchestrator agent.",
+            detail: "The Orchestrator runs all agents together — Risk Manager + Threat Intel + Compliance Monitor + Remediation — in one go. It populates all 4 registers simultaneously: Risk Register, Threat Register, Control Deficiencies, and Remediation Tracker.",
+          },
+          {
+            text: "Risk Overview auto-refreshes once risks exist.",
+            detail: "Once the Risk Manager (or Orchestrator) has written risk entries, the Risk Overview page shows: domain breakdown (Identity, Cloud Security, Application Security, Network, …), ALE per domain, likelihood vs impact heat map, top risks ranked by severity, and trend over time as new scans run.",
+          },
+        ],
+        tips: [
+          "The full workflow is: Scan → Findings → Risk Agent → Risk Register → Risk Overview. If Risk Overview looks empty, it means either no scans have been run for the active client, or the Risk Manager agent hasn't been executed against those findings yet.",
+          "Risk Overview is only as good as your scans — shallow scans produce thin risk data. Running multiple scanner types (network + SAST + cloud) gives the ALE model more signal.",
+        ],
+      },
+      {
         id: "risk-register",
         title: "Risk Register — prioritised risks + AI analysis",
         summary: "Multi-select slicer chips, top 5 risks, and an AI Agent Risk Analysis tile grid.",
