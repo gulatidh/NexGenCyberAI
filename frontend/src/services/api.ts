@@ -433,3 +433,17 @@ export const remediationTrackerApi = {
   delete: (clientId: string, actionId: string) =>
     apiClient.delete(`/clients/${clientId}/remediation-actions/${actionId}`),
 };
+
+export const customFrameworksApi = {
+  list: () => apiClient.get("/frameworks/custom/").then((r) => r.data),
+  create: (data: { name: string; description?: string }) =>
+    apiClient.post("/frameworks/custom/", data).then((r) => r.data),
+  get: (id: string) => apiClient.get(`/frameworks/custom/${id}/`).then((r) => r.data),
+  delete: (id: string) => apiClient.delete(`/frameworks/custom/${id}/`),
+  addControls: (id: string, controlIds: string[]) =>
+    apiClient.post(`/frameworks/custom/${id}/controls/`, { control_ids: controlIds }).then((r) => r.data),
+  removeControl: (id: string, fkCtrlId: string) =>
+    apiClient.delete(`/frameworks/custom/${id}/controls/${fkCtrlId}/`),
+  pickerControls: (params: { framework?: string; domain?: string; search?: string; page?: number }) =>
+    apiClient.get("/frameworks/controls/", { params }).then((r) => r.data),
+};

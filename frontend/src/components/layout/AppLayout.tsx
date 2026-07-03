@@ -13,7 +13,7 @@ import {
   Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
-  Cable, Settings, Radar, GppBad, PlaylistAddCheck,
+  Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -56,7 +56,8 @@ const NAV_GROUPS: NavGroup[] = [
         { label: "Technologies",    icon: <Apps />,    path: "/assets/technologies" },
         { label: "Stale Assets",    icon: <History />, path: "/stale-assets" },
       ] },
-      { label: "Frameworks",      icon: <Policy />,   path: "/frameworks" },
+      { label: "Frameworks",       icon: <Policy />,      path: "/frameworks" },
+      { label: "Custom Standards", icon: <LibraryAdd />, path: "/custom-frameworks" },
     ],
   },
   {

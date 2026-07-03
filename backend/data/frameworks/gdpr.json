@@ -1,0 +1,543 @@
+{
+  "framework": "gdpr",
+  "version": "2016/679 (GDPR)",
+  "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679",
+  "controls": [
+    {
+      "control_id": "ART-5",
+      "parent": null,
+      "domain": "Principles",
+      "title": "Principles Relating to Processing of Personal Data",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-5-1-A",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Lawfulness, Fairness and Transparency",
+      "description": "Personal data must be processed lawfully, fairly, and in a transparent manner in relation to the data subject. Organisations must be able to demonstrate a valid legal basis for each processing activity and communicate processing purposes clearly to individuals.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-5-1-B",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Purpose Limitation",
+      "description": "Personal data must be collected for specified, explicit, and legitimate purposes and must not be processed in a manner incompatible with those purposes. Secondary uses of data must be assessed for compatibility before any new processing begins.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-5-1-C",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Data Minimisation",
+      "description": "Personal data collected must be adequate, relevant, and limited to what is necessary in relation to the purposes for which it is processed. Organisations must review data collection practices to eliminate fields and records that are not strictly required.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-5-1-D",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Accuracy",
+      "description": "Personal data must be accurate and, where necessary, kept up to date. Organisations must take every reasonable step to ensure that inaccurate data is erased or rectified without delay, including implementing periodic data quality reviews.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-5-1-E",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Storage Limitation",
+      "description": "Personal data must be kept in a form that permits identification of data subjects for no longer than is necessary for the purposes for which the data is processed. Organisations must define and enforce data retention schedules and automated deletion workflows.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-5-1-F",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Integrity and Confidentiality",
+      "description": "Personal data must be processed in a manner that ensures appropriate security, including protection against unauthorised or unlawful processing and against accidental loss, destruction, or damage, using appropriate technical and organisational measures such as encryption and access controls.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-5-2",
+      "parent": "ART-5",
+      "domain": "Principles",
+      "title": "Accountability",
+      "description": "The controller must be responsible for and be able to demonstrate compliance with all data protection principles. Organisations must maintain records of processing activities, conduct regular audits, and document all compliance decisions and justifications.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-6",
+      "parent": null,
+      "domain": "Lawful Basis",
+      "title": "Lawfulness of Processing",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-6-1",
+      "parent": "ART-6",
+      "domain": "Lawful Basis",
+      "title": "Identify and Document Legal Basis",
+      "description": "Before initiating any personal data processing activity, the controller must identify and document at least one valid legal basis from Article 6(1) (consent, contract, legal obligation, vital interests, public task, or legitimate interests). The legal basis must be recorded in the Record of Processing Activities.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-6-2",
+      "parent": "ART-6",
+      "domain": "Lawful Basis",
+      "title": "Consent Management",
+      "description": "Where processing is based on consent, organisations must implement mechanisms to obtain freely given, specific, informed, and unambiguous consent, and must maintain evidence of consent. Withdrawal of consent must be as easy as giving it, and systems must honour withdrawal immediately.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-6-3",
+      "parent": "ART-6",
+      "domain": "Lawful Basis",
+      "title": "Legitimate Interests Assessment",
+      "description": "Where processing relies on legitimate interests (Art. 6(1)(f)), the controller must conduct and document a three-part Legitimate Interests Assessment (LIA) balancing the controller's interests against data subject rights and freedoms before processing commences.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-9",
+      "parent": null,
+      "domain": "Special Category Data",
+      "title": "Processing of Special Categories of Personal Data",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-9-1",
+      "parent": "ART-9",
+      "domain": "Special Category Data",
+      "title": "Prohibition and Explicit Exceptions for Special Category Data",
+      "description": "Processing of special category data (health, biometric, racial, religious, political, sexual orientation, genetic data) is prohibited unless an explicit exemption under Art. 9(2) applies. Controllers must document the applicable exemption and implement additional safeguards before processing any special category data.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-9-2",
+      "parent": "ART-9",
+      "domain": "Special Category Data",
+      "title": "Enhanced Safeguards for Special Category Data",
+      "description": "Where special category data is lawfully processed, organisations must apply enhanced technical and organisational measures including stricter access controls, encryption at rest and in transit, dedicated audit logging, and prohibition of automated decision-making without human review.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-12-14",
+      "parent": null,
+      "domain": "Transparency",
+      "title": "Transparency and Privacy Notices",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-12-1",
+      "parent": "ART-12-14",
+      "domain": "Transparency",
+      "title": "Transparent Communication to Data Subjects",
+      "description": "Controllers must provide all information required under Articles 13 and 14 in a concise, transparent, intelligible, and easily accessible form using clear and plain language. Information must be provided free of charge and within one month of a data subject request.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-13-1",
+      "parent": "ART-12-14",
+      "domain": "Transparency",
+      "title": "Privacy Notice — Data Collected Directly",
+      "description": "At the time personal data is collected from the data subject, the controller must provide the identity and contact details of the controller, purposes and legal basis for processing, recipients or categories of recipients, and any intended transfers to third countries.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-14-1",
+      "parent": "ART-12-14",
+      "domain": "Transparency",
+      "title": "Privacy Notice — Data Obtained Indirectly",
+      "description": "Where personal data is not obtained directly from the data subject, the controller must provide privacy notice information within one month of obtaining the data, or at the latest when first communication with the data subject occurs, including the categories of data held and their source.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-13-2",
+      "parent": "ART-12-14",
+      "domain": "Transparency",
+      "title": "Retention Periods and Automated Decision-Making Disclosure",
+      "description": "Privacy notices must include the retention period or criteria used to determine it, information about the right to withdraw consent, the right to lodge a complaint with a supervisory authority, and the existence of any automated decision-making including profiling and its logic and significance.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-15-22",
+      "parent": null,
+      "domain": "Data Subject Rights",
+      "title": "Rights of the Data Subject",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-15",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right of Access",
+      "description": "Data subjects have the right to obtain confirmation of whether personal data concerning them is being processed, and to access that data along with supplementary information including purposes, categories, recipients, and retention periods. Controllers must respond within one month and provide a copy of the data free of charge.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-16",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right to Rectification",
+      "description": "Data subjects have the right to obtain rectification of inaccurate personal data without undue delay. Organisations must implement mechanisms to receive, verify, and action rectification requests within one month, and must notify all recipients of the corrected data.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-17",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right to Erasure (Right to be Forgotten)",
+      "description": "Data subjects have the right to obtain erasure of personal data without undue delay where the data is no longer necessary, consent is withdrawn, or processing was unlawful. Organisations must implement technical erasure workflows including removal from backups and notification to downstream processors.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-18",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right to Restriction of Processing",
+      "description": "Data subjects may request restriction of processing where they contest the accuracy, the processing is unlawful, or they have objected to processing. Systems must support a 'restricted' flag that prevents further processing while preserving the data, and must notify the subject before lifting any restriction.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-20",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right to Data Portability",
+      "description": "Where processing is based on consent or contract and is carried out by automated means, data subjects have the right to receive their personal data in a structured, commonly used, and machine-readable format (e.g. JSON, CSV), and to transmit that data to another controller.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-21",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Right to Object",
+      "description": "Data subjects may object at any time to processing based on legitimate interests or for direct marketing purposes. Where an objection is received for direct marketing, processing must cease immediately without assessment; for other bases the controller must demonstrate compelling legitimate grounds.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-22",
+      "parent": "ART-15-22",
+      "domain": "Data Subject Rights",
+      "title": "Rights Related to Automated Decision-Making and Profiling",
+      "description": "Data subjects have the right not to be subject to a decision based solely on automated processing, including profiling, which produces legal or similarly significant effects. Organisations must implement meaningful human review mechanisms and inform subjects of the logic, significance, and envisaged consequences of automated decisions.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-24-25",
+      "parent": null,
+      "domain": "Controller Responsibility",
+      "title": "Controller Responsibility and Privacy by Design",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-24",
+      "parent": "ART-24-25",
+      "domain": "Controller Responsibility",
+      "title": "Responsibility of the Controller",
+      "description": "Controllers must implement appropriate technical and organisational measures to ensure and be able to demonstrate that processing is performed in accordance with the GDPR. This includes maintaining Records of Processing Activities (RoPA), adopting data protection policies, and conducting regular compliance reviews.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-25-1",
+      "parent": "ART-24-25",
+      "domain": "Controller Responsibility",
+      "title": "Privacy by Design",
+      "description": "Both at the time of determining the means of processing and at the time of the processing itself, controllers must implement data protection principles in a proactive manner, including pseudonymisation and data minimisation, with technical controls built into system design rather than retrofitted.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-25-2",
+      "parent": "ART-24-25",
+      "domain": "Controller Responsibility",
+      "title": "Privacy by Default",
+      "description": "Controllers must implement appropriate technical and organisational measures to ensure that, by default, only personal data which is necessary for each specific purpose is processed. This applies to the amount of data collected, the extent of processing, the storage period, and the accessibility of data — default settings must be privacy-protective.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-25-3",
+      "parent": "ART-24-25",
+      "domain": "Controller Responsibility",
+      "title": "Certification as Demonstration of Compliance",
+      "description": "An approved certification mechanism pursuant to Article 42 may be used to demonstrate compliance with privacy by design and by default requirements. Organisations should evaluate and pursue relevant certifications (e.g. ISO 27701) to demonstrate accountability to supervisory authorities.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-28",
+      "parent": null,
+      "domain": "Processor Agreements",
+      "title": "Processor and Data Processing Agreements",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-28-1",
+      "parent": "ART-28",
+      "domain": "Processor Agreements",
+      "title": "Due Diligence and Selection of Processors",
+      "description": "Controllers must only appoint processors that provide sufficient guarantees to implement appropriate technical and organisational measures to meet GDPR requirements and protect data subject rights. A documented vendor assessment and due diligence process must be completed before engaging any processor.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-28-3",
+      "parent": "ART-28",
+      "domain": "Processor Agreements",
+      "title": "Data Processing Agreement (DPA) Requirements",
+      "description": "Processing by a processor must be governed by a binding Data Processing Agreement that specifies the subject matter, duration, nature and purpose of processing, type of personal data, categories of data subjects, and obligations and rights of the controller. The DPA must require the processor to process data only on documented instructions from the controller.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-28-4",
+      "parent": "ART-28",
+      "domain": "Processor Agreements",
+      "title": "Sub-Processor Controls",
+      "description": "Processors must not engage sub-processors without prior specific or general written authorisation from the controller. Where general authorisation is given, the processor must notify the controller of any intended changes and allow the controller the opportunity to object. Sub-processors must be bound by equivalent obligations to the primary DPA.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-32",
+      "parent": null,
+      "domain": "Security of Processing",
+      "title": "Security of Processing",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-32-1-A",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Pseudonymisation and Encryption of Personal Data",
+      "description": "Implement pseudonymisation and encryption of personal data as a primary technical safeguard. Encryption must be applied both at rest and in transit using current strong algorithms (e.g. AES-256, TLS 1.2+). Pseudonymisation must separate identifying data from processing data sets where technically feasible.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-32-1-B",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Ongoing Confidentiality, Integrity, Availability, and Resilience",
+      "description": "Implement controls to ensure ongoing confidentiality, integrity, availability, and resilience of processing systems and services. This includes access controls, network segmentation, patch management, and capacity planning to sustain operations under normal and adverse conditions.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-32-1-C",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Ability to Restore Availability and Access",
+      "description": "Implement and regularly test the ability to restore the availability and access to personal data in a timely manner in the event of a physical or technical incident. Documented backup procedures, recovery time objectives, and tested restore procedures must be in place.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-32-1-D",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Regular Testing and Evaluation of Security Measures",
+      "description": "Establish a process for regularly testing, assessing, and evaluating the effectiveness of technical and organisational measures for ensuring the security of processing. This must include penetration testing, vulnerability scanning, and periodic security assessments against defined criteria.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-32-2",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Risk-Based Approach to Security Levels",
+      "description": "When determining the appropriate level of security, controllers and processors must take into account the risks presented by processing, in particular from accidental or unlawful destruction, loss, alteration, unauthorised disclosure of, or access to personal data. A documented risk assessment must be performed and reviewed periodically.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-32-3",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Staff Confidentiality Obligations",
+      "description": "Ensure that any natural person acting under the authority of the controller or processor who has access to personal data does not process it except on instructions from the controller, unless required to do so by EU or Member State law. All staff with data access must sign confidentiality agreements and complete data protection training.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-32-4",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Access Controls and Privilege Management",
+      "description": "Implement role-based access controls to restrict access to personal data to only those individuals who require it to perform their job functions. Access must be reviewed at least quarterly, with immediate revocation upon role change or departure, and all privileged access must be logged and monitored.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-32-5",
+      "parent": "ART-32",
+      "domain": "Security of Processing",
+      "title": "Incident Detection and Security Monitoring",
+      "description": "Deploy technical measures to detect security incidents involving personal data including unauthorised access attempts, data exfiltration, and anomalous processing patterns. Monitoring systems must generate alerts that are reviewed within defined timeframes to enable the 72-hour breach notification window under Article 33.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-33",
+      "parent": null,
+      "domain": "Breach Notification",
+      "title": "Notification of a Personal Data Breach to the Supervisory Authority",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-33-1",
+      "parent": "ART-33",
+      "domain": "Breach Notification",
+      "title": "72-Hour Notification to Supervisory Authority",
+      "description": "In the event of a personal data breach, the controller must notify the competent supervisory authority without undue delay and, where feasible, not later than 72 hours after becoming aware of it. Notifications delayed beyond 72 hours must be accompanied by reasons for the delay.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-33-3",
+      "parent": "ART-33",
+      "domain": "Breach Notification",
+      "title": "Breach Notification Content Requirements",
+      "description": "Breach notifications must describe the nature of the breach including categories and approximate number of data subjects and records concerned, contact details of the DPO, likely consequences of the breach, and measures taken or proposed to address the breach and mitigate its adverse effects.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-33-5",
+      "parent": "ART-33",
+      "domain": "Breach Notification",
+      "title": "Breach Register and Documentation",
+      "description": "Controllers must document all personal data breaches, comprising the facts relating to the breach, its effects, and the remedial action taken. This breach register must be maintained regardless of whether the breach requires notification to the supervisory authority or data subjects, and must be available for supervisory authority inspection.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-34",
+      "parent": null,
+      "domain": "Breach Notification",
+      "title": "Communication of a Personal Data Breach to the Data Subject",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-34-1",
+      "parent": "ART-34",
+      "domain": "Breach Notification",
+      "title": "Subject Notification When High Risk",
+      "description": "Where a personal data breach is likely to result in a high risk to the rights and freedoms of natural persons, the controller must communicate the breach to the affected data subjects without undue delay in clear and plain language, describing the nature of the breach and practical recommendations for the data subject to mitigate adverse effects.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-34-3",
+      "parent": "ART-34",
+      "domain": "Breach Notification",
+      "title": "Exceptions to Subject Notification",
+      "description": "Subject notification is not required where appropriate technical protection measures (e.g. encryption rendering data unintelligible) were applied to the affected data, subsequent measures make high risk to subjects unlikely, or individual communication would involve disproportionate effort (in which case a public communication is required). Controllers must document the justification for any exception claimed.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-35",
+      "parent": null,
+      "domain": "Data Protection Impact Assessment",
+      "title": "Data Protection Impact Assessment (DPIA)",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-35-1",
+      "parent": "ART-35",
+      "domain": "Data Protection Impact Assessment",
+      "title": "DPIA Requirement for High-Risk Processing",
+      "description": "A DPIA is mandatory prior to processing where the type of processing, in particular using new technologies, is likely to result in a high risk to the rights and freedoms of natural persons. Organisations must maintain a list of processing activities requiring DPIAs and ensure they are completed and approved before processing begins.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-35-3",
+      "parent": "ART-35",
+      "domain": "Data Protection Impact Assessment",
+      "title": "DPIA Mandatory Scenarios",
+      "description": "A DPIA is always required for systematic and extensive profiling with significant effects, large-scale processing of special category data, and systematic monitoring of publicly accessible areas. Organisations must evaluate each new processing initiative against these criteria before launch.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-35-7",
+      "parent": "ART-35",
+      "domain": "Data Protection Impact Assessment",
+      "title": "DPIA Content and Process",
+      "description": "The DPIA must contain a systematic description of the processing, an assessment of the necessity and proportionality of the processing, an assessment of the risks to data subject rights, and the measures envisaged to address those risks. The DPIA must be reviewed when the processing risk changes.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-35-9",
+      "parent": "ART-35",
+      "domain": "Data Protection Impact Assessment",
+      "title": "Prior Consultation with Supervisory Authority",
+      "description": "Where a DPIA indicates that the processing would result in a high residual risk that the controller cannot mitigate with appropriate measures, the controller must consult with the supervisory authority prior to commencing processing. The supervisory authority must be provided with the full DPIA documentation.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-37-39",
+      "parent": null,
+      "domain": "Data Protection Officer",
+      "title": "Data Protection Officer",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-37",
+      "parent": "ART-37-39",
+      "domain": "Data Protection Officer",
+      "title": "Designation of a Data Protection Officer",
+      "description": "Organisations must designate a DPO where required (public authority, large-scale systematic monitoring, or large-scale special category processing). The DPO's contact details must be published and communicated to the supervisory authority. The DPO must have expert knowledge of data protection law and may be an employee or external contractor.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-38",
+      "parent": "ART-37-39",
+      "domain": "Data Protection Officer",
+      "title": "Position and Resources of the Data Protection Officer",
+      "description": "The controller must ensure the DPO is involved in all issues relating to data protection, is provided adequate resources to carry out tasks, and is not dismissed or penalised for performing their role. The DPO must report directly to the highest management level and must not receive instructions regarding the exercise of their tasks.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-39",
+      "parent": "ART-37-39",
+      "domain": "Data Protection Officer",
+      "title": "Tasks of the Data Protection Officer",
+      "description": "The DPO must inform and advise the controller and staff on obligations, monitor compliance, provide advice on DPIAs, cooperate with and act as contact point for the supervisory authority, and maintain a record of all monitoring and advisory activities. The DPO must also manage data subject inquiries.",
+      "weight": 1
+    },
+    {
+      "control_id": "ART-44-49",
+      "parent": null,
+      "domain": "International Transfers",
+      "title": "Transfers of Personal Data to Third Countries",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "ART-45",
+      "parent": "ART-44-49",
+      "domain": "International Transfers",
+      "title": "Transfers Based on Adequacy Decision",
+      "description": "Personal data may be transferred to a third country only where the European Commission has adopted an adequacy decision for that country or territory. Organisations must maintain an up-to-date register of all data transfers and verify the continued validity of applicable adequacy decisions before each transfer.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-46",
+      "parent": "ART-44-49",
+      "domain": "International Transfers",
+      "title": "Standard Contractual Clauses (SCCs)",
+      "description": "In the absence of an adequacy decision, organisations may transfer personal data using Commission-approved Standard Contractual Clauses. SCCs must be implemented in full without modification of the operative clauses, and a Transfer Impact Assessment (TIA) must be conducted to verify that the destination country's law does not undermine SCC protections.",
+      "weight": 3
+    },
+    {
+      "control_id": "ART-47",
+      "parent": "ART-44-49",
+      "domain": "International Transfers",
+      "title": "Binding Corporate Rules (BCRs)",
+      "description": "Multinational organisations may use Binding Corporate Rules approved by a lead supervisory authority to transfer data within the corporate group. BCRs must be legally binding and enforceable, must include all essential elements required by Article 47, and must be reviewed and updated when significant changes occur in processing activities.",
+      "weight": 2
+    },
+    {
+      "control_id": "ART-49",
+      "parent": "ART-44-49",
+      "domain": "International Transfers",
+      "title": "Derogations for Specific Situations",
+      "description": "Transfers not covered by adequacy decisions or appropriate safeguards may only occur on the basis of specific derogations (explicit consent, contract necessity, vital interests, public register data, legal claims). Derogations may not be used for systematic or repeated transfers and must be documented with justification in the Record of Processing Activities.",
+      "weight": 1
+    }
+  ]
+}

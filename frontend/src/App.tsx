@@ -45,6 +45,7 @@ import LandingPage from "./pages/LandingPage";
 import ThreatRegister from "./pages/ThreatRegister";
 import ControlDeficiencies from "./pages/ControlDeficiencies";
 import RemediationTracker from "./pages/RemediationTracker";
+import CustomFrameworks from "./pages/CustomFrameworks";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -124,6 +125,7 @@ function ProtectedApp() {
           <Route path="/threat-register" element={<ThreatRegister />} />
           <Route path="/control-deficiencies" element={<ControlDeficiencies />} />
           <Route path="/remediation-tracker" element={<RemediationTracker />} />
+          <Route path="/custom-frameworks" element={<CustomFrameworks />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:clientId" element={<ClientDetail />} />
           <Route path="/projects" element={<Projects />} />

@@ -10,6 +10,7 @@ from sqlalchemy.sql import func
 from db.database import Base
 import enum
 import uuid
+from datetime import datetime, timezone
 
 
 def _uuid():
@@ -393,6 +394,32 @@ class FrameworkControl(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     statuses = relationship("ClientControlStatus", back_populates="control", cascade="all, delete-orphan")
+
+
+class CustomFramework(Base):
+    __tablename__ = "custom_frameworks"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False)
+    slug = Column(String(128), nullable=False, unique=True, index=True)
+    description = Column(Text)
+    created_by = Column(String(255))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    controls = relationship("CustomFrameworkControl", back_populates="custom_framework", cascade="all, delete-orphan")
+
+
+class CustomFrameworkControl(Base):
+    __tablename__ = "custom_framework_controls"
+    __table_args__ = (
+        UniqueConstraint("custom_framework_id", "framework_control_id"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    custom_framework_id = Column(String(36), ForeignKey("custom_frameworks.id"), nullable=False, index=True)
+    framework_control_id = Column(String(36), ForeignKey("framework_controls.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    custom_framework = relationship("CustomFramework", back_populates="controls")
+    framework_control = relationship("FrameworkControl")
 
 
 class ClientControlStatus(Base):

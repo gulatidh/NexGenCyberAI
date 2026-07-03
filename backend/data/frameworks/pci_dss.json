@@ -1,0 +1,743 @@
+{
+  "framework": "pci_dss",
+  "version": "v4.0",
+  "source": "https://www.pcisecuritystandards.org/document_library/?category=pcidss&document=pci_dss",
+  "controls": [
+    {
+      "control_id": "REQ-1",
+      "parent": null,
+      "domain": "Network Security Controls",
+      "title": "Install and Maintain Network Security Controls",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-1-1",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Network Security Control Policies and Procedures",
+      "description": "Establish, implement, and maintain standards and procedures for network security controls. All firewall and network device configurations must be covered by documented policies that define business justification for every open port and service, with annual review cycles.",
+      "weight": 1
+    },
+    {
+      "control_id": "REQ-1-2",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Define and Document Network Architecture",
+      "description": "Maintain accurate and current network diagrams that identify all connections between the cardholder data environment (CDE) and other networks, including wireless networks. Diagrams must show all cardholder data flows and be updated whenever the network environment changes.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-1-3",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Restrict Inbound and Outbound Traffic to the CDE",
+      "description": "Configure network security controls to restrict all inbound and outbound traffic to that which is necessary for the cardholder data environment. All other traffic must be explicitly denied. Rules must define source and destination IP, protocol, and port for each permitted flow.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-1-4",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Network Segmentation to Isolate the CDE",
+      "description": "Implement network segmentation controls to isolate the cardholder data environment from untrusted networks and other internal networks. Segmentation must be validated at least every six months by penetration testing or firewall review to confirm that out-of-scope systems cannot reach the CDE.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-1-5",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Control Connections to and from Untrusted Networks",
+      "description": "Implement controls at all connections between the CDE and untrusted networks, including stateful inspection firewalls. Anti-spoofing controls must be in place to detect and block forged source IP addresses, and direct public access to any cardholder data component must be prohibited.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-1-6",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Review and Approve Firewall Ruleset Every Six Months",
+      "description": "Review all network security control rulesets at least every six months to confirm they remain justified, documented with a business owner, and provide minimum necessary access. Expired or unjustified rules must be removed and the review outcome documented with approver signatures.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-1-7",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Secure and Harden All Network Security Devices",
+      "description": "Ensure all network security control devices (firewalls, routers, switches) are hardened according to vendor guidance or industry benchmarks (e.g. CIS). Default accounts must be changed or disabled, unnecessary services removed, and management interfaces restricted to authorised management networks only.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-1-8",
+      "parent": "REQ-1",
+      "domain": "Network Security Controls",
+      "title": "Personal Firewall Software on Mobile and End-User Devices",
+      "description": "Deploy personal firewall or endpoint security software on any portable devices (laptops, tablets) used by employees that connect to both untrusted networks and the CDE. The firewall software must be actively running, not alterable by end users, and generating logs reviewed by the security team.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-2",
+      "parent": null,
+      "domain": "Secure Configurations",
+      "title": "Apply Secure Configurations to All System Components",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-2-1",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Configuration Standards for All System Components",
+      "description": "Develop, implement, and maintain configuration standards for all system components in scope. Standards must address changing vendor-supplied defaults, disabling or removing unnecessary functionality, and must be based on industry-accepted hardening standards (e.g. CIS Benchmarks, DISA STIGs).",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-2-2",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Eliminate Vendor Default Credentials and Settings",
+      "description": "Before installing any system component on the network, change all vendor-supplied defaults including passwords, community strings, and other security parameters. A documented inventory of all defaults encountered and their replacements must be maintained as evidence of compliance.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-2-3",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Disable All Unnecessary Functionality",
+      "description": "Remove or disable all unnecessary features, components, subsystems, and file systems, including scripts, drivers, features, subsystems, file systems, and unnecessary web servers. Only enable services, protocols, and daemons that are required for the system's primary function.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-2-4",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Inventory of All In-Scope System Components",
+      "description": "Maintain an accurate inventory of all hardware and software in scope for PCI DSS, including a description of function and business owner. The inventory must be reviewed and updated at least every 12 months, and any newly discovered component must be assessed for scope impact before deployment.",
+      "weight": 1
+    },
+    {
+      "control_id": "REQ-2-5",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Protect All Non-Console Administrative Access",
+      "description": "Encrypt all non-console administrative access using strong cryptography. Technologies such as SSH, VPN, or TLS must be used in place of clear-text administrative protocols (Telnet, FTP, HTTP). Clear-text protocols must be disabled on all in-scope components.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-2-6",
+      "parent": "REQ-2",
+      "domain": "Secure Configurations",
+      "title": "Shared Hosting Providers Must Protect Each Entity's CDE",
+      "description": "Shared hosting providers must implement controls to protect each entity's hosted environment and cardholder data, ensuring that each hosted entity can only access their own cardholder data environment and cannot access other customers' data, audit logs, or configuration files.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-3",
+      "parent": null,
+      "domain": "Protect Stored Account Data",
+      "title": "Protect Stored Account Data",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-3-1",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Data Retention and Disposal Policy for Cardholder Data",
+      "description": "Define and implement a data retention and disposal policy that limits storage of cardholder data to only what is necessary for legal, regulatory, or business requirements. Data no longer needed must be deleted using secure deletion methods that render it unrecoverable.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-3-2",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Do Not Store Sensitive Authentication Data After Authorisation",
+      "description": "Sensitive authentication data (full magnetic stripe, CAV2/CVC2/CVV2/CID codes, and PINs/PIN blocks) must not be stored after authorisation even if encrypted. Verify that these data elements do not appear in logs, databases, or any other storage location.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-3-3",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Mask the PAN When Displayed",
+      "description": "Mask the Primary Account Number (PAN) when displayed, showing at most the first six and last four digits. Only personnel with a defined business need and documented approval may see more than these digits. Technical controls must prevent bypassing of masking in applications and reports.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-3-4",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Render the PAN Unreadable Wherever Stored",
+      "description": "Wherever the PAN is stored, render it unreadable using strong cryptography (AES-256 or equivalent), one-way hashes (SHA-256+), truncation, or tokenisation. Key management procedures must ensure that cryptographic keys are stored separately from the encrypted data.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-3-5",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Cryptographic Key Management Procedures",
+      "description": "Document and implement key management procedures and processes for cryptographic keys used to protect stored account data. Procedures must cover key generation, distribution, storage in secure hardware, rotation (at least every two years), revocation, and secure destruction of retired keys.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-3-6",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Protect Cryptographic Keys Against Disclosure and Misuse",
+      "description": "Restrict access to cryptographic keys to the minimum number of custodians necessary, store keys in the fewest possible locations, and use split knowledge and dual control for all key-encrypting keys. Key custodians must acknowledge in writing that they understand and accept their responsibilities.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-3-7",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Discover and Eliminate Unintended PAN Storage",
+      "description": "Run automated data discovery tools at least quarterly to scan all storage locations (databases, log files, file shares) for unintended PAN storage. Any discovered instances must be remediated immediately by deletion or tokenisation, and the scan results must be documented and reviewed by management.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-3-8",
+      "parent": "REQ-3",
+      "domain": "Protect Stored Account Data",
+      "title": "Secure Destruction of Cardholder Data",
+      "description": "When cardholder data is no longer needed, destroy it securely using methods that make recovery impossible (e.g. cross-cut shredding for paper, cryptographic erasure or DOD-compliant wipe for digital media). Destruction must be logged with date, method, and approver.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-4",
+      "parent": null,
+      "domain": "Encrypt Data in Transit",
+      "title": "Protect Cardholder Data with Strong Cryptography During Transmission",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-4-1",
+      "parent": "REQ-4",
+      "domain": "Encrypt Data in Transit",
+      "title": "Use Strong Cryptography for Cardholder Data Transmission",
+      "description": "Use strong cryptography and security protocols (TLS 1.2 or higher) to safeguard cardholder data during transmission over open, public networks. Older protocols (SSL, TLS 1.0, TLS 1.1) must be disabled on all systems that transmit cardholder data.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-4-2",
+      "parent": "REQ-4",
+      "domain": "Encrypt Data in Transit",
+      "title": "Certificate and Trust Validation",
+      "description": "Ensure that trusted keys and certificates are in place on all systems transmitting cardholder data over public networks. Certificates must be from a trusted Certificate Authority, be within their validity period, and certificate validation must be enforced — never bypass certificate errors in production.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-4-3",
+      "parent": "REQ-4",
+      "domain": "Encrypt Data in Transit",
+      "title": "Prohibit Sending PANs via Unprotected End-User Messaging",
+      "description": "Prohibit sending PANs via end-user messaging technologies such as email, instant messaging, SMS, or chat unless the messaging solution is end-to-end encrypted and the recipient is authenticated. Policies and technical controls must prevent unintended exposure of PANs through messaging channels.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-4-4",
+      "parent": "REQ-4",
+      "domain": "Encrypt Data in Transit",
+      "title": "Inventory of Trusted Keys and Certificates",
+      "description": "Maintain an inventory of all trusted keys and certificates used for cardholder data transmission, including expiry dates, owning systems, and responsible custodians. An automated certificate management process must trigger renewal actions at least 30 days before expiry to prevent unplanned service interruptions.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-5",
+      "parent": null,
+      "domain": "Anti-Malware",
+      "title": "Protect All Systems and Networks from Malicious Software",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-5-1",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Deploy Anti-Malware on All Applicable Systems",
+      "description": "Deploy anti-malware software on all system components commonly affected by malicious software including all operating systems, end-user devices, and servers in the CDE. The solution must provide real-time protection, automatic signature updates, and generate logs of all detected events.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-5-2",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Ensure Anti-Malware Mechanisms Are Active and Current",
+      "description": "Ensure all anti-malware mechanisms are maintained current and actively running. Anti-malware signature definitions must be updated at least daily, and scan engines must be updated when new versions are released. Management must receive reports confirming coverage and detection currency.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-5-3",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Anti-Malware Generates Audit Logs",
+      "description": "Configure anti-malware solutions to generate audit logs. Logs must include the date, time, malware identifier, system name, and action taken. Logs must be retained in accordance with the log retention requirement (Requirement 10.7) and must be included in the centralised log review process.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-5-4",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Anti-Phishing Mechanisms",
+      "description": "Implement anti-phishing controls to detect and protect personnel against phishing attacks. Controls must include email filtering with attachment and URL scanning, DNS-based filtering, and periodic simulated phishing campaigns with mandatory remedial training for personnel who fail.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-5-5",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Evaluate Systems Not Commonly Affected by Malware Periodically",
+      "description": "For system components identified as not commonly affected by malicious software, periodically evaluate that these systems do not require anti-malware protection and document the risk-based justification. Reviews must be conducted at least annually and whenever the threat landscape changes.",
+      "weight": 1
+    },
+    {
+      "control_id": "REQ-5-6",
+      "parent": "REQ-5",
+      "domain": "Anti-Malware",
+      "title": "Removable Media Controls",
+      "description": "Automatically scan all removable electronic media for malware when inserted into any in-scope system component. Block or alert on the use of unauthorised removable media in the CDE, and maintain an audit log of all removable media connections.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-6",
+      "parent": null,
+      "domain": "Secure Systems and Software",
+      "title": "Develop and Maintain Secure Systems and Software",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-6-1",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Establish a Security Vulnerability Management Process",
+      "description": "Identify, prioritise, and address security vulnerabilities for all in-scope system components. Organisations must subscribe to vulnerability intelligence sources, risk-rank all vulnerabilities using a defined methodology (e.g. CVSS), and patch or remediate critical vulnerabilities within one month of discovery.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-6-2",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Protect All System Components from Known Vulnerabilities by Patching",
+      "description": "Protect all system components from known vulnerabilities by installing applicable security patches and updates within defined timeframes: critical patches within one month, all others within three months of release. A formal patch testing and approval process must exist before production deployment.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-6-3",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Secure Development Lifecycle (SDLC) for Bespoke and Custom Software",
+      "description": "Develop all internal and bespoke software according to secure development practices including training developers in OWASP Top 10 vulnerabilities, code review by a security-knowledgeable reviewer before release, and separation of development, test, and production environments with no production cardholder data in test.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-6-4",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Protection of Web-Facing Applications Against Attacks",
+      "description": "Protect all web-facing applications (whether custom or third-party) against known vulnerabilities by either implementing a technical review of all application code for common vulnerabilities using manual or automated tools, or deploying a Web Application Firewall (WAF) in blocking mode in front of each web-facing application.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-6-5",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Manage Security Vulnerabilities in Third-Party Software Components",
+      "description": "Maintain an inventory of all third-party software components (libraries, frameworks, APIs) used in bespoke and custom applications. Monitor vulnerability disclosures for each component and remediate known vulnerabilities promptly. Remove or replace components that are no longer supported by the vendor.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-6-6",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Address Common Software Attack Techniques in Code",
+      "description": "Train development staff and include automated static analysis tooling to detect and remediate OWASP Top 10 issues including injection flaws, broken authentication, XSS, insecure direct object references, security misconfiguration, and using components with known vulnerabilities before any code is deployed to production.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-6-7",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "E-Commerce and Payment-Page Script Integrity Controls",
+      "description": "For payment pages delivered to browsers, manage all scripts loaded in the consumer's browser to ensure only authorised scripts execute and alert on unauthorised changes. Implement Subresource Integrity (SRI) for third-party scripts and a Content Security Policy (CSP) that blocks unauthorised script sources.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-6-8",
+      "parent": "REQ-6",
+      "domain": "Secure Systems and Software",
+      "title": "Formal Change Control Process",
+      "description": "Implement a formal change control process for all changes to in-scope system components covering documentation of impact and security review, management authorisation, testing in a non-production environment, and back-out procedures. Emergency changes must be reviewed post-deployment.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-7",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Restrict Access to System Components and Cardholder Data by Business Need to Know",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-7-1",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "Limit Access to System Components and Cardholder Data to Only Those with Business Need",
+      "description": "Define access control requirements for each system component based on business need to know. All access to cardholder data must be explicitly approved by authorised management and limited to the minimum data elements required for the individual's specific job function.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-7-2",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "Implement Role-Based Access Control (RBAC)",
+      "description": "Implement an access control system with role-based access control that restricts access to system components to only those individuals whose job requires such access. Roles must be defined based on the principle of least privilege, and the access control system must deny access by default unless explicitly granted.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-7-3",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "All Access Must Be Assigned to an Identified Individual Account",
+      "description": "Ensure all access to system components and cardholder data is granted to, and associated with, an individual user account and never to a shared generic account for day-to-day operations. Any use of shared or generic accounts must have documented business justification, management approval, and additional compensating controls.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-7-4",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "Review User Access at Least Every Six Months",
+      "description": "Review accounts and access privileges for all users, including third parties, at least every six months. Access no longer required must be revoked within one business day of the review completing. The review outcome must be documented and signed off by the data owner.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-7-5",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "Revoke Access Immediately Upon Termination",
+      "description": "Revoke all access for terminated employees and contractors immediately upon separation or contract end. An automated process must disable accounts, reclaim hardware tokens, and retrieve physical access credentials within four hours of an HR termination notification being issued.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-7-6",
+      "parent": "REQ-7",
+      "domain": "Access Control",
+      "title": "Control and Monitor Access of Third-Party Remote Access",
+      "description": "Manage and control all third-party remote access accounts: activate them only when needed and deactivate immediately after use, use unique accounts per vendor, require MFA, and monitor all third-party sessions in real time with the capability to terminate the session immediately if suspicious activity is detected.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-8",
+      "parent": null,
+      "domain": "Identification and Authentication",
+      "title": "Identify Users and Authenticate Access to System Components",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-8-1",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Policies and Procedures for User Identification and Authentication",
+      "description": "Establish and document policies and procedures for the identification and authentication of all users with access to in-scope system components. Policies must cover account lifecycle, password requirements, MFA requirements, and consequences for policy violations.",
+      "weight": 1
+    },
+    {
+      "control_id": "REQ-8-2",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Unique User IDs for All Users",
+      "description": "Assign unique user IDs to each user with access to system components or cardholder data. Shared or generic accounts must not be used for interactive access. Each user ID must be traceable to a specific individual to ensure accountability for all actions performed.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-8-3",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Strong Authentication for All Users",
+      "description": "Authenticate all users (including administrators) with at least one authentication factor: something known (password meeting complexity requirements), something possessed (hardware token or OTP), or something inherent (biometric). Authentication data must be encrypted during transmission and not stored in clear text.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-8-4",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Multi-Factor Authentication for All Access into the CDE",
+      "description": "Implement multi-factor authentication for all access into the cardholder data environment (including administrator access, remote access, and access from service accounts that can be used interactively). MFA must use at least two distinct authentication factors and must not be bypassable by any user.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-8-5",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Password and Passphrase Requirements",
+      "description": "Implement and enforce password/passphrase requirements: minimum length of 12 characters (or eight if the system does not support 12), containing both numeric and alphabetic characters, changed at least every 90 days, not the same as the previous four passwords, and locked out after ten failed attempts with a minimum 30-minute lockout duration.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-8-6",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Management of Application and System Accounts",
+      "description": "Manage all application and system accounts (service accounts, batch accounts, API keys) with the same rigour as interactive user accounts. Service account passwords must be complex, stored in a secrets management vault, rotated at least every 12 months or whenever a custodian with knowledge of the credential leaves, and reviewed quarterly.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-8-7",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Do Not Use Group, Shared, or Generic Authentication Credentials",
+      "description": "Prohibit the use of group, shared, or generic IDs, passwords, or other authentication methods for interactive user access. Where shared accounts are technically unavoidable (e.g. for some legacy applications), compensating controls including individual accountability logging, session recording, and quarterly password rotation must be documented and approved.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-8-8",
+      "parent": "REQ-8",
+      "domain": "Identification and Authentication",
+      "title": "Secure Authentication for Remote Access and Administrator Access",
+      "description": "For all remote access and all administrative access to in-scope system components, require MFA even within the internal network. Use phishing-resistant MFA methods (hardware FIDO2 keys or certificate-based authentication) for privileged accounts accessing cardholder data systems.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-9",
+      "parent": null,
+      "domain": "Physical Access",
+      "title": "Restrict Physical Access to Cardholder Data",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-9-1",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Physical Access Controls for Sensitive Areas",
+      "description": "Implement physical security controls for all facilities housing CDE systems, including locked cages, locked doors with electronic access controls, and monitoring via CCTV. Sensitive areas must require at least two independent verification steps (badge + PIN or badge + biometric) for entry.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-9-2",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Visitor Access Controls and Audit Logs",
+      "description": "Control and limit physical access by visitors to areas housing CDE systems. All visitors must be authorised before entry, escorted at all times while in sensitive areas, and must sign in and out. Visitor logs must be maintained for at least three months.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-9-3",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Media and Device Inventory Controls",
+      "description": "Maintain an inventory of all media containing cardholder data. Classify media, physically secure all media, and restrict distribution of media to authorised parties with documented approval. Complete and verify the media inventory at least annually.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-9-4",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Secure Physical Media Containing Cardholder Data in Transit",
+      "description": "Send media containing cardholder data via a trackable and secure carrier or courier that can be monitored. Log all media sent outside the facility including content description, sender, recipient, carrier details, and date sent. Management approval is required before any media leaves the facility.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-9-5",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Secure Destruction of Physical Media",
+      "description": "Destroy physical media containing cardholder data using methods that make data recovery impossible: cross-cut shredding, incineration, or pulping for paper; degaussing or physical destruction for magnetic media; and cryptographic erasure or physical destruction for solid-state media. Destruction must be logged.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-9-6",
+      "parent": "REQ-9",
+      "domain": "Physical Access",
+      "title": "Point-of-Interaction (POI) Device Tamper Detection",
+      "description": "Maintain an inventory of all point-of-interaction devices (card readers, terminals) including make, model, and serial number. Inspect devices at least once every three months for signs of tampering or substitution. Train staff to recognise and report suspicious devices or behaviour immediately.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Log and Monitor All Access to System Components and Cardholder Data",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-10-1",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Implement Audit Logging for All CDE System Components",
+      "description": "Implement audit logs to link all access to system components (user IDs, processes, applications) to each individual user. Logs must capture all actions taken by individuals with root or administrative privileges, all access to cardholder data, all invalid logical access attempts, and all changes to logging mechanisms.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10-2",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Required Audit Log Events",
+      "description": "Capture at minimum the following audit log events: user identification, event type, date and time, success or failure indication, origin of event, and identity or name of affected data, system component, or resource. Logs must include enough detail to reconstruct the actions and timing of any security event.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10-3",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Protect Audit Logs from Destruction and Unauthorised Modification",
+      "description": "Protect audit logs using write-once log storage, file integrity monitoring, or a centralised log management system that prevents log modification or deletion. Only personnel with a documented business need may access logs, and any attempt to clear or modify logs must trigger an immediate alert to security staff.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10-4",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Synchronise All System Clocks and Time",
+      "description": "Synchronise all in-scope system component clocks to a single authoritative time source using NTP or equivalent. Time discrepancies greater than one second between CDE systems must alert and be remediated, as inconsistent timestamps impair incident investigation and log correlation.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-10-5",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Retain Audit Log History for At Least 12 Months",
+      "description": "Retain audit logs for at least 12 months, with at least three months of logs immediately available for analysis. Log retention schedules must be enforced by automated archiving policies, and logs must be stored in a tamper-evident format that allows reconstruction of the full 12-month history on demand.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-10-6",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Review Logs and Security Events at Least Daily",
+      "description": "Review logs for all system components at least once daily. Reviews must include all security events, all logs of system components that store, process, or transmit cardholder data, and logs from critical infrastructure components. Use automated log management tools and SIEM to detect anomalies and reduce manual review burden.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10-7",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "File Integrity Monitoring (FIM)",
+      "description": "Deploy file integrity monitoring to alert personnel to unauthorised modification of critical system files, configuration files, and content files. Perform FIM comparisons at least weekly and generate alerts for any unexpected changes. Maintain a baseline of approved file states against which comparisons are made.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-10-8",
+      "parent": "REQ-10",
+      "domain": "Logging and Monitoring",
+      "title": "Detect and Report on Critical Security Control Failures",
+      "description": "Implement processes to detect and alert on failures of critical security controls in a timely manner, including failures of firewalls, IDS/IPS, FIM, anti-malware, access controls, and audit logging. Failures must be responded to within defined timeframes and documented.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-11",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Test Security of Systems and Networks Regularly",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-11-1",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "Wireless Access Point Scanning",
+      "description": "Test for the presence of unauthorised wireless access points quarterly, using a wireless analyser or a wireless IDS/IPS that continuously monitors for unauthorised wireless signals in the CDE. Any unauthorised access point detected must be identified, located, and eliminated or quarantined immediately.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-11-2",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "Internal and External Vulnerability Scans",
+      "description": "Run internal vulnerability scans at least quarterly and after any significant change to the CDE. Run external vulnerability scans at least quarterly using a PCI SSC-approved scanning vendor (ASV). All high-risk and critical vulnerabilities must be remediated and scans repeated until a clean report is achieved.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-11-3",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "External and Internal Penetration Testing",
+      "description": "Conduct penetration testing at least annually and after any significant infrastructure change or upgrade. Penetration tests must cover the full perimeter of the CDE and critical internal systems, follow a defined methodology (e.g. PTES, OWASP), and be performed by a qualified internal or external penetration tester independent of the tested environment.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-11-4",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "Segmentation Penetration Testing",
+      "description": "If network segmentation is used to reduce PCI DSS scope, test the segmentation controls at least every six months and after any change to the segmentation architecture. Penetration tests must verify that segmentation is operational and effective and that all out-of-scope systems cannot reach cardholder data components.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-11-5",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "Intrusion Detection and/or Prevention Systems",
+      "description": "Deploy intrusion detection or prevention systems (IDS/IPS) to monitor all traffic at the perimeter of the CDE and at critical internal points. IDS/IPS signatures must be kept current and alert on all known attack patterns. All IDS/IPS alerts must be reviewed and responded to within defined SLAs.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-11-6",
+      "parent": "REQ-11",
+      "domain": "Security Testing",
+      "title": "Change and Tamper Detection for Payment Page Scripts",
+      "description": "Deploy a mechanism to detect and alert on unauthorised changes to payment pages in the browser. This must include monitoring for changes to HTTP headers and script content at least weekly, or use a Content Security Policy and Subresource Integrity reporting to identify deviations from the authorised baseline automatically.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-12",
+      "parent": null,
+      "domain": "Security Policies and Program",
+      "title": "Support Information Security with Organisational Policies and Programs",
+      "description": "",
+      "weight": 0
+    },
+    {
+      "control_id": "REQ-12-1",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Establish, Publish, Maintain, and Disseminate a Security Policy",
+      "description": "Establish an overall information security policy that addresses all PCI DSS requirements, is reviewed at least annually and updated when the environment changes, and is disseminated to all relevant personnel including vendors. Personnel must acknowledge receipt and understanding of the policy annually.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-12-2",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Annual Risk Assessment",
+      "description": "Perform a formal risk assessment at least annually and whenever the environment changes significantly. The risk assessment must identify critical assets, threats, and vulnerabilities, produce a risk ranking for each identified risk, and inform the prioritisation of security controls and remediation efforts.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-12-3",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Security Awareness Training Program",
+      "description": "Implement a formal security awareness training program for all personnel upon hire and at least annually thereafter. Training must include recognising phishing and social engineering, safe handling of cardholder data, acceptable use of technology, and reporting procedures for suspected security incidents.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-12-4",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Manage Service Provider Relationships",
+      "description": "Maintain a list of all service providers with whom cardholder data is shared or that can affect the security of cardholder data. Ensure a written agreement is in place with each acknowledging responsibility for cardholder data security, and monitor service providers' PCI DSS compliance status at least annually.",
+      "weight": 2
+    },
+    {
+      "control_id": "REQ-12-5",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Incident Response Plan",
+      "description": "Develop and implement an incident response plan to handle security breaches immediately upon discovery. The plan must define roles and responsibilities, communication procedures (including notification to card brands and acquirers), containment and recovery steps, legal and forensic requirements, and must be tested at least annually via tabletop or live exercise.",
+      "weight": 3
+    },
+    {
+      "control_id": "REQ-12-6",
+      "parent": "REQ-12",
+      "domain": "Security Policies and Program",
+      "title": "Responsibility Assignment and Executive Accountability",
+      "description": "Assign an individual or team the formal responsibility of managing PCI DSS compliance, including maintaining the security policy, coordinating training, and reporting compliance status to executive leadership at least quarterly. Executive management must formally review and accept residual risk associated with the cardholder data environment.",
+      "weight": 1
+    }
+  ]
+}
