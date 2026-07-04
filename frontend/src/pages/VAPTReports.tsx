@@ -140,7 +140,7 @@ export default function VAPTReports() {
 
   const handleSubmit = () => {
     if (mode === "scan") {
-      const scan = completedScans.find((s: any) => s.id === selectedScanId);
+      completedScans.find((s: any) => s.id === selectedScanId);
       createFromScanMutation.mutate({
         scan_id: selectedScanId,
         title: form.title || undefined,
