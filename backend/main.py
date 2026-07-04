@@ -1187,6 +1187,7 @@ async def _generate_changelog_if_new() -> None:
     Falls back to local git commands when running outside CI."""
     import subprocess
     import os
+    import json
     try:
         from db.database import SessionLocal
         from api.models.models import ChangelogEntry
