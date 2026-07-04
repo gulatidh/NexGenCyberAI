@@ -4,7 +4,7 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, Select,
   MenuItem, FormControl, InputLabel, Tooltip, Alert, CircularProgress,
-  Stack, Badge,
+  Stack,
 } from "@mui/material";
 import {
   GppGood, Add, Visibility, Delete, Security, CheckCircle,
@@ -204,7 +204,6 @@ export default function VAPTReports() {
               {reports.map((report: any) => {
                 const fc = report.finding_counts || {};
                 const hasCritical = (fc.critical || 0) > 0;
-                const hasHigh = (fc.high || 0) > 0;
                 return (
                   <TableRow
                     key={report.id}
