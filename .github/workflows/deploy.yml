@@ -193,8 +193,8 @@ jobs:
           fi
           echo "Upload accepted. Polling Oryx build..."
           # Tolerate transient timeouts on the poll itself — Kudu can be slow
-          # while it's busy building. Up to 60 polls × 30s = 30 min budget.
-          for i in $(seq 1 60); do
+          # while it's busy building. Up to 180 polls × 20s = 60 min budget.
+          for i in $(seq 1 180); do
             RESP=$(curl -sS -m 60 --retry 3 --retry-delay 5 -u "$USER:$PW" \
               "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
             if [ -z "$RESP" ]; then
