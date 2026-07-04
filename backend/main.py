@@ -1214,49 +1214,86 @@ async def _generate_changelog_if_new() -> None:
                 logger.info("Changelog: SHA %s already recorded, skipping", current_sha[:8])
                 return
 
-            # Get commits since last entry
-            last_entry = db.query(ChangelogEntry).order_by(ChangelogEntry.deployed_at.desc()).first()
-            commit_messages: list = []
-            try:
-                if last_entry and last_entry.commit_sha:
-                    git_cmd = ["git", "log", "--pretty=format:%h %s", f"{last_entry.commit_sha}..{current_sha}"]
-                else:
-                    git_cmd = ["git", "log", "--pretty=format:%h %s", "-20"]
-                result = subprocess.run(git_cmd, capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=10)
-                if result.returncode == 0 and result.stdout.strip():
-                    commit_messages = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-            except Exception as exc:
-                logger.debug("Changelog: git log failed: %s", exc)
-
-            if not commit_messages:
-                commit_messages = [f"Deployment at {current_sha[:8]}"]
-
-            # Generate human-readable summary via LLM
-            summary = await _llm_summarise_commits(commit_messages)
-
-            # Version label: date + entry count for that day
             from datetime import datetime, timezone
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            day_count = db.query(ChangelogEntry).filter(
-                ChangelogEntry.version_label.like(f"{today}%")
-            ).count()
-            version_label = today + (f" #{day_count + 1}" if day_count > 0 else "")
 
+            last_entry = db.query(ChangelogEntry).order_by(ChangelogEntry.deployed_at.desc()).first()
             flow_id = (
                 os.environ.get("GITHUB_RUN_ID")
                 or os.environ.get("GITHUB_RUN_NUMBER")
                 or "local"
             )
-            entry = ChangelogEntry(
-                commit_sha=current_sha,
-                version_label=version_label,
-                raw_commits=commit_messages,
-                summary=summary,
-                flow_id=flow_id,
-            )
-            db.add(entry)
-            db.commit()
-            logger.info("Changelog: recorded new entry for %s (%d commits)", current_sha[:8], len(commit_messages))
+
+            if last_entry and last_entry.commit_sha:
+                # Normal incremental update — commits since last recorded SHA
+                commit_messages: list = []
+                try:
+                    result = subprocess.run(
+                        ["git", "log", "--pretty=format:%h %s", f"{last_entry.commit_sha}..{current_sha}"],
+                        capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=10,
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        commit_messages = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+                except Exception as exc:
+                    logger.debug("Changelog: git log failed: %s", exc)
+
+                if not commit_messages:
+                    commit_messages = [f"Deployment at {current_sha[:8]}"]
+
+                summary = await _llm_summarise_commits(commit_messages)
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                day_count = db.query(ChangelogEntry).filter(ChangelogEntry.version_label.like(f"{today}%")).count()
+                version_label = today + (f" #{day_count + 1}" if day_count > 0 else "")
+                db.add(ChangelogEntry(
+                    commit_sha=current_sha, version_label=version_label,
+                    raw_commits=commit_messages, summary=summary, flow_id=flow_id,
+                ))
+                db.commit()
+                logger.info("Changelog: recorded new entry for %s (%d commits)", current_sha[:8], len(commit_messages))
+
+            else:
+                # First run — walk full git history, group by date, create one entry per day
+                logger.info("Changelog: first run — reconstructing full history by date")
+                try:
+                    result = subprocess.run(
+                        ["git", "log", "--pretty=format:%H\t%as\t%s", "--reverse"],
+                        capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=15,
+                    )
+                    all_commits = []
+                    if result.returncode == 0 and result.stdout.strip():
+                        for line in result.stdout.strip().splitlines():
+                            parts = line.split("\t", 2)
+                            if len(parts) == 3:
+                                all_commits.append({"sha": parts[0], "date": parts[1], "msg": parts[2]})
+
+                    # Group commits by date
+                    from collections import defaultdict
+                    by_date: dict = defaultdict(list)
+                    sha_by_date: dict = {}
+                    for c in all_commits:
+                        by_date[c["date"]].append(f"{c['sha'][:7]} {c['msg']}")
+                        sha_by_date[c["date"]] = c["sha"]  # last SHA for that date
+
+                    for date_str in sorted(by_date.keys()):
+                        msgs = by_date[date_str]
+                        day_sha = sha_by_date[date_str]
+                        # Skip if this date's SHA is already recorded
+                        if db.query(ChangelogEntry).filter(ChangelogEntry.commit_sha == day_sha).first():
+                            continue
+                        summary = await _llm_summarise_commits(msgs)
+                        day_count = db.query(ChangelogEntry).filter(ChangelogEntry.version_label.like(f"{date_str}%")).count()
+                        version_label = date_str + (f" #{day_count + 1}" if day_count > 0 else "")
+                        deployed_at = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+                        # Mark historical entries — current SHA entry gets real flow_id
+                        entry_flow_id = flow_id if day_sha == current_sha else "historical"
+                        db.add(ChangelogEntry(
+                            commit_sha=day_sha, version_label=version_label,
+                            raw_commits=msgs, summary=summary,
+                            flow_id=entry_flow_id, deployed_at=deployed_at,
+                        ))
+                        db.commit()
+                        logger.info("Changelog: backfilled %s (%d commits)", date_str, len(msgs))
+                except Exception as exc:
+                    logger.warning("Changelog: history reconstruction failed: %s", exc)
         finally:
             db.close()
     except Exception as exc:
