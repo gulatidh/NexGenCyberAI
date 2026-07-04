@@ -4,16 +4,16 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, Select,
   MenuItem, FormControl, InputLabel, Tooltip, Alert, CircularProgress,
-  Stack,
+  Stack, Divider, LinearProgress,
 } from "@mui/material";
 import {
   GppGood, Add, Visibility, Delete, Security, CheckCircle,
-  HourglassEmpty, Shield,
+  HourglassEmpty, Shield, AutoAwesome, Article,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
-import { vaptApi } from "../services/api";
+import { vaptApi, scansApi } from "../services/api";
 
 const SEV_COLORS: Record<string, string> = {
   critical: "#C62828",
@@ -21,6 +21,20 @@ const SEV_COLORS: Record<string, string> = {
   medium: "#F9A825",
   low: "#2E7D32",
   informational: "#1565C0",
+};
+
+const SCAN_TYPE_LABEL: Record<string, string> = {
+  web: "Web App (ZAP)",
+  semgrep: "SAST (Semgrep)",
+  codeql: "SAST (CodeQL)",
+  sonarqube: "SAST (SonarQube)",
+  nmap: "Network (Nmap)",
+  openvas: "Network (OpenVAS)",
+  trivy: "Container (Trivy)",
+  gitleaks: "Secrets (Gitleaks)",
+  trufflehog: "Secrets (TruffleHog)",
+  owasp_dc: "Dependencies (OWASP DC)",
+  ai_code_review: "AI Code Review",
 };
 
 function SeverityBadge({ count, severity }: { count: number; severity: string }) {
@@ -58,6 +72,14 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
+const EMPTY_FORM = {
+  title: "",
+  classification: "Confidential",
+  version: "1.0",
+  prepared_by: "",
+  report_date: new Date().toISOString().slice(0, 10),
+};
+
 export default function VAPTReports() {
   const navigate = useNavigate();
   const { clientId } = useActiveClient();
@@ -65,13 +87,9 @@ export default function VAPTReports() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    title: "",
-    classification: "Confidential",
-    version: "1.0",
-    prepared_by: "",
-    report_date: new Date().toISOString().slice(0, 10),
-  });
+  const [mode, setMode] = useState<"scan" | "blank">("scan");
+  const [selectedScanId, setSelectedScanId] = useState("");
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const { data: reports = [], isLoading, error } = useQuery({
     queryKey: ["vapt-reports", clientId],
@@ -79,12 +97,28 @@ export default function VAPTReports() {
     enabled: !!clientId,
   });
 
-  const createMutation = useMutation({
+  const { data: scans = [] } = useQuery({
+    queryKey: ["scans", clientId],
+    queryFn: () => scansApi.list(clientId!),
+    enabled: !!clientId && createOpen,
+  });
+
+  const completedScans = (scans as any[]).filter((s: any) => s.status === "completed");
+
+  const createFromScanMutation = useMutation({
+    mutationFn: (data: any) => vaptApi.createFromScan(clientId!, data),
+    onSuccess: (newReport) => {
+      qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
+      handleClose();
+      navigate(`/vapt-reports/${newReport.id}`);
+    },
+  });
+
+  const createBlankMutation = useMutation({
     mutationFn: (data: any) => vaptApi.create(clientId!, data),
     onSuccess: (newReport) => {
       qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
-      setCreateOpen(false);
-      setForm({ title: "", classification: "Confidential", version: "1.0", prepared_by: "", report_date: new Date().toISOString().slice(0, 10) });
+      handleClose();
       navigate(`/vapt-reports/${newReport.id}`);
     },
   });
@@ -96,6 +130,30 @@ export default function VAPTReports() {
       setDeleteTarget(null);
     },
   });
+
+  const handleClose = () => {
+    setCreateOpen(false);
+    setMode("scan");
+    setSelectedScanId("");
+    setForm(EMPTY_FORM);
+  };
+
+  const handleSubmit = () => {
+    if (mode === "scan") {
+      const scan = completedScans.find((s: any) => s.id === selectedScanId);
+      createFromScanMutation.mutate({
+        scan_id: selectedScanId,
+        title: form.title || undefined,
+        classification: form.classification,
+        prepared_by: form.prepared_by || undefined,
+      });
+    } else {
+      createBlankMutation.mutate(form);
+    }
+  };
+
+  const isPending = createFromScanMutation.isPending || createBlankMutation.isPending;
+  const mutationError = createFromScanMutation.error || createBlankMutation.error;
 
   const totalReports = reports.length;
   const draftCount = reports.filter((r: any) => r.status === "draft").length;
@@ -154,21 +212,10 @@ export default function VAPTReports() {
         />
       </Stack>
 
-      {/* Error */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Failed to load VAPT reports.
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>Failed to load VAPT reports.</Alert>}
 
-      {/* Loading */}
-      {isLoading && (
-        <Box sx={{ textAlign: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      )}
+      {isLoading && <Box sx={{ textAlign: "center", py: 6 }}><CircularProgress /></Box>}
 
-      {/* Empty state */}
       {!isLoading && reports.length === 0 && (
         <Box sx={{
           textAlign: "center", py: 8, border: "2px dashed rgba(255,255,255,0.1)",
@@ -179,7 +226,7 @@ export default function VAPTReports() {
             No VAPT reports yet
           </Typography>
           <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-            Create your first report to start documenting security assessment findings.
+            Generate a report from a completed scan — Aegis fills in scope, findings, and AI-generated remediation automatically.
           </Typography>
           <Button variant="outlined" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
             Create First Report
@@ -187,7 +234,6 @@ export default function VAPTReports() {
         </Box>
       )}
 
-      {/* Reports table */}
       {!isLoading && reports.length > 0 && (
         <TableContainer component={Paper} sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <Table>
@@ -201,7 +247,7 @@ export default function VAPTReports() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {reports.map((report: any) => {
+              {(reports as any[]).map((report: any) => {
                 const fc = report.finding_counts || {};
                 const hasCritical = (fc.critical || 0) > 0;
                 return (
@@ -214,34 +260,21 @@ export default function VAPTReports() {
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {hasCritical && <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#C62828", flexShrink: 0 }} />}
-                        <Typography sx={{ fontWeight: 600, fontSize: "0.88rem" }}>
-                          {report.title}
-                        </Typography>
+                        <Typography sx={{ fontWeight: 600, fontSize: "0.88rem" }}>{report.title}</Typography>
                       </Box>
                       {report.parent_report_id && (
-                        <Typography variant="caption" color="text.disabled">
-                          Retest version
-                        </Typography>
+                        <Typography variant="caption" color="text.disabled">Retest version</Typography>
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={`v${report.version}`}
-                        size="small"
-                        sx={{ bgcolor: "rgba(21,101,192,0.15)", color: "#90CAF9", fontWeight: 700 }}
-                      />
+                      <Chip label={`v${report.version}`} size="small"
+                        sx={{ bgcolor: "rgba(21,101,192,0.15)", color: "#90CAF9", fontWeight: 700 }} />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={report.classification}
-                        size="small"
-                        variant="outlined"
-                        sx={{ borderColor: "rgba(255,255,255,0.2)", fontSize: "0.72rem" }}
-                      />
+                      <Chip label={report.classification} size="small" variant="outlined"
+                        sx={{ borderColor: "rgba(255,255,255,0.2)", fontSize: "0.72rem" }} />
                     </TableCell>
-                    <TableCell>
-                      <StatusChip status={report.status} />
-                    </TableCell>
+                    <TableCell><StatusChip status={report.status} /></TableCell>
                     <TableCell sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
                       {report.report_date
                         ? new Date(report.report_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
@@ -267,11 +300,7 @@ export default function VAPTReports() {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            onClick={() => setDeleteTarget(report.id)}
-                            sx={{ color: "error.main" }}
-                          >
+                          <IconButton size="small" onClick={() => setDeleteTarget(report.id)} sx={{ color: "error.main" }}>
                             <Delete fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -286,71 +315,162 @@ export default function VAPTReports() {
       )}
 
       {/* Create dialog */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={createOpen} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <GppGood sx={{ color: "#1565C0" }} />
             New VAPT Report
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
-          <TextField
-            label="Report Title"
-            required
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            fullWidth
-            placeholder="e.g. Web Application VAPT — Q2 2026"
-          />
-          <FormControl fullWidth>
-            <InputLabel>Classification</InputLabel>
-            <Select
-              value={form.classification}
-              label="Classification"
-              onChange={(e) => setForm((f) => ({ ...f, classification: e.target.value }))}
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 0, pt: 1 }}>
+          {/* Mode toggle */}
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Button
+              variant={mode === "scan" ? "contained" : "outlined"}
+              startIcon={<AutoAwesome />}
+              onClick={() => setMode("scan")}
+              size="small"
+              sx={mode === "scan" ? { bgcolor: "#1A237E" } : {}}
             >
-              {["Confidential", "Internal", "Public"].map((c) => (
-                <MenuItem key={c} value={c}>{c}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Version"
-            value={form.version}
-            onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))}
-            fullWidth
-            placeholder="1.0"
-          />
-          <TextField
-            label="Prepared By"
-            value={form.prepared_by}
-            onChange={(e) => setForm((f) => ({ ...f, prepared_by: e.target.value }))}
-            fullWidth
-            placeholder="Author / team name"
-          />
-          <TextField
-            label="Report Date"
-            type="date"
-            value={form.report_date}
-            onChange={(e) => setForm((f) => ({ ...f, report_date: e.target.value }))}
-            fullWidth
-            slotProps={{ inputLabel: { shrink: true } }}
-          />
+              Generate from Scan
+            </Button>
+            <Button
+              variant={mode === "blank" ? "contained" : "outlined"}
+              startIcon={<Article />}
+              onClick={() => setMode("blank")}
+              size="small"
+              sx={mode === "blank" ? { bgcolor: "#1A237E" } : {}}
+            >
+              Blank Report
+            </Button>
+          </Stack>
+
+          {mode === "scan" && (
+            <Alert severity="info" sx={{ mb: 2, fontSize: "0.82rem" }}>
+              Aegis will import all findings from the selected scan, derive scope and methodology automatically,
+              and use AI to generate executive summary, detailed remediation steps, and conclusion.
+            </Alert>
+          )}
+
+          {/* Scan picker — only in scan mode */}
+          {mode === "scan" && (
+            <FormControl fullWidth sx={{ mb: 2 }} required>
+              <InputLabel>Select Completed Scan</InputLabel>
+              <Select
+                value={selectedScanId}
+                label="Select Completed Scan"
+                onChange={(e) => {
+                  setSelectedScanId(e.target.value);
+                  const scan = completedScans.find((s: any) => s.id === e.target.value);
+                  if (scan && !form.title) {
+                    setForm((f) => ({ ...f, title: `VAPT Report — ${scan.name || scan.scan_type || "Scan"}` }));
+                  }
+                }}
+              >
+                {completedScans.length === 0 && (
+                  <MenuItem disabled value="">No completed scans found</MenuItem>
+                )}
+                {completedScans.map((s: any) => {
+                  const ct = s.connector?.connector_type || s.scan_type || "";
+                  const label = SCAN_TYPE_LABEL[ct] || ct || "Scan";
+                  return (
+                    <MenuItem key={s.id} value={s.id}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {s.name || `${label} — ${new Date(s.created_at).toLocaleDateString()}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {label} · {new Date(s.created_at).toLocaleDateString("en-GB")} ·{" "}
+                          {s.summary?.total || 0} findings
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          )}
+
+          <Divider sx={{ mb: 2 }} />
+
+          {/* Common fields */}
+          <Stack spacing={2}>
+            <TextField
+              label={mode === "scan" ? "Report Title (optional — auto-generated if blank)" : "Report Title"}
+              required={mode === "blank"}
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              fullWidth
+              placeholder="e.g. Web Application VAPT — Q2 2026"
+            />
+            <FormControl fullWidth>
+              <InputLabel>Classification</InputLabel>
+              <Select
+                value={form.classification}
+                label="Classification"
+                onChange={(e) => setForm((f) => ({ ...f, classification: e.target.value }))}
+              >
+                {["Confidential", "Internal", "Public"].map((c) => (
+                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Prepared By"
+              value={form.prepared_by}
+              onChange={(e) => setForm((f) => ({ ...f, prepared_by: e.target.value }))}
+              fullWidth
+              placeholder="Author / team name"
+            />
+            {mode === "blank" && (
+              <TextField
+                label="Version"
+                value={form.version}
+                onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))}
+                fullWidth
+                placeholder="1.0"
+              />
+            )}
+          </Stack>
+
+          {isPending && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                {mode === "scan"
+                  ? "Importing findings and generating AI content — this may take 15–30 seconds…"
+                  : "Creating report…"}
+              </Typography>
+              <LinearProgress />
+            </Box>
+          )}
+
+          {mutationError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              Failed to create report. Please try again.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button onClick={handleClose} disabled={isPending}>Cancel</Button>
           <Button
             variant="contained"
-            onClick={() => createMutation.mutate(form)}
-            disabled={!form.title.trim() || createMutation.isPending}
+            startIcon={mode === "scan" ? <AutoAwesome /> : undefined}
+            onClick={handleSubmit}
+            disabled={
+              isPending ||
+              (mode === "scan" && !selectedScanId) ||
+              (mode === "blank" && !form.title.trim())
+            }
             sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
           >
-            {createMutation.isPending ? "Creating…" : "Create Report"}
+            {isPending
+              ? mode === "scan" ? "Generating…" : "Creating…"
+              : mode === "scan" ? "Generate Report" : "Create Report"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Delete confirm dialog */}
+      {/* Delete confirm */}
       <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: "error.main" }}>Delete Report</DialogTitle>
         <DialogContent>

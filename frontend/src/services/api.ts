@@ -459,7 +459,9 @@ export const vaptApi = {
   deleteFinding: (clientId: string, reportId: string, findingId: string) =>
     apiClient.delete(`/clients/${clientId}/vapt-reports/${reportId}/findings/${findingId}/`),
   exportUrl: (clientId: string, reportId: string, format: string) =>
-    `/api/v1/clients/${clientId}/vapt-reports/${reportId}/export/${format}`,
+    `/clients/${clientId}/vapt-reports/${reportId}/export/${format}`,
+  createFromScan: (clientId: string, data: { scan_id: string; title?: string; classification?: string; prepared_by?: string }) =>
+    apiClient.post(`/clients/${clientId}/vapt-reports/from-scan/`, data).then((r) => r.data),
 };
 
 export const customFrameworksApi = {

@@ -1031,6 +1031,7 @@ class VAPTReport(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    scan_id = Column(String(36), nullable=True)             # source scan this report was generated from
     parent_report_id = Column(String(36), nullable=True)   # set on retest versions
     title = Column(String(500), nullable=False)
     version = Column(String(20), default="1.0")

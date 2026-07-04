@@ -23,12 +23,12 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.models.models import Client, VAPTFinding, VAPTReport
+from api.models.models import Client, Finding, Scan, VAPTFinding, VAPTReport
 from core.security import get_current_user
 from db.database import get_db
 
@@ -142,6 +142,13 @@ class VAPTReportCreate(BaseModel):
     retest_date: Optional[str] = None
 
 
+class VAPTReportFromScan(BaseModel):
+    scan_id: str
+    title: Optional[str] = None          # defaults to scan name
+    classification: str = "Confidential"
+    prepared_by: Optional[str] = None
+
+
 class VAPTReportUpdate(BaseModel):
     title: Optional[str] = None
     classification: Optional[str] = None
@@ -243,6 +250,314 @@ async def create_vapt_report(
     d = _report_to_dict(report)
     d["finding_counts"] = {}
     d["total_findings"] = 0
+    return d
+
+
+# ── Methodology templates by connector/scan type ──────────────────────────────
+
+_METHODOLOGY: Dict[str, Dict] = {
+    "web": {
+        "phases": [
+            {"name": "Reconnaissance", "description": "Passive and active information gathering — DNS enumeration, HTTP header analysis, technology fingerprinting."},
+            {"name": "Automated Scanning", "description": "OWASP ZAP active scan covering OWASP Top 10 attack categories including injection, broken authentication, XSS, IDOR, and security misconfigurations."},
+            {"name": "Manual Verification", "description": "Analyst review and proof-of-concept reproduction of flagged vulnerabilities to eliminate false positives."},
+            {"name": "Reporting", "description": "Risk-rated findings with evidence, reproduction steps, and remediation guidance aligned to OWASP ASVS."},
+        ],
+        "tools": ["OWASP ZAP", "Burp Suite", "curl", "Nikto"],
+        "standards": ["OWASP Top 10", "OWASP ASVS", "PTES"],
+    },
+    "semgrep": {
+        "phases": [
+            {"name": "Code Acquisition", "description": "Source code retrieved from repository or uploaded archive."},
+            {"name": "Static Analysis", "description": "Semgrep pattern matching against community and custom rule sets covering injection, secrets, insecure deserialization, and cryptographic weaknesses."},
+            {"name": "AI Triage", "description": "LLM-assisted triage to reduce false positives and enrich findings with context-aware remediation advice."},
+            {"name": "Reporting", "description": "File- and line-level findings mapped to CWE identifiers with fix recommendations."},
+        ],
+        "tools": ["Semgrep", "Claude AI (triage)"],
+        "standards": ["OWASP Top 10", "CWE/SANS Top 25", "NIST SSDF"],
+    },
+    "codeql": {
+        "phases": [
+            {"name": "Code Acquisition", "description": "Source code compiled or indexed into CodeQL database."},
+            {"name": "Query Execution", "description": "CodeQL security queries executed across all supported languages, targeting data-flow vulnerabilities, injection sinks, and unsafe API usage."},
+            {"name": "AI Enrichment", "description": "LLM-assisted severity assessment and step-by-step remediation generation."},
+            {"name": "Reporting", "description": "Findings presented with taint-flow traces, CWE mappings, and actionable fixes."},
+        ],
+        "tools": ["CodeQL CLI", "GitHub Advanced Security", "Claude AI"],
+        "standards": ["CWE Top 25", "OWASP Top 10", "NIST SSDF"],
+    },
+    "sonarqube": {
+        "phases": [
+            {"name": "Project Scan", "description": "SonarQube analysis run against the codebase covering bugs, vulnerabilities, code smells, and security hotspots."},
+            {"name": "Security Hotspot Review", "description": "All security hotspots reviewed and triaged by severity."},
+            {"name": "Reporting", "description": "Findings with quality-gate status, debt estimates, and remediation guidance."},
+        ],
+        "tools": ["SonarQube", "SonarScanner"],
+        "standards": ["OWASP Top 10", "CWE", "CERT"],
+    },
+    "nmap": {
+        "phases": [
+            {"name": "Host Discovery", "description": "TCP/UDP port sweep to enumerate live hosts and open services."},
+            {"name": "Service Fingerprinting", "description": "Version detection for identified services to flag outdated or vulnerable software."},
+            {"name": "Vulnerability Correlation", "description": "Identified service versions cross-referenced against CVE database for known exploits."},
+            {"name": "Reporting", "description": "Network attack surface mapped with risk ratings per open service."},
+        ],
+        "tools": ["Nmap", "NSE Scripts"],
+        "standards": ["PTES", "NIST SP 800-115"],
+    },
+    "openvas": {
+        "phases": [
+            {"name": "Scan Configuration", "description": "OpenVAS scanner configured with full and fast scan policy against defined target range."},
+            {"name": "Authenticated Scanning", "description": "Credentialed scan to identify privilege-escalation paths and internal misconfigurations."},
+            {"name": "CVE Assessment", "description": "Identified CVEs prioritised by CVSS score and exploitability."},
+            {"name": "Reporting", "description": "Risk-rated vulnerability report with remediation timelines."},
+        ],
+        "tools": ["OpenVAS / Greenbone", "CVE Database"],
+        "standards": ["CVSSv3", "PTES", "NIST SP 800-115"],
+    },
+    "trivy": {
+        "phases": [
+            {"name": "Image/Filesystem Scan", "description": "Trivy scans container images and filesystems for OS package vulnerabilities and misconfigurations."},
+            {"name": "Secret Detection", "description": "Embedded secrets and hardcoded credentials identified."},
+            {"name": "CVE Triage", "description": "CVEs triaged by fixability and severity; unfixed CVEs flagged separately."},
+            {"name": "Reporting", "description": "Container security posture report with patching recommendations."},
+        ],
+        "tools": ["Trivy", "OCI Registry"],
+        "standards": ["CIS Docker Benchmark", "CVSSv3", "NIST SP 800-190"],
+    },
+    "gitleaks": {
+        "phases": [
+            {"name": "Repository Scan", "description": "Gitleaks scans entire git history for secrets, API keys, and credentials."},
+            {"name": "Entropy Analysis", "description": "High-entropy strings analysed to surface non-pattern-matched secrets."},
+            {"name": "Reporting", "description": "Exposed secrets listed with commit reference, file path, and remediation steps."},
+        ],
+        "tools": ["Gitleaks"],
+        "standards": ["OWASP Top 10 (A02)", "NIST SSDF"],
+    },
+    "trufflehog": {
+        "phases": [
+            {"name": "Deep History Scan", "description": "TruffleHog scans all commits and branches for verified and unverified credentials."},
+            {"name": "Verification", "description": "Discovered credentials verified against upstream APIs where supported."},
+            {"name": "Reporting", "description": "Confirmed and suspected secret exposures with remediation guidance."},
+        ],
+        "tools": ["TruffleHog"],
+        "standards": ["OWASP Top 10 (A02)", "NIST SSDF"],
+    },
+    "owasp_dc": {
+        "phases": [
+            {"name": "Dependency Extraction", "description": "All third-party libraries and transitive dependencies catalogued from project manifests."},
+            {"name": "CVE Correlation", "description": "Dependencies cross-referenced against NVD and OSS Index for known vulnerabilities."},
+            {"name": "Reporting", "description": "Vulnerable components reported with upgrade paths and severity."},
+        ],
+        "tools": ["OWASP Dependency-Check", "NVD", "OSS Index"],
+        "standards": ["OWASP Top 10 (A06)", "CycloneDX SBOM"],
+    },
+    "ai_code_review": {
+        "phases": [
+            {"name": "Code Ingestion", "description": "Source code ingested, parsed, and chunked by file and function boundary."},
+            {"name": "Risk Triage", "description": "AI triage phase scores each chunk for security relevance, prioritising high-risk files."},
+            {"name": "Deep Review", "description": "LLM-assisted four-phase review: triage → per-chunk review → self-critique → cross-file taint tracing."},
+            {"name": "Reporting", "description": "Structured findings with severity, CWE mapping, evidence, and AI-generated remediation."},
+        ],
+        "tools": ["Aegis AI Code Review", "Claude AI", "OpenAI GPT-4o"],
+        "standards": ["OWASP Top 10", "CWE/SANS Top 25", "NIST SSDF"],
+    },
+}
+
+_DEFAULT_METHODOLOGY = {
+    "phases": [
+        {"name": "Discovery", "description": "Target identification and information gathering."},
+        {"name": "Assessment", "description": "Automated and manual vulnerability assessment."},
+        {"name": "Reporting", "description": "Risk-rated findings with remediation guidance."},
+    ],
+    "tools": ["Aegis Security Platform"],
+    "standards": ["PTES", "OWASP"],
+}
+
+
+async def _ai_generate_report_content(
+    client_name: str,
+    scan_type: str,
+    findings: List[Dict],
+    scope: Dict,
+) -> Dict[str, str]:
+    """Call LLM to generate executive summary, per-finding enhanced remediation, and conclusion."""
+    try:
+        from core.ai_providers import get_llm, ProviderUnavailableError
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
+        for f in findings:
+            s = (f.get("severity") or "").lower()
+            if s in sev_counts:
+                sev_counts[s] += 1
+
+        findings_summary = "\n".join(
+            f"- [{f.get('severity','').upper()}] {f.get('title','')}: {(f.get('description') or '')[:200]}"
+            for f in findings[:30]
+        )
+
+        system = (
+            "You are a senior penetration tester writing a professional VAPT report. "
+            "Be concise, precise, and business-appropriate. Do not use markdown headers or bullet symbols — "
+            "write in clear prose paragraphs. Output JSON only."
+        )
+
+        prompt = f"""
+Client: {client_name}
+Scan type: {scan_type}
+Scope: {json.dumps(scope)}
+Findings ({len(findings)} total — Critical:{sev_counts['critical']} High:{sev_counts['high']} Medium:{sev_counts['medium']} Low:{sev_counts['low']}):
+{findings_summary}
+
+Return a JSON object with exactly these keys:
+{{
+  "executive_summary": "3-4 paragraph executive summary suitable for a CISO/board audience. Explain the engagement purpose, overall risk posture, and top concerns.",
+  "conclusion": "2-3 paragraph conclusion covering overall security maturity, critical remediation priorities, and recommended next steps.",
+  "finding_remediations": {{
+    "<finding_title>": "Detailed step-by-step remediation for this specific finding — 4-8 concrete technical steps."
+  }}
+}}
+
+Include a remediation entry for every finding listed above.
+"""
+        llm = get_llm()
+        resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        raw = str(resp.content).strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except Exception as exc:
+        logger.warning("AI report generation failed: %s", exc)
+        return {}
+
+
+# ── From-Scan auto-generate ───────────────────────────────────────────────────
+
+@router.post("/clients/{cid}/vapt-reports/from-scan/", status_code=status.HTTP_201_CREATED)
+async def create_report_from_scan(
+    cid: str,
+    payload: VAPTReportFromScan,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """
+    Create a fully populated VAPT report from an existing scan.
+    Findings, scope, methodology are derived from scan data.
+    Executive summary, conclusion, and per-finding remediation are AI-generated.
+    """
+    client = _get_client_or_404(cid, db)
+    scan = db.query(Scan).filter(Scan.id == payload.scan_id, Scan.client_id == cid).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    findings: List[Finding] = db.query(Finding).filter(Finding.scan_id == scan.id).all()
+
+    # Derive scan type label
+    connector_type = ""
+    if scan.connector:
+        ct = scan.connector.connector_type
+        connector_type = ct.value if hasattr(ct, "value") else str(ct)
+    elif scan.scan_type:
+        st = scan.scan_type
+        connector_type = st.value if hasattr(st, "value") else str(st)
+
+    # Build scope from unique assets
+    assets = sorted({f.resource_id for f in findings if f.resource_id})
+    scope = {
+        "in_scope": assets[:50],
+        "out_of_scope": [],
+        "scan_type": connector_type,
+        "scan_id": scan.id,
+        "scan_name": scan.name or "",
+    }
+
+    # Methodology from template
+    methodology = _METHODOLOGY.get(connector_type, _DEFAULT_METHODOLOGY)
+
+    # Build findings dicts for AI
+    findings_for_ai = [
+        {
+            "title": f.title,
+            "severity": f.severity.value if hasattr(f.severity, "value") else str(f.severity),
+            "description": f.description or "",
+            "resource_id": f.resource_id or "",
+            "remediation": f.remediation or "",
+            "evidence": json.dumps(f.evidence) if f.evidence else "",
+            "cve_id": f.cve_id or "",
+            "cvss_score": f.cvss_score,
+        }
+        for f in findings
+    ]
+
+    # AI generation (gracefully degrades if LLM unavailable)
+    ai = await _ai_generate_report_content(
+        client_name=client.name,
+        scan_type=connector_type,
+        findings=findings_for_ai,
+        scope=scope,
+    )
+
+    title = payload.title or f"VAPT Report — {scan.name or connector_type.upper()} — {client.name}"
+
+    report = VAPTReport(
+        client_id=cid,
+        scan_id=scan.id,
+        title=title,
+        classification=payload.classification,
+        version="1.0",
+        prepared_by=payload.prepared_by,
+        report_date=datetime.now(timezone.utc),
+        status="draft",
+        executive_summary=ai.get("executive_summary", ""),
+        scope_json=json.dumps(scope),
+        methodology_json=json.dumps(methodology),
+        conclusion=ai.get("conclusion", ""),
+    )
+    db.add(report)
+    db.flush()
+
+    # Import findings
+    ai_remediations: Dict[str, str] = ai.get("finding_remediations", {})
+    sev_order = ["critical", "high", "medium", "low", "informational", "info"]
+
+    sorted_findings = sorted(
+        findings_for_ai,
+        key=lambda x: sev_order.index(x["severity"].lower()) if x["severity"].lower() in sev_order else 99,
+    )
+
+    for idx, fd in enumerate(sorted_findings):
+        sev = fd["severity"].lower()
+        if sev == "info":
+            sev = "informational"
+        enhanced_remediation = ai_remediations.get(fd["title"], fd.get("remediation", ""))
+        vapt_finding = VAPTFinding(
+            report_id=report.id,
+            finding_id=f"F-{idx + 1:02d}",
+            title=fd["title"],
+            severity=sev,
+            affected_asset=fd["resource_id"],
+            description=fd["description"],
+            impact="",
+            evidence=fd["evidence"],
+            reproduction_steps="",
+            recommendation=enhanced_remediation,
+            references=fd["cve_id"] if fd.get("cve_id") else "",
+            retest_status="pending",
+            order_index=idx,
+        )
+        db.add(vapt_finding)
+
+    db.commit()
+    db.refresh(report)
+    d = _report_to_dict(report)
+    d["findings"] = [_finding_to_dict(f) for f in report.findings]
+    d["finding_counts"] = _sev_counts(report.findings)
+    d["total_findings"] = len(report.findings)
     return d
 
 

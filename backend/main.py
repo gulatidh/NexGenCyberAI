@@ -356,6 +356,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("clients.deleted_at ALTER failed: %s", exc)
 
+        # vapt_reports.scan_id — source scan reference
+        try:
+            vapt_cols = {c["name"] for c in inspector.get_columns("vapt_reports")}
+        except Exception:
+            vapt_cols = set()
+        if vapt_cols and "scan_id" not in vapt_cols:
+            ddl = ("ALTER TABLE vapt_reports ADD scan_id NVARCHAR(36) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE vapt_reports ADD COLUMN scan_id VARCHAR(36)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added vapt_reports.scan_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("vapt_reports.scan_id ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
