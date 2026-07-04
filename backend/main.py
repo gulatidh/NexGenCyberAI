@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -385,6 +385,22 @@ def _ensure_added_columns() -> None:
                 logger.info("Added vapt_reports.scan_id column (%s)", dialect)
             except Exception as exc:
                 logger.warning("vapt_reports.scan_id ALTER failed: %s", exc)
+
+        # changelog_entries.flow_id — GitHub Actions run ID captured at deploy time
+        try:
+            cl_cols = {c["name"] for c in inspector.get_columns("changelog_entries")}
+        except Exception:
+            cl_cols = set()
+        if cl_cols and "flow_id" not in cl_cols:
+            ddl = ("ALTER TABLE changelog_entries ADD flow_id NVARCHAR(100) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE changelog_entries ADD COLUMN flow_id VARCHAR(100)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added changelog_entries.flow_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("changelog_entries.flow_id ALTER failed: %s", exc)
 
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
@@ -972,6 +988,7 @@ app.include_router(remediation_tracker.router, prefix="/api/v1")
 app.include_router(custom_frameworks.router, prefix="/api/v1")
 app.include_router(assistant.router, prefix="/api/v1")
 app.include_router(vapt_reports.router, prefix="/api/v1")
+app.include_router(changelog.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
@@ -1108,6 +1125,16 @@ async def _warm_threat_intel_cache() -> None:
         logging.getLogger(__name__).exception("Failed to warm threat-intel cache")
 
 
+@app.on_event("startup")
+async def _startup_generate_changelog() -> None:
+    """Fire-and-forget: generate a changelog entry for this deploy if the commit SHA is new."""
+    import asyncio
+    try:
+        asyncio.create_task(_generate_changelog_if_new())
+    except Exception:
+        logger.exception("Failed to schedule changelog generation")
+
+
 @app.on_event("shutdown")
 async def _stop_mission_scheduler() -> None:
     try:
@@ -1115,6 +1142,125 @@ async def _stop_mission_scheduler() -> None:
         shutdown_scheduler()
     except Exception:
         pass
+
+
+# ── Changelog generation ─────────────────────────────────────────────────────
+
+async def _llm_summarise_commits(commit_messages: list) -> str:
+    """Use the configured LLM to convert commit messages into user-friendly changelog."""
+    try:
+        from core.ai_providers import get_llm
+        from langchain_core.messages import SystemMessage, HumanMessage
+        llm = get_llm()
+        system = (
+            "You are a technical writer creating a user-friendly product changelog. "
+            "Convert the given git commit messages into clear, plain-English bullet points that a non-technical user can understand. "
+            "Group related changes. Use active voice. Focus on WHAT changed and WHY it matters to the user. "
+            "Do NOT mention commit hashes, branch names, or git terminology. "
+            "Do NOT say 'we' or 'I'. Write as: '• New: ...', '• Improved: ...', '• Fixed: ...'. "
+            "Return ONLY the bullet points, no headers, no intro text."
+        )
+        user = "Convert these commits to a user-friendly changelog:\n\n" + "\n".join(commit_messages)
+        response = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=user)])
+        raw = response.content if hasattr(response, "content") else str(response)
+        return raw.strip()
+    except Exception as exc:
+        logger.debug("Changelog LLM summarisation failed, using raw commits: %s", exc)
+        # Fallback: simple formatting of commit messages without LLM
+        lines = []
+        for msg in commit_messages:
+            # Strip commit hash prefix (7 chars + space)
+            text = msg[8:] if len(msg) > 8 else msg
+            text = (text.replace("feat:", "New:").replace("fix:", "Fixed:")
+                    .replace("docs:", "Updated:").replace("refactor:", "Improved:")
+                    .replace("chore:", "Updated:"))
+            lines.append(f"• {text.strip()}")
+        return "\n".join(lines)
+
+
+async def _generate_changelog_if_new() -> None:
+    """On startup: detect new commits since last changelog entry, summarise with LLM, save."""
+    import subprocess
+    import os
+    try:
+        from db.database import SessionLocal
+        from api.models.models import ChangelogEntry
+        db = SessionLocal()
+        try:
+            # Get current SHA from git or env var
+            current_sha = None
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=5,
+                )
+                if result.returncode == 0:
+                    current_sha = result.stdout.strip()
+            except Exception:
+                pass
+            if not current_sha:
+                current_sha = (
+                    os.environ.get("GITHUB_SHA")
+                    or os.environ.get("COMMIT_SHA")
+                    or os.environ.get("GIT_SHA")
+                )
+            if not current_sha:
+                logger.info("Changelog: no commit SHA available, skipping")
+                return
+
+            # Check if already recorded
+            existing = db.query(ChangelogEntry).filter(ChangelogEntry.commit_sha == current_sha).first()
+            if existing:
+                logger.info("Changelog: SHA %s already recorded, skipping", current_sha[:8])
+                return
+
+            # Get commits since last entry
+            last_entry = db.query(ChangelogEntry).order_by(ChangelogEntry.deployed_at.desc()).first()
+            commit_messages: list = []
+            try:
+                if last_entry and last_entry.commit_sha:
+                    git_cmd = ["git", "log", "--pretty=format:%h %s", f"{last_entry.commit_sha}..{current_sha}"]
+                else:
+                    git_cmd = ["git", "log", "--pretty=format:%h %s", "-20"]
+                result = subprocess.run(git_cmd, capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=10)
+                if result.returncode == 0 and result.stdout.strip():
+                    commit_messages = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+            except Exception as exc:
+                logger.debug("Changelog: git log failed: %s", exc)
+
+            if not commit_messages:
+                commit_messages = [f"Deployment at {current_sha[:8]}"]
+
+            # Generate human-readable summary via LLM
+            summary = await _llm_summarise_commits(commit_messages)
+
+            # Version label: date + entry count for that day
+            from datetime import datetime, timezone
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            day_count = db.query(ChangelogEntry).filter(
+                ChangelogEntry.version_label.like(f"{today}%")
+            ).count()
+            version_label = today + (f" #{day_count + 1}" if day_count > 0 else "")
+
+            flow_id = (
+                os.environ.get("GITHUB_RUN_ID")
+                or os.environ.get("GITHUB_RUN_NUMBER")
+                or "local"
+            )
+            entry = ChangelogEntry(
+                commit_sha=current_sha,
+                version_label=version_label,
+                raw_commits=commit_messages,
+                summary=summary,
+                flow_id=flow_id,
+            )
+            db.add(entry)
+            db.commit()
+            logger.info("Changelog: recorded new entry for %s (%d commits)", current_sha[:8], len(commit_messages))
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Changelog generation failed (non-fatal): %s", exc)
 
 
 # ── Knowledge base seeding ───────────────────────────────────────────────────

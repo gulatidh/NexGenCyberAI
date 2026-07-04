@@ -1083,3 +1083,25 @@ class VAPTFinding(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     report = relationship("VAPTReport", back_populates="findings")
+
+
+# ── Changelog ─────────────────────────────────────────────────────────────────
+
+class ChangelogEntry(Base):
+    """Auto-generated on every deploy — LLM summarises new git commits into
+    user-friendly bullet points. One row per unique commit SHA so restarts
+    don't duplicate entries."""
+    __tablename__ = "changelog_entries"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    commit_sha = Column(String(40), unique=True, index=True)
+    version_label = Column(String(50))          # e.g. "2026-07-04" or "2026-07-04 #2"
+    raw_commits = Column(JSON)                   # list of "shortsha message" strings
+    summary = Column(Text)                       # LLM-generated human-readable summary
+    environment = Column(String(50), default="production")
+    # GitHub Actions run identifier — set from GITHUB_RUN_ID, GITHUB_RUN_NUMBER,
+    # or "local" when running outside CI. Displayed in the "What's New" UI as
+    # "Run #<id>" so engineers can cross-reference the deployment pipeline.
+    flow_id = Column(String(100))
+    deployed_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

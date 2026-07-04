@@ -25,11 +25,13 @@ import {
   Visibility, VisibilityOff, LinkOutlined,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
+  NewReleases,
 } from "@mui/icons-material";
+import Skeleton from "@mui/material/Skeleton";
 import LinearProgress from "@mui/material/LinearProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { emailApi, ssoApi, adminApi, clientsApi, projectsApi } from "../services/api";
+import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi } from "../services/api";
 import { MyAccess, AccessRole, AccessScope, Client, Project, UserAccessSummary } from "../types";
 import { fmt, fromNow } from "../utils/datetime";
 
@@ -824,9 +826,120 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ── What's New tab ───────────────────────────────────────────────────────────
+function WhatsNewTab() {
+  const { data: entries = [], isLoading } = useQuery<any[]>({
+    queryKey: ["changelog"],
+    queryFn: changelogApi.list,
+    staleTime: 5 * 60_000,
+  });
+
+  return (
+    <Box>
+      <SectionHeader
+        icon={<NewReleases />}
+        title="What's New"
+        subtitle="Auto-generated on every deploy — AI summarises the latest changes"
+      />
+
+      {isLoading ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {[1, 2, 3].map((i) => (
+            <Card key={i} variant="outlined">
+              <CardContent>
+                <Skeleton width="40%" height={24} sx={{ mb: 1 }} />
+                <Skeleton width="100%" />
+                <Skeleton width="90%" />
+                <Skeleton width="95%" />
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      ) : entries.length === 0 ? (
+        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+          <NewReleases sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+          <Typography sx={{ color: "text.secondary" }}>
+            No updates recorded yet — deploys will appear here automatically.
+          </Typography>
+        </Card>
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {entries.map((entry: any, idx: number) => {
+            const bulletLines = (entry.summary || "")
+              .split("\n")
+              .map((l: string) => l.trim())
+              .filter(Boolean);
+            const commitCount = (entry.raw_commits || []).length;
+            const shortSha = entry.commit_sha ? entry.commit_sha.slice(0, 7) : "unknown";
+            const deployedDate = entry.deployed_at
+              ? new Date(entry.deployed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+              : "—";
+
+            const flowLabel = entry.flow_id && entry.flow_id !== "local"
+              ? `Run #${entry.flow_id}`
+              : (entry.flow_id || "local");
+
+            return (
+              <Card key={entry.id} variant="outlined" sx={{ borderLeft: idx === 0 ? `3px solid ${ACCENT}` : undefined }}>
+                <CardContent>
+                  {/* Header row: [Latest]  Flow: Run#xxx  •  Jul 4, 2026 */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5, flexWrap: "wrap" }}>
+                    {idx === 0 && (
+                      <Chip label="Latest" size="small" color="primary" sx={{ fontSize: 10, height: 20 }} />
+                    )}
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: ACCENT }}>
+                      Flow: {flowLabel}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "text.disabled" }}>•</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      {deployedDate}
+                    </Typography>
+                  </Box>
+
+                  {/* Description — LLM-generated bullet points */}
+                  <Box sx={{ mb: 1.5 }}>
+                    {bulletLines.length > 0 ? (
+                      bulletLines.map((line: string, li: number) => (
+                        <Typography
+                          key={li}
+                          variant="body2"
+                          sx={{ color: "text.secondary", lineHeight: 1.7 }}
+                        >
+                          {line}
+                        </Typography>
+                      ))
+                    ) : (
+                      <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                        No summary available.
+                      </Typography>
+                    )}
+                  </Box>
+
+                  {/* Footer */}
+                  <Divider sx={{ mb: 1 }} />
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      {commitCount} commit{commitCount !== 1 ? "s" : ""}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>•</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                      SHA: {shortSha}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 // ── Main Settings page ───────────────────────────────────────────────────────
 const TABS = [
   { label: "General",          icon: <SettingsIcon fontSize="small" /> },
+  { label: "What's New",       icon: <NewReleases fontSize="small" /> },
   { label: "Email",            icon: <MarkEmailRead fontSize="small" /> },
   { label: "SSO / Identity",   icon: <Security fontSize="small" /> },
   { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
@@ -885,12 +998,13 @@ export default function Settings() {
 
       {/* Tab panels */}
       <TabPanel value={tab} index={0}><GeneralTab me={me} /></TabPanel>
-      <TabPanel value={tab} index={1}><EmailTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={2}><SsoTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={3}><SyncTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={4}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={5}><UsersTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={6}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={1}><WhatsNewTab /></TabPanel>
+      <TabPanel value={tab} index={2}><EmailTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={3}><SsoTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={4}><SyncTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={5}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={6}><UsersTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={7}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

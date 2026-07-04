@@ -464,6 +464,10 @@ export const vaptApi = {
     apiClient.post(`/clients/${clientId}/vapt-reports/from-scan/`, data).then((r) => r.data),
 };
 
+export const changelogApi = {
+  list: () => apiClient.get("/changelog/").then((r) => r.data),
+};
+
 export const customFrameworksApi = {
   listAll: () => apiClient.get("/frameworks/all/").then((r) => r.data),
   list: () => apiClient.get("/frameworks/custom/").then((r) => r.data),
