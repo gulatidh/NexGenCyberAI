@@ -421,7 +421,8 @@ const GROUPS: Group[] = [
           { text: "What agents do under the hood: findings from the selected scan are packaged into a structured LLM prompt. The LLM returns structured JSON which is parsed into register entries (Risk, ThreatEntry, ControlDeficiency, RemediationAction) and a narrative. Both are persisted to the database.", detail: "Provider auto-failover: if your primary LLM is unavailable, the platform automatically tries the next in order — Azure OpenAI → OpenAI → Gemini → Bedrock → Anthropic. Each failover is logged at WARNING level in App Service logs." },
           { text: "Select your client in the top toolbar. Open AI Buddies from the left nav." },
           { text: "Pick the Scan to analyse. Only completed scans appear — running or pending scans have no findings yet." },
-          { text: "Choose which agents to run:", detail: "Risk Manager → Risk Register + Risk Overview. Threat Intel → Threat Register (MITRE ATT&CK mappings). Compliance Monitor → Control Deficiencies (framework control gaps). Remediation → Remediation Tracker (time-banded actions). Orchestrator → all 4 registers in one run. Vulnerability Analysis + Framework Mapping → scan verdict enrichment only." },
+          { text: "Select a Framework from the Framework dropdown. This controls which compliance framework the Compliance Monitor and Framework Analyst evaluate your findings against. Standard options: NIST CSF, ISO 27001, PCI DSS, GDPR, CIS v8, SOC 2, and more. Your custom frameworks also appear here with a blue 'Custom' chip.", detail: "Selecting a custom framework tells the agent to evaluate findings against the specific controls you selected when building it — not a generic industry standard. If your organisation uses a bespoke standard (e.g. combining NIST + internal policy controls), build it in Custom Standards and select it here." },
+          { text: "Choose which agents to run:", detail: "Risk Manager → Risk Register + Risk Overview. Threat Intel → Threat Register (MITRE ATT&CK mappings). Compliance Monitor → Control Deficiencies (framework control gaps — uses the Framework you selected). Remediation → Remediation Tracker (time-banded actions). Orchestrator → all 4 registers in one run. Vulnerability Analysis + Framework Mapping → scan verdict enrichment only." },
           { text: "Click 'Run agents'. Individual agents run in parallel. The Orchestrator sequences all sub-agents internally then persists all register outputs at once." },
           { text: "Results: register entries appear immediately in their respective register pages. Narrative output appears in the per-agent tabs on the Assessment detail page." },
         ],
@@ -567,6 +568,78 @@ const GROUPS: Group[] = [
         tips: [
           "Reports is the fastest way to build an audit evidence trail — everything generated for a client, in reverse chronological order, in one view. For audit evidence packs, pull PDFs from relevant workflow report rows here.",
           "If a scan verdict is missing from the feed: it means the AI verdict wasn't generated at scan time. Open the Assessment detail → Verdict tab → click 'Generate verdict' to create it retroactively. It then appears in this feed.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "frameworks",
+    title: "Frameworks & Custom Standards",
+    icon: <MenuBook />,
+    color: "#00897B",
+    topics: [
+      {
+        id: "framework-library",
+        title: "What the framework library is",
+        summary: "Aegis ships with a pre-seeded library of industry compliance frameworks — NIST CSF 2.0, ISO 27001:2022, PCI DSS 4.0, GDPR, CIS Controls v8, and more. Each framework is a structured list of controls with IDs, domains, and descriptions. Scan findings are automatically mapped to these controls when you tag a framework at scan time.",
+        steps: [
+          { text: "Open Frameworks from the left nav (under the Frameworks section)." },
+          { text: "Browse controls by framework, domain, or search term. Each control shows its ID (e.g. PR.DS-1 for NIST CSF, A.8.24 for ISO 27001), title, domain, and description." },
+          { text: "Controls are read-only — they reflect the official published standard. You cannot edit built-in controls." },
+          { text: "To see which findings breach a specific control: open a finding's detail panel → look at the control_mappings field. Or filter Control Deficiencies by framework + control ID after running the Compliance Monitor agent." },
+        ],
+        tips: [
+          "Framework controls are seeded on startup from JSON files in the backend. New frameworks can be added by dropping a correctly formatted JSON file into the frameworks data directory — no code change needed.",
+          "The CIS Benchmarks (Azure, AWS, GCP, M365, Windows Server, Ubuntu) are also seeded — useful for cloud posture and OS hardening reviews.",
+        ],
+        warnings: [
+          "If the Frameworks page shows no controls: the seed process may have failed on startup. Check the backend logs for '_seed_framework_controls' errors. Restarting the backend re-runs the seed automatically.",
+        ],
+      },
+      {
+        id: "custom-framework-build",
+        title: "Build a custom compliance standard",
+        summary: "Custom Standards let you define your own compliance framework by picking controls from any combination of built-in frameworks — mix NIST controls with ISO 27001 and your own internal policy requirements. Once built, the custom framework appears in the AI Agents framework selector and can be evaluated against any scan.",
+        steps: [
+          { text: "Open Frameworks → Custom Standards from the left nav." },
+          { text: "Click 'New Framework'. Enter a name (e.g. 'Accenture Security Standard') and an optional description. Click Create.", detail: "A URL-safe slug is auto-generated from the name (e.g. 'accenture-security-standard'). If a slug already exists, a suffix (-2, -3, …) is added automatically." },
+          { text: "The framework is created but has no controls yet. Click 'Add Controls' on the framework card to open the control picker." },
+          { text: "In the control picker: choose a source framework (NIST CSF, ISO 27001, PCI DSS, etc.), optionally filter by domain (e.g. 'Access Control', 'Data Protection'), and search by keyword.", detail: "The picker loads 100 controls per page. Use the search box to narrow down — searching 'encryption' across ISO 27001 quickly surfaces A.8.24 (Cryptography)." },
+          { text: "Select individual controls using their checkboxes, or use 'Select All' for the current page. Click 'Add Selected' to add them to your custom framework." },
+          { text: "Repeat the picker process for each source framework you want to pull from — e.g. add NIST controls first, then ISO 27001, then CIS v8." },
+          { text: "To remove a control: open the framework card → hover any control → click the Remove (×) icon. Removed controls are immediately detached from the framework but still exist in the control library." },
+        ],
+        tips: [
+          "Good use case: you're a managed service provider who must comply with both ISO 27001 and a customer's internal security policy. Build one custom framework with the relevant ISO controls + the customer's policy controls. Run the Compliance Monitor against it — one evaluation covers both.",
+          "Control count is shown on the framework card. Aim for 30–100 controls for meaningful compliance scoring. Very small frameworks (< 10 controls) produce narrow results; very large ones (> 200) slow down agent evaluations.",
+          "You can have multiple custom frameworks — one per customer, one per regulation, one per internal audit area. They are independent of each other and of all standard frameworks.",
+        ],
+        warnings: [
+          "Custom framework controls are references — they point at existing controls in the built-in library. If you want a control that doesn't exist in any built-in framework, it cannot be added to a custom framework. The control must exist in the seeded library first.",
+          "Deleting a custom framework permanently removes it and all its control selections. This does not delete the underlying controls from the library — they are unaffected.",
+        ],
+      },
+      {
+        id: "custom-framework-evaluate",
+        title: "Evaluate findings against a custom framework",
+        summary: "After building your custom standard, use it in AI Agents exactly like any built-in framework. The Compliance Monitor and Framework Analyst agents will evaluate scan findings specifically against the controls you selected — producing control gap entries, an audit readiness score, and remediation guidance tailored to your framework.",
+        steps: [
+          { text: "Make sure your custom framework has controls added to it (Custom Standards page). An empty custom framework produces empty agent output." },
+          { text: "Open AI Buddies from the left nav. Select your client in the top toolbar." },
+          { text: "Choose a completed scan from the Scan selector." },
+          { text: "Open the Framework dropdown (next to the Scan selector in the toolbar). Scroll to the bottom of the list — your custom frameworks appear there with a blue 'Custom' chip and their control count.", detail: "The framework dropdown shows all built-in frameworks (NIST CSF, ISO 27001, PCI DSS, etc.) followed by your custom frameworks. Custom frameworks are distinguished by the blue 'Custom' chip." },
+          { text: "Select your custom framework from the dropdown." },
+          { text: "Click 'Run' on the Compliance Monitor agent (or the Orchestrator to run all agents at once). The agent loads your custom framework's control list from the database, injects it as context into the LLM prompt, and evaluates each finding against those specific controls." },
+          { text: "View results: open Control Deficiencies from the left nav. The gaps are now mapped to your custom framework's control IDs — not to a generic standard. Filter by framework if needed to isolate your custom standard's results." },
+        ],
+        tips: [
+          "Run the Compliance Monitor separately for each framework you care about — NIST CSF one run, your custom standard the next. Control Deficiencies accumulates results from all runs, so you can see gaps across multiple frameworks simultaneously using the framework filter chip.",
+          "The AI generates: a per-control gap assessment, an overall audit readiness score (0–100), regulatory obligation citations, and evidence inventory notes — all based on your custom control list. The more specific your controls, the more specific the output.",
+          "If you update your custom framework (add or remove controls), re-run the Compliance Monitor — the agent always reads the current control list from the database at run time, so there's no caching issue.",
+        ],
+        warnings: [
+          "If your custom framework doesn't appear in the Framework dropdown on the Agents page: the dropdown loads on page mount. Try refreshing the page. If still missing, check that the framework was actually saved (Custom Standards page should show it with a control count).",
+          "Selecting a custom framework affects only the Compliance Monitor and Framework Analyst agents. Risk Manager, Threat Intel, and Remediation agents are framework-independent — they don't change behaviour based on the framework selector.",
         ],
       },
     ],

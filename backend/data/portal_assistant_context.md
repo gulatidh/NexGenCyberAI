@@ -208,9 +208,40 @@ Connectors and Projects are tabs inside the Client Detail page (open Clients →
 
 ## Frameworks & Custom Standards
 
-**Seeded frameworks:** NIST CSF 2.0, CIS Controls v8, GDPR (67 controls), ISO/IEC 27001:2022 (97 controls), PCI DSS v4.0 (92 controls).
+**Seeded frameworks:** NIST CSF 2.0, CIS Controls v8, GDPR (67 controls), ISO/IEC 27001:2022 (97 controls), PCI DSS v4.0 (92 controls), plus CIS Benchmarks for Azure, AWS, GCP, M365, Windows Server, Ubuntu.
 
-**Custom Standards (left nav → Custom Standards):** Create a named standard, then pick controls from any existing framework using the picker (filter by framework, domain, or search). Controls are linked by reference — no duplication.
+### Built-in Framework Library
+- **Where:** Frameworks in the left nav (under Frameworks section)
+- Browse controls by framework, domain, or keyword search
+- Controls are read-only — they reflect the official published standard
+- Controls are automatically linked to scan findings when you tag a framework at scan launch time
+
+### Custom Standards — Build Your Own Framework
+
+**Why:** Your organisation may need to comply with a bespoke combination of controls (e.g. ISO 27001 + internal policy + NIST subset). Build one custom framework and evaluate everything against it.
+
+**How to build:**
+1. Left nav → Custom Standards → **New Framework** → enter name + description → Create
+2. Click **Add Controls** on the framework card → control picker opens
+3. In the picker: choose source framework (NIST CSF, ISO 27001, PCI DSS, etc.), filter by domain or search keyword, check controls you want, click **Add Selected**
+4. Repeat for each source framework you want to draw from
+5. The framework card shows the control count — aim for 30–100 controls for meaningful scoring
+
+**How to evaluate a custom framework against scan findings:**
+1. Open **AI Buddies** (left nav)
+2. Select your client and a completed scan
+3. Open the **Framework** dropdown in the toolbar (next to the Scan selector)
+4. Scroll to the bottom — your custom frameworks appear with a blue **Custom** chip
+5. Select your custom framework
+6. Run the **Compliance Monitor** agent (or **Orchestrator** for all agents at once)
+7. The agent loads your control list from the database and evaluates each finding against those specific controls
+8. Results appear in **Control Deficiencies** — gaps are mapped to your custom control IDs
+
+**Common questions:**
+- *My custom framework doesn't appear in the Framework dropdown* — refresh the page; the dropdown loads on mount. If still missing, check Custom Standards page to confirm the framework was saved.
+- *I ran the agent but Control Deficiencies is empty* — ensure your custom framework has controls added (non-zero control count on the framework card) before running the agent.
+- *Can I have multiple custom frameworks?* — Yes. Create one per customer, regulation, or audit area. Each is independent. The Framework dropdown shows all of them.
+- *Does selecting a custom framework affect all agents?* — No. Only Compliance Monitor and Framework Analyst use the framework selection. Risk Manager, Threat Intel, and Remediation agents are framework-independent.
 
 ---
 
