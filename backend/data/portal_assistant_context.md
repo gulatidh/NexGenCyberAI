@@ -242,6 +242,64 @@ Connectors and Projects are tabs inside the Client Detail page (open Clients →
 
 ---
 
+## VAPT Reports
+
+**Where:** Security → VAPT Reports (left nav)
+
+VAPT Reports produce professional Vulnerability Assessment & Penetration Testing reports suitable for customers, technical teams, and leadership. Reports can be exported as PDF or Word.
+
+### Creating a Report
+
+**Recommended: Generate from Scan (AI-assisted)**
+1. Click **New Report** → dialog opens with "Generate from Scan" selected by default.
+2. Pick any **completed scan** from the dropdown — it shows scan type, date, and finding count.
+3. Fill: Classification (Confidential / Internal / Public) and Prepared By. Title auto-fills from the scan name.
+4. Click **Generate Report** — Aegis takes 15–30 seconds and then:
+   - Imports all findings from the scan, sorted by severity (Critical → High → Medium → Low)
+   - Auto-assigns finding IDs: F-01, F-02, …
+   - Derives scope from the affected assets in the findings
+   - Selects the correct methodology template for the scan type (web, SAST, network, container, secrets, etc.)
+   - Calls AI to generate: executive summary, conclusion, and step-by-step detailed remediation for each finding
+5. You land directly on the fully populated report.
+
+**Alternative: Blank Report**
+Toggle to "Blank Report" in the dialog — creates an empty report for you to fill manually.
+
+### Report Structure (4 tabs)
+
+| Tab | What it contains |
+|---|---|
+| Document Control | Title, version, classification, prepared by, report date, executive summary, conclusion |
+| Scope & Methodology | In-scope assets, out-of-scope items, testing phases, tools used, standards (OWASP, PTES, etc.) |
+| Findings | Full finding list — severity, affected asset, description, impact, evidence, reproduction steps, detailed remediation, retest status |
+| Export & History | Download buttons for all 4 export formats |
+
+### Exports
+
+- **Full Report PDF** — cover page, severity matrix, all sections, colour-coded findings table, remediation roadmap. Professional format ready to share with customers.
+- **Full Report DOCX** — editable Word version of the same report. Good for adding client-specific letterhead.
+- **Remediation Plan PDF** — prioritised action plan only, suitable for the technical team or sprint planning.
+- **Remediation Plan DOCX** — editable remediation plan.
+
+### Rescan / Retest Versioning
+
+- Click **Create Retest Version** at the top of a report.
+- Bumps the version (1.0 → 1.1), copies all findings with retest status reset to **Pending**.
+- After the retest, update each finding's **Retest Status** to Passed / Failed / Not Applicable.
+- Export the new version — it clearly shows which issues are now closed vs still open.
+- All versions are linked in the report list (shown as "Retest version").
+
+### Common VAPT Issues
+
+| Problem | Solution |
+|---|---|
+| No scans in "Generate from Scan" picker | Only **completed** scans appear — run a scan first and wait for it to finish |
+| Report generated but no findings | The scan had 0 findings — check the scan's Findings tab to confirm |
+| AI content (exec summary, remediation) is blank | AI provider not configured → Settings → AI Settings → configure and test a provider |
+| PDF/DOCX download fails | Ensure backend has `reportlab` and `python-docx` installed (`pip3 install reportlab python-docx`) |
+
+---
+
 ## Administration
 
 **Grant access:** Settings → Administration → Grant access. Three roles: Reader (view-only), Editor (full CRUD on security data), Admin (all + RBAC + client delete + sync). Three scopes: Global, Client, Project. Revocation is immediate.
@@ -269,3 +327,5 @@ Connectors and Projects are tabs inside the Client Detail page (open Clients →
 | Cloud connector test fails | Check IAM scope (Azure: subscription level, not resource group); check API enabled (GCP) |
 | Compliance Monitor producing empty output | Bug was fixed in commit 350d541 — ensure this version is deployed |
 | Dashboard KPIs look wrong | Check client selected in top toolbar; run "Delete blank findings" to remove empty rows inflating counts |
+| VAPT report has no AI content | AI provider not configured — go to AI Settings, add and test a provider |
+| VAPT scan picker is empty | Only completed scans show — run a scan first; it must reach "Completed" status |
