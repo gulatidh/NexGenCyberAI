@@ -1180,7 +1180,11 @@ async def _llm_summarise_commits(commit_messages: list) -> str:
 
 
 async def _generate_changelog_if_new() -> None:
-    """On startup: detect new commits since last changelog entry, summarise with LLM, save."""
+    """On startup: detect new commits since last changelog entry, summarise with LLM, save.
+
+    In Azure App Service, git is unavailable at runtime — commit metadata is
+    bundled as DEPLOY_INFO.json by the CI workflow and read here.
+    Falls back to local git commands when running outside CI."""
     import subprocess
     import os
     try:
@@ -1188,54 +1192,84 @@ async def _generate_changelog_if_new() -> None:
         from api.models.models import ChangelogEntry
         db = SessionLocal()
         try:
-            # Get current SHA from git or env var
-            current_sha = None
-            try:
-                result = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=5,
-                )
-                if result.returncode == 0:
-                    current_sha = result.stdout.strip()
-            except Exception:
-                pass
+            from datetime import datetime, timezone
+
+            # ── Load deploy metadata ──────────────────────────────────────────
+            deploy_info: dict = {}
+            deploy_info_path = os.path.join(os.path.dirname(__file__), "DEPLOY_INFO.json")
+            if os.path.exists(deploy_info_path):
+                try:
+                    with open(deploy_info_path) as f:
+                        deploy_info = json.load(f)
+                    logger.info("Changelog: loaded DEPLOY_INFO.json")
+                except Exception as exc:
+                    logger.warning("Changelog: failed to read DEPLOY_INFO.json: %s", exc)
+
+            # ── Resolve current SHA ───────────────────────────────────────────
+            current_sha = (
+                deploy_info.get("commit_sha")
+                or os.environ.get("GITHUB_SHA")
+                or os.environ.get("COMMIT_SHA")
+                or os.environ.get("GIT_SHA")
+            )
+            # Fallback: try local git (works in dev, not in Azure)
             if not current_sha:
-                current_sha = (
-                    os.environ.get("GITHUB_SHA")
-                    or os.environ.get("COMMIT_SHA")
-                    or os.environ.get("GIT_SHA")
-                )
+                try:
+                    result = subprocess.run(
+                        ["git", "rev-parse", "HEAD"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    if result.returncode == 0:
+                        current_sha = result.stdout.strip()
+                except Exception:
+                    pass
+
             if not current_sha:
                 logger.info("Changelog: no commit SHA available, skipping")
                 return
 
-            # Check if already recorded
+            # ── Already recorded? ─────────────────────────────────────────────
             existing = db.query(ChangelogEntry).filter(ChangelogEntry.commit_sha == current_sha).first()
             if existing:
                 logger.info("Changelog: SHA %s already recorded, skipping", current_sha[:8])
                 return
 
-            from datetime import datetime, timezone
-
-            last_entry = db.query(ChangelogEntry).order_by(ChangelogEntry.deployed_at.desc()).first()
             flow_id = (
-                os.environ.get("GITHUB_RUN_ID")
+                deploy_info.get("run_id")
+                or os.environ.get("GITHUB_RUN_ID")
                 or os.environ.get("GITHUB_RUN_NUMBER")
                 or "local"
             )
 
+            last_entry = db.query(ChangelogEntry).order_by(ChangelogEntry.deployed_at.desc()).first()
+
             if last_entry and last_entry.commit_sha:
-                # Normal incremental update — commits since last recorded SHA
+                # ── Incremental update: commits since last recorded SHA ────────
                 commit_messages: list = []
-                try:
-                    result = subprocess.run(
-                        ["git", "log", "--pretty=format:%h %s", f"{last_entry.commit_sha}..{current_sha}"],
-                        capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=10,
-                    )
-                    if result.returncode == 0 and result.stdout.strip():
-                        commit_messages = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
-                except Exception as exc:
-                    logger.debug("Changelog: git log failed: %s", exc)
+                # Try DEPLOY_INFO first (Azure-safe)
+                if deploy_info.get("commit_messages"):
+                    # commit_messages is the last 50 by convention — filter to those
+                    # after last_entry.commit_sha by truncating at the known SHA
+                    all_msgs = deploy_info["commit_messages"]
+                    # Find the cut point: messages include short SHA prefix
+                    short_last = last_entry.commit_sha[:7]
+                    cut = None
+                    for i, m in enumerate(all_msgs):
+                        if m.startswith(short_last):
+                            cut = i
+                            break
+                    commit_messages = all_msgs[:cut] if cut is not None else all_msgs
+                # Fallback to local git
+                if not commit_messages:
+                    try:
+                        r = subprocess.run(
+                            ["git", "log", "--pretty=format:%h %s", f"{last_entry.commit_sha}..{current_sha}"],
+                            capture_output=True, text=True, timeout=10,
+                        )
+                        if r.returncode == 0 and r.stdout.strip():
+                            commit_messages = [l.strip() for l in r.stdout.strip().splitlines() if l.strip()]
+                    except Exception:
+                        pass
 
                 if not commit_messages:
                     commit_messages = [f"Deployment at {current_sha[:8]}"]
@@ -1252,49 +1286,59 @@ async def _generate_changelog_if_new() -> None:
                 logger.info("Changelog: recorded new entry for %s (%d commits)", current_sha[:8], len(commit_messages))
 
             else:
-                # First run — walk full git history, group by date, create one entry per day
+                # ── First run: reconstruct full history grouped by date ────────
                 logger.info("Changelog: first run — reconstructing full history by date")
-                try:
-                    result = subprocess.run(
-                        ["git", "log", "--pretty=format:%H\t%as\t%s", "--reverse"],
-                        capture_output=True, text=True, cwd="/opt/NexGenCyberAI", timeout=15,
-                    )
-                    all_commits = []
-                    if result.returncode == 0 and result.stdout.strip():
-                        for line in result.stdout.strip().splitlines():
-                            parts = line.split("\t", 2)
-                            if len(parts) == 3:
-                                all_commits.append({"sha": parts[0], "date": parts[1], "msg": parts[2]})
+                from collections import defaultdict
 
-                    # Group commits by date
-                    from collections import defaultdict
-                    by_date: dict = defaultdict(list)
-                    sha_by_date: dict = {}
-                    for c in all_commits:
-                        by_date[c["date"]].append(f"{c['sha'][:7]} {c['msg']}")
-                        sha_by_date[c["date"]] = c["sha"]  # last SHA for that date
+                all_commits = []
+                # Try DEPLOY_INFO first (Azure-safe)
+                if deploy_info.get("all_history"):
+                    for line in deploy_info["all_history"]:
+                        parts = line.split("\t", 2)
+                        if len(parts) == 3:
+                            all_commits.append({"sha": parts[0], "date": parts[1], "msg": parts[2]})
+                # Fallback to local git
+                if not all_commits:
+                    try:
+                        r = subprocess.run(
+                            ["git", "log", "--pretty=format:%H\t%as\t%s", "--reverse"],
+                            capture_output=True, text=True, timeout=15,
+                        )
+                        if r.returncode == 0 and r.stdout.strip():
+                            for line in r.stdout.strip().splitlines():
+                                parts = line.split("\t", 2)
+                                if len(parts) == 3:
+                                    all_commits.append({"sha": parts[0], "date": parts[1], "msg": parts[2]})
+                    except Exception as exc:
+                        logger.warning("Changelog: git log failed: %s", exc)
 
-                    for date_str in sorted(by_date.keys()):
-                        msgs = by_date[date_str]
-                        day_sha = sha_by_date[date_str]
-                        # Skip if this date's SHA is already recorded
-                        if db.query(ChangelogEntry).filter(ChangelogEntry.commit_sha == day_sha).first():
-                            continue
-                        summary = await _llm_summarise_commits(msgs)
-                        day_count = db.query(ChangelogEntry).filter(ChangelogEntry.version_label.like(f"{date_str}%")).count()
-                        version_label = date_str + (f" #{day_count + 1}" if day_count > 0 else "")
-                        deployed_at = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
-                        # Mark historical entries — current SHA entry gets real flow_id
-                        entry_flow_id = flow_id if day_sha == current_sha else "historical"
-                        db.add(ChangelogEntry(
-                            commit_sha=day_sha, version_label=version_label,
-                            raw_commits=msgs, summary=summary,
-                            flow_id=entry_flow_id, deployed_at=deployed_at,
-                        ))
-                        db.commit()
-                        logger.info("Changelog: backfilled %s (%d commits)", date_str, len(msgs))
-                except Exception as exc:
-                    logger.warning("Changelog: history reconstruction failed: %s", exc)
+                if not all_commits:
+                    # Last resort — single entry for this deploy
+                    all_commits = [{"sha": current_sha, "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "msg": "Initial deploy"}]
+
+                by_date: dict = defaultdict(list)
+                sha_by_date: dict = {}
+                for c in all_commits:
+                    by_date[c["date"]].append(f"{c['sha'][:7]} {c['msg']}")
+                    sha_by_date[c["date"]] = c["sha"]
+
+                for date_str in sorted(by_date.keys()):
+                    msgs = by_date[date_str]
+                    day_sha = sha_by_date[date_str]
+                    if db.query(ChangelogEntry).filter(ChangelogEntry.commit_sha == day_sha).first():
+                        continue
+                    summary = await _llm_summarise_commits(msgs)
+                    day_count = db.query(ChangelogEntry).filter(ChangelogEntry.version_label.like(f"{date_str}%")).count()
+                    version_label = date_str + (f" #{day_count + 1}" if day_count > 0 else "")
+                    deployed_at = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+                    entry_flow_id = flow_id if day_sha == current_sha else "historical"
+                    db.add(ChangelogEntry(
+                        commit_sha=day_sha, version_label=version_label,
+                        raw_commits=msgs, summary=summary,
+                        flow_id=entry_flow_id, deployed_at=deployed_at,
+                    ))
+                    db.commit()
+                    logger.info("Changelog: backfilled %s (%d commits)", date_str, len(msgs))
         finally:
             db.close()
     except Exception as exc:

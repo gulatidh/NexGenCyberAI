@@ -44,3 +44,4 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+backend/DEPLOY_INFO.json
