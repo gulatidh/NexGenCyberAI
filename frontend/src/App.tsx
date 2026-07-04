@@ -48,6 +48,7 @@ import RemediationTracker from "./pages/RemediationTracker";
 import CustomFrameworks from "./pages/CustomFrameworks";
 import VAPTReports from "./pages/VAPTReports";
 import VAPTReportDetail from "./pages/VAPTReportDetail";
+import ScanDiff from "./pages/ScanDiff";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -135,6 +136,7 @@ function ProtectedApp() {
           <Route path="/connectors" element={<Connectors />} />
           <Route path="/scans" element={<Scans />} />
           <Route path="/scans/:scanId" element={<ScanDetail />} />
+          <Route path="/scans/:scanId/diff" element={<ScanDiff />} />
           <Route path="/findings" element={<Findings />} />
           <Route path="/risks" element={<Risks />} />
           <Route path="/assets" element={<Assets />} />

@@ -669,6 +669,146 @@ async def upload_scan_binary(
     return {"ok": True, **meta, "scan_id": scan_id}
 
 
+@router.get("/coverage-gaps/")
+async def get_coverage_gaps(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return resources from the latest scan's raw_context that have no associated findings.
+
+    These are 'unseen' assets — discovered during enumeration but never triggered a rule.
+    The AI agents couldn't reason about them before raw_context was introduced.
+    """
+    # Get the latest completed scan with raw_context for this client
+    latest_scan = (
+        db.query(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.status == ScanStatus.COMPLETED,
+        )
+        .order_by(Scan.completed_at.desc())
+        .first()
+    )
+
+    if not latest_scan:
+        return {"scan_id": None, "covered": [], "uncovered": [], "summary": {"total": 0, "covered": 0, "uncovered": 0}}
+
+    raw_ctx = getattr(latest_scan, "raw_context", None)
+    if not raw_ctx:
+        return {
+            "scan_id": latest_scan.id,
+            "covered": [],
+            "uncovered": [],
+            "summary": {
+                "total": 0,
+                "covered": 0,
+                "uncovered": 0,
+                "message": "No resource inventory available — re-run the scan to collect it",
+            },
+        }
+
+    try:
+        resources = json.loads(raw_ctx)
+    except Exception:
+        resources = []
+
+    # Get all resource_ids from findings for this scan
+    findings = db.query(Finding).filter(Finding.scan_id == latest_scan.id).all()
+    finding_resource_ids = {(f.resource_id or "").lower() for f in findings if f.resource_id}
+
+    covered = []
+    uncovered = []
+    for r in resources:
+        rid = (r.get("id") or r.get("resource_id") or "").lower()
+        if rid and any(rid in frid or frid in rid for frid in finding_resource_ids):
+            covered.append(r)
+        else:
+            uncovered.append(r)
+
+    return {
+        "scan_id": latest_scan.id,
+        "summary": {
+            "total": len(resources),
+            "covered": len(covered),
+            "uncovered": len(uncovered),
+            "coverage_pct": round(len(covered) / len(resources) * 100) if resources else 0,
+        },
+        "covered": covered[:100],    # cap for API response size
+        "uncovered": uncovered[:200],
+    }
+
+
+@router.get("/{scan_id}/diff")
+async def get_scan_diff(
+    client_id: str,
+    scan_id: str,
+    compare_with: Optional[str] = None,  # scan_id of the "base" scan to compare against
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Compare two scans and return new/resolved/persisting findings.
+
+    If compare_with is not provided, uses scan.parent_scan_id.
+    """
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    base_id = compare_with or getattr(scan, "parent_scan_id", None)
+    if not base_id:
+        raise HTTPException(
+            status_code=422,
+            detail="No base scan to compare against. Provide compare_with= or re-scan (which auto-sets parent_scan_id).",
+        )
+
+    base_scan = db.query(Scan).filter(Scan.id == base_id, Scan.client_id == client_id).first()
+    if not base_scan:
+        raise HTTPException(status_code=404, detail="Base scan not found")
+
+    current_findings = db.query(Finding).filter(Finding.scan_id == scan_id).all()
+    base_findings = db.query(Finding).filter(Finding.scan_id == base_id).all()
+
+    # Key findings by (title, resource_id) for matching
+    def _key(f):
+        return (f.title.strip().lower(), (f.resource_id or "").strip().lower())
+
+    current_keys = {_key(f): f for f in current_findings}
+    base_keys = {_key(f): f for f in base_findings}
+
+    new_findings = [f for k, f in current_keys.items() if k not in base_keys]
+    resolved_findings = [f for k, f in base_keys.items() if k not in current_keys]
+    persisting_findings = [f for k, f in current_keys.items() if k in base_keys]
+
+    def _serialize(f):
+        return {
+            "id": f.id,
+            "title": f.title,
+            "severity": f.severity.value if hasattr(f.severity, "value") else f.severity,
+            "resource_id": f.resource_id,
+            "resource_type": f.resource_type,
+            "control_id": f.control_id,
+            "description": f.description,
+        }
+
+    return {
+        "scan_id": scan_id,
+        "base_scan_id": base_id,
+        "scan_completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+        "base_scan_completed_at": base_scan.completed_at.isoformat() if base_scan.completed_at else None,
+        "summary": {
+            "new": len(new_findings),
+            "resolved": len(resolved_findings),
+            "persisting": len(persisting_findings),
+            "total_current": len(current_findings),
+            "total_base": len(base_findings),
+        },
+        "new_findings": [_serialize(f) for f in new_findings],
+        "resolved_findings": [_serialize(f) for f in resolved_findings],
+        "persisting_findings": [_serialize(f) for f in persisting_findings],
+    }
+
+
 @router.patch("/{scan_id}/findings/{finding_id}", response_model=FindingResponse)
 async def update_finding(
     client_id: str, scan_id: str, finding_id: str,

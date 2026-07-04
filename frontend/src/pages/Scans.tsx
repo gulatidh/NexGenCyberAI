@@ -8,7 +8,7 @@ import {
   Tabs, Tab, Stack, Tooltip, Divider, IconButton, Badge,
   Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History } from "@mui/icons-material";
+import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -414,6 +414,22 @@ export default function Scans() {
                               </IconButton>
                             </Tooltip>
                           )}
+                          {tile.parent_scan_id && (
+                            <Tooltip title="View diff — compare with previous scan">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/scans/${tile.id}/diff`); }}
+                                sx={{
+                                  position: "absolute", top: 6, right: 84,
+                                  color: "#34A853",
+                                  bgcolor: "rgba(52,168,83,0.10)",
+                                  "&:hover": { bgcolor: "rgba(52,168,83,0.22)" },
+                                }}
+                              >
+                                <CompareArrows sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </>
                       );
                     })()}
@@ -421,7 +437,7 @@ export default function Scans() {
                       label={status}
                       size="small"
                       sx={{
-                        position: "absolute", top: 12, right: 84,
+                        position: "absolute", top: 12, right: tile.parent_scan_id ? 110 : 84,
                         bgcolor: `${statusColor}20`,
                         color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
                         textTransform: "uppercase", letterSpacing: 0.5,
