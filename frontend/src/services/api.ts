@@ -211,6 +211,15 @@ export const dashboardApi = {
     apiClient.get(`/dashboard/activity`, { params: { days } }).then((r) => r.data),
 };
 
+export const trendsApi = {
+  findings: (clientId: string) =>
+    apiClient.get(`/dashboard/clients/${clientId}/trends/findings/`).then((r) => r.data),
+  riskScore: (clientId: string) =>
+    apiClient.get(`/dashboard/clients/${clientId}/trends/risk-score/`).then((r) => r.data),
+  compliance: (clientId: string) =>
+    apiClient.get(`/dashboard/clients/${clientId}/trends/compliance/`).then((r) => r.data),
+};
+
 export const riskOverviewApi = {
   get: (clientId: string, days: number = 30) =>
     apiClient.get(`/clients/${clientId}/risk-overview/`, { params: { days } }).then((r) => r.data),
@@ -466,6 +475,19 @@ export const vaptApi = {
 
 export const changelogApi = {
   list: () => apiClient.get("/changelog/").then((r) => r.data),
+};
+
+export const ticketsApi = {
+  list: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/tickets/`).then((r) => r.data),
+  createFromFinding: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/tickets/create-from-finding/`, data).then((r) => r.data),
+  createFromRemediation: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/tickets/create-from-remediation/`, data).then((r) => r.data),
+  sync: (clientId: string, ticketSyncId: string) =>
+    apiClient.post(`/clients/${clientId}/tickets/${ticketSyncId}/sync/`).then((r) => r.data),
+  getConnectors: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/tickets/connectors/`).then((r) => r.data),
 };
 
 export const customFrameworksApi = {

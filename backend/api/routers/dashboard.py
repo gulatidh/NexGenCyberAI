@@ -1,5 +1,5 @@
 """Dashboard summary endpoint."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
@@ -298,3 +298,129 @@ async def get_activity_feed(
 
     events.sort(key=lambda e: e["when_iso"], reverse=True)
     return {"days": days, "events": events[:80]}
+
+
+# ── Trend endpoints (per-client) ───────────────────────────────────────────────
+
+@router.get("/clients/{client_id}/trends/findings/")
+async def get_findings_trend(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Finding counts grouped by severity over time (one point per completed scan, last 30)."""
+    active_cids = db.query(Client.id).filter(Client.deleted_at.is_(None))
+
+    scans = (
+        db.query(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.status == ScanStatus.COMPLETED,
+            Scan.client_id.in_(active_cids),
+        )
+        .order_by(Scan.completed_at.asc())
+        .limit(30)
+        .all()
+    )
+
+    result = []
+    for scan in scans:
+        counts: Dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        findings = db.query(Finding).filter(Finding.scan_id == scan.id).all()
+        for f in findings:
+            sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+            counts[sev] = counts.get(sev, 0) + 1
+        scan_type_val = scan.scan_type.value if hasattr(scan.scan_type, "value") else str(scan.scan_type)
+        result.append({
+            "date": scan.completed_at.isoformat() if scan.completed_at else None,
+            "scan_id": scan.id,
+            "scan_name": scan.name or scan_type_val,
+            **counts,
+            "total": sum(counts.values()),
+        })
+    return result
+
+
+@router.get("/clients/{client_id}/trends/risk-score/")
+async def get_risk_score_trend(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Risk score over time (0-100, one point per completed scan, last 30)."""
+    active_cids = db.query(Client.id).filter(Client.deleted_at.is_(None))
+
+    scans = (
+        db.query(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.status == ScanStatus.COMPLETED,
+            Scan.client_id.in_(active_cids),
+        )
+        .order_by(Scan.completed_at.asc())
+        .limit(30)
+        .all()
+    )
+
+    result = []
+    for scan in scans:
+        counts: Dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        findings = db.query(Finding).filter(Finding.scan_id == scan.id).all()
+        for f in findings:
+            sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+            counts[sev] = counts.get(sev, 0) + 1
+        total = sum(counts.values())
+        # Weighted score: critical=10, high=5, medium=2, low=1, info=0
+        raw = (
+            counts["critical"] * 10
+            + counts["high"] * 5
+            + counts["medium"] * 2
+            + counts["low"] * 1
+        )
+        # Normalise: max possible raw per finding is 10 (all critical)
+        # cap at 100 so even extreme data looks clean on the chart
+        risk_score = min(100.0, round(raw / max(total, 1) * 10, 1))
+        scan_type_val = scan.scan_type.value if hasattr(scan.scan_type, "value") else str(scan.scan_type)
+        result.append({
+            "date": scan.completed_at.isoformat() if scan.completed_at else None,
+            "scan_id": scan.id,
+            "scan_name": scan.name or scan_type_val,
+            "risk_score": risk_score,
+            **counts,
+        })
+    return result
+
+
+@router.get("/clients/{client_id}/trends/compliance/")
+async def get_compliance_trend(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Framework compliance % over the last 90 days."""
+    active_cids = db.query(Client.id).filter(Client.deleted_at.is_(None))
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+
+    assessments = (
+        db.query(FrameworkAssessment)
+        .filter(
+            FrameworkAssessment.client_id == client_id,
+            FrameworkAssessment.client_id.in_(active_cids),
+            FrameworkAssessment.assessed_at >= cutoff,
+        )
+        .order_by(FrameworkAssessment.assessed_at.asc())
+        .all()
+    )
+
+    result = []
+    for a in assessments:
+        fw = a.framework.value if hasattr(a.framework, "value") else str(a.framework)
+        result.append({
+            "date": a.assessed_at.isoformat() if a.assessed_at else None,
+            "framework": fw,
+            "score": round(a.overall_score or 0.0, 1),
+            "passed": a.controls_passed or 0,
+            "failed": a.controls_failed or 0,
+            "total": a.controls_total or 0,
+        })
+    return result

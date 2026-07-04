@@ -2,7 +2,7 @@ import React from "react";
 import {
   Grid, Card, CardContent, Typography, Box,
   LinearProgress, CircularProgress, Chip, Avatar,
-  Button, useTheme,
+  Button, Skeleton, useTheme,
 } from "@mui/material";
 import {
   BugReport, Security, Warning,
@@ -11,13 +11,15 @@ import {
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { dashboardApi } from "../services/api";
+import { dashboardApi, trendsApi } from "../services/api";
 import { DashboardSummary } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, Label,
+  AreaChart, Area, LineChart, Line, ReferenceLine, CartesianGrid,
 } from "recharts";
 import { fromNow } from "../utils/datetime";
+import { useActiveClient } from "../contexts/ClientContext";
 
 // Finding-severity doughnut — Google brand palette.
 const SEV_DONUT = [
@@ -74,9 +76,74 @@ interface ActivityEvent {
   link?: string;
 }
 
+// ── Trend chart helpers ────────────────────────────────────────────────────────
+
+const TREND_SEV_COLORS: Record<string, string> = {
+  critical: "#f44336",
+  high: "#ff9800",
+  medium: "#ffeb3b",
+  low: "#4caf50",
+};
+
+const COMPLIANCE_LINE_COLORS = ["#4285F4", "#34A853", "#ff6d00", "#00e676", "#ff4081", "#9C27B0"];
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+interface FindingTrendPoint {
+  date: string | null;
+  scan_id: string;
+  scan_name: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  total: number;
+}
+
+interface RiskScoreTrendPoint {
+  date: string | null;
+  scan_id: string;
+  scan_name: string;
+  risk_score: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+interface ComplianceTrendPoint {
+  date: string | null;
+  framework: string;
+  score: number;
+  passed: number;
+  failed: number;
+  total: number;
+}
+
+// Transform flat compliance rows into chart-friendly format:
+// [{date, NIST_CSF: 72, CIS_V8: 68, ...}, ...]
+function pivotCompliance(rows: ComplianceTrendPoint[]): { data: Record<string, any>[]; frameworks: string[] } {
+  const fwSet = new Set<string>();
+  const byDate: Record<string, Record<string, any>> = {};
+  for (const r of rows) {
+    const d = r.date || "";
+    if (!byDate[d]) byDate[d] = { date: d };
+    byDate[d][r.framework] = r.score;
+    fwSet.add(r.framework);
+  }
+  const data = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
+  return { data, frameworks: Array.from(fwSet) };
+}
+
 export default function Dashboard() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { clientId } = useActiveClient();
   const [activityFilter, setActivityFilter] = React.useState<string>("all");
   const { data, isLoading } = useQuery<DashboardSummary>({
     queryKey: ["dashboard"],
@@ -86,6 +153,26 @@ export default function Dashboard() {
   const { data: activityResp } = useQuery<{ days: number; events: ActivityEvent[] }>({
     queryKey: ["dashboard-activity", 3],
     queryFn: () => dashboardApi.activity(3),
+    refetchInterval: 60_000,
+  });
+
+  // Trend queries — only enabled when a client is selected
+  const { data: findingsTrend, isLoading: loadingFindingsTrend } = useQuery<FindingTrendPoint[]>({
+    queryKey: ["trends-findings", clientId],
+    queryFn: () => trendsApi.findings(clientId),
+    enabled: !!clientId,
+    refetchInterval: 60_000,
+  });
+  const { data: riskTrend, isLoading: loadingRiskTrend } = useQuery<RiskScoreTrendPoint[]>({
+    queryKey: ["trends-risk-score", clientId],
+    queryFn: () => trendsApi.riskScore(clientId),
+    enabled: !!clientId,
+    refetchInterval: 60_000,
+  });
+  const { data: complianceTrend, isLoading: loadingComplianceTrend } = useQuery<ComplianceTrendPoint[]>({
+    queryKey: ["trends-compliance", clientId],
+    queryFn: () => trendsApi.compliance(clientId),
+    enabled: !!clientId,
     refetchInterval: 60_000,
   });
 
@@ -339,6 +426,164 @@ export default function Dashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* ── Risk Trend Charts ──────────────────────────────────────────────── */}
+      <Box sx={{ mb: 1.5, mt: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          <TrendingUp sx={{ color: "#4285F4", fontSize: 22 }} />
+          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Trends</Typography>
+          {!clientId && (
+            <Chip label="Select a client to see trends" size="small"
+              sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.08)", color: "text.secondary" }} />
+          )}
+        </Box>
+
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          {/* Chart 1: Findings Over Time */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
+                  Findings Over Time
+                </Typography>
+                {!clientId ? (
+                  <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                  </Box>
+                ) : loadingFindingsTrend ? (
+                  <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />
+                ) : !findingsTrend || findingsTrend.length < 2 ? (
+                  <Box sx={{ height: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                    <TrendingUp sx={{ color: "text.disabled", fontSize: 40 }} />
+                    <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center" }}>
+                      Run at least 2 scans to see trend data
+                    </Typography>
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={findingsTrend.map((d) => ({ ...d, date: fmtDate(d.date) }))}
+                      margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                      <defs>
+                        {Object.entries(TREND_SEV_COLORS).map(([k, color]) => (
+                          <linearGradient key={k} id={`grad-${k}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={color} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={color} stopOpacity={0.02} />
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary, fontSize: 10 }} />
+                      <YAxis tick={{ fill: theme.palette.text.secondary, fontSize: 10 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
+                        labelStyle={{ color: theme.palette.text.primary, fontWeight: 600, marginBottom: 4 }}
+                      />
+                      {(["critical", "high", "medium", "low"] as const).map((sev) => (
+                        <Area key={sev} type="monotone" dataKey={sev} stackId="1"
+                          stroke={TREND_SEV_COLORS[sev]} fill={`url(#grad-${sev})`}
+                          name={sev.charAt(0).toUpperCase() + sev.slice(1)} strokeWidth={1.5} />
+                      ))}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Chart 2: Risk Score Trend */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
+                  Risk Score Trend
+                </Typography>
+                {!clientId ? (
+                  <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                  </Box>
+                ) : loadingRiskTrend ? (
+                  <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />
+                ) : !riskTrend || riskTrend.length < 2 ? (
+                  <Box sx={{ height: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                    <TrendingUp sx={{ color: "text.disabled", fontSize: 40 }} />
+                    <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center" }}>
+                      Run at least 2 scans to see trend data
+                    </Typography>
+                  </Box>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={riskTrend.map((d) => ({ ...d, date: fmtDate(d.date) }))}
+                      margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                      <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary, fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: theme.palette.text.secondary, fontSize: 10 }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
+                        labelStyle={{ color: theme.palette.text.primary, fontWeight: 600, marginBottom: 4 }}
+                        formatter={(v: any) => [`${v}`, "Risk Score"]}
+                      />
+                      <ReferenceLine y={70} stroke="#f44336" strokeDasharray="4 2"
+                        label={{ value: "Danger", fill: "#f44336", fontSize: 10, position: "insideTopRight" }} />
+                      <Line type="monotone" dataKey="risk_score" stroke="#f44336" strokeWidth={2}
+                        dot={{ fill: "#f44336", r: 4 }} activeDot={{ r: 6 }} name="Risk Score" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Chart 3: Framework Compliance Over Time */}
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 600, mb: 1.5 }}>
+                  Framework Compliance Over Time
+                </Typography>
+                {!clientId ? (
+                  <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                  </Box>
+                ) : loadingComplianceTrend ? (
+                  <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />
+                ) : !complianceTrend || complianceTrend.length < 2 ? (
+                  <Box sx={{ height: 300, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1 }}>
+                    <TrendingUp sx={{ color: "text.disabled", fontSize: 40 }} />
+                    <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center" }}>
+                      Run at least 2 scans to see trend data
+                    </Typography>
+                  </Box>
+                ) : (() => {
+                  const { data: pivoted, frameworks } = pivotCompliance(complianceTrend);
+                  return (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={pivoted.map((d) => ({ ...d, date: fmtDate(d.date) }))}
+                        margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="date" tick={{ fill: theme.palette.text.secondary, fontSize: 10 }} />
+                        <YAxis domain={[0, 100]} tick={{ fill: theme.palette.text.secondary, fontSize: 10 }}
+                          tickFormatter={(v: number) => `${v}%`} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#1e232c", border: "none", borderRadius: 8 }}
+                          labelStyle={{ color: theme.palette.text.primary, fontWeight: 600, marginBottom: 4 }}
+                          formatter={(v: any, name: any) => [`${v}%`, name.replace(/_/g, " ").toUpperCase()]}
+                        />
+                        <Legend iconSize={10} wrapperStyle={{ color: theme.palette.text.secondary, fontSize: 10 }}
+                          formatter={(value: string) => value.replace(/_/g, " ").toUpperCase()} />
+                        {frameworks.map((fw, i) => (
+                          <Line key={fw} type="monotone" dataKey={fw}
+                            stroke={COMPLIANCE_LINE_COLORS[i % COMPLIANCE_LINE_COLORS.length]}
+                            strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
 
       {/* Activity Row */}
       <Grid container spacing={2}>
