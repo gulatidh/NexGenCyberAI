@@ -28,6 +28,7 @@ async def list_changelog(
             "version_label": e.version_label,
             "summary": e.summary,
             "raw_commits": e.raw_commits,
+            "flow_id": e.flow_id,
             "deployed_at": e.deployed_at.isoformat() if e.deployed_at else None,
         })
     return result
