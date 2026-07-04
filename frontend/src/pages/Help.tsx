@@ -573,6 +573,87 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    id: "vapt-reports",
+    title: "VAPT Reports",
+    icon: <AutoStories />,
+    color: "#7B61FF",
+    topics: [
+      {
+        id: "vapt-what-is",
+        title: "What is a VAPT Report",
+        summary: "End-to-end penetration test report with findings, severity, and remediation",
+        steps: [
+          { text: "What it does: VAPT (Vulnerability Assessment and Penetration Testing) reports in Aegis are structured engagement documents that capture all findings from a security test — including scope, methodology, executive summary, per-finding detail, and retest history." },
+          { text: "Why it matters: A VAPT report is the deliverable that goes to clients, boards, and auditors. It translates raw scanner output into an accountable, versioned document with clear remediation ownership." },
+          { text: "Structure: Reports are versioned (1.0, 1.1…), linked to a scan, and contain: Document Control (title, classification, prepared by, reviewed by, dates), Scope & Methodology, Findings (severity-banded, with evidence and reproduction steps), and Export & History." },
+          { text: "When to use: After completing a security scan — use 'Generate from Scan' to auto-populate findings. Or create a blank report for manual engagements." },
+        ],
+        tips: [
+          "Always link a report to a completed scan so AI can auto-generate the executive summary",
+          "Use Classification: Confidential for client deliverables",
+        ],
+        warnings: [
+          "Retested reports bump to a minor version (1.0 → 1.1) — the original findings are preserved",
+        ],
+      },
+      {
+        id: "vapt-generate-from-scan",
+        title: "Generating a Report from a Scan",
+        summary: "Use AI to auto-generate executive summary and per-finding remediation from scan results",
+        steps: [
+          { text: "What it does: The 'Generate from Scan' flow imports all findings from a completed scan, derives scope from discovered assets, selects the methodology template based on scan type (DAST, SAST, network, cloud, etc.), then calls an AI agent to write the executive summary, per-finding remediation guidance, and conclusion." },
+          { text: "How to use: Security section → VAPT Reports → New Report → select 'Generate from Scan' (default) → pick a completed scan from the dropdown → click Generate. The AI takes 30–60 seconds." },
+          { text: "What you get: A fully populated report with executive summary (professional prose), per-finding sections with CVSS context, tailored remediation steps (not generic), and a conclusion. You can edit anything after generation." },
+          { text: "Scan picker shows: scan type, date, and finding count — choose a scan with findings.", detail: "Methodology is auto-selected from 10 templates based on connector type. Scope is derived from the scan's asset list. The LLM receives all Finding rows and produces structured output in one pass." },
+        ],
+        tips: [
+          "Re-generate is available — if AI output is poor, fix the scan findings and regenerate",
+          "Pick your highest-finding-count scan for the richest report",
+        ],
+        warnings: [
+          "Scan must be in COMPLETED status with at least one finding",
+          "AI generation requires a configured AI provider (Connections → AI Settings)",
+        ],
+      },
+      {
+        id: "vapt-findings-retest",
+        title: "Managing Findings and Retest Lifecycle",
+        summary: "Add, edit, and track findings through remediation and retest cycles",
+        steps: [
+          { text: "What it does: Each VAPT report contains its own findings table (separate from scanner findings). You can add findings manually, edit severity/evidence/reproduction steps, and track retest status through a lifecycle: pending → pass/fail." },
+          { text: "Retest workflow: After remediation, create a retest (Report detail → Export & History → Initiate Retest). This creates a new report version (1.0 → 1.1) with all findings copied as 'pending retest'. Update each finding to 'pass' or 'fail' as you verify fixes." },
+          { text: "Versioning: Minor version bumps on retest (1.0 → 1.1 → 1.2). The parent report is preserved. The version chain is visible in Export & History." },
+          { text: "Finding fields: Title, severity (Critical/High/Medium/Low/Info), affected asset, description, impact, evidence (screenshots, logs), reproduction steps, recommendation, references, retest status, retest notes." },
+        ],
+        tips: [
+          "Use retest notes to record what was fixed and when",
+          "Order findings by severity — the order_index field controls PDF export order",
+        ],
+        warnings: [
+          "Findings in a VAPT report are separate from scanner findings — changes here do not affect the Scan findings table",
+        ],
+      },
+      {
+        id: "vapt-export",
+        title: "Exporting Reports",
+        summary: "Download full reports and remediation plans as PDF or Word documents",
+        steps: [
+          { text: "What it does: Four export formats are available from the Export & History tab: Full Report PDF, Full Report DOCX (Word), Remediation Plan PDF, Remediation Plan DOCX." },
+          { text: "Full Report: Contains Document Control, Executive Summary, Scope & Methodology, all findings with full detail, and Conclusion. Suitable for client delivery." },
+          { text: "Remediation Plan: Contains only actionable remediation items grouped by priority — a working document for the engineering team, not client-facing." },
+          { text: "How to export: Report detail → Export & History tab → click the format button. The file downloads immediately.", detail: "If export fails: verify the report has findings. Empty reports generate empty documents." },
+        ],
+        tips: [
+          "DOCX format is editable — use it when clients need to add their own branding",
+          "PDF is preferred for final client delivery — it cannot be accidentally modified",
+        ],
+        warnings: [
+          "Large reports (100+ findings) may take a few seconds to generate",
+        ],
+      },
+    ],
+  },
+  {
     id: "frameworks",
     title: "Frameworks & Custom Standards",
     icon: <MenuBook />,
