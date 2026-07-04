@@ -67,6 +67,8 @@ class ScannerCategory(str, enum.Enum):
 CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
     ConnectorType.OKTA: ScannerCategory.CLOUD,
     ConnectorType.CYBERARK: ScannerCategory.CLOUD,
+    ConnectorType.SERVICENOW: ScannerCategory.CLOUD,
+    ConnectorType.JIRA: ScannerCategory.CLOUD,
     ConnectorType.WEB: ScannerCategory.DAST,
     ConnectorType.SEMGREP: ScannerCategory.SAST,
     ConnectorType.CODEQL: ScannerCategory.SAST,
@@ -1105,3 +1107,21 @@ class ChangelogEntry(Base):
     flow_id = Column(String(100))
     deployed_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Ticket Integration ─────────────────────────────────────────────────────────
+
+class TicketSync(Base):
+    """Tracks tickets created in ServiceNow or Jira from findings or remediation actions."""
+    __tablename__ = "ticket_syncs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    connector_type = Column(String(50))        # "servicenow" | "jira"
+    source_type = Column(String(50))           # "finding" | "remediation_action"
+    source_id = Column(String(36))             # finding.id or remediation_action.id
+    ticket_id = Column(String(200))            # SN incident sys_id or Jira issue key
+    ticket_url = Column(String(500))
+    ticket_status = Column(String(100))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

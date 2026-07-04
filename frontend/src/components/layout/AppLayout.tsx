@@ -13,7 +13,7 @@ import {
   Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
-  Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
+  Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood, ConfirmationNumber,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Control Deficiencies", icon: <GppBad />,          path: "/control-deficiencies" },
       { label: "Remediation",         icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
       { label: "VAPT Reports",       icon: <GppGood />,          path: "/vapt-reports" },
+      { label: "Ticket Sync",        icon: <ConfirmationNumber />, path: "/ticket-sync" },
     ],
   },
   {

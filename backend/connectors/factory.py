@@ -12,6 +12,7 @@ from connectors.onprem.connector import OnPremConnector
 from connectors.entraid.connector import EntraIDConnector
 from connectors.containers.connector import ContainerConnector
 from connectors.saas.servicenow.connector import ServiceNowConnector
+from connectors.saas.jira.connector import JiraConnector
 from connectors.saas.okta.connector import OktaConnector
 from connectors.cyberark.connector import CyberArkConnector
 from connectors.web.connector import WebConnector
@@ -35,6 +36,7 @@ _REGISTRY = {
     ConnectorType.ENTRAID: EntraIDConnector,
     ConnectorType.CONTAINERS: ContainerConnector,
     ConnectorType.SERVICENOW: ServiceNowConnector,
+    ConnectorType.JIRA: JiraConnector,
     ConnectorType.OKTA: OktaConnector,
     ConnectorType.CYBERARK: CyberArkConnector,
     ConnectorType.WEB: WebConnector,

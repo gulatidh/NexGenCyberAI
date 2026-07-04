@@ -5,10 +5,12 @@ import {
   FormControl, InputLabel, Select, MenuItem, IconButton, Alert,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Tooltip, Menu, MenuItem as MuiMenuItem, LinearProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
+  Snackbar,
 } from "@mui/material";
-import { Refresh, Assignment } from "@mui/icons-material";
+import { Refresh, Assignment, ConfirmationNumber, OpenInNew } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { remediationTrackerApi } from "../services/api";
+import { remediationTrackerApi, ticketsApi } from "../services/api";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -47,6 +49,24 @@ interface RemediationAction {
   created_at?: string;
 }
 
+interface TicketConnector {
+  id: string;
+  name: string;
+  connector_type: string;
+  status: string;
+  config: Record<string, any>;
+}
+
+interface TicketSync {
+  id: string;
+  source_type: string;
+  source_id: string;
+  ticket_id: string;
+  ticket_url: string;
+  ticket_status: string;
+  connector_type: string;
+}
+
 function StatusMenu({ action, onUpdate }: { action: RemediationAction; onUpdate: (status: string) => void }) {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   return (
@@ -66,12 +86,125 @@ function StatusMenu({ action, onUpdate }: { action: RemediationAction; onUpdate:
   );
 }
 
+/** Dialog: pick connector + optional group/project key, then create a ticket */
+function CreateTicketDialog({
+  open,
+  action,
+  connectors,
+  clientId,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  action: RemediationAction | null;
+  connectors: TicketConnector[];
+  clientId: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [connectorId, setConnectorId] = useState("");
+  const [assignmentGroup, setAssignmentGroup] = useState("");
+  const [projectKey, setProjectKey] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const selectedConnector = connectors.find((c) => c.id === connectorId);
+  const isSN = selectedConnector?.connector_type === "servicenow";
+  const isJira = selectedConnector?.connector_type === "jira";
+
+  // Pre-fill project_key from connector config when Jira is selected
+  React.useEffect(() => {
+    if (selectedConnector?.connector_type === "jira") {
+      setProjectKey(selectedConnector.config?.project_key || "");
+    }
+  }, [connectorId, selectedConnector]);
+
+  const handleCreate = async () => {
+    if (!action || !connectorId) return;
+    setCreating(true);
+    try {
+      await ticketsApi.createFromRemediation(clientId, {
+        remediation_action_id: action.id,
+        connector_id: connectorId,
+        assignment_group: assignmentGroup || undefined,
+        project_key: projectKey || undefined,
+      });
+      toast.success("Ticket created successfully");
+      onCreated();
+      onClose();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || "Failed to create ticket";
+      toast.error(detail);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Create Ticket</DialogTitle>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+        {connectors.length === 0 ? (
+          <Alert severity="warning">
+            No ServiceNow or Jira connectors configured for this client. Add one under Connections.
+          </Alert>
+        ) : (
+          <>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Action: <strong>{action?.title || action?.action?.slice(0, 80)}</strong>
+            </Typography>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Ticketing System</InputLabel>
+              <Select value={connectorId} label="Ticketing System" onChange={(e) => setConnectorId(e.target.value)}>
+                {connectors.map((c) => (
+                  <MenuItem key={c.id} value={c.id}>
+                    {c.name} ({c.connector_type === "servicenow" ? "ServiceNow" : "Jira"})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {isSN && (
+              <TextField
+                size="small"
+                label="Assignment Group (optional)"
+                value={assignmentGroup}
+                onChange={(e) => setAssignmentGroup(e.target.value)}
+                fullWidth
+              />
+            )}
+            {isJira && (
+              <TextField
+                size="small"
+                label="Project Key"
+                value={projectKey}
+                onChange={(e) => setProjectKey(e.target.value)}
+                fullWidth
+                helperText="e.g. SEC, OPS"
+              />
+            )}
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={handleCreate}
+          disabled={creating || !connectorId || connectors.length === 0}
+        >
+          {creating ? "Creating…" : "Create Ticket"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function RemediationTracker() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
   const [filterStatus, setFilterStatus] = useState("open");
   const [filterBand, setFilterBand] = useState("");
   const [groupByBand, setGroupByBand] = useState(true);
+  const [ticketDialogAction, setTicketDialogAction] = useState<RemediationAction | null>(null);
 
   const { data: actions = [], isLoading, refetch } = useQuery<RemediationAction[]>({
     queryKey: ["remediation-actions", clientId, filterStatus, filterBand],
@@ -81,6 +214,29 @@ export default function RemediationTracker() {
     }),
     enabled: !!clientId,
   });
+
+  const { data: ticketConnectors = [] } = useQuery<TicketConnector[]>({
+    queryKey: ["ticket-connectors", clientId],
+    queryFn: () => ticketsApi.getConnectors(clientId),
+    enabled: !!clientId,
+  });
+
+  const { data: ticketSyncs = [] } = useQuery<TicketSync[]>({
+    queryKey: ["ticket-syncs", clientId],
+    queryFn: () => ticketsApi.list(clientId),
+    enabled: !!clientId,
+  });
+
+  // Build a lookup: source_id → TicketSync (latest per source_id)
+  const ticketBySourceId = React.useMemo(() => {
+    const map: Record<string, TicketSync> = {};
+    for (const t of ticketSyncs) {
+      if (t.source_type === "remediation_action") {
+        map[t.source_id] = t;
+      }
+    }
+    return map;
+  }, [ticketSyncs]);
 
   const updateMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -103,59 +259,88 @@ export default function RemediationTracker() {
   })).filter((g) => g.items.length > 0);
   const ungrouped = actions.filter((a) => !BAND_ORDER.includes(a.band || ""));
 
-  const renderRow = (a: RemediationAction) => (
-    <TableRow key={a.id} hover
-      sx={{ opacity: a.status === "cancelled" ? 0.5 : 1,
-            textDecoration: a.status === "completed" ? "line-through" : "none" }}>
-      <TableCell>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: BAND_COLOR[a.band || ""] || "#4285F4",
-            width: 24, textAlign: "center" }}>
-            {a.priority ?? "—"}
-          </Typography>
-        </Box>
-      </TableCell>
-      <TableCell sx={{ maxWidth: 340 }}>
-        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.4 }}>{a.action}</Typography>
-        {a.notes && (
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>{a.notes}</Typography>
-        )}
-      </TableCell>
-      {!groupByBand && (
+  const renderRow = (a: RemediationAction) => {
+    const existingTicket = ticketBySourceId[a.id];
+    return (
+      <TableRow key={a.id} hover
+        sx={{ opacity: a.status === "cancelled" ? 0.5 : 1,
+              textDecoration: a.status === "completed" ? "line-through" : "none" }}>
         <TableCell>
-          {a.band ? (
-            <Chip label={a.band} size="small"
-              sx={{ bgcolor: `${BAND_COLOR[a.band] || "#4285F4"}22`,
-                color: BAND_COLOR[a.band] || "#4285F4", fontSize: 10, height: 18 }} />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: BAND_COLOR[a.band || ""] || "#4285F4",
+              width: 24, textAlign: "center" }}>
+              {a.priority ?? "—"}
+            </Typography>
+          </Box>
+        </TableCell>
+        <TableCell sx={{ maxWidth: 340 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.4 }}>{a.action}</Typography>
+          {a.notes && (
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>{a.notes}</Typography>
+          )}
+          {existingTicket && (
+            <Box sx={{ mt: 0.5 }}>
+              <Chip
+                label={`${existingTicket.connector_type === "servicenow" ? "SN" : "Jira"}: ${existingTicket.ticket_id}`}
+                size="small"
+                icon={<ConfirmationNumber sx={{ fontSize: "12px !important" }} />}
+                onClick={() => existingTicket.ticket_url && window.open(existingTicket.ticket_url, "_blank")}
+                sx={{
+                  bgcolor: existingTicket.connector_type === "servicenow" ? "#7C3AED22" : "#0052CC22",
+                  color: existingTicket.connector_type === "servicenow" ? "#7C3AED" : "#0052CC",
+                  fontSize: 10, height: 18, cursor: existingTicket.ticket_url ? "pointer" : "default",
+                }}
+              />
+            </Box>
+          )}
+        </TableCell>
+        {!groupByBand && (
+          <TableCell>
+            {a.band ? (
+              <Chip label={a.band} size="small"
+                sx={{ bgcolor: `${BAND_COLOR[a.band] || "#4285F4"}22`,
+                  color: BAND_COLOR[a.band] || "#4285F4", fontSize: 10, height: 18 }} />
+            ) : <Typography variant="caption">—</Typography>}
+          </TableCell>
+        )}
+        <TableCell>
+          {a.effort ? (
+            <Chip label={a.effort} size="small"
+              sx={{ bgcolor: `${EFFORT_COLOR[a.effort] || "#9e9e9e"}22`,
+                color: EFFORT_COLOR[a.effort] || "#9e9e9e", fontSize: 10, height: 18 }} />
           ) : <Typography variant="caption">—</Typography>}
         </TableCell>
-      )}
-      <TableCell>
-        {a.effort ? (
-          <Chip label={a.effort} size="small"
-            sx={{ bgcolor: `${EFFORT_COLOR[a.effort] || "#9e9e9e"}22`,
-              color: EFFORT_COLOR[a.effort] || "#9e9e9e", fontSize: 10, height: 18 }} />
-        ) : <Typography variant="caption">—</Typography>}
-      </TableCell>
-      <TableCell>
-        {a.impact ? (
-          <Chip label={a.impact} size="small"
-            sx={{ bgcolor: `${IMPACT_COLOR[a.impact] || "#9e9e9e"}22`,
-              color: IMPACT_COLOR[a.impact] || "#9e9e9e", fontSize: 10, height: 18 }} />
-        ) : <Typography variant="caption">—</Typography>}
-      </TableCell>
-      <TableCell>
-        <Chip label={a.status.replace("_", " ")} size="small"
-          sx={{ bgcolor: `${STATUS_COLOR[a.status] || "#9e9e9e"}22`,
-            color: STATUS_COLOR[a.status] || "#9e9e9e",
-            fontSize: 10, height: 18, textTransform: "capitalize" }} />
-      </TableCell>
-      <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{a.created_at ? fmt(a.created_at) : "—"}</TableCell>
-      <TableCell>
-        <StatusMenu action={a} onUpdate={(status) => updateMut.mutate({ id: a.id, status })} />
-      </TableCell>
-    </TableRow>
-  );
+        <TableCell>
+          {a.impact ? (
+            <Chip label={a.impact} size="small"
+              sx={{ bgcolor: `${IMPACT_COLOR[a.impact] || "#9e9e9e"}22`,
+                color: IMPACT_COLOR[a.impact] || "#9e9e9e", fontSize: 10, height: 18 }} />
+          ) : <Typography variant="caption">—</Typography>}
+        </TableCell>
+        <TableCell>
+          <Chip label={a.status.replace("_", " ")} size="small"
+            sx={{ bgcolor: `${STATUS_COLOR[a.status] || "#9e9e9e"}22`,
+              color: STATUS_COLOR[a.status] || "#9e9e9e",
+              fontSize: 10, height: 18, textTransform: "capitalize" }} />
+        </TableCell>
+        <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{a.created_at ? fmt(a.created_at) : "—"}</TableCell>
+        <TableCell>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <StatusMenu action={a} onUpdate={(status) => updateMut.mutate({ id: a.id, status })} />
+            <Tooltip title={existingTicket ? `Ticket: ${existingTicket.ticket_id}` : "Create Ticket"}>
+              <IconButton
+                size="small"
+                onClick={(e) => { e.stopPropagation(); setTicketDialogAction(a); }}
+                sx={{ color: existingTicket ? (existingTicket.connector_type === "servicenow" ? "#7C3AED" : "#0052CC") : "text.secondary" }}
+              >
+                <ConfirmationNumber sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   const colHeaders = ["#", "Action", ...(!groupByBand ? ["Band"] : []), "Effort", "Impact", "Status", "Created", ""];
 
@@ -309,6 +494,18 @@ export default function RemediationTracker() {
           </TableContainer>
         )
       )}
+
+      {/* Create Ticket Dialog */}
+      <CreateTicketDialog
+        open={ticketDialogAction !== null}
+        action={ticketDialogAction}
+        connectors={ticketConnectors}
+        clientId={clientId || ""}
+        onClose={() => setTicketDialogAction(null)}
+        onCreated={() => {
+          qc.invalidateQueries({ queryKey: ["ticket-syncs", clientId] });
+        }}
+      />
     </Box>
   );
 }

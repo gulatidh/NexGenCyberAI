@@ -49,6 +49,7 @@ import CustomFrameworks from "./pages/CustomFrameworks";
 import VAPTReports from "./pages/VAPTReports";
 import VAPTReportDetail from "./pages/VAPTReportDetail";
 import ScanDiff from "./pages/ScanDiff";
+import TicketSyncPage from "./pages/TicketSync";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -160,6 +161,7 @@ function ProtectedApp() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/vapt-reports" element={<VAPTReports />} />
           <Route path="/vapt-reports/:reportId" element={<VAPTReportDetail />} />
+          <Route path="/ticket-sync" element={<TicketSyncPage />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>

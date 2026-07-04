@@ -100,3 +100,63 @@ class ServiceNowConnector(BaseConnector):
 
     async def get_compliance_status(self, framework: str) -> Dict[str, Any]:
         return {}
+
+    async def _post(self, path: str, payload: Dict) -> Dict:
+        url = f"{self._base_url}{path}"
+        timeout = httpx.Timeout(30)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            if tok := self.credentials.get("oauth_token"):
+                resp = await client.post(
+                    url,
+                    headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+                    json=payload,
+                )
+            else:
+                resp = await client.post(
+                    url,
+                    auth=(self.credentials["username"], self.credentials["password"]),
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def create_incident(
+        self,
+        title: str,
+        description: str,
+        severity: str,
+        assignment_group: str | None = None,
+        category: str = "Security",
+    ) -> Dict[str, Any]:
+        """Create a ServiceNow incident and return {sys_id, number, url}."""
+        # Map severity → impact/urgency (1=critical, 2=high, 3=medium, 4=low)
+        _sev_map = {"critical": "1", "high": "2", "medium": "3", "low": "4"}
+        level = _sev_map.get(severity.lower(), "3")
+        body: Dict[str, Any] = {
+            "short_description": title[:160],
+            "description": description,
+            "impact": level,
+            "urgency": level,
+            "category": category,
+        }
+        if assignment_group:
+            body["assignment_group"] = assignment_group
+        data = await self._post("/api/now/table/incident", body)
+        result = data.get("result", {})
+        sys_id = result.get("sys_id", "")
+        number = result.get("number", "")
+        url = f"{self._base_url}/incident.do?sys_id={sys_id}" if sys_id else ""
+        return {"sys_id": sys_id, "number": number, "url": url}
+
+    async def get_incident_status(self, sys_id: str) -> Dict[str, Any]:
+        """Return current {state, number, url} for a given incident sys_id."""
+        data = await self._get(
+            f"/api/now/table/incident/{sys_id}",
+            {"sysparm_fields": "state,number,sys_id"},
+        )
+        result = data.get("result", {})
+        number = result.get("number", "")
+        state = result.get("state", "")
+        url = f"{self._base_url}/incident.do?sys_id={sys_id}" if sys_id else ""
+        return {"state": state, "number": number, "url": url}

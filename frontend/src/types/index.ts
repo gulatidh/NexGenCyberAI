@@ -501,6 +501,19 @@ export interface MyAccess {
   manageable_scopes?: ManageableScopes;
 }
 
+export interface TicketSync {
+  id: string;
+  client_id: string;
+  connector_type: string;
+  source_type: string;
+  source_id: string;
+  ticket_id: string;
+  ticket_url: string;
+  ticket_status: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface DashboardSummary {
   total_clients: number;
   active_connectors: number;
