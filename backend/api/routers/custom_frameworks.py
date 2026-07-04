@@ -102,6 +102,48 @@ def _unique_slug(db: Session, base: str, exclude_id: Optional[str] = None) -> st
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+@router.get("/frameworks/all/")
+async def list_all_frameworks_for_evaluation(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """
+    Return all frameworks available for agent evaluation:
+    standard built-in frameworks + user-created custom frameworks.
+    Shape: [{value, label, is_custom, control_count}]
+    """
+    from api.models.models import FrameworkType
+    STANDARD_LABELS = {
+        "nist_csf": "NIST CSF 2.0",
+        "nist_800_53": "NIST 800-53",
+        "cis_v8": "CIS Controls v8",
+        "gdpr": "GDPR",
+        "iso_27001": "ISO 27001:2022",
+        "soc2": "SOC 2",
+        "pci_dss": "PCI DSS 4.0",
+        "cis_azure": "CIS Azure",
+        "cis_aws": "CIS AWS",
+        "cis_gcp": "CIS GCP",
+        "cis_m365": "CIS M365",
+        "cis_windows_server": "CIS Windows Server",
+        "cis_ubuntu": "CIS Ubuntu",
+    }
+    result = []
+    for ft in FrameworkType:
+        label = STANDARD_LABELS.get(ft.value, ft.value.replace("_", " ").upper())
+        result.append({"value": ft.value, "label": label, "is_custom": False, "control_count": None})
+
+    custom_fws = db.query(CustomFramework).order_by(CustomFramework.name.asc()).all()
+    for fw in custom_fws:
+        result.append({
+            "value": fw.slug,
+            "label": fw.name,
+            "is_custom": True,
+            "control_count": len(fw.controls),
+        })
+    return result
+
+
 @router.get("/frameworks/custom/", response_model=List[CustomFrameworkSummary])
 async def list_custom_frameworks(
     db: Session = Depends(get_db),

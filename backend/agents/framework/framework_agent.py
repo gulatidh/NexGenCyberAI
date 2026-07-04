@@ -137,6 +137,8 @@ assert gaps without citing evidence. You never invent control IDs."""
             + "\n\n"
             + self.consulting_packaging_directive()
         )
+        if self.extra_context:
+            system += f"\n\n## Framework Controls Reference\n{self.extra_context}"
 
         user = f"""## Framework Compliance Assessment Input: {client_name}
 

@@ -53,6 +53,7 @@ class BaseAgent(ABC):
     ):
         self._provider = provider
         self._model = model
+        self.extra_context: Optional[str] = None  # injected by run_agent for custom frameworks
 
     # ── Provider helpers ───────────────────────────────────────────────────────
 

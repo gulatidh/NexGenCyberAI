@@ -465,6 +465,7 @@ export const vaptApi = {
 };
 
 export const customFrameworksApi = {
+  listAll: () => apiClient.get("/frameworks/all/").then((r) => r.data),
   list: () => apiClient.get("/frameworks/custom/").then((r) => r.data),
   create: (data: { name: string; description?: string }) =>
     apiClient.post("/frameworks/custom/", data).then((r) => r.data),

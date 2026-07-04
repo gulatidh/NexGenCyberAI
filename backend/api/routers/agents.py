@@ -1,11 +1,12 @@
 """AI Agent execution endpoints."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 from api.models.models import (
     AgentRun, AgentType, Scan, Finding, Risk, RiskLevel,
     ThreatEntry, ControlDeficiency, RemediationAction,
+    CustomFramework, CustomFrameworkControl,
 )
 from api.schemas.schemas import AgentRunRequest, AgentRunResponse
 from db.database import get_db
@@ -227,22 +228,60 @@ async def run_agent(
     client = db.query(Client).filter(Client.id == client_id).first()
     client_name = client.name if client else "Unknown"
 
+    # Resolve framework: comes from input_data["framework"], default nist_csf
+    input_data = payload.input_data or {}
+    framework_slug: str = input_data.get("framework", "nist_csf") or "nist_csf"
+
+    # Check if this is a custom framework slug (not a standard FrameworkType value)
+    standard_values = {e.value for e in __import__("api.models.models", fromlist=["FrameworkType"]).FrameworkType}
+    custom_context: Optional[str] = None
+    if framework_slug not in standard_values:
+        cf = db.query(CustomFramework).filter(CustomFramework.slug == framework_slug).first()
+        if cf is None:
+            raise HTTPException(status_code=404, detail=f"Framework '{framework_slug}' not found")
+        # Build a controls context string for the agent
+        controls = (
+            db.query(CustomFrameworkControl)
+            .filter(CustomFrameworkControl.custom_framework_id == cf.id)
+            .all()
+        )
+        lines = [f"# Custom Framework: {cf.name}", cf.description or "", ""]
+        for cc in controls:
+            fc = cc.framework_control
+            lines.append(
+                f"- {fc.control_id}: {fc.title}"
+                + (f" — {fc.description[:200]}" if fc.description else "")
+            )
+        custom_context = "\n".join(lines)
+        # Use the human name as the framework label for the agent
+        framework_slug = cf.name
+
     agent_run_db = AgentRun(
         client_id=client_id,
         agent_type=payload.agent_type,
         scan_id=payload.scan_id,
         status="running",
-        input_data=payload.input_data or {},
+        input_data=input_data,
     )
     db.add(agent_run_db)
     db.commit()
     db.refresh(agent_run_db)
 
     try:
-        result = await _get_orchestrator().run_single_agent(
+        orchestrator = _get_orchestrator()
+        # Inject custom framework controls into agent context if applicable
+        if custom_context:
+            orchestrator.framework.extra_context = custom_context
+            orchestrator.compliance.extra_context = custom_context
+        else:
+            orchestrator.framework.extra_context = None
+            orchestrator.compliance.extra_context = None
+
+        result = await orchestrator.run_single_agent(
             payload.agent_type.value,
             findings,
             client_name,
+            framework=framework_slug,
         )
         agent_run_db.output_data = result
         agent_run_db.status = "completed"

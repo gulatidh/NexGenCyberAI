@@ -11,7 +11,7 @@ import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { agentsApi, scansApi, agentCatalogApi, adminApi } from "../services/api";
+import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
 import { Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 import RichOutput from "../components/RichOutput";
@@ -248,6 +248,7 @@ export default function Agents() {
   const { canAct } = useViewMode();
   const { clientId: selectedClientId } = useActiveClient();
   const [selectedScanId, setSelectedScanId] = useState("");
+  const [selectedFramework, setSelectedFramework] = useState("nist_csf");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [briefingAgent, setBriefingAgent] = useState<Agent | null>(null);
@@ -264,6 +265,11 @@ export default function Agents() {
     enabled: !!selectedClientId,
   });
 
+  const { data: allFrameworks = [] } = useQuery<any[]>({
+    queryKey: ["frameworks-all"],
+    queryFn: () => customFrameworksApi.listAll(),
+  });
+
   const { data: catalogData, isLoading } = useQuery<{ groups: AgentGroup[] }>({
     queryKey: ["agent-catalog"], queryFn: agentCatalogApi.list,
   });
@@ -273,7 +279,11 @@ export default function Agents() {
 
   const runMutation = useMutation({
     mutationFn: (agentType: AgentType) =>
-      agentsApi.run(selectedClientId, { agent_type: agentType, scan_id: selectedScanId || undefined }),
+      agentsApi.run(selectedClientId, {
+        agent_type: agentType,
+        scan_id: selectedScanId || undefined,
+        input_data: { framework: selectedFramework },
+      }),
     onSuccess: (_, agentType) => { qc.invalidateQueries({ queryKey: ["agent-runs"] }); toast.success(`${agentType} started`); },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Agent run failed"),
   });
@@ -324,6 +334,23 @@ export default function Agents() {
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">No scan</MenuItem>
               {scans.map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
+            <Select value={selectedFramework} onChange={(e) => setSelectedFramework(e.target.value)} label="Framework"
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              {allFrameworks.map((f: any) => (
+                <MenuItem key={f.value} value={f.value}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {f.label}
+                    {f.is_custom && (
+                      <Chip label="Custom" size="small"
+                        sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
+                    )}
+                  </Box>
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           {isAdmin && (

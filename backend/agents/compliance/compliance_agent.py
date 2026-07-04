@@ -155,6 +155,8 @@ and between required and recommended controls in other frameworks."""
             + "\n\n"
             + self.consulting_packaging_directive()
         )
+        if self.extra_context:
+            system += f"\n\n## Framework Controls Reference\n{self.extra_context}"
 
         user = f"""## Compliance Audit Report Input: {client_name}
 
