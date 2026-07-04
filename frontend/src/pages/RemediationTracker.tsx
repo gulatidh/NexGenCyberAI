@@ -6,9 +6,8 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Tooltip, Menu, MenuItem as MuiMenuItem, LinearProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
-  Snackbar,
 } from "@mui/material";
-import { Refresh, Assignment, ConfirmationNumber, OpenInNew } from "@mui/icons-material";
+import { Refresh, Assignment, ConfirmationNumber } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { remediationTrackerApi, ticketsApi } from "../services/api";
 import { toast } from "react-toastify";
