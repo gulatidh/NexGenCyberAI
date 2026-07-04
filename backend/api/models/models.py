@@ -31,6 +31,7 @@ class ConnectorType(str, enum.Enum):
     ONPREM = "onprem"
     SERVICENOW = "servicenow"
     OKTA = "okta"
+    CYBERARK = "cyberark"
     ENTRAID = "entraid"
     CONTAINERS = "containers"
     GITHUB = "github"
@@ -64,6 +65,8 @@ class ScannerCategory(str, enum.Enum):
 # ConnectorType → ScannerCategory dispatch. New scanners must register here so
 # the UI and factory both know which group they belong to.
 CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
+    ConnectorType.OKTA: ScannerCategory.CLOUD,
+    ConnectorType.CYBERARK: ScannerCategory.CLOUD,
     ConnectorType.WEB: ScannerCategory.DAST,
     ConnectorType.SEMGREP: ScannerCategory.SAST,
     ConnectorType.CODEQL: ScannerCategory.SAST,

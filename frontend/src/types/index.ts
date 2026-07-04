@@ -1,7 +1,7 @@
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type RiskLevel = "critical" | "high" | "medium" | "low";
 export type ConnectorType =
-  | "azure" | "aws" | "gcp" | "onprem" | "servicenow" | "okta" | "entraid"
+  | "azure" | "aws" | "gcp" | "onprem" | "servicenow" | "okta" | "cyberark" | "entraid"
   | "containers" | "github" | "jira" | "web"
   // SAST
   | "semgrep" | "codeql" | "sonarqube"

@@ -13,6 +13,7 @@ from connectors.entraid.connector import EntraIDConnector
 from connectors.containers.connector import ContainerConnector
 from connectors.saas.servicenow.connector import ServiceNowConnector
 from connectors.saas.okta.connector import OktaConnector
+from connectors.cyberark.connector import CyberArkConnector
 from connectors.web.connector import WebConnector
 from connectors.scanners.semgrep import SemgrepConnector
 from connectors.scanners.codeql import CodeQLConnector
@@ -35,6 +36,7 @@ _REGISTRY = {
     ConnectorType.CONTAINERS: ContainerConnector,
     ConnectorType.SERVICENOW: ServiceNowConnector,
     ConnectorType.OKTA: OktaConnector,
+    ConnectorType.CYBERARK: CyberArkConnector,
     ConnectorType.WEB: WebConnector,
     # SAST
     ConnectorType.SEMGREP: SemgrepConnector,

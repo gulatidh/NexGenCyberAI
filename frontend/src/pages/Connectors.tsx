@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   azure: "☁️ Azure", aws: "🟠 AWS", gcp: "🔵 GCP",
   onprem: "🖥️ On-Premises", servicenow: "🟣 ServiceNow",
-  okta: "🔑 Okta", entraid: "🆔 Entra ID",
+  okta: "🔑 Okta", cyberark: "🔐 CyberArk", entraid: "🆔 Entra ID",
   containers: "🐳 Containers", github: "🐙 GitHub", jira: "📋 Jira",
   web: "🌐 Web App (ZAP)",
   // SAST
@@ -68,6 +68,12 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
   okta: [
     { key: "domain", label: "Okta Domain (xxx.okta.com)" },
     { key: "api_token", label: "API Token", secret: true },
+  ],
+  cyberark: [
+    { key: "base_url",  label: "PVWA URL (https://cyberark.company.com)" },
+    { key: "username",  label: "Username" },
+    { key: "password",  label: "Password", secret: true },
+    { key: "auth_type", label: "Auth Type (CyberArk / LDAP / Windows)", placeholder: "CyberArk" },
   ],
   entraid: [
     { key: "tenant_id", label: "Tenant ID" },
@@ -202,7 +208,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
 // Drives the section grouping on the Connectors page.
 const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   azure: "cloud", aws: "cloud", gcp: "cloud", onprem: "cloud",
-  servicenow: "cloud", okta: "cloud", entraid: "cloud",
+  servicenow: "cloud", okta: "cloud", cyberark: "cloud", entraid: "cloud",
   containers: "cloud", github: "cloud", jira: "cloud",
   web: "dast",
   semgrep: "sast", codeql: "sast", sonarqube: "sast",
