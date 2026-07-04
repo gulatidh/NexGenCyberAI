@@ -159,6 +159,17 @@ class EntraIDConnector(BaseConnector):
         findings.extend(await self._check_app_registrations())
         findings.extend(await self._check_password_policy())
 
+        # --- Next-layer identity security checks ---
+        findings.extend(await self._check_legacy_authentication())
+        findings.extend(await self._check_identity_protection_risky_users())
+        findings.extend(await self._check_identity_protection_risky_signins())
+        findings.extend(await self._check_break_glass_accounts())
+        findings.extend(await self._check_admin_consent_policy())
+        findings.extend(await self._check_enterprise_applications())
+        findings.extend(await self._check_authentication_methods_policy())
+        findings.extend(await self._check_app_registration_owners())
+        findings.extend(await self._check_sign_in_anomalies())
+
         return findings
 
     # ------------------------------------------------------------------
@@ -625,6 +636,655 @@ class EntraIDConnector(BaseConnector):
         except Exception:
             pass
 
+        return findings
+
+    async def _check_legacy_authentication(self) -> List[ConnectorFinding]:
+        """
+        Verify a Conditional Access policy exists that explicitly blocks legacy auth protocols.
+        NIST IA-2 | resource_type: Microsoft.AzureAD/policies
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get("/identity/conditionalAccess/policies")
+            policies = data.get("value", [])
+
+            def _blocks_legacy_auth(policy: Dict) -> bool:
+                if policy.get("state") != "enabled":
+                    return False
+                client_app_types = policy.get("conditions", {}).get("clientAppTypes", [])
+                has_eas = "exchangeActiveSync" in client_app_types
+                has_other = "other" in client_app_types
+                grant = policy.get("grantControls") or {}
+                operator_or = grant.get("operator") == "OR"
+                built_in = grant.get("builtInControls", [])
+                has_block = "block" in built_in
+                return has_eas and has_other and operator_or and has_block
+
+            if not any(_blocks_legacy_auth(p) for p in policies):
+                findings.append(ConnectorFinding(
+                    title="No Conditional Access policy blocking legacy authentication protocols",
+                    description=(
+                        "Legacy authentication protocols (SMTP AUTH, POP3, IMAP, MAPI, EWS, ActiveSync) "
+                        "do not support modern MFA challenges. Attackers use these protocols to bypass "
+                        "MFA entirely."
+                    ),
+                    severity=FindingSeverity.HIGH,
+                    resource_type="Microsoft.AzureAD/policies",
+                    control_id="NIST IA-2",
+                    framework="nist_csf",
+                    remediation=(
+                        "Create a Conditional Access policy with condition 'Client apps = Exchange "
+                        "ActiveSync clients + Other clients' and grant = Block."
+                    ),
+                ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_legacy_authentication failed: %s", exc)
+        return findings
+
+    async def _check_identity_protection_risky_users(self) -> List[ConnectorFinding]:
+        """
+        Report users currently flagged as at-risk by Entra ID Identity Protection.
+        Requires Entra ID P2 licence — handle 403 gracefully.
+        NIST SI-4 | resource_type: Microsoft.AzureAD/riskyUsers
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get(
+                "/identityProtection/riskyUsers?$filter=riskState eq 'atRisk'&$top=50", beta=True
+            )
+            users = data.get("value", [])
+            high_users = [u for u in users if u.get("riskLevel") == "high"]
+            medium_users = [u for u in users if u.get("riskLevel") == "medium"]
+
+            if high_users:
+                findings.append(ConnectorFinding(
+                    title=f"Entra ID Identity Protection: {len(high_users)} users flagged as HIGH risk",
+                    description=(
+                        "Identity Protection has detected anomalous behaviour for these users "
+                        "(leaked credentials, impossible travel, anonymous IP, etc.). Their accounts "
+                        "may be compromised."
+                    ),
+                    severity=FindingSeverity.CRITICAL,
+                    resource_type="Microsoft.AzureAD/riskyUsers",
+                    control_id="NIST SI-4",
+                    framework="nist_csf",
+                    remediation=(
+                        "Review each user in Entra ID → Identity Protection → Risky Users. "
+                        "Confirm the risk is genuine, then require password reset + MFA "
+                        "re-registration, or dismiss if false positive."
+                    ),
+                ))
+            if medium_users:
+                findings.append(ConnectorFinding(
+                    title=f"Entra ID Identity Protection: {len(medium_users)} users flagged as MEDIUM risk",
+                    description=(
+                        "Identity Protection has detected anomalous behaviour for these users "
+                        "(leaked credentials, impossible travel, anonymous IP, etc.). Their accounts "
+                        "may be compromised."
+                    ),
+                    severity=FindingSeverity.HIGH,
+                    resource_type="Microsoft.AzureAD/riskyUsers",
+                    control_id="NIST SI-4",
+                    framework="nist_csf",
+                    remediation=(
+                        "Review each user in Entra ID → Identity Protection → Risky Users. "
+                        "Confirm the risk is genuine, then require password reset + MFA "
+                        "re-registration, or dismiss if false positive."
+                    ),
+                ))
+        except httpx.HTTPStatusError as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            if exc.response.status_code == 403:
+                logger.info(
+                    "_check_identity_protection_risky_users: 403 Forbidden — "
+                    "Entra ID Identity Protection requires a P2 licence."
+                )
+            else:
+                logger.warning("_check_identity_protection_risky_users failed: %s", exc)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_identity_protection_risky_users failed: %s", exc)
+        return findings
+
+    async def _check_identity_protection_risky_signins(self) -> List[ConnectorFinding]:
+        """
+        Report sign-in risk detections flagged by Entra ID Identity Protection.
+        Requires Entra ID P2 licence — handle 403 gracefully.
+        NIST AU-6 | resource_type: Microsoft.AzureAD/riskDetections
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get(
+                "/identityProtection/riskDetections?$filter=riskState eq 'atRisk'&$top=100", beta=True
+            )
+            detections = data.get("value", [])
+            high_count = sum(1 for d in detections if d.get("riskLevel") == "high")
+            medium_count = sum(1 for d in detections if d.get("riskLevel") == "medium")
+
+            # Top 3 deduplicated detection types for description enrichment
+            event_types: List[str] = []
+            seen: set = set()
+            for d in detections:
+                et = d.get("riskEventType", "")
+                if et and et not in seen:
+                    seen.add(et)
+                    event_types.append(et)
+                    if len(event_types) == 3:
+                        break
+            top_types_str = ", ".join(event_types) if event_types else "various"
+
+            if high_count > 0:
+                findings.append(ConnectorFinding(
+                    title=f"Entra ID Identity Protection: {high_count} HIGH-risk sign-in detections in the current period",
+                    description=(
+                        f"Identity Protection has flagged {high_count} high-risk sign-in events "
+                        f"(top detection types: {top_types_str}). These events may indicate active "
+                        "account compromise."
+                    ),
+                    severity=FindingSeverity.CRITICAL,
+                    resource_type="Microsoft.AzureAD/riskDetections",
+                    control_id="NIST AU-6",
+                    framework="nist_csf",
+                    remediation=(
+                        "Review in Entra ID → Identity Protection → Risk Detections. Enable "
+                        "risk-based Conditional Access policies to auto-remediate high-risk sign-ins."
+                    ),
+                ))
+            if medium_count > 10:
+                findings.append(ConnectorFinding(
+                    title=f"Entra ID Identity Protection: {medium_count} MEDIUM-risk sign-in detections",
+                    description=(
+                        f"Identity Protection has flagged {medium_count} medium-risk sign-in events "
+                        f"(top detection types: {top_types_str}). Elevated medium-risk volumes may "
+                        "indicate broad credential attacks."
+                    ),
+                    severity=FindingSeverity.HIGH,
+                    resource_type="Microsoft.AzureAD/riskDetections",
+                    control_id="NIST AU-6",
+                    framework="nist_csf",
+                    remediation=(
+                        "Review in Entra ID → Identity Protection → Risk Detections. Enable "
+                        "risk-based Conditional Access policies to auto-remediate high-risk sign-ins."
+                    ),
+                ))
+        except httpx.HTTPStatusError as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            if exc.response.status_code == 403:
+                logger.info(
+                    "_check_identity_protection_risky_signins: 403 Forbidden — "
+                    "Entra ID Identity Protection requires a P2 licence."
+                )
+            else:
+                logger.warning("_check_identity_protection_risky_signins failed: %s", exc)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_identity_protection_risky_signins failed: %s", exc)
+        return findings
+
+    async def _check_break_glass_accounts(self) -> List[ConnectorFinding]:
+        """
+        Detect presence of break-glass emergency accounts and verify CA policy exclusions.
+        NIST CP-2 | resource_type: Microsoft.AzureAD/users
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            _BREAK_GLASS_KEYWORDS = {"break", "glass", "emergency", "bgaccount", "emergency-admin", "breakglass"}
+
+            users_data = await self._graph_get(
+                "/users?$filter=userType eq 'Member'"
+                "&$select=displayName,userPrincipalName,accountEnabled,createdDateTime,id"
+            )
+            all_users = users_data.get("value", [])
+
+            def _is_break_glass(user: Dict) -> bool:
+                name = (user.get("displayName") or "").lower()
+                upn = (user.get("userPrincipalName") or "").lower()
+                return any(kw in name or kw in upn for kw in _BREAK_GLASS_KEYWORDS)
+
+            bg_accounts = [u for u in all_users if _is_break_glass(u)]
+
+            if not bg_accounts:
+                findings.append(ConnectorFinding(
+                    title="No break-glass (emergency access) accounts identified in the directory",
+                    description=(
+                        "Break-glass accounts are excluded from Conditional Access policies "
+                        "(including MFA) and are used to recover tenant access if all regular admin "
+                        "accounts are locked out. Their absence is a risk."
+                    ),
+                    severity=FindingSeverity.MEDIUM,
+                    resource_type="Microsoft.AzureAD/users",
+                    control_id="NIST CP-2",
+                    framework="nist_csf",
+                    remediation=(
+                        "Create 2 break-glass accounts with cloud-only credentials, exclude them "
+                        "from all CA policies, store credentials in a physical safe, and monitor "
+                        "them via alert rules."
+                    ),
+                ))
+            else:
+                # Check whether these accounts are excluded from all CA policies
+                try:
+                    ca_data = await self._graph_get("/identity/conditionalAccess/policies")
+                    policies = ca_data.get("value", [])
+                    bg_ids = {u.get("id") for u in bg_accounts if u.get("id")}
+
+                    def _excluded_from_policy(policy: Dict, account_ids: set) -> bool:
+                        exclude_users = (
+                            policy.get("conditions", {})
+                            .get("users", {})
+                            .get("excludeUsers", [])
+                        )
+                        return bool(account_ids.intersection(set(exclude_users)))
+
+                    all_excluded = all(
+                        any(_excluded_from_policy(p, {uid}) for p in policies)
+                        for uid in bg_ids
+                    )
+
+                    if not all_excluded:
+                        findings.append(ConnectorFinding(
+                            title="Break-glass accounts may not be excluded from all Conditional Access policies",
+                            description=(
+                                f"{len(bg_accounts)} break-glass account(s) were found but one or more "
+                                "may not be excluded from all Conditional Access policies. If a CA "
+                                "policy locks them out, tenant recovery may be impossible."
+                            ),
+                            severity=FindingSeverity.LOW,
+                            resource_type="Microsoft.AzureAD/users",
+                            control_id="NIST CP-2",
+                            framework="nist_csf",
+                            remediation=(
+                                "Verify each break-glass account is explicitly excluded from every "
+                                "Conditional Access policy via Entra ID → Conditional Access → "
+                                "Exclusions."
+                            ),
+                        ))
+                except Exception:
+                    pass  # CA policy lookup is best-effort
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_break_glass_accounts failed: %s", exc)
+        return findings
+
+    async def _check_admin_consent_policy(self) -> List[ConnectorFinding]:
+        """
+        Detect overly permissive OAuth consent settings that enable consent phishing.
+        NIST AC-3 | resource_type: Microsoft.AzureAD/policies
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get("/policies/authorizationPolicy")
+            policies = data.get("value", [data]) if isinstance(data, dict) and "value" not in data else data.get("value", [data])
+
+            for policy in policies:
+                # Check allowUserConsentForRiskyApps
+                if policy.get("allowUserConsentForRiskyApps"):
+                    findings.append(ConnectorFinding(
+                        title="Users can consent to risky OAuth applications",
+                        description=(
+                            "This allows any user to consent to third-party OAuth applications "
+                            "requesting access to their mailbox, files, and Teams data — a common "
+                            "vector for business email compromise via OAuth phishing (consent phishing)."
+                        ),
+                        severity=FindingSeverity.HIGH,
+                        resource_type="Microsoft.AzureAD/policies",
+                        control_id="NIST AC-3",
+                        framework="nist_csf",
+                        remediation=(
+                            "Set user consent to 'Allow user consent for apps from verified "
+                            "publishers' or 'Require admin approval for all apps' in Entra ID → "
+                            "Enterprise Applications → Consent and Permissions."
+                        ),
+                    ))
+
+                # Check for legacy consent policy
+                grant_policy_ids = policy.get("permissionGrantPolicyIdsAssignedToDefaultUserRole", []) or []
+                if "ManagePermissionGrantsForSelf.microsoft-user-default-legacy-policy" in grant_policy_ids:
+                    findings.append(ConnectorFinding(
+                        title="Users can grant OAuth app consent without admin approval (legacy policy)",
+                        description=(
+                            "This allows any user to consent to third-party OAuth applications "
+                            "requesting access to their mailbox, files, and Teams data — a common "
+                            "vector for business email compromise via OAuth phishing (consent phishing)."
+                        ),
+                        severity=FindingSeverity.HIGH,
+                        resource_type="Microsoft.AzureAD/policies",
+                        control_id="NIST AC-3",
+                        framework="nist_csf",
+                        remediation=(
+                            "Set user consent to 'Allow user consent for apps from verified "
+                            "publishers' or 'Require admin approval for all apps' in Entra ID → "
+                            "Enterprise Applications → Consent and Permissions."
+                        ),
+                    ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_admin_consent_policy failed: %s", exc)
+        return findings
+
+    async def _check_enterprise_applications(self) -> List[ConnectorFinding]:
+        """
+        Audit enterprise applications (service principals) for non-expiring secrets,
+        unverified publishers with high privileges, and missing publisher info.
+        NIST AC-3 | resource_type: Microsoft.AzureAD/servicePrincipals
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get(
+                "/servicePrincipals"
+                "?$select=displayName,appId,publisherName,verifiedPublisher,"
+                "oauth2PermissionScopes,keyCredentials,passwordCredentials"
+                "&$top=200"
+            )
+            apps = data.get("value", [])
+            seen_app_ids: set = set()
+
+            _HIGH_PRIV_SCOPES = {"Directory.Read.All", "Mail.Read", "Files.ReadWrite.All"}
+
+            for app in apps:
+                app_id = app.get("appId", "")
+                if app_id in seen_app_ids:
+                    continue
+                seen_app_ids.add(app_id)
+
+                name = app.get("displayName") or app_id or "unknown"
+                password_creds = app.get("passwordCredentials") or []
+                key_creds = app.get("keyCredentials") or []
+                verified_publisher = app.get("verifiedPublisher") or {}
+                publisher_name = app.get("publisherName")
+                oauth_scopes = [
+                    s.get("value", "") for s in (app.get("oauth2PermissionScopes") or [])
+                ]
+
+                # Non-expiring client secrets
+                for cred in password_creds:
+                    if not cred.get("endDateTime"):
+                        findings.append(ConnectorFinding(
+                            title=f"Enterprise app '{name}' has a non-expiring client secret",
+                            description=(
+                                f"Enterprise application '{name}' has a client secret with no "
+                                "expiry date. Non-expiring secrets remain valid indefinitely and "
+                                "increase the blast radius of a credential leak."
+                            ),
+                            severity=FindingSeverity.MEDIUM,
+                            resource_type="Microsoft.AzureAD/servicePrincipals",
+                            control_id="NIST AC-3",
+                            framework="nist_csf",
+                            remediation=(
+                                f"Set an expiry date on all client secrets for '{name}' and rotate "
+                                "them on a regular schedule (maximum 1 year)."
+                            ),
+                        ))
+                        break  # One finding per app for this issue
+
+                # Unverified publisher with high-privilege scopes
+                is_verified = bool(verified_publisher.get("displayName"))
+                has_high_priv = bool(_HIGH_PRIV_SCOPES.intersection(set(oauth_scopes)))
+                if not is_verified and has_high_priv:
+                    findings.append(ConnectorFinding(
+                        title=f"Unverified enterprise app '{name}' has high-privilege directory permissions",
+                        description=(
+                            f"Enterprise application '{name}' has been granted high-privilege "
+                            "permissions (Directory.Read.All, Mail.Read, or Files.ReadWrite.All) "
+                            "but its publisher is not verified by Microsoft."
+                        ),
+                        severity=FindingSeverity.HIGH,
+                        resource_type="Microsoft.AzureAD/servicePrincipals",
+                        control_id="NIST AC-3",
+                        framework="nist_csf",
+                        remediation=(
+                            f"Review whether '{name}' still requires these permissions. If the app "
+                            "is internal, complete Microsoft publisher verification. If external, "
+                            "confirm it is legitimate before retaining these grants."
+                        ),
+                    ))
+
+                # No verified publisher but has any credentials
+                has_creds = bool(password_creds or key_creds)
+                if not publisher_name and has_creds:
+                    findings.append(ConnectorFinding(
+                        title=f"Enterprise app '{name}' has no verified publisher — treat as untrusted",
+                        description=(
+                            f"Enterprise application '{name}' has credentials configured but no "
+                            "verified publisher name. Apps without a verified publisher identity "
+                            "are harder to audit and may be shadow IT or malicious."
+                        ),
+                        severity=FindingSeverity.LOW,
+                        resource_type="Microsoft.AzureAD/servicePrincipals",
+                        control_id="NIST AC-3",
+                        framework="nist_csf",
+                        remediation=(
+                            f"Identify the owner of '{name}', confirm its purpose, and either "
+                            "complete publisher verification or remove the application."
+                        ),
+                    ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_enterprise_applications failed: %s", exc)
+        return findings
+
+    async def _check_authentication_methods_policy(self) -> List[ConnectorFinding]:
+        """
+        Review enabled authentication methods for phishable-only configurations and
+        absence of phishing-resistant alternatives.
+        NIST IA-2 | resource_type: Microsoft.AzureAD/policies
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get("/policies/authenticationMethodsPolicy")
+            configs = data.get("authenticationMethodConfigurations") or []
+
+            method_states: Dict[str, str] = {}
+            method_details: Dict[str, Dict] = {}
+            for cfg in configs:
+                method_id = cfg.get("id", "")
+                method_states[method_id] = cfg.get("state", "disabled")
+                method_details[method_id] = cfg
+
+            authenticator_enabled = method_states.get("MicrosoftAuthenticator") == "enabled"
+            sms_enabled = method_states.get("Sms") == "enabled"
+            voice_enabled = method_states.get("Voice") == "enabled"
+            fido2_enabled = method_states.get("Fido2") == "enabled"
+
+            # Phishable-only: SMS or voice enabled but Authenticator disabled
+            if (sms_enabled or voice_enabled) and not authenticator_enabled:
+                findings.append(ConnectorFinding(
+                    title="Phishable authentication methods (SMS/voice) are enabled without phishing-resistant alternatives",
+                    description=(
+                        "SMS and voice call OTP authentication can be intercepted via SIM-swapping "
+                        "or SS7 attacks. Without Microsoft Authenticator or FIDO2 as alternatives, "
+                        "all MFA in the tenant is phishable."
+                    ),
+                    severity=FindingSeverity.MEDIUM,
+                    resource_type="Microsoft.AzureAD/policies",
+                    control_id="NIST IA-2",
+                    framework="nist_csf",
+                    remediation=(
+                        "Enable Microsoft Authenticator push notifications or FIDO2 security keys "
+                        "in Entra ID → Authentication Methods → Policies, and encourage users to "
+                        "register phishing-resistant credentials."
+                    ),
+                ))
+
+            # Authenticator enabled with TOTP but no FIDO2
+            authenticator_cfg = method_details.get("MicrosoftAuthenticator", {})
+            soft_oath_enabled = authenticator_cfg.get("isSoftwareOathEnabled", False)
+            if authenticator_enabled and soft_oath_enabled and not fido2_enabled:
+                findings.append(ConnectorFinding(
+                    title="FIDO2/passkey authentication is not enabled — consider adding phishing-resistant auth",
+                    description=(
+                        "Microsoft Authenticator TOTP codes are enabled but FIDO2 security keys "
+                        "(passkeys) are not. FIDO2 provides the highest phishing resistance and "
+                        "meets AAL3 requirements."
+                    ),
+                    severity=FindingSeverity.LOW,
+                    resource_type="Microsoft.AzureAD/policies",
+                    control_id="NIST IA-2",
+                    framework="nist_csf",
+                    remediation=(
+                        "Enable FIDO2 security keys in Entra ID → Authentication Methods → "
+                        "FIDO2 Security Key. Consider deploying hardware keys to privileged users."
+                    ),
+                ))
+
+            # Microsoft Authenticator disabled entirely
+            if not authenticator_enabled:
+                findings.append(ConnectorFinding(
+                    title="Microsoft Authenticator app push notifications are disabled — consider enabling for MFA",
+                    description=(
+                        "The Microsoft Authenticator authentication method is disabled for this "
+                        "tenant. Authenticator push notifications are the most user-friendly "
+                        "phishing-resistant MFA method available without hardware tokens."
+                    ),
+                    severity=FindingSeverity.HIGH,
+                    resource_type="Microsoft.AzureAD/policies",
+                    control_id="NIST IA-2",
+                    framework="nist_csf",
+                    remediation=(
+                        "Enable Microsoft Authenticator in Entra ID → Authentication Methods → "
+                        "Microsoft Authenticator and target all users or privileged users first."
+                    ),
+                ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_authentication_methods_policy failed: %s", exc)
+        return findings
+
+    async def _check_app_registration_owners(self) -> List[ConnectorFinding]:
+        """
+        Identify app registrations with no owners or with external guest owners.
+        NIST AC-2 | resource_type: Microsoft.AzureAD/applications
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get("/applications?$select=displayName,appId,id&$top=100")
+            apps = data.get("value", [])
+
+            for app in apps:
+                app_obj_id = app.get("id", "")
+                name = app.get("displayName") or app.get("appId", "unknown")
+
+                try:
+                    owners_data = await self._graph_get(f"/applications/{app_obj_id}/owners")
+                    owners = owners_data.get("value", [])
+                except Exception:
+                    continue  # Cannot read owners — skip this app
+
+                if not owners:
+                    findings.append(ConnectorFinding(
+                        title=f"App registration '{name}' has no owners assigned",
+                        description=(
+                            f"App registration '{name}' (id: {app_obj_id}) has no owners. "
+                            "Ownerless app registrations cannot be managed, rotated, or "
+                            "decommissioned by an accountable individual. This is an orphaned "
+                            "credential risk."
+                        ),
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=app_obj_id,
+                        resource_type="Microsoft.AzureAD/applications",
+                        control_id="NIST AC-2",
+                        framework="nist_csf",
+                        remediation=(
+                            f"Assign at least one owner to each app registration via Entra ID → "
+                            f"App registrations → {name} → Owners."
+                        ),
+                    ))
+                else:
+                    for owner in owners:
+                        user_type = owner.get("userType", "")
+                        guest_email = (
+                            owner.get("mail")
+                            or owner.get("userPrincipalName")
+                            or owner.get("id", "unknown")
+                        )
+                        if user_type == "Guest":
+                            findings.append(ConnectorFinding(
+                                title=f"External guest user '{guest_email}' is an owner of app registration '{name}'",
+                                description=(
+                                    f"External guest user '{guest_email}' is listed as an owner of "
+                                    f"app registration '{name}'. Guests can modify the application's "
+                                    "credentials and redirect URIs, which could enable account takeover."
+                                ),
+                                severity=FindingSeverity.HIGH,
+                                resource_id=app_obj_id,
+                                resource_type="Microsoft.AzureAD/applications",
+                                control_id="NIST AC-2",
+                                framework="nist_csf",
+                                remediation=(
+                                    f"Remove guest user '{guest_email}' as an owner of '{name}'. "
+                                    "App registration owners should be internal members only."
+                                ),
+                            ))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_app_registration_owners failed: %s", exc)
+        return findings
+
+    async def _check_sign_in_anomalies(self) -> List[ConnectorFinding]:
+        """
+        Detect potential credential-stuffing by counting distinct countries with
+        failed sign-ins in the most recent 100 log entries.
+        Requires AuditLog.Read.All — handle 403 gracefully.
+        NIST SI-4 | resource_type: Microsoft.AzureAD/signIns
+        """
+        findings: List[ConnectorFinding] = []
+        try:
+            data = await self._graph_get(
+                "/auditLogs/signIns"
+                "?$filter=status/errorCode ne 0"
+                "&$top=100"
+                "&$orderby=createdDateTime desc"
+            )
+            sign_ins = data.get("value", [])
+
+            now = datetime.now(timezone.utc)
+            cutoff = now - timedelta(hours=24)
+
+            countries: set = set()
+            for si in sign_ins:
+                created_str = si.get("createdDateTime")
+                created = self._parse_dt(created_str)
+                if created and created < cutoff:
+                    continue  # Outside 24-hour window
+                country = (si.get("location") or {}).get("countryOrRegion")
+                if country:
+                    countries.add(country)
+
+            if len(countries) > 3:
+                findings.append(ConnectorFinding(
+                    title=(
+                        f"Sign-in anomaly: failed logins detected from {len(countries)} countries "
+                        "in the past 24 hours — possible credential stuffing"
+                    ),
+                    description=(
+                        "Multiple failed authentication attempts from geographically dispersed "
+                        "locations suggest an automated credential stuffing or password spray "
+                        f"attack is underway. Countries observed: {', '.join(sorted(countries))}."
+                    ),
+                    severity=FindingSeverity.HIGH,
+                    resource_type="Microsoft.AzureAD/signIns",
+                    control_id="NIST SI-4",
+                    framework="nist_csf",
+                    remediation=(
+                        "Review sign-in logs in Entra ID. Enable Entra ID Identity Protection and "
+                        "configure risk-based CA policies to block or challenge risky sign-ins."
+                    ),
+                ))
+        except httpx.HTTPStatusError as exc:
+            import logging
+            logger = logging.getLogger(__name__)
+            if exc.response.status_code == 403:
+                logger.info(
+                    "_check_sign_in_anomalies: 403 Forbidden — AuditLog.Read.All permission required."
+                )
+            else:
+                logger.warning("_check_sign_in_anomalies failed: %s", exc)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("_check_sign_in_anomalies failed: %s", exc)
         return findings
 
     # ------------------------------------------------------------------
