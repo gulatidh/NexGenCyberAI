@@ -254,6 +254,40 @@ def _collect_scope(
         for c in connectors
     })
 
+    # ── Raw resource configuration (from scan.raw_context) ────
+    # Load the actual security config snapshots so the LLM reasons about
+    # real misconfigurations, not just asset names.
+    resource_configs: List[Dict[str, Any]] = []
+    try:
+        scans_q = db.query(Scan).filter(
+            Scan.client_id == client_id,
+            Scan.raw_context.isnot(None),
+        )
+        if scan_ids:
+            scans_q = scans_q.filter(Scan.id.in_(scan_ids))
+        else:
+            # Most recent scan per connector for client-wide scope
+            scans_q = scans_q.order_by(Scan.completed_at.desc()).limit(5)
+        raw_scans = scans_q.all()
+        seen_resource_ids: set = set()
+        for s in raw_scans:
+            try:
+                resources = json.loads(s.raw_context or "[]")
+                for r in resources:
+                    rid = r.get("id") or r.get("name") or ""
+                    if rid in seen_resource_ids:
+                        continue
+                    seen_resource_ids.add(rid)
+                    resource_configs.append(r)
+                    if len(resource_configs) >= 60:
+                        break
+            except Exception:
+                pass
+            if len(resource_configs) >= 60:
+                break
+    except Exception:
+        pass
+
     return {
         "client_name": client_name,
         "scope_type": scope_type,
@@ -266,6 +300,7 @@ def _collect_scope(
         "risk_count": len(risk_rows),
         "risks": risk_rows,
         "connector_types": connector_types,
+        "resource_configs": resource_configs,
     }
 
 
@@ -556,6 +591,26 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
                          f"L={r.get('likelihood') or '—'}/I={r.get('impact') or '—'}, status={r.get('status')})")
     else:
         parts.append("- (no risks recorded yet — propose the risks this architecture introduces)")
+
+    # ── Raw resource configuration ────
+    resource_configs = scope.get("resource_configs") or []
+    if resource_configs:
+        parts.append("")
+        parts.append(
+            f"## Raw resource configuration — {len(resource_configs)} resources with actual security settings"
+        )
+        parts.append(
+            "IMPORTANT: Use this configuration data to identify misconfiguration gaps the finding list may not capture. "
+            "Evaluate each resource's `config` dict for missing security controls (e.g. encryption disabled, "
+            "public access enabled, MFA not enforced, logging off, stale credentials, open ports)."
+        )
+        for rc in resource_configs:
+            name = rc.get("name") or rc.get("id") or "unknown"
+            rtype = rc.get("type") or "resource"
+            config = rc.get("config") or {}
+            # Truncate config to avoid token explosion
+            config_str = json.dumps(config, default=str)[:800]
+            parts.append(f"- [{rtype}] {name}: {config_str}")
 
     if library:
         parts.append("")
