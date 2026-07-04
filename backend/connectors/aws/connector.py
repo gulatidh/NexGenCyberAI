@@ -75,24 +75,120 @@ class AWSConnector(BaseConnector):
     async def get_resources(self) -> List[Dict[str, Any]]:
         session = self._session()
         resources = []
-        # EC2 instances
-        ec2 = session.client("ec2")
-        resp = ec2.describe_instances()
-        for reservation in resp.get("Reservations", []):
-            for inst in reservation.get("Instances", []):
+
+        # S3 Buckets
+        try:
+            s3 = session.client("s3")
+            buckets = s3.list_buckets().get("Buckets", [])
+            for b in buckets:
+                name = b["Name"]
+                config = {"versioning": None, "encryption": None, "public_access_blocked": None, "logging": None}
+                try:
+                    v = s3.get_bucket_versioning(Bucket=name)
+                    config["versioning"] = v.get("Status") == "Enabled"
+                except Exception:
+                    pass
+                try:
+                    enc = s3.get_bucket_encryption(Bucket=name)
+                    config["encryption"] = bool(enc.get("ServerSideEncryptionConfiguration"))
+                except Exception:
+                    config["encryption"] = False
+                try:
+                    pab = s3.get_public_access_block(Bucket=name)
+                    pab_cfg = pab.get("PublicAccessBlockConfiguration", {})
+                    config["public_access_blocked"] = all([
+                        pab_cfg.get("BlockPublicAcls"), pab_cfg.get("BlockPublicPolicy"),
+                        pab_cfg.get("IgnorePublicAcls"), pab_cfg.get("RestrictPublicBuckets"),
+                    ])
+                except Exception:
+                    pass
+                try:
+                    log = s3.get_bucket_logging(Bucket=name)
+                    config["logging"] = bool(log.get("LoggingEnabled"))
+                except Exception:
+                    pass
                 resources.append({
-                    "id": inst["InstanceId"],
-                    "name": next((t["Value"] for t in inst.get("Tags", []) if t["Key"] == "Name"), inst["InstanceId"]),
-                    "type": "ec2_instance",
-                    "state": inst["State"]["Name"],
-                    "region": self.config.get("region", "us-east-1"),
+                    "id": f"arn:aws:s3:::{name}", "name": name,
+                    "type": "AWS::S3::Bucket", "location": "",
+                    "config": config,
                 })
-        # S3 buckets
-        s3 = session.client("s3")
-        buckets = s3.list_buckets().get("Buckets", [])
-        for b in buckets:
-            resources.append({"id": b["Name"], "name": b["Name"], "type": "s3_bucket"})
-        return resources
+        except Exception as exc:
+            logger.debug("AWS get_resources S3 failed: %s", exc)
+
+        # EC2 Instances
+        try:
+            ec2 = session.client("ec2")
+            pages = ec2.get_paginator("describe_instances").paginate()
+            for page in pages:
+                for res in page["Reservations"]:
+                    for inst in res["Instances"]:
+                        iid = inst.get("InstanceId", "")
+                        name = next((t["Value"] for t in inst.get("Tags", []) if t["Key"] == "Name"), iid)
+                        resources.append({
+                            "id": iid, "name": name,
+                            "type": "AWS::EC2::Instance",
+                            "location": inst.get("Placement", {}).get("AvailabilityZone", ""),
+                            "config": {
+                                "state": inst.get("State", {}).get("Name"),
+                                "public_ip": inst.get("PublicIpAddress"),
+                                "iam_profile": bool(inst.get("IamInstanceProfile")),
+                                "ebs_optimized": inst.get("EbsOptimized"),
+                                "monitoring": inst.get("Monitoring", {}).get("State"),
+                            },
+                        })
+        except Exception as exc:
+            logger.debug("AWS get_resources EC2 failed: %s", exc)
+
+        # RDS Instances
+        try:
+            rds = session.client("rds")
+            paginator = rds.get_paginator("describe_db_instances")
+            for page in paginator.paginate():
+                for db in page.get("DBInstances", []):
+                    resources.append({
+                        "id": db.get("DBInstanceArn", ""), "name": db.get("DBInstanceIdentifier", ""),
+                        "type": "AWS::RDS::DBInstance",
+                        "location": db.get("AvailabilityZone", ""),
+                        "config": {
+                            "engine": db.get("Engine"),
+                            "engine_version": db.get("EngineVersion"),
+                            "publicly_accessible": db.get("PubliclyAccessible"),
+                            "storage_encrypted": db.get("StorageEncrypted"),
+                            "multi_az": db.get("MultiAZ"),
+                            "auto_minor_upgrade": db.get("AutoMinorVersionUpgrade"),
+                            "backup_retention_days": db.get("BackupRetentionPeriod"),
+                            "deletion_protection": db.get("DeletionProtection"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("AWS get_resources RDS failed: %s", exc)
+
+        # Security Groups (summary)
+        try:
+            ec2 = session.client("ec2")
+            sg_paginator = ec2.get_paginator("describe_security_groups")
+            for page in sg_paginator.paginate():
+                for sg in page.get("SecurityGroups", []):
+                    any_open = any(
+                        any(
+                            r.get("CidrIp") == "0.0.0.0/0" or r.get("CidrIpv6") == "::/0"
+                            for r in (perm.get("IpRanges", []) + [{"CidrIpv6": x.get("CidrIpv6")} for x in perm.get("Ipv6Ranges", [])])
+                        )
+                        for perm in sg.get("IpPermissions", [])
+                    )
+                    resources.append({
+                        "id": sg.get("GroupId", ""), "name": sg.get("GroupName", ""),
+                        "type": "AWS::EC2::SecurityGroup", "location": "",
+                        "config": {
+                            "vpc_id": sg.get("VpcId"),
+                            "has_open_inbound": any_open,
+                            "inbound_rule_count": len(sg.get("IpPermissions", [])),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("AWS get_resources SecurityGroups failed: %s", exc)
+
+        return resources[:200]
 
     # ── S3 Buckets ────────────────────────────────────────────────────────────
 

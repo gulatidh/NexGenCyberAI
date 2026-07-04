@@ -62,22 +62,84 @@ class GCPConnector(BaseConnector):
 
     async def get_resources(self) -> List[Dict[str, Any]]:
         creds = self._credentials()
-        project_id = self.credentials["project_id"]
-        client = asset_v1.AssetServiceClient(credentials=creds)
+        project_id = self.credentials.get("project_id", "")
         resources = []
-        request = asset_v1.ListAssetsRequest(
-            parent=f"projects/{project_id}",
-            asset_types=["compute.googleapis.com/Instance", "storage.googleapis.com/Bucket"],
-            content_type=asset_v1.ContentType.RESOURCE,
-        )
-        for asset in client.list_assets(request=request):
-            resources.append({
-                "id": asset.name,
-                "name": asset.name.split("/")[-1],
-                "type": asset.asset_type,
-                "project": project_id,
-            })
-        return resources
+
+        # GCS Buckets
+        try:
+            from google.cloud import storage as gcs
+            gcs_client = gcs.Client(project=project_id, credentials=creds)
+            for bucket in gcs_client.list_buckets():
+                try:
+                    bucket.reload()
+                except Exception:
+                    pass
+                iam_cfg = getattr(bucket, "iam_configuration", None)
+                resources.append({
+                    "id": bucket.name, "name": bucket.name,
+                    "type": "storage.googleapis.com/Bucket",
+                    "location": bucket.location or "",
+                    "config": {
+                        "versioning_enabled": getattr(bucket, "versioning_enabled", None),
+                        "uniform_bucket_level_access": getattr(iam_cfg, "uniform_bucket_level_access_enabled", None) if iam_cfg else None,
+                        "public_access_prevention": str(getattr(iam_cfg, "public_access_prevention", "") or "") if iam_cfg else "",
+                        "retention_policy": bool(getattr(bucket, "retention_policy", None)),
+                        "default_kms_key": bool(getattr(bucket, "default_kms_key_name", None)),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("GCP get_resources GCS failed: %s", exc)
+
+        # Compute Instances
+        try:
+            from google.cloud import compute_v1
+            agg_client = compute_v1.InstancesClient(credentials=creds)
+            for zone, instances in agg_client.aggregated_list(project=project_id):
+                for inst in (instances.instances or []):
+                    has_public_ip = any(
+                        any(getattr(ac, "nat_ip", None) for ac in (getattr(ni, "access_configs", None) or []))
+                        for ni in (getattr(inst, "network_interfaces", None) or [])
+                    )
+                    resources.append({
+                        "id": str(inst.id), "name": inst.name or "",
+                        "type": "compute.googleapis.com/Instance",
+                        "location": zone,
+                        "config": {
+                            "status": getattr(inst, "status", None),
+                            "has_public_ip": has_public_ip,
+                            "service_account": bool(getattr(inst, "service_accounts", None)),
+                            "shielded_vm": bool(getattr(inst, "shielded_instance_config", None)),
+                            "deletion_protection": getattr(inst, "deletion_protection", False),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("GCP get_resources Compute failed: %s", exc)
+
+        # GKE Clusters
+        try:
+            from google.cloud import container_v1
+            cc = container_v1.ClusterManagerClient(credentials=creds)
+            resp = cc.list_clusters(parent=f"projects/{project_id}/locations/-")
+            for cluster in (resp.clusters or []):
+                net_policy = getattr(cluster, "network_policy", None)
+                private_cfg = getattr(cluster, "private_cluster_config", None)
+                legacy_abac = getattr(cluster, "legacy_abac", None)
+                resources.append({
+                    "id": cluster.name, "name": cluster.name,
+                    "type": "container.googleapis.com/Cluster",
+                    "location": cluster.location or "",
+                    "config": {
+                        "k8s_version": getattr(cluster, "current_master_version", None),
+                        "network_policy_enabled": bool(net_policy and getattr(net_policy, "enabled", False)),
+                        "private_cluster": bool(private_cfg and getattr(private_cfg, "enable_private_nodes", False)),
+                        "rbac_enabled": bool(legacy_abac and not getattr(legacy_abac, "enabled", True)),
+                        "autopilot": bool(getattr(cluster, "autopilot", None)),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("GCP get_resources GKE failed: %s", exc)
+
+        return resources[:200]
 
     # ── GCS Buckets ───────────────────────────────────────────────────────────
 

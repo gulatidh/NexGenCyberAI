@@ -82,8 +82,84 @@ class EntraIDConnector(BaseConnector):
             return ConnectorTestResult(success=False, message=str(exc))
 
     async def get_resources(self) -> List[Dict[str, Any]]:
-        data = await self._graph_get("/users?$top=100&$select=id,displayName,userPrincipalName,accountEnabled")
-        return data.get("value", [])
+        resources = []
+
+        # Users with security-relevant properties
+        try:
+            users_data = await self._graph_get(
+                "/users?$select=id,displayName,userPrincipalName,userType,accountEnabled,signInActivity,assignedLicenses&$top=200"
+            )
+            for u in (users_data.get("value") or []):
+                si = u.get("signInActivity") or {}
+                resources.append({
+                    "id": u.get("id", ""),
+                    "name": u.get("displayName") or u.get("userPrincipalName", ""),
+                    "type": "Microsoft.AzureAD/User",
+                    "location": "",
+                    "config": {
+                        "user_type": u.get("userType"),
+                        "account_enabled": u.get("accountEnabled"),
+                        "last_sign_in": si.get("lastSignInDateTime"),
+                        "has_licenses": bool(u.get("assignedLicenses")),
+                    },
+                })
+        except Exception as exc:
+            import logging as _lg
+            _lg.getLogger(__name__).debug("EntraID get_resources users failed: %s", exc)
+
+        # Applications with security-relevant credential info
+        try:
+            apps_data = await self._graph_get(
+                "/applications?$select=id,displayName,appId,passwordCredentials,keyCredentials,verifiedPublisher&$top=100"
+            )
+            for a in (apps_data.get("value") or []):
+                pw_creds = a.get("passwordCredentials") or []
+                has_nonexpiring = any(not c.get("endDateTime") for c in pw_creds)
+                resources.append({
+                    "id": a.get("id", ""),
+                    "name": a.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/Application",
+                    "location": "",
+                    "config": {
+                        "app_id": a.get("appId"),
+                        "secret_count": len(pw_creds),
+                        "cert_count": len(a.get("keyCredentials") or []),
+                        "has_nonexpiring_secret": has_nonexpiring,
+                        "verified_publisher": bool(a.get("verifiedPublisher")),
+                    },
+                })
+        except Exception as exc:
+            import logging as _lg
+            _lg.getLogger(__name__).debug("EntraID get_resources apps failed: %s", exc)
+
+        # Conditional Access policies
+        try:
+            policies_data = await self._graph_get(
+                "/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,grantControls"
+            )
+            for p in (policies_data.get("value") or []):
+                grant = p.get("grantControls") or {}
+                built_in = grant.get("builtInControls") or []
+                conditions = p.get("conditions") or {}
+                resources.append({
+                    "id": p.get("id", ""),
+                    "name": p.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/ConditionalAccessPolicy",
+                    "location": "",
+                    "config": {
+                        "state": p.get("state"),
+                        "requires_mfa": "mfa" in built_in,
+                        "blocks_legacy_auth": bool(
+                            "exchangeActiveSync" in (conditions.get("clientAppTypes") or []) and
+                            "block" in built_in
+                        ),
+                    },
+                })
+        except Exception as exc:
+            import logging as _lg
+            _lg.getLogger(__name__).debug("EntraID get_resources CA policies failed: %s", exc)
+
+        return resources[:200]
 
     # ------------------------------------------------------------------
     # Configuration review entry point

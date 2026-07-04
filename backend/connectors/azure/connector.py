@@ -91,18 +91,170 @@ class AzureConnector(BaseConnector):
 
     async def get_resources(self) -> List[Dict[str, Any]]:
         cred = self._build_credential()
-        subscription_id = self.credentials["subscription_id"]
-        rm = ResourceManagementClient(cred, subscription_id)
+        sub_id = self.credentials["subscription_id"]
         resources = []
-        for r in rm.resources.list():
-            resources.append({
-                "id": r.id,
-                "name": r.name,
-                "type": r.type,
-                "location": r.location,
-                "tags": r.tags or {},
-            })
-        return resources
+
+        # Storage accounts
+        try:
+            from azure.mgmt.storage import StorageManagementClient
+            sc = StorageManagementClient(cred, sub_id)
+            for sa in sc.storage_accounts.list():
+                resources.append({
+                    "id": sa.id or "", "name": sa.name or "",
+                    "type": "Microsoft.Storage/storageAccounts",
+                    "location": sa.location or "",
+                    "config": {
+                        "https_only": getattr(sa, "enable_https_traffic_only", None),
+                        "min_tls_version": str(getattr(sa, "minimum_tls_version", "") or ""),
+                        "allow_blob_public_access": getattr(sa, "allow_blob_public_access", None),
+                        "network_acls_default_action": str(getattr(getattr(sa, "network_rule_set", None), "default_action", "") or ""),
+                        "encryption_enabled": bool(getattr(sa, "encryption", None)),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources storage failed: %s", exc)
+
+        # Key Vaults
+        try:
+            from azure.mgmt.keyvault import KeyVaultManagementClient
+            kvc = KeyVaultManagementClient(cred, sub_id)
+            for kv in kvc.vaults.list():
+                props = getattr(kv, "properties", None)
+                resources.append({
+                    "id": kv.id or "", "name": kv.name or "",
+                    "type": "Microsoft.KeyVault/vaults",
+                    "location": kv.location or "",
+                    "config": {
+                        "soft_delete_enabled": getattr(props, "enable_soft_delete", None) if props else None,
+                        "purge_protection_enabled": getattr(props, "enable_purge_protection", None) if props else None,
+                        "public_network_access": str(getattr(props, "public_network_access", "") or "") if props else "",
+                        "sku": str(getattr(getattr(props, "sku", None), "name", "") or "") if props else "",
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources keyvault failed: %s", exc)
+
+        # Virtual Machines
+        try:
+            from azure.mgmt.compute import ComputeManagementClient
+            cc = ComputeManagementClient(cred, sub_id)
+            for vm in cc.virtual_machines.list_all():
+                sp = getattr(vm, "storage_profile", None)
+                os_disk = getattr(sp, "os_disk", None) if sp else None
+                enc = getattr(os_disk, "encryption_settings", None) if os_disk else None
+                os_profile = getattr(vm, "os_profile", None)
+                resources.append({
+                    "id": vm.id or "", "name": vm.name or "",
+                    "type": "Microsoft.Compute/virtualMachines",
+                    "location": vm.location or "",
+                    "config": {
+                        "disk_encryption_enabled": bool(enc and getattr(enc, "enabled", False)),
+                        "os_disk_type": str(getattr(os_disk, "os_type", "") or "") if os_disk else "",
+                        "admin_username": getattr(os_profile, "admin_username", None) if os_profile else None,
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources VM failed: %s", exc)
+
+        # SQL Servers
+        try:
+            from azure.mgmt.sql import SqlManagementClient
+            sql = SqlManagementClient(cred, sub_id)
+            for server in sql.servers.list():
+                resources.append({
+                    "id": server.id or "", "name": server.name or "",
+                    "type": "Microsoft.Sql/servers",
+                    "location": server.location or "",
+                    "config": {
+                        "public_network_access": str(getattr(server, "public_network_access", "") or ""),
+                        "minimal_tls_version": str(getattr(server, "minimal_tls_version", "") or ""),
+                        "admin_login": getattr(server, "administrator_login", None),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources SQL failed: %s", exc)
+
+        # App Services
+        try:
+            from azure.mgmt.web import WebSiteManagementClient
+            wc = WebSiteManagementClient(cred, sub_id)
+            for app in wc.web_apps.list():
+                resources.append({
+                    "id": app.id or "", "name": app.name or "",
+                    "type": "Microsoft.Web/sites",
+                    "location": app.location or "",
+                    "config": {
+                        "https_only": getattr(app, "https_only", None),
+                        "kind": getattr(app, "kind", None),
+                        "state": getattr(app, "state", None),
+                        "outbound_ip_addresses": getattr(app, "outbound_ip_addresses", None),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources AppService failed: %s", exc)
+
+        # AKS Clusters
+        try:
+            from azure.mgmt.containerservice import ContainerServiceClient
+            csc = ContainerServiceClient(cred, sub_id)
+            for cluster in csc.managed_clusters.list():
+                np = getattr(cluster, "network_profile", None)
+                api_profile = getattr(cluster, "api_server_access_profile", None)
+                resources.append({
+                    "id": cluster.id or "", "name": cluster.name or "",
+                    "type": "Microsoft.ContainerService/managedClusters",
+                    "location": cluster.location or "",
+                    "config": {
+                        "kubernetes_version": getattr(cluster, "kubernetes_version", None),
+                        "enable_rbac": getattr(cluster, "enable_rbac", None),
+                        "network_policy": str(getattr(np, "network_policy", "") or "") if np else "",
+                        "private_cluster": getattr(api_profile, "enable_private_cluster", None) if api_profile else None,
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources AKS failed: %s", exc)
+
+        # NSGs (security rules summary)
+        try:
+            from azure.mgmt.network import NetworkManagementClient
+            nc = NetworkManagementClient(cred, sub_id)
+            for nsg in nc.network_security_groups.list_all():
+                inbound_allow_any = any(
+                    r.direction == "Inbound" and r.access == "Allow" and
+                    (getattr(r, "source_address_prefix", "") or "").lower() in ("*", "0.0.0.0/0", "internet", "any")
+                    for r in (nsg.security_rules or [])
+                )
+                resources.append({
+                    "id": nsg.id or "", "name": nsg.name or "",
+                    "type": "Microsoft.Network/networkSecurityGroups",
+                    "location": nsg.location or "",
+                    "config": {
+                        "rule_count": len(nsg.security_rules or []),
+                        "has_internet_inbound_allow": inbound_allow_any,
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources NSG failed: %s", exc)
+
+        # Container Registries
+        try:
+            from azure.mgmt.containerregistry import ContainerRegistryManagementClient
+            rc = ContainerRegistryManagementClient(cred, sub_id)
+            for reg in rc.registries.list():
+                resources.append({
+                    "id": reg.id or "", "name": reg.name or "",
+                    "type": "Microsoft.ContainerRegistry/registries",
+                    "location": reg.location or "",
+                    "config": {
+                        "admin_user_enabled": getattr(reg, "admin_user_enabled", None),
+                        "public_network_access": str(getattr(reg, "public_network_access", "") or ""),
+                        "sku": str(getattr(getattr(reg, "sku", None), "name", "") or ""),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("Azure get_resources ACR failed: %s", exc)
+
+        return resources[:200]
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

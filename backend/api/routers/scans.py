@@ -220,7 +220,7 @@ async def _execute_scan(
                 try:
                     resources = await connector.get_resources()
                     if resources:
-                        scan.raw_context = json.dumps(resources[:500])  # cap at 500 resources to keep prompt size reasonable
+                        scan.raw_context = json.dumps(resources[:200])  # cap at 200 resources — configs are larger now
                         db.commit()
                 except Exception as _rc_exc:
                     import logging as _lg
