@@ -160,18 +160,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          # Bundle commit metadata into DEPLOY_INFO.json so the What's New
-          # changelog works in Azure App Service (no git at runtime).
-          git log --pretty=format:"%h %s" -50 > /tmp/commit_messages.txt 2>/dev/null || true
-          git log --pretty=format:"%H\t%as\t%s" --reverse > /tmp/all_history.txt 2>/dev/null || true
-          python3 -c "
-import json, os
-msgs=[l.strip() for l in open('/tmp/commit_messages.txt').readlines() if l.strip()]
-hist=[l.strip() for l in open('/tmp/all_history.txt').readlines() if l.strip()]
-data={'commit_sha':os.environ['COMMIT_SHA'],'run_id':os.environ['RUN_ID'],'run_number':os.environ['RUN_NUMBER'],'commit_messages':msgs,'all_history':hist}
-json.dump(data,open('backend/DEPLOY_INFO.json','w'),indent=2)
-print('DEPLOY_INFO.json written:',len(msgs),'commits,',len(hist),'history entries')
-"
+          python3 -c "import json,os,subprocess; r1=subprocess.run(['git','log','--pretty=format:%h %s','-50'],capture_output=True,text=True); r2=subprocess.run(['git','log','--pretty=format:%H\t%as\t%s','--reverse'],capture_output=True,text=True); msgs=[l.strip() for l in r1.stdout.splitlines() if l.strip()]; hist=[l.strip() for l in r2.stdout.splitlines() if l.strip()]; data={'commit_sha':os.environ['COMMIT_SHA'],'run_id':os.environ['RUN_ID'],'run_number':os.environ['RUN_NUMBER'],'commit_messages':msgs,'all_history':hist}; open('backend/DEPLOY_INFO.json','w').write(json.dumps(data,indent=2)); print('DEPLOY_INFO.json written:',len(msgs),'commits,',len(hist),'history')"
 
       - name: Package backend
         run: |
