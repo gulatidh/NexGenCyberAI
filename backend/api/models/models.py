@@ -269,6 +269,7 @@ class Scan(Base):
     # same connector + scan_type + framework. UI walks the chain to build
     # version history for a target.
     parent_scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    raw_context = Column(Text)  # JSON resource inventory collected at scan time
 
     client = relationship("Client", back_populates="scans")
     project = relationship("Project", back_populates="scans")

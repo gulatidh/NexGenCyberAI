@@ -442,13 +442,328 @@ class AzureConnector(BaseConnector):
             logger.warning("VM security scan failed: %s", exc)
         return findings
 
+    # ── App Service ───────────────────────────────────────────────────────────
+
+    def _check_app_service(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.web import WebSiteManagementClient
+            wc = WebSiteManagementClient(cred, sub_id)
+            for app in wc.web_apps.list():
+                rid = app.id or ""
+                name = app.name or rid
+                rtype = "Microsoft.Web/sites"
+                site_config = None
+                try:
+                    rg = rid.split("/")[4] if rid.count("/") >= 5 else ""
+                    if rg:
+                        site_config = wc.web_apps.get_configuration(rg, name)
+                except Exception:
+                    pass
+
+                # HTTPS only
+                if not getattr(app, "https_only", True):
+                    findings.append(ConnectorFinding(
+                        title=f"App Service '{name}' allows unencrypted HTTP traffic",
+                        description="HTTPS-only mode is disabled. HTTP requests are not redirected to HTTPS, exposing data in transit.",
+                        severity=FindingSeverity.HIGH,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST SC-8",
+                        remediation="Enable HTTPS-only mode on the App Service.",
+                        framework="nist",
+                        control_mappings=mappings_for("appservice-https-only"),
+                    ))
+
+                if site_config:
+                    # Min TLS version
+                    min_tls = str(getattr(site_config, "min_tls_version", "") or "")
+                    if min_tls and min_tls not in ("1.2", "1.3"):
+                        findings.append(ConnectorFinding(
+                            title=f"App Service '{name}' permits outdated TLS ({min_tls})",
+                            description=f"Minimum TLS version is {min_tls}. TLS < 1.2 has known cryptographic weaknesses.",
+                            severity=FindingSeverity.MEDIUM,
+                            resource_id=rid, resource_type=rtype,
+                            control_id="NIST SC-8",
+                            remediation="Set minimum TLS version to 1.2 in App Service configuration.",
+                            framework="nist",
+                            control_mappings=mappings_for("appservice-tls-version"),
+                        ))
+                    # Remote debugging
+                    if getattr(site_config, "remote_debugging_enabled", False):
+                        findings.append(ConnectorFinding(
+                            title=f"App Service '{name}' has remote debugging enabled",
+                            description="Remote debugging is enabled on the production App Service. This opens an unauthenticated debug port that grants full code execution access.",
+                            severity=FindingSeverity.HIGH,
+                            resource_id=rid, resource_type=rtype,
+                            control_id="NIST CM-7",
+                            remediation="Disable remote debugging in App Service configuration.",
+                            framework="nist",
+                            control_mappings=mappings_for("appservice-remote-debug"),
+                        ))
+                    # FTP state
+                    ftp_state = str(getattr(site_config, "ftp_state", "") or "")
+                    if ftp_state and ftp_state.lower() not in ("ftpsdisabled", "disabled"):
+                        findings.append(ConnectorFinding(
+                            title=f"App Service '{name}' has FTP deployment enabled",
+                            description=f"FTP/FTPS deployment is set to '{ftp_state}'. Plain FTP transmits credentials in clear text.",
+                            severity=FindingSeverity.MEDIUM,
+                            resource_id=rid, resource_type=rtype,
+                            control_id="NIST SC-8",
+                            remediation="Set FTP state to 'FtpsOnly' or 'Disabled' in App Service configuration.",
+                            framework="nist",
+                            control_mappings=mappings_for("appservice-ftp"),
+                        ))
+        except ImportError:
+            logger.warning("azure-mgmt-web not installed; skipping App Service checks")
+        except Exception as exc:
+            logger.warning("App Service scan failed: %s", exc)
+        return findings
+
+    # ── SQL Databases ─────────────────────────────────────────────────────────
+
+    def _check_sql_databases(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.sql import SqlManagementClient
+            sc = SqlManagementClient(cred, sub_id)
+            for server in sc.servers.list():
+                srv_name = server.name or ""
+                srv_rid = server.id or ""
+                rg = srv_rid.split("/")[4] if srv_rid.count("/") >= 5 else ""
+                rtype = "Microsoft.Sql/servers"
+
+                # Public network access
+                pub = str(getattr(server, "public_network_access", "") or "")
+                if pub.lower() == "enabled":
+                    findings.append(ConnectorFinding(
+                        title=f"SQL Server '{srv_name}' has public network access enabled",
+                        description="Public network access is enabled on the SQL Server. The server endpoint is reachable from the internet.",
+                        severity=FindingSeverity.HIGH,
+                        resource_id=srv_rid, resource_type=rtype,
+                        control_id="NIST SC-7",
+                        remediation="Disable public network access and use Private Endpoint for SQL Server connectivity.",
+                        framework="nist",
+                        control_mappings=mappings_for("sql-public-network"),
+                    ))
+
+                if rg:
+                    # Firewall rule 0.0.0.0 (Allow all Azure IPs / unrestricted)
+                    try:
+                        for fw_rule in sc.firewall_rules.list_by_server(rg, srv_name):
+                            if getattr(fw_rule, "start_ip_address", "") == "0.0.0.0" and getattr(fw_rule, "end_ip_address", "") == "255.255.255.255":
+                                findings.append(ConnectorFinding(
+                                    title=f"SQL Server '{srv_name}' firewall allows all IPs (0.0.0.0–255.255.255.255)",
+                                    description=f"Firewall rule '{fw_rule.name}' permits connections from any IP address. This exposes the SQL Server to brute-force and exploitation from the internet.",
+                                    severity=FindingSeverity.CRITICAL,
+                                    resource_id=srv_rid, resource_type=rtype,
+                                    control_id="NIST SC-7",
+                                    remediation="Remove the catch-all firewall rule and restrict access to known IP ranges or use Private Endpoint.",
+                                    framework="nist",
+                                    control_mappings=mappings_for("sql-firewall-open"),
+                                ))
+                    except Exception:
+                        pass
+
+                    # Per-DB checks: TDE
+                    try:
+                        for db in sc.databases.list_by_server(rg, srv_name):
+                            db_name = db.name or ""
+                            db_rid = db.id or ""
+                            if db_name == "master":
+                                continue
+                            try:
+                                tde = sc.transparent_data_encryptions.get(rg, srv_name, db_name, "current")
+                                if str(getattr(tde, "state", "") or "").lower() != "enabled":
+                                    findings.append(ConnectorFinding(
+                                        title=f"SQL Database '{srv_name}/{db_name}' has TDE disabled",
+                                        description="Transparent Data Encryption is not enabled. Data at rest on the database and backups is not encrypted.",
+                                        severity=FindingSeverity.HIGH,
+                                        resource_id=db_rid,
+                                        resource_type="Microsoft.Sql/servers/databases",
+                                        control_id="NIST SC-28",
+                                        remediation="Enable Transparent Data Encryption on the SQL database.",
+                                        framework="nist",
+                                        control_mappings=mappings_for("sql-tde"),
+                                    ))
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+        except ImportError:
+            logger.warning("azure-mgmt-sql not installed; skipping SQL database checks")
+        except Exception as exc:
+            logger.warning("SQL database scan failed: %s", exc)
+        return findings
+
+    # ── AKS Clusters ──────────────────────────────────────────────────────────
+
+    def _check_aks_clusters(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.containerservice import ContainerServiceClient
+            cc = ContainerServiceClient(cred, sub_id)
+            for cluster in cc.managed_clusters.list():
+                rid = cluster.id or ""
+                name = cluster.name or rid
+                rtype = "Microsoft.ContainerService/managedClusters"
+
+                # RBAC
+                if not getattr(cluster, "enable_rbac", True):
+                    findings.append(ConnectorFinding(
+                        title=f"AKS cluster '{name}' has Kubernetes RBAC disabled",
+                        description="Kubernetes Role-Based Access Control is disabled. All authenticated users have unrestricted access to cluster resources.",
+                        severity=FindingSeverity.HIGH,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST AC-6",
+                        remediation="Enable Kubernetes RBAC on the AKS cluster.",
+                        framework="nist",
+                        control_mappings=mappings_for("aks-rbac-disabled"),
+                    ))
+
+                # Private cluster
+                api_profile = getattr(cluster, "api_server_access_profile", None)
+                is_private = getattr(api_profile, "enable_private_cluster", False) if api_profile else False
+                if not is_private:
+                    findings.append(ConnectorFinding(
+                        title=f"AKS cluster '{name}' has public API server endpoint",
+                        description="The Kubernetes API server is accessible from the public internet. An exposed API server increases the attack surface for credential stuffing and exploitation.",
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST SC-7",
+                        remediation="Enable private cluster mode to restrict API server access to within the VNet.",
+                        framework="nist",
+                        control_mappings=mappings_for("aks-public-api"),
+                    ))
+
+                # Network policy
+                np = getattr(cluster, "network_profile", None)
+                net_policy = str(getattr(np, "network_policy", "") or "") if np else ""
+                if not net_policy or net_policy.lower() == "none":
+                    findings.append(ConnectorFinding(
+                        title=f"AKS cluster '{name}' has no network policy configured",
+                        description="No Kubernetes network policy is set. All pods can communicate with each other without restriction, allowing lateral movement if a pod is compromised.",
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST SC-7",
+                        remediation="Configure a network policy (Azure or Calico) to restrict inter-pod traffic to required paths only.",
+                        framework="nist",
+                        control_mappings=mappings_for("aks-no-network-policy"),
+                    ))
+        except ImportError:
+            logger.warning("azure-mgmt-containerservice not installed; skipping AKS checks")
+        except Exception as exc:
+            logger.warning("AKS cluster scan failed: %s", exc)
+        return findings
+
+    # ── Container Registry ────────────────────────────────────────────────────
+
+    def _check_container_registry(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.containerregistry import ContainerRegistryManagementClient
+            rc = ContainerRegistryManagementClient(cred, sub_id)
+            for reg in rc.registries.list():
+                rid = reg.id or ""
+                name = reg.name or rid
+                rtype = "Microsoft.ContainerRegistry/registries"
+
+                # Admin user
+                if getattr(reg, "admin_user_enabled", False):
+                    findings.append(ConnectorFinding(
+                        title=f"Container Registry '{name}' has admin user enabled",
+                        description="The legacy admin account is enabled. Admin credentials are static, shared, and not auditable — use Azure AD identities instead.",
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST AC-2",
+                        remediation="Disable admin user and use Azure RBAC with managed identities for registry authentication.",
+                        framework="nist",
+                        control_mappings=mappings_for("acr-admin-enabled"),
+                    ))
+
+                # Public network access
+                pub = str(getattr(reg, "public_network_access", "") or "")
+                if pub.lower() == "enabled":
+                    findings.append(ConnectorFinding(
+                        title=f"Container Registry '{name}' is publicly accessible",
+                        description="Public network access is enabled. The registry endpoint accepts connections from any IP address on the internet.",
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=rid, resource_type=rtype,
+                        control_id="NIST SC-7",
+                        remediation="Disable public network access and use Private Endpoint or service endpoints for registry access.",
+                        framework="nist",
+                        control_mappings=mappings_for("acr-public-access"),
+                    ))
+        except ImportError:
+            logger.warning("azure-mgmt-containerregistry not installed; skipping Container Registry checks")
+        except Exception as exc:
+            logger.warning("Container Registry scan failed: %s", exc)
+        return findings
+
+    # ── Public IPs ────────────────────────────────────────────────────────────
+
+    def _check_public_ips(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.network import NetworkManagementClient
+            nc = NetworkManagementClient(cred, sub_id)
+            for pip in nc.public_ip_addresses.list_all():
+                if getattr(pip, "ip_configuration", None) is None:
+                    rid = pip.id or ""
+                    name = pip.name or rid
+                    findings.append(ConnectorFinding(
+                        title=f"Public IP '{name}' is unassociated (idle resource)",
+                        description="This public IP address is not attached to any resource. Unmanaged public IPs add to your attack surface and incur unnecessary cost.",
+                        severity=FindingSeverity.LOW,
+                        resource_id=rid,
+                        resource_type="Microsoft.Network/publicIPAddresses",
+                        control_id="NIST CM-7",
+                        remediation="Delete unneeded public IP addresses or associate them with the intended resource.",
+                        framework="nist",
+                        control_mappings=mappings_for("network-unattached-pip"),
+                    ))
+        except ImportError:
+            logger.warning("azure-mgmt-network not installed; skipping public IP checks")
+        except Exception as exc:
+            logger.warning("Public IP scan failed: %s", exc)
+        return findings
+
+    # ── Log Analytics ─────────────────────────────────────────────────────────
+
+    def _check_monitor_log_analytics(self, cred, sub_id: str) -> List[ConnectorFinding]:
+        findings: List[ConnectorFinding] = []
+        try:
+            from azure.mgmt.loganalytics import LogAnalyticsManagementClient
+            lac = LogAnalyticsManagementClient(cred, sub_id)
+            for ws in lac.workspaces.list():
+                rid = ws.id or ""
+                name = ws.name or rid
+                retention = getattr(ws, "retention_in_days", None)
+                if retention is not None and retention < 90:
+                    findings.append(ConnectorFinding(
+                        title=f"Log Analytics workspace '{name}' has short retention ({retention} days)",
+                        description=f"Data retention is set to {retention} days. Security investigations typically require 90+ days of log history; many compliance frameworks mandate 365 days.",
+                        severity=FindingSeverity.MEDIUM,
+                        resource_id=rid,
+                        resource_type="Microsoft.OperationalInsights/workspaces",
+                        control_id="NIST AU-11",
+                        remediation="Increase Log Analytics workspace retention to at least 90 days (recommended: 365 days for compliance).",
+                        framework="nist",
+                        control_mappings=mappings_for("monitor-log-retention"),
+                    ))
+        except ImportError:
+            logger.warning("azure-mgmt-loganalytics not installed; skipping Log Analytics checks")
+        except Exception as exc:
+            logger.warning("Log Analytics scan failed: %s", exc)
+        return findings
+
     # ── Public scan methods ───────────────────────────────────────────────────
 
     async def run_configuration_review(self) -> List[ConnectorFinding]:
         """
         Run all configuration checks:
         1. Defender for Cloud assessments (if enabled)
-        2. Direct ARM checks: NSG rules, storage accounts, Key Vault, RBAC, activity log
+        2. Direct ARM checks: NSG rules, storage accounts, Key Vault, RBAC, activity log,
+           App Service, SQL databases, AKS, Container Registry, public IPs, Log Analytics
         """
         cred = self._build_credential()
         sub_id = self.credentials["subscription_id"]
@@ -460,6 +775,12 @@ class AzureConnector(BaseConnector):
         findings += self._check_key_vaults(cred, sub_id)
         findings += self._check_rbac(cred, sub_id)
         findings += self._check_activity_logs(cred, sub_id)
+        findings += self._check_app_service(cred, sub_id)
+        findings += self._check_sql_databases(cred, sub_id)
+        findings += self._check_aks_clusters(cred, sub_id)
+        findings += self._check_container_registry(cred, sub_id)
+        findings += self._check_public_ips(cred, sub_id)
+        findings += self._check_monitor_log_analytics(cred, sub_id)
         return findings
 
     async def run_vulnerability_scan(self) -> List[ConnectorFinding]:

@@ -216,6 +216,16 @@ async def _execute_scan(
                     config_findings = await connector.run_configuration_review()
                     all_findings.extend(config_findings)
 
+                # Collect raw resource inventory for agent context
+                try:
+                    resources = await connector.get_resources()
+                    if resources:
+                        scan.raw_context = json.dumps(resources[:500])  # cap at 500 resources to keep prompt size reasonable
+                        db.commit()
+                except Exception as _rc_exc:
+                    import logging as _lg
+                    _lg.getLogger(__name__).debug("Resource inventory collection failed: %s", _rc_exc)
+
         if asset_external_id:
             target = asset_external_id.lower()
             all_findings = [

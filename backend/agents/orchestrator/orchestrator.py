@@ -34,6 +34,11 @@ class AgentOrchestrator:
         self.remediation = RemediationAgent()
         self.compliance = ComplianceMonitorAgent()
 
+    def set_resource_inventory(self, data: Optional[str]) -> None:
+        """Inject raw resource inventory into all sub-agents' system prompts."""
+        for agent in (self.vascan, self.framework, self.threat_intel, self.risk, self.remediation, self.compliance):
+            agent.resource_inventory = data
+
     async def run_full_assessment(
         self,
         findings: List[Dict],

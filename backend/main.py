@@ -163,6 +163,20 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.parent_scan_id ALTER failed: %s", exc)
 
+        # Add scans.raw_context — JSON resource inventory collected at scan time,
+        # injected into agent system prompts so the LLM can reason over the full
+        # asset list (not just findings).
+        if "raw_context" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD raw_context NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN raw_context TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.raw_context column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.raw_context ALTER failed: %s", exc)
+
         # Add scheduled_mission_runs.report — structured LLM report per run.
         try:
             run_cols = {c["name"] for c in inspector.get_columns("scheduled_mission_runs")}

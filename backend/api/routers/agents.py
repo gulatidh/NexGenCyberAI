@@ -267,6 +267,13 @@ async def run_agent(
     db.commit()
     db.refresh(agent_run_db)
 
+    # Load raw resource inventory from the scan if available
+    raw_context_str: Optional[str] = None
+    if payload.scan_id:
+        raw_ctx = getattr(scan, "raw_context", None)
+        if raw_ctx:
+            raw_context_str = raw_ctx
+
     try:
         orchestrator = _get_orchestrator()
         # Inject custom framework controls into agent context if applicable
@@ -276,6 +283,9 @@ async def run_agent(
         else:
             orchestrator.framework.extra_context = None
             orchestrator.compliance.extra_context = None
+
+        # Inject resource inventory into all agents
+        orchestrator.set_resource_inventory(raw_context_str)
 
         result = await orchestrator.run_single_agent(
             payload.agent_type.value,

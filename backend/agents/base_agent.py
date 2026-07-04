@@ -54,6 +54,7 @@ class BaseAgent(ABC):
         self._provider = provider
         self._model = model
         self.extra_context: Optional[str] = None  # injected by run_agent for custom frameworks
+        self.resource_inventory: Optional[str] = None  # injected from scan.raw_context
 
     # ── Provider helpers ───────────────────────────────────────────────────────
 
@@ -219,6 +220,13 @@ CRITICAL REMINDERS:
         structured error dict that matches the expected output schema.
         """
         llm = self._get_llm()
+        if self.resource_inventory:
+            system_prompt = (
+                system_prompt
+                + f"\n\n## Resource Inventory\nThe following resources were discovered during the scan. "
+                f"Use this to reason about assets that have no findings but may still be relevant to the security posture:\n\n"
+                f"{self.resource_inventory}"
+            )
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
         try:
             response = await llm.ainvoke(messages)
