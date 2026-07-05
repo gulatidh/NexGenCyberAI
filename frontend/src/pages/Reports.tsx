@@ -11,6 +11,7 @@
  * Each report has CSV download and Print (browser PDF).
  */
 import React, { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
@@ -18,7 +19,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   FormControlLabel, Checkbox,
 } from "@mui/material";
-import { Print, Download, Description, Email, Send } from "@mui/icons-material";
+import { Print, Download, Description, Email, Send, GppGood } from "@mui/icons-material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import {
@@ -65,6 +66,7 @@ function downloadCSV(filename: string, rows: Record<string, any>[]) {
 }
 
 export default function Reports() {
+  const navigate = useNavigate();
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [reportType, setReportType] = useState<ReportType>("executive");
@@ -290,6 +292,22 @@ export default function Reports() {
 
   return (
     <Box>
+      {/* VAPT Reports quick-access */}
+      <Card variant="outlined" sx={{ mb: 3, p: 2, display: "flex", alignItems: "center", gap: 2,
+        borderColor: "rgba(66,133,244,0.3)", bgcolor: "rgba(66,133,244,0.04)" }}>
+        <GppGood sx={{ color: "#4285F4", fontSize: 32 }} />
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>VAPT Engagement Reports</Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Full penetration test reports with findings, methodology, retest tracking and PDF/DOCX export
+          </Typography>
+        </Box>
+        <Button variant="outlined" size="small" onClick={() => navigate("/vapt-reports")}
+          sx={{ borderColor: "#4285F4", color: "#4285F4", whiteSpace: "nowrap" }}>
+          Open VAPT Reports
+        </Button>
+      </Card>
+
       {/* Print-only stylesheet — hides chrome, shows ref'd report cleanly */}
       <style>{`
         @media print {

@@ -97,9 +97,9 @@ export default function ThreatRegister() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Threat Register</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>AI Threat Intelligence</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            MITRE ATT&CK–mapped threat intelligence from the Threat Intel agent
+            MITRE ATT&CK–mapped threats surfaced by the AI Threat Intel agent
           </Typography>
         </Box>
         <IconButton onClick={() => refetch()}><Refresh /></IconButton>

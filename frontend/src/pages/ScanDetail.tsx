@@ -4,7 +4,7 @@ import {
   Box, Typography, Card, CardContent, Chip, Button, CircularProgress, Tabs, Tab,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Alert, Grid,
   Divider, LinearProgress, Tooltip, Collapse, IconButton, Dialog, DialogTitle,
-  DialogContent, DialogActions,
+  DialogContent, DialogActions, Menu, MenuItem as MuiMenuItem,
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
@@ -12,9 +12,10 @@ import {
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { assessmentsApi, findingsApi } from "../services/api";
+import { assessmentsApi, findingsApi, agentsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "../components/RichOutput";
+import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -447,6 +448,8 @@ export default function ScanDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("verdict");
+  const [agentMenuAnchor, setAgentMenuAnchor] = useState<null | HTMLElement>(null);
+  const { clientId } = useActiveClient();
   // When the browser triggers print (button or Ctrl+P), expand every tab
   // section so the whole assessment renders as a single document.
   const [printing, setPrinting] = useState<boolean>(false);
@@ -480,6 +483,19 @@ export default function ScanDetail() {
       setTimeout(() => qc.invalidateQueries({ queryKey: ["scan-detail", scanId] }), 8000);
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to queue verdict"),
+  });
+
+  const runAgentMutation = useMutation({
+    mutationFn: (agentType: string) => agentsApi.run(clientId!, {
+      scan_id: scanId,
+      agent_type: agentType,
+      framework: data?.framework || "nist_csf",
+    }),
+    onSuccess: () => {
+      toast.success("Agent queued — results will appear in AI Buddies");
+      setAgentMenuAnchor(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to queue agent"),
   });
 
   const [pendingDelete, setPendingDelete] = React.useState<Finding | null>(null);
@@ -580,6 +596,31 @@ export default function ScanDetail() {
               "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
             Print / PDF
           </Button>
+          {data.status === "completed" && clientId && (
+            <>
+              <Button
+                variant="outlined"
+                startIcon={<SmartToy />}
+                className="no-print"
+                onClick={(e) => setAgentMenuAnchor(e.currentTarget)}
+                sx={{ borderColor: "#7C4DFF", color: "#7C4DFF", "&:hover": { borderColor: "#7C4DFF", bgcolor: "rgba(124,77,255,0.08)" } }}
+              >
+                Analyse with AI
+              </Button>
+              <Menu anchorEl={agentMenuAnchor} open={Boolean(agentMenuAnchor)} onClose={() => setAgentMenuAnchor(null)}>
+                {[
+                  { type: "orchestrator", label: "Full Orchestrated Analysis" },
+                  { type: "threat_intel", label: "Threat Intelligence" },
+                  { type: "compliance_monitor", label: "Compliance Monitor" },
+                  { type: "remediation", label: "Remediation Planner" },
+                ].map(({ type, label }) => (
+                  <MuiMenuItem key={type} onClick={() => runAgentMutation.mutate(type)} disabled={runAgentMutation.isPending}>
+                    {label}
+                  </MuiMenuItem>
+                ))}
+              </Menu>
+            </>
+          )}
           <Button variant="contained" startIcon={<AutoAwesome />}
             disabled={generateMutation.isPending}
             className="no-print"

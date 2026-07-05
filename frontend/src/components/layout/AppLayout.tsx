@@ -13,7 +13,7 @@ import {
   Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
-  Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood, ConfirmationNumber,
+  Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -68,11 +68,10 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Findings",      icon: <Security />,  path: "/findings" },
       { label: "Threat Models", icon: <Hub />,       path: "/threat-models" },
       { label: "Risk Register", icon: <Assessment />, path: "/risks" },
-      { label: "Threat Register",     icon: <Radar />,            path: "/threat-register" },
-      { label: "Control Deficiencies", icon: <GppBad />,          path: "/control-deficiencies" },
-      { label: "Remediation",         icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
-      { label: "VAPT Reports",       icon: <GppGood />,          path: "/vapt-reports" },
-      { label: "Ticket Sync",        icon: <ConfirmationNumber />, path: "/ticket-sync" },
+      { label: "AI Threat Intelligence", icon: <Radar />,            path: "/threat-register" },
+      { label: "Compliance Gaps",        icon: <GppBad />,          path: "/control-deficiencies" },
+      { label: "Remediation",            icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
+      { label: "VAPT Reports",           icon: <GppGood />,          path: "/vapt-reports" },
     ],
   },
   {

@@ -104,9 +104,9 @@ export default function ControlDeficiencies() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Control Deficiencies</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Compliance Gaps</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Framework control gaps identified by the Compliance agent — auditor-ready register
+            Framework control gaps identified by the Compliance Monitor agent — auditor-ready register
           </Typography>
         </Box>
         <IconButton onClick={() => refetch()}><Refresh /></IconButton>
@@ -177,14 +177,14 @@ export default function ControlDeficiencies() {
         </Box>
       )}
 
-      {!clientId && <Alert severity="info">Select a client to view their control deficiencies.</Alert>}
+      {!clientId && <Alert severity="info">Select a client to view their compliance gaps.</Alert>}
       {clientId && isLoading && <CircularProgress size={24} />}
 
       {clientId && !isLoading && entries.length === 0 && (
         <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
           <GppBad sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
           <Typography sx={{ color: "text.secondary" }}>
-            No control deficiencies yet. Run the <strong>Compliance Monitor</strong> agent on a completed scan.
+            No compliance gaps yet. Run the <strong>Compliance Monitor</strong> agent on a completed scan.
           </Typography>
         </Card>
       )}

@@ -6,8 +6,9 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Tooltip, Menu, MenuItem as MuiMenuItem, LinearProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
+  Tabs, Tab, Link,
 } from "@mui/material";
-import { Refresh, Assignment, ConfirmationNumber } from "@mui/icons-material";
+import { Refresh, Assignment, ConfirmationNumber, OpenInNew } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { remediationTrackerApi, ticketsApi } from "../services/api";
 import { toast } from "react-toastify";
@@ -64,6 +65,7 @@ interface TicketSync {
   ticket_url: string;
   ticket_status: string;
   connector_type: string;
+  created_at?: string;
 }
 
 function StatusMenu({ action, onUpdate }: { action: RemediationAction; onUpdate: (status: string) => void }) {
@@ -197,9 +199,13 @@ function CreateTicketDialog({
   );
 }
 
+const CONNECTOR_COLOR: Record<string, string> = { servicenow: "#7C3AED", jira: "#0052CC" };
+const CONNECTOR_LABEL: Record<string, string> = { servicenow: "ServiceNow", jira: "Jira" };
+
 export default function RemediationTracker() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const [mainTab, setMainTab] = useState<"actions" | "tickets">("actions");
   const [filterStatus, setFilterStatus] = useState("open");
   const [filterBand, setFilterBand] = useState("");
   const [groupByBand, setGroupByBand] = useState(true);
@@ -236,6 +242,12 @@ export default function RemediationTracker() {
     }
     return map;
   }, [ticketSyncs]);
+
+  const syncStatusMut = useMutation({
+    mutationFn: (ticketSyncId: string) => ticketsApi.sync(clientId!, ticketSyncId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ticket-syncs", clientId] }); toast.success("Status synced"); },
+    onError: () => toast.error("Sync failed"),
+  });
 
   const updateMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
@@ -345,7 +357,7 @@ export default function RemediationTracker() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>Remediation Tracker</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
@@ -353,16 +365,27 @@ export default function RemediationTracker() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
-          <Tooltip title={groupByBand ? "Show flat list" : "Group by band"}>
-            <IconButton onClick={() => setGroupByBand((g) => !g)}>
-              <Assignment fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          {mainTab === "actions" && (
+            <Tooltip title={groupByBand ? "Show flat list" : "Group by band"}>
+              <IconButton onClick={() => setGroupByBand((g) => !g)}>
+                <Assignment fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           <IconButton onClick={() => refetch()}><Refresh /></IconButton>
         </Box>
       </Box>
 
-      <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
+      <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)}
+        sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 3,
+          "& .MuiTab-root": { textTransform: "none", fontWeight: 600, color: "text.secondary" },
+          "& .Mui-selected": { color: "#4285F4" },
+          "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
+        <Tab value="actions" label={`Actions (${actions.length})`} icon={<Assignment sx={{ fontSize: 16 }} />} iconPosition="start" />
+        <Tab value="tickets" label={`Tickets (${ticketSyncs.length})`} icon={<ConfirmationNumber sx={{ fontSize: 16 }} />} iconPosition="start" />
+      </Tabs>
+
+      {mainTab === "actions" && <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
         <FormControl size="small" sx={{ minWidth: 150 }}>
           <InputLabel>Status</InputLabel>
           <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
@@ -380,9 +403,9 @@ export default function RemediationTracker() {
             {BAND_ORDER.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
           </Select>
         </FormControl>
-      </Box>
+      </Box>}
 
-      {/* KPI strip */}
+      {mainTab === "actions" && <>{/* KPI strip */}
       {clientId && (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
           {[
@@ -492,6 +515,83 @@ export default function RemediationTracker() {
             </Table>
           </TableContainer>
         )
+      )}
+
+      </>}
+
+      {/* Tickets tab */}
+      {mainTab === "tickets" && (
+        <Box>
+          {!clientId && <Alert severity="info">Select a client to view their tickets.</Alert>}
+          {clientId && ticketSyncs.length === 0 && (
+            <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+              <ConfirmationNumber sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>
+                No tickets yet. Use the <strong>Create Ticket</strong> button on an action above to push to ServiceNow or Jira.
+              </Typography>
+            </Card>
+          )}
+          {clientId && ticketSyncs.length > 0 && (
+            <TableContainer component={Card} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    {["Source", "Ticket", "System", "Status", "Created", ""].map((h) => (
+                      <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {ticketSyncs.map((sync) => {
+                    const color = CONNECTOR_COLOR[sync.connector_type] || "#9e9e9e";
+                    const label = CONNECTOR_LABEL[sync.connector_type] || sync.connector_type;
+                    return (
+                      <TableRow key={sync.id} hover>
+                        <TableCell>
+                          <Chip label={sync.source_type === "finding" ? "Finding" : "Remediation"}
+                            size="small"
+                            sx={{ bgcolor: sync.source_type === "finding" ? "#EA433522" : "#4285F422",
+                              color: sync.source_type === "finding" ? "#EA4335" : "#4285F4",
+                              fontSize: 10, height: 18 }} />
+                        </TableCell>
+                        <TableCell>
+                          {sync.ticket_url ? (
+                            <Link href={sync.ticket_url} target="_blank" rel="noopener noreferrer"
+                              sx={{ display: "flex", alignItems: "center", gap: 0.5, fontSize: 12 }}>
+                              {sync.ticket_id}<OpenInNew sx={{ fontSize: 12 }} />
+                            </Link>
+                          ) : (
+                            <Typography variant="body2" sx={{ fontSize: 12 }}>{sync.ticket_id}</Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={label} size="small"
+                            sx={{ bgcolor: `${color}22`, color, fontSize: 10, height: 18 }} />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontSize: 12, textTransform: "capitalize" }}>
+                            {sync.ticket_status || "—"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                          {sync.created_at ? fmt(sync.created_at) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip title="Sync status from ticketing system">
+                            <IconButton size="small" onClick={() => syncStatusMut.mutate(sync.id)}
+                              disabled={syncStatusMut.isPending}>
+                              <Refresh sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
       )}
 
       {/* Create Ticket Dialog */}
