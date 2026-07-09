@@ -51,6 +51,14 @@ class ConnectorType(str, enum.Enum):
     TRUFFLEHOG = "trufflehog"
     # AI-powered local code review (runs in-process, no GitHub Actions)
     AI_CODE_REVIEW = "ai_code_review"
+    # Enterprise professional scanners (API-based, no GitHub Actions)
+    TENABLE = "tenable"
+    BURP_ENTERPRISE = "burp_enterprise"
+    SNYK = "snyk"
+    RAPID7 = "rapid7"
+    QUALYS = "qualys"
+    INVICTI = "invicti"
+    ACUNETIX = "acunetix"
 
 
 class ScannerCategory(str, enum.Enum):
@@ -60,6 +68,7 @@ class ScannerCategory(str, enum.Enum):
     NETWORK = "network"     # Network & infra (nmap, openvas, trivy container)
     DEPENDENCY = "dependency"  # Dependency + secret scanning (OWASP DC, gitleaks, trufflehog)
     CLOUD = "cloud"         # Existing cloud / identity connectors
+    ENTERPRISE = "enterprise"  # Professional/paid scanners — direct API integration
 
 
 # ConnectorType → ScannerCategory dispatch. New scanners must register here so
@@ -80,6 +89,13 @@ CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
     ConnectorType.GITLEAKS: ScannerCategory.DEPENDENCY,
     ConnectorType.TRUFFLEHOG: ScannerCategory.DEPENDENCY,
     ConnectorType.AI_CODE_REVIEW: ScannerCategory.SAST,
+    ConnectorType.TENABLE: ScannerCategory.ENTERPRISE,
+    ConnectorType.BURP_ENTERPRISE: ScannerCategory.ENTERPRISE,
+    ConnectorType.SNYK: ScannerCategory.ENTERPRISE,
+    ConnectorType.RAPID7: ScannerCategory.ENTERPRISE,
+    ConnectorType.QUALYS: ScannerCategory.ENTERPRISE,
+    ConnectorType.INVICTI: ScannerCategory.ENTERPRISE,
+    ConnectorType.ACUNETIX: ScannerCategory.ENTERPRISE,
 }
 
 class ConnectorStatus(str, enum.Enum):

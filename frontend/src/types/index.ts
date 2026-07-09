@@ -10,7 +10,9 @@ export type ConnectorType =
   // Dependency & Secret
   | "owasp_dc" | "gitleaks" | "trufflehog"
   // AI-powered local code review
-  | "ai_code_review";
+  | "ai_code_review"
+  // Enterprise professional scanners
+  | "tenable" | "burp_enterprise" | "snyk" | "rapid7" | "qualys" | "invicti" | "acunetix";
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 export type ScanType = "vulnerability" | "configuration" | "compliance" | "full";
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";

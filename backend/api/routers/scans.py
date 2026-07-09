@@ -85,6 +85,19 @@ async def _execute_scan(
                 from api.models.models import ConnectorType as _CT
                 ctype = connector_db.connector_type
                 ctype_value = ctype.value if hasattr(ctype, "value") else str(ctype)
+
+                # Enterprise professional scanners — direct API (no GitHub Actions)
+                _ENTERPRISE_SCANNER_TYPES = {
+                    _CT.TENABLE.value, _CT.BURP_ENTERPRISE.value, _CT.SNYK.value,
+                    _CT.RAPID7.value, _CT.QUALYS.value, _CT.INVICTI.value, _CT.ACUNETIX.value,
+                }
+                if ctype_value in _ENTERPRISE_SCANNER_TYPES:
+                    from services.scanners import run_enterprise_scan
+                    _ent_creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                    _ent_cfg = connector_db.config or {}
+                    await run_enterprise_scan(ctype_value, scan.id, db_url, _ent_creds, _ent_cfg)
+                    return
+
                 if ctype_value == _CT.WEB.value:
                     from connectors.web.connector import trigger_zap_scan
                     from api.models.models import FrameworkType

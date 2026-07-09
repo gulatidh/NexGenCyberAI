@@ -26,6 +26,10 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
   // AI-powered local code review
   ai_code_review: "🤖 AI Code Review",
+  // Enterprise professional scanners
+  tenable: "🔴 Tenable.io", burp_enterprise: "🟠 Burp Enterprise", snyk: "💜 Snyk",
+  rapid7: "🔵 Rapid7 InsightVM", qualys: "🟢 Qualys VMDR",
+  invicti: "⚪ Invicti", acunetix: "🔺 Acunetix Enterprise",
 };
 
 // Connector types hidden from the "Add connector" picker — their GitHub
@@ -188,6 +192,37 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
       placeholder: "ghp_…",
       help: "Required for private repos. Scope 'repo' (read)." },
   ],
+  tenable: [
+    { key: "access_key", label: "Access Key", secret: true, placeholder: "a0b1c2d3-...", help: "Tenable.io Settings → My Account → API Keys" },
+    { key: "secret_key", label: "Secret Key", secret: true, placeholder: "e4f5g6h7-..." },
+  ],
+  burp_enterprise: [
+    { key: "host", label: "Burp Enterprise Host URL", placeholder: "https://burp.company.com", help: "Your Burp Suite Enterprise server URL" },
+    { key: "api_key", label: "API Key", secret: true, placeholder: "burp_api_...", help: "Enterprise Settings → API" },
+  ],
+  snyk: [
+    { key: "api_key", label: "API Token", secret: true, placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", help: "Snyk Account Settings → Auth Token" },
+    { key: "org_id", label: "Organisation ID", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", help: "Snyk Settings → Organisation → General" },
+  ],
+  rapid7: [
+    { key: "host", label: "InsightVM Host URL", placeholder: "https://insightvm.company.com", help: "Your InsightVM console URL" },
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", secret: true },
+  ],
+  qualys: [
+    { key: "api_url", label: "Qualys API URL", placeholder: "https://qualysapi.qualys.com", help: "Your Qualys platform API URL (varies by pod)" },
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", secret: true },
+  ],
+  invicti: [
+    { key: "api_url", label: "Invicti API URL", placeholder: "https://www.invicti.com/api/1.0", help: "Cloud: https://www.invicti.com/api/1.0 · On-prem: https://your-server/api/1.0" },
+    { key: "api_token", label: "API Token", secret: true, placeholder: "invicti_token_...", help: "Invicti Settings → API Tokens" },
+    { key: "username", label: "Username (for Basic auth)", placeholder: "user@company.com" },
+  ],
+  acunetix: [
+    { key: "host", label: "Acunetix Host URL", placeholder: "https://acunetix.company.com", help: "Your Acunetix Enterprise server (port 3443 is used automatically)" },
+    { key: "api_key", label: "API Key", secret: true, placeholder: "1/xxxx...", help: "Acunetix → Profile → API Key" },
+  ],
 };
 
 // Top-of-dialog quick-setup guidance per connector type. Shown above the form.
@@ -202,6 +237,13 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   gitleaks: "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets (where TruffleHog can ping the issuer) are flagged critical.",
   ai_code_review: "LLM-powered code security review. Point at a Git repo or upload a zip archive. The AI triages files, chunks them by function, runs multi-pass vulnerability analysis (review → self-critique → cross-file taint tracing), and writes findings directly — no GitHub Actions required.",
+  tenable:        "Connects to Tenable.io's REST API to launch network/host vulnerability scans. Scans the target IPs/CIDRs you configure and ingests all found vulnerabilities with CVSS scores.",
+  burp_enterprise:"Connects to your Burp Suite Enterprise server to launch DAST scans against web applications. Uses Burp's industry-standard crawler and active attack engine.",
+  snyk:           "Connects to your Snyk organisation and ingests issues from all projects — open-source vulnerabilities, license issues, and Snyk Code findings.",
+  rapid7:         "Connects to your Rapid7 InsightVM console to launch a site scan and ingest discovered vulnerabilities with severity, CVSS scores, and remediation guidance.",
+  qualys:         "Connects to your Qualys VMDR subscription to launch authenticated scans against the specified IP/CIDR ranges and ingest QID-based vulnerabilities.",
+  invicti:        "Connects to Invicti's cloud or on-prem API to launch proof-based DAST scans. Low false-positive rate due to evidence-based vulnerability confirmation.",
+  acunetix:       "Connects to your Acunetix Enterprise instance to create a scan target and launch a full vulnerability scan. Ingests web application vulnerabilities, misconfigurations, and OWASP Top 10 issues.",
 };
 
 // Connector → category mapping (mirrors backend CONNECTOR_CATEGORY).
@@ -215,6 +257,8 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   nmap: "network", openvas: "network", trivy: "network",
   owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
   ai_code_review: "sast",
+  tenable: "enterprise", burp_enterprise: "enterprise", snyk: "enterprise",
+  rapid7: "enterprise", qualys: "enterprise", invicti: "enterprise", acunetix: "enterprise",
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -223,9 +267,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   sast: "SAST — Static AppSec",
   network: "Network & Infrastructure",
   dependency: "Dependency & Secret",
+  enterprise: "Enterprise Scanners",
 };
 
-const CATEGORY_ORDER = ["cloud", "dast", "sast", "network", "dependency"] as const;
+const CATEGORY_ORDER = ["cloud", "dast", "sast", "network", "dependency", "enterprise"] as const;
 
 const STATUS_PROPS: Record<string, any> = {
   active: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#00e676", label: "Active" },
