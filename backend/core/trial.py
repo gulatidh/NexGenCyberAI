@@ -25,7 +25,16 @@ TRIAL_ALLOWED_AGENT_GROUP = "operational"
 
 
 def is_admin(user: Dict[str, Any]) -> bool:
-    return "NexGenAdmin" in (user.get("roles") or [])
+    # Explicit app role always works
+    if "NexGenAdmin" in (user.get("roles") or []):
+        return True
+    # Same-tenant users are admins — matches any user who authenticated
+    # against the same Azure AD tenant as the backend (AZURE_TENANT_ID env var).
+    from core.config import get_settings
+    tenant_id = get_settings().AZURE_TENANT_ID
+    if tenant_id and user.get("tid") == tenant_id:
+        return True
+    return False
 
 
 def get_trial(db: Session, user: Dict[str, Any]) -> "TrialUser | None":  # type: ignore[name-defined]
