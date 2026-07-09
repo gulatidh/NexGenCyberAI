@@ -188,6 +188,12 @@ export default function LandingPage() {
       redirectStartPage: `${window.location.origin}/dashboard`,
     }).catch(() => {});
 
+  const startFreeTrial = () =>
+    instance.loginRedirect({
+      ...loginRequest,
+      redirectStartPage: `${window.location.origin}/trial/activate`,
+    }).catch(() => {});
+
   return (
     <Box sx={{ bgcolor: BG, minHeight: "100vh", color: "white", fontFamily: "Inter, sans-serif", overflowX: "hidden" }}>
 
@@ -298,12 +304,19 @@ export default function LandingPage() {
               </Typography>
 
               <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                <Button onClick={signIn} variant="contained" size="large" endIcon={<ArrowForward />} sx={{
+                <Button onClick={startFreeTrial} variant="contained" size="large" endIcon={<ArrowForward />} sx={{
                   background: CYAN, color: "#060810", fontWeight: 700, fontSize: 15,
                   textTransform: "none", px: 4, py: 1.5, borderRadius: 2,
                   "&:hover": { background: "#00B8E0", transform: "translateY(-1px)" }, transition: "all 0.2s",
                 }}>
-                  Sign In to Aegis
+                  Start Free Trial
+                </Button>
+                <Button onClick={signIn} variant="outlined" size="large" sx={{
+                  color: "rgba(255,255,255,0.65)", borderColor: BORDER, fontWeight: 500,
+                  textTransform: "none", px: 4, py: 1.5, borderRadius: 2,
+                  "&:hover": { borderColor: "rgba(255,255,255,0.4)", bgcolor: "rgba(255,255,255,0.04)" },
+                }}>
+                  Sign In
                 </Button>
                 <Button variant="outlined" size="large" href="#features" sx={{
                   color: "rgba(255,255,255,0.65)", borderColor: BORDER, fontWeight: 500,
@@ -670,19 +683,28 @@ export default function LandingPage() {
             </Box>
           </Typography>
           <Typography sx={{ color: "rgba(255,255,255,0.42)", mb: 5, fontSize: 17, lineHeight: 1.65 }}>
-            Sign in with your Microsoft account and start your first AI security scan in under two minutes.
+            Start a free 3-day trial with your Microsoft work account. No credit card required.
           </Typography>
-          <Button onClick={signIn} variant="contained" size="large" endIcon={<ArrowForward />} sx={{
-            background: CYAN, color: "#060810", fontWeight: 700, fontSize: 16,
-            textTransform: "none", px: 5, py: 1.75, borderRadius: 2,
-            boxShadow: "0 0 40px rgba(0,212,255,0.28)",
-            "&:hover": { background: "#00B8E0", transform: "translateY(-2px)", boxShadow: "0 0 60px rgba(0,212,255,0.4)" },
-            transition: "all 0.25s",
-          }}>
-            Sign In to Aegis
-          </Button>
+          <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+            <Button onClick={startFreeTrial} variant="contained" size="large" endIcon={<ArrowForward />} sx={{
+              background: CYAN, color: "#060810", fontWeight: 700, fontSize: 16,
+              textTransform: "none", px: 5, py: 1.75, borderRadius: 2,
+              boxShadow: "0 0 40px rgba(0,212,255,0.28)",
+              "&:hover": { background: "#00B8E0", transform: "translateY(-2px)", boxShadow: "0 0 60px rgba(0,212,255,0.4)" },
+              transition: "all 0.25s",
+            }}>
+              Start Free Trial
+            </Button>
+            <Button onClick={signIn} variant="outlined" size="large" sx={{
+              color: "rgba(255,255,255,0.65)", borderColor: BORDER, fontWeight: 500,
+              textTransform: "none", px: 5, py: 1.75, borderRadius: 2,
+              "&:hover": { borderColor: "rgba(255,255,255,0.4)", bgcolor: "rgba(255,255,255,0.04)" },
+            }}>
+              Sign In
+            </Button>
+          </Box>
           <Typography sx={{ mt: 2.5, fontSize: 12, color: "rgba(255,255,255,0.2)" }}>
-            Microsoft Entra ID authentication · No password required
+            Microsoft Entra ID (work accounts only) · No password required
           </Typography>
         </Container>
       </Box>

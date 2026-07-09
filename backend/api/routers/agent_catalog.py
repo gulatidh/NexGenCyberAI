@@ -246,9 +246,9 @@ async def run_agent(
         raise HTTPException(status_code=409, detail="Agent is disabled. Enable it before running.")
 
     # Trial: only operational group agents allowed
-    from core.trial import get_or_create_trial, check_agent_access, is_admin
+    from core.trial import get_trial, check_agent_access, is_admin
     if not is_admin(user):
-        _trial = get_or_create_trial(db, user)
+        _trial = get_trial(db, user)
         check_agent_access(_trial, a.group_key or "")
 
     if a.legacy_orchestrator:

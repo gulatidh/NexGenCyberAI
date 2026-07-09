@@ -507,4 +507,5 @@ export const customFrameworksApi = {
 
 export const usersApi = {
   me: () => apiClient.get("/users/me/").then((r) => r.data),
+  startTrial: () => apiClient.post("/users/trial/start/").then((r) => r.data),
 };

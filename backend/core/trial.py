@@ -1,6 +1,10 @@
 """Trial user management and limit enforcement.
 
-Trial accounts are created automatically on first login. Limits:
+Trial accounts are created ONLY when a user explicitly clicks "Start Free Trial"
+on the landing page (POST /users/trial/start). Users with no trial record get
+full access — this covers admins and any user who was invited directly.
+
+Limits for active trial users:
   - 1 client
   - 3 scans total
   - Operational AI agents only (group_key == "operational")
@@ -24,7 +28,15 @@ def is_admin(user: Dict[str, Any]) -> bool:
     return "NexGenAdmin" in (user.get("roles") or [])
 
 
-def get_or_create_trial(db: Session, user: Dict[str, Any]) -> "TrialUser":  # type: ignore[name-defined]
+def get_trial(db: Session, user: Dict[str, Any]) -> "TrialUser | None":  # type: ignore[name-defined]
+    """Return an existing trial record, or None if the user has never activated a trial."""
+    from api.models.models import TrialUser
+    user_id = user.get("sub") or user.get("oid") or ""
+    return db.query(TrialUser).filter(TrialUser.user_id == user_id).first()
+
+
+def create_trial(db: Session, user: Dict[str, Any]) -> "TrialUser":  # type: ignore[name-defined]
+    """Create a new trial for a user who clicked Start Free Trial. Idempotent — returns existing record if already created."""
     from api.models.models import TrialUser
     user_id = user.get("sub") or user.get("oid") or ""
     email = user.get("email") or user.get("preferred_username") or user.get("upn") or ""
@@ -64,8 +76,8 @@ def trial_status(trial: "TrialUser") -> Dict[str, Any]:  # type: ignore[name-def
     }
 
 
-def require_trial_active(trial: "TrialUser") -> None:  # type: ignore[name-defined]
-    if trial.is_upgraded:
+def require_trial_active(trial: "TrialUser | None") -> None:  # type: ignore[name-defined]
+    if trial is None or trial.is_upgraded:
         return
     now = datetime.now(timezone.utc)
     expires = trial.trial_expires_at
@@ -78,8 +90,8 @@ def require_trial_active(trial: "TrialUser") -> None:  # type: ignore[name-defin
         )
 
 
-def check_client_limit(db: Session, trial: "TrialUser") -> None:  # type: ignore[name-defined]
-    if trial.is_upgraded:
+def check_client_limit(db: Session, trial: "TrialUser | None") -> None:  # type: ignore[name-defined]
+    if trial is None or trial.is_upgraded:
         return
     require_trial_active(trial)
     from api.models.models import Client
@@ -91,8 +103,8 @@ def check_client_limit(db: Session, trial: "TrialUser") -> None:  # type: ignore
         )
 
 
-def check_scan_limit(db: Session, trial: "TrialUser", client_id: str) -> None:  # type: ignore[name-defined]
-    if trial.is_upgraded:
+def check_scan_limit(db: Session, trial: "TrialUser | None", client_id: str) -> None:  # type: ignore[name-defined]
+    if trial is None or trial.is_upgraded:
         return
     require_trial_active(trial)
     from api.models.models import Scan, ScanStatus
@@ -108,8 +120,8 @@ def check_scan_limit(db: Session, trial: "TrialUser", client_id: str) -> None:  
         )
 
 
-def check_agent_access(trial: "TrialUser", agent_group: str) -> None:  # type: ignore[name-defined]
-    if trial.is_upgraded:
+def check_agent_access(trial: "TrialUser | None", agent_group: str) -> None:  # type: ignore[name-defined]
+    if trial is None or trial.is_upgraded:
         return
     require_trial_active(trial)
     if agent_group != TRIAL_ALLOWED_AGENT_GROUP:
@@ -119,9 +131,9 @@ def check_agent_access(trial: "TrialUser", agent_group: str) -> None:  # type: i
         )
 
 
-def check_write_access(trial: "TrialUser", resource: str = "configuration") -> None:  # type: ignore[name-defined]
+def check_write_access(trial: "TrialUser | None", resource: str = "configuration") -> None:  # type: ignore[name-defined]
     """Block write operations on sensitive config for trial users."""
-    if trial.is_upgraded:
+    if trial is None or trial.is_upgraded:
         return
     require_trial_active(trial)
     raise HTTPException(
