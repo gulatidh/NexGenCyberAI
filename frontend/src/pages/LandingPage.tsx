@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   Box, Container, Typography, Button, Grid, Chip,
   Accordion, AccordionSummary, AccordionDetails,
-  Avatar, ToggleButtonGroup, ToggleButton,
+  Avatar,
 } from "@mui/material";
 import {
   Code, Assessment, AccountTree, TrendingUp, VerifiedUser, SmartToy,
@@ -130,63 +130,6 @@ const TESTIMONIALS = [
   },
 ];
 
-const PRICING = [
-  {
-    tier: "Starter",
-    monthly: 0,
-    yearly: 0,
-    desc: "Explore AI security scanning for a single project.",
-    features: [
-      "1 client workspace",
-      "5 scans per month",
-      "AI Code Review (repos ≤ 50k lines)",
-      "3 AI security agents",
-      "Threat & Remediation registers",
-      "NIST CSF compliance mapping",
-    ],
-    cta: "Get started free",
-    highlight: false,
-  },
-  {
-    tier: "Professional",
-    monthly: 199,
-    yearly: 159,
-    desc: "Full platform for growing security teams.",
-    features: [
-      "15 client workspaces",
-      "Unlimited scans",
-      "All 9 scanner integrations",
-      "All 60+ AI security agents",
-      "All 3 security registers",
-      "VAPT Reports (PDF & DOCX export)",
-      "Custom compliance frameworks",
-      "Risk portfolio & FAIR model",
-      "Ticket sync (Jira / ServiceNow)",
-      "Multi-provider AI failover",
-    ],
-    cta: "Start free trial",
-    highlight: true,
-  },
-  {
-    tier: "Enterprise",
-    monthly: null,
-    yearly: null,
-    desc: "Unlimited scale with white-glove support.",
-    features: [
-      "Unlimited client workspaces",
-      "Private LLM deployment option",
-      "SSO / Entra ID integration",
-      "Custom scanner connectors",
-      "SIEM & SOAR integrations",
-      "Dedicated security engineer",
-      "SLA-backed support (99.9%)",
-      "On-premises deployment option",
-    ],
-    cta: "Contact sales",
-    highlight: false,
-  },
-];
-
 const FAQS = [
   {
     q: "What scanners does Aegis integrate with?",
@@ -218,10 +161,10 @@ const FAQS = [
   },
 ];
 
-const NAV_LINKS = ["Features", "Process", "Integrations", "Pricing", "FAQ"];
+const NAV_LINKS = ["Features", "Process", "Integrations", "FAQ"];
 
 const FOOTER_LINKS: Record<string, string[]> = {
-  Product: ["Features", "Integrations", "Pricing", "Changelog"],
+  Product: ["Features", "Integrations", "Changelog"],
   Security: ["AI Code Review", "VAPT Reports", "Threat Modeling", "Compliance"],
   Company: ["About", "Blog", "Contact", "Careers"],
   Legal: ["Privacy Policy", "Terms of Service", "Security", "Cookie Policy"],
@@ -231,7 +174,6 @@ export default function LandingPage() {
   const { instance } = useMsal();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [billing, setBilling] = useState<"monthly" | "yearly">("monthly");
   const [faqOpen, setFaqOpen] = useState<string | false>(false);
 
   useEffect(() => {
@@ -673,118 +615,6 @@ export default function LandingPage() {
                 </Box>
               </Grid>
             ))}
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* ── Pricing ────────────────────────────────────────────────────────── */}
-      <Box id="pricing" sx={{ py: { xs: 10, md: 16 } }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", mb: 8 }}>
-            <Chip label="Pricing" size="small" sx={{ mb: 2.5, background: `rgba(0,212,255,0.08)`, border: `1px solid rgba(0,212,255,0.22)`, color: CYAN, fontWeight: 600, fontSize: 12 }} />
-            <Typography sx={{ fontSize: { xs: 28, md: 40 }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2 }}>
-              Simple, transparent pricing
-            </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.4)", fontSize: 16, mb: 4 }}>
-              Start free. Scale as your team grows.
-            </Typography>
-
-            <ToggleButtonGroup
-              value={billing}
-              exclusive
-              onChange={(_, v) => v && setBilling(v)}
-              sx={{
-                "& .MuiToggleButton-root": {
-                  color: "rgba(255,255,255,0.4)", borderColor: BORDER, px: 3, py: 0.75,
-                  fontSize: 14, textTransform: "none",
-                  "&.Mui-selected": { color: "white", background: "rgba(0,212,255,0.12)", borderColor: "rgba(0,212,255,0.3)" },
-                },
-              }}
-            >
-              <ToggleButton value="monthly">Monthly</ToggleButton>
-              <ToggleButton value="yearly">
-                Yearly&nbsp;
-                <Chip label="Save 20%" size="small" sx={{ background: "rgba(16,185,129,0.2)", color: GREEN, fontSize: 10, fontWeight: 700, height: 18, "& .MuiChip-label": { px: 0.75 } }} />
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Box>
-
-          <Grid container spacing={3} sx={{ alignItems: "stretch" }}>
-            {PRICING.map(({ tier, monthly, yearly, desc, features, cta, highlight }) => {
-              const price = billing === "yearly" ? yearly : monthly;
-              return (
-                <Grid key={tier} size={{ xs: 12, md: 4 }}>
-                  <Box sx={{
-                    p: 4, borderRadius: 3, height: "100%", display: "flex", flexDirection: "column",
-                    background: highlight
-                      ? `linear-gradient(135deg, rgba(0,212,255,0.08), rgba(124,58,237,0.08))`
-                      : CARD_BG,
-                    border: highlight ? `1px solid rgba(0,212,255,0.3)` : `1px solid ${BORDER}`,
-                    position: "relative", overflow: "hidden",
-                    boxShadow: highlight ? "0 0 60px rgba(0,212,255,0.1)" : "none",
-                  }}>
-                    {highlight && (
-                      <Chip label="Most popular" size="small" sx={{
-                        position: "absolute", top: 16, right: 16,
-                        background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`,
-                        color: "#060810", fontSize: 11, fontWeight: 700,
-                      }} />
-                    )}
-
-                    <Typography sx={{ fontWeight: 700, fontSize: 20, mb: 0.75 }}>{tier}</Typography>
-                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.4)", mb: 3 }}>{desc}</Typography>
-
-                    <Box sx={{ mb: 3 }}>
-                      {price === null ? (
-                        <Typography sx={{ fontSize: 34, fontWeight: 800 }}>Custom</Typography>
-                      ) : price === 0 ? (
-                        <Typography sx={{ fontSize: 40, fontWeight: 800, background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                          Free
-                        </Typography>
-                      ) : (
-                        <Box sx={{ display: "flex", alignItems: "flex-end", gap: 0.5 }}>
-                          <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.45)", mb: 0.75 }}>$</Typography>
-                          <Typography sx={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>{price}</Typography>
-                          <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.38)", mb: 0.75 }}>/mo</Typography>
-                        </Box>
-                      )}
-                      {billing === "yearly" && price !== null && price > 0 && monthly !== null && (
-                        <Typography sx={{ fontSize: 12, color: GREEN, mt: 0.5 }}>
-                          Billed annually · Save ${(monthly - (price as number)) * 12}/yr
-                        </Typography>
-                      )}
-                    </Box>
-
-                    <Button
-                      onClick={tier !== "Enterprise" ? signIn : undefined}
-                      variant={highlight ? "contained" : "outlined"}
-                      fullWidth
-                      sx={{
-                        mb: 3.5, textTransform: "none", fontWeight: 700, fontSize: 14, py: 1.25, borderRadius: 2,
-                        ...(highlight ? {
-                          background: CYAN, color: "#060810",
-                          "&:hover": { background: "#00B8E0" },
-                        } : {
-                          borderColor: BORDER, color: "rgba(255,255,255,0.65)",
-                          "&:hover": { borderColor: "rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.03)" },
-                        }),
-                      }}
-                    >
-                      {cta}
-                    </Button>
-
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, flex: 1 }}>
-                      {features.map((f) => (
-                        <Box key={f} sx={{ display: "flex", alignItems: "flex-start", gap: 1.25 }}>
-                          <CheckCircle sx={{ fontSize: 15, color: highlight ? CYAN : GREEN, flexShrink: 0, mt: 0.15 }} />
-                          <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.54)", lineHeight: 1.5 }}>{f}</Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                </Grid>
-              );
-            })}
           </Grid>
         </Container>
       </Box>

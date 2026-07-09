@@ -504,3 +504,7 @@ export const customFrameworksApi = {
   pickerControls: (params: { framework?: string; domain?: string; search?: string; page?: number }) =>
     apiClient.get("/frameworks/controls/", { params }).then((r) => r.data),
 };
+
+export const usersApi = {
+  me: () => apiClient.get("/users/me/").then((r) => r.data),
+};

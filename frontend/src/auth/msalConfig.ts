@@ -8,7 +8,9 @@ import { Configuration, BrowserCacheLocation, LogLevel } from "@azure/msal-brows
 export const msalConfig: Configuration = {
   auth: {
     clientId: process.env.REACT_APP_AZURE_CLIENT_ID || "",
-    authority: `https://login.microsoftonline.com/${process.env.REACT_APP_AZURE_TENANT_ID || "common"}`,
+    // "organizations" restricts login to work/school accounts — personal
+    // outlook.com / hotmail.com accounts are blocked at the Microsoft login page.
+    authority: `https://login.microsoftonline.com/${process.env.REACT_APP_AZURE_TENANT_ID || "organizations"}`,
     redirectUri: process.env.REACT_APP_REDIRECT_URI || window.location.origin,
     postLogoutRedirectUri: window.location.origin,
   },

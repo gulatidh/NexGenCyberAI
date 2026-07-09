@@ -17,7 +17,11 @@ async def list_clients(db: Session = Depends(get_db), _=Depends(get_current_user
 
 
 @router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
-async def create_client(payload: ClientCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def create_client(payload: ClientCreate, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    from core.trial import get_or_create_trial, check_client_limit, is_admin
+    if not is_admin(user):
+        trial = get_or_create_trial(db, user)
+        check_client_limit(db, trial)
     if db.query(Client).filter(Client.slug == payload.slug).first():
         raise HTTPException(status_code=400, detail="Slug already exists")
     client = Client(**payload.model_dump())

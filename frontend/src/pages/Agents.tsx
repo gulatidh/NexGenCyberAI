@@ -8,13 +8,14 @@ import {
   Switch, IconButton, Tooltip, Drawer, Divider,
 } from "@mui/material";
 import {
-  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
+  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, LockClock,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
 import { Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 import RichOutput from "../components/RichOutput";
+import { useTrialStatus } from "../hooks/useTrialStatus";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,9 +65,9 @@ const GROUP_COLOR: Record<string, string> = {
 
 // ── Configuration dialog ─────────────────────────────────────────────────────
 
-function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
+function ConfigureDialog({ open, agent, onClose, onSave, isAdmin, hideSensitive }: {
   open: boolean; agent: Agent | null; onClose: () => void;
-  onSave: (patch: any) => void; isAdmin: boolean;
+  onSave: (patch: any) => void; isAdmin: boolean; hideSensitive?: boolean;
 }) {
   const [form, setForm] = useState<Partial<Agent>>({});
   React.useEffect(() => { setForm(agent || {}); }, [agent]);
@@ -110,12 +111,21 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin }: {
               slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
               sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
           </Grid>
-          <Grid size={{ xs: 12 }}>
-            <TextField fullWidth size="small" label="System Prompt" multiline minRows={6} disabled={readOnly}
-              value={form.system_prompt || ""} onChange={(e) => set("system_prompt", e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
-          </Grid>
+          {!hideSensitive && (
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="System Prompt" multiline minRows={6} disabled={readOnly}
+                value={form.system_prompt || ""} onChange={(e) => set("system_prompt", e.target.value)}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+          )}
+          {hideSensitive && (
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="warning" sx={{ fontSize: 13 }}>
+                AI instructions are not visible on the trial plan. Upgrade for full access.
+              </Alert>
+            </Grid>
+          )}
           <Grid size={{ xs: 6, sm: 3 }}>
             <TextField fullWidth size="small" label="Provider" disabled={readOnly}
               placeholder="inherit"
@@ -274,8 +284,14 @@ export default function Agents() {
     queryKey: ["agent-catalog"], queryFn: agentCatalogApi.list,
   });
 
-  const groups = useMemo(() => catalogData?.groups || [], [catalogData]);
-  const groupOptions = useMemo(() => groups.map((g) => ({ key: g.key, label: g.label })), [groups]);
+  const { isTrial, trialActive, daysLeft, allowedAgentGroup } = useTrialStatus();
+  const allGroups = useMemo(() => catalogData?.groups || [], [catalogData]);
+  // Trial users see only the "operational" group
+  const groups = useMemo(
+    () => (isTrial && trialActive ? allGroups.filter((g) => g.key === (allowedAgentGroup || "operational")) : allGroups),
+    [allGroups, isTrial, trialActive, allowedAgentGroup],
+  );
+  const groupOptions = useMemo(() => allGroups.map((g) => ({ key: g.key, label: g.label })), [allGroups]);
 
   const runMutation = useMutation({
     mutationFn: (agentType: AgentType) =>
@@ -360,6 +376,13 @@ export default function Agents() {
           )}
         </Box>
       </Box>
+
+      {isTrial && trialActive && (
+        <Alert severity="info" icon={<LockClock />} sx={{ mb: 2 }}>
+          <strong>Trial plan ({daysLeft} day{daysLeft !== 1 ? "s" : ""} left)</strong> — Operational agents only.
+          Upgrade for access to all {allGroups.reduce((s, g) => s + g.agents.length, 0)} specialist agents across {allGroups.length} groups.
+        </Alert>
+      )}
 
       {isLoading ? (
         <CircularProgress sx={{ color: "#4285F4" }} />
@@ -479,6 +502,7 @@ export default function Agents() {
         onClose={() => setConfiguring(null)}
         onSave={(patch) => updateMutation.mutate({ id: configuring!.id, patch })}
         isAdmin={isAdmin}
+        hideSensitive={isTrial && trialActive}
       />
       <NewAgentDialog
         open={newOpen}
