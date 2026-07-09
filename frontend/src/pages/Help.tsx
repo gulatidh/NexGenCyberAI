@@ -39,7 +39,7 @@ const GROUPS: Group[] = [
       {
         id: "sign-in",
         title: "Sign in to Aegis AI",
-        summary: "Aegis AI uses Microsoft Entra ID (Azure AD) for authentication — your work Microsoft account is your only credential. No separate passwords are created or stored anywhere on the platform.",
+        summary: "Aegis AI uses Microsoft Entra ID (Azure AD) for authentication — your work Microsoft account is your only credential. No separate passwords are created or stored anywhere on the platform. Only Microsoft work or school accounts are accepted — personal Outlook.com, Hotmail.com, and Live.com accounts are blocked.",
         steps: [
           { text: "Open the platform URL. The landing page is public. Click 'Sign in' or navigate to any protected route — you'll be redirected to Microsoft Entra ID automatically." },
           { text: "Authenticate with your work Microsoft account. Complete MFA if your organisation requires it." },
@@ -53,6 +53,26 @@ const GROUPS: Group[] = [
         ],
         warnings: [
           "If sign-in loops without landing on the dashboard: your browser may be blocking third-party cookies. MSAL uses them for silent token refresh. Safari ITP and Firefox strict mode can trigger this — use a different browser or relax the cookie setting.",
+        ],
+      },
+      {
+        id: "free-trial",
+        title: "Free trial — what you get and how it works",
+        summary: "New users can start a 3-day free trial directly from the landing page. The trial gives full access to Operational AI Buddies, one client, and three scans — enough to run a complete security assessment and see Aegis in action.",
+        steps: [
+          { text: "How to start a trial: visit the Aegis landing page → click 'Start Free Trial' → authenticate with your Microsoft work account (personal Outlook/Hotmail accounts are not accepted). The trial activates automatically after sign-in and your 3-day clock starts immediately." },
+          { text: "What trial users can do: create 1 client, run up to 3 scans (across all scanner types including enterprise), and run any Operational AI agent (Risk Manager, VA Scanner, Framework Analyst, Compliance Monitor, Threat Intel, Remediation, Orchestrator)." },
+          { text: "What trial users cannot do: add more than 1 client, run more than 3 scans, access advisory or specialist AI agent groups (Strategy, Cloud, Identity, Detection, Response), modify AI provider settings, or add/edit/delete connectors.", detail: "These restrictions are enforced both in the UI (buttons disabled, agents hidden) and server-side (402 Payment Required responses). UI-only bypasses don't work." },
+          { text: "Trial banner: a persistent info bar at the top of every page shows remaining days and the trial limits. When the trial expires, the banner turns red and new scans and agent runs are blocked — existing data (findings, risks, reports) remains accessible." },
+          { text: "To upgrade: contact the team at sales@nexgencyberai.com. An admin will mark your account as upgraded, which immediately removes all trial restrictions with no data loss." },
+        ],
+        tips: [
+          "Recommended trial workflow: (1) Add your client, (2) Add a connector for your most important scanner, (3) Run one scan, (4) Run the Orchestrator agent — it populates all 4 registers in one click. You'll see Risk Overview, Threat Register, Control Deficiencies, and Remediation Tracker all populated from a single assessment.",
+          "The trial activates only when you click 'Start Free Trial' on the landing page — logging in via 'Sign In' as an existing user does not activate a trial.",
+        ],
+        warnings: [
+          "Trial requires a Microsoft work or school account (Entra ID). Personal Microsoft accounts (Outlook.com, Hotmail.com, Live.com) are blocked at the login screen — this is enforced by MSAL authority configuration, not just a UI check.",
+          "The 3-day timer starts the moment you complete the 'Start Free Trial' login flow — there is no grace period. Start your trial when you have time to explore the platform.",
         ],
       },
       {
@@ -167,6 +187,28 @@ const GROUPS: Group[] = [
         ],
         warnings: [
           "Treat uploaded binaries as sensitive — App Service /home/ disk is in your Azure tenant but not encrypted at rest by default. For regulated environments, consider moving uploads to Azure Blob with a customer-managed key.",
+        ],
+      },
+      {
+        id: "enterprise-scanners",
+        title: "Add an enterprise scanner (Tenable, Burp Suite, Snyk, Rapid7, Qualys, Invicti, Acunetix)",
+        summary: "Enterprise scanners connect to your existing commercial security tools via their REST APIs. Unlike workflow scanners (which run GitHub Actions jobs), enterprise scanners run as direct API integrations — Aegis calls the tool's API, waits for results, and ingests findings automatically.",
+        steps: [
+          { text: "How enterprise scanners work: Aegis authenticates to the scanner's cloud or on-prem API, creates a scan job, polls for completion (up to 2 hours), fetches results, normalises severity, and persists findings to the database — identical to any other scan from the platform's perspective." },
+          { text: "Supported enterprise tools:", detail: "Tenable.io — full vulnerability management via pytenable SDK. Burp Suite Enterprise — enterprise DAST via REST API. Snyk — SCA/SAST across all org projects. Rapid7 InsightVM — network vulnerability management via site scans. Qualys VMDR — cloud-based VM platform via XML API. Invicti (Netsparker) — proof-based DAST with low false-positive rate. Acunetix Enterprise — web application scanner." },
+          { text: "Go to Connections → Scanners section → 'Add Scanner'. Pick your enterprise tool from the Enterprise Scanners category." },
+          { text: "Fill in the credentials. Each tool requires different fields:", detail: "Tenable.io: access_key + secret_key. Burp Suite Enterprise: host URL + api_key. Snyk: api_token + org_id. Rapid7 InsightVM: host URL + username + password + site_id. Qualys VMDR: api_url + username + password + scan_title + ip_to_scan. Invicti: base_url + api_token. Acunetix: base_url + api_key + target_url." },
+          { text: "Save the connector. Then go to Assessments → New Scan → Enterprise Scanners tab. Pick the tool and the connector you just saved. Click Start Scan." },
+          { text: "The scan runs asynchronously. Status shows PENDING → RUNNING while the external scanner executes, then COMPLETED when findings are ingested. Large vulnerability scans can take 30–120 minutes depending on target scope." },
+        ],
+        tips: [
+          "Enterprise scanners bypass the GitHub Actions workflow — they run as FastAPI BackgroundTasks. No GitHub repository or AEGIS_API_URL secret is needed for these.",
+          "Tenable.io and Qualys VMDR are best for broad network/VM vulnerability coverage. Burp Suite Enterprise and Invicti are best for web application DAST. Snyk is best for developer-centric SCA and SAST across a whole org's repos.",
+          "If a scan stays in RUNNING for more than 2 hours and never completes: the enterprise scanner's API may have timed out or returned an unexpected response. Check the backend App Service logs for the scan_id to see the error detail.",
+        ],
+        warnings: [
+          "Enterprise scanners launch real scans in your external tool — a Tenable.io scan will run against your configured targets and consume your scan credits/quota in that tool. Only configure connectors for targets you have explicit authorisation to scan.",
+          "Credentials are encrypted at rest using the platform's Fernet key. Rotate your API keys in the external tool and re-save the connector if the key is compromised.",
         ],
       },
     ],
