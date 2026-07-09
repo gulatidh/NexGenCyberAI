@@ -31,7 +31,7 @@ const SEV_COLOR: Record<string, string> = {
 // must match a backend ConnectorType value. `status` controls whether the row
 // is selectable (Live) or shown as a teaser (Soon).
 type ScannerStatus = "live" | "soon";
-type ScanCategory = "cloud" | "dast" | "sast" | "network" | "dependency";
+type ScanCategory = "cloud" | "dast" | "sast" | "network" | "dependency" | "enterprise";
 type ScannerDef = {
   id: string;             // unique key
   name: string;           // display label
@@ -47,6 +47,7 @@ const CATEGORY_LABEL: Record<ScanCategory, string> = {
   sast: "SAST — Static AppSec",
   network: "Network & Infrastructure",
   dependency: "Dependency & Secret",
+  enterprise: "Enterprise Scanners",
 };
 
 const CATEGORY_COLOR: Record<ScanCategory, string> = {
@@ -55,6 +56,7 @@ const CATEGORY_COLOR: Record<ScanCategory, string> = {
   sast: "#4285F4",        // Google Blue — static
   network: "#34A853",     // Google Green — infra
   dependency: "#EA4335",  // Google Red — secrets / deps
+  enterprise: "#9C27B0",  // Purple — enterprise tools
 };
 
 const SCANNERS: ScannerDef[] = [
@@ -85,23 +87,23 @@ const SCANNERS: ScannerDef[] = [
   { id: "trufflehog", name: "TruffleHog", connectorType: "trufflehog", category: "dependency", status: "live",
     description: "Secret scanner (git + filesystem) with verification. Runs in GitHub Actions." },
   // Enterprise Professional Scanners
-  { id: "tenable", name: "Tenable.io", connectorType: "tenable", category: "enterprise" as any, status: "live",
+  { id: "tenable", name: "Tenable.io", connectorType: "tenable", category: "enterprise", status: "live",
     description: "Industry-leading vulnerability management platform. Scans hosts, cloud assets, and containers via Tenable's REST API. Requires access_key + secret_key." },
-  { id: "burp_enterprise", name: "Burp Suite Enterprise", connectorType: "burp_enterprise", category: "enterprise" as any, status: "live",
+  { id: "burp_enterprise", name: "Burp Suite Enterprise", connectorType: "burp_enterprise", category: "enterprise", status: "live",
     description: "PortSwigger's enterprise-grade DAST platform. Automated web app scanning with Burp's industry-standard crawler and attack engine. Requires host URL + API key." },
-  { id: "snyk", name: "Snyk", connectorType: "snyk", category: "enterprise" as any, status: "live",
+  { id: "snyk", name: "Snyk", connectorType: "snyk", category: "enterprise", status: "live",
     description: "SCA + code security platform. Scans all projects in your Snyk organisation for vulnerable dependencies, license issues, and code vulnerabilities. Requires API key + org_id." },
-  { id: "rapid7", name: "Rapid7 InsightVM", connectorType: "rapid7", category: "enterprise" as any, status: "live",
+  { id: "rapid7", name: "Rapid7 InsightVM", connectorType: "rapid7", category: "enterprise", status: "live",
     description: "Rapid7's enterprise vulnerability management. Launches site scans, polls for results, and ingests prioritised vulnerabilities with remediation guidance. Requires host + credentials + site_id." },
-  { id: "qualys", name: "Qualys VMDR", connectorType: "qualys", category: "enterprise" as any, status: "live",
+  { id: "qualys", name: "Qualys VMDR", connectorType: "qualys", category: "enterprise", status: "live",
     description: "Qualys Vulnerability Management Detection and Response. Cloud-based scanning of IPs and CIDR ranges. Requires Qualys API URL + credentials." },
-  { id: "invicti", name: "Invicti (Netsparker)", connectorType: "invicti", category: "enterprise" as any, status: "live",
+  { id: "invicti", name: "Invicti (Netsparker)", connectorType: "invicti", category: "enterprise", status: "live",
     description: "Enterprise DAST with proof-based scanning and low false-positive rates. Scans web applications and APIs. Requires API URL + API token." },
-  { id: "acunetix", name: "Acunetix Enterprise", connectorType: "acunetix", category: "enterprise" as any, status: "live",
+  { id: "acunetix", name: "Acunetix Enterprise", connectorType: "acunetix", category: "enterprise", status: "live",
     description: "Acunetix enterprise web vulnerability scanner. Creates targets, launches full scans, and ingests vulnerabilities via REST API. Requires host URL + API key." },
 ];
 
-const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency", "enterprise" as any];
+const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency", "enterprise"];
 
 export default function Scans() {
   const { canAct } = useViewMode();
