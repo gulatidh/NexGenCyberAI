@@ -227,8 +227,35 @@ async def get_my_access(
 ):
     """Caller's own grants — used by the SPA to gate the Admin nav item and
     decide whether write actions are visible. Always succeeds for an
-    authenticated user, even if they have no grants."""
+    authenticated user, even if they have no grants.
+
+    Same-tenant users (tid matches AZURE_TENANT_ID) are auto-bootstrapped as
+    global admin on first call so they can manage grants without a manual
+    bootstrap step."""
+    from core.trial import is_admin as _is_tenant_admin
     email = _user_email(user)
+
+    # Auto-bootstrap: same-tenant admin with no DB grant yet → create one now
+    if _is_tenant_admin(user):
+        existing = db.query(UserAccess).filter(
+            UserAccess.email == email,
+            UserAccess.scope_type == AccessScope.GLOBAL,
+            UserAccess.role == AccessRole.ADMIN,
+        ).first()
+        if not existing:
+            try:
+                db.add(UserAccess(
+                    email=email,
+                    role=AccessRole.ADMIN,
+                    scope_type=AccessScope.GLOBAL,
+                    scope_id=None,
+                    granted_by="auto-tenant-admin",
+                    granted_at=datetime.now(timezone.utc),
+                ))
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+
     grants = get_user_grants(db, email)
     eff_global = effective_role(grants, AccessScope.GLOBAL, db=db)
     is_admin = eff_global == AccessRole.ADMIN
