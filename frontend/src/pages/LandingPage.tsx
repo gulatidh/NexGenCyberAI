@@ -6,7 +6,7 @@ import {
 import {
   Code, Assessment, AccountTree, TrendingUp, VerifiedUser, SmartToy,
   ArrowForward, Shield, Hub, Lock, CheckCircle, Radar,
-  Menu as MenuIcon, Close as CloseIcon, ExpandMore, Star,
+  Menu as MenuIcon, Close as CloseIcon, ExpandMore,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
