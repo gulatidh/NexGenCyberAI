@@ -1,5 +1,5 @@
 """AI Agent execution endpoints."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -14,7 +14,6 @@ from core.security import get_current_user
 from core.authz import require_editor_anywhere
 
 router = APIRouter(prefix="/clients/{client_id}/agents", tags=["agents"])
-_orchestrator = None
 
 
 def _persist_threat_intel(db, client_id: str, run_id: str, scan_id, threat_result: dict) -> int:
@@ -171,18 +170,67 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
         result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result)
 
 
-def _get_orchestrator():
-    global _orchestrator
-    if _orchestrator is None:
+async def _run_agent_task(
+    run_id: str,
+    client_id: str,
+    agent_type_val: str,
+    findings: list,
+    client_name: str,
+    framework_slug: str,
+    custom_context,
+    raw_context_str,
+):
+    """Background task: runs the agent in a fresh DB session so the HTTP thread is not blocked."""
+    from db.database import SessionLocal
+    db = SessionLocal()
+    try:
+        run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+        if run is None:
+            return
+        run.status = "running"
+        db.commit()
+
         from agents.orchestrator.orchestrator import AgentOrchestrator
-        _orchestrator = AgentOrchestrator()
-    return _orchestrator
+        orchestrator = AgentOrchestrator()
+
+        if custom_context:
+            orchestrator.framework.extra_context = custom_context
+            orchestrator.compliance.extra_context = custom_context
+
+        orchestrator.set_resource_inventory(raw_context_str)
+
+        result = await orchestrator.run_single_agent(
+            agent_type_val,
+            findings,
+            client_name,
+            framework=framework_slug,
+        )
+
+        run.status = "completed"
+        run.output_data = result
+        run.completed_at = datetime.now(timezone.utc)
+        _persist_to_registers(db, agent_type_val, client_id, run_id, run.scan_id, result, findings)
+        db.commit()
+
+    except Exception as exc:
+        try:
+            run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+            if run:
+                run.status = "failed"
+                run.error_message = str(exc)
+                run.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 
 @router.post("/run/", response_model=AgentRunResponse, dependencies=[Depends(require_editor_anywhere)])
 async def run_agent(
     client_id: str,
     payload: AgentRunRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -190,6 +238,7 @@ async def run_agent(
     # nothing — running an agent on an empty/incomplete scan wastes LLM
     # budget and produces useless output. Tell the user to re-scan first.
     findings = []
+    scan = None
     if payload.scan_id:
         from api.models.models import Scan as _Scan, ScanStatus as _ScanStatus
         scan = db.query(_Scan).filter(_Scan.id == payload.scan_id).first()
@@ -256,60 +305,36 @@ async def run_agent(
         # Use the human name as the framework label for the agent
         framework_slug = cf.name
 
+    # Load raw resource inventory from the scan if available
+    raw_context_str: Optional[str] = None
+    if scan is not None:
+        raw_ctx = getattr(scan, "raw_context", None)
+        if raw_ctx:
+            raw_context_str = raw_ctx
+
     agent_run_db = AgentRun(
         client_id=client_id,
         agent_type=payload.agent_type,
         scan_id=payload.scan_id,
-        status="running",
+        status="queued",
         input_data=input_data,
     )
     db.add(agent_run_db)
     db.commit()
     db.refresh(agent_run_db)
 
-    # Load raw resource inventory from the scan if available
-    raw_context_str: Optional[str] = None
-    if payload.scan_id:
-        raw_ctx = getattr(scan, "raw_context", None)
-        if raw_ctx:
-            raw_context_str = raw_ctx
+    background_tasks.add_task(
+        _run_agent_task,
+        run_id=agent_run_db.id,
+        client_id=client_id,
+        agent_type_val=payload.agent_type.value,
+        findings=findings,
+        client_name=client_name,
+        framework_slug=framework_slug,
+        custom_context=custom_context,
+        raw_context_str=raw_context_str,
+    )
 
-    try:
-        orchestrator = _get_orchestrator()
-        # Inject custom framework controls into agent context if applicable
-        if custom_context:
-            orchestrator.framework.extra_context = custom_context
-            orchestrator.compliance.extra_context = custom_context
-        else:
-            orchestrator.framework.extra_context = None
-            orchestrator.compliance.extra_context = None
-
-        # Inject resource inventory into all agents
-        orchestrator.set_resource_inventory(raw_context_str)
-
-        result = await orchestrator.run_single_agent(
-            payload.agent_type.value,
-            findings,
-            client_name,
-            framework=framework_slug,
-        )
-        agent_run_db.output_data = result
-        agent_run_db.status = "completed"
-
-        # Route each agent's structured output to the appropriate register
-        agent_val = payload.agent_type.value
-        _persist_to_registers(
-            db, agent_val, client_id, agent_run_db.id, payload.scan_id, result, findings
-        )
-
-    except Exception as exc:
-        agent_run_db.status = "failed"
-        agent_run_db.error_message = str(exc)
-        result = {"error": str(exc)}
-
-    agent_run_db.completed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(agent_run_db)
     return agent_run_db
 
 

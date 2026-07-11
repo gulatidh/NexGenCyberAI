@@ -6,7 +6,7 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, Alert,
   ToggleButton, ToggleButtonGroup, FormControlLabel, Checkbox, Grid,
-  Drawer, Divider,
+  Drawer, Divider, Collapse,
 } from "@mui/material";
 import { Add, PlayArrow, Edit, Delete, Schedule, History, Print, Article, Close as CloseIcon } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -83,6 +83,7 @@ export default function Missions() {
 
   const [historyMission, setHistoryMission] = useState<Mission | null>(null);
   const [reportRun, setReportRun] = useState<any | null>(null);
+  const [expandedErrorId, setExpandedErrorId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState("New Scheduled Mission");
@@ -424,7 +425,25 @@ export default function Missions() {
                         {run.output}
                       </Typography>
                     )}
-                    {run.error && (
+                    {run.status === "failed" && (
+                      <Box sx={{ mt: 0.5 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", cursor: "pointer", "&:hover": { color: "#EA4335" }, fontSize: 11 }}
+                          onClick={() => setExpandedErrorId(expandedErrorId === run.id ? null : run.id)}
+                        >
+                          {expandedErrorId === run.id ? "Hide error ▲" : "Show error ▼"}
+                        </Typography>
+                        <Collapse in={expandedErrorId === run.id} timeout="auto" unmountOnExit>
+                          <Box sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: "error.main", whiteSpace: "pre-wrap", fontSize: 11 }}>
+                              {run.output || run.error_message || run.error || "No details"}
+                            </Typography>
+                          </Box>
+                        </Collapse>
+                      </Box>
+                    )}
+                    {run.error && run.status !== "failed" && (
                       <Alert severity="error" sx={{ mt: 1, fontSize: 11 }}>{run.error}</Alert>
                     )}
                     {run.report && (

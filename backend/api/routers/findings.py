@@ -1,13 +1,17 @@
 """Global findings endpoints (across all scans for a client)."""
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
+import csv
+import io
 from api.models.models import Finding, Scan, FrameworkType
 from api.schemas.schemas import FindingResponse, FindingUpdate
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere
 from services.compliance import recompute_client_framework
 from services.finding_classifier import classify, SECTIONS, CATEGORY_TO_SECTION
 
@@ -23,6 +27,8 @@ async def list_findings(
     scan_id: Optional[str] = None,
     section: Optional[str] = None,
     category: Optional[str] = None,
+    limit: int = 300,
+    offset: int = 0,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -39,7 +45,7 @@ async def list_findings(
         q = q.filter(Scan.project_id == project_id)
     if scan_id:
         q = q.filter(Finding.scan_id == scan_id)
-    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(2000).all()
+    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).offset(offset).limit(min(limit, 5000)).all()
 
     # Section/category filters happen in Python (heuristic-driven)
     if section or category:
@@ -55,7 +61,7 @@ async def list_findings(
             f.seen_count = 1
             f.first_seen_at = f.created_at
         rows.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)
-        return rows[:300]
+        return rows[:min(limit, 5000)]
 
     # Dedupe by (resource_id, title) — pick the latest detection as the
     # representative, set first_seen_at to the earliest, and seen_count to
@@ -83,7 +89,7 @@ async def list_findings(
         deduped.append(latest)
 
     deduped.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)
-    return deduped[:300]
+    return deduped[:min(limit, 5000)]
 
 
 @router.get("/categories")
@@ -128,7 +134,51 @@ async def get_finding_categories(
     return {"sections": sections_out, "grand_total": sum(s["total"] for s in sections_out)}
 
 
-@router.patch("/{finding_id}", response_model=FindingResponse)
+@router.get("/export/")
+async def export_findings_csv(
+    client_id: str,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    scan_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    q = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id)
+    )
+    if severity:
+        q = q.filter(Finding.severity == severity)
+    if status:
+        q = q.filter(Finding.status == status)
+    if scan_id:
+        q = q.filter(Finding.scan_id == scan_id)
+    rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(10000).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "title", "severity", "status", "resource_id", "resource_type", "cve_id", "cvss_score", "control_id", "framework", "description", "remediation", "created_at"])
+    for f in rows:
+        writer.writerow([
+            f.id, f.title,
+            f.severity.value if hasattr(f.severity, "value") else f.severity,
+            f.status.value if hasattr(f.status, "value") else f.status,
+            f.resource_id or "", f.resource_type or "", f.cve_id or "",
+            f.cvss_score or "", f.control_id or "",
+            f.framework.value if hasattr(f.framework, "value") else (f.framework or ""),
+            (f.description or "").replace("\n", " "), (f.remediation or "").replace("\n", " "),
+            f.created_at.isoformat() if f.created_at else "",
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=findings-{client_id}.csv"},
+    )
+
+
+@router.patch("/{finding_id}", response_model=FindingResponse, dependencies=[Depends(require_editor_anywhere)])
 async def update_finding_status(
     client_id: str,
     finding_id: str,
@@ -157,7 +207,7 @@ async def update_finding_status(
     return f
 
 
-@router.delete("/{finding_id}")
+@router.delete("/{finding_id}", dependencies=[Depends(require_editor_anywhere)])
 async def delete_finding(
     client_id: str,
     finding_id: str,
@@ -177,7 +227,7 @@ async def delete_finding(
     return {"deleted": True}
 
 
-@router.post("/cleanup-blank")
+@router.post("/cleanup-blank", dependencies=[Depends(require_editor_anywhere)])
 async def delete_blank_findings(
     client_id: str,
     db: Session = Depends(get_db),

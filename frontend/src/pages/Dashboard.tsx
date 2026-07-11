@@ -213,7 +213,7 @@ export default function Dashboard() {
           { title: "Clients", value: data.total_clients, icon: <People />, color: "#4285F4", path: "/clients" },
           { title: "Active Connectors", value: data.active_connectors, icon: <Cable />, color: "#34A853", path: "/connectors" },
           { title: "Open Findings", value: data.open_findings, icon: <BugReport />, color: "#ff9800", path: "/findings" },
-          { title: "Critical Findings", value: data.critical_findings, icon: <Security />, color: "#f44336", path: "/findings" },
+          { title: "Critical Findings", value: data.critical_findings, icon: <Security />, color: "#f44336", path: "/findings?severity=critical" },
           { title: "Open Risks", value: data.risks_open, icon: <Warning />, color: "#ffeb3b", path: "/risks" },
           { title: "Scans (30d)", value: data.scans_last_30d, icon: <TrendingUp />, color: "#00e676", path: "/scans" },
           { title: "Agent Runs", value: (data as any).agent_runs_total ?? 0, icon: <SmartToy />, color: "#ff6d00", path: "/agents" },

@@ -5,10 +5,10 @@ import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  Switch, IconButton, Tooltip, Drawer, Divider,
+  Switch, IconButton, Tooltip, Drawer, Divider, LinearProgress, Collapse,
 } from "@mui/material";
 import {
-  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
+  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
@@ -251,6 +251,62 @@ function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+// ── Recent run row ───────────────────────────────────────────────────────────
+
+interface AgentRun {
+  id: string;
+  agent_type: string;
+  status: "queued" | "running" | "completed" | "failed";
+  started_at?: string;
+  output_data?: any;
+  error_message?: string;
+}
+
+const RUN_STATUS_COLOR: Record<string, string> = {
+  completed: "#34A853",
+  failed: "#EA4335",
+  queued: "#FBBC04",
+  running: "#FBBC04",
+};
+
+function RecentRunRow({ run }: { run: AgentRun }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasOutput = run.status === "completed" && run.output_data;
+  return (
+    <Box sx={{ bgcolor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 1.5, p: 1.25, mb: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+        <Chip label={run.agent_type} size="small"
+          sx={{ height: 20, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
+        <Chip label={run.status} size="small"
+          sx={{ height: 20, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+            bgcolor: `${RUN_STATUS_COLOR[run.status] || "#888"}20`,
+            color: RUN_STATUS_COLOR[run.status] || "#888" }} />
+        {run.started_at && (
+          <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
+            {new Date(run.started_at).toLocaleString()}
+          </Typography>
+        )}
+        {hasOutput && (
+          <Box sx={{ ml: "auto" }}>
+            <IconButton size="small" onClick={() => setExpanded((e) => !e)} sx={{ color: "text.secondary" }}>
+              {expanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+            </IconButton>
+          </Box>
+        )}
+      </Box>
+      {hasOutput && (
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <Box sx={{ mt: 1, pt: 1, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", whiteSpace: "pre-wrap", fontSize: 11 }}>
+              {typeof run.output_data === "string" ? run.output_data : JSON.stringify(run.output_data, null, 2)}
+            </Typography>
+          </Box>
+        </Collapse>
+      )}
+    </Box>
+  );
+}
+
 export default function Agents() {
   const qc = useQueryClient();
   const { canAct } = useViewMode();
@@ -263,6 +319,7 @@ export default function Agents() {
   const [briefingPrompt, setBriefingPrompt] = useState("");
   const [briefingOutput, setBriefingOutput] = useState<{ output: string; provider: string; model?: string; tokens_used: number; duration_ms: number } | null>(null);
   const [briefingError, setBriefingError] = useState<string>("");
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
 
   const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
   const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
@@ -286,6 +343,35 @@ export default function Agents() {
   const groups = allGroups;
   const groupOptions = useMemo(() => allGroups.map((g) => ({ key: g.key, label: g.label })), [allGroups]);
 
+  // Polling query — fetches a single run until completed/failed
+  const { data: pollingRun } = useQuery<AgentRun>({
+    queryKey: ["agent-run-poll", selectedClientId, pollingRunId],
+    queryFn: () => agentsApi.getRun(selectedClientId, pollingRunId!),
+    enabled: !!pollingRunId && !!selectedClientId,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "completed" || status === "failed") return false;
+      return 3000;
+    },
+  });
+
+  // Stop polling when terminal state reached
+  React.useEffect(() => {
+    if (pollingRun?.status === "completed" || pollingRun?.status === "failed") {
+      setPollingRunId(null);
+      qc.invalidateQueries({ queryKey: ["agent-runs-list", selectedClientId] });
+    }
+  }, [pollingRun?.status, qc, selectedClientId]);
+
+  // Recent runs list — last 5 for the current client
+  const { data: recentRunsData } = useQuery<AgentRun[]>({
+    queryKey: ["agent-runs-list", selectedClientId],
+    queryFn: () => agentsApi.listRuns(selectedClientId),
+    enabled: !!selectedClientId,
+    refetchInterval: 15000,
+    select: (runs) => runs.slice(0, 5),
+  });
+
   const runMutation = useMutation({
     mutationFn: (agentType: AgentType) =>
       agentsApi.run(selectedClientId, {
@@ -293,7 +379,15 @@ export default function Agents() {
         scan_id: selectedScanId || undefined,
         input_data: { framework: selectedFramework },
       }),
-    onSuccess: (_, agentType) => { qc.invalidateQueries({ queryKey: ["agent-runs"] }); toast.success(`${agentType} started`); },
+    onSuccess: (run, agentType) => {
+      if (run?.id) {
+        setPollingRunId(run.id);
+        toast.info(`${agentType} queued — polling for result…`);
+      } else {
+        qc.invalidateQueries({ queryKey: ["agent-runs"] });
+        toast.success(`${agentType} started`);
+      }
+    },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Agent run failed"),
   });
 
@@ -429,10 +523,10 @@ export default function Agents() {
                             <Tooltip title={!canAct ? "Switch to Analyst mode (top-right toggle) to run agents" : !selectedClientId ? "Select a client from the dropdown above first" : ""}>
                               <span>
                                 <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                                  disabled={!selectedClientId || runMutation.isPending || !canAct}
+                                  disabled={!selectedClientId || runMutation.isPending || !canAct || !!pollingRunId}
                                   onClick={() => runMutation.mutate(agent.key as AgentType)}
                                   sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
-                                  Run
+                                  {pollingRunId ? "Running…" : "Run"}
                                 </Button>
                               </span>
                             </Tooltip>
@@ -480,6 +574,42 @@ export default function Agents() {
             </Box>
           );
         })
+      )}
+
+      {/* Polling status banner */}
+      {(pollingRunId || pollingRun?.status === "completed" || pollingRun?.status === "failed") && (
+        <Box sx={{ mt: 3, mb: 2 }}>
+          {pollingRunId && (
+            <>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
+                Agent running — waiting for result…
+              </Typography>
+              <LinearProgress sx={{ borderRadius: 1 }} />
+            </>
+          )}
+          {!pollingRunId && pollingRun?.status === "failed" && (
+            <Alert severity="error">
+              {pollingRun.error_message || "Agent run failed"}
+            </Alert>
+          )}
+          {!pollingRunId && pollingRun?.status === "completed" && pollingRun.output_data && (
+            <Alert severity="success">
+              Agent completed. View output in Recent Runs below.
+            </Alert>
+          )}
+        </Box>
+      )}
+
+      {/* Recent Runs */}
+      {selectedClientId && (recentRunsData?.length ?? 0) > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, mb: 1 }}>
+            Recent Runs
+          </Typography>
+          {(recentRunsData || []).map((run) => (
+            <RecentRunRow key={run.id} run={run} />
+          ))}
+        </Box>
       )}
 
       <ConfigureDialog

@@ -7,8 +7,12 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip, IconButton,
   Snackbar,
 } from "@mui/material";
-import { BugReport, DeleteOutlined, CleaningServices } from "@mui/icons-material";
+import { BugReport, DeleteOutlined, CleaningServices, FileDownload } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
+import { useMsal } from "@azure/msal-react";
+import { loginRequest } from "../auth/msalConfig";
+
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { findingsApi, projectsApi, scansApi } from "../services/api";
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
@@ -148,6 +152,7 @@ function CategoryTile({ cat, active, onClick }: {
 export default function Findings() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const { instance, accounts } = useMsal();
   const [projectId, setProjectId] = useState("");
   const [scanId, setScanId] = useState("");
   const [sevFilter, setSevFilter] = useState("");
@@ -155,6 +160,33 @@ export default function Findings() {
   const [section, setSection] = useState("security_posture");
   const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
+
+  const handleExport = async () => {
+    const account = accounts[0];
+    let token = "";
+    if (account) {
+      try {
+        const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
+        token = resp.accessToken;
+      } catch { }
+    }
+    const params = new URLSearchParams();
+    if (sevFilter) params.set("severity", sevFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    if (scanId) params.set("scan_id", scanId);
+    const res = await fetch(
+      `${API_BASE}/clients/${clientId}/findings/export/?${params}`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `findings-${clientId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId],
@@ -327,6 +359,21 @@ export default function Findings() {
               <MenuItem value="false_positive">False Positive</MenuItem>
             </Select>
           </FormControl>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FileDownload sx={{ fontSize: 16 }} />}
+            disabled={!clientId}
+            onClick={handleExport}
+            sx={{
+              color: "text.secondary",
+              borderColor: "divider",
+              textTransform: "none",
+              "&:hover": { borderColor: "#34A853", color: "#34A853", bgcolor: "rgba(52,168,83,0.05)" },
+            }}
+          >
+            Export CSV
+          </Button>
         </Box>
       </Box>
 
