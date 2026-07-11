@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Box, Container, Typography, Button, Grid, Chip,
   Accordion, AccordionSummary, AccordionDetails,
-  Avatar,
 } from "@mui/material";
 import {
   Code, Assessment, AccountTree, TrendingUp, VerifiedUser, SmartToy,
@@ -101,33 +100,6 @@ const STEPS = [
   { n: "02", title: "AI agents enrich every finding", desc: "Threat Intel maps findings to MITRE ATT&CK. Risk Manager scores likelihood × impact. Compliance Monitor identifies control gaps. Remediation Agent generates priority-banded playbooks." },
   { n: "03", title: "Registers auto-populate", desc: "Agent outputs route to dedicated registers: Threat Register (TTPs), Control Deficiencies (compliance gaps), and Remediation Tracker (banded action items). No manual triage." },
   { n: "04", title: "Track to closure", desc: "Risk Domains group findings for executive reporting. Update remediation status, sync tickets to Jira or ServiceNow, generate VAPT reports, and run scheduled AI missions — all from one platform." },
-];
-
-const TESTIMONIALS = [
-  {
-    quote: "Aegis gave us complete attack surface visibility in under an hour. The AI agents automatically mapped every finding to MITRE ATT&CK techniques — something our team was doing manually over weeks.",
-    name: "Sarah Chen",
-    title: "CISO · FinTech",
-    avatar: "SC",
-    color: CYAN,
-    stars: 5,
-  },
-  {
-    quote: "The four-phase AI code review catches cross-file taint flows that static rules miss entirely. The remediation steps are actionable, not generic boilerplate. We now run it on every PR.",
-    name: "Marcus Reid",
-    title: "Security Engineering Lead",
-    avatar: "MR",
-    color: PURPLE,
-    stars: 5,
-  },
-  {
-    quote: "We use Aegis on every client engagement. The AI VAPT report generator cuts our reporting time by 60%. Clients love the executive summaries — readable by non-technical stakeholders.",
-    name: "Priya Nair",
-    title: "Principal Penetration Tester",
-    avatar: "PN",
-    color: GREEN,
-    stars: 5,
-  },
 ];
 
 const FAQS = [
@@ -571,52 +543,6 @@ export default function LandingPage() {
               </Box>
             ))}
           </Box>
-        </Container>
-      </Box>
-
-      {/* ── Testimonials ───────────────────────────────────────────────────── */}
-      <Box sx={{ py: { xs: 8, md: 12 }, background: "rgba(255,255,255,0.012)", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", mb: 8 }}>
-            <Chip label="What teams say" size="small" sx={{ mb: 2.5, background: `rgba(124,58,237,0.1)`, border: `1px solid rgba(124,58,237,0.25)`, color: PURPLE, fontWeight: 600, fontSize: 12 }} />
-            <Typography sx={{ fontSize: { xs: 24, md: 36 }, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Trusted by security professionals
-            </Typography>
-          </Box>
-
-          <Grid container spacing={3}>
-            {TESTIMONIALS.map(({ quote, name, title, avatar, color, stars }) => (
-              <Grid key={name} size={{ xs: 12, md: 4 }}>
-                <Box sx={{
-                  p: 3.5, borderRadius: 3, height: "100%",
-                  background: CARD_BG, border: `1px solid ${BORDER}`,
-                  display: "flex", flexDirection: "column", gap: 2.5,
-                  transition: "all 0.25s",
-                  "&:hover": { border: `1px solid rgba(255,255,255,0.1)`, transform: "translateY(-3px)", boxShadow: "0 16px 48px rgba(0,0,0,0.4)" },
-                }}>
-                  <Box sx={{ display: "flex", gap: 0.5 }}>
-                    {Array.from({ length: stars }).map((_, i) => (
-                      <Star key={i} sx={{ fontSize: 16, color: AMBER }} />
-                    ))}
-                  </Box>
-
-                  <Typography sx={{ fontSize: 15, lineHeight: 1.72, color: "rgba(255,255,255,0.68)", fontStyle: "italic", flex: 1 }}>
-                    "{quote}"
-                  </Typography>
-
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Avatar sx={{ width: 40, height: 40, background: `${color}20`, border: `1px solid ${color}30`, color, fontSize: 13, fontWeight: 700 }}>
-                      {avatar}
-                    </Avatar>
-                    <Box>
-                      <Typography sx={{ fontWeight: 700, fontSize: 14 }}>{name}</Typography>
-                      <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.38)" }}>{title}</Typography>
-                    </Box>
-                  </Box>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
         </Container>
       </Box>
 
