@@ -1142,21 +1142,3 @@ class TicketSync(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-
-# ── Trial Users ────────────────────────────────────────────────────────────────
-
-class TrialUser(Base):
-    """3-day trial tracking for new users (auto-created on first authenticated request).
-
-    Users with the NexGenAdmin role bypass all trial restrictions.
-    Trial limits: 1 client, 3 scans total, operational agents only, read-only configs.
-    """
-    __tablename__ = "trial_users"
-
-    user_id = Column(String(255), primary_key=True)   # Azure AD 'sub' claim
-    email = Column(String(255), nullable=False, index=True)
-    display_name = Column(String(255))
-    trial_started_at = Column(DateTime(timezone=True), server_default=func.now())
-    trial_expires_at = Column(DateTime(timezone=True), nullable=False)
-    # Set True by admin to grant full access before trial expires
-    is_upgraded = Column(Boolean, default=False, nullable=False)

@@ -18,8 +18,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { aiApi, adminApi } from "../services/api";
 import { AIProvider, MyAccess } from "../types";
-import { useTrialStatus } from "../hooks/useTrialStatus";
-
 const PROVIDER_LOGOS: Record<string, string> = {
   anthropic: "🟣 Anthropic Claude",
   openai: "🟢 OpenAI GPT",
@@ -42,7 +40,6 @@ const SECRET_FIELDS: SecretField[] = [
 
 export default function AISettings() {
   const qc = useQueryClient();
-  const { readOnlyConfigs } = useTrialStatus();
   const [selectedProvider, setSelectedProvider] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
   const [testPrompt, setTestPrompt] = useState("Summarise the top 3 cyber threats for a financial institution in 2025.");
@@ -222,11 +219,6 @@ export default function AISettings() {
 
   return (
     <Box>
-      {readOnlyConfigs && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <strong>Trial mode:</strong> AI provider settings are read-only. Upgrade to configure API keys and change providers.
-        </Alert>
-      )}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
         <Psychology sx={{ color: "#4285F4", fontSize: 32 }} />
         <Box>
@@ -275,11 +267,11 @@ export default function AISettings() {
                       <Chip label={`${Object.values(form).filter((v) => v !== null).length} unsaved`}
                         size="small" sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700, fontSize: 11 }} />
                     )}
-                    <Tooltip title={readOnlyConfigs ? "Upgrade to edit AI provider settings" : !isAdmin ? "Admin role required to edit" : ""}>
+                    <Tooltip title={!isAdmin ? "Admin role required to edit" : ""}>
                       <span>
                         <Button
                           variant="contained" startIcon={<Save />}
-                          disabled={!isAdmin || !dirty || saveMutation.isPending || readOnlyConfigs}
+                          disabled={!isAdmin || !dirty || saveMutation.isPending}
                           onClick={handleSave}
                           sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
                           {saveMutation.isPending ? "Saving..." : "Save Changes"}
@@ -355,11 +347,11 @@ export default function AISettings() {
                         </Box>
                       </Box>
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                        <Tooltip title={readOnlyConfigs ? "Upgrade to configure API keys" : !isAdmin ? "Admin role required" : (expanded ? "Collapse" : "Edit configuration")}>
+                        <Tooltip title={!isAdmin ? "Admin role required" : (expanded ? "Collapse" : "Edit configuration")}>
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!isAdmin || readOnlyConfigs}
+                              disabled={!isAdmin}
                               onClick={() => setExpandedTile(expanded ? null : provider.provider)}
                               sx={{
                                 color: expanded ? "#4285F4" : "text.secondary",

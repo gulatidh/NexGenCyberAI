@@ -50,7 +50,6 @@ import VAPTReports from "./pages/VAPTReports";
 import VAPTReportDetail from "./pages/VAPTReportDetail";
 import ScanDiff from "./pages/ScanDiff";
 import TicketSyncPage from "./pages/TicketSync";
-import TrialActivate from "./pages/TrialActivate";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -181,8 +180,6 @@ export default function App() {
               <Routes>
                 {/* Public landing page — no auth required */}
                 <Route path="/" element={<LandingPage />} />
-                {/* Trial activation — called after "Start Free Trial" login redirect */}
-                <Route path="/trial/activate" element={<TrialActivate />} />
                 {/* All other routes require Microsoft Entra ID sign-in */}
                 <Route path="/*" element={<ProtectedApp />} />
               </Routes>

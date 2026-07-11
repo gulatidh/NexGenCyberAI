@@ -389,11 +389,6 @@ async def start_scan(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    from core.trial import get_trial, check_scan_limit, is_admin
-    if not is_admin(user):
-        trial = get_trial(db, user)
-        check_scan_limit(db, trial, client_id)
-
     # Infer project_id from connector if not explicitly provided
     proj_id = payload.project_id
     if not proj_id and payload.connector_id:

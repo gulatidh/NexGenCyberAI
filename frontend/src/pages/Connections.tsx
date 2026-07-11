@@ -22,8 +22,6 @@ import { useNavigate } from "react-router-dom";
 import { connectorsApi, projectsApi, aiApi } from "../services/api";
 import { Connector, ConnectorType, Project, AIProvider } from "../types";
 import { toast } from "react-toastify";
-import { useTrialStatus } from "../hooks/useTrialStatus";
-
 // ── AI provider display map ───────────────────────────────────────────────────
 
 const PROVIDER_LOGOS: Record<string, string> = {
@@ -278,7 +276,6 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
 
 export default function Connections() {
   const navigate = useNavigate();
-  const { readOnlyConfigs } = useTrialStatus();
   const qc = useQueryClient();
 
   // ── Client / project selection ──────────────────────────────────────────────
@@ -503,7 +500,6 @@ export default function Connections() {
             <Button
               size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}
               onClick={() => openEdit(conn)}
-              disabled={readOnlyConfigs}
               sx={{
                 borderColor: "divider", color: "text.secondary", fontSize: 11,
                 "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
@@ -518,7 +514,7 @@ export default function Connections() {
                   deleteMutation.mutate(conn.id);
                 }
               }}
-              disabled={deleteMutation.isPending || readOnlyConfigs}
+              disabled={deleteMutation.isPending}
               sx={{
                 borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
                 "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
@@ -589,11 +585,6 @@ export default function Connections() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <Box>
-      {readOnlyConfigs && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          <strong>Trial mode:</strong> Connector configuration is read-only. Upgrade to add, edit, or delete connectors.
-        </Alert>
-      )}
       {/* ── Page header ── */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
@@ -728,7 +719,7 @@ export default function Connections() {
           count={platformConnectors.length}
           onAdd={() => openAdd("platform")}
           addLabel="Add Platform Connector"
-          disabled={!selectedClientId || projects.length === 0 || readOnlyConfigs}
+          disabled={!selectedClientId || projects.length === 0}
         />
 
         {!selectedClientId ? (
@@ -778,7 +769,7 @@ export default function Connections() {
           count={scannerConnectors.length}
           onAdd={() => openAdd("scanner")}
           addLabel="Add Scanner"
-          disabled={!selectedClientId || projects.length === 0 || readOnlyConfigs}
+          disabled={!selectedClientId || projects.length === 0}
         />
 
         {!selectedClientId ? (

@@ -56,26 +56,6 @@ const GROUPS: Group[] = [
         ],
       },
       {
-        id: "free-trial",
-        title: "Free trial — what you get and how it works",
-        summary: "New users can start a 3-day free trial directly from the landing page. The trial gives full access to Operational AI Buddies, one client, and three scans — enough to run a complete security assessment and see Aegis in action.",
-        steps: [
-          { text: "How to start a trial: visit the Aegis landing page → click 'Start Free Trial' → authenticate with your Microsoft work account (personal Outlook/Hotmail accounts are not accepted). The trial activates automatically after sign-in and your 3-day clock starts immediately." },
-          { text: "What trial users can do: create 1 client, run up to 3 scans (across all scanner types including enterprise), and run any Operational AI agent (Risk Manager, VA Scanner, Framework Analyst, Compliance Monitor, Threat Intel, Remediation, Orchestrator)." },
-          { text: "What trial users cannot do: add more than 1 client, run more than 3 scans, access advisory or specialist AI agent groups (Strategy, Cloud, Identity, Detection, Response), modify AI provider settings, or add/edit/delete connectors.", detail: "These restrictions are enforced both in the UI (buttons disabled, agents hidden) and server-side (402 Payment Required responses). UI-only bypasses don't work." },
-          { text: "Trial banner: a persistent info bar at the top of every page shows remaining days and the trial limits. When the trial expires, the banner turns red and new scans and agent runs are blocked — existing data (findings, risks, reports) remains accessible." },
-          { text: "To upgrade: contact the team at sales@nexgencyberai.com. An admin will mark your account as upgraded, which immediately removes all trial restrictions with no data loss." },
-        ],
-        tips: [
-          "Recommended trial workflow: (1) Add your client, (2) Add a connector for your most important scanner, (3) Run one scan, (4) Run the Orchestrator agent — it populates all 4 registers in one click. You'll see Risk Overview, Threat Register, Control Deficiencies, and Remediation Tracker all populated from a single assessment.",
-          "The trial activates only when you click 'Start Free Trial' on the landing page — logging in via 'Sign In' as an existing user does not activate a trial.",
-        ],
-        warnings: [
-          "Trial requires a Microsoft work or school account (Entra ID). Personal Microsoft accounts (Outlook.com, Hotmail.com, Live.com) are blocked at the login screen — this is enforced by MSAL authority configuration, not just a UI check.",
-          "The 3-day timer starts the moment you complete the 'Start Free Trial' login flow — there is no grace period. Start your trial when you have time to explore the platform.",
-        ],
-      },
-      {
         id: "first-client",
         title: "Create your first client",
         summary: "Clients are the top-level multi-tenant containers in Aegis AI. Every piece of security data — connectors, scans, findings, risks, threat entries, remediation actions — lives under a client and is invisible across client boundaries.",

@@ -24,7 +24,6 @@ import { MyAccess, Client } from "../../types";
 import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import { useViewMode } from "../../theme/ViewModeContext";
-import { useTrialStatus } from "../../hooks/useTrialStatus";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -103,7 +102,6 @@ export default function AppLayout() {
   const { mode: viewMode, setMode: setViewMode, readOnly, setReadOnly } = useViewMode();
   const { clientId, setClientId } = useActiveClient();
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
-  const { isTrial, trialActive, trialExpired, daysLeft } = useTrialStatus();
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -547,25 +545,6 @@ export default function AppLayout() {
             </Menu>
           </Toolbar>
         </AppBar>
-        {(isTrial && trialActive) && (
-          <Alert
-            severity="info"
-            sx={{ borderRadius: 0, py: 0.5, "& .MuiAlert-message": { width: "100%", textAlign: "center" } }}
-          >
-            <strong>3-Day Free Trial</strong> — {daysLeft != null ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} remaining` : "Trial active"}.
-            {" "}1 client · 3 scans · Operational AI Agents only · Read-only configs.
-            {" "}<a href="mailto:sales@nexgencyberai.com" style={{ color: "inherit", fontWeight: 600 }}>Contact us to upgrade →</a>
-          </Alert>
-        )}
-        {trialExpired && (
-          <Alert
-            severity="error"
-            sx={{ borderRadius: 0, py: 0.5, "& .MuiAlert-message": { width: "100%", textAlign: "center" } }}
-          >
-            <strong>Trial expired.</strong> Your 3-day trial has ended — new scans and agent runs are disabled.
-            {" "}<a href="mailto:sales@nexgencyberai.com" style={{ color: "inherit", fontWeight: 600 }}>Contact us to upgrade →</a>
-          </Alert>
-        )}
         <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: "auto" }}>
           <Outlet />
         </Box>

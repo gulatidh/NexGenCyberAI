@@ -17,6 +17,8 @@ from api.schemas.schemas import (
 )
 from db.database import get_db
 from core.security import get_current_user
+from core.config import get_settings as _get_settings
+_settings = _get_settings()
 from core.authz import (
     _normalize_email, _user_email, effective_role, get_user_grants, require_role,
     is_admin_anywhere, can_manage_scope, manageable_scope_ids, require_editor_anywhere,
@@ -232,11 +234,11 @@ async def get_my_access(
     Same-tenant users (tid matches AZURE_TENANT_ID) are auto-bootstrapped as
     global admin on first call so they can manage grants without a manual
     bootstrap step."""
-    from core.trial import is_admin as _is_tenant_admin
     email = _user_email(user)
+    tid = user.get("tid", "")
 
     # Auto-bootstrap: same-tenant admin with no DB grant yet → create one now
-    if _is_tenant_admin(user):
+    if _settings.AZURE_TENANT_ID and tid == _settings.AZURE_TENANT_ID:
         existing = db.query(UserAccess).filter(
             UserAccess.email == email,
             UserAccess.scope_type == AccessScope.GLOBAL,

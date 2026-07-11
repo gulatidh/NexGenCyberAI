@@ -8,15 +8,13 @@ import {
   Switch, IconButton, Tooltip, Drawer, Divider,
 } from "@mui/material";
 import {
-  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, LockClock,
+  SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
 import { Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 import RichOutput from "../components/RichOutput";
-import { useTrialStatus } from "../hooks/useTrialStatus";
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Agent {
@@ -284,13 +282,8 @@ export default function Agents() {
     queryKey: ["agent-catalog"], queryFn: agentCatalogApi.list,
   });
 
-  const { isTrial, trialActive, daysLeft, allowedAgentGroup } = useTrialStatus();
   const allGroups = useMemo(() => catalogData?.groups || [], [catalogData]);
-  // Trial users see only the "operational" group
-  const groups = useMemo(
-    () => (isTrial && trialActive ? allGroups.filter((g) => g.key === (allowedAgentGroup || "operational")) : allGroups),
-    [allGroups, isTrial, trialActive, allowedAgentGroup],
-  );
+  const groups = allGroups;
   const groupOptions = useMemo(() => allGroups.map((g) => ({ key: g.key, label: g.label })), [allGroups]);
 
   const runMutation = useMutation({
@@ -376,13 +369,6 @@ export default function Agents() {
           )}
         </Box>
       </Box>
-
-      {isTrial && trialActive && (
-        <Alert severity="info" icon={<LockClock />} sx={{ mb: 2 }}>
-          <strong>Trial plan ({daysLeft} day{daysLeft !== 1 ? "s" : ""} left)</strong> — Operational agents only.
-          Upgrade for access to all {allGroups.reduce((s, g) => s + g.agents.length, 0)} specialist agents across {allGroups.length} groups.
-        </Alert>
-      )}
 
       {isLoading ? (
         <CircularProgress sx={{ color: "#4285F4" }} />
@@ -502,7 +488,6 @@ export default function Agents() {
         onClose={() => setConfiguring(null)}
         onSave={(patch) => updateMutation.mutate({ id: configuring!.id, patch })}
         isAdmin={isAdmin}
-        hideSensitive={isTrial && trialActive}
       />
       <NewAgentDialog
         open={newOpen}
