@@ -11,12 +11,12 @@ import { BugReport, DeleteOutlined, CleaningServices, FileDownload } from "@mui/
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { findingsApi, projectsApi, scansApi } from "../services/api";
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
+
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
