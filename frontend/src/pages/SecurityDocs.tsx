@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
-  Box, Typography, Card, CardContent, Button, Alert, CircularProgress,
+  Box, Typography, Card, Button, Alert, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   TextField, Chip, IconButton, Tooltip, Divider,
 } from "@mui/material";

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
-  Box, Typography, Card, CardContent, Button, Alert, CircularProgress,
+  Box, Typography, Card, CardContent, Button, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Chip, IconButton, Switch, Tooltip, Collapse, Grid,
   FormGroup, FormControlLabel, Checkbox, Divider,

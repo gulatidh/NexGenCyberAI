@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Box, Typography, Button, Alert, CircularProgress, Card, CardContent,
+  Box, Typography, Button, Alert, CircularProgress, Card,
   Grid, Chip, Table, TableHead, TableRow, TableCell, TableBody,
   TableContainer,
 } from "@mui/material";
