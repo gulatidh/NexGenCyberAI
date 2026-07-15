@@ -12,6 +12,48 @@ from core.config import get_settings
 from db.database import Base, engine
 from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog, tickets, users
 
+# Optional new routers — imported individually so a missing file never breaks boot.
+try:
+    from api.routers import posture_history as _posture_history
+except ImportError:
+    _posture_history = None
+try:
+    from api.routers import attack_paths as _attack_paths
+except ImportError:
+    _attack_paths = None
+try:
+    from api.routers import nl_query as _nl_query
+except ImportError:
+    _nl_query = None
+try:
+    from api.routers import scorecard as _scorecard
+except ImportError:
+    _scorecard = None
+try:
+    from api.routers import api_keys as _api_keys
+except ImportError:
+    _api_keys = None
+try:
+    from api.routers import comments as _comments
+except ImportError:
+    _comments = None
+try:
+    from api.routers import webhooks as _webhooks
+except ImportError:
+    _webhooks = None
+try:
+    from api.routers import ctem as _ctem
+except ImportError:
+    _ctem = None
+try:
+    from api.routers import evidence as _evidence
+except ImportError:
+    _evidence = None
+try:
+    from api.routers import documents as _documents
+except ImportError:
+    _documents = None
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
 
@@ -401,6 +443,46 @@ def _ensure_added_columns() -> None:
                 logger.info("Added changelog_entries.flow_id column (%s)", dialect)
             except Exception as exc:
                 logger.warning("changelog_entries.flow_id ALTER failed: %s", exc)
+
+        # findings: assignee_email, due_date (ISO string), remediated_at
+        try:
+            finding_cols = {c["name"] for c in inspector.get_columns("findings")}
+        except Exception:
+            finding_cols = set()
+        _finding_additions = [
+            ("assignee_email",  "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("due_date",        "NVARCHAR(32) NULL",   "VARCHAR(32)"),
+            ("remediated_at",   "DATETIME2 NULL",      "TIMESTAMP"),
+        ]
+        for col, mssql_type, sqlite_type in _finding_additions:
+            if finding_cols and col not in finding_cols:
+                ddl = (f"ALTER TABLE findings ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE findings ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added findings.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("findings.%s ALTER failed: %s", col, exc)
+
+        # risks: assignee_email, due_date (ISO string)
+        # Note: risks already has a due_date DateTime column from the model;
+        # only add assignee_email here (due_date was in the original schema).
+        _risk_additions = [
+            ("assignee_email",  "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+        ]
+        for col, mssql_type, sqlite_type in _risk_additions:
+            if risk_cols and col not in risk_cols:
+                ddl = (f"ALTER TABLE risks ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE risks ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added risks.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("risks.%s ALTER failed: %s", col, exc)
 
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
@@ -991,6 +1073,12 @@ app.include_router(vapt_reports.router, prefix="/api/v1")
 app.include_router(changelog.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
+
+# New optional routers — registered only when the module file exists.
+for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
+             _comments, _webhooks, _ctem, _evidence, _documents):
+    if _mod is not None and hasattr(_mod, "router"):
+        app.include_router(_mod.router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

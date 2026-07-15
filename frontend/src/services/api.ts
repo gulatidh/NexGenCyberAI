@@ -508,3 +508,107 @@ export const customFrameworksApi = {
 export const usersApi = {
   me: () => apiClient.get("/users/me/").then((r) => r.data),
 };
+
+export const postureApi = {
+  getHistory: (clientId: string, days = 90) =>
+    apiClient.get(`/clients/${clientId}/posture-history/?days=${days}`).then((r) => r.data),
+  triggerSnapshot: (clientId: string) =>
+    apiClient.post(`/clients/${clientId}/posture-history/snapshot`).then((r) => r.data),
+};
+
+export const attackPathApi = {
+  get: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/attack-paths/`).then((r) => r.data),
+};
+
+export const nlQueryApi = {
+  query: (clientId: string, question: string) =>
+    apiClient.post(`/clients/${clientId}/query/nl`, { question }).then((r) => r.data),
+};
+
+export const mttrApi = {
+  // MTTR is computed client-side from posture history snapshots; no dedicated endpoint needed
+};
+
+// ── New API clients ────────────────────────────────────────────────────────────
+
+// Alias for convenience in new APIs
+const api = apiClient;
+const API_BASE = apiClient.defaults.baseURL || "";
+
+export const commentsApi = {
+  list: (clientId: string, entityType: string, entityId: string) =>
+    api.get(`/clients/${clientId}/comments/?entity_type=${entityType}&entity_id=${entityId}`).then(r => r.data),
+  create: (clientId: string, data: { entity_type: string; entity_id: string; body: string }) =>
+    api.post(`/clients/${clientId}/comments/`, data).then(r => r.data),
+  update: (clientId: string, commentId: string, body: string) =>
+    api.patch(`/clients/${clientId}/comments/${commentId}?body=${encodeURIComponent(body)}`).then(r => r.data),
+  delete: (clientId: string, commentId: string) =>
+    api.delete(`/clients/${clientId}/comments/${commentId}`).then(r => r.data),
+  assign: (clientId: string, entityType: string, entityId: string, assigneeEmail: string, dueDate?: string) => {
+    let url = `/clients/${clientId}/comments/assign?entity_type=${entityType}&entity_id=${entityId}&assignee_email=${encodeURIComponent(assigneeEmail)}`;
+    if (dueDate) url += `&due_date=${dueDate}`;
+    return api.put(url).then(r => r.data);
+  },
+};
+
+export const webhooksApi = {
+  list: (clientId?: string) =>
+    api.get(`/webhooks/${clientId ? `?client_id=${clientId}` : ''}`).then(r => r.data),
+  create: (data: { name: string; url: string; secret?: string; events: string[]; client_id?: string }) =>
+    api.post('/webhooks/', data).then(r => r.data),
+  toggle: (id: string, isActive: boolean) =>
+    api.patch(`/webhooks/${id}?is_active=${isActive}`).then(r => r.data),
+  delete: (id: string) => api.delete(`/webhooks/${id}`).then(r => r.data),
+  test: (id: string) => api.post(`/webhooks/${id}/test`).then(r => r.data),
+  deliveries: (id: string) => api.get(`/webhooks/${id}/deliveries`).then(r => r.data),
+};
+
+export const ctemApi = {
+  list: (clientId: string) => api.get(`/clients/${clientId}/ctem/`).then(r => r.data),
+  create: (clientId: string, data: { name: string; description?: string }) =>
+    api.post(`/clients/${clientId}/ctem/`, data).then(r => r.data),
+  get: (clientId: string, programId: string) =>
+    api.get(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),
+  updatePhase: (clientId: string, programId: string, phase: string, notes?: string, completed?: boolean) => {
+    const params = new URLSearchParams();
+    if (notes !== undefined) params.set('notes', notes);
+    if (completed !== undefined) params.set('completed', String(completed));
+    return api.patch(`/clients/${clientId}/ctem/${programId}/phases/${phase}?${params}`).then(r => r.data);
+  },
+  delete: (clientId: string, programId: string) =>
+    api.delete(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),
+};
+
+export const scorecardApi = {
+  listTokens: (clientId: string) =>
+    api.get(`/clients/${clientId}/scorecard/tokens`).then(r => r.data),
+  createToken: (clientId: string, label: string) =>
+    api.post(`/clients/${clientId}/scorecard/tokens?label=${encodeURIComponent(label)}`).then(r => r.data),
+  revokeToken: (clientId: string, tokenId: string) =>
+    api.delete(`/clients/${clientId}/scorecard/tokens/${tokenId}`).then(r => r.data),
+};
+
+export const documentsApi = {
+  list: (clientId: string) => api.get(`/clients/${clientId}/documents/`).then(r => r.data),
+  upload: (clientId: string, file: File) => {
+    const fd = new FormData(); fd.append('file', file);
+    return api.post(`/clients/${clientId}/documents/`, fd).then(r => r.data);
+  },
+  delete: (clientId: string, docId: string) =>
+    api.delete(`/clients/${clientId}/documents/${docId}`).then(r => r.data),
+  query: (clientId: string, question: string) =>
+    api.post(`/clients/${clientId}/documents/query`, { question }).then(r => r.data),
+};
+
+export const apiKeysApi = {
+  list: () => api.get('/api-keys/').then(r => r.data),
+  create: (data: { name: string; client_id?: string; scopes: string[]; expires_days?: number }) =>
+    api.post('/api-keys/', data).then(r => r.data),
+  revoke: (id: string) => api.delete(`/api-keys/${id}`).then(r => r.data),
+};
+
+export const evidenceApi = {
+  downloadUrl: (clientId: string, framework?: string) =>
+    `${API_BASE}/clients/${clientId}/evidence/package${framework ? `?framework=${framework}` : ''}`,
+};

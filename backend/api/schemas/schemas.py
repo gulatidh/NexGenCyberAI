@@ -456,3 +456,132 @@ class DashboardSummary(BaseModel):
     recent_risks: List[Dict] = []
     recent_findings: List[Dict] = []
     agent_runs_total: int = 0
+
+
+# ── Posture History ────────────────────────────────────────────────────────────
+class PostureSnapshotResponse(BaseModel):
+    id: str
+    client_id: str
+    captured_at: Optional[datetime]
+    open_findings: int
+    critical_findings: int
+    high_findings: int
+    medium_findings: int
+    low_findings: int
+    open_risks: int
+    mttr_critical_hours: Optional[float]
+    mttr_high_hours: Optional[float]
+    compliance_score: Optional[float]
+    scan_count_30d: int
+    agent_runs_30d: int
+    model_config = {"from_attributes": True}
+
+# ── Comments ───────────────────────────────────────────────────────────────────
+class CommentCreate(BaseModel):
+    entity_type: str
+    entity_id: str
+    body: str
+
+class CommentResponse(BaseModel):
+    id: str
+    client_id: str
+    entity_type: str
+    entity_id: str
+    author_email: str
+    author_name: Optional[str]
+    body: str
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+# ── Webhooks ───────────────────────────────────────────────────────────────────
+class WebhookCreate(BaseModel):
+    name: str
+    url: str
+    secret: Optional[str] = None
+    events: List[str] = []
+    client_id: Optional[str] = None
+
+class WebhookResponse(BaseModel):
+    id: str
+    client_id: Optional[str]
+    name: str
+    url: str
+    events: Optional[List[str]]
+    is_active: bool
+    created_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+# ── Scorecard ──────────────────────────────────────────────────────────────────
+class ScorecardTokenResponse(BaseModel):
+    id: str
+    client_id: str
+    token: str
+    label: str
+    is_active: bool
+    created_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+# ── CTEM ───────────────────────────────────────────────────────────────────────
+class CTEMPhaseNoteResponse(BaseModel):
+    id: str
+    program_id: str
+    phase: str
+    notes: Optional[str]
+    actions: Optional[List[str]]
+    completed: bool
+    completed_at: Optional[datetime]
+    completed_by: Optional[str]
+    model_config = {"from_attributes": True}
+
+class CTEMProgramCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class CTEMProgramResponse(BaseModel):
+    id: str
+    client_id: str
+    name: str
+    description: Optional[str]
+    status: str
+    current_phase: str
+    created_by: Optional[str]
+    created_at: Optional[datetime]
+    phases: List[CTEMPhaseNoteResponse] = []
+    model_config = {"from_attributes": True}
+
+# ── Security Documents ─────────────────────────────────────────────────────────
+class SecurityDocumentResponse(BaseModel):
+    id: str
+    client_id: str
+    filename: str
+    content_type: Optional[str]
+    size_bytes: int
+    chunk_count: int
+    uploaded_by: Optional[str]
+    uploaded_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+# ── API Keys ───────────────────────────────────────────────────────────────────
+class APIKeyCreate(BaseModel):
+    name: str
+    client_id: Optional[str] = None
+    scopes: List[str] = ["read:findings", "read:risks", "read:dashboard"]
+    expires_days: Optional[int] = None  # None = never expires
+
+class APIKeyResponse(BaseModel):
+    id: str
+    client_id: Optional[str]
+    name: str
+    key_prefix: str
+    scopes: Optional[List[str]]
+    is_active: bool
+    last_used_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    created_at: Optional[datetime]
+    model_config = {"from_attributes": True}
+
+class APIKeyCreated(APIKeyResponse):
+    """Returned only at creation time — includes the full key."""
+    full_key: str

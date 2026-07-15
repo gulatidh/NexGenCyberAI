@@ -316,6 +316,9 @@ class Finding(Base):
     cve_id = Column(String(50))
     cvss_score = Column(Float)
     control_mappings = Column(JSON, default={})  # {framework_value: [control_ids]} — fans this finding out across frameworks
+    assignee_email = Column(String(200), nullable=True)
+    due_date = Column(String(32), nullable=True)          # ISO date string e.g. "2026-09-30"
+    remediated_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -335,6 +338,7 @@ class Risk(Base):
     risk_score = Column(Float)                  # likelihood × impact / 10  (0-10)
     category = Column(String(100))
     owner = Column(String(200))
+    assignee_email = Column(String(200), nullable=True)
     due_date = Column(DateTime(timezone=True))
     status = Column(String(50), default="open")
     mitigation_plan = Column(Text)
@@ -1141,4 +1145,156 @@ class TicketSync(Base):
     ticket_status = Column(String(100))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# ── Posture Snapshots ──────────────────────────────────────────────────────────
+
+class PostureSnapshot(Base):
+    """Point-in-time metric capture per client — taken daily by the snapshot job."""
+    __tablename__ = "posture_snapshots"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    captured_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    open_findings = Column(Integer, default=0)
+    critical_findings = Column(Integer, default=0)
+    high_findings = Column(Integer, default=0)
+    medium_findings = Column(Integer, default=0)
+    low_findings = Column(Integer, default=0)
+    open_risks = Column(Integer, default=0)
+    mttr_critical_hours = Column(Float, nullable=True)   # avg hours critical findings take to close
+    mttr_high_hours = Column(Float, nullable=True)
+    compliance_score = Column(Float, nullable=True)
+    scan_count_30d = Column(Integer, default=0)
+    agent_runs_30d = Column(Integer, default=0)
+
+
+# ── Comments ───────────────────────────────────────────────────────────────────
+
+class Comment(Base):
+    """User comment on any security entity (finding, risk, remediation_action, threat_entry)."""
+    __tablename__ = "comments"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)   # "finding"|"risk"|"remediation_action"|"threat_entry"
+    entity_id = Column(String(36), nullable=False, index=True)
+    author_email = Column(String(200), nullable=False)
+    author_name = Column(String(200))
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# ── Webhooks ───────────────────────────────────────────────────────────────────
+
+class WebhookConfig(Base):
+    """Outbound webhook — fires on platform events to Slack, Teams, or any URL."""
+    __tablename__ = "webhook_configs"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=True, index=True)  # None = global
+    name = Column(String(200), nullable=False)
+    url = Column(String(1000), nullable=False)
+    secret = Column(String(200), nullable=True)    # HMAC signing secret
+    events = Column(JSON, default=list)            # ["finding.critical","scan.completed","agent.completed"]
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    deliveries = relationship("WebhookDelivery", back_populates="webhook", cascade="all, delete-orphan")
+
+
+class WebhookDelivery(Base):
+    """Log of every outbound webhook attempt."""
+    __tablename__ = "webhook_deliveries"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    webhook_id = Column(String(36), ForeignKey("webhook_configs.id"), nullable=False, index=True)
+    event_type = Column(String(100), nullable=False)
+    payload = Column(JSON)
+    status = Column(String(20), default="pending")   # pending|success|failed
+    response_status = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    webhook = relationship("WebhookConfig", back_populates="deliveries")
+
+
+# ── Scorecard Tokens ───────────────────────────────────────────────────────────
+
+class ScorecardToken(Base):
+    """Read-only embeddable scorecard link — shareable without login."""
+    __tablename__ = "scorecard_tokens"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    token = Column(String(64), unique=True, nullable=False)   # random hex
+    label = Column(String(200), default="Public Scorecard")
+    created_by = Column(String(200))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+
+
+# ── CTEM Programs ──────────────────────────────────────────────────────────────
+
+class CTEMProgram(Base):
+    """Continuous Threat Exposure Management engagement — 5-phase workflow."""
+    __tablename__ = "ctem_programs"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    name = Column(String(300), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), default="active")     # active|completed|paused
+    current_phase = Column(String(30), default="scope")  # scope|discover|prioritise|validate|mobilise
+    created_by = Column(String(200))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    phases = relationship("CTEMPhaseNote", back_populates="program", cascade="all, delete-orphan", order_by="CTEMPhaseNote.phase")
+
+
+class CTEMPhaseNote(Base):
+    """Notes and completion status for a single CTEM phase."""
+    __tablename__ = "ctem_phase_notes"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    program_id = Column(String(36), ForeignKey("ctem_programs.id"), nullable=False, index=True)
+    phase = Column(String(30), nullable=False)   # scope|discover|prioritise|validate|mobilise
+    notes = Column(Text, nullable=True)
+    actions = Column(JSON, default=list)          # list of action strings
+    completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_by = Column(String(200), nullable=True)
+
+    program = relationship("CTEMProgram", back_populates="phases")
+
+
+# ── Security Documents (RAG) ───────────────────────────────────────────────────
+
+class SecurityDocument(Base):
+    """Customer-uploaded security document for RAG-powered querying."""
+    __tablename__ = "security_documents"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    filename = Column(String(500), nullable=False)
+    content_type = Column(String(100))
+    size_bytes = Column(Integer, default=0)
+    extracted_text = Column(Text)         # full extracted plain text
+    chunk_count = Column(Integer, default=0)
+    uploaded_by = Column(String(200))
+    uploaded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+# ── API Keys ───────────────────────────────────────────────────────────────────
+
+class APIKey(Base):
+    """Programmatic API key for machine-to-machine access."""
+    __tablename__ = "api_keys"
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=True, index=True)  # None = global
+    name = Column(String(200), nullable=False)
+    key_hash = Column(String(64), nullable=False, unique=True)   # SHA-256 hex of full key
+    key_prefix = Column(String(12), nullable=False)              # first 8 chars for UI display
+    created_by = Column(String(200))
+    is_active = Column(Boolean, default=True)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    scopes = Column(JSON, default=list)    # ["read:findings","read:risks","read:dashboard"]
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

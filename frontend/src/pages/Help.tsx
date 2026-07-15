@@ -6,7 +6,7 @@ import {
 import {
   ExpandMore, MenuBook, RocketLaunch, Hub, BugReport, Insights,
   SmartToy, Schedule, AutoStories, BarChart, AdminPanelSettings,
-  SettingsSuggest, Search, Lightbulb, Warning, Radar,
+  SettingsSuggest, Search, Lightbulb, Warning, Radar, Psychology,
 } from "@mui/icons-material";
 
 interface Step {
@@ -90,11 +90,37 @@ const GROUPS: Group[] = [
           { text: "Frameworks — view seeded framework controls (NIST CSF, CIS v8, GDPR, ISO 27001, PCI DSS) and build Custom Standards by picking controls from any existing framework." },
           { text: "AI Buddies — run agents against completed scans. Also browse the full catalog of 60+ advisory agents." },
           { text: "Settings group (bottom): AI Settings (LLM provider config), Sync (feed sync — admin), Administration (RBAC — admin), Help." },
+          { text: "New Intelligence section: Attack Paths (→ /attack-paths), Ask Your Data / NL Query (→ /nl-query), Security Docs / RAG (→ /security-docs)." },
+          { text: "New Governance section: Posture Trends (→ /posture-trends), CTEM Programs (→ /ctem)." },
+          { text: "Settings section additions: Webhooks (→ /webhooks), API Keys (→ /api-keys)." },
         ],
         tips: [
           "Habit to build: select your client in the top toolbar before navigating anywhere. Every page reads the global selection — no data shows until a client is active.",
           "Connectors and Projects don't have standalone nav entries. They're tabs inside the Client Detail page: open Clients → click a client card.",
           "The Analyst / Executive toggle in the top toolbar switches the Dashboard between a detailed operational view and a summary executive view.",
+        ],
+      },
+      {
+        id: "platform-overview",
+        title: "What's new — advanced features overview",
+        summary: "Aegis has 7 advanced features beyond the core scan → findings → agents flow: Attack Path Visualisation, Natural Language Query, Posture Trends, CTEM workflow, Security Document RAG, Webhooks, and API Keys.",
+        steps: [
+          { text: "Attack Path Visualisation (Intelligence → Attack Paths): SVG graph that maps your open findings onto MITRE ATT&CK phases — Initial Access through Exfiltration. See which findings chain together into a realistic attack path.", detail: "No configuration needed — the graph is generated automatically from your current findings. Select a client and navigate to /attack-paths." },
+          { text: "Natural Language Query (Intelligence → Ask Your Data): type a plain-English question about your security data — 'How many critical findings are unresolved?', 'Which scanner found the most highs?' — and the platform generates SQL, runs it safely, and returns a result table plus a plain-English summary.", detail: "Only SELECT queries are allowed. The safety validator blocks DROP, DELETE, INSERT, UPDATE, and other write keywords before execution." },
+          { text: "Posture Trends (Governance → Posture Trends): Recharts area and line charts showing how your open finding counts, risk scores, and audit readiness percentage have changed over time. Takes a ?days= parameter (default 90). Manual snapshots trigger via the button on the page.", detail: "Snapshots must exist for the charts to show data. Click 'Capture Snapshot' on the Posture Trends page to seed the first data point. After that, snapshots accumulate automatically or via schedule." },
+          { text: "CTEM Programs (Governance → CTEM): structured 5-phase Continuous Threat Exposure Management workflow — Scope, Discover, Prioritise, Validate, Mobilise. Create a program per engagement or quarter. Advance phases with notes recording decisions made.", detail: "CTEM provides the process scaffolding around your scan and findings data — it answers 'where are we in the exposure management cycle?' not just 'what vulnerabilities exist?'" },
+          { text: "Security Document RAG (Intelligence → Security Docs): upload your security policies, procedures, or third-party assessment reports (PDF, DOCX, TXT). Then ask natural-language questions — 'Does our password policy cover MFA?' — and get answers grounded in your uploaded documents.", detail: "Documents are chunked at 800 chars with 100-char overlap. Retrieval uses keyword ranking followed by an LLM synthesis pass. Works entirely client-scoped — no cross-client document leakage." },
+          { text: "Webhooks (Settings → Webhooks): configure Slack, Teams, or any custom HTTPS endpoint to receive real-time event notifications. Supported events: critical finding created, scan completed, agent analysis completed. Payloads are HMAC-SHA256 signed for verification.", detail: "Use the 'Test delivery' button after saving a webhook to confirm the endpoint receives and responds correctly before relying on it for production alerts." },
+          { text: "API Keys (Settings → API Keys): generate machine-to-machine API keys for CI/CD pipelines, SIEM integrations, or custom scripts. Keys use the prefix 'aegis_' followed by 32 bytes of hex. The full key is shown only once at creation — store it securely. Revoke instantly from the same page." },
+        ],
+        tips: [
+          "Start with Posture Trends — capture a snapshot today and one per week going forward. After a month you'll have a concrete trending dataset to show stakeholders.",
+          "NL Query is the fastest way to answer ad-hoc reporting questions during a meeting without building a custom dashboard. Bookmark useful queries for repeat use.",
+          "Set up a Webhook to Slack for 'finding.critical' events so the security team gets instant notification when a critical finding is ingested — no polling the portal required.",
+        ],
+        warnings: [
+          "NL Query executes real database queries — results reflect live data at query time, not a snapshot. For audit evidence, use the Evidence Package download instead.",
+          "API key full values are shown only at creation time. If you close the dialog without copying, the key cannot be recovered — you must revoke and create a new one.",
         ],
       },
     ],
@@ -743,6 +769,221 @@ const GROUPS: Group[] = [
         warnings: [
           "If your custom framework doesn't appear in the Framework dropdown on the Agents page: the dropdown loads on page mount. Try refreshing the page. If still missing, check that the framework was actually saved (Custom Standards page should show it with a control count).",
           "Selecting a custom framework affects only the Compliance Monitor and Framework Analyst agents. Risk Manager, Threat Intel, and Remediation agents are framework-independent — they don't change behaviour based on the framework selector.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "intelligence",
+    title: "Intelligence & analysis",
+    icon: <Psychology />,
+    color: "#9C27B0",
+    topics: [
+      {
+        id: "attack-paths",
+        title: "Attack Path Visualisation",
+        summary: "The Attack Paths page renders your open findings as a layered SVG graph, grouping them by MITRE ATT&CK phase to show how individual vulnerabilities chain into realistic multi-stage attack paths from Initial Access to Exfiltration.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to Intelligence → Attack Paths." },
+          { text: "How the graph is built: the backend reads all open findings for the client, applies rule-based phase classification (pattern matching on title, description, CVE ID, and severity), and returns nodes, edges, and path chains.", detail: "Phases: Initial Access (external-facing vulns, CVE exploits), Execution (code execution weaknesses), Persistence (config gaps, auth issues), Lateral Movement (network/IAM misconfigs), Exfiltration (data exposure, logging gaps). A finding can appear in multiple phases." },
+          { text: "Reading the graph: nodes are colour-coded by phase. Edges connect phases that have correlated findings — a path with edges from Initial Access → Execution → Exfiltration means the platform detected findings enabling all three steps." },
+          { text: "Stats panel (right side): summary counts per phase, total nodes, total paths identified. Use this for a quick verbal summary: 'We have 3 attack paths, 7 Initial Access nodes, 2 reaching Exfiltration'." },
+          { text: "The graph regenerates live — run new scans and refresh the page to see updated paths." },
+        ],
+        tips: [
+          "Focus remediation effort on findings that appear in the highest number of path chains — they are the nodes that enable the most complete attack scenarios.",
+          "A long chain (Initial Access → Lateral Movement → Exfiltration) with no gaps is a red flag for a board briefing — it means an attacker has a complete playbook against your environment.",
+          "If the graph shows no nodes: no open findings exist for the active client, or the client has no completed scans. Run a scan first.",
+        ],
+        warnings: [
+          "Attack path classification is rule-based — it does not run a real exploitation chain. It shows potential paths based on finding characteristics, not confirmed exploitability.",
+        ],
+      },
+      {
+        id: "nl-query",
+        title: "Ask Your Data (Natural Language Query)",
+        summary: "Type a plain-English security question and Aegis translates it into SQL, runs it safely against your live data, and returns a result table plus a plain-English summary — no SQL knowledge required.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to Intelligence → Ask Your Data." },
+          { text: "Type your question in the text field. Examples:", detail: "'How many critical findings are still open?' / 'Which scanner found the most high-severity findings?' / 'What are the top 5 resources by finding count?' / 'Show me all findings with a CVSS score above 9.0' / 'How many findings were remediated this month?'" },
+          { text: "Click 'Ask'. The platform sends your question to the LLM which generates a SQLite SELECT statement targeting your client's findings, risks, and other tables." },
+          { text: "Safety validation runs before execution: the generated SQL is checked for SELECT-only compliance. Any query containing DROP, DELETE, INSERT, UPDATE, ALTER, or EXEC is rejected and an error is shown — the database is never written to." },
+          { text: "Results appear as a paginated table with column headers. A plain-English summary sentence appears above the table." },
+          { text: "The generated SQL is shown below the results — review it to understand exactly what was queried. This is useful for building dashboards or reports based on the same query." },
+        ],
+        tips: [
+          "Be specific about severity and status in your questions: 'open critical findings' vs 'all critical findings' returns different counts.",
+          "Ask comparative questions to surface insights: 'Which client has the most unresolved findings?' is useful for MSP portfolio views if you run NL Query as an admin.",
+          "Copy the generated SQL and use it in your own reporting tools (Power BI, Grafana, etc.) by connecting directly to the SQLite file on the backend host.",
+        ],
+        warnings: [
+          "NL Query reads live data — counts change as findings are created or remediated. For point-in-time audit evidence, use the Evidence Package download from /evidence/package instead.",
+          "Complex multi-table JOIN queries may occasionally produce incorrect SQL from the LLM. If results look wrong, rephrase the question more simply and compare the generated SQL to the result.",
+        ],
+      },
+      {
+        id: "posture-trends",
+        title: "Posture Trends & MTTR Tracking",
+        summary: "Posture Trends shows time-series charts of your security metrics — open findings by severity, overall risk score, and audit readiness percentage — so you can demonstrate improvement over time and track MTTR (Mean Time to Remediate) against SLA targets.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to Governance → Posture Trends." },
+          { text: "If the charts are empty: no snapshots have been captured yet. Click 'Capture Snapshot' to record today's metrics as the first data point.", detail: "Snapshots capture: open critical/high/medium/low/info counts, total risk ALE, and audit readiness %. Each snapshot is timestamped — the chart plots them chronologically." },
+          { text: "The ?days= selector (top-right) controls the time window: 30, 60, or 90 days (default). Adjust to zoom in on recent changes or view longer trends." },
+          { text: "MTTR section (below the posture charts): shows average time-to-remediate per severity vs. SLA targets.", detail: "SLA targets: Critical 24h, High 168h (7 days), Medium 720h (30 days). MTTR is computed from Finding.remediated_at - Finding.created_at for all findings with status=remediated. Red bars = SLA breached; green = within target." },
+          { text: "Capture snapshots regularly — weekly snapshots give meaningful trend lines. Monthly snapshots are the minimum for board-level reporting." },
+          { text: "Snapshot API: POST /api/v1/clients/{cid}/posture-history/snapshot — integrate this into your CI/CD pipeline or a cron job to automate captures without manual intervention." },
+        ],
+        tips: [
+          "Use the posture trend chart in monthly security reports: 'Open criticals dropped from 14 to 3 over 60 days' is more compelling than a static finding count.",
+          "MTTR breaches on Critical findings are an immediate red flag — 24h SLA means a critical vuln should be remediated the same day it's found. If the chart shows MTTR > 72h for criticals, escalate the remediation process.",
+          "If remediated_at is not being set: ensure the findings PATCH endpoint updates status to 'remediated' — that transition stamps the timestamp automatically.",
+        ],
+        warnings: [
+          "MTTR can only be computed for findings that have transitioned to 'remediated' status. Findings marked 'accepted' or 'closed' without being marked 'remediated' first are excluded from MTTR calculations.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "governance",
+    title: "Governance & compliance",
+    icon: <Radar />,
+    color: "#34A853",
+    topics: [
+      {
+        id: "ctem",
+        title: "CTEM Workflow (Continuous Threat Exposure Management)",
+        summary: "CTEM is a 5-phase operational framework for managing threat exposure continuously rather than point-in-time. Aegis implements CTEM Programs as a structured workflow: Scope → Discover → Prioritise → Validate → Mobilise — each phase records decisions and artifacts before advancing.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to Governance → CTEM Programs." },
+          { text: "Click 'New Program'. Enter a name (e.g. 'Q3 2026 Exposure Assessment') and optional description. The program is created at the Scope phase." },
+          { text: "Phase 1 — Scope: define what systems, assets, and risk categories are in scope for this cycle. Record scope decisions in the phase note field. Click 'Advance Phase' when scope is documented.", detail: "Scope decisions here inform which scans to run and which findings are in-scope for subsequent phases. Be explicit — 'all internet-facing assets in prod' is better than 'production environment'." },
+          { text: "Phase 2 — Discover: run scans (Assessments) and AI agents for the scoped assets. Link relevant scan results. Record discovery findings in the phase note. Advance when discovery is complete.", detail: "This phase overlaps with normal scan workflow — run your ZAP, Nmap, Semgrep, cloud connector scans here. The CTEM program provides the governance wrapper that tracks when and why you ran them." },
+          { text: "Phase 3 — Prioritise: use Risk Overview, FAIR-lite ALE scores, and attack path analysis to rank findings. Record prioritisation rationale. Advance when the team agrees on the priority list." },
+          { text: "Phase 4 — Validate: verify that high-priority findings are genuine (not false positives) and that proposed remediations are technically feasible. Record validation notes. Advance when validation is signed off." },
+          { text: "Phase 5 — Mobilise: assign remediation actions (Remediation Tracker), set due dates, notify stakeholders. Record mobilisation decisions. This phase closes the loop — findings become tracked work items." },
+        ],
+        tips: [
+          "Run CTEM Programs quarterly for broad coverage, or after significant infrastructure changes. Don't wait for annual audits.",
+          "Phase notes are the audit trail. Record who made which decision and why — this is what auditors and boards ask for when reviewing your exposure management process.",
+          "CTEM Programs pair well with Webhooks — configure a webhook for 'agent.completed' to notify the team when Discover phase analysis is ready to review.",
+        ],
+        warnings: [
+          "Advancing a phase is irreversible in the current implementation — you cannot move backward. Ensure phase notes are complete before clicking Advance.",
+        ],
+      },
+      {
+        id: "evidence",
+        title: "Compliance Evidence Collection (Evidence Package)",
+        summary: "The Evidence Package endpoint bundles your compliance-relevant data — findings, control deficiencies, remediation actions, agent logs, and framework assessments — into a single downloadable ZIP file for audit submission.",
+        steps: [
+          { text: "Select your client in the top toolbar." },
+          { text: "To download an evidence package: call GET /api/v1/clients/{cid}/evidence/package or use the 'Download Evidence' button on the Frameworks page (if available in the UI). An optional ?framework= query param filters the control deficiencies to a specific framework (e.g. iso_27001, pci_dss, gdpr).", detail: "The ZIP contains: findings.csv (all findings with severity, status, CVE, CVSS, assignee, due_date), control_deficiencies.json (framework gaps with control IDs and audit readiness), remediation_actions.json (all remediation tracker items with status and completion timestamps), agent_run_log.json (all agent executions with timestamps and types), framework_assessments.json (compliance scores per framework)." },
+          { text: "Provide the ZIP directly to auditors as pre-packaged evidence. The package reflects data at the time of download — re-download at audit completion for a final evidence snapshot." },
+          { text: "Filter by framework to produce a focused package: 'evidence for PCI DSS audit' only includes PCI DSS–mapped control deficiencies, making the package more navigable for a scoped audit." },
+          { text: "For GDPR right-to-erasure or data handling audits: the package proves that findings are tracked, assigned, and remediated in accordance with your stated security policy." },
+        ],
+        tips: [
+          "Download evidence packages at the start and end of a remediation sprint to show before/after state — two timestamped ZIPs are more compelling audit evidence than a dashboard screenshot.",
+          "The CSV format of findings.csv is importable into Excel, Google Sheets, or any GRC tool for further filtering or annotation by the auditor.",
+        ],
+        warnings: [
+          "Evidence packages contain full finding details including descriptions, evidence JSON, and CVE information — treat them as confidential documents (mark as Confidential / Internal Only) and share only via secure channels.",
+        ],
+      },
+      {
+        id: "scorecard",
+        title: "Embeddable Security Scorecard",
+        summary: "Generate a shareable public URL that displays a live security score for your client — no login required. Embed in customer portals, status pages, or executive dashboards. Score updates automatically as findings are resolved.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to the client's settings or the Scorecard section." },
+          { text: "Click 'Generate Scorecard Link'. The platform creates a ScorecardToken (random hex) and returns the public URL: /public/scorecard/{token}." },
+          { text: "Share the URL with anyone who needs visibility — customer, board member, partner. No Aegis account required to view it." },
+          { text: "The scorecard shows: overall score (0–100), severity breakdown (critical/high/medium/low/info open counts), and a colour-coded risk band (green >80, yellow 60–80, red <60).", detail: "Score formula: max(0, 100 - critical*10 - high*3 - other_open). Each open critical deducts 10 points, each open high deducts 3 points, each other open finding deducts 1 point." },
+          { text: "Manage tokens: GET /clients/{cid}/scorecard/tokens lists all active tokens. DELETE /clients/{cid}/scorecard/tokens/{token} revokes access immediately — the URL returns 404 for anyone who tries it after revocation." },
+          { text: "Multiple tokens can exist per client — create separate tokens for different audiences (e.g. one for the customer portal, one for the executive dashboard) and revoke each independently." },
+        ],
+        tips: [
+          "Use scorecard URLs in SLA reporting to customers — they can self-serve their current security score without needing a portal login or a meeting.",
+          "Revoke and reissue tokens when a client engagement ends or personnel change — old URLs should not remain active indefinitely.",
+        ],
+        warnings: [
+          "Scorecard URLs are public and require no authentication. Anyone with the URL can see the score and finding counts. Do not share tokens over insecure channels. The token is the only access control — treat it like a password.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "integrations",
+    title: "Integrations & API",
+    icon: <Hub />,
+    color: "#4285F4",
+    topics: [
+      {
+        id: "webhooks",
+        title: "Slack / Teams / Custom Webhook Notifications",
+        summary: "Configure outbound webhooks to Slack, Microsoft Teams, or any HTTPS endpoint so your team receives real-time notifications when critical findings are created, scans complete, or AI agents finish analysis — without polling the portal.",
+        steps: [
+          { text: "Navigate to Settings → Webhooks." },
+          { text: "Click 'Add Webhook'. Fill in:", detail: "Name: descriptive label (e.g. 'Security Team Slack'). URL: the HTTPS endpoint that will receive events (Slack incoming webhook URL, Teams connector URL, or your own API endpoint). Events: select one or more — 'finding.critical', 'scan.completed', 'agent.completed'. Secret (optional but recommended): a string used to generate the HMAC-SHA256 signature." },
+          { text: "Click 'Save'. Click 'Test Delivery' on the webhook row to send a test payload immediately.", detail: "Test deliveries POST a sample JSON payload to your endpoint. Check the Delivery Log for the HTTP response code. A 200 response means your endpoint received and accepted it." },
+          { text: "How payload signing works: every delivery includes an X-Aegis-Signature header containing HMAC-SHA256(secret, payload_body_as_bytes). Verify this on your endpoint to confirm the payload is genuine and hasn't been tampered with.", detail: "In Python: hmac.compare_digest(computed_sig, received_sig). In Node.js: crypto.createHmac('sha256', secret).update(body).digest('hex'). Reject deliveries where signatures don't match." },
+          { text: "Delivery Log: each webhook config shows a log of recent deliveries — timestamp, event type, HTTP status code, and response body. Use this to diagnose delivery failures." },
+          { text: "For Slack: create an Incoming Webhook App in your Slack workspace (api.slack.com/apps → Incoming Webhooks → Add New Webhook to Workspace). Paste the resulting URL into Aegis. Aegis payloads use a JSON structure that Slack's incoming webhooks accept natively." },
+          { text: "For Teams: create a workflow using 'Post to a channel when a webhook request is received' in Power Automate, or use the Teams Incoming Webhook connector. Paste the webhook URL into Aegis." },
+        ],
+        tips: [
+          "Start with 'finding.critical' — an immediate Slack message when a critical finding is ingested is the highest-value notification. The team can react within minutes rather than the next time someone checks the portal.",
+          "Use separate webhooks for separate audiences — one to the security team's Slack channel, one to the CISO's Teams channel, each subscribed to different event types.",
+          "If deliveries show 4xx errors: check that your endpoint accepts POST requests with Content-Type: application/json and doesn't require additional auth headers that Aegis isn't sending.",
+        ],
+        warnings: [
+          "Webhook deliveries are fire-and-forget with one retry on failure. If your endpoint is down during a critical finding event, the notification is not queued indefinitely. Ensure your endpoint has high availability for security-critical events.",
+          "Do not use webhook URLs as substitutes for authentication. Validate the X-Aegis-Signature on every delivery — a leaked webhook URL could otherwise allow spoofed events.",
+        ],
+      },
+      {
+        id: "api-keys",
+        title: "API Keys & Programmatic Access",
+        summary: "Generate long-lived API keys for CI/CD pipelines, SIEM integrations, or scripts that need to call Aegis APIs without a user login. Keys use the 'aegis_' prefix and are scoped to specific capabilities. The full key is shown only once — store it securely immediately.",
+        steps: [
+          { text: "Navigate to Settings → API Keys." },
+          { text: "Click 'Create API Key'. Enter a descriptive name (e.g. 'GitHub Actions CI pipeline', 'Splunk SIEM integration'). Select the scopes this key requires — scopes limit what the key can call.", detail: "Scopes control access: 'findings:read' (query findings), 'scans:write' (trigger scans), 'reports:read' (download evidence/reports), 'webhooks:write' (configure webhooks). Assign minimum necessary scopes — principle of least privilege." },
+          { text: "Click 'Generate'. The full key (format: aegis_[64 hex chars]) is displayed exactly once in a highlighted box. Copy it immediately — this is the only time the platform shows the full key value.", detail: "What's stored in the database: only a SHA-256 hash of the key — not the key itself. This means even a direct database read cannot recover the key. If you lose it, revoke and create a new one." },
+          { text: "Use the key in API calls via the Authorization header: Authorization: Bearer aegis_[your-key-here]. The platform verifies by hashing the received key and comparing to stored hashes." },
+          { text: "To revoke: find the key in the API Keys list (identified by its name and creation date — never by the full key value), click 'Revoke'. The key becomes invalid immediately — any in-flight request using it returns 401." },
+          { text: "Key list shows: name, scopes, creation date, last-used timestamp, and status. Monitor last-used to identify unused keys that should be revoked." },
+        ],
+        tips: [
+          "Create separate keys per integration — one for GitHub Actions, one for your SIEM, one for scripts. This makes it easy to revoke one without disrupting others.",
+          "Set calendar reminders to rotate API keys every 90 days, or immediately after any team member who knew the key leaves the organisation.",
+          "Use API keys in CI/CD to trigger scans automatically on code merge: POST /api/v1/clients/{cid}/scans/ with the appropriate connector and scan type. The pipeline gets findings back as JSON.",
+        ],
+        warnings: [
+          "Never commit API keys to source control, even in private repositories. Use CI/CD secret management (GitHub Actions Secrets, Azure Key Vault, HashiCorp Vault) to inject them as environment variables at runtime.",
+          "If a key is compromised, revoke it immediately from Settings → API Keys. There is no 'suspend' — only revoke. Issue a new key through a different channel than the compromised one.",
+        ],
+      },
+      {
+        id: "security-docs",
+        title: "Security Document RAG (Policy Q&A)",
+        summary: "Upload your organisation's security policies, procedures, compliance reports, or vendor assessments (PDF, DOCX, or TXT) and ask plain-English questions. The platform retrieves the most relevant sections and generates a grounded answer — no hallucination from general training data, only your documents.",
+        steps: [
+          { text: "Select your client in the top toolbar. Navigate to Intelligence → Security Docs." },
+          { text: "Click 'Upload Document'. Select a PDF, DOCX, or TXT file. The platform extracts text, chunks it (800 chars, 100-char overlap), and stores it in the SecurityDocument table for the active client.", detail: "Supported: PDF (via pdfminer/PyMuPDF), DOCX (via python-docx), TXT (plain text). Password-protected PDFs are not supported — export to unprotected PDF first. Scanned/image-only PDFs with no embedded text yield no extractable content." },
+          { text: "Once uploaded, the document appears in the list with its filename, upload date, and page/chunk count." },
+          { text: "Ask a question in the Q&A panel: type your question and click 'Ask'. The system retrieves the top-ranked chunks using keyword matching, then sends them to the LLM as context to generate an answer.", detail: "The answer includes which document sections were used as sources, so you can verify the answer against the original document." },
+          { text: "Example questions:", detail: "'Does our information security policy address remote access?' / 'What is our defined RTO for critical systems?' / 'Does this vendor SOC 2 report cover our data region?' / 'Which controls does our password policy implement?'" },
+          { text: "Delete documents: click the trash icon on any document row. The document and all its chunks are removed from the RAG corpus immediately." },
+        ],
+        tips: [
+          "Upload your most current versions of key documents: Information Security Policy, Business Continuity Plan, Incident Response Plan, and any relevant third-party audit reports (SOC 2, ISO cert, pen test reports).",
+          "RAG works best with text-dense documents. Short 2-page policies produce fewer chunks than comprehensive standards — both work, but longer documents give the retrieval system more to work with.",
+          "For compliance questionnaires (vendor DDQs, customer security assessments): upload the questionnaire as TXT and ask 'Does our information security policy address [question]?' for quick first-pass responses.",
+        ],
+        warnings: [
+          "Documents are stored client-scoped — documents uploaded for Client A are never accessible when Client B is the active client. Verify the correct client is selected before uploading.",
+          "RAG answers are only as accurate as your uploaded documents. If a policy is out of date, the answer reflects the outdated policy. Keep documents current.",
         ],
       },
     ],

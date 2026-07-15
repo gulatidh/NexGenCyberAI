@@ -14,7 +14,8 @@ import {
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
-  SyncAlt, Assignment,
+  SyncAlt, Assignment, AccountTree, Psychology, Description,
+  Notifications, VpnKey, TrendingUp,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -85,11 +86,28 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    section: "Intelligence",
+    items: [
+      { label: "Attack Paths",   icon: <AccountTree />,  path: "/attack-paths" },
+      { label: "Ask Your Data",  icon: <Psychology />,   path: "/nl-query" },
+      { label: "Security Docs",  icon: <Description />,  path: "/security-docs" },
+    ],
+  },
+  {
+    section: "Governance",
+    items: [
+      { label: "Posture Trends", icon: <TrendingUp />,   path: "/posture-trends" },
+      { label: "CTEM Programs",  icon: <Radar />,        path: "/ctem" },
+    ],
+  },
+  {
     section: "Settings",
     items: [
-      { label: "Settings",     icon: <Settings />,    path: "/settings" },
-      { label: "Access Logs",  icon: <Assignment />,  path: "/access-logs", adminOnly: true },
-      { label: "Help",         icon: <MenuBook />,    path: "/help" },
+      { label: "Settings",     icon: <Settings />,       path: "/settings" },
+      { label: "Webhooks",     icon: <Notifications />,  path: "/webhooks" },
+      { label: "API Keys",     icon: <VpnKey />,         path: "/api-keys" },
+      { label: "Access Logs",  icon: <Assignment />,     path: "/access-logs", adminOnly: true },
+      { label: "Help",         icon: <MenuBook />,       path: "/help" },
     ],
   },
 ];

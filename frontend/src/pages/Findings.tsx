@@ -7,12 +7,12 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip, IconButton,
   Snackbar,
 } from "@mui/material";
-import { BugReport, DeleteOutlined, CleaningServices, FileDownload } from "@mui/icons-material";
+import { BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { findingsApi, projectsApi, scansApi } from "../services/api";
+import { findingsApi, projectsApi, scansApi, postureApi } from "../services/api";
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
@@ -209,6 +209,18 @@ export default function Findings() {
     enabled: !!clientId,
   });
 
+  // Posture history for MTTR display (last 30 days, latest snapshot)
+  const { data: postureHistory = [] } = useQuery<any[]>({
+    queryKey: ["posture-history-findings", clientId],
+    queryFn: () => postureApi.getHistory(clientId, 30),
+    enabled: !!clientId,
+  });
+  const sortedPosture = [...postureHistory].sort(
+    (a, b) => new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime()
+  );
+  const latestPosture = sortedPosture[sortedPosture.length - 1] ?? null;
+  const prevPosture = sortedPosture[sortedPosture.length - 2] ?? null;
+
   // When a specific scan is selected the catData query still returns global
   // (all-scan) counts. Recompute counts from the already-fetched scan-filtered
   // findings list so the tiles reflect only that scan's data.
@@ -376,6 +388,89 @@ export default function Findings() {
           </Button>
         </Box>
       </Box>
+
+      {/* MTTR strip — compact row shown when posture history is available */}
+      {clientId && latestPosture && (
+        <Box sx={{ display: "flex", gap: 1.5, mb: 2.5, flexWrap: "wrap", alignItems: "center" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 0.5 }}>
+            MTTR:
+          </Typography>
+          {[
+            {
+              label: "Critical",
+              hours: latestPosture.mttr_critical_hours as number | null,
+              prevHours: prevPosture?.mttr_critical_hours as number | null | undefined,
+              sla: 24,
+            },
+            {
+              label: "High",
+              hours: latestPosture.mttr_high_hours as number | null,
+              prevHours: prevPosture?.mttr_high_hours as number | null | undefined,
+              sla: 168,
+            },
+          ].map(({ label, hours, prevHours, sla }) => {
+            const withinSla = hours != null && hours < sla;
+            const improving = hours != null && prevHours != null && hours < prevHours;
+            const display =
+              hours == null
+                ? "—"
+                : hours < 1
+                ? `${Math.round(hours * 60)}m`
+                : hours < 24
+                ? `${hours.toFixed(1)}h`
+                : `${(hours / 24).toFixed(1)}d`;
+            return (
+              <Tooltip
+                key={label}
+                title={
+                  hours == null
+                    ? `${label}: no data`
+                    : `${label} MTTR: ${display} — SLA ${hours < sla ? "met" : "breached"} (target < ${sla}h)${improving ? " — Improving" : ""}`
+                }
+              >
+                <Chip
+                  size="small"
+                  icon={
+                    hours == null ? undefined : withinSla ? (
+                      <CheckCircle sx={{ fontSize: "14px !important", color: "#34A853 !important" }} />
+                    ) : (
+                      <Cancel sx={{ fontSize: "14px !important", color: "#f44336 !important" }} />
+                    )
+                  }
+                  label={`${label}: ${display}${improving ? " ↓" : ""}`}
+                  sx={{
+                    bgcolor: hours == null
+                      ? "rgba(255,255,255,0.06)"
+                      : withinSla
+                      ? "rgba(52,168,83,0.12)"
+                      : "rgba(244,67,54,0.12)",
+                    color: hours == null
+                      ? "text.secondary"
+                      : withinSla
+                      ? "#34A853"
+                      : "#f44336",
+                    fontSize: 11,
+                    height: 22,
+                    fontWeight: improving ? 700 : 400,
+                  }}
+                />
+              </Tooltip>
+            );
+          })}
+          {latestPosture.compliance_score != null && (
+            <Chip
+              size="small"
+              label={`Compliance: ${(latestPosture.compliance_score as number).toFixed(1)}%`}
+              sx={{
+                bgcolor: "rgba(66,133,244,0.12)",
+                color: "#82b1ff",
+                fontSize: 11,
+                height: 22,
+              }}
+            />
+          )}
+        </Box>
+      )}
 
       {clientId && (
         <>

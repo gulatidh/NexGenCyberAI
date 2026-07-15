@@ -50,6 +50,13 @@ import VAPTReports from "./pages/VAPTReports";
 import VAPTReportDetail from "./pages/VAPTReportDetail";
 import ScanDiff from "./pages/ScanDiff";
 import TicketSyncPage from "./pages/TicketSync";
+import CTEMPage from "./pages/CTEMPage";
+import SecurityDocs from "./pages/SecurityDocs";
+import Webhooks from "./pages/Webhooks";
+import APIKeysPage from "./pages/APIKeysPage";
+import AttackPaths from "./pages/AttackPaths";
+import NLQuery from "./pages/NLQuery";
+import PostureTrends from "./pages/PostureTrends";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -162,6 +169,13 @@ function ProtectedApp() {
           <Route path="/vapt-reports" element={<VAPTReports />} />
           <Route path="/vapt-reports/:reportId" element={<VAPTReportDetail />} />
           <Route path="/ticket-sync" element={<TicketSyncPage />} />
+          <Route path="/ctem" element={<CTEMPage />} />
+          <Route path="/security-docs" element={<SecurityDocs />} />
+          <Route path="/webhooks" element={<Webhooks />} />
+          <Route path="/api-keys" element={<APIKeysPage />} />
+          <Route path="/attack-paths" element={<AttackPaths />} />
+          <Route path="/nl-query" element={<NLQuery />} />
+          <Route path="/posture-trends" element={<PostureTrends />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>
