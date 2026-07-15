@@ -606,27 +606,110 @@ export default function LandingPage() {
             ))}
           </Grid>
 
-          {/* Architecture callout */}
-          <Box sx={{
-            p: { xs: 3, md: 4 }, borderRadius: 2,
-            border: `1px solid rgba(52,168,83,0.25)`,
-            background: "rgba(52,168,83,0.04)",
-            display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 4, alignItems: { md: "center" },
-          }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 1, color: "#34A853" }}>Deployment Options</Typography>
-              <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 13.5, lineHeight: 1.7 }}>
-                Azure: App Service + private endpoint + VNet integration. AWS: Elastic Beanstalk or ECS + VPC private subnet + PrivateLink. GCP: Cloud Run + VPC connector. On-prem: Docker or Kubernetes on your own hardware. All options: zero public egress, your choice of managed or self-hosted AI.
-              </Typography>
+          {/* Azure Reference Architecture Diagram */}
+          <Box sx={{ borderRadius: 2, border: `1px solid rgba(52,168,83,0.25)`, background: "rgba(52,168,83,0.04)", p: { xs: 2, md: 4 } }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 3, color: "#34A853", textAlign: "center" }}>
+              Azure Reference Architecture (private deployment)
+            </Typography>
+            <Box sx={{ overflowX: "auto" }}>
+              <svg viewBox="0 0 860 340" width="100%" style={{ display: "block", maxWidth: 860, margin: "0 auto" }} aria-label="Azure private deployment architecture diagram">
+                <defs>
+                  <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="rgba(255,255,255,0.35)" />
+                  </marker>
+                  <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="#34A853" />
+                  </marker>
+                </defs>
+
+                {/* ── User / Corp Network ── */}
+                <rect x="10" y="120" width="130" height="100" rx="10" fill="rgba(66,133,244,0.08)" stroke="rgba(66,133,244,0.4)" strokeWidth="1.5" />
+                <text x="75" y="145" textAnchor="middle" fill="#4285F4" fontSize="11" fontWeight="700">CORP NETWORK</text>
+                <rect x="26" y="155" width="98" height="28" rx="6" fill="rgba(66,133,244,0.15)" stroke="rgba(66,133,244,0.3)" strokeWidth="1" />
+                <text x="75" y="174" textAnchor="middle" fill="rgba(255,255,255,0.8)" fontSize="10">👤 Analyst / User</text>
+                <rect x="26" y="189" width="98" height="22" rx="5" fill="rgba(66,133,244,0.1)" stroke="rgba(66,133,244,0.25)" strokeWidth="1" />
+                <text x="75" y="204" textAnchor="middle" fill="rgba(255,255,255,0.55)" fontSize="9">VPN / ExpressRoute</text>
+
+                {/* arrow corp → vnet */}
+                <line x1="140" y1="170" x2="185" y2="170" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" markerEnd="url(#arr)" strokeDasharray="4 3" />
+
+                {/* ── Azure VNet boundary ── */}
+                <rect x="185" y="20" width="490" height="300" rx="14" fill="rgba(0,180,255,0.03)" stroke="rgba(0,180,255,0.2)" strokeWidth="1.5" strokeDasharray="6 4" />
+                <text x="430" y="42" textAnchor="middle" fill="rgba(0,180,255,0.5)" fontSize="11" fontWeight="600">Azure Virtual Network (private subnet — no public IP)</text>
+
+                {/* ── App Gateway / Private Endpoint ── */}
+                <rect x="205" y="120" width="130" height="100" rx="10" fill="rgba(251,188,4,0.06)" stroke="rgba(251,188,4,0.35)" strokeWidth="1.5" />
+                <text x="270" y="143" textAnchor="middle" fill="#FBBC04" fontSize="10" fontWeight="700">APP GATEWAY</text>
+                <text x="270" y="158" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="9">Private Endpoint</text>
+                <rect x="220" y="165" width="100" height="22" rx="5" fill="rgba(251,188,4,0.1)" stroke="rgba(251,188,4,0.25)" strokeWidth="1" />
+                <text x="270" y="180" textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9">WAF + TLS Termination</text>
+                <rect x="220" y="192" width="100" height="20" rx="5" fill="rgba(251,188,4,0.07)" stroke="rgba(251,188,4,0.2)" strokeWidth="1" />
+                <text x="270" y="205" textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize="9">No public listener</text>
+
+                {/* arrow gateway → app service */}
+                <line x1="335" y1="170" x2="375" y2="170" stroke="#34A853" strokeWidth="1.5" markerEnd="url(#arr-green)" />
+
+                {/* ── Aegis App Service ── */}
+                <rect x="375" y="55" width="140" height="230" rx="10" fill="rgba(52,168,83,0.07)" stroke="rgba(52,168,83,0.45)" strokeWidth="2" />
+                <text x="445" y="78" textAnchor="middle" fill="#34A853" fontSize="11" fontWeight="700">AEGIS</text>
+                <text x="445" y="92" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">Azure App Service</text>
+                <rect x="388" y="100" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="115" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">⚡ FastAPI Backend</text>
+                <rect x="388" y="128" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="143" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">⚛ React Frontend</text>
+                <rect x="388" y="156" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="171" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">🗄 SQLite / Azure SQL</text>
+                <rect x="388" y="184" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="199" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">🤖 AI Agent Runner</text>
+                <rect x="388" y="212" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="227" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">🔐 Entra ID Auth</text>
+                <rect x="388" y="240" width="114" height="22" rx="5" fill="rgba(52,168,83,0.12)" stroke="rgba(52,168,83,0.3)" strokeWidth="1" />
+                <text x="445" y="255" textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize="9">📊 Scanner Connectors</text>
+
+                {/* arrow app service → AI */}
+                <line x1="515" y1="130" x2="555" y2="130" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" markerEnd="url(#arr)" strokeDasharray="4 3" />
+
+                {/* ── Azure OpenAI (private endpoint) ── */}
+                <rect x="555" y="60" width="105" height="60" rx="10" fill="rgba(124,58,237,0.08)" stroke="rgba(124,58,237,0.4)" strokeWidth="1.5" />
+                <text x="607" y="82" textAnchor="middle" fill={PURPLE} fontSize="10" fontWeight="700">AZURE OpenAI</text>
+                <text x="607" y="97" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="9">Private Endpoint</text>
+                <text x="607" y="112" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="8">GPT-4o / Claude</text>
+
+                {/* arrow app service → storage */}
+                <line x1="515" y1="200" x2="555" y2="200" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" markerEnd="url(#arr)" strokeDasharray="4 3" />
+
+                {/* ── Key Vault ── */}
+                <rect x="555" y="150" width="105" height="45" rx="10" fill="rgba(234,67,53,0.07)" stroke="rgba(234,67,53,0.3)" strokeWidth="1.5" />
+                <text x="607" y="170" textAnchor="middle" fill="#EA4335" fontSize="10" fontWeight="700">KEY VAULT</text>
+                <text x="607" y="186" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">Secrets / Certs</text>
+
+                {/* ── Storage ── */}
+                <rect x="555" y="210" width="105" height="45" rx="10" fill="rgba(251,188,4,0.07)" stroke="rgba(251,188,4,0.3)" strokeWidth="1.5" />
+                <text x="607" y="230" textAnchor="middle" fill="#FBBC04" fontSize="10" fontWeight="700">BLOB STORAGE</text>
+                <text x="607" y="246" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">Reports / Exports</text>
+
+                {/* ── Monitor ── */}
+                <rect x="555" y="270" width="105" height="38" rx="10" fill="rgba(0,180,255,0.07)" stroke="rgba(0,180,255,0.3)" strokeWidth="1.5" />
+                <text x="607" y="288" textAnchor="middle" fill={CYAN} fontSize="10" fontWeight="700">AZURE MONITOR</text>
+                <text x="607" y="302" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">Logs / Alerts</text>
+
+                {/* ── Entra ID (outside VNet) ── */}
+                <rect x="690" y="120" width="115" height="60" rx="10" fill="rgba(66,133,244,0.07)" stroke="rgba(66,133,244,0.35)" strokeWidth="1.5" />
+                <text x="748" y="142" textAnchor="middle" fill="#4285F4" fontSize="10" fontWeight="700">ENTRA ID</text>
+                <text x="748" y="157" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="9">Identity / SSO</text>
+                <text x="748" y="171" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="8">Multi-tenant auth</text>
+                <line x1="660" y1="213" x2="690" y2="150" stroke="rgba(66,133,244,0.4)" strokeWidth="1.2" markerEnd="url(#arr)" strokeDasharray="4 3" />
+
+                {/* legend */}
+                <line x1="205" y1="328" x2="235" y2="328" stroke="#34A853" strokeWidth="1.5" />
+                <text x="240" y="332" fill="rgba(255,255,255,0.45)" fontSize="9">Internal traffic (private)</text>
+                <line x1="360" y1="328" x2="390" y2="328" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" strokeDasharray="4 3" />
+                <text x="395" y="332" fill="rgba(255,255,255,0.45)" fontSize="9">Service-to-service (VNet)</text>
+              </svg>
             </Box>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minWidth: { md: 220 } }}>
-              {["Azure / AWS / GCP / On-Prem", "Private Endpoints / VPC", "VPN / ExpressRoute / Direct Connect", "Self-hosted or managed AI", "Your database, your keys"].map((item) => (
-                <Box key={item} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#34A853", flexShrink: 0 }} />
-                  <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>{item}</Typography>
-                </Box>
-              ))}
-            </Box>
+            <Typography sx={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: 11, mt: 2 }}>
+              All components run inside your Azure subscription with no public internet exposure. AWS, GCP, and on-prem topologies follow the same private-network pattern.
+            </Typography>
           </Box>
         </Container>
       </Box>
