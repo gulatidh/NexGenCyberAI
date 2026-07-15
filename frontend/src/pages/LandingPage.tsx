@@ -546,6 +546,91 @@ export default function LandingPage() {
         </Container>
       </Box>
 
+      {/* ── Private Deployment ─────────────────────────────────────────────── */}
+      <Box id="deployment" sx={{ py: { xs: 10, md: 14 }, borderTop: `1px solid ${BORDER}` }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", mb: 8 }}>
+            <Chip label="ENTERPRISE DEPLOYMENT" size="small" sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontWeight: 700, fontSize: 11, letterSpacing: 1, mb: 2 }} />
+            <Typography sx={{ fontSize: { xs: 28, md: 38 }, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15, mb: 2 }}>
+              Deploy inside your{" "}
+              <Box component="span" sx={{ background: `linear-gradient(135deg, #34A853, ${CYAN})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                own environment
+              </Box>
+            </Typography>
+            <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 620, mx: "auto", lineHeight: 1.65 }}>
+              Aegis runs entirely inside your own cloud or on-premises infrastructure — Azure, AWS, GCP, or a private data centre. No internet exposure. No data leaving your boundary. Works wherever your workloads live.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3} sx={{ mb: 6 }}>
+            {[
+              {
+                icon: "🔒",
+                title: "Private Network Only",
+                body: "Deploy behind a private load balancer or app gateway — the portal is accessible only via your VPN, VNet, or private network. No public internet exposure required.",
+              },
+              {
+                icon: "☁️",
+                title: "Any Cloud or On-Premises",
+                body: "Runs on Azure App Service, AWS Elastic Beanstalk, GCP Cloud Run, Kubernetes, or a plain VM in your own data centre. You own the infrastructure; we own none of it.",
+              },
+              {
+                icon: "🔐",
+                title: "Data Never Leaves",
+                body: "All scan data, findings, AI analysis, and reports are stored in your own database. Nothing is sent to external services or third-party SaaS platforms.",
+              },
+              {
+                icon: "🤖",
+                title: "Your Own AI Models",
+                body: "Connect to Azure OpenAI, AWS Bedrock, Google Vertex AI, or a self-hosted model. AI agents call your own deployment — no data touches a shared public LLM endpoint.",
+              },
+              {
+                icon: "🌐",
+                title: "Internal Access via VPN / ExpressRoute",
+                body: "Integrate with your existing network topology. Route platform traffic through VPN Gateway, ExpressRoute, AWS Direct Connect, or GCP Interconnect — users access it like any internal app.",
+              },
+            ].map((card) => (
+              <Grid key={card.title} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Box sx={{
+                  p: 3, height: "100%",
+                  border: `1px solid ${BORDER}`, borderRadius: 2,
+                  background: "rgba(255,255,255,0.02)",
+                  transition: "border-color 0.2s",
+                  "&:hover": { borderColor: "rgba(52,168,83,0.4)", background: "rgba(52,168,83,0.03)" },
+                }}>
+                  <Typography sx={{ fontSize: 28, mb: 1.5 }}>{card.icon}</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1, color: "text.primary" }}>{card.title}</Typography>
+                  <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 13.5, lineHeight: 1.65 }}>{card.body}</Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Architecture callout */}
+          <Box sx={{
+            p: { xs: 3, md: 4 }, borderRadius: 2,
+            border: `1px solid rgba(52,168,83,0.25)`,
+            background: "rgba(52,168,83,0.04)",
+            display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 4, alignItems: { md: "center" },
+          }}>
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 1, color: "#34A853" }}>Deployment Options</Typography>
+              <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 13.5, lineHeight: 1.7 }}>
+                Azure: App Service + private endpoint + VNet integration. AWS: Elastic Beanstalk or ECS + VPC private subnet + PrivateLink. GCP: Cloud Run + VPC connector. On-prem: Docker or Kubernetes on your own hardware. All options: zero public egress, your choice of managed or self-hosted AI.
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minWidth: { md: 220 } }}>
+              {["Azure / AWS / GCP / On-Prem", "Private Endpoints / VPC", "VPN / ExpressRoute / Direct Connect", "Self-hosted or managed AI", "Your database, your keys"].map((item) => (
+                <Box key={item} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#34A853", flexShrink: 0 }} />
+                  <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>{item}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+
       {/* ── FAQ ────────────────────────────────────────────────────────────── */}
       <Box id="faq" sx={{ py: { xs: 8, md: 12 }, background: "rgba(255,255,255,0.012)", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
         <Container maxWidth="md">
@@ -580,96 +665,6 @@ export default function LandingPage() {
                 </AccordionDetails>
               </Accordion>
             ))}
-          </Box>
-        </Container>
-      </Box>
-
-      {/* ── Private Deployment ─────────────────────────────────────────────── */}
-      <Box id="deployment" sx={{ py: { xs: 10, md: 14 }, borderTop: `1px solid ${BORDER}` }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", mb: 8 }}>
-            <Chip label="ENTERPRISE DEPLOYMENT" size="small" sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontWeight: 700, fontSize: 11, letterSpacing: 1, mb: 2 }} />
-            <Typography sx={{ fontSize: { xs: 28, md: 38 }, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.15, mb: 2 }}>
-              Deploy inside your{" "}
-              <Box component="span" sx={{ background: `linear-gradient(135deg, #34A853, ${CYAN})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                own environment
-              </Box>
-            </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 580, mx: "auto", lineHeight: 1.65 }}>
-              Aegis can be deployed entirely within your Azure subscription. No internet exposure. No data leaving your boundary. Your security data stays where your data governance requires it.
-            </Typography>
-          </Box>
-
-          <Grid container spacing={3} sx={{ mb: 6 }}>
-            {[
-              {
-                icon: "🔒",
-                title: "Private Endpoints Only",
-                body: "Deploy on Azure App Service with private endpoints — the portal is accessible only via your VNet or ExpressRoute. No public internet exposure required.",
-              },
-              {
-                icon: "🏢",
-                title: "Your Azure Subscription",
-                body: "Runs entirely in your own Azure tenant. You control the resource group, region, networking, and compliance boundaries — Accenture or any managed provider can deploy it for you.",
-              },
-              {
-                icon: "🔐",
-                title: "Data Never Leaves",
-                body: "All scan data, findings, AI analysis, and reports are stored in your own Azure SQL or SQLite on App Service. Nothing is sent to external services or third-party SaaS platforms.",
-              },
-              {
-                icon: "🤖",
-                title: "Your Own AI Models",
-                body: "Connect to Azure OpenAI in your tenant — AI agents call your own deployment, not a shared API. Data processed by AI never touches a public LLM endpoint.",
-              },
-              {
-                icon: "🌐",
-                title: "Internal Access via ExpressRoute",
-                body: "Integrate with your existing hub-and-spoke VNet topology. Route platform traffic through ExpressRoute or VPN Gateway — users access it like any internal application.",
-              },
-              {
-                icon: "✅",
-                title: "Compliance Ready",
-                body: "Suitable for ISO 27001, SOC 2, and regulated industry environments. No data residency concerns — you choose the Azure region and own the encryption keys.",
-              },
-            ].map((card) => (
-              <Grid key={card.title} size={{ xs: 12, sm: 6, md: 4 }}>
-                <Box sx={{
-                  p: 3, height: "100%",
-                  border: `1px solid ${BORDER}`, borderRadius: 2,
-                  background: "rgba(255,255,255,0.02)",
-                  transition: "border-color 0.2s",
-                  "&:hover": { borderColor: "rgba(52,168,83,0.4)", background: "rgba(52,168,83,0.03)" },
-                }}>
-                  <Typography sx={{ fontSize: 28, mb: 1.5 }}>{card.icon}</Typography>
-                  <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1, color: "text.primary" }}>{card.title}</Typography>
-                  <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 13.5, lineHeight: 1.65 }}>{card.body}</Typography>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-
-          {/* Architecture callout */}
-          <Box sx={{
-            p: { xs: 3, md: 4 }, borderRadius: 2,
-            border: `1px solid rgba(52,168,83,0.25)`,
-            background: "rgba(52,168,83,0.04)",
-            display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 4, alignItems: { md: "center" },
-          }}>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 1, color: "#34A853" }}>Reference Architecture</Typography>
-              <Typography sx={{ color: "rgba(255,255,255,0.55)", fontSize: 13.5, lineHeight: 1.7 }}>
-                Azure App Service (private endpoint) → VNet Integration → Azure OpenAI (private endpoint) → App Service Storage / Azure SQL. Access via Private DNS Zone + ExpressRoute or VPN. All traffic stays on the Microsoft backbone — zero public egress required.
-              </Typography>
-            </Box>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, minWidth: { md: 220 } }}>
-              {["Azure App Service", "Private Endpoints", "VNet Integration", "Azure OpenAI (your tenant)", "ExpressRoute / VPN Gateway"].map((item) => (
-                <Box key={item} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#34A853", flexShrink: 0 }} />
-                  <Typography sx={{ color: "rgba(255,255,255,0.6)", fontSize: 13 }}>{item}</Typography>
-                </Box>
-              ))}
-            </Box>
           </Box>
         </Container>
       </Box>
