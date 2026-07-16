@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  Box, Container, Typography, Button, Grid, Chip,
-  Accordion, AccordionSummary, AccordionDetails,
+  Box, Container, Typography, Button, Grid, Chip, IconButton,
+  Accordion, AccordionSummary, AccordionDetails, Tab, Tabs,
 } from "@mui/material";
 import {
   Code, Assessment, AccountTree, TrendingUp, VerifiedUser, SmartToy,
   ArrowForward, Shield, Hub, Lock, CheckCircle, Radar,
   Menu as MenuIcon, Close as CloseIcon, ExpandMore,
+  AltRoute, QuestionAnswer, Analytics, Webhook, VpnKey,
+  Gavel, Campaign, AutoAwesome, Terminal, Person, Groups,
+  BusinessCenter,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
@@ -135,6 +138,118 @@ const FAQS = [
 
 const NAV_LINKS = ["Features", "Process", "Integrations", "FAQ"];
 
+const TERMINAL_LINES = [
+  { text: "$ aegis agent run --orchestrator --scan-id a4f9bc12", color: CYAN, delay: 0 },
+  { text: "", color: "", delay: 400 },
+  { text: "⚡ Loading 84 open findings across 3 scans…", color: "rgba(255,255,255,0.6)", delay: 800 },
+  { text: "", color: "", delay: 1100 },
+  { text: "🔍  [CRITICAL] CWE-89 · SQL Injection · api/auth.py:127", color: DANGER, delay: 1400 },
+  { text: "    ATT&CK: T1190 Exploit Public-Facing Application", color: "rgba(255,255,255,0.45)", delay: 1700 },
+  { text: "    Gap: PCI DSS 6.3.1, NIST SI-10 → Priority: IMMEDIATE", color: AMBER, delay: 2000 },
+  { text: "", color: "", delay: 2200 },
+  { text: "🔍  [HIGH] CWE-798 · Hardcoded Key · config/settings.py:12", color: "#F97316", delay: 2500 },
+  { text: "    ATT&CK: T1552.001 Credentials In Files", color: "rgba(255,255,255,0.45)", delay: 2800 },
+  { text: "    Gap: NIST SC-28, ISO A.9.4.3 → Priority: HIGH", color: AMBER, delay: 3100 },
+  { text: "", color: "", delay: 3300 },
+  { text: "🔍  [HIGH] CWE-79 · Reflected XSS · frontend/search.js:48", color: "#F97316", delay: 3600 },
+  { text: "    ATT&CK: T1059.007 JavaScript · CVSS 8.2", color: "rgba(255,255,255,0.45)", delay: 3900 },
+  { text: "", color: "", delay: 4100 },
+  { text: "✅  Threat Register:     12 new ATT&CK entries", color: GREEN, delay: 4400 },
+  { text: "✅  Control Deficiencies: 8 framework gaps identified", color: GREEN, delay: 4700 },
+  { text: "✅  Remediation Tracker: 19 priority-banded actions", color: GREEN, delay: 5000 },
+  { text: "", color: "", delay: 5200 },
+  { text: "📄  VAPT report generated — PDF ready for download", color: CYAN, delay: 5500 },
+];
+
+const USE_CASES = [
+  {
+    icon: <Person sx={{ fontSize: 22 }} />,
+    persona: "CISO",
+    headline: "Board-ready risk visibility in minutes",
+    problem: "You're asked to present risk posture weekly but findings are buried in spreadsheets from five different tools.",
+    solution: "Aegis aggregates every finding into a live risk score, attack path graph, and CTEM program — one number that means something.",
+    points: ["Live risk score per client", "CTEM 5-phase program tracking", "Embeddable scorecard for board decks"],
+    color: CYAN,
+  },
+  {
+    icon: <Groups sx={{ fontSize: 22 }} />,
+    persona: "AppSec Team",
+    headline: "From commit to finding in one pipeline",
+    problem: "Running 9 different scanners means 9 different UIs, 9 result formats, and no unified view of what's actually exploitable.",
+    solution: "Submit a repo URL or zip — Aegis runs SAST, DAST, SCA, and secrets scanning, then an AI agent cross-traces taint paths and ranks by real exploitability.",
+    points: ["9 scanners, one unified schema", "AI cross-file taint analysis", "Priority-banded remediation playbooks"],
+    color: PURPLE,
+  },
+  {
+    icon: <BusinessCenter sx={{ fontSize: 22 }} />,
+    persona: "Compliance Officer",
+    headline: "Continuous compliance, not point-in-time snapshots",
+    problem: "Framework assessments take weeks of manual evidence gathering. By the time the report is done, the environment has changed.",
+    solution: "Every finding is automatically mapped to NIST, ISO 27001, PCI DSS, and GDPR controls. One click generates an audit evidence package with findings, control gaps, and remediation status.",
+    points: ["5 frameworks auto-mapped per finding", "Custom frameworks builder", "One-click evidence ZIP export"],
+    color: GREEN,
+  },
+];
+
+const NEW_CAPABILITIES = [
+  {
+    icon: <Radar sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "AI-Driven CTEM",
+    desc: "5-phase exposure management — AI populates each phase from live findings, asset tags, and risk data. Phase-gated workflow unlocks as work is completed.",
+    color: "#4285F4",
+  },
+  {
+    icon: <AltRoute sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Attack Path Visualisation",
+    desc: "SVG attack chain graph automatically built from findings — maps initial access → lateral movement → exfiltration using MITRE ATT&CK phase classification.",
+    color: DANGER,
+  },
+  {
+    icon: <QuestionAnswer sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Ask Your Data",
+    desc: "Natural language queries over your findings. Type a question, get AI-generated SQL + a result table + a plain-English summary. No SQL knowledge required.",
+    color: CYAN,
+  },
+  {
+    icon: <Analytics sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Posture Trends",
+    desc: "Historical posture snapshots charted over time — open findings by severity, audit readiness %, and MTTR per severity vs. SLA targets.",
+    color: PURPLE,
+  },
+  {
+    icon: <Webhook sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Slack & Teams Webhooks",
+    desc: "Real-time notifications on critical findings, scan completions, and agent results. HMAC-SHA256 signed payloads for verified delivery.",
+    color: "#FB923C",
+  },
+  {
+    icon: <VpnKey sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Embeddable Scorecard",
+    desc: "Public no-auth scorecard endpoint with a token — embed a live security score widget in your customer portal, status page, or executive dashboard.",
+    color: GREEN,
+  },
+  {
+    icon: <Gavel sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "Compliance Evidence Package",
+    desc: "One-click ZIP export: findings CSV, control deficiencies JSON, remediation log, and agent run history — everything an auditor needs, formatted.",
+    color: AMBER,
+  },
+  {
+    icon: <AutoAwesome sx={{ fontSize: 22 }} />,
+    label: "New",
+    title: "RAG over Security Docs",
+    desc: "Upload your own security policies, procedures, or standards. Ask natural-language questions — AI answers grounded in your actual documents.",
+    color: "#F472B6",
+  },
+];
+
 const FOOTER_LINKS: Record<string, string[]> = {
   Product: ["Features", "Integrations", "Changelog"],
   Security: ["AI Code Review", "VAPT Reports", "Threat Modeling", "Compliance"],
@@ -147,11 +262,74 @@ export default function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [faqOpen, setFaqOpen] = useState<string | false>(false);
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const [terminalLines, setTerminalLines] = useState<typeof TERMINAL_LINES>([]);
+  const [terminalStarted, setTerminalStarted] = useState(false);
+  const [useCaseTab, setUseCaseTab] = useState(0);
+  const [statCounts, setStatCounts] = useState([0, 0, 0]);
+  const statsRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const terminalBottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", fn);
     return () => window.removeEventListener("scroll", fn);
+  }, []);
+
+  // Terminal animation — starts when section scrolls into view
+  useEffect(() => {
+    if (terminalStarted) return;
+    const el = terminalRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setTerminalStarted(true);
+        obs.disconnect();
+      }
+    }, { threshold: 0.3 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [terminalStarted]);
+
+  useEffect(() => {
+    if (!terminalStarted) return;
+    let cancelled = false;
+    TERMINAL_LINES.forEach((line, idx) => {
+      setTimeout(() => {
+        if (cancelled) return;
+        setTerminalLines(prev => [...prev, line]);
+        if (terminalBottomRef.current) {
+          terminalBottomRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, line.delay);
+    });
+    return () => { cancelled = true; };
+  }, [terminalStarted]);
+
+  // Animated stat counters — trigger when stats section scrolls into view
+  const STAT_TARGETS = [9, 60, 5];
+  useEffect(() => {
+    const el = statsRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      obs.disconnect();
+      const duration = 1400;
+      const steps = 50;
+      const interval = duration / steps;
+      let step = 0;
+      const timer = setInterval(() => {
+        step++;
+        const progress = Math.min(step / steps, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setStatCounts(STAT_TARGETS.map(t => Math.round(t * eased)));
+        if (step >= steps) clearInterval(timer);
+      }, interval);
+    }, { threshold: 0.5 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signIn = () =>
@@ -164,9 +342,33 @@ export default function LandingPage() {
   return (
     <Box sx={{ bgcolor: BG, minHeight: "100vh", color: "white", fontFamily: "Inter, sans-serif", overflowX: "hidden" }}>
 
+      {/* ── Announcement bar ───────────────────────────────────────────────── */}
+      {!announcementDismissed && (
+        <Box sx={{
+          background: `linear-gradient(90deg, rgba(124,58,237,0.85) 0%, rgba(0,212,255,0.7) 100%)`,
+          backdropFilter: "blur(8px)",
+          py: 0.9, px: 2, display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 1.5, position: "relative", zIndex: 200,
+        }}>
+          <Campaign sx={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }} />
+          <Typography sx={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.9)", textAlign: "center" }}>
+            <Box component="span" sx={{ fontWeight: 700 }}>New: </Box>
+            AI-driven CTEM, Attack Paths, Natural Language Queries, and Embeddable Scorecards are now live.
+          </Typography>
+          <Button size="small" href="#new-capabilities"
+            sx={{ color: "white", fontSize: 12, fontWeight: 700, textTransform: "none", textDecoration: "underline", p: 0, minWidth: 0 }}>
+            See what's new →
+          </Button>
+          <IconButton size="small" onClick={() => setAnnouncementDismissed(true)}
+            sx={{ position: "absolute", right: 8, color: "rgba(255,255,255,0.5)", "&:hover": { color: "white" } }}>
+            <CloseIcon sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Box>
+      )}
+
       {/* ── Navbar ─────────────────────────────────────────────────────────── */}
       <Box sx={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        position: "fixed", top: announcementDismissed ? 0 : 40, left: 0, right: 0, zIndex: 100,
         backdropFilter: scrolled ? "blur(16px)" : "none",
         background: scrolled ? "rgba(6,8,16,0.92)" : "transparent",
         borderBottom: scrolled ? `1px solid ${BORDER}` : "none",
@@ -238,7 +440,7 @@ export default function LandingPage() {
       </Box>
 
       {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <Box sx={{ position: "relative", pt: { xs: 14, md: 18 }, pb: { xs: 8, md: 10 }, overflow: "hidden" }}>
+      <Box sx={{ position: "relative", pt: { xs: announcementDismissed ? 14 : 18, md: announcementDismissed ? 18 : 22 }, pb: { xs: 8, md: 10 }, overflow: "hidden" }}>
         <Box sx={{ position: "absolute", top: "5%", left: "30%", width: 900, height: 600, borderRadius: "50%",
           background: `radial-gradient(ellipse, rgba(0,212,255,0.1) 0%, rgba(124,58,237,0.07) 40%, transparent 70%)`,
           pointerEvents: "none", transform: "translateX(-50%)" }} />
@@ -387,15 +589,21 @@ export default function LandingPage() {
       </Box>
 
       {/* ── Stats bar ──────────────────────────────────────────────────────── */}
-      <Box sx={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, background: "rgba(255,255,255,0.015)", py: 5 }}>
+      <Box ref={statsRef} sx={{ borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}`, background: "rgba(255,255,255,0.015)", py: 5 }}>
         <Container maxWidth="lg">
           <Grid container spacing={2} sx={{ justifyContent: "center" }}>
-            {STATS.map(({ value, label }) => (
+            {[
+              { value: `${statCounts[0]}+`, label: "Scanner integrations" },
+              { value: `${statCounts[1]}+`, label: "AI security agents" },
+              { value: `${statCounts[2]}`, label: "Compliance frameworks" },
+              { value: "Real-time", label: "Risk scoring" },
+            ].map(({ value, label }) => (
               <Grid key={label} size={{ xs: 6, sm: 3 }} sx={{ textAlign: "center" }}>
                 <Typography sx={{
                   fontSize: { xs: 30, md: 38 }, fontWeight: 800,
                   background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`,
                   WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                  transition: "all 0.1s",
                 }}>
                   {value}
                 </Typography>
@@ -469,6 +677,154 @@ export default function LandingPage() {
         </Container>
       </Box>
 
+      {/* ── Use Cases ──────────────────────────────────────────────────────── */}
+      <Box sx={{ py: { xs: 8, md: 14 }, background: "rgba(255,255,255,0.012)", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", mb: 6 }}>
+            <Chip label="Built for security teams" size="small" sx={{ mb: 2.5, background: `rgba(0,212,255,0.08)`, border: `1px solid rgba(0,212,255,0.22)`, color: CYAN, fontWeight: 600, fontSize: 12 }} />
+            <Typography sx={{ fontSize: { xs: 26, md: 38 }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2 }}>
+              One platform. Every security role.
+            </Typography>
+            <Typography sx={{ color: "rgba(255,255,255,0.38)", fontSize: 16, maxWidth: 520, mx: "auto" }}>
+              Aegis adapts to how your team works — whether you're presenting to the board, hunting vulnerabilities, or preparing for an audit.
+            </Typography>
+          </Box>
+
+          <Box sx={{ borderBottom: `1px solid ${BORDER}`, mb: 4 }}>
+            <Tabs
+              value={useCaseTab}
+              onChange={(_, v) => setUseCaseTab(v)}
+              centered
+              sx={{
+                "& .MuiTab-root": { color: "rgba(255,255,255,0.4)", textTransform: "none", fontSize: 14, fontWeight: 600 },
+                "& .Mui-selected": { color: "white" },
+                "& .MuiTabs-indicator": { background: `linear-gradient(90deg, ${CYAN}, ${PURPLE})`, height: 2 },
+              }}
+            >
+              {USE_CASES.map((uc) => (
+                <Tab key={uc.persona} label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ color: useCaseTab === USE_CASES.indexOf(uc) ? uc.color : "inherit" }}>{uc.icon}</Box>
+                    {uc.persona}
+                  </Box>
+                } />
+              ))}
+            </Tabs>
+          </Box>
+
+          {USE_CASES.map((uc, idx) => (
+            <Box key={uc.persona} sx={{ display: useCaseTab === idx ? "block" : "none" }}>
+              <Grid container spacing={6} sx={{ alignItems: "center" }}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <Chip label={uc.persona} size="small" sx={{ mb: 2, background: `${uc.color}18`, color: uc.color, border: `1px solid ${uc.color}30`, fontWeight: 700 }} />
+                  <Typography sx={{ fontSize: { xs: 24, md: 32 }, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, mb: 2 }}>
+                    {uc.headline}
+                  </Typography>
+
+                  <Box sx={{ p: 2, mb: 3, borderRadius: 2, background: "rgba(234,67,53,0.07)", border: `1px solid rgba(234,67,53,0.2)` }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.65 }}>
+                      <Box component="span" sx={{ color: DANGER, fontWeight: 700 }}>Challenge: </Box>
+                      {uc.problem}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2, mb: 3, borderRadius: 2, background: `${uc.color}0A`, border: `1px solid ${uc.color}25` }}>
+                    <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.65 }}>
+                      <Box component="span" sx={{ color: uc.color, fontWeight: 700 }}>Aegis: </Box>
+                      {uc.solution}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    {uc.points.map((p) => (
+                      <Box key={p} sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <CheckCircle sx={{ fontSize: 16, color: uc.color, flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.55)" }}>{p}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Grid>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  {/* Visual placeholder — mini dashboard preview tailored per persona */}
+                  <Box sx={{
+                    p: 3, borderRadius: 3, border: `1px solid ${uc.color}30`,
+                    background: `${uc.color}07`,
+                    boxShadow: `0 0 60px ${uc.color}0F`,
+                  }}>
+                    {idx === 0 && (
+                      /* CISO view — risk score + CTEM progress */
+                      <Box>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Security Posture Overview</Typography>
+                        <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+                          {[{ label: "Risk Score", val: "72", color: AMBER }, { label: "Open", val: "84", color: DANGER }, { label: "CTEM", val: "3/5", color: CYAN }].map(s => (
+                            <Box key={s.label} sx={{ flex: 1, p: 1.5, borderRadius: 2, border: `1px solid ${BORDER}`, background: "rgba(0,0,0,0.2)", textAlign: "center" }}>
+                              <Typography sx={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.val}</Typography>
+                              <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{s.label}</Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                        <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.28)", mb: 1, textTransform: "uppercase", letterSpacing: 0.8 }}>Risk trend (30 days)</Typography>
+                        <Box sx={{ height: 60, display: "flex", alignItems: "flex-end", gap: 1 }}>
+                          {[55,58,62,60,65,68,70,69,72,71,74,72].map((v, i) => (
+                            <Box key={i} sx={{ flex: 1, height: `${(v/80)*100}%`, borderRadius: "3px 3px 0 0", background: i === 11 ? AMBER : `${AMBER}55`, transition: "all 0.3s" }} />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                    {idx === 1 && (
+                      /* AppSec view — scan pipeline */
+                      <Box>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Scan Pipeline</Typography>
+                        {[
+                          { name: "AI Code Review", status: "✅ Complete", findings: "23 findings", color: GREEN },
+                          { name: "Semgrep SAST", status: "✅ Complete", findings: "11 findings", color: GREEN },
+                          { name: "OWASP ZAP DAST", status: "⚡ Running", findings: "—", color: CYAN },
+                          { name: "Gitleaks Secrets", status: "⏳ Queued", findings: "—", color: AMBER },
+                        ].map((s, i) => (
+                          <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 1, borderBottom: `1px solid ${BORDER}` }}>
+                            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{s.name}</Typography>
+                            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                              <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{s.findings}</Typography>
+                              <Typography sx={{ fontSize: 11, color: s.color }}>{s.status}</Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                        <Box sx={{ mt: 2, p: 1.5, borderRadius: 1.5, background: "rgba(0,212,255,0.06)", border: `1px solid rgba(0,212,255,0.18)` }}>
+                          <Typography sx={{ fontSize: 11, color: "rgba(0,212,255,0.8)" }}>⚡ AI taint tracer — cross-file analysis in progress…</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    {idx === 2 && (
+                      /* Compliance view — framework coverage */
+                      <Box>
+                        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Framework Coverage</Typography>
+                        {[
+                          { fw: "NIST CSF 2.0", pct: 78, color: GREEN },
+                          { fw: "ISO 27001:2022", pct: 64, color: CYAN },
+                          { fw: "PCI DSS v4.0", pct: 51, color: AMBER },
+                          { fw: "GDPR", pct: 83, color: PURPLE },
+                        ].map((f) => (
+                          <Box key={f.fw} sx={{ mb: 1.5 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.4 }}>
+                              <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{f.fw}</Typography>
+                              <Typography sx={{ fontSize: 11, color: f.color, fontWeight: 700 }}>{f.pct}%</Typography>
+                            </Box>
+                            <Box sx={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.06)" }}>
+                              <Box sx={{ width: `${f.pct}%`, height: "100%", borderRadius: 3, background: f.color, transition: "width 0.8s" }} />
+                            </Box>
+                          </Box>
+                        ))}
+                        <Button size="small" variant="outlined" sx={{ mt: 1.5, fontSize: 11, color: GREEN, borderColor: `${GREEN}44`, textTransform: "none" }}>
+                          Export evidence package →
+                        </Button>
+                      </Box>
+                    )}
+                  </Box>
+                </Grid>
+              </Grid>
+            </Box>
+          ))}
+        </Container>
+      </Box>
+
       {/* ── Process ────────────────────────────────────────────────────────── */}
       <Box id="process" sx={{ py: { xs: 8, md: 12 }, background: "rgba(255,255,255,0.012)", borderTop: `1px solid ${BORDER}`, borderBottom: `1px solid ${BORDER}` }}>
         <Container maxWidth="md">
@@ -508,6 +864,80 @@ export default function LandingPage() {
         </Container>
       </Box>
 
+      {/* ── Live AI terminal ───────────────────────────────────────────────── */}
+      <Box ref={terminalRef} sx={{ py: { xs: 8, md: 14 }, borderTop: `1px solid ${BORDER}` }}>
+        <Container maxWidth="lg">
+          <Grid container spacing={8} sx={{ alignItems: "center" }}>
+            <Grid size={{ xs: 12, md: 5 }}>
+              <Chip label="Watch it work" size="small" sx={{ mb: 2.5, background: `rgba(0,212,255,0.08)`, border: `1px solid rgba(0,212,255,0.22)`, color: CYAN, fontWeight: 600, fontSize: 12 }} />
+              <Typography sx={{ fontSize: { xs: 26, md: 36 }, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2, mb: 2.5 }}>
+                AI agents turn findings into{" "}
+                <Box component="span" sx={{ background: `linear-gradient(135deg, ${CYAN}, ${PURPLE})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  action
+                </Box>
+                {" "}automatically.
+              </Typography>
+              <Typography sx={{ color: "rgba(255,255,255,0.42)", fontSize: 15, lineHeight: 1.75, mb: 3 }}>
+                The Orchestrator agent runs all four specialists in one call — Threat Intel maps to MITRE ATT&CK, Risk Manager scores impact, Compliance Monitor identifies control gaps, and Remediation Agent writes priority-banded playbooks. All three registers populate without any manual triage.
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {[
+                  { label: "Threat Register", sub: "ATT&CK technique + attacker profile per finding", color: DANGER },
+                  { label: "Control Deficiencies", sub: "Framework gaps across NIST, ISO, PCI, GDPR", color: AMBER },
+                  { label: "Remediation Tracker", sub: "Banded action items: Quick Win / Near Term / Long", color: GREEN },
+                ].map((r) => (
+                  <Box key={r.label} sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 1.5, borderRadius: 2, border: `1px solid ${r.color}25`, background: `${r.color}07` }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: r.color, mt: 0.5, flexShrink: 0, boxShadow: `0 0 6px ${r.color}` }} />
+                    <Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>{r.label}</Typography>
+                      <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.38)" }}>{r.sub}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 12, md: 7 }}>
+              <Box sx={{
+                background: "#0a0e1a", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 3,
+                overflow: "hidden", boxShadow: "0 40px 80px rgba(0,0,0,0.6)",
+              }}>
+                {/* Terminal chrome */}
+                <Box sx={{ borderBottom: `1px solid rgba(255,255,255,0.07)`, px: 2.5, py: 1.5, display: "flex", alignItems: "center", gap: 1.5, background: "rgba(0,0,0,0.3)" }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FF5F57" }} />
+                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E" }} />
+                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840" }} />
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, ml: 1.5 }}>
+                    <Terminal sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }} />
+                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>aegis-cli — orchestrator</Typography>
+                  </Box>
+                </Box>
+                {/* Terminal output */}
+                <Box sx={{ p: 2.5, minHeight: 340, maxHeight: 400, overflowY: "auto", fontFamily: "monospace" }}>
+                  {terminalLines.map((line, idx) => (
+                    <Typography key={idx} sx={{
+                      fontSize: 12, lineHeight: 1.8,
+                      color: line.color || "rgba(255,255,255,0.35)",
+                      fontFamily: "monospace",
+                    }}>
+                      {line.text || " "}
+                    </Typography>
+                  ))}
+                  {terminalLines.length > 0 && terminalLines.length < TERMINAL_LINES.length && (
+                    <Box sx={{ display: "inline-block", width: 8, height: 14, background: CYAN, ml: 0.25, animation: "blink 1s step-end infinite", "@keyframes blink": { "0%, 100%": { opacity: 1 }, "50%": { opacity: 0 } } }} />
+                  )}
+                  {terminalLines.length === 0 && (
+                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.2)", fontFamily: "monospace" }}>
+                      Scroll into view to watch the agent run…
+                    </Typography>
+                  )}
+                  <div ref={terminalBottomRef} />
+                </Box>
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
       {/* ── Integrations ───────────────────────────────────────────────────── */}
       <Box id="integrations" sx={{ py: { xs: 8, md: 12 } }}>
         <Container maxWidth="lg">
@@ -540,6 +970,65 @@ export default function LandingPage() {
                     </Box>
                   ))}
                 </Box>
+              </Box>
+            ))}
+          </Box>
+        </Container>
+      </Box>
+
+      {/* ── New capabilities ───────────────────────────────────────────────── */}
+      <Box id="new-capabilities" sx={{ py: { xs: 8, md: 12 }, borderTop: `1px solid ${BORDER}` }}>
+        <Container maxWidth="lg">
+          <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", mb: 5, flexWrap: "wrap", gap: 2 }}>
+            <Box>
+              <Chip label="Just shipped" size="small" sx={{ mb: 1.5, background: `rgba(251,188,4,0.1)`, border: `1px solid rgba(251,188,4,0.3)`, color: AMBER, fontWeight: 700, fontSize: 11 }} />
+              <Typography sx={{ fontSize: { xs: 24, md: 34 }, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                New capabilities
+              </Typography>
+              <Typography sx={{ color: "rgba(255,255,255,0.38)", fontSize: 15, mt: 0.5 }}>
+                Eight new features added to the platform
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Horizontal scroll cards */}
+          <Box sx={{
+            display: "flex", gap: 2, overflowX: "auto", pb: 2,
+            scrollSnapType: "x mandatory",
+            "&::-webkit-scrollbar": { height: 4 },
+            "&::-webkit-scrollbar-track": { background: "rgba(255,255,255,0.04)", borderRadius: 2 },
+            "&::-webkit-scrollbar-thumb": { background: "rgba(255,255,255,0.15)", borderRadius: 2 },
+          }}>
+            {NEW_CAPABILITIES.map((cap) => (
+              <Box key={cap.title} sx={{
+                flexShrink: 0, width: { xs: 260, md: 280 }, p: 2.5,
+                scrollSnapAlign: "start",
+                border: `1px solid ${BORDER}`, borderRadius: 2.5,
+                background: CARD_BG,
+                transition: "all 0.25s",
+                "&:hover": {
+                  border: `1px solid ${cap.color}35`,
+                  background: `${cap.color}08`,
+                  transform: "translateY(-3px)",
+                  boxShadow: `0 16px 40px rgba(0,0,0,0.4)`,
+                },
+              }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                  <Box sx={{
+                    width: 42, height: 42, borderRadius: 1.5,
+                    background: `${cap.color}18`, border: `1px solid ${cap.color}30`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: cap.color,
+                  }}>
+                    {cap.icon}
+                  </Box>
+                  <Chip label={cap.label} size="small" sx={{
+                    background: "rgba(251,188,4,0.12)", color: AMBER,
+                    border: "1px solid rgba(251,188,4,0.25)", fontSize: 10, fontWeight: 700, height: 20,
+                  }} />
+                </Box>
+                <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1, letterSpacing: "-0.01em" }}>{cap.title}</Typography>
+                <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.42)", lineHeight: 1.65 }}>{cap.desc}</Typography>
               </Box>
             ))}
           </Box>
