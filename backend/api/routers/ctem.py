@@ -239,6 +239,21 @@ async def delete_program(
 
 # ── Save analyst phase data (generic for all phases) ──────────────────────────
 
+@router.get("/{program_id}/phase-data/{phase}")
+async def get_phase_data(
+    client_id: str,
+    program_id: str,
+    phase: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return stored structured data for any phase."""
+    if phase not in PHASES:
+        raise HTTPException(status_code=400, detail=f"Phase must be one of {PHASES}")
+    pn = _get_phase_note(db, client_id, program_id, phase)
+    return pn.phase_data_json or {}
+
+
 @router.put("/{program_id}/phase-data/{phase}", dependencies=[Depends(require_editor_anywhere)])
 async def save_phase_data(
     client_id: str,

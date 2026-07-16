@@ -579,6 +579,8 @@ export const ctemApi = {
   delete: (clientId: string, programId: string) =>
     api.delete(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),
   // Phase structured data
+  getPhaseData: (clientId: string, programId: string, phase: string) =>
+    api.get(`/clients/${clientId}/ctem/${programId}/phase-data/${phase}`).then(r => r.data),
   savePhaseData: (clientId: string, programId: string, phase: string, data: Record<string, unknown>) =>
     api.put(`/clients/${clientId}/ctem/${programId}/phase-data/${phase}`, data).then(r => r.data),
   // AI brief
