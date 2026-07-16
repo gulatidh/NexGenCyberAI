@@ -535,6 +535,7 @@ class CTEMPhaseNoteResponse(BaseModel):
     completed_by: Optional[str]
     ai_brief: Optional[str] = None
     ai_brief_generated_at: Optional[datetime] = None
+    phase_data_json: Optional[Dict[str, Any]] = None
     model_config = {"from_attributes": True}
 
 class CTEMProgramCreate(BaseModel):

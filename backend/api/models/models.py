@@ -1261,6 +1261,16 @@ class CTEMPhaseNote(Base):
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     completed_by = Column(String(200), nullable=True)
+    # AI brief — written by LLM then editable by analyst
+    ai_brief = Column(Text, nullable=True)
+    ai_brief_generated_at = Column(DateTime(timezone=True), nullable=True)
+    # Per-phase structured data (JSON blob keyed by phase type):
+    # scope:      {assets: [{resource_id, resource_type, display_name, scope_status, notes}]}
+    # discover:   {categories: [{category, total, previous, notes}], summary}
+    # prioritise: {items: [{rank, title, severity, source, rationale, analyst_notes, finding_id}]}
+    # validate:   {methods: [{name, tests_run, confirmed, notes}], notable_findings, summary}
+    # mobilise:   {owners: [{team, open, closed_on_time, sla_breach, notes}], blockers}
+    phase_data_json = Column(JSON, nullable=True, default=dict)
 
     program = relationship("CTEMProgram", back_populates="phases")
 

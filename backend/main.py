@@ -484,7 +484,7 @@ def _ensure_added_columns() -> None:
                 except Exception as exc:
                     logger.warning("risks.%s ALTER failed: %s", col, exc)
 
-        # ctem_phase_notes: ai_brief + ai_brief_generated_at — AI analysis saved per phase
+        # ctem_phase_notes: ai_brief + ai_brief_generated_at + phase_data_json
         try:
             ctem_cols = {c["name"] for c in inspector.get_columns("ctem_phase_notes")}
         except Exception:
@@ -492,6 +492,7 @@ def _ensure_added_columns() -> None:
         _ctem_additions = [
             ("ai_brief",              "NVARCHAR(MAX) NULL",  "TEXT"),
             ("ai_brief_generated_at", "DATETIME2 NULL",      "TIMESTAMP"),
+            ("phase_data_json",       "NVARCHAR(MAX) NULL",  "TEXT"),
         ]
         for col, mssql_type, sqlite_type in _ctem_additions:
             if ctem_cols and col not in ctem_cols:

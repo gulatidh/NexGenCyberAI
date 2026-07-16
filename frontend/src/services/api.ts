@@ -578,10 +578,26 @@ export const ctemApi = {
   },
   delete: (clientId: string, programId: string) =>
     api.delete(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),
-  getPhaseData: (clientId: string, programId: string, phase: string) =>
-    api.get(`/clients/${clientId}/ctem/${programId}/phase-data/${phase}`).then(r => r.data),
+  // Phase structured data
+  savePhaseData: (clientId: string, programId: string, phase: string, data: Record<string, unknown>) =>
+    api.put(`/clients/${clientId}/ctem/${programId}/phase-data/${phase}`, data).then(r => r.data),
+  // AI brief
   generateAIBrief: (clientId: string, programId: string, phase: string) =>
     api.post(`/clients/${clientId}/ctem/${programId}/ai-brief/${phase}`).then(r => r.data),
+  saveAIBrief: (clientId: string, programId: string, phase: string, brief: string) =>
+    api.put(`/clients/${clientId}/ctem/${programId}/ai-brief/${phase}`, { brief }).then(r => r.data),
+  // Scope assets
+  getScopeAssets: (clientId: string, programId: string) =>
+    api.get(`/clients/${clientId}/ctem/${programId}/scope/assets`).then(r => r.data),
+  // Discover findings
+  getDiscoverFindings: (clientId: string, programId: string) =>
+    api.get(`/clients/${clientId}/ctem/${programId}/discover/findings`).then(r => r.data),
+  // Prioritise: AI generate
+  generatePriorities: (clientId: string, programId: string) =>
+    api.post(`/clients/${clientId}/ctem/${programId}/prioritise/generate`).then(r => r.data),
+  // Export
+  exportUrl: (clientId: string, programId: string, format: 'pdf' | 'docx') =>
+    `${api.defaults.baseURL}/clients/${clientId}/ctem/${programId}/export?format=${format}`,
 };
 
 export const scorecardApi = {

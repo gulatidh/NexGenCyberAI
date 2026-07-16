@@ -1,66 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Alert,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, IconButton, Grid, Tooltip, Divider, LinearProgress,
+  TextField, IconButton, Grid, Tooltip, Divider,
   Accordion, AccordionSummary, AccordionDetails, Paper,
+  Table, TableHead, TableRow, TableCell, TableBody,
+  Select, MenuItem, FormControl, InputLabel, LinearProgress,
 } from "@mui/material";
 import {
   Add, Delete, CheckCircle, RadioButtonUnchecked, Radar,
-  AutoAwesome, ExpandMore, Cable, BugReport, Verified,
-  Speed, WarningAmber, Lock,
+  AutoAwesome, ExpandMore, Lock, ArrowUpward, ArrowDownward,
+  FileDownload, Edit, Save,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ctemApi } from "../services/api";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
 const PHASES = [
-  {
-    key: "scope",
-    label: "1. Scope",
-    icon: <Cable fontSize="small" />,
-    desc: "Define what matters: crown jewels, critical systems, business processes at risk.",
-    color: "#4285F4",
-  },
-  {
-    key: "discover",
-    label: "2. Discover",
-    icon: <BugReport fontSize="small" />,
-    desc: "Enumerate the attack surface: run scans, connectors, and asset discovery.",
-    color: "#FBBC04",
-  },
-  {
-    key: "prioritise",
-    label: "3. Prioritise",
-    icon: <Speed fontSize="small" />,
-    desc: "Rank exposures by likelihood and business impact using AI risk scoring.",
-    color: "#EA4335",
-  },
-  {
-    key: "validate",
-    label: "4. Validate",
-    icon: <Verified fontSize="small" />,
-    desc: "Confirm exploitability: run DAST/VAPT, verify findings are real.",
-    color: "#9C27B0",
-  },
-  {
-    key: "mobilise",
-    label: "5. Mobilise",
-    icon: <WarningAmber fontSize="small" />,
-    desc: "Drive remediation: assign owners, set due dates, track SLA compliance.",
-    color: "#34A853",
-  },
+  { key: "scope",      label: "1. Scope",      color: "#4285F4" },
+  { key: "discover",   label: "2. Discover",   color: "#FBBC04" },
+  { key: "prioritise", label: "3. Prioritise", color: "#EA4335" },
+  { key: "validate",   label: "4. Validate",   color: "#9C27B0" },
+  { key: "mobilise",   label: "5. Mobilise",   color: "#34A853" },
 ];
 
-interface PhaseData {
+const SEV_COLORS: Record<string, string> = {
+  critical: "#EA4335", high: "#FF6D00", medium: "#FBBC04", low: "#34A853", info: "#4285F4",
+};
+
+const SCOPE_STATUSES = [
+  { value: "untagged",     label: "Untagged" },
+  { value: "in_scope",     label: "In Scope" },
+  { value: "out_of_scope", label: "Out of Scope" },
+  { value: "crown_jewel",  label: "Crown Jewel" },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PhaseNote {
+  phase: string;
   notes?: string;
   completed?: boolean;
   completed_by?: string;
   completed_at?: string;
   ai_brief?: string;
   ai_brief_generated_at?: string;
+  phase_data_json?: Record<string, unknown>;
 }
 
 interface CTEMProgram {
@@ -69,284 +62,788 @@ interface CTEMProgram {
   description?: string;
   status?: string;
   current_phase?: string;
-  phases?: Record<string, PhaseData>;
+  phases?: PhaseNote[];
   created_at?: string;
 }
 
-// ── Stat chip helper ──────────────────────────────────────────────────────────
-function StatChip({ label, value, color }: { label: string; value: number | string; color?: string }) {
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 60 }}>
-      <Typography variant="h6" sx={{ fontWeight: 800, color: color || "text.primary", lineHeight: 1 }}>
-        {value}
-      </Typography>
-      <Typography variant="caption" sx={{ color: "text.secondary", textAlign: "center" }}>
-        {label}
-      </Typography>
-    </Box>
-  );
+interface ScopeAsset {
+  resource_id: string;
+  resource_type: string;
+  display_name: string;
+  exposure_category: string;
+  finding_count: number;
+  scope_status: string;
+  notes: string;
 }
 
-// ── Severity row helper ───────────────────────────────────────────────────────
-const SEV_COLORS: Record<string, string> = {
-  critical: "#EA4335", high: "#FF6D00", medium: "#FBBC04", low: "#34A853", info: "#4285F4",
-};
-
-function SevRow({ counts }: { counts: Record<string, number> }) {
-  return (
-    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-      {Object.entries(counts).map(([sev, n]) => (
-        <Chip
-          key={sev}
-          label={`${n} ${sev}`}
-          size="small"
-          sx={{
-            bgcolor: `${SEV_COLORS[sev] || "#888"}22`,
-            color: SEV_COLORS[sev] || "#888",
-            fontSize: 10,
-            height: 20,
-            fontWeight: 700,
-          }}
-        />
-      ))}
-    </Box>
-  );
+interface PriorityItem {
+  rank: number;
+  title: string;
+  severity: string;
+  source: "ai" | "analyst";
+  rationale: string;
+  analyst_notes: string;
+  finding_id?: string;
 }
 
-// ── Phase data widget ─────────────────────────────────────────────────────────
-function PhaseDataWidget({ clientId, programId, phase }: { clientId: string; programId: string; phase: string }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["ctem-phase-data", clientId, programId, phase],
-    queryFn: () => ctemApi.getPhaseData(clientId, programId, phase),
-    enabled: !!clientId && !!programId,
-    staleTime: 60_000,
-  });
-
-  if (isLoading) return <CircularProgress size={16} sx={{ display: "block", my: 1 }} />;
-  if (!data) return null;
-
-  if (phase === "scope") {
-    const d = data as { connectors_total: number; connectors_active: number; connectors: { name: string; type: string; status: string }[]; scan_types_available: string[] };
-    return (
-      <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", my: 1.5 }}>
-        <StatChip label="Connectors" value={d.connectors_total} />
-        <StatChip label="Active" value={d.connectors_active} color="#34A853" />
-        <StatChip label="Scan Types" value={d.scan_types_available?.length ?? 0} color="#4285F4" />
-        <Box>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>Scan types available:</Typography>
-          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", mt: 0.5 }}>
-            {(d.scan_types_available ?? []).map((t: string) => (
-              <Chip key={t} label={t} size="small" sx={{ fontSize: 10, height: 18 }} />
-            ))}
-            {(d.scan_types_available ?? []).length === 0 && (
-              <Typography variant="caption" sx={{ color: "warning.main" }}>No active connectors — add one in Connections</Typography>
-            )}
-          </Box>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (phase === "discover") {
-    const d = data as { scans_completed: number; findings_total: number; findings_by_severity: Record<string, number>; scan_types_run: string[] };
-    return (
-      <Box sx={{ my: 1.5 }}>
-        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 1.5 }}>
-          <StatChip label="Scans Run" value={d.scans_completed} color="#4285F4" />
-          <StatChip label="Total Findings" value={d.findings_total} />
-          <StatChip label="Critical" value={d.findings_by_severity?.critical ?? 0} color="#EA4335" />
-          <StatChip label="High" value={d.findings_by_severity?.high ?? 0} color="#FF6D00" />
-        </Box>
-        {d.findings_by_severity && <SevRow counts={d.findings_by_severity} />}
-      </Box>
-    );
-  }
-
-  if (phase === "prioritise") {
-    const d = data as { open_findings_total: number; open_by_severity: Record<string, number>; top_findings_by_cvss: { title: string; severity: string; cvss: number | null; cve?: string }[] };
-    return (
-      <Box sx={{ my: 1.5 }}>
-        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 1.5 }}>
-          <StatChip label="Open Findings" value={d.open_findings_total} />
-          <StatChip label="Critical Open" value={d.open_by_severity?.critical ?? 0} color="#EA4335" />
-          <StatChip label="High Open" value={d.open_by_severity?.high ?? 0} color="#FF6D00" />
-        </Box>
-        {d.top_findings_by_cvss?.length > 0 && (
-          <Box>
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Top by CVSS:</Typography>
-            {d.top_findings_by_cvss.slice(0, 5).map((f, i) => (
-              <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.4 }}>
-                <Chip label={f.severity} size="small" sx={{ bgcolor: `${SEV_COLORS[f.severity] || "#888"}22`, color: SEV_COLORS[f.severity], fontSize: 10, height: 18, minWidth: 60 }} />
-                {f.cvss && <Chip label={`CVSS ${f.cvss}`} size="small" sx={{ fontSize: 10, height: 18 }} />}
-                <Typography variant="caption" sx={{ color: "text.primary" }} noWrap>{f.title}</Typography>
-              </Box>
-            ))}
-          </Box>
-        )}
-      </Box>
-    );
-  }
-
-  if (phase === "validate") {
-    const d = data as { finding_statuses: Record<string, number>; vapt_reports: number; confirmed_pct: number };
-    return (
-      <Box sx={{ my: 1.5 }}>
-        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 1.5 }}>
-          <StatChip label="VAPT Reports" value={d.vapt_reports} color="#9C27B0" />
-          <StatChip label="Confirmed %" value={`${d.confirmed_pct ?? 0}%`} color="#34A853" />
-          <StatChip label="Open" value={d.finding_statuses?.open ?? 0} color="#EA4335" />
-          <StatChip label="In Progress" value={d.finding_statuses?.in_progress ?? 0} color="#FBBC04" />
-          <StatChip label="Remediated" value={d.finding_statuses?.remediated ?? 0} color="#34A853" />
-        </Box>
-        <Box>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>Finding confirmation progress:</Typography>
-          <LinearProgress
-            variant="determinate"
-            value={d.confirmed_pct ?? 0}
-            sx={{ mt: 0.5, height: 6, borderRadius: 3, bgcolor: "rgba(255,255,255,0.08)" }}
-          />
-        </Box>
-      </Box>
-    );
-  }
-
-  if (phase === "mobilise") {
-    const d = data as { remediation_actions: Record<string, number>; actions_total: number; sla_breaches: Record<string, number>; remediated_last_30d: number };
-    const totalBreaches = Object.values(d.sla_breaches ?? {}).reduce((a, b) => a + b, 0);
-    return (
-      <Box sx={{ my: 1.5 }}>
-        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 1.5 }}>
-          <StatChip label="Total Actions" value={d.actions_total} />
-          <StatChip label="In Progress" value={d.remediation_actions?.in_progress ?? 0} color="#FBBC04" />
-          <StatChip label="Completed" value={d.remediation_actions?.completed ?? 0} color="#34A853" />
-          <StatChip label="Closed (30d)" value={d.remediated_last_30d ?? 0} color="#4285F4" />
-        </Box>
-        {totalBreaches > 0 && (
-          <Alert severity="warning" sx={{ py: 0.5, mt: 1 }}>
-            <Typography variant="caption">
-              SLA breaches: {d.sla_breaches?.critical ?? 0} critical (24h), {d.sla_breaches?.high ?? 0} high (7d), {d.sla_breaches?.medium ?? 0} medium (30d)
-            </Typography>
-          </Alert>
-        )}
-        {totalBreaches === 0 && <Alert severity="success" sx={{ py: 0.5, mt: 1 }}><Typography variant="caption">All SLA targets on track</Typography></Alert>}
-      </Box>
-    );
-  }
-
-  return null;
+interface ValidationMethod {
+  name: string;
+  tests_run: number | string;
+  confirmed: number | string;
+  notes: string;
 }
 
-// ── AI Brief section ──────────────────────────────────────────────────────────
-function AIBriefSection({
-  clientId, programId, phase, brief, briefGeneratedAt,
-  onBriefGenerated,
+interface MobilisationOwner {
+  team: string;
+  open: number | string;
+  closed_on_time: number | string;
+  sla_breach: number | string;
+  notes: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared: AI Brief editor
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AIBriefEditor({
+  clientId, programId, phase, brief, briefGeneratedAt, onRefresh,
 }: {
-  clientId: string;
-  programId: string;
-  phase: string;
-  brief?: string;
-  briefGeneratedAt?: string;
-  onBriefGenerated: () => void;
+  clientId: string; programId: string; phase: string;
+  brief?: string; briefGeneratedAt?: string; onRefresh: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [localBrief, setLocalBrief] = useState(brief ?? "");
   const [generating, setGenerating] = useState(false);
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      await ctemApi.generateAIBrief(clientId, programId, phase);
-      onBriefGenerated();
+      const res = await ctemApi.generateAIBrief(clientId, programId, phase);
+      setLocalBrief(res.brief ?? "");
+      onRefresh();
       toast.success("AI brief generated");
     } catch {
-      toast.error("AI brief generation failed — check AI provider settings");
+      toast.error("AI generation failed — check AI Settings");
     } finally {
       setGenerating(false);
     }
   };
 
+  const handleSave = async () => {
+    try {
+      await ctemApi.saveAIBrief(clientId, programId, phase, localBrief);
+      onRefresh();
+      setEditing(false);
+      toast.success("Brief saved");
+    } catch {
+      toast.error("Save failed");
+    }
+  };
+
+  const displayBrief = editing ? localBrief : (brief ?? localBrief);
+
   return (
-    <Box sx={{ mt: 1.5 }}>
+    <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-        <AutoAwesome sx={{ fontSize: 16, color: "#FBBC04" }} />
-        <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary" }}>
-          AI Analysis {briefGeneratedAt ? `· generated ${fmt(briefGeneratedAt)}` : ""}
+        <AutoAwesome sx={{ fontSize: 15, color: "#FBBC04" }} />
+        <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary" }}>
+          AI ANALYSIS {briefGeneratedAt ? `· ${fmt(briefGeneratedAt)}` : ""}
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={generating ? <CircularProgress size={12} /> : <AutoAwesome sx={{ fontSize: 14 }} />}
-          onClick={handleGenerate}
-          disabled={generating}
-          sx={{ ml: "auto", fontSize: 11, py: 0.3, px: 1 }}
-        >
-          {brief ? "Regenerate" : "Generate AI Brief"}
-        </Button>
+        <Box sx={{ ml: "auto", display: "flex", gap: 0.5 }}>
+          <Button size="small" variant="outlined"
+            startIcon={generating ? <CircularProgress size={11} /> : <AutoAwesome sx={{ fontSize: 13 }} />}
+            onClick={handleGenerate} disabled={generating}
+            sx={{ fontSize: 11, py: 0.3, px: 1 }}>
+            {brief ? "Regenerate" : "Generate AI Brief"}
+          </Button>
+          {brief && !editing && (
+            <Button size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 13 }} />}
+              onClick={() => { setLocalBrief(brief ?? ""); setEditing(true); }}
+              sx={{ fontSize: 11, py: 0.3, px: 1 }}>
+              Edit
+            </Button>
+          )}
+          {editing && (
+            <Button size="small" variant="contained" startIcon={<Save sx={{ fontSize: 13 }} />}
+              onClick={handleSave} sx={{ fontSize: 11, py: 0.3, px: 1 }}>
+              Save
+            </Button>
+          )}
+        </Box>
       </Box>
-      {brief && (
-        <Paper
-          variant="outlined"
-          sx={{
-            p: 1.5,
-            bgcolor: "rgba(251,188,4,0.04)",
-            borderColor: "rgba(251,188,4,0.2)",
-            borderRadius: 1,
-            whiteSpace: "pre-wrap",
-            fontSize: 12,
-            fontFamily: "inherit",
-            color: "text.primary",
-            maxHeight: 320,
-            overflow: "auto",
-          }}
-        >
-          {brief}
+      {editing ? (
+        <TextField
+          multiline fullWidth minRows={6} size="small"
+          value={localBrief} onChange={(e) => setLocalBrief(e.target.value)}
+          sx={{ "& textarea": { fontSize: 12, fontFamily: "inherit" } }}
+        />
+      ) : displayBrief ? (
+        <Paper variant="outlined" sx={{
+          p: 1.5, bgcolor: "rgba(251,188,4,0.04)", borderColor: "rgba(251,188,4,0.2)",
+          borderRadius: 1, whiteSpace: "pre-wrap", fontSize: 12, maxHeight: 280, overflow: "auto",
+        }}>
+          {displayBrief}
         </Paper>
-      )}
-      {!brief && !generating && (
+      ) : (
         <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
-          Click "Generate AI Brief" to get an AI analysis of this phase based on your platform data.
+          Click "Generate AI Brief" for an AI analysis grounded in your platform data.
         </Typography>
       )}
     </Box>
   );
 }
 
-// ── Phase accordion ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 1: Scope
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ScopePhaseContent({ clientId, programId }: { clientId: string; programId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["ctem-scope-assets", clientId, programId],
+    queryFn: () => ctemApi.getScopeAssets(clientId, programId),
+    enabled: !!clientId && !!programId,
+  });
+
+  const [assets, setAssets] = useState<ScopeAsset[]>([]);
+  const [initialized, setInitialized] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (data?.assets && !initialized) {
+      setAssets(data.assets);
+      setInitialized(true);
+    }
+  }, [data, initialized]);
+
+  const updateAsset = (idx: number, field: keyof ScopeAsset, value: string) => {
+    setAssets(prev => prev.map((a, i) => i === idx ? { ...a, [field]: value } : a));
+  };
+
+  const saveAssets = async () => {
+    setSaving(true);
+    try {
+      await ctemApi.savePhaseData(clientId, programId, "scope", { assets });
+      toast.success("Scope saved");
+    } catch {
+      toast.error("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) return <CircularProgress size={20} sx={{ display: "block", my: 2 }} />;
+
+  const scopeCount = assets.filter(a => a.scope_status === "in_scope").length;
+  const crownCount = assets.filter(a => a.scope_status === "crown_jewel").length;
+  const outCount   = assets.filter(a => a.scope_status === "out_of_scope").length;
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        <Chip label={`${scopeCount} In Scope`} size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+        <Chip label={`${crownCount} Crown Jewel`} size="small" sx={{ bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335", fontWeight: 700 }} />
+        <Chip label={`${outCount} Out of Scope`} size="small" sx={{ bgcolor: "rgba(0,0,0,0.06)", color: "text.secondary", fontWeight: 700 }} />
+        <Typography variant="caption" sx={{ color: "text.secondary", alignSelf: "center" }}>
+          {assets.length} assets discovered from findings
+        </Typography>
+        <Button size="small" variant="contained" onClick={saveAssets} disabled={saving} sx={{ ml: "auto" }}>
+          {saving ? "Saving…" : "Save Scope"}
+        </Button>
+      </Box>
+
+      {assets.length === 0 ? (
+        <Alert severity="info">No assets discovered yet. Run a scan to populate the asset list.</Alert>
+      ) : (
+        <Box sx={{ overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Resource</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Type / Category</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Findings</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Scope Status</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Analyst Comment</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {assets.map((asset, idx) => {
+                const statusColor = asset.scope_status === "crown_jewel" ? "#EA4335"
+                  : asset.scope_status === "in_scope" ? "#4285F4"
+                  : asset.scope_status === "out_of_scope" ? "#9E9E9E" : "text.secondary";
+                return (
+                  <TableRow key={`${asset.resource_id}-${idx}`} hover sx={{ opacity: asset.scope_status === "out_of_scope" ? 0.5 : 1 }}>
+                    <TableCell sx={{ fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <Tooltip title={asset.resource_id}>
+                        <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{asset.resource_id}</Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 11 }}>
+                      <Box>
+                        <Typography variant="caption" sx={{ display: "block" }}>{asset.resource_type}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>{asset.exposure_category}</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ textAlign: "center" }}>
+                      <Chip label={asset.finding_count} size="small"
+                        sx={{ bgcolor: asset.finding_count > 5 ? "rgba(234,67,53,0.1)" : "rgba(0,0,0,0.05)", fontSize: 10, height: 18, color: asset.finding_count > 5 ? "#EA4335" : "text.primary" }} />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 150 }}>
+                      <FormControl size="small" fullWidth>
+                        <Select
+                          value={asset.scope_status}
+                          onChange={(e) => updateAsset(idx, "scope_status", e.target.value)}
+                          sx={{ fontSize: 11, color: statusColor, "& .MuiSelect-select": { py: 0.5 } }}
+                        >
+                          {SCOPE_STATUSES.map(s => (
+                            <MenuItem key={s.value} value={s.value} sx={{ fontSize: 11 }}>{s.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 200 }}>
+                      <TextField
+                        size="small" fullWidth
+                        placeholder="Add comment…"
+                        value={asset.notes}
+                        onChange={(e) => updateAsset(idx, "notes", e.target.value)}
+                        sx={{ "& input": { fontSize: 11, py: 0.5 } }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 2: Discover
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DiscoverPhaseContent({ clientId, programId, phaseData, onSave }: {
+  clientId: string; programId: string;
+  phaseData: Record<string, unknown>; onSave: (d: Record<string, unknown>) => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["ctem-discover", clientId, programId],
+    queryFn: () => ctemApi.getDiscoverFindings(clientId, programId),
+    enabled: !!clientId && !!programId,
+  });
+
+  const [summary, setSummary] = useState((phaseData?.summary as string) ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const cats: Array<Record<string, unknown>> = (data?.exposure_categories as Array<Record<string, unknown>>) ?? [];
+  const recent: Array<Record<string, unknown>> = (data?.recent_open_findings as Array<Record<string, unknown>>) ?? [];
+
+  const handleSave = async () => {
+    setSaving(true);
+    const categories = cats.map(c => ({ ...c, notes: "" }));
+    await onSave({ categories, summary });
+    setSaving(false);
+  };
+
+  if (isLoading) return <CircularProgress size={20} sx={{ display: "block", my: 2 }} />;
+
+  const isAllAssets = data?.all_assets_mode;
+  return (
+    <Box>
+      {isAllAssets && (
+        <Alert severity="info" sx={{ mb: 2, py: 0.5 }}>
+          <Typography variant="caption">Showing all findings — tag assets as "In Scope" in the Scope phase to filter by scoped assets.</Typography>
+        </Alert>
+      )}
+      {!isAllAssets && (
+        <Alert severity="success" sx={{ mb: 2, py: 0.5 }}>
+          <Typography variant="caption">Showing findings for {data?.scoped_asset_count} scoped assets ({data?.findings_total} total findings)</Typography>
+        </Alert>
+      )}
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
+        EXPOSURE CATEGORIES
+      </Typography>
+      <Box sx={{ overflowX: "auto", mb: 3 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Exposure Category</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Total</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#EA4335" }}>Critical</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#FF6D00" }}>High</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#FBBC04" }}>Medium</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#34A853" }}>Low</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {cats.length === 0 && (
+              <TableRow><TableCell colSpan={6} sx={{ textAlign: "center", color: "text.secondary", fontSize: 11 }}>No findings yet</TableCell></TableRow>
+            )}
+            {cats.map((c, i) => (
+              <TableRow key={i} hover>
+                <TableCell sx={{ fontSize: 11 }}>{c.category as string}</TableCell>
+                <TableCell sx={{ textAlign: "center", fontSize: 11, fontWeight: 700 }}>{c.total as number}</TableCell>
+                <TableCell sx={{ textAlign: "center", fontSize: 11, color: "#EA4335" }}>{(c.critical as number) || "—"}</TableCell>
+                <TableCell sx={{ textAlign: "center", fontSize: 11, color: "#FF6D00" }}>{(c.high as number) || "—"}</TableCell>
+                <TableCell sx={{ textAlign: "center", fontSize: 11, color: "#FBBC04" }}>{(c.medium as number) || "—"}</TableCell>
+                <TableCell sx={{ textAlign: "center", fontSize: 11, color: "#34A853" }}>{(c.low as number) || "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
+        RECENT OPEN FINDINGS (SCOPED ASSETS)
+      </Typography>
+      <Box sx={{ overflowX: "auto", mb: 2 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Finding</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Severity</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Category</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Resource</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>CVSS</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {recent.slice(0, 10).map((f, i) => (
+              <TableRow key={i} hover>
+                <TableCell sx={{ fontSize: 11, maxWidth: 200 }}>{f.title as string}</TableCell>
+                <TableCell>
+                  <Chip label={f.severity as string} size="small"
+                    sx={{ bgcolor: `${SEV_COLORS[f.severity as string] || "#888"}22`, color: SEV_COLORS[f.severity as string], fontSize: 10, height: 18, fontWeight: 700 }} />
+                </TableCell>
+                <TableCell sx={{ fontSize: 10, color: "text.secondary" }}>{f.exposure_category as string}</TableCell>
+                <TableCell sx={{ fontSize: 10, fontFamily: "monospace", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.resource_id as string}</TableCell>
+                <TableCell sx={{ fontSize: 11 }}>{f.cvss ? String(f.cvss) : "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+
+      <TextField fullWidth multiline minRows={2} size="small" label="Discovery summary notes"
+        value={summary} onChange={(e) => setSummary(e.target.value)} sx={{ mb: 1 }} />
+      <Button size="small" variant="outlined" onClick={handleSave} disabled={saving}>Save Notes</Button>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 3: Prioritise
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PrioritisePhaseContent({ clientId, programId, phaseData, onSave }: {
+  clientId: string; programId: string;
+  phaseData: Record<string, unknown>; onSave: (d: Record<string, unknown>) => void;
+}) {
+  const [items, setItems] = useState<PriorityItem[]>((phaseData?.items as PriorityItem[]) ?? []);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const generateAI = async () => {
+    setGenerating(true);
+    try {
+      const res = await ctemApi.generatePriorities(clientId, programId);
+      setItems(res.items ?? []);
+      toast.success("AI priorities generated — review and adjust as needed");
+    } catch {
+      toast.error("AI generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const addItem = () => {
+    setItems(prev => [...prev, { rank: prev.length + 1, title: "", severity: "medium", source: "analyst", rationale: "", analyst_notes: "" }]);
+  };
+
+  const removeItem = (idx: number) => {
+    setItems(prev => prev.filter((_, i) => i !== idx).map((it, i) => ({ ...it, rank: i + 1 })));
+  };
+
+  const moveItem = (idx: number, dir: -1 | 1) => {
+    const newItems = [...items];
+    const target = idx + dir;
+    if (target < 0 || target >= newItems.length) return;
+    [newItems[idx], newItems[target]] = [newItems[target], newItems[idx]];
+    setItems(newItems.map((it, i) => ({ ...it, rank: i + 1 })));
+  };
+
+  const updateItem = (idx: number, field: keyof PriorityItem, value: string) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ items });
+    setSaving(false);
+  };
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+        <Button size="small" variant="outlined"
+          startIcon={generating ? <CircularProgress size={12} /> : <AutoAwesome sx={{ fontSize: 14 }} />}
+          onClick={generateAI} disabled={generating}>
+          Generate AI Top 5
+        </Button>
+        <Button size="small" variant="outlined" startIcon={<Add />} onClick={addItem}>Add Item</Button>
+        <Button size="small" variant="contained" onClick={handleSave} disabled={saving} sx={{ ml: "auto" }}>
+          {saving ? "Saving…" : "Save Priorities"}
+        </Button>
+      </Box>
+
+      {items.length === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <Typography variant="caption">Click "Generate AI Top 5" to have AI rank the most critical exposures, then add or adjust items as needed.</Typography>
+        </Alert>
+      )}
+
+      {items.map((item, idx) => (
+        <Paper key={idx} variant="outlined" sx={{ p: 1.5, mb: 1, position: "relative" }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3, flexShrink: 0 }}>
+              <IconButton size="small" onClick={() => moveItem(idx, -1)} disabled={idx === 0} sx={{ p: 0.3 }}>
+                <ArrowUpward sx={{ fontSize: 14 }} />
+              </IconButton>
+              <Typography variant="caption" sx={{ textAlign: "center", fontWeight: 800, color: "primary.main" }}>#{item.rank}</Typography>
+              <IconButton size="small" onClick={() => moveItem(idx, 1)} disabled={idx === items.length - 1} sx={{ p: 0.3 }}>
+                <ArrowDownward sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Grid container spacing={1}>
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <TextField fullWidth size="small" label="Title" value={item.title}
+                    onChange={(e) => updateItem(idx, "title", e.target.value)}
+                    sx={{ "& input": { fontSize: 12 } }} />
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ fontSize: 12 }}>Severity</InputLabel>
+                    <Select value={item.severity} label="Severity"
+                      onChange={(e) => updateItem(idx, "severity", e.target.value)}
+                      sx={{ fontSize: 12, color: SEV_COLORS[item.severity] }}>
+                      {["critical","high","medium","low"].map(s => (
+                        <MenuItem key={s} value={s} sx={{ fontSize: 12, color: SEV_COLORS[s] }}>{s}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6, md: 3 }}>
+                  <Chip
+                    label={item.source === "ai" ? "AI Suggested" : "Analyst Added"}
+                    size="small"
+                    sx={{
+                      bgcolor: item.source === "ai" ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)",
+                      color: item.source === "ai" ? "#FBBC04" : "#34A853",
+                      fontSize: 10, height: 28, alignSelf: "center",
+                    }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small" label="Rationale" value={item.rationale}
+                    onChange={(e) => updateItem(idx, "rationale", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small" label="Analyst Notes" value={item.analyst_notes}
+                    onChange={(e) => updateItem(idx, "analyst_notes", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </Grid>
+              </Grid>
+            </Box>
+            <IconButton size="small" color="error" onClick={() => removeItem(idx)} sx={{ flexShrink: 0, mt: 0.5 }}>
+              <Delete fontSize="small" />
+            </IconButton>
+          </Box>
+        </Paper>
+      ))}
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4: Validate
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_VALIDATION_METHODS: ValidationMethod[] = [
+  { name: "Automated BAS (attack simulation)", tests_run: "", confirmed: "", notes: "" },
+  { name: "Manual attack-path validation (red/purple team)", tests_run: "", confirmed: "", notes: "" },
+  { name: "Control-efficacy check (detection review)", tests_run: "", confirmed: "", notes: "" },
+];
+
+function ValidatePhaseContent({ clientId, programId, phaseData, onSave }: {
+  clientId: string; programId: string;
+  phaseData: Record<string, unknown>; onSave: (d: Record<string, unknown>) => void;
+}) {
+  const [methods, setMethods] = useState<ValidationMethod[]>(
+    (phaseData?.methods as ValidationMethod[])?.length
+      ? (phaseData.methods as ValidationMethod[])
+      : DEFAULT_VALIDATION_METHODS
+  );
+  const [notableFindings, setNotableFindings] = useState((phaseData?.notable_findings as string) ?? "");
+  const [summary, setSummary] = useState((phaseData?.summary as string) ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const updateMethod = (idx: number, field: keyof ValidationMethod, value: string) => {
+    setMethods(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
+  };
+
+  const addMethod = () => setMethods(prev => [...prev, { name: "", tests_run: "", confirmed: "", notes: "" }]);
+  const removeMethod = (idx: number) => setMethods(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ methods, notable_findings: notableFindings, summary });
+    setSaving(false);
+  };
+
+  const totalTests = methods.reduce((s, m) => s + (Number(m.tests_run) || 0), 0);
+  const totalConfirmed = methods.reduce((s, m) => s + (Number(m.confirmed) || 0), 0);
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        <Chip label={`${totalTests} Tests Run`} size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+        <Chip label={`${totalConfirmed} Confirmed Exploitable`} size="small" sx={{ bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335", fontWeight: 700 }} />
+        {totalTests > 0 && (
+          <Chip label={`${Math.round(totalConfirmed/totalTests*100)}% confirmation rate`} size="small" variant="outlined" />
+        )}
+      </Box>
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
+        VALIDATION METHODS
+      </Typography>
+      <Box sx={{ overflowX: "auto", mb: 2 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Validation Method</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Tests Run</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Confirmed Exploitable</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Notes</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {methods.map((m, idx) => (
+              <TableRow key={idx}>
+                <TableCell sx={{ minWidth: 220 }}>
+                  <TextField fullWidth size="small" value={m.name}
+                    onChange={(e) => updateMethod(idx, "name", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </TableCell>
+                <TableCell sx={{ width: 100 }}>
+                  <TextField size="small" type="number" value={m.tests_run}
+                    onChange={(e) => updateMethod(idx, "tests_run", e.target.value)}
+                    sx={{ "& input": { fontSize: 11, textAlign: "center" } }} />
+                </TableCell>
+                <TableCell sx={{ width: 130 }}>
+                  <TextField size="small" type="number" value={m.confirmed}
+                    onChange={(e) => updateMethod(idx, "confirmed", e.target.value)}
+                    sx={{ "& input": { fontSize: 11, textAlign: "center" } }} />
+                </TableCell>
+                <TableCell>
+                  <TextField fullWidth size="small" value={m.notes}
+                    onChange={(e) => updateMethod(idx, "notes", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </TableCell>
+                <TableCell sx={{ width: 36 }}>
+                  <IconButton size="small" color="error" onClick={() => removeMethod(idx)}>
+                    <Delete sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+      <Button size="small" startIcon={<Add />} onClick={addMethod} sx={{ mb: 2 }}>Add Method</Button>
+
+      <TextField fullWidth multiline minRows={4} size="small"
+        label="Notable Findings (one per line — e.g. lateral movement confirmed, phishing blocked)"
+        placeholder="• Simulated lateral movement from DMZ reached identity provider admin console in 3 hops — no SIEM alert&#10;• Exfiltration via misconfigured storage bucket validated as exploitable&#10;• Phishing-to-credential-reuse blocked by conditional access — control confirmed effective"
+        value={notableFindings} onChange={(e) => setNotableFindings(e.target.value)}
+        sx={{ mb: 1 }} />
+
+      <TextField fullWidth multiline minRows={2} size="small" label="Validation summary"
+        value={summary} onChange={(e) => setSummary(e.target.value)} sx={{ mb: 1 }} />
+
+      <Button size="small" variant="contained" onClick={handleSave} disabled={saving}>
+        {saving ? "Saving…" : "Save"}
+      </Button>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 5: Mobilise
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobilisePhaseContent({ clientId, programId, phaseData, onSave }: {
+  clientId: string; programId: string;
+  phaseData: Record<string, unknown>; onSave: (d: Record<string, unknown>) => void;
+}) {
+  const [owners, setOwners] = useState<MobilisationOwner[]>(
+    (phaseData?.owners as MobilisationOwner[]) ?? []
+  );
+  const [blockers, setBlockers] = useState<string[]>(
+    Array.isArray(phaseData?.blockers) ? (phaseData.blockers as string[]) : [""]
+  );
+  const [saving, setSaving] = useState(false);
+
+  const updateOwner = (idx: number, field: keyof MobilisationOwner, value: string) => {
+    setOwners(prev => prev.map((o, i) => i === idx ? { ...o, [field]: value } : o));
+  };
+  const addOwner = () => setOwners(prev => [...prev, { team: "", open: "", closed_on_time: "", sla_breach: "", notes: "" }]);
+  const removeOwner = (idx: number) => setOwners(prev => prev.filter((_, i) => i !== idx));
+
+  const updateBlocker = (idx: number, val: string) => setBlockers(prev => prev.map((b, i) => i === idx ? val : b));
+  const addBlocker = () => setBlockers(prev => [...prev, ""]);
+  const removeBlocker = (idx: number) => setBlockers(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSave = async () => {
+    setSaving(true);
+    await onSave({ owners, blockers: blockers.filter(b => b.trim()) });
+    setSaving(false);
+  };
+
+  const totalBreach = owners.reduce((s, o) => s + (Number(o.sla_breach) || 0), 0);
+
+  return (
+    <Box>
+      {totalBreach > 0 && (
+        <Alert severity="error" sx={{ mb: 2, py: 0.5 }}>
+          <Typography variant="caption">{totalBreach} SLA breaches across owner teams — immediate action required</Typography>
+        </Alert>
+      )}
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
+        OWNER TEAMS
+      </Typography>
+      <Box sx={{ overflowX: "auto", mb: 2 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Owner Team</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Open</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center" }}>Closed On-Time</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#EA4335" }}>SLA Breach</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Notes</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {owners.length === 0 && (
+              <TableRow><TableCell colSpan={6} sx={{ textAlign: "center", color: "text.secondary", fontSize: 11 }}>No teams added yet</TableCell></TableRow>
+            )}
+            {owners.map((o, idx) => (
+              <TableRow key={idx} hover>
+                <TableCell sx={{ minWidth: 180 }}>
+                  <TextField fullWidth size="small" placeholder="e.g. Cloud Platform Team" value={o.team}
+                    onChange={(e) => updateOwner(idx, "team", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </TableCell>
+                <TableCell sx={{ width: 70 }}>
+                  <TextField size="small" type="number" value={o.open}
+                    onChange={(e) => updateOwner(idx, "open", e.target.value)}
+                    sx={{ "& input": { fontSize: 11, textAlign: "center" } }} />
+                </TableCell>
+                <TableCell sx={{ width: 100 }}>
+                  <TextField size="small" type="number" value={o.closed_on_time}
+                    onChange={(e) => updateOwner(idx, "closed_on_time", e.target.value)}
+                    sx={{ "& input": { fontSize: 11, textAlign: "center" } }} />
+                </TableCell>
+                <TableCell sx={{ width: 90 }}>
+                  <TextField size="small" type="number" value={o.sla_breach}
+                    onChange={(e) => updateOwner(idx, "sla_breach", e.target.value)}
+                    sx={{ "& input": { fontSize: 11, textAlign: "center", color: Number(o.sla_breach) > 0 ? "#EA4335" : "inherit" } }} />
+                </TableCell>
+                <TableCell>
+                  <TextField fullWidth size="small" value={o.notes}
+                    onChange={(e) => updateOwner(idx, "notes", e.target.value)}
+                    sx={{ "& input": { fontSize: 11 } }} />
+                </TableCell>
+                <TableCell sx={{ width: 36 }}>
+                  <IconButton size="small" color="error" onClick={() => removeOwner(idx)}>
+                    <Delete sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Box>
+      <Button size="small" startIcon={<Add />} onClick={addOwner} sx={{ mb: 2 }}>Add Team</Button>
+
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 1 }}>
+        BLOCKERS
+      </Typography>
+      {blockers.map((b, idx) => (
+        <Box key={idx} sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+          <TextField fullWidth size="small" placeholder={`Blocker ${idx + 1} — e.g. OT change freeze delayed 3 critical patches`}
+            value={b} onChange={(e) => updateBlocker(idx, e.target.value)}
+            sx={{ "& input": { fontSize: 11 } }} />
+          <IconButton size="small" color="error" onClick={() => removeBlocker(idx)}>
+            <Delete sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Box>
+      ))}
+      <Button size="small" startIcon={<Add />} onClick={addBlocker} sx={{ mb: 2 }}>Add Blocker</Button>
+
+      <Button size="small" variant="contained" onClick={handleSave} disabled={saving}>
+        {saving ? "Saving…" : "Save"}
+      </Button>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase accordion wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
 function PhaseAccordion({
-  ph, phaseData, programId, clientId, isCurrentPhase, isLocked, onRefresh,
+  ph, phaseNote, programId, clientId, isCurrentPhase, isLocked, onRefresh,
 }: {
   ph: typeof PHASES[0];
-  phaseData: PhaseData;
-  programId: string;
-  clientId: string;
-  isCurrentPhase: boolean;
-  isLocked: boolean;
+  phaseNote: PhaseNote;
+  programId: string; clientId: string;
+  isCurrentPhase: boolean; isLocked: boolean;
   onRefresh: () => void;
 }) {
   const qc = useQueryClient();
-  const [notes, setNotes] = useState(phaseData.notes ?? "");
   const [expanded, setExpanded] = useState(isCurrentPhase);
-
-  const done = phaseData.completed ?? false;
+  const [notes, setNotes] = useState(phaseNote.notes ?? "");
+  const done = phaseNote.completed ?? false;
+  const pd = (phaseNote.phase_data_json as Record<string, unknown>) ?? {};
 
   const updateMut = useMutation({
     mutationFn: (args: { n?: string; completed?: boolean }) =>
       ctemApi.updatePhase(clientId, programId, ph.key, args.n, args.completed),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ctem", clientId] });
-      toast.success("Phase updated");
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ctem", clientId] }); toast.success("Phase updated"); },
     onError: () => toast.error("Update failed"),
   });
 
-  // Locked: future phase not yet reached — show a minimal locked row
+  const savePhaseData = useCallback(async (data: Record<string, unknown>) => {
+    await ctemApi.savePhaseData(clientId, programId, ph.key, data);
+    qc.invalidateQueries({ queryKey: ["ctem", clientId] });
+    toast.success("Saved");
+  }, [clientId, programId, ph.key, qc]);
+
   if (isLocked) {
     return (
-      <Box
-        sx={{
-          display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.2,
-          mb: 1, border: "1px solid", borderColor: "divider", borderRadius: 1,
-          opacity: 0.45, cursor: "not-allowed",
-        }}
-      >
+      <Box sx={{
+        display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.5,
+        mb: 1, border: "1px solid", borderColor: "divider", borderRadius: 1,
+        opacity: 0.4, cursor: "not-allowed",
+      }}>
         <Lock fontSize="small" sx={{ color: "text.disabled" }} />
         <Typography variant="body2" sx={{ fontWeight: 600, color: "text.disabled" }}>{ph.label}</Typography>
         <Typography variant="caption" sx={{ color: "text.disabled", ml: 1 }}>
@@ -356,96 +853,72 @@ function PhaseAccordion({
     );
   }
 
-  // Completed phase: expandable but read-only (no mark-complete button)
-  const isReadOnly = done;
-
   return (
-    <Accordion
-      expanded={expanded}
-      onChange={(_, v) => setExpanded(v)}
-      variant="outlined"
-      sx={{
-        mb: 1,
-        "&:before": { display: "none" },
-        borderColor: done ? "rgba(52,168,83,0.3)" : isCurrentPhase ? `${ph.color}44` : "divider",
-      }}
-    >
-      <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 48 }}>
+    <Accordion expanded={expanded} onChange={(_, v) => setExpanded(v)} variant="outlined"
+      sx={{ mb: 1, "&:before": { display: "none" }, borderColor: done ? "rgba(52,168,83,0.3)" : isCurrentPhase ? `${ph.color}44` : "divider" }}>
+      <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 52 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1 }}>
-          <Box sx={{ color: done ? "#34A853" : ph.color, display: "flex" }}>
+          <Box sx={{ color: done ? "#34A853" : ph.color }}>
             {done ? <CheckCircle fontSize="small" /> : <RadioButtonUnchecked fontSize="small" />}
           </Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>{ph.label}</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>{ph.label}</Typography>
           {done && <Chip label="Complete" size="small" sx={{ bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontSize: 10, height: 18 }} />}
           {isCurrentPhase && !done && <Chip label="Active" size="small" sx={{ bgcolor: `${ph.color}22`, color: ph.color, fontSize: 10, height: 18 }} />}
-          {phaseData.ai_brief && (
-            <Chip icon={<AutoAwesome sx={{ fontSize: 12 }} />} label="AI brief" size="small"
+          {phaseNote.ai_brief && (
+            <Chip icon={<AutoAwesome sx={{ fontSize: 11 }} />} label="AI brief" size="small"
               sx={{ bgcolor: "rgba(251,188,4,0.1)", color: "#FBBC04", fontSize: 10, height: 18, ml: "auto", mr: 1 }} />
           )}
         </Box>
       </AccordionSummary>
 
       <AccordionDetails sx={{ pt: 0 }}>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>{ph.desc}</Typography>
+        {/* Phase-specific content */}
+        {ph.key === "scope" && <ScopePhaseContent clientId={clientId} programId={programId} />}
+        {ph.key === "discover" && <DiscoverPhaseContent clientId={clientId} programId={programId} phaseData={pd} onSave={savePhaseData} />}
+        {ph.key === "prioritise" && <PrioritisePhaseContent clientId={clientId} programId={programId} phaseData={pd} onSave={savePhaseData} />}
+        {ph.key === "validate" && <ValidatePhaseContent clientId={clientId} programId={programId} phaseData={pd} onSave={savePhaseData} />}
+        {ph.key === "mobilise" && <MobilisePhaseContent clientId={clientId} programId={programId} phaseData={pd} onSave={savePhaseData} />}
 
-        <Box sx={{ my: 1 }}>
-          <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", display: "block", mb: 0.5 }}>
-            PLATFORM DATA
-          </Typography>
-          <PhaseDataWidget clientId={clientId} programId={programId} phase={ph.key} />
-        </Box>
+        <Divider sx={{ my: 2 }} />
 
-        <Divider sx={{ my: 1.5 }} />
-
-        <AIBriefSection
-          clientId={clientId}
-          programId={programId}
-          phase={ph.key}
-          brief={phaseData.ai_brief}
-          briefGeneratedAt={phaseData.ai_brief_generated_at}
-          onBriefGenerated={onRefresh}
+        {/* AI Brief (editable) */}
+        <AIBriefEditor
+          clientId={clientId} programId={programId} phase={ph.key}
+          brief={phaseNote.ai_brief} briefGeneratedAt={phaseNote.ai_brief_generated_at}
+          onRefresh={onRefresh}
         />
 
-        <Divider sx={{ my: 1.5 }} />
+        <Divider sx={{ my: 2 }} />
 
-        <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", display: "block", mb: 0.5 }}>
-          ANALYST NOTES
+        {/* Analyst notes */}
+        <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", display: "block", mb: 0.5 }}>
+          ADDITIONAL ANALYST NOTES
         </Typography>
-        <TextField
-          multiline minRows={2} maxRows={6} fullWidth size="small"
-          label="Add notes, decisions, or observations"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          sx={{ mb: 1 }}
-          disabled={isReadOnly}
-        />
+        <TextField multiline minRows={2} maxRows={5} fullWidth size="small"
+          label="Free-form notes, decisions, or audit trail entries"
+          value={notes} onChange={(e) => setNotes(e.target.value)} sx={{ mb: 1 }} />
 
-        {done && phaseData.completed_by && (
+        {done && phaseNote.completed_by && (
           <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
-            Completed by {phaseData.completed_by}{phaseData.completed_at ? ` on ${fmt(phaseData.completed_at)}` : ""}
+            Completed by {phaseNote.completed_by}{phaseNote.completed_at ? ` on ${fmt(phaseNote.completed_at)}` : ""}
           </Typography>
         )}
 
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          {!isReadOnly && (
-            <Button size="small" variant="outlined"
-              onClick={() => updateMut.mutate({ n: notes })}
-              disabled={updateMut.isPending}>
-              Save Notes
-            </Button>
-          )}
+          <Button size="small" variant="outlined"
+            onClick={() => updateMut.mutate({ n: notes })} disabled={updateMut.isPending}>
+            Save Notes
+          </Button>
           {!done && (
             <Button size="small" variant="contained"
               sx={{ bgcolor: ph.color, "&:hover": { filter: "brightness(0.85)" } }}
-              onClick={() => updateMut.mutate({ n: notes, completed: true })}
-              disabled={updateMut.isPending}>
+              onClick={() => updateMut.mutate({ n: notes, completed: true })} disabled={updateMut.isPending}>
               Mark Phase Complete
             </Button>
           )}
           {done && (
             <Button size="small" variant="outlined" color="warning"
-              onClick={() => updateMut.mutate({ n: phaseData.notes ?? "", completed: false })}
-              disabled={updateMut.isPending}>
+              onClick={() => updateMut.mutate({ n: phaseNote.notes ?? "", completed: false })} disabled={updateMut.isPending}>
               Reopen Phase
             </Button>
           )}
@@ -455,95 +928,85 @@ function PhaseAccordion({
   );
 }
 
-// ── CTEM exposure score ───────────────────────────────────────────────────────
-function ExposureScore({ phases, currentPhase }: { phases: Record<string, PhaseData>; currentPhase: string }) {
-  const completedCount = PHASES.filter((p) => phases[p.key]?.completed).length;
-  const briefCount = PHASES.filter((p) => phases[p.key]?.ai_brief).length;
-  const score = Math.round((completedCount / PHASES.length) * 60 + (briefCount / PHASES.length) * 40);
-  const color = score >= 80 ? "#34A853" : score >= 50 ? "#FBBC04" : "#EA4335";
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress indicator
+// ─────────────────────────────────────────────────────────────────────────────
 
+function ProgressBar({ phases, currentPhase }: { phases: Record<string, PhaseNote>; currentPhase: string }) {
+  const completedCount = PHASES.filter(p => phases[p.key]?.completed).length;
+  const pct = Math.round((completedCount / PHASES.length) * 100);
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      <Box sx={{ position: "relative", width: 48, height: 48 }}>
-        <CircularProgress variant="determinate" value={score} size={48} thickness={4} sx={{ color }} />
-        <Typography
-          variant="caption"
-          sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontWeight: 800, fontSize: 11, color }}
-        >
-          {score}%
-        </Typography>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 180 }}>
+      <Box sx={{ flex: 1 }}>
+        <LinearProgress variant="determinate" value={pct} sx={{ height: 6, borderRadius: 3 }} />
       </Box>
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 700 }}>CTEM Progress</Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          {completedCount}/{PHASES.length} phases · {briefCount} AI briefs
-        </Typography>
-      </Box>
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "primary.main", whiteSpace: "nowrap" }}>
+        {completedCount}/{PHASES.length} phases
+      </Typography>
     </Box>
   );
 }
 
-// ── Program card ──────────────────────────────────────────────────────────────
-function ProgramCard({
-  program, clientId, onDelete,
-}: { program: CTEMProgram; clientId: string; onDelete: () => void }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Program card
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; clientId: string; onDelete: () => void }) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const phases = program.phases || {};
-  const phasesMap: Record<string, PhaseData> = {};
-  if (Array.isArray(program.phases)) {
-    (program.phases as unknown as (PhaseData & { phase: string })[]).forEach((p) => {
-      phasesMap[p.phase] = p;
-    });
-  } else {
-    Object.assign(phasesMap, phases);
-  }
+  const phaseMap: Record<string, PhaseNote> = {};
+  (program.phases ?? []).forEach(pn => { phaseMap[pn.phase] = pn; });
 
-  const completedCount = PHASES.filter((p) => phasesMap[p.key]?.completed).length;
   const currentPhase = program.current_phase || "scope";
-  const currentPhaseIdx = PHASES.findIndex((p) => p.key === currentPhase);
-
+  const currentPhaseIdx = PHASES.findIndex(p => p.key === currentPhase);
   const onRefresh = () => qc.invalidateQueries({ queryKey: ["ctem", clientId] });
+
+  const downloadReport = (format: "pdf" | "docx") => {
+    const token = localStorage.getItem("aegis-token") || "";
+    const url = ctemApi.exportUrl(clientId, program.id, format);
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.blob())
+      .then(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `CTEM-${program.name}.${format}`;
+        a.click();
+      })
+      .catch(() => toast.error("Export failed"));
+  };
 
   return (
     <Card variant="outlined" sx={{ mb: 2 }}>
       <CardContent sx={{ pb: "12px !important" }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box sx={{ flex: 1, cursor: "pointer" }} onClick={() => setExpanded((v) => !v)}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1 }}>
+          <Box sx={{ flex: 1, cursor: "pointer" }} onClick={() => setExpanded(v => !v)}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{program.name}</Typography>
             {program.description && (
               <Typography variant="caption" sx={{ color: "text.secondary" }}>{program.description}</Typography>
             )}
-            <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <Box sx={{ display: "flex", gap: 1, mt: 0.5, flexWrap: "wrap", alignItems: "center" }}>
               <Chip
-                label={completedCount === PHASES.length ? "Complete" : "In Progress"}
+                label={program.status === "completed" ? "Complete" : "In Progress"}
                 size="small"
-                sx={{
-                  bgcolor: completedCount === PHASES.length ? "rgba(52,168,83,0.15)" : "rgba(66,133,244,0.15)",
-                  color: completedCount === PHASES.length ? "#34A853" : "#4285F4",
-                  fontSize: 10, height: 18,
-                }}
+                sx={{ bgcolor: program.status === "completed" ? "rgba(52,168,83,0.15)" : "rgba(66,133,244,0.15)", color: program.status === "completed" ? "#34A853" : "#4285F4", fontSize: 10, height: 18 }}
               />
               <Chip label={`Active: ${PHASES[currentPhaseIdx]?.label ?? currentPhase}`} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
-              <Chip label={`${completedCount}/${PHASES.length} complete`} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
-              {program.created_at && (
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  {fmt(program.created_at)}
-                </Typography>
-              )}
+              {program.created_at && <Typography variant="caption" sx={{ color: "text.secondary" }}>{fmt(program.created_at)}</Typography>}
             </Box>
           </Box>
-          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-            {!expanded && <ExposureScore phases={phasesMap} currentPhase={currentPhase} />}
-            <Button size="small" onClick={() => setExpanded((v) => !v)} sx={{ ml: 1 }}>
-              {expanded ? "Collapse" : "Open"}
-            </Button>
+          <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", flexShrink: 0 }}>
+            {!expanded && <ProgressBar phases={phaseMap} currentPhase={currentPhase} />}
+            <Button size="small" onClick={() => setExpanded(v => !v)}>{expanded ? "Collapse" : "Open"}</Button>
+            <Tooltip title="Download PDF">
+              <IconButton size="small" onClick={() => downloadReport("pdf")}><FileDownload fontSize="small" /></IconButton>
+            </Tooltip>
+            <Tooltip title="Download DOCX">
+              <IconButton size="small" onClick={() => downloadReport("docx")} sx={{ fontSize: 11 }}>W</IconButton>
+            </Tooltip>
             <Tooltip title="Delete program">
-              <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}>
-                <Delete fontSize="small" />
-              </IconButton>
+              <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}><Delete fontSize="small" /></IconButton>
             </Tooltip>
           </Box>
         </Box>
@@ -552,25 +1015,21 @@ function ProgramCard({
           <>
             <Divider sx={{ my: 2 }} />
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-              <ExposureScore phases={phasesMap} currentPhase={currentPhase} />
+              <ProgressBar phases={phaseMap} currentPhase={currentPhase} />
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Platform data and AI briefs load automatically · future phases unlock when current phase is marked complete
+                Future phases unlock when current phase is marked complete
               </Typography>
             </Box>
-            <Box>
-              {PHASES.map((ph, idx) => (
-                <PhaseAccordion
-                  key={ph.key}
-                  ph={ph}
-                  phaseData={phasesMap[ph.key] ?? {}}
-                  programId={program.id}
-                  clientId={clientId}
-                  isCurrentPhase={idx === currentPhaseIdx}
-                  isLocked={idx > currentPhaseIdx && !phasesMap[ph.key]?.completed}
-                  onRefresh={onRefresh}
-                />
-              ))}
-            </Box>
+            {PHASES.map((ph, idx) => (
+              <PhaseAccordion
+                key={ph.key} ph={ph}
+                phaseNote={phaseMap[ph.key] ?? { phase: ph.key }}
+                programId={program.id} clientId={clientId}
+                isCurrentPhase={idx === currentPhaseIdx}
+                isLocked={idx > currentPhaseIdx && !phaseMap[ph.key]?.completed}
+                onRefresh={onRefresh}
+              />
+            ))}
           </>
         )}
       </CardContent>
@@ -578,7 +1037,7 @@ function ProgramCard({
       <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Delete Program?</DialogTitle>
         <DialogContent>
-          <Typography>Are you sure you want to delete <strong>{program.name}</strong>? This cannot be undone.</Typography>
+          <Typography>Delete <strong>{program.name}</strong>? This cannot be undone.</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDelete(false)}>Cancel</Button>
@@ -589,7 +1048,10 @@ function ProgramCard({
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Main page
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function CTEMPage() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
@@ -607,20 +1069,15 @@ export default function CTEMPage() {
     mutationFn: () => ctemApi.create(clientId, { name: newName.trim(), description: newDesc.trim() || undefined }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ctem", clientId] });
-      setCreateOpen(false);
-      setNewName("");
-      setNewDesc("");
+      setCreateOpen(false); setNewName(""); setNewDesc("");
       toast.success("CTEM program created");
     },
     onError: () => toast.error("Create failed"),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (programId: string) => ctemApi.delete(clientId, programId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ctem", clientId] });
-      toast.success("Program deleted");
-    },
+    mutationFn: (id: string) => ctemApi.delete(clientId, id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ctem", clientId] }); toast.success("Deleted"); },
     onError: () => toast.error("Delete failed"),
   });
 
@@ -628,9 +1085,9 @@ export default function CTEMPage() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>CTEM Programs</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Continuous Threat Exposure Management</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            AI-driven exposure management — platform data auto-populates each phase, manual notes always available
+            AI-assisted 5-phase program — scope assets, discover exposures, prioritise risk, validate exploitability, mobilise remediation
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} disabled={!clientId}>
@@ -644,22 +1101,16 @@ export default function CTEMPage() {
       {clientId && !isLoading && programs.length === 0 && (
         <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
           <Radar sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary", mb: 1 }}>
-            No CTEM programs yet.
-          </Typography>
+          <Typography sx={{ color: "text.secondary", mb: 1 }}>No CTEM programs yet.</Typography>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Create a program to start an AI-guided exposure management cycle. Each phase shows live data from your scans, findings, and remediation tracker — plus one-click AI briefs.
+            Create a program to begin a structured exposure management cycle.
+            Each phase pulls live platform data and provides AI-assisted analysis — you stay in control.
           </Typography>
         </Card>
       )}
 
-      {clientId && !isLoading && programs.map((p) => (
-        <ProgramCard
-          key={p.id}
-          program={p}
-          clientId={clientId}
-          onDelete={() => deleteMut.mutate(p.id)}
-        />
+      {clientId && !isLoading && programs.map(p => (
+        <ProgramCard key={p.id} program={p} clientId={clientId} onDelete={() => deleteMut.mutate(p.id)} />
       ))}
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
@@ -667,25 +1118,20 @@ export default function CTEMPage() {
         <DialogContent sx={{ pt: 2 }}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Program Name" fullWidth size="small" required
+              <TextField label="Program Name" fullWidth size="small" required
                 value={newName} onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Q3 Cloud Exposure Reduction"
-              />
+                placeholder="e.g. Q3 Cloud Exposure Reduction" />
             </Grid>
             <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Description (optional)" fullWidth size="small" multiline minRows={2}
+              <TextField label="Description (optional)" fullWidth size="small" multiline minRows={2}
                 value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Brief objective or scope statement"
-              />
+                placeholder="Brief objective or scope statement" />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={!newName.trim() || createMut.isPending}
-            onClick={() => createMut.mutate()}>
+          <Button variant="contained" disabled={!newName.trim() || createMut.isPending} onClick={() => createMut.mutate()}>
             Create
           </Button>
         </DialogActions>
