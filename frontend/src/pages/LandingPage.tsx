@@ -82,13 +82,6 @@ const FEATURES = [
   },
 ];
 
-const STATS = [
-  { value: "9+", label: "Scanner integrations" },
-  { value: "60+", label: "AI security agents" },
-  { value: "5", label: "Compliance frameworks" },
-  { value: "Real-time", label: "Risk scoring" },
-];
-
 const SCANNER_GROUPS = [
   { label: "SAST", color: CYAN, items: ["Semgrep", "CodeQL", "SonarQube", "AI Code Review"] },
   { label: "DAST", color: PURPLE, items: ["OWASP ZAP"] },
