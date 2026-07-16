@@ -312,42 +312,18 @@ jobs:
           echo "Polling: $POLL_URL"
 
           # No Oryx = just unzip + restart, typically 30-60 s. 10 min budget.
+          # All python3 -c calls are single-line to avoid YAML multi-line issues.
           for i in $(seq 1 60); do
             RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" "$POLL_URL" || echo "")
-            # Specific-URL endpoint returns an object; $top=1 returns an array
-            ST=$(echo "$RESP" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-item = d if isinstance(d, dict) else d[0]
-print(item.get('status',''))
-" 2>/dev/null || echo "")
-            PR=$(echo "$RESP" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-item = d if isinstance(d, dict) else d[0]
-print((item.get('progress') or '')[:80])
-" 2>/dev/null || echo "")
+            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); item=d if isinstance(d,dict) else d[0]; print(item.get('status',''))" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); item=d if isinstance(d,dict) else d[0]; print((item.get('progress') or '')[:80])" 2>/dev/null || echo "")
             echo "[$i] status=$ST progress=$PR"
             if [ "$ST" = "4" ]; then echo "Backend deployed successfully"; exit 0; fi
             if [ "$ST" = "3" ]; then
               echo "=== Deploy failed — fetching Kudu log ==="
-              LOG_URL=$(echo "$RESP" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-item = d if isinstance(d, dict) else d[0]
-print(item.get('log_url',''))
-" 2>/dev/null || echo "")
+              LOG_URL=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); item=d if isinstance(d,dict) else d[0]; print(item.get('log_url',''))" 2>/dev/null || echo "")
               if [ -n "$LOG_URL" ]; then
-                curl -sS -m 30 -u "$USER:$PW" "$LOG_URL" | python3 -c "
-import json,sys
-try:
-  for e in json.load(sys.stdin):
-    print(e.get('log_time',''), e.get('message',''))
-    for d in (e.get('details_url') and [e['details_url']] or []):
-      pass
-except Exception as ex:
-  print('raw:', sys.stdin.read()[:3000])
-" 2>/dev/null || true
+                curl -sS -m 30 -u "$USER:$PW" "$LOG_URL" | python3 -c "import json,sys; [print(e.get('log_time',''), e.get('message','')) for e in json.load(sys.stdin)]" 2>/dev/null || true
               fi
               exit 1
             fi
