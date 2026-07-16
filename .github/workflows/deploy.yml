@@ -240,9 +240,50 @@ jobs:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
           REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://nexgencyberai-dev-okxksu-web.azurewebsites.net' }}
 
-      - name: Deploy Frontend to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZ_FRONTEND_APP }}
-          package: ./frontend/build
-          startup-command: "npx --yes serve -s . -l 8080"
+      - name: Set frontend startup command
+        run: |
+          az webapp config set \
+            --name "$AZ_FRONTEND_APP" \
+            --resource-group "$AZ_RESOURCE_GROUP" \
+            --startup-file "npx --yes serve -s . -l 8080"
+
+      - name: Deploy Frontend (Kudu zipdeploy)
+        run: |
+          set -euo pipefail
+          APP_NAME="$AZ_FRONTEND_APP"
+          RG="$AZ_RESOURCE_GROUP"
+          USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
+          PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
+          cd frontend && zip -qr ../frontend.zip build/ && cd ..
+          echo "Uploading frontend zip..."
+          CODE=""
+          for attempt in $(seq 1 20); do
+            CODE=$(curl -sS -m 120 -u "$USER:$PW" -o /tmp/fe_deploy.out -w "%{http_code}" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
+              -H "Content-Type: application/zip" \
+              --data-binary @frontend.zip || echo "000")
+            if [ "$CODE" = "202" ] || [ "$CODE" = "200" ]; then
+              echo "Upload accepted on attempt $attempt"
+              break
+            fi
+            if [ "$CODE" = "409" ]; then
+              echo "[$attempt] HTTP 409 — Kudu busy, sleeping 50s"
+              sleep 50; continue
+            fi
+            echo "[$attempt] Upload failed HTTP $CODE: $(cat /tmp/fe_deploy.out)"
+            sleep 20
+          done
+          if [ "$CODE" != "202" ] && [ "$CODE" != "200" ]; then
+            echo "Upload failed after retries with HTTP $CODE"; exit 1
+          fi
+          echo "Polling deployment status..."
+          for i in $(seq 1 60); do
+            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" \
+              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
+            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            echo "[$i] status=$ST"
+            if [ "$ST" = "4" ]; then echo "Frontend deploy succeeded"; exit 0; fi
+            if [ "$ST" = "3" ]; then echo "Frontend deploy failed"; exit 1; fi
+            sleep 15
+          done
+          echo "Timed out waiting for frontend deploy"; exit 1
