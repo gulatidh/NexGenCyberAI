@@ -60,13 +60,63 @@ def _exposure_category(resource_type: Optional[str]) -> str:
     return resource_type.replace("_", " ").title()
 
 
+def _discover_assets(db: Session, client_id: str) -> List[Dict]:
+    """Query findings for the client and return a list of asset dicts for scope pre-seeding."""
+    # Primary: findings with a non-empty resource_id
+    rows = (
+        db.query(Finding.resource_id, Finding.resource_type, func.count(Finding.id).label("cnt"))
+        .join(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.resource_id.isnot(None),
+            Finding.resource_id != "",
+        )
+        .group_by(Finding.resource_id, Finding.resource_type)
+        .order_by(func.count(Finding.id).desc())
+        .limit(200)
+        .all()
+    )
+    # Fallback: group by resource_type when resource_ids are absent
+    if not rows:
+        rows = (
+            db.query(Finding.resource_type, Finding.resource_type, func.count(Finding.id).label("cnt"))
+            .join(Scan)
+            .filter(Scan.client_id == client_id, Finding.resource_type.isnot(None), Finding.resource_type != "")
+            .group_by(Finding.resource_type)
+            .order_by(func.count(Finding.id).desc())
+            .limit(50)
+            .all()
+        )
+    assets = []
+    for resource_id, resource_type, cnt in rows:
+        rid = resource_id or resource_type or "unknown"
+        assets.append({
+            "resource_id": rid,
+            "resource_type": resource_type or "unknown",
+            "display_name": rid,
+            "exposure_category": _exposure_category(resource_type),
+            "finding_count": cnt,
+            "scope_status": "untagged",
+            "notes": "",
+        })
+    return assets
+
+
 def _ensure_phases(db: Session, program: CTEMProgram):
     existing = {p.phase for p in program.phases}
+    needs_asset_seed = "scope" not in existing
     for phase in PHASES:
         if phase not in existing:
             db.add(CTEMPhaseNote(program_id=program.id, phase=phase))
     db.commit()
     db.refresh(program)
+    # Auto-seed scope assets from existing findings so the analyst sees something immediately
+    if needs_asset_seed:
+        scope_pn = next((p for p in program.phases if p.phase == "scope"), None)
+        if scope_pn:
+            assets = _discover_assets(db, program.client_id)
+            scope_pn.phase_data_json = {"assets": assets}
+            db.commit()
 
 
 def _get_phase_note(db: Session, client_id: str, program_id: str, phase: str) -> CTEMPhaseNote:
@@ -236,60 +286,40 @@ async def get_scope_assets(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Return unique resources from findings + existing analyst tags from scope phase_data_json."""
+    """Return unique resources from findings + existing analyst tags from scope phase_data_json.
+    If the scope phase has no saved assets yet, auto-discover and persist them now."""
     pn = _get_phase_note(db, client_id, program_id, "scope")
-    existing_tags: Dict[str, Dict] = {}
-    if pn.phase_data_json and "assets" in pn.phase_data_json:
-        for a in pn.phase_data_json["assets"]:
-            key = f"{a.get('resource_id','')}__{a.get('resource_type','')}"
-            existing_tags[key] = a
 
-    # Discover unique resources from findings.
-    # Include rows where resource_id is set to any non-empty value.
-    rows = (
-        db.query(Finding.resource_id, Finding.resource_type, func.count(Finding.id).label("cnt"))
-        .join(Scan)
-        .filter(
-            Scan.client_id == client_id,
-            Finding.resource_id.isnot(None),
-            Finding.resource_id != "",
-        )
-        .group_by(Finding.resource_id, Finding.resource_type)
-        .order_by(func.count(Finding.id).desc())
-        .limit(200)
-        .all()
-    )
+    # If the phase has never been seeded, discover and persist immediately
+    saved_assets: List[Dict] = (pn.phase_data_json or {}).get("assets", [])
+    if not saved_assets:
+        discovered = _discover_assets(db, client_id)
+        if discovered:
+            pn.phase_data_json = {"assets": discovered}
+            db.commit()
+            saved_assets = discovered
 
-    # If still no assets, fall back to distinct resource_type groupings so the
-    # user sees something even when individual resource_ids weren't captured.
-    if not rows:
-        rows = (
-            db.query(
-                Finding.resource_type,
-                Finding.resource_type,
-                func.count(Finding.id).label("cnt"),
-            )
-            .join(Scan)
-            .filter(Scan.client_id == client_id, Finding.resource_type.isnot(None))
-            .group_by(Finding.resource_type)
-            .order_by(func.count(Finding.id).desc())
-            .limit(50)
-            .all()
-        )
-
+    # Merge saved analyst tags with a fresh discovery pass to pick up new findings
+    existing_tags: Dict[str, Dict] = {
+        f"{a.get('resource_id','')}__{a.get('resource_type','')}": a
+        for a in saved_assets
+    }
+    fresh = _discover_assets(db, client_id)
+    seen_keys: set = set()
     assets = []
-    for resource_id, resource_type, cnt in rows:
-        key = f"{resource_id}__{resource_type}"
+    for item in fresh:
+        key = f"{item['resource_id']}__{item['resource_type']}"
+        seen_keys.add(key)
         tag = existing_tags.get(key, {})
         assets.append({
-            "resource_id": resource_id or resource_type or "unknown",
-            "resource_type": resource_type or "unknown",
-            "display_name": resource_id or resource_type or "unknown",
-            "exposure_category": _exposure_category(resource_type),
-            "finding_count": cnt,
-            "scope_status": tag.get("scope_status", "untagged"),  # untagged|in_scope|out_of_scope|crown_jewel
+            **item,
+            "scope_status": tag.get("scope_status", "untagged"),
             "notes": tag.get("notes", ""),
         })
+    # Preserve analyst-tagged assets not in the latest discovery (e.g. retired resources)
+    for key, a in existing_tags.items():
+        if key not in seen_keys and a.get("scope_status", "untagged") != "untagged":
+            assets.append(a)
 
     connectors = db.query(Connector).filter(Connector.client_id == client_id).all()
     return {

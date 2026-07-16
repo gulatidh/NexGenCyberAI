@@ -232,9 +232,16 @@ function ScopePhaseContent({ clientId, programId }: { clientId: string; programI
     }
   };
 
-  if (isLoading) return <CircularProgress size={20} sx={{ display: "block", my: 2 }} />;
+  if (isLoading) return (
+    <Box sx={{ py: 2 }}>
+      <LinearProgress sx={{ borderRadius: 1 }} />
+      <Typography variant="caption" sx={{ color: "text.secondary", mt: 1, display: "block" }}>
+        Discovering assets from scan findings…
+      </Typography>
+    </Box>
+  );
   if (isError) return (
-    <Alert severity="error" action={<Button size="small" onClick={() => refetch()}>Retry</Button>}>
+    <Alert severity="error" action={<Button size="small" onClick={() => refetch()}>Retry</Button>} sx={{ mb: 1 }}>
       Failed to load assets — check that the backend is running and this program exists.
     </Alert>
   );
@@ -258,7 +265,9 @@ function ScopePhaseContent({ clientId, programId }: { clientId: string; programI
       </Box>
 
       {assets.length === 0 ? (
-        <Alert severity="info">No assets discovered yet. Run a scan to populate the asset list.</Alert>
+        <Alert severity="info" action={<Button size="small" onClick={() => refetch()}>Refresh</Button>}>
+          No assets found for this client yet. Run a scan first — assets are automatically discovered from scan findings.
+        </Alert>
       ) : (
         <Box sx={{ overflowX: "auto" }}>
           <Table size="small">
