@@ -81,7 +81,22 @@ def _get_phase_note(db: Session, client_id: str, program_id: str, phase: str) ->
         .first()
     )
     if not pn:
-        raise HTTPException(status_code=404, detail="Phase note not found")
+        # Phase notes missing — program was created before _ensure_phases existed.
+        # Auto-create them now so old programs work without re-creating.
+        program = (
+            db.query(CTEMProgram)
+            .filter(CTEMProgram.id == program_id, CTEMProgram.client_id == client_id)
+            .first()
+        )
+        if not program:
+            raise HTTPException(status_code=404, detail="CTEM program not found")
+        _ensure_phases(db, program)
+        pn = db.query(CTEMPhaseNote).filter(
+            CTEMPhaseNote.program_id == program_id,
+            CTEMPhaseNote.phase == phase,
+        ).first()
+        if not pn:
+            raise HTTPException(status_code=500, detail="Failed to create phase note")
     return pn
 
 
@@ -229,25 +244,47 @@ async def get_scope_assets(
             key = f"{a.get('resource_id','')}__{a.get('resource_type','')}"
             existing_tags[key] = a
 
-    # Discover unique resources from findings
+    # Discover unique resources from findings.
+    # Include rows where resource_id is set to any non-empty value.
     rows = (
         db.query(Finding.resource_id, Finding.resource_type, func.count(Finding.id).label("cnt"))
         .join(Scan)
-        .filter(Scan.client_id == client_id, Finding.resource_id.isnot(None))
+        .filter(
+            Scan.client_id == client_id,
+            Finding.resource_id.isnot(None),
+            Finding.resource_id != "",
+        )
         .group_by(Finding.resource_id, Finding.resource_type)
         .order_by(func.count(Finding.id).desc())
         .limit(200)
         .all()
     )
 
+    # If still no assets, fall back to distinct resource_type groupings so the
+    # user sees something even when individual resource_ids weren't captured.
+    if not rows:
+        rows = (
+            db.query(
+                Finding.resource_type,
+                Finding.resource_type,
+                func.count(Finding.id).label("cnt"),
+            )
+            .join(Scan)
+            .filter(Scan.client_id == client_id, Finding.resource_type.isnot(None))
+            .group_by(Finding.resource_type)
+            .order_by(func.count(Finding.id).desc())
+            .limit(50)
+            .all()
+        )
+
     assets = []
     for resource_id, resource_type, cnt in rows:
         key = f"{resource_id}__{resource_type}"
         tag = existing_tags.get(key, {})
         assets.append({
-            "resource_id": resource_id,
+            "resource_id": resource_id or resource_type or "unknown",
             "resource_type": resource_type or "unknown",
-            "display_name": resource_id,
+            "display_name": resource_id or resource_type or "unknown",
             "exposure_category": _exposure_category(resource_type),
             "finding_count": cnt,
             "scope_status": tag.get("scope_status", "untagged"),  # untagged|in_scope|out_of_scope|crown_jewel

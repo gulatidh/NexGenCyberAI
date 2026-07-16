@@ -198,10 +198,11 @@ function AIBriefEditor({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ScopePhaseContent({ clientId, programId }: { clientId: string; programId: string }) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["ctem-scope-assets", clientId, programId],
     queryFn: () => ctemApi.getScopeAssets(clientId, programId),
     enabled: !!clientId && !!programId,
+    retry: 1,
   });
 
   const [assets, setAssets] = useState<ScopeAsset[]>([]);
@@ -232,6 +233,11 @@ function ScopePhaseContent({ clientId, programId }: { clientId: string; programI
   };
 
   if (isLoading) return <CircularProgress size={20} sx={{ display: "block", my: 2 }} />;
+  if (isError) return (
+    <Alert severity="error" action={<Button size="small" onClick={() => refetch()}>Retry</Button>}>
+      Failed to load assets — check that the backend is running and this program exists.
+    </Alert>
+  );
 
   const scopeCount = assets.filter(a => a.scope_status === "in_scope").length;
   const crownCount = assets.filter(a => a.scope_status === "crown_jewel").length;
