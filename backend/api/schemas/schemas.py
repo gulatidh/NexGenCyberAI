@@ -533,6 +533,8 @@ class CTEMPhaseNoteResponse(BaseModel):
     completed: bool
     completed_at: Optional[datetime]
     completed_by: Optional[str]
+    ai_brief: Optional[str] = None
+    ai_brief_generated_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class CTEMProgramCreate(BaseModel):

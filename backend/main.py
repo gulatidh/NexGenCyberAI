@@ -484,6 +484,27 @@ def _ensure_added_columns() -> None:
                 except Exception as exc:
                     logger.warning("risks.%s ALTER failed: %s", col, exc)
 
+        # ctem_phase_notes: ai_brief + ai_brief_generated_at — AI analysis saved per phase
+        try:
+            ctem_cols = {c["name"] for c in inspector.get_columns("ctem_phase_notes")}
+        except Exception:
+            ctem_cols = set()
+        _ctem_additions = [
+            ("ai_brief",              "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("ai_brief_generated_at", "DATETIME2 NULL",      "TIMESTAMP"),
+        ]
+        for col, mssql_type, sqlite_type in _ctem_additions:
+            if ctem_cols and col not in ctem_cols:
+                ddl = (f"ALTER TABLE ctem_phase_notes ADD {col} {mssql_type}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE ctem_phase_notes ADD COLUMN {col} {sqlite_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added ctem_phase_notes.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("ctem_phase_notes.%s ALTER failed: %s", col, exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

@@ -578,6 +578,10 @@ export const ctemApi = {
   },
   delete: (clientId: string, programId: string) =>
     api.delete(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),
+  getPhaseData: (clientId: string, programId: string, phase: string) =>
+    api.get(`/clients/${clientId}/ctem/${programId}/phase-data/${phase}`).then(r => r.data),
+  generateAIBrief: (clientId: string, programId: string, phase: string) =>
+    api.post(`/clients/${clientId}/ctem/${programId}/ai-brief/${phase}`).then(r => r.data),
 };
 
 export const scorecardApi = {
