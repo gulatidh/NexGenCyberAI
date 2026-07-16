@@ -232,10 +232,20 @@ jobs:
       - name: Package backend
         run: |
           cd backend
+          # Exclude compiled bytecode, dev/test artefacts, and bulky but
+          # unnecessary subdirectories inside vendored packages to keep the
+          # zip as small as possible (faster upload → less risk of timeout).
           zip -qr ../backend.zip . \
-            -x "*.pyc" "__pycache__/*" "*/__pycache__/*" \
+            -x "*.pyc" \
+            -x "*/__pycache__/*" \
             -x "nexgencyberai.db" ".env" "*.db-shm" "*.db-wal" \
-            -x "vendor/*.dist-info/*" "vendor/*.data/*"
+            -x "vendor/*.dist-info/*" \
+            -x "vendor/*.data/*" \
+            -x "vendor/*/tests/*" \
+            -x "vendor/*/test/*" \
+            -x "vendor/*/_test_*" \
+            -x "vendor/*/docs/*" \
+            -x "vendor/*/doc/*"
           cd ..
           echo "Backend zip: $(du -sh backend.zip | cut -f1)"
 
@@ -252,16 +262,20 @@ jobs:
             --name "$APP_NAME" --resource-group "$RG" \
             --query publishingPassword -o tsv)"
 
-          # buildAndDeployment=false → skip Oryx; deps are in vendor/.
-          # isAsync=false → synchronous; 200 means done, no polling loop needed.
-          echo "Uploading backend zip (no Oryx)..."
+          # isAsync=true → Kudu returns 202 immediately after the upload
+          # stream closes, then extracts in the background. This avoids the
+          # 504 Gateway Timeout that hits isAsync=false on large zips because
+          # the gateway kills connections that stay open > ~4 min.
+          # buildAndDeployment=false → skip Oryx; deps are pre-bundled in vendor/.
+          echo "Uploading backend zip (async, no Oryx)..."
+          CODE=""
           for attempt in $(seq 1 5); do
-            CODE=$(curl -sS -m 300 -u "$USER:$PW" -o /tmp/be_deploy.out -w "%{http_code}" \
-              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=false&buildAndDeployment=false" \
+            CODE=$(curl -sS -m 600 -u "$USER:$PW" -o /tmp/be_deploy.out -w "%{http_code}" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=false" \
               -H "Content-Type: application/zip" \
               --data-binary @backend.zip || echo "000")
             echo "Attempt $attempt → HTTP $CODE"
-            [ "$CODE" = "200" ] && { echo "Backend deployed successfully"; exit 0; }
+            [ "$CODE" = "202" ] && { echo "Upload accepted"; break; }
             if [ "$CODE" = "409" ]; then
               echo "Kudu busy — waiting 60 s before retry"
               sleep 60; continue
@@ -269,7 +283,22 @@ jobs:
             echo "Unexpected response: $(cat /tmp/be_deploy.out)"
             sleep 30
           done
-          echo "Backend deploy failed after 5 attempts (last HTTP $CODE)"; exit 1
+          [ "$CODE" = "202" ] || { echo "Upload failed after retries (HTTP $CODE)"; exit 1; }
+
+          # Poll for extraction complete. No Oryx = just unzip + restart,
+          # typically done in 30-60 s. Allow up to 10 min to be safe.
+          echo "Polling for deploy completion..."
+          for i in $(seq 1 60); do
+            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" \
+              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
+            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:80])" 2>/dev/null || echo "")
+            echo "[$i] status=$ST progress=$PR"
+            [ "$ST" = "4" ] && { echo "Backend deployed successfully"; exit 0; }
+            [ "$ST" = "3" ] && { echo "Backend deploy failed"; exit 1; }
+            sleep 10
+          done
+          echo "Timed out waiting for deploy to complete"; exit 1
 
   # ── 4. Deploy Frontend ────────────────────────────────────────────────────
   # Runs in PARALLEL with deploy-backend. Downloads the build artifact
@@ -321,14 +350,15 @@ jobs:
           cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
           echo "Frontend zip: $(du -sh frontend.zip | cut -f1)"
 
-          echo "Uploading frontend zip (sync)..."
+          echo "Uploading frontend zip (async)..."
+          CODE=""
           for attempt in $(seq 1 5); do
             CODE=$(curl -sS -m 180 -u "$USER:$PW" -o /tmp/fe_deploy.out -w "%{http_code}" \
-              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=false" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
               -H "Content-Type: application/zip" \
               --data-binary @frontend.zip || echo "000")
             echo "Attempt $attempt → HTTP $CODE"
-            [ "$CODE" = "200" ] && { echo "Frontend deployed successfully"; exit 0; }
+            [ "$CODE" = "202" ] && { echo "Upload accepted"; break; }
             if [ "$CODE" = "409" ]; then
               echo "Kudu busy — waiting 60 s before retry"
               sleep 60; continue
@@ -336,4 +366,16 @@ jobs:
             echo "Unexpected response: $(cat /tmp/fe_deploy.out)"
             sleep 20
           done
-          echo "Frontend deploy failed after 5 attempts (last HTTP $CODE)"; exit 1
+          [ "$CODE" = "202" ] || { echo "Frontend upload failed after retries (HTTP $CODE)"; exit 1; }
+
+          echo "Polling for deploy completion..."
+          for i in $(seq 1 40); do
+            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" \
+              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
+            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
+            echo "[$i] status=$ST"
+            [ "$ST" = "4" ] && { echo "Frontend deployed successfully"; exit 0; }
+            [ "$ST" = "3" ] && { echo "Frontend deploy failed"; exit 1; }
+            sleep 10
+          done
+          echo "Timed out waiting for frontend deploy"; exit 1
