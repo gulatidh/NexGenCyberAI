@@ -254,7 +254,9 @@ jobs:
           RG="$AZ_RESOURCE_GROUP"
           USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
           PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
-          cd frontend && zip -qr ../frontend.zip build/ && cd ..
+          # Zip build CONTENTS (not the build/ directory itself) so that
+          # index.html lands at wwwroot/ and `serve -s .` serves it correctly.
+          cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
           echo "Uploading frontend zip..."
           CODE=""
           for attempt in $(seq 1 20); do
