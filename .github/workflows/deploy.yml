@@ -202,6 +202,12 @@ jobs:
             --resource-group "$AZ_RESOURCE_GROUP" \
             --startup-file "python3 -m gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
+          # Give App Service time to apply the settings restart before we push
+          # a new deployment — otherwise Kudu can be mid-restart when the zip
+          # lands, causing an immediate status=3 failure.
+          echo "Waiting 40 s for settings restart to complete..."
+          sleep 40
+
       - name: Restore vendor cache
         id: vendor-cache
         uses: actions/cache@v4
@@ -273,15 +279,25 @@ jobs:
           # stream closes, then extracts in the background. Avoids the 504
           # that hits isAsync=false on large zips (gateway timeout ~4 min).
           # Oryx is disabled via SCM_DO_BUILD_DURING_DEPLOYMENT app setting.
+          # Capture the Location header so we poll the exact deployment, not
+          # just ?$top=1 which can race with old/stale records.
           echo "Uploading backend zip (async, Oryx disabled)..."
           CODE=""
+          DEPLOY_URL=""
           for attempt in $(seq 1 5); do
-            CODE=$(curl -sS -m 600 -u "$USER:$PW" -o /tmp/be_deploy.out -w "%{http_code}" \
+            CODE=$(curl -sS -m 600 -u "$USER:$PW" \
+              -D /tmp/be_headers.txt \
+              -o /tmp/be_deploy.out \
+              -w "%{http_code}" \
               -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
               -H "Content-Type: application/zip" \
               --data-binary @backend.zip || echo "000")
             echo "Attempt $attempt → HTTP $CODE"
-            [ "$CODE" = "202" ] && { echo "Upload accepted"; break; }
+            if [ "$CODE" = "202" ]; then
+              DEPLOY_URL=$(grep -i "^location:" /tmp/be_headers.txt | tr -d '\r\n' | sed 's/[Ll]ocation: //')
+              echo "Upload accepted — deploy URL: $DEPLOY_URL"
+              break
+            fi
             if [ "$CODE" = "409" ]; then
               echo "Kudu busy — waiting 60 s before retry"
               sleep 60; continue
@@ -291,17 +307,50 @@ jobs:
           done
           [ "$CODE" = "202" ] || { echo "Upload failed after retries (HTTP $CODE)"; exit 1; }
 
-          # Poll for extraction complete. No Oryx = just unzip + restart,
-          # typically done in 30-60 s. Allow up to 10 min to be safe.
-          echo "Polling for deploy completion..."
+          # Use the specific deployment URL if we got one; fall back to ?$top=1
+          POLL_URL="${DEPLOY_URL:-https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1}"
+          echo "Polling: $POLL_URL"
+
+          # No Oryx = just unzip + restart, typically 30-60 s. 10 min budget.
           for i in $(seq 1 60); do
-            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" \
-              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
-            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
-            PR=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print((d[0].get('progress') or '')[:80])" 2>/dev/null || echo "")
+            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" "$POLL_URL" || echo "")
+            # Specific-URL endpoint returns an object; $top=1 returns an array
+            ST=$(echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+item = d if isinstance(d, dict) else d[0]
+print(item.get('status',''))
+" 2>/dev/null || echo "")
+            PR=$(echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+item = d if isinstance(d, dict) else d[0]
+print((item.get('progress') or '')[:80])
+" 2>/dev/null || echo "")
             echo "[$i] status=$ST progress=$PR"
-            [ "$ST" = "4" ] && { echo "Backend deployed successfully"; exit 0; }
-            [ "$ST" = "3" ] && { echo "Backend deploy failed"; exit 1; }
+            if [ "$ST" = "4" ]; then echo "Backend deployed successfully"; exit 0; fi
+            if [ "$ST" = "3" ]; then
+              echo "=== Deploy failed — fetching Kudu log ==="
+              LOG_URL=$(echo "$RESP" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+item = d if isinstance(d, dict) else d[0]
+print(item.get('log_url',''))
+" 2>/dev/null || echo "")
+              if [ -n "$LOG_URL" ]; then
+                curl -sS -m 30 -u "$USER:$PW" "$LOG_URL" | python3 -c "
+import json,sys
+try:
+  for e in json.load(sys.stdin):
+    print(e.get('log_time',''), e.get('message',''))
+    for d in (e.get('details_url') and [e['details_url']] or []):
+      pass
+except Exception as ex:
+  print('raw:', sys.stdin.read()[:3000])
+" 2>/dev/null || true
+              fi
+              exit 1
+            fi
             sleep 10
           done
           echo "Timed out waiting for deploy to complete"; exit 1
