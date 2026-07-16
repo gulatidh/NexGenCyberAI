@@ -186,14 +186,21 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set startup command
+      - name: Configure App Service settings
         run: |
-          # PYTHONPATH points to the vendor/ bundle baked into the zip so the
-          # app doesn't need Oryx or an antenv virtual environment.
+          # SCM_DO_BUILD_DURING_DEPLOYMENT=false is the correct way to disable
+          # Oryx — the buildAndDeployment query param on zipdeploy is ignored.
+          # PYTHONPATH tells the runtime where the pre-bundled packages live.
+          az webapp config appsettings set \
+            --name "$AZ_BACKEND_APP" \
+            --resource-group "$AZ_RESOURCE_GROUP" \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+                       PYTHONPATH=/home/site/wwwroot/vendor
+
           az webapp config set \
             --name "$AZ_BACKEND_APP" \
             --resource-group "$AZ_RESOURCE_GROUP" \
-            --startup-file "PYTHONPATH=/home/site/wwwroot/vendor python3 -m gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
+            --startup-file "python3 -m gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 0.0.0.0:8000 --timeout 300 --graceful-timeout 60 --max-requests 600 --max-requests-jitter 150 --log-file -"
 
       - name: Restore vendor cache
         id: vendor-cache
@@ -263,15 +270,14 @@ jobs:
             --query publishingPassword -o tsv)"
 
           # isAsync=true → Kudu returns 202 immediately after the upload
-          # stream closes, then extracts in the background. This avoids the
-          # 504 Gateway Timeout that hits isAsync=false on large zips because
-          # the gateway kills connections that stay open > ~4 min.
-          # buildAndDeployment=false → skip Oryx; deps are pre-bundled in vendor/.
-          echo "Uploading backend zip (async, no Oryx)..."
+          # stream closes, then extracts in the background. Avoids the 504
+          # that hits isAsync=false on large zips (gateway timeout ~4 min).
+          # Oryx is disabled via SCM_DO_BUILD_DURING_DEPLOYMENT app setting.
+          echo "Uploading backend zip (async, Oryx disabled)..."
           CODE=""
           for attempt in $(seq 1 5); do
             CODE=$(curl -sS -m 600 -u "$USER:$PW" -o /tmp/be_deploy.out -w "%{http_code}" \
-              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&buildAndDeployment=false" \
+              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
               -H "Content-Type: application/zip" \
               --data-binary @backend.zip || echo "000")
             echo "Attempt $attempt → HTTP $CODE"
