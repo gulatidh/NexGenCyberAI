@@ -22,7 +22,7 @@ async def list_api_keys(db: Session = Depends(get_db), _=Depends(get_current_use
 
 @router.post("/", response_model=APIKeyCreated, dependencies=[Depends(require_editor_anywhere)])
 async def create_api_key(payload: APIKeyCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    full_key = "aegis_" + secrets.token_hex(32)
+    full_key = "monitara_" + secrets.token_hex(32)
     key_hash = hashlib.sha256(full_key.encode()).hexdigest()
     expires_at = None
     if payload.expires_days:

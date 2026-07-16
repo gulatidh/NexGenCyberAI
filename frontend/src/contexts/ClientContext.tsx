@@ -12,12 +12,12 @@ const ClientContext = createContext<ClientContextValue>({
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
   const [clientId, setClientIdState] = useState(
-    () => localStorage.getItem("aegis-active-client") || ""
+    () => localStorage.getItem("monitara-active-client") || ""
   );
 
   const setClientId = useCallback((id: string) => {
     setClientIdState(id);
-    localStorage.setItem("aegis-active-client", id);
+    localStorage.setItem("monitara-active-client", id);
   }, []);
 
   return (

@@ -629,7 +629,7 @@ export default function Connections() {
             <Box>
               <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 16 }}>AI Providers</Typography>
               <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12 }}>
-                Language models powering Aegis AI agents
+                Language models powering Monitara AI agents
               </Typography>
             </Box>
           </Box>

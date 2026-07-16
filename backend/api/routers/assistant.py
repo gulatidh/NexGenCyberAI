@@ -46,7 +46,7 @@ async def chat(payload: ChatRequest, _=Depends(get_current_user)):
     page_hint = f"\n\nThe user is currently on page: {payload.current_page}" if payload.current_page else ""
 
     system_content = (
-        "You are the Aegis AI Platform Assistant — an expert on the Aegis AI cybersecurity "
+        "You are the Monitara AI Platform Assistant — an expert on the Monitara AI cybersecurity "
         "platform. Answer questions about features, workflows, and troubleshooting based on "
         "the documentation below. Be concise and specific. Always tell the user exactly where "
         "to click or navigate. If something isn't covered in the documentation, say so honestly "

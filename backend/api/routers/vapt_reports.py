@@ -359,7 +359,7 @@ _METHODOLOGY: Dict[str, Dict] = {
             {"name": "Deep Review", "description": "LLM-assisted four-phase review: triage → per-chunk review → self-critique → cross-file taint tracing."},
             {"name": "Reporting", "description": "Structured findings with severity, CWE mapping, evidence, and AI-generated remediation."},
         ],
-        "tools": ["Aegis AI Code Review", "Claude AI", "OpenAI GPT-4o"],
+        "tools": ["Monitara AI Code Review", "Claude AI", "OpenAI GPT-4o"],
         "standards": ["OWASP Top 10", "CWE/SANS Top 25", "NIST SSDF"],
     },
 }
@@ -370,7 +370,7 @@ _DEFAULT_METHODOLOGY = {
         {"name": "Assessment", "description": "Automated and manual vulnerability assessment."},
         {"name": "Reporting", "description": "Risk-rated findings with remediation guidance."},
     ],
-    "tools": ["Aegis Security Platform"],
+    "tools": ["Monitara Security Platform"],
     "standards": ["PTES", "OWASP"],
 }
 

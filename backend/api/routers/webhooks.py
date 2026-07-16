@@ -72,5 +72,5 @@ async def test_webhook(webhook_id: str, background_tasks: BackgroundTasks, db: S
     if not wh:
         raise HTTPException(status_code=404, detail="Webhook not found")
     from services.webhook_dispatcher import dispatch_event
-    background_tasks.add_task(dispatch_event, "webhook.test", {"message": "Test event from Aegis"}, wh.client_id)
+    background_tasks.add_task(dispatch_event, "webhook.test", {"message": "Test event from Monitara"}, wh.client_id)
     return {"queued": True}

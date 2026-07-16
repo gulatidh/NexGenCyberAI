@@ -75,7 +75,7 @@ def _run_tenable_blocking(access_key, secret_key, targets, policy_id, scan_id):
 
     # Build scan kwargs
     scan_kwargs = dict(
-        name=f"Aegis-{scan_id[:8]}",
+        name=f"Monitara-{scan_id[:8]}",
         targets=[t.strip() for t in str(targets).split(",") if t.strip()],
     )
     if policy_id:

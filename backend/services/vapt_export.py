@@ -276,7 +276,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     # COVER PAGE
     # ═══════════════════════════════════════════════════════════════════════
     story.append(Spacer(1, 4 * cm))
-    story.append(Paragraph("AEGIS AI", ParagraphStyle(
+    story.append(Paragraph("MONITARA AI", ParagraphStyle(
         "brand", fontName="Helvetica-Bold", fontSize=16, textColor=HexColor("#42A5F5"),
         alignment=TA_CENTER, letterSpacing=4)))
     story.append(Spacer(1, 0.5 * cm))
@@ -926,7 +926,7 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
     _set_cell_shading(cell, "0D1B4B")
     p = cell.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("AEGIS AI\n")
+    run = p.add_run("MONITARA AI\n")
     run.bold = True
     run.font.size = Pt(20)
     run.font.color.rgb = RGBColor(0x42, 0xA5, 0xF5)

@@ -68,7 +68,7 @@ function LoginPage() {
       height: "100vh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
-      <img src={`${process.env.PUBLIC_URL}/aegis-logo.jpg`} alt="Aegis AI"
+      <img src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Monitara AI"
         style={{ width: 90, height: 90, marginBottom: 16 }} />
       <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 36, margin: 0, letterSpacing: "-0.02em", fontWeight: 800 }}>
         <span style={{ color: "#4285F4" }}>A</span>

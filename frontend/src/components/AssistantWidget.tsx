@@ -68,7 +68,7 @@ export default function AssistantWidget() {
 
   return (
     <>
-      <Tooltip title={open ? "" : "Ask Aegis Assistant"} placement="left">
+      <Tooltip title={open ? "" : "Ask Monitara Assistant"} placement="left">
         <Fab
           size="medium"
           onClick={() => setOpen((o) => !o)}
@@ -124,7 +124,7 @@ export default function AssistantWidget() {
             <SmartToy sx={{ color: "#4285F4", fontSize: 20 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "text.primary", lineHeight: 1.2 }}>
-                Aegis Assistant
+                Monitara Assistant
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                 Ask anything about the platform
@@ -160,7 +160,7 @@ export default function AssistantWidget() {
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <AutoAwesome sx={{ color: "#4285F4", fontSize: 28, mb: 1 }} />
                 <Typography sx={{ color: "text.secondary", fontSize: 13, mb: 2 }}>
-                  Ask me anything about Aegis AI
+                  Ask me anything about Monitara AI
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
                   {SUGGESTIONS.map((s) => (
@@ -201,7 +201,7 @@ export default function AssistantWidget() {
               >
                 {msg.role === "assistant" && (
                   <Typography variant="caption" sx={{ color: "#4285F4", fontSize: 10.5, fontWeight: 600, display: "block", mb: 0.25, pl: 0.5 }}>
-                    AEGIS
+                    MONITARA
                   </Typography>
                 )}
                 <Box
@@ -229,9 +229,9 @@ export default function AssistantWidget() {
                     key={i}
                     sx={{
                       width: 6, height: 6, borderRadius: "50%", bgcolor: "#4285F4",
-                      animation: "aegisPulse 1.2s ease-in-out infinite",
+                      animation: "monitaraPulse 1.2s ease-in-out infinite",
                       animationDelay: `${i * 0.18}s`,
-                      "@keyframes aegisPulse": {
+                      "@keyframes monitaraPulse": {
                         "0%, 80%, 100%": { opacity: 0.25, transform: "scale(0.75)" },
                         "40%": { opacity: 1, transform: "scale(1)" },
                       },

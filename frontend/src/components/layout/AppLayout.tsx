@@ -195,7 +195,7 @@ export default function AppLayout() {
     mutationFn: adminApi.bootstrapAdmin,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-access"] });
-      setBootstrapSnack("You are now a global admin. Welcome to Aegis!");
+      setBootstrapSnack("You are now a global admin. Welcome to Monitara!");
     },
     onError: () => setBootstrapSnack("An admin already exists — contact them for access."),
   });
@@ -240,12 +240,12 @@ export default function AppLayout() {
         borderBottom: "1px solid", borderColor: "divider", minHeight: 64,
       }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
-          <Box component="img" src={`${process.env.PUBLIC_URL}/aegis-logo.jpg`} alt="Aegis AI"
+          <Box component="img" src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Monitara AI"
             sx={{ width: 32, height: 32, flexShrink: 0 }} />
           {expanded && (
             <Box sx={{ whiteSpace: "nowrap" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                Aegis<span style={{ color: "#FFFFFF" }}>&nbsp;AI</span>
+                Monitara<span style={{ color: "#FFFFFF" }}>&nbsp;AI</span>
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
                 AI Security Posture
@@ -468,7 +468,7 @@ export default function AppLayout() {
                 display: { xs: "none", sm: "block" },
               }}
             >
-              <Box component="span" sx={{ color: "#4285F4" }}>Aegis</Box>
+              <Box component="span" sx={{ color: "#4285F4" }}>Monitara</Box>
               <Box component="span" sx={{ color: "text.primary" }}> AI</Box>
             </Typography>
             <Chip

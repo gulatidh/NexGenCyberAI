@@ -1,4 +1,4 @@
-# NexGenCyberAI — Aegis Security Platform
+# NexGenCyberAI — Monitara Security Platform
 
 AI-powered security operations platform. FastAPI backend + React/TypeScript frontend, deployed to Azure App Service via GitHub Actions.
 

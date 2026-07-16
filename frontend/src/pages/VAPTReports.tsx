@@ -226,7 +226,7 @@ export default function VAPTReports() {
             No VAPT reports yet
           </Typography>
           <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-            Generate a report from a completed scan — Aegis fills in scope, findings, and AI-generated remediation automatically.
+            Generate a report from a completed scan — Monitara fills in scope, findings, and AI-generated remediation automatically.
           </Typography>
           <Button variant="outlined" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
             Create First Report
@@ -347,7 +347,7 @@ export default function VAPTReports() {
 
           {mode === "scan" && (
             <Alert severity="info" sx={{ mb: 2, fontSize: "0.82rem" }}>
-              Aegis will import all findings from the selected scan, derive scope and methodology automatically,
+              Monitara will import all findings from the selected scan, derive scope and methodology automatically,
               and use AI to generate executive summary, detailed remediation steps, and conclusion.
             </Alert>
           )}

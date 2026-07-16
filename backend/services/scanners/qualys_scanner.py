@@ -46,13 +46,13 @@ async def run_qualys_scan(scan_id: str, db_url: str, creds: dict, config: dict) 
             raise ValueError("Qualys requires 'targets' in config (IPs or CIDR)")
 
         auth = (username, password)
-        headers = {"X-Requested-With": "Aegis"}
+        headers = {"X-Requested-With": "Monitara"}
 
         async with httpx.AsyncClient(timeout=120, verify=True) as client:
             # Launch scan
             launch_params = {
                 "action": "launch",
-                "scan_title": f"Aegis-{scan_id[:8]}",
+                "scan_title": f"Monitara-{scan_id[:8]}",
                 "ip": targets,
             }
             if option_id:
