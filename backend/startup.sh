@@ -5,22 +5,30 @@ cd /home/site/wwwroot
 ANTENV=/home/site/wwwroot/antenv
 PYTHON3=/opt/python/3.12.13/bin/python3
 
+CORE_PACKAGES=(
+    "fastapi==0.115.12"
+    "uvicorn==0.34.0"
+    "gunicorn==23.0.0"
+    "sqlalchemy==2.0.40"
+    "azure-identity==1.25.3"
+    "azure-mgmt-authorization==4.0.0"
+    "google-cloud-asset==4.3.0"
+    "google-cloud-securitycenter==1.44.0"
+    "langchain==1.2.17"
+    "langchain-openai==1.2.1"
+    "langchain-community==0.4.1"
+)
+
 if ! $ANTENV/bin/python3 -c "import fastapi" 2>/dev/null; then
-    echo "[startup] fastapi missing — rebuilding antenv..."
+    echo "[startup] antenv missing or broken — installing core packages (~4 min)..."
     rm -rf $ANTENV
     $PYTHON3 -m venv $ANTENV
-    $ANTENV/bin/pip install -r /home/site/wwwroot/requirements.txt -q --no-cache-dir
-    echo "[startup] Full pip install complete"
+    $ANTENV/bin/pip install "${CORE_PACKAGES[@]}" \
+        -q --no-cache-dir
+    echo "[startup] Core install complete — app will start; background features load on first use"
 elif ! $ANTENV/bin/python3 -c "import azure.identity; import langchain; import google.cloud.asset_v1" 2>/dev/null; then
     echo "[startup] Some packages missing — targeted install..."
-    $ANTENV/bin/pip install \
-        "azure-identity==1.25.3" \
-        "azure-mgmt-authorization==4.0.0" \
-        "google-cloud-asset==4.3.0" \
-        "google-cloud-securitycenter==1.44.0" \
-        "langchain==1.2.17" \
-        "langchain-openai==1.2.1" \
-        "langchain-community==0.4.1" \
+    $ANTENV/bin/pip install "${CORE_PACKAGES[@]}" \
         -q --no-cache-dir
     echo "[startup] Targeted install complete"
 fi
