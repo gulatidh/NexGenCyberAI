@@ -25,7 +25,7 @@ AI-powered security operations platform. FastAPI backend + React/TypeScript fron
 GitHub Actions CI/CD
   ├── backend-test     → pytest
   ├── frontend-test    → tsc + npm run build (uploads artifact)
-  ├── deploy-backend   → pre-bundled deps zip → Kudu → Azure App Service (API)
+  ├── deploy-backend   → Oryx build (antenv) → Kudu → Azure App Service (API)
   └── deploy-frontend  → build artifact zip  → Kudu → Azure App Service (Web)
 
 Azure Resources
@@ -214,9 +214,9 @@ GitHub Actions runs automatically. Watch progress under the **Actions** tab. The
 ### 4. Seed initial data (optional)
 
 ```bash
-# Run against the live backend via SSH or Kudu console
+# Run against the live backend via Kudu console (App Service → Advanced Tools → Bash)
 cd /home/site/wwwroot
-PYTHONPATH=/home/site/wwwroot/vendor python3 seed_data.py
+python3 seed_data.py
 ```
 
 ---
@@ -335,14 +335,16 @@ To deploy a staging or production environment alongside dev:
 
 ### Backend returns 500 / "uvicorn not found"
 
-The startup command uses the pre-bundled vendor directory. Check:
+Oryx creates a Python virtual environment (antenv) during deployment. If it's missing:
 ```bash
-# In Kudu console (App Service → Advanced Tools → Bash)
-ls /home/site/wwwroot/vendor/gunicorn
-PYTHONPATH=/home/site/wwwroot/vendor python3 -c "import gunicorn; print(gunicorn.__version__)"
+# Check Kudu → Advanced Tools → Bash
+ls /home/site/wwwroot/antenv/lib/
+ls /home/site/wwwroot/output.tar.zst  # compressed antenv from Oryx
 ```
 
-If vendor is missing, the deploy job may have failed before packaging. Re-run the workflow.
+If `antenv` is empty but `output.tar.zst` exists, restart the app — the runtime container
+extracts the tarball on startup. If both are missing, check that `SCM_DO_BUILD_DURING_DEPLOYMENT=true`
+in App Service → Configuration → Application settings, then re-run the deploy workflow.
 
 ### Login loop / 401 on API calls
 
@@ -360,7 +362,7 @@ Another deploy is already running on that App Service. The workflow retries auto
 
 ### First backend deploy is slow (~12 min)
 
-The Python vendor cache is cold on the first run — pip installs ~40 packages into the cache. Every subsequent deploy with the same `requirements.txt` restores the cache in ~30 s and skips pip entirely.
+Oryx runs `pip install` into the antenv virtual environment. The first run (or any run after `requirements.txt` changes) installs all packages. Subsequent code-only deploys are faster because Oryx detects the unchanged `requirements.txt` and skips pip.
 
 ### Terraform state storage doesn't exist
 
