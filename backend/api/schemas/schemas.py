@@ -269,6 +269,7 @@ class AssetResponse(BaseModel):
     status: AssetStatus
     first_seen_at: Optional[datetime]
     last_synced_at: Optional[datetime]
+    reappeared_at: Optional[datetime] = None
     open_findings_count: int = 0
     risks_count: int = 0
     model_config = {"from_attributes": True}

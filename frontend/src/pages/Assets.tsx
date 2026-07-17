@@ -113,7 +113,23 @@ export default function Assets() {
     },
   });
 
-  const classCounts = assets.reduce((acc: Record<string, number>, a) => {
+  const BADGE_DAYS = 7;
+  const badgeCutoff = Date.now() - BADGE_DAYS * 24 * 60 * 60 * 1000;
+  // "N" = newly discovered (first_seen_at within 7 days, never been stale)
+  const isNewAsset = (a: Asset) =>
+    !!a.first_seen_at &&
+    new Date(a.first_seen_at).getTime() >= badgeCutoff &&
+    !a.reappeared_at;
+  // "R" = was STALE, reappeared in the live inventory within 7 days
+  const isReappeared = (a: Asset) =>
+    !!a.reappeared_at && new Date(a.reappeared_at).getTime() >= badgeCutoff;
+
+  const [newOnly, setNewOnly] = useState(false);
+  const displayedAssets = newOnly ? assets.filter((a) => isNewAsset(a) || isReappeared(a)) : assets;
+  const newCount = assets.filter(isNewAsset).length;
+  const reappearedCount = assets.filter(isReappeared).length;
+
+  const classCounts = displayedAssets.reduce((acc: Record<string, number>, a) => {
     const c = a.asset_class || "other";
     acc[c] = (acc[c] || 0) + 1;
     return acc;
@@ -126,13 +142,13 @@ export default function Assets() {
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
   const sortedAssets = React.useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...assets].sort((a, b) => {
+    return [...displayedAssets].sort((a, b) => {
       const av: any = (a as any)[sortKey] ?? "";
       const bv: any = (b as any)[sortKey] ?? "";
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
       return String(av).localeCompare(String(bv)) * dir;
     });
-  }, [assets, sortKey, sortDir]);
+  }, [displayedAssets, sortKey, sortDir]);
   const setSort = (k: string) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else { setSortKey(k); setSortDir("asc"); }
@@ -206,9 +222,25 @@ export default function Assets() {
 
       {clientId && (
         <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
-          <Chip label={`All: ${assets.length}`} size="small" clickable
-            onClick={() => setAssetClass("")}
-            sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass ? "none" : "1px solid #4285F4" }} />
+          <Chip label={`All: ${displayedAssets.length}`} size="small" clickable
+            onClick={() => { setAssetClass(""); setNewOnly(false); }}
+            sx={{ bgcolor: assetClass || newOnly ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass || newOnly ? "none" : "1px solid #4285F4" }} />
+          {(newCount > 0 || reappearedCount > 0) && (
+            <Tooltip title={`${newCount} new asset(s) discovered + ${reappearedCount} reappeared in the last ${BADGE_DAYS} days. Click to filter.`}>
+              <Chip
+                label={[newCount > 0 && `N:${newCount}`, reappearedCount > 0 && `R:${reappearedCount}`].filter(Boolean).join("  ")}
+                size="small"
+                clickable
+                onClick={() => { setNewOnly(!newOnly); setAssetClass(""); }}
+                sx={{
+                  bgcolor: newOnly ? "rgba(0,230,118,0.25)" : "rgba(0,230,118,0.1)",
+                  color: "#00e676",
+                  border: newOnly ? "1px solid #00e676" : "none",
+                  fontWeight: 600,
+                }}
+              />
+            </Tooltip>
+          )}
           {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
             <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
               onClick={() => setAssetClass(assetClass === c ? "" : c)}
@@ -314,9 +346,23 @@ export default function Assets() {
                         "& td": { borderColor: "divider", py: 1 } }}
                       onClick={() => navigate(`/assets/${a.id}`)}>
                       <TableCell sx={{ color: "text.primary", maxWidth: 240 }}>
-                        <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {a.name}
-                        </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {a.name}
+                          </Typography>
+                          {isReappeared(a) && (
+                            <Tooltip title="Reappeared — this asset was previously STALE and is now back in the live inventory">
+                              <Chip label="R" size="small"
+                                sx={{ bgcolor: "rgba(255,152,0,0.2)", color: "#ff9800", fontSize: 10, height: 16, minWidth: 20, flexShrink: 0, fontWeight: 700 }} />
+                            </Tooltip>
+                          )}
+                          {isNewAsset(a) && (
+                            <Tooltip title="New — first discovered in the last 7 days">
+                              <Chip label="N" size="small"
+                                sx={{ bgcolor: "rgba(0,230,118,0.2)", color: "#00e676", fontSize: 10, height: 16, minWidth: 20, flexShrink: 0, fontWeight: 700 }} />
+                            </Tooltip>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 200 }}>
                         <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>

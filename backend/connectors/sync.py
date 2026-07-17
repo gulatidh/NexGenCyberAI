@@ -223,6 +223,7 @@ async def sync_connector_assets(
             db.add(asset)
             created += 1
         else:
+            was_stale = existing_row.status == AssetStatus.STALE
             existing_row.name = parsed.get("name") or existing_row.name
             existing_row.asset_type = parsed.get("asset_type") or existing_row.asset_type
             existing_row.asset_class = parsed.get("asset_class") or existing_row.asset_class
@@ -235,6 +236,8 @@ async def sync_connector_assets(
             existing_row.provider_metadata = raw
             existing_row.status = AssetStatus.ACTIVE
             existing_row.last_synced_at = now
+            if was_stale:
+                existing_row.reappeared_at = now  # "R" badge on the frontend
             updated += 1
 
     marked_stale = 0

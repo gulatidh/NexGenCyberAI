@@ -444,6 +444,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("changelog_entries.flow_id ALTER failed: %s", exc)
 
+        # assets.reappeared_at — stamped when a STALE asset is re-found in a sync
+        try:
+            asset_cols = {c["name"] for c in inspector.get_columns("assets")}
+        except Exception:
+            asset_cols = set()
+        if asset_cols and "reappeared_at" not in asset_cols:
+            ddl = ("ALTER TABLE assets ADD reappeared_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE assets ADD COLUMN reappeared_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added assets.reappeared_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("assets.reappeared_at ALTER failed: %s", exc)
+
         # findings: assignee_email, due_date (ISO string), remediated_at,
         # duplicate_of_id, occurrence_count, last_seen_at (deduplication columns)
         try:

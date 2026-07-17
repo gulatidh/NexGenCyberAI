@@ -403,6 +403,8 @@ class Asset(Base):
     status = Column(SAEnum(AssetStatus, values_callable=_ev), default=AssetStatus.ACTIVE)
     first_seen_at = Column(DateTime(timezone=True), server_default=func.now())
     last_synced_at = Column(DateTime(timezone=True), server_default=func.now())
+    # Set when an asset transitions from STALE back to ACTIVE (reappears in the live inventory).
+    reappeared_at = Column(DateTime(timezone=True), nullable=True)
 
     connector = relationship("Connector", back_populates="assets")
     project = relationship("Project", back_populates="assets")

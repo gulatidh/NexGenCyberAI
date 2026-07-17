@@ -241,6 +241,7 @@ export interface Asset {
   status: AssetStatus;
   first_seen_at?: string;
   last_synced_at?: string;
+  reappeared_at?: string;
   open_findings_count: number;
   risks_count: number;
 }
