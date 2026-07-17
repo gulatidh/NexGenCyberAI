@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Alert,
@@ -180,9 +182,15 @@ function AIBriefEditor({
       ) : displayBrief ? (
         <Paper variant="outlined" sx={{
           p: 1.5, bgcolor: "rgba(251,188,4,0.04)", borderColor: "rgba(251,188,4,0.2)",
-          borderRadius: 1, whiteSpace: "pre-wrap", fontSize: 12, maxHeight: 280, overflow: "auto",
+          borderRadius: 1, maxHeight: 400, overflow: "auto",
+          "& h1,& h2,& h3,& h4": { mt: 1, mb: 0.5, fontSize: "0.85rem", fontWeight: 700, color: "text.primary" },
+          "& p": { fontSize: "0.75rem", my: 0.5, color: "text.secondary", lineHeight: 1.6 },
+          "& ul,& ol": { pl: 2, my: 0.5 },
+          "& li": { fontSize: "0.75rem", color: "text.secondary", mb: 0.25 },
+          "& strong": { fontWeight: 700, color: "text.primary" },
+          "& code": { fontSize: "0.7rem", bgcolor: "rgba(255,255,255,0.08)", px: 0.5, borderRadius: 0.5 },
         }}>
-          {displayBrief}
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayBrief}</ReactMarkdown>
         </Paper>
       ) : (
         <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
