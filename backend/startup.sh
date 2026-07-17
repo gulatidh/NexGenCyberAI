@@ -2,8 +2,7 @@
 set -e
 cd /home/site/wwwroot
 
-# Antenv lives at /home/site/antenv (outside wwwroot) so zip deploys don't wipe it
-ANTENV=/home/site/antenv
+ANTENV=/home/site/wwwroot/antenv
 PYTHON3=/opt/python/3.12.13/bin/python3
 
 if ! $ANTENV/bin/python3 -c "import fastapi" 2>/dev/null; then
