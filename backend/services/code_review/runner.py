@@ -298,6 +298,7 @@ async def run_ai_code_review(
             sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
 
         scan.summary = {
+            **(scan.summary or {}),
             **sev_counts,
             "total": len(all_findings),
             "files_triaged": len(top_files),

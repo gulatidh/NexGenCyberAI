@@ -323,7 +323,7 @@ async def _execute_scan(
         sev_counts = {s: 0 for s in ["critical", "high", "medium", "low", "info"]}
         for f in all_findings:
             sev_counts[f.severity.value] = sev_counts.get(f.severity.value, 0) + 1
-        scan.summary = {**sev_counts, "total": len(all_findings)}
+        scan.summary = {**(scan.summary or {}), **sev_counts, "total": len(all_findings)}
         scan.status = ScanStatus.COMPLETED
         scan.completed_at = datetime.now(timezone.utc)
         db.commit()

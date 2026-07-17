@@ -76,14 +76,16 @@ export default function Assets() {
         q: search || undefined,
       }),
     enabled: !!clientId,
+    refetchInterval: 30000, // auto-refresh every 30 s so new assets appear after a scan completes
   });
 
   const syncMutation = useMutation({
     mutationFn: () => assetsApi.sync(clientId, connectorId || undefined),
     onSuccess: () => {
-      // Refetch shortly after the background sync has likely completed.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 1500);
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 6000);
+      // Sync runs as a background task; poll a few times to catch when it lands.
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 3000);
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 10000);
+      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 20000);
     },
   });
 
