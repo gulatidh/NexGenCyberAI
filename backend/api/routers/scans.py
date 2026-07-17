@@ -266,23 +266,79 @@ async def _execute_scan(
 
             all_findings = [f for f in all_findings if _matches(f)]
 
-        # Persist raw findings
-        for f in all_findings:
-            finding = Finding(
-                scan_id=scan_id,
-                title=f.title,
-                description=f.description,
-                severity=f.severity.value,
-                resource_id=f.resource_id,
-                resource_type=f.resource_type,
-                control_id=f.control_id,
-                framework=scan.framework,
-                remediation=f.remediation,
-                evidence=f.evidence,
-                cve_id=f.cve_id,
-                cvss_score=f.cvss_score or None,
-                control_mappings=getattr(f, "control_mappings", {}) or {},
+        # Persist findings with cross-scan deduplication.
+        # Canonical findings (duplicate_of_id IS NULL) are updated in-place when
+        # the same (resource_id, title) appears again; a lightweight marker row
+        # is created for the current scan so per-scan queries stay accurate.
+        _ingest_now = datetime.now(timezone.utc)
+        _dedup_map: dict = {}
+        try:
+            _existing = (
+                db.query(Finding)
+                .join(Scan, Finding.scan_id == Scan.id)
+                .filter(
+                    Scan.client_id == scan.client_id,
+                    Finding.status == "open",
+                    Finding.duplicate_of_id.is_(None),
+                )
+                .all()
             )
+            _dedup_map = {
+                (
+                    (f.resource_id or "").strip().lower()[:200],
+                    (f.title or "").strip().lower()[:200],
+                ): f
+                for f in _existing
+            }
+        except Exception:
+            pass  # dedup map build failed — fall through to plain ingest
+
+        for f in all_findings:
+            _dkey = (
+                (f.resource_id or "").strip().lower()[:200],
+                (f.title or "").strip().lower()[:200],
+            )
+            _canonical = _dedup_map.get(_dkey)
+            if _canonical is not None:
+                # Already known — bump the canonical counter and link this scan
+                _canonical.occurrence_count = (_canonical.occurrence_count or 1) + 1
+                _canonical.last_seen_at = _ingest_now
+                finding = Finding(
+                    scan_id=scan_id,
+                    title=f.title,
+                    description=None,
+                    severity=f.severity.value,
+                    resource_id=f.resource_id,
+                    resource_type=f.resource_type,
+                    control_id=f.control_id,
+                    framework=scan.framework,
+                    cve_id=f.cve_id,
+                    cvss_score=f.cvss_score or None,
+                    control_mappings={},
+                    duplicate_of_id=_canonical.id,
+                    occurrence_count=_canonical.occurrence_count,
+                    last_seen_at=_ingest_now,
+                )
+            else:
+                finding = Finding(
+                    scan_id=scan_id,
+                    title=f.title,
+                    description=f.description,
+                    severity=f.severity.value,
+                    resource_id=f.resource_id,
+                    resource_type=f.resource_type,
+                    control_id=f.control_id,
+                    framework=scan.framework,
+                    remediation=f.remediation,
+                    evidence=f.evidence,
+                    cve_id=f.cve_id,
+                    cvss_score=f.cvss_score or None,
+                    control_mappings=getattr(f, "control_mappings", {}) or {},
+                    duplicate_of_id=None,
+                    occurrence_count=1,
+                    last_seen_at=_ingest_now,
+                )
+                _dedup_map[_dkey] = finding  # register as canonical for this run
             db.add(finding)
         db.commit()
 

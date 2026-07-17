@@ -45,6 +45,13 @@ async def list_findings(
         q = q.filter(Scan.project_id == project_id)
     if scan_id:
         q = q.filter(Finding.scan_id == scan_id)
+    # For the global (cross-scan) view, filter to canonical findings only.
+    # Duplicate marker rows (duplicate_of_id IS NOT NULL) represent re-detections
+    # of an already-known issue; they are counted on the canonical row via
+    # occurrence_count and should not appear as separate entries.
+    if not scan_id:
+        q = q.filter(Finding.duplicate_of_id.is_(None))
+
     rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).offset(offset).limit(min(limit, 5000)).all()
 
     # Section/category filters happen in Python (heuristic-driven)
@@ -55,18 +62,19 @@ async def list_findings(
         )]
 
     # When filtering to a single scan, skip cross-scan deduplication — the
-    # user wants to see every raw finding from that specific run.
+    # user wants to see every raw finding from that specific run (including
+    # duplicate markers so per-scan counts match the scan summary).
     if scan_id:
         for f in rows:
-            f.seen_count = 1
+            f.seen_count = getattr(f, "occurrence_count", None) or 1
             f.first_seen_at = f.created_at
         rows.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)
         return rows[:min(limit, 5000)]
 
-    # Dedupe by (resource_id, title) — pick the latest detection as the
-    # representative, set first_seen_at to the earliest, and seen_count to
-    # the number of scans that flagged it. Same-issue duplicates from
-    # multiple scans collapse to one row.
+    # Global view: rows are already canonical-only (duplicate_of_id IS NULL).
+    # Dedupe by (resource_id, title) to collapse any pre-dedup-era duplicates
+    # (old data written before this feature was deployed), and set seen_count
+    # from occurrence_count where available, otherwise count the group size.
     def _key(f: Finding) -> tuple:
         return ((f.resource_id or "").strip().lower(), (f.title or "").strip().lower())
 
@@ -76,16 +84,18 @@ async def list_findings(
 
     deduped: List[Finding] = []
     for group in grouped.values():
-        # Latest first by created_at (already sorted from query)
         latest = max(group, key=lambda x: x.created_at or 0)
         earliest = min(
             (g for g in group if g.created_at is not None),
             key=lambda x: x.created_at,
             default=latest,
         )
-        # Set extra attrs that FindingResponse picks up via from_attributes
-        latest.seen_count = len(group)
+        # Prefer occurrence_count from DB (write-side dedup); fall back to
+        # the Python group size (read-side dedup for pre-existing data).
+        db_occ = getattr(latest, "occurrence_count", None)
+        latest.seen_count = max(len(group), db_occ or 1)
         latest.first_seen_at = earliest.created_at
+        # last_seen_at comes straight from the model attribute (may be None for old rows)
         deduped.append(latest)
 
     deduped.sort(key=lambda f: (f.cvss_score or 0, f.created_at or 0), reverse=True)

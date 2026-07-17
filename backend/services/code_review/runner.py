@@ -153,8 +153,35 @@ def _update_scan_status(db, scan_id: str, status: str, error: str = "") -> None:
 
 
 def _ingest_findings(db, scan_id: str, scan, findings) -> None:
-    """Write ReviewFinding objects as DB Finding rows."""
-    from api.models.models import Finding
+    """Write ReviewFinding objects as DB Finding rows with cross-scan deduplication."""
+    from api.models.models import Finding, Scan as ScanModel
+    from datetime import datetime, timezone
+
+    ingest_now = datetime.now(timezone.utc)
+
+    # Build dedup map: existing open canonical findings for this client
+    dedup_map: dict = {}
+    try:
+        existing = (
+            db.query(Finding)
+            .join(ScanModel, Finding.scan_id == ScanModel.id)
+            .filter(
+                ScanModel.client_id == scan.client_id,
+                Finding.status == "open",
+                Finding.duplicate_of_id.is_(None),
+            )
+            .all()
+        )
+        dedup_map = {
+            (
+                (f.resource_id or "").strip().lower()[:200],
+                (f.title or "").strip().lower()[:200],
+            ): f
+            for f in existing
+        }
+    except Exception:
+        pass
+
     for f in findings:
         evidence = getattr(f, "evidence", {}) or {}
         evidence["proof_of_exploit"] = f.proof_of_exploit
@@ -162,18 +189,44 @@ def _ingest_findings(db, scan_id: str, scan, findings) -> None:
         if f.cwe_id:
             evidence["cwe_id"] = f.cwe_id
 
-        db_finding = Finding(
-            scan_id=scan_id,
-            title=f.title[:255],
-            description=f.description,
-            severity=f.severity,
-            resource_id=f.file_path,
-            resource_type="code_file",
-            control_id=f.cwe_id if f.cwe_id else None,
-            framework=scan.framework,
-            remediation=f.remediation,
-            evidence=evidence,
+        dkey = (
+            (f.file_path or "").strip().lower()[:200],
+            (f.title or "").strip().lower()[:200],
         )
+        canonical = dedup_map.get(dkey)
+        if canonical is not None:
+            canonical.occurrence_count = (canonical.occurrence_count or 1) + 1
+            canonical.last_seen_at = ingest_now
+            db_finding = Finding(
+                scan_id=scan_id,
+                title=f.title[:255],
+                description=None,
+                severity=f.severity,
+                resource_id=f.file_path,
+                resource_type="code_file",
+                control_id=f.cwe_id if f.cwe_id else None,
+                framework=scan.framework,
+                duplicate_of_id=canonical.id,
+                occurrence_count=canonical.occurrence_count,
+                last_seen_at=ingest_now,
+            )
+        else:
+            db_finding = Finding(
+                scan_id=scan_id,
+                title=f.title[:255],
+                description=f.description,
+                severity=f.severity,
+                resource_id=f.file_path,
+                resource_type="code_file",
+                control_id=f.cwe_id if f.cwe_id else None,
+                framework=scan.framework,
+                remediation=f.remediation,
+                evidence=evidence,
+                duplicate_of_id=None,
+                occurrence_count=1,
+                last_seen_at=ingest_now,
+            )
+            dedup_map[dkey] = db_finding
         db.add(db_finding)
     db.commit()
 

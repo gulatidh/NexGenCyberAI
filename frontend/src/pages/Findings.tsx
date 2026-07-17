@@ -601,12 +601,22 @@ export default function Findings() {
                           <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {f.title}
                           </Typography>
-                          {(f.seen_count ?? 1) > 1 && (
-                            <Tooltip title={`Detected in ${f.seen_count} scans`}>
-                              <Chip label={`×${f.seen_count}`} size="small"
-                                sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 16, flexShrink: 0 }} />
-                            </Tooltip>
-                          )}
+                          {(() => {
+                            const n = f.occurrence_count ?? f.seen_count ?? 1;
+                            if (n > 1) return (
+                              <Tooltip title={`Re-confirmed in ${n} scans — same issue, not a new finding`}>
+                                <Chip label={`×${n}`} size="small"
+                                  sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 16, flexShrink: 0 }} />
+                              </Tooltip>
+                            );
+                            if (f.duplicate_of_id) return (
+                              <Tooltip title="Duplicate — links to an existing finding detected in a previous scan">
+                                <Chip label="DUP" size="small"
+                                  sx={{ bgcolor: "rgba(255,152,0,0.12)", color: "#ff9800", fontSize: 10, height: 16, flexShrink: 0 }} />
+                              </Tooltip>
+                            );
+                            return null;
+                          })()}
                         </Box>
                       </TableCell>
                       <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>
@@ -681,6 +691,38 @@ export default function Findings() {
                     {selected.resource_type === "code_file" ? "File" : selected.resource_type === "host" || selected.resource_type === "ip" ? "Host" : "Resource"}: {selected.resource_id}
                   </Typography>
                 )}
+                {/* Dedup metadata row */}
+                {(() => {
+                  const n = selected.occurrence_count ?? selected.seen_count ?? 1;
+                  const firstSeen = selected.first_seen_at || selected.created_at;
+                  const lastSeen = selected.last_seen_at;
+                  if (n <= 1 && !lastSeen) return null;
+                  return (
+                    <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2 }}>
+                      {n > 1 && (
+                        <Chip
+                          size="small"
+                          label={`Confirmed in ${n} scans`}
+                          sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontSize: 11, height: 22 }}
+                        />
+                      )}
+                      {firstSeen && (
+                        <Chip
+                          size="small"
+                          label={`First seen: ${fromNow(firstSeen)}`}
+                          sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 11, height: 22 }}
+                        />
+                      )}
+                      {lastSeen && lastSeen !== firstSeen && (
+                        <Chip
+                          size="small"
+                          label={`Last confirmed: ${fromNow(lastSeen)}`}
+                          sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 11, height: 22 }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })()}
                 {selected.remediation && (
                   <Box sx={{ bgcolor: "rgba(0,230,118,0.08)", border: "1px solid rgba(0,230,118,0.2)", borderRadius: 1, p: 1.5, mb: 2 }}>
                     <Typography variant="caption" sx={{ color: "#00e676", fontWeight: 600, display: "block", mb: 0.5 }}>Remediation</Typography>

@@ -162,11 +162,17 @@ class FindingResponse(BaseModel):
     cve_id: Optional[str]
     cvss_score: Optional[float]
     created_at: Optional[datetime]
-    # Dedupe metadata: when the same (resource_id, title) appears in multiple
-    # scans, the listing collapses them to a single row. seen_count = number
-    # of scans that flagged it; first_seen_at = earliest detection.
+    # Dedup metadata — populated by the findings list endpoint.
+    # seen_count / first_seen_at: legacy read-side dedup (still used for old rows)
     seen_count: Optional[int] = 1
     first_seen_at: Optional[datetime] = None
+    # Write-side dedup fields (set at ingest time starting with this release):
+    # occurrence_count = how many scans confirmed this finding (canonical only)
+    # last_seen_at = most recent scan that found it
+    # duplicate_of_id = non-null on marker rows that link to the canonical row
+    occurrence_count: Optional[int] = 1
+    last_seen_at: Optional[datetime] = None
+    duplicate_of_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class FindingUpdate(BaseModel):

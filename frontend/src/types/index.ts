@@ -111,6 +111,9 @@ export interface Finding {
   created_at?: string;
   seen_count?: number;
   first_seen_at?: string;
+  occurrence_count?: number;
+  last_seen_at?: string;
+  duplicate_of_id?: string;
 }
 
 export interface Risk {

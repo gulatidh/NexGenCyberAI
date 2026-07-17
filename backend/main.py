@@ -444,15 +444,19 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("changelog_entries.flow_id ALTER failed: %s", exc)
 
-        # findings: assignee_email, due_date (ISO string), remediated_at
+        # findings: assignee_email, due_date (ISO string), remediated_at,
+        # duplicate_of_id, occurrence_count, last_seen_at (deduplication columns)
         try:
             finding_cols = {c["name"] for c in inspector.get_columns("findings")}
         except Exception:
             finding_cols = set()
         _finding_additions = [
-            ("assignee_email",  "NVARCHAR(200) NULL",  "VARCHAR(200)"),
-            ("due_date",        "NVARCHAR(32) NULL",   "VARCHAR(32)"),
-            ("remediated_at",   "DATETIME2 NULL",      "TIMESTAMP"),
+            ("assignee_email",   "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("due_date",         "NVARCHAR(32) NULL",   "VARCHAR(32)"),
+            ("remediated_at",    "DATETIME2 NULL",      "TIMESTAMP"),
+            ("duplicate_of_id",  "NVARCHAR(36) NULL",   "VARCHAR(36)"),
+            ("occurrence_count", "INT NULL",             "INTEGER"),
+            ("last_seen_at",     "DATETIME2 NULL",      "TIMESTAMP"),
         ]
         for col, mssql_type, sqlite_type in _finding_additions:
             if finding_cols and col not in finding_cols:
