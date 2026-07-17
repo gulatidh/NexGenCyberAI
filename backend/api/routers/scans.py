@@ -212,9 +212,12 @@ async def _execute_scan(
                     # Else: stay in RUNNING — workflow will mark COMPLETED via ingest.
                     return
 
-                # Refresh asset inventory before the scan so findings join to fresh assets.
+                # Refresh asset inventory before the scan — discover new assets, update
+                # existing ones, but do NOT mark any assets as STALE. A transient API
+                # gap during the scan should never silently remove assets from the UI.
+                # Stale marking is reserved for explicit "Sync Assets" from the UI.
                 try:
-                    await sync_connector_assets(db, connector_db)
+                    await sync_connector_assets(db, connector_db, mark_stale=False)
                 except Exception as exc:
                     logger_msg = f"Pre-scan asset sync failed for connector {connector_db.id}: {exc}"
                     import logging as _lg

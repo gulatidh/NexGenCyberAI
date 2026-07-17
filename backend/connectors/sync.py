@@ -165,8 +165,17 @@ def _parse_resource(connector_type: ConnectorType, resource: Dict[str, Any]) -> 
         return None
 
 
-async def sync_connector_assets(db: Session, connector_db: Connector) -> Tuple[int, int, int]:
+async def sync_connector_assets(
+    db: Session,
+    connector_db: Connector,
+    mark_stale: bool = True,
+) -> Tuple[int, int, int]:
     """Pull resources from one connector and upsert them into the assets table.
+
+    mark_stale=True (default for explicit syncs): assets absent from the live
+    API response are marked STALE so the inventory stays accurate.
+    mark_stale=False (used for pre-scan syncs): only discover and update assets;
+    never demote existing ACTIVE assets so a transient API gap doesn't wipe them.
 
     Returns (created, updated, marked_stale).
     """
@@ -229,10 +238,11 @@ async def sync_connector_assets(db: Session, connector_db: Connector) -> Tuple[i
             updated += 1
 
     marked_stale = 0
-    for ext, row in existing.items():
-        if ext not in seen_ids and row.status != AssetStatus.STALE:
-            row.status = AssetStatus.STALE
-            marked_stale += 1
+    if mark_stale:
+        for ext, row in existing.items():
+            if ext not in seen_ids and row.status != AssetStatus.STALE:
+                row.status = AssetStatus.STALE
+                marked_stale += 1
 
     connector_db.last_synced_at = now
     db.commit()

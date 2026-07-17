@@ -240,6 +240,32 @@ async def sync_assets(
     }
 
 
+@router.post("/restore-stale/")
+async def restore_stale_assets(
+    client_id: str,
+    connector_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Mark all STALE assets as ACTIVE again.
+
+    Use this to recover assets that were incorrectly demoted to STALE — e.g. after
+    a scan-triggered sync that had an incomplete API response.  A full explicit Sync
+    will re-evaluate and re-apply STALE to assets truly absent from the live inventory.
+    """
+    q = db.query(Asset).filter(
+        Asset.client_id == client_id,
+        Asset.status == AssetStatus.STALE,
+    )
+    if connector_id:
+        q = q.filter(Asset.connector_id == connector_id)
+    stale = q.all()
+    for a in stale:
+        a.status = AssetStatus.ACTIVE
+    db.commit()
+    return {"restored": len(stale)}
+
+
 @router.post("/{asset_id}/scan/", response_model=ScanResponse, status_code=201)
 async def scan_asset(
     client_id: str,
