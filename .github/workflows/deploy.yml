@@ -182,24 +182,29 @@ jobs:
 
       - name: Configure App Service
         run: |
+          ok=false
           for attempt in 1 2 3; do
             az webapp config set \
               --name "$AZ_BACKEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
               --startup-file "bash /home/site/wwwroot/startup.sh" \
-              --output none && break
+              --output none && { ok=true; break; }
             echo "Attempt $attempt failed, retrying in 20s..."
             sleep 20
           done
+          $ok || { echo "ERROR: startup-file config failed after 3 attempts — aborting"; exit 1; }
+
+          ok=false
           for attempt in 1 2 3; do
             az webapp config appsettings set \
               --name "$AZ_BACKEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
               --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false \
-              --output none && break
+              --output none && { ok=true; break; }
             echo "Attempt $attempt failed, retrying in 20s..."
             sleep 20
           done
+          $ok || { echo "ERROR: SCM_DO_BUILD_DURING_DEPLOYMENT=false failed after 3 attempts — aborting"; exit 1; }
 
       - name: Generate deploy info
         env:
