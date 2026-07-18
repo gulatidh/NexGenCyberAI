@@ -227,34 +227,22 @@ jobs:
           set -euo pipefail
           APP_NAME="$AZ_BACKEND_APP"
           RG="$AZ_RESOURCE_GROUP"
-          USER="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingUserName -o tsv)"
-          PW="$(az webapp deployment list-publishing-credentials --name "$APP_NAME" --resource-group "$RG" --query publishingPassword -o tsv)"
 
           echo "Uploading backend zip (no Oryx, preserve antenv)..."
-          CODE=""
+          # az webapp deploy uses OneDeploy API — more resilient than raw curl zipdeploy.
           for attempt in $(seq 1 5); do
-            # clean=false: extracts zip but does NOT delete existing files (antenv survives)
-            CODE=$(curl -sS -m 300 -u "$USER:$PW" -o /tmp/be_deploy.out -w "%{http_code}" \
-              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true&clean=false" \
-              -H "Content-Type: application/zip" \
-              --data-binary @backend.zip || echo "000")
-            echo "Attempt $attempt → HTTP $CODE"
-            [ "$CODE" = "202" ] && { echo "Upload accepted"; break; }
-            [ "$CODE" = "409" ] && { echo "Kudu busy — waiting 30 s"; sleep 30; continue; }
-            echo "Unexpected: $(cat /tmp/be_deploy.out)"; sleep 20
+            echo "Attempt $attempt — deploying backend..."
+            az webapp deploy \
+              --name "$APP_NAME" \
+              --resource-group "$RG" \
+              --src-path backend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Backend deployed successfully"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30 s before retry"
+            sleep 30
           done
-          [ "$CODE" = "202" ] || { echo "Upload failed (HTTP $CODE)"; exit 1; }
-
-          echo "Polling for deploy completion..."
-          for i in $(seq 1 30); do
-            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
-            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status',''))" 2>/dev/null || echo "")
-            echo "[$i] status=$ST"
-            [ "$ST" = "4" ] && { echo "Backend deployed successfully"; exit 0; }
-            [ "$ST" = "3" ] && { echo "Backend deploy failed"; exit 1; }
-            sleep 10
-          done
-          echo "Timed out"; exit 1
+          echo "Backend deploy failed after 5 attempts"; exit 1
 
   # ── 4. Deploy Frontend ────────────────────────────────────────────────────
   # Runs in PARALLEL with deploy-backend. Downloads the build artifact
@@ -301,44 +289,24 @@ jobs:
           APP_NAME="$AZ_FRONTEND_APP"
           RG="$AZ_RESOURCE_GROUP"
 
-          USER="$(az webapp deployment list-publishing-credentials \
-            --name "$APP_NAME" --resource-group "$RG" \
-            --query publishingUserName -o tsv)"
-          PW="$(az webapp deployment list-publishing-credentials \
-            --name "$APP_NAME" --resource-group "$RG" \
-            --query publishingPassword -o tsv)"
-
           # Zip build CONTENTS (not the build/ directory itself) so that
           # index.html lands at wwwroot/ and `serve -s .` serves it correctly.
           cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
           echo "Frontend zip: $(du -sh frontend.zip | cut -f1)"
 
-          echo "Uploading frontend zip (async)..."
-          CODE=""
+          # Use az webapp deploy (Kudu OneDeploy API) — more resilient than raw
+          # curl zipdeploy, has built-in retry logic, avoids Kudu SCM 503 on B1.
+          # Retry the whole command up to 5 times with 30 s back-off.
           for attempt in $(seq 1 5); do
-            CODE=$(curl -sS -m 180 -u "$USER:$PW" -o /tmp/fe_deploy.out -w "%{http_code}" \
-              -X POST "https://${APP_NAME}.scm.azurewebsites.net/api/zipdeploy?isAsync=true" \
-              -H "Content-Type: application/zip" \
-              --data-binary @frontend.zip || echo "000")
-            echo "Attempt $attempt → HTTP $CODE"
-            [ "$CODE" = "202" ] && { echo "Upload accepted"; break; }
-            if [ "$CODE" = "409" ]; then
-              echo "Kudu busy — waiting 60 s before retry"
-              sleep 60; continue
-            fi
-            echo "Unexpected response: $(cat /tmp/fe_deploy.out)"
-            sleep 20
+            echo "Attempt $attempt — deploying frontend..."
+            az webapp deploy \
+              --name "$APP_NAME" \
+              --resource-group "$RG" \
+              --src-path frontend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Frontend deployed successfully"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30 s before retry"
+            sleep 30
           done
-          [ "$CODE" = "202" ] || { echo "Frontend upload failed after retries (HTTP $CODE)"; exit 1; }
-
-          echo "Polling for deploy completion..."
-          for i in $(seq 1 40); do
-            RESP=$(curl -sS -m 30 --retry 3 --retry-delay 5 -u "$USER:$PW" \
-              "https://${APP_NAME}.scm.azurewebsites.net/api/deployments?\$top=1" || echo "")
-            ST=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0].get('status'))" 2>/dev/null || echo "")
-            echo "[$i] status=$ST"
-            [ "$ST" = "4" ] && { echo "Frontend deployed successfully"; exit 0; }
-            [ "$ST" = "3" ] && { echo "Frontend deploy failed"; exit 1; }
-            sleep 10
-          done
-          echo "Timed out waiting for frontend deploy"; exit 1
+          echo "Frontend deploy failed after 5 attempts"; exit 1
