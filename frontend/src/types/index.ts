@@ -221,7 +221,7 @@ export interface FrameworkDetail {
   controls: ControlStatusEntry[];
 }
 
-export type AssetStatus = "active" | "stale" | "deleted";
+export type AssetStatus = "active" | "stale" | "deleted" | "new" | "reappeared";
 export type AssetClass = "vm" | "storage" | "network" | "database" | "identity" | "keyvault" | "other";
 
 export interface Asset {

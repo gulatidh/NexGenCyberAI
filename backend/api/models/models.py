@@ -172,6 +172,8 @@ class AssetStatus(str, enum.Enum):
     ACTIVE = "active"
     STALE = "stale"
     DELETED = "deleted"
+    NEW = "new"
+    REAPPEARED = "reappeared"
 
 class AccessRole(str, enum.Enum):
     READER = "reader"

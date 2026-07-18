@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, distinct
 from typing import List, Optional, Dict, Any
+from datetime import datetime, timezone
 
 from api.models.models import (
     Asset, AssetStatus, Connector, Finding, Risk, Scan, ScanStatus, ScanType,
@@ -240,30 +241,28 @@ async def sync_assets(
     }
 
 
-@router.post("/restore-stale/")
-async def restore_stale_assets(
+@router.post("/approve/")
+async def approve_assets(
     client_id: str,
-    connector_id: Optional[str] = None,
+    body: dict,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Mark all STALE assets as ACTIVE again.
-
-    Use this to recover assets that were incorrectly demoted to STALE — e.g. after
-    a scan-triggered sync that had an incomplete API response.  A full explicit Sync
-    will re-evaluate and re-apply STALE to assets truly absent from the live inventory.
-    """
-    q = db.query(Asset).filter(
+    """Approve NEW or REAPPEARED (or STALE) assets, promoting them to ACTIVE."""
+    asset_ids = body.get("asset_ids", [])
+    if not asset_ids:
+        raise HTTPException(status_code=422, detail="asset_ids required")
+    now = datetime.now(timezone.utc)
+    assets = db.query(Asset).filter(
         Asset.client_id == client_id,
-        Asset.status == AssetStatus.STALE,
-    )
-    if connector_id:
-        q = q.filter(Asset.connector_id == connector_id)
-    stale = q.all()
-    for a in stale:
+        Asset.id.in_(asset_ids),
+        Asset.status.in_([AssetStatus.NEW, AssetStatus.REAPPEARED, AssetStatus.STALE]),
+    ).all()
+    for a in assets:
         a.status = AssetStatus.ACTIVE
+        a.last_synced_at = now
     db.commit()
-    return {"restored": len(stale)}
+    return {"approved": len(assets)}
 
 
 @router.post("/{asset_id}/scan/", response_model=ScanResponse, status_code=201)

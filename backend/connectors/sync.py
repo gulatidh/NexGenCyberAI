@@ -189,7 +189,7 @@ async def sync_connector_assets(
 
     existing = {a.external_id: a for a in db.query(Asset).filter(Asset.connector_id == connector_db.id).all()}
     seen_ids: set = set()
-    created = updated = 0
+    created = updated = marked_stale = 0
 
     for raw in raw_resources or []:
         parsed = _parse_resource(connector_db.connector_type, raw)
@@ -198,7 +198,9 @@ async def sync_connector_assets(
         ext = parsed["external_id"]
         seen_ids.add(ext)
         existing_row = existing.get(ext)
+
         if existing_row is None:
+            # Brand new resource — create as NEW (pending user approval)
             asset = Asset(
                 client_id=connector_db.client_id,
                 project_id=connector_db.project_id,
@@ -214,14 +216,14 @@ async def sync_connector_assets(
                 cloud_project_id=parsed.get("project_id"),
                 tags=parsed.get("tags") or {},
                 provider_metadata=raw,
-                status=AssetStatus.ACTIVE,
+                status=AssetStatus.NEW,
                 first_seen_at=now,
                 last_synced_at=now,
             )
             db.add(asset)
             created += 1
         else:
-            was_stale = existing_row.status == AssetStatus.STALE
+            current = existing_row.status
             existing_row.name = parsed.get("name") or existing_row.name
             existing_row.asset_type = parsed.get("asset_type") or existing_row.asset_type
             existing_row.asset_class = parsed.get("asset_class") or existing_row.asset_class
@@ -232,36 +234,19 @@ async def sync_connector_assets(
             existing_row.cloud_project_id = parsed.get("project_id") or existing_row.cloud_project_id
             existing_row.tags = parsed.get("tags") or {}
             existing_row.provider_metadata = raw
-            existing_row.status = AssetStatus.ACTIVE
             existing_row.last_synced_at = now
-            if was_stale:
-                existing_row.reappeared_at = now  # "R" badge on the frontend
+            if current == AssetStatus.STALE:
+                existing_row.status = AssetStatus.REAPPEARED
+                existing_row.reappeared_at = now
+            # ACTIVE, NEW, REAPPEARED → no status change
             updated += 1
 
-    # last_synced_at is only stamped when an asset is actually found (in the upsert
-    # loop above). Assets not returned by the API keep their old last_synced_at so
-    # the staleness window below is meaningful.
-
-    # Mark assets STALE only when:
-    #   1. The API returned at least one result (non-empty = auth/network is working)
-    #   2. The asset has been consistently absent for STALE_AFTER_DAYS — grace period
-    #      that tolerates a single partial-API-failure without immediately marking stale.
-    from datetime import timedelta
-    STALE_AFTER_DAYS = 3
-    stale_cutoff = now - timedelta(days=STALE_AFTER_DAYS)
-
-    marked_stale = 0
+    # Mark ACTIVE assets stale when API returned results (non-empty = auth working)
     if seen_ids:
         for ext, row in existing.items():
             if ext not in seen_ids and row.status == AssetStatus.ACTIVE:
-                last_seen = row.last_synced_at
-                if last_seen is None:
-                    last_seen_utc = now - timedelta(days=STALE_AFTER_DAYS + 1)
-                else:
-                    last_seen_utc = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
-                if last_seen_utc < stale_cutoff:
-                    row.status = AssetStatus.STALE
-                    marked_stale += 1
+                row.status = AssetStatus.STALE
+                marked_stale += 1
 
     connector_db.last_synced_at = now
     db.commit()

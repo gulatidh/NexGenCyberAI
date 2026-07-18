@@ -358,10 +358,8 @@ export const assetsApi = {
       .then((r) => r.data),
   scan: (clientId: string, assetId: string) =>
     apiClient.post(`/clients/${clientId}/assets/${assetId}/scan/`).then((r) => r.data),
-  restoreStale: (clientId: string, connectorId?: string) =>
-    apiClient
-      .post(`/clients/${clientId}/assets/restore-stale/`, null, { params: connectorId ? { connector_id: connectorId } : {} })
-      .then((r) => r.data),
+  approve: (clientId: string, assetIds: string[]) =>
+    apiClient.post(`/clients/${clientId}/assets/approve/`, { asset_ids: assetIds }).then((r) => r.data),
 };
 
 export const missionsApi = {

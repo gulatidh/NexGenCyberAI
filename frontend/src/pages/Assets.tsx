@@ -3,8 +3,9 @@ import {
   Box, Typography, Card, Chip, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, TextField, Alert, Tooltip,
+  Checkbox, Tabs, Tab,
 } from "@mui/material";
-import { Storage, Refresh, PlayArrow } from "@mui/icons-material";
+import { Storage, Refresh, PlayArrow, CheckCircle } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, connectorsApi, assetsApi, projectsApi } from "../services/api";
@@ -25,9 +26,13 @@ const STATUS_COLOR: Record<string, string> = {
   active: "#00e676",
   stale: "#ff9800",
   deleted: "rgba(255,255,255,0.4)",
+  new: "#4285F4",
+  reappeared: "#ce93d8",
 };
 
 const ASSET_CLASSES = ["vm", "storage", "network", "database", "identity", "keyvault", "other"];
+
+type ActiveTab = "active" | "new" | "reappeared" | "stale";
 
 export default function Assets() {
   const qc = useQueryClient();
@@ -39,8 +44,11 @@ export default function Assets() {
   const [assetClass, setAssetClass] = useState("");
   const [resourceGroup, setResourceGroup] = useState("");
   const [region, setRegion] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
   const [search, setSearch] = useState("");
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<ActiveTab>("active");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
@@ -54,52 +62,65 @@ export default function Assets() {
     enabled: !!clientId,
   });
 
-  // Reset connector + class filters when project changes so we don't show stale picks
   React.useEffect(() => {
     setConnectorId("");
   }, [projectId]);
+
   const { data: facets = {} as any } = useQuery<any>({
     queryKey: ["asset-facets", clientId],
     queryFn: () => assetsApi.facets(clientId),
     enabled: !!clientId,
   });
-  const { data: assets = [], isLoading } = useQuery<Asset[]>({
-    queryKey: ["assets", clientId, projectId, connectorId, assetClass, resourceGroup, region, statusFilter, search],
-    queryFn: () =>
-      assetsApi.list(clientId, {
-        project_id: projectId || undefined,
-        connector_id: connectorId || undefined,
-        asset_class: assetClass || undefined,
-        resource_group: resourceGroup || undefined,
-        region: region || undefined,
-        status: statusFilter || undefined,
-        q: search || undefined,
-      }),
-    enabled: !!clientId,
-    refetchInterval: 30000, // auto-refresh every 30 s so new assets appear after a scan completes
-  });
 
-  const syncMutation = useMutation({
-    mutationFn: () => assetsApi.sync(clientId, connectorId || undefined),
-    onSuccess: () => {
-      // Sync runs as a background task; poll a few times to catch when it lands.
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 3000);
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 10000);
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["assets"] }), 20000);
-    },
-  });
-
+  // All assets — used for tab counts
   const { data: allAssets = [] } = useQuery<Asset[]>({
     queryKey: ["assets-all-status", clientId],
     queryFn: () => assetsApi.list(clientId, { status: "all" }),
     enabled: !!clientId,
     refetchInterval: 30000,
   });
+
+  // Tab-specific assets — what's shown in the table
+  const { data: tabAssets = [], isLoading } = useQuery<Asset[]>({
+    queryKey: ["assets", clientId, projectId, activeTab, search],
+    queryFn: () =>
+      assetsApi.list(clientId, {
+        project_id: projectId || undefined,
+        status: activeTab,
+        q: search || undefined,
+      }),
+    enabled: !!clientId,
+    refetchInterval: 30000,
+  });
+
+  // Tab counts from allAssets
+  const activeCount = allAssets.filter((a) => a.status === "active").length;
+  const newCount = allAssets.filter((a) => a.status === "new").length;
+  const reappearedCount = allAssets.filter((a) => a.status === "reappeared").length;
   const staleCount = allAssets.filter((a) => a.status === "stale").length;
 
-  const restoreStaleMutation = useMutation({
-    mutationFn: () => assetsApi.restoreStale(clientId, connectorId || undefined),
+  const syncMutation = useMutation({
+    mutationFn: () => assetsApi.sync(clientId, connectorId || undefined),
     onSuccess: () => {
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["assets"] });
+        qc.invalidateQueries({ queryKey: ["assets-all-status"] });
+      }, 3000);
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["assets"] });
+        qc.invalidateQueries({ queryKey: ["assets-all-status"] });
+      }, 10000);
+      setTimeout(() => {
+        qc.invalidateQueries({ queryKey: ["assets"] });
+        qc.invalidateQueries({ queryKey: ["assets-all-status"] });
+      }, 20000);
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (ids: string[]) => assetsApi.approve(clientId, ids),
+    onSuccess: () => {
+      setSelectedIds([]);
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["assets-all-status"] });
     },
@@ -112,21 +133,14 @@ export default function Assets() {
     },
   });
 
-  const BADGE_DAYS = 7;
-  const badgeCutoff = Date.now() - BADGE_DAYS * 24 * 60 * 60 * 1000;
-  // "N" = newly discovered (first_seen_at within 7 days, never been stale)
-  const isNewAsset = (a: Asset) =>
-    !!a.first_seen_at &&
-    new Date(a.first_seen_at).getTime() >= badgeCutoff &&
-    !a.reappeared_at;
-  // "R" = was STALE, reappeared in the live inventory within 7 days
-  const isReappeared = (a: Asset) =>
-    !!a.reappeared_at && new Date(a.reappeared_at).getTime() >= badgeCutoff;
-
-  const [newOnly, setNewOnly] = useState(false);
-  const displayedAssets = newOnly ? assets.filter((a) => isNewAsset(a) || isReappeared(a)) : assets;
-  const newCount = assets.filter(isNewAsset).length;
-  const reappearedCount = assets.filter(isReappeared).length;
+  // Apply connector + assetClass filters client-side (they are visual filters, not tab filters)
+  const displayedAssets = tabAssets.filter((a) => {
+    if (connectorId && a.connector_id !== connectorId) return false;
+    if (assetClass && a.asset_class !== assetClass) return false;
+    if (resourceGroup && a.resource_group !== resourceGroup) return false;
+    if (region && a.region !== region) return false;
+    return true;
+  });
 
   const classCounts = displayedAssets.reduce((acc: Record<string, number>, a) => {
     const c = a.asset_class || "other";
@@ -148,9 +162,40 @@ export default function Assets() {
       return String(av).localeCompare(String(bv)) * dir;
     });
   }, [displayedAssets, sortKey, sortDir]);
+
   const setSort = (k: string) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else { setSortKey(k); setSortDir("asc"); }
+  };
+
+  const showCheckboxes = activeTab === "new" || activeTab === "reappeared";
+  const allVisibleSelected = displayedAssets.length > 0 && displayedAssets.every((a) => selectedIds.includes(a.id));
+  const someSelected = selectedIds.length > 0 && !allVisibleSelected;
+
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(displayedAssets.map((a) => a.id));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleTabChange = (_: React.SyntheticEvent, val: ActiveTab) => {
+    setActiveTab(val);
+    setSelectedIds([]);
+  };
+
+  const TAB_COLORS: Record<ActiveTab, string> = {
+    active: "#00e676",
+    new: "#4285F4",
+    reappeared: "#ce93d8",
+    stale: "#ff9800",
   };
 
   return (
@@ -165,7 +210,7 @@ export default function Assets() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); setSelectedIds([]); }} label="Client"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>
@@ -190,20 +235,6 @@ export default function Assets() {
               ))}
             </Select>
           </FormControl>
-          {staleCount > 0 && (
-            <Tooltip title={`${staleCount} stale asset(s). Click to restore all to Active — next sync will re-evaluate automatically.`}>
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={restoreStaleMutation.isPending}
-                onClick={() => restoreStaleMutation.mutate()}
-                sx={{ color: "#ff9800", borderColor: "#ff9800", textTransform: "none",
-                  "&:hover": { bgcolor: "rgba(255,152,0,0.08)", borderColor: "#ff9800" } }}
-              >
-                Restore {staleCount} stale
-              </Button>
-            </Tooltip>
-          )}
           <Button
             variant="contained"
             startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
@@ -217,76 +248,111 @@ export default function Assets() {
       </Box>
 
       {clientId && (
-        <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
-          <Chip label={`All: ${displayedAssets.length}`} size="small" clickable
-            onClick={() => { setAssetClass(""); setNewOnly(false); }}
-            sx={{ bgcolor: assetClass || newOnly ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass || newOnly ? "none" : "1px solid #4285F4" }} />
-          {(newCount > 0 || reappearedCount > 0) && (
-            <Tooltip title={`${newCount} new asset(s) discovered + ${reappearedCount} reappeared in the last ${BADGE_DAYS} days. Click to filter.`}>
-              <Chip
-                label={[newCount > 0 && `N:${newCount}`, reappearedCount > 0 && `R:${reappearedCount}`].filter(Boolean).join("  ")}
-                size="small"
-                clickable
-                onClick={() => { setNewOnly(!newOnly); setAssetClass(""); }}
-                sx={{
-                  bgcolor: newOnly ? "rgba(0,230,118,0.25)" : "rgba(0,230,118,0.1)",
-                  color: "#00e676",
-                  border: newOnly ? "1px solid #00e676" : "none",
-                  fontWeight: 600,
-                }}
-              />
-            </Tooltip>
-          )}
-          {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
-            <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
-              onClick={() => setAssetClass(assetClass === c ? "" : c)}
+        <>
+          {/* Tab bar */}
+          <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
               sx={{
-                bgcolor: `${CLASS_COLOR[c]}${assetClass === c ? "40" : "20"}`,
-                color: CLASS_COLOR[c],
-                border: assetClass === c ? `1px solid ${CLASS_COLOR[c]}` : "none",
-              }} />
-          ))}
-          <Box sx={{ flexGrow: 1 }} />
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Resource Group</InputLabel>
-            <Select value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} label="Resource Group"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="">All</MenuItem>
-              {(facets.resource_group || []).map((rg: string) => (
-                <MenuItem key={rg} value={rg}>{rg}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Region</InputLabel>
-            <Select value={region} onChange={(e) => setRegion(e.target.value)} label="Region"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="">All</MenuItem>
-              {(facets.region || []).map((r: string) => (
-                <MenuItem key={r} value={r}>{r}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Status</InputLabel>
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} label="Status"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="all">All (incl. stale)</MenuItem>
-            </Select>
-          </FormControl>
-          <TextField size="small" placeholder="Search name…" value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 180,
-              "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
-              "& input::placeholder": { color: "text.secondary" } }} />
-          <Tooltip title="Stale assets (not seen in the latest sync) — excluded from assessments & reports">
-            <Button variant="outlined" size="small" onClick={() => navigate("/stale-assets")}
-              sx={{ color: "#ff9800", borderColor: "rgba(255,152,0,0.5)", whiteSpace: "nowrap" }}>
-              Stale assets →
-            </Button>
-          </Tooltip>
-        </Box>
+                "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
+                "& .MuiTabs-indicator": { backgroundColor: TAB_COLORS[activeTab] },
+              }}
+            >
+              <Tab
+                value="active"
+                label={`Active (${activeCount})`}
+                sx={{ "&.Mui-selected": { color: "#00e676" } }}
+              />
+              <Tab
+                value="new"
+                label={`New (${newCount})`}
+                sx={{ "&.Mui-selected": { color: "#4285F4" } }}
+              />
+              <Tab
+                value="reappeared"
+                label={`Reappeared (${reappearedCount})`}
+                sx={{ "&.Mui-selected": { color: "#ce93d8" } }}
+              />
+              <Tab
+                value="stale"
+                label={`Stale (${staleCount})`}
+                sx={{ "&.Mui-selected": { color: "#ff9800" } }}
+              />
+            </Tabs>
+          </Box>
+
+          {/* Filters row */}
+          <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+            <Chip label={`All: ${displayedAssets.length}`} size="small" clickable
+              onClick={() => setAssetClass("")}
+              sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass ? "none" : "1px solid #4285F4" }} />
+            {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
+              <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
+                onClick={() => setAssetClass(assetClass === c ? "" : c)}
+                sx={{
+                  bgcolor: `${CLASS_COLOR[c]}${assetClass === c ? "40" : "20"}`,
+                  color: CLASS_COLOR[c],
+                  border: assetClass === c ? `1px solid ${CLASS_COLOR[c]}` : "none",
+                }} />
+            ))}
+            <Box sx={{ flexGrow: 1 }} />
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel sx={{ color: "text.secondary" }}>Resource Group</InputLabel>
+              <Select value={resourceGroup} onChange={(e) => setResourceGroup(e.target.value)} label="Resource Group"
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                <MenuItem value="">All</MenuItem>
+                {(facets.resource_group || []).map((rg: string) => (
+                  <MenuItem key={rg} value={rg}>{rg}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ color: "text.secondary" }}>Region</InputLabel>
+              <Select value={region} onChange={(e) => setRegion(e.target.value)} label="Region"
+                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                <MenuItem value="">All</MenuItem>
+                {(facets.region || []).map((r: string) => (
+                  <MenuItem key={r} value={r}>{r}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField size="small" placeholder="Search name…" value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ minWidth: 180,
+                "& .MuiOutlinedInput-root": { color: "text.primary", "& fieldset": { borderColor: "divider" } },
+                "& input::placeholder": { color: "text.secondary" } }} />
+          </Box>
+
+          {/* Approve action bar — only for new/reappeared tabs */}
+          {showCheckboxes && (
+            <Box sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<CheckCircle sx={{ fontSize: 16 }} />}
+                disabled={selectedIds.length === 0 || approveMutation.isPending}
+                onClick={() => approveMutation.mutate(selectedIds)}
+                sx={{ bgcolor: "#00e676", color: "#0d1117", "&:hover": { bgcolor: "#00c853" }, textTransform: "none" }}
+              >
+                Approve selected ({selectedIds.length})
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                disabled={displayedAssets.length === 0 || approveMutation.isPending}
+                onClick={() => approveMutation.mutate(displayedAssets.map((a) => a.id))}
+                sx={{ color: "#00e676", borderColor: "#00e676", textTransform: "none",
+                  "&:hover": { bgcolor: "rgba(0,230,118,0.08)", borderColor: "#00e676" } }}
+              >
+                Approve all ({displayedAssets.length})
+              </Button>
+              {approveMutation.isPending && (
+                <CircularProgress size={16} sx={{ color: "#00e676" }} />
+              )}
+            </Box>
+          )}
+        </>
       )}
 
       {!clientId ? (
@@ -297,11 +363,14 @@ export default function Assets() {
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
-      ) : assets.length === 0 ? (
+      ) : displayedAssets.length === 0 ? (
         <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Storage sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
           <Typography sx={{ color: "text.secondary" }}>
-            No assets discovered yet. Click <b>Sync Now</b> to pull inventory from your connectors.
+            {activeTab === "active" && "No active assets. Click Sync Now to pull inventory from your connectors."}
+            {activeTab === "new" && "No new assets pending approval."}
+            {activeTab === "reappeared" && "No reappeared assets pending approval."}
+            {activeTab === "stale" && "No stale assets."}
           </Typography>
         </Card>
       ) : (
@@ -310,6 +379,17 @@ export default function Assets() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                  {showCheckboxes && (
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        size="small"
+                        checked={allVisibleSelected}
+                        indeterminate={someSelected}
+                        onChange={toggleSelectAll}
+                        sx={{ color: "text.secondary", "&.Mui-checked": { color: "#00e676" }, "&.MuiCheckbox-indeterminate": { color: "#00e676" } }}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell><TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
                     sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>NAME</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "asset_type"} direction={sortDir} onClick={() => setSort("asset_type")}
@@ -336,29 +416,27 @@ export default function Assets() {
                   const klass = a.asset_class || "other";
                   const findingColor = a.open_findings_count > 0 ? "#f44336" : "rgba(255,255,255,0.3)";
                   const riskColor = a.risks_count > 0 ? "#ff9800" : "rgba(255,255,255,0.3)";
+                  const isSelected = selectedIds.includes(a.id);
                   return (
                     <TableRow key={a.id}
                       sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                        "& td": { borderColor: "divider", py: 1 } }}
-                      onClick={() => navigate(`/assets/${a.id}`)}>
+                        "& td": { borderColor: "divider", py: 1 },
+                        ...(isSelected ? { bgcolor: "rgba(0,230,118,0.05)" } : {}),
+                      }}
+                      onClick={() => showCheckboxes ? toggleSelect(a.id) : navigate(`/assets/${a.id}`)}>
+                      {showCheckboxes && (
+                        <TableCell padding="checkbox" onClick={(e) => { e.stopPropagation(); toggleSelect(a.id); }}>
+                          <Checkbox
+                            size="small"
+                            checked={isSelected}
+                            sx={{ color: "text.secondary", "&.Mui-checked": { color: "#00e676" } }}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell sx={{ color: "text.primary", maxWidth: 240 }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {a.name}
-                          </Typography>
-                          {isReappeared(a) && (
-                            <Tooltip title="Reappeared — this asset was previously STALE and is now back in the live inventory">
-                              <Chip label="R" size="small"
-                                sx={{ bgcolor: "rgba(255,152,0,0.2)", color: "#ff9800", fontSize: 10, height: 16, minWidth: 20, flexShrink: 0, fontWeight: 700 }} />
-                            </Tooltip>
-                          )}
-                          {isNewAsset(a) && (
-                            <Tooltip title="New — first discovered in the last 7 days">
-                              <Chip label="N" size="small"
-                                sx={{ bgcolor: "rgba(0,230,118,0.2)", color: "#00e676", fontSize: 10, height: 16, minWidth: 20, flexShrink: 0, fontWeight: 700 }} />
-                            </Tooltip>
-                          )}
-                        </Box>
+                        <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {a.name}
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 200 }}>
                         <Typography variant="caption" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
