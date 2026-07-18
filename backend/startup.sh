@@ -40,7 +40,7 @@ fi
 
 exec $ANTENV/bin/gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
-    --workers 2 \
+    --workers 1 \
     --bind 0.0.0.0:8000 \
     --timeout 300 \
     --graceful-timeout 60 \

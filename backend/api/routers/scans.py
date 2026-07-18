@@ -230,16 +230,6 @@ async def _execute_scan(
                     config_findings = await connector.run_configuration_review()
                     all_findings.extend(config_findings)
 
-                # Collect raw resource inventory for agent context
-                try:
-                    resources = await connector.get_resources()
-                    if resources:
-                        scan.raw_context = json.dumps(resources[:200])  # cap at 200 resources — configs are larger now
-                        db.commit()
-                except Exception as _rc_exc:
-                    import logging as _lg
-                    _lg.getLogger(__name__).debug("Resource inventory collection failed: %s", _rc_exc)
-
         if asset_external_id:
             target = asset_external_id.lower()
             all_findings = [
@@ -384,6 +374,23 @@ async def _execute_scan(
         scan.status = ScanStatus.COMPLETED
         scan.completed_at = datetime.now(timezone.utc)
         db.commit()
+
+        # Collect raw resource inventory for agent context — runs AFTER scan is
+        # marked completed so an OOM here never leaves the scan stuck in RUNNING.
+        # Strip per-resource "config" blobs to keep the JSON small.
+        if scan.connector_id and connector_db:
+            try:
+                resources = await connector.get_resources()
+                if resources:
+                    slim = [
+                        {k: v for k, v in r.items() if k != "config"}
+                        for r in resources[:300]
+                    ]
+                    scan.raw_context = json.dumps(slim)
+                    db.commit()
+            except Exception as _rc_exc:
+                import logging as _lg
+                _lg.getLogger(__name__).debug("raw_context collection failed (non-fatal): %s", _rc_exc)
 
         # Re-derive framework compliance from the new findings
         try:

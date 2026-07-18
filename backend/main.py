@@ -940,32 +940,57 @@ def _fail_stale_threat_models() -> None:
 
 
 def _fail_stale_scans() -> None:
-    """Fail scans stuck in pending/running past the longest plausible scanner
-    runtime. A workflow-driven scan that's cancelled, times out, or fails to
-    dispatch never calls /scans/ingest, so the scan would otherwise sit
-    'running' forever. Age-gated well beyond the slowest job (OWASP DC ~60m)
-    so an in-flight scan is never killed."""
+    """Fail scans stuck in pending/running past the longest plausible runtime.
+
+    Direct-API scans (azure, entraid, enterprise) run in a BackgroundTask and
+    complete in <15 min. If they're still running after 20 min the gunicorn
+    worker was OOM-killed — mark them failed immediately.
+
+    Workflow-driven scans (ZAP, nmap, OWASP DC) dispatch to GitHub Actions and
+    can legitimately run for up to 90 min — keep the long grace window for those.
+    """
     from datetime import datetime, timezone, timedelta
     from sqlalchemy.orm import Session
-    from api.models.models import Scan, ScanStatus
+    from api.models.models import Scan, ScanStatus, Connector
 
-    STALE_AFTER = timedelta(minutes=90)
+    # Connector types that run locally (not via GitHub Actions)
+    DIRECT_API_TYPES = {
+        "azure", "entraid", "aws", "gcp",
+        "tenable", "burp_enterprise", "snyk", "rapid7",
+        "qualys", "invicti", "acunetix",
+    }
+
     now = datetime.now(timezone.utc)
-    cutoff = now - STALE_AFTER
     try:
         with Session(engine) as db:
             stuck = db.query(Scan).filter(
                 Scan.status.in_([ScanStatus.PENDING.value, ScanStatus.RUNNING.value])
             ).all()
+            # Pre-fetch connector types for stuck scans
+            connector_ids = [s.connector_id for s in stuck if s.connector_id]
+            connectors = {}
+            if connector_ids:
+                for c in db.query(Connector).filter(Connector.id.in_(connector_ids)).all():
+                    ct = c.connector_type.value if hasattr(c.connector_type, "value") else str(c.connector_type)
+                    connectors[c.id] = ct
+
             n = 0
             for s in stuck:
+                ct = connectors.get(s.connector_id, "") if s.connector_id else ""
+                stale_after = timedelta(minutes=20) if ct in DIRECT_API_TYPES else timedelta(minutes=90)
+                cutoff = now - stale_after
+
                 ref = s.started_at or s.created_at
                 if ref is not None and ref.tzinfo is None:
                     ref = ref.replace(tzinfo=timezone.utc)
                 if ref is not None and ref > cutoff:
                     continue  # still within the grace window — leave it running
+
                 s.status = ScanStatus.FAILED
                 s.error_message = (
+                    "Scan interrupted — the server restarted (likely out of memory) "
+                    "before this scan could complete. Re-run the scan."
+                    if ct in DIRECT_API_TYPES else
                     "Scan timed out — the scanner workflow didn't report back "
                     "(cancelled, timed out, or failed to dispatch). Re-run the scan."
                 )
