@@ -238,20 +238,30 @@ async def sync_connector_assets(
                 existing_row.reappeared_at = now  # "R" badge on the frontend
             updated += 1
 
-    # Stamp last_synced_at on ALL assets for this connector so the Assets page
-    # always shows a fresh "last synced" time — even for assets the API didn't
-    # return this round (e.g. beyond a pagination cap or temporarily missing).
-    for row in existing.values():
-        row.last_synced_at = now
+    # last_synced_at is only stamped when an asset is actually found (in the upsert
+    # loop above). Assets not returned by the API keep their old last_synced_at so
+    # the staleness window below is meaningful.
 
-    # Mark assets STALE only when the API actually returned results — a completely
-    # empty response means a connection/auth failure, not "everything deleted".
+    # Mark assets STALE only when:
+    #   1. The API returned at least one result (non-empty = auth/network is working)
+    #   2. The asset has been consistently absent for STALE_AFTER_DAYS — grace period
+    #      that tolerates a single partial-API-failure without immediately marking stale.
+    from datetime import timedelta
+    STALE_AFTER_DAYS = 3
+    stale_cutoff = now - timedelta(days=STALE_AFTER_DAYS)
+
     marked_stale = 0
     if seen_ids:
         for ext, row in existing.items():
-            if ext not in seen_ids and row.status != AssetStatus.STALE:
-                row.status = AssetStatus.STALE
-                marked_stale += 1
+            if ext not in seen_ids and row.status == AssetStatus.ACTIVE:
+                last_seen = row.last_synced_at
+                if last_seen is None:
+                    last_seen_utc = now - timedelta(days=STALE_AFTER_DAYS + 1)
+                else:
+                    last_seen_utc = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+                if last_seen_utc < stale_cutoff:
+                    row.status = AssetStatus.STALE
+                    marked_stale += 1
 
     connector_db.last_synced_at = now
     db.commit()

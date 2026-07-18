@@ -112,7 +112,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources storage failed: %s", exc)
+            logger.warning("Azure get_resources storage failed: %s", exc)
 
         # Key Vaults
         try:
@@ -132,7 +132,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources keyvault failed: %s", exc)
+            logger.warning("Azure get_resources keyvault failed: %s", exc)
 
         # Virtual Machines
         try:
@@ -154,7 +154,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources VM failed: %s", exc)
+            logger.warning("Azure get_resources VM failed: %s", exc)
 
         # SQL Servers
         try:
@@ -172,7 +172,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources SQL failed: %s", exc)
+            logger.warning("Azure get_resources SQL failed: %s", exc)
 
         # App Services
         try:
@@ -191,7 +191,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources AppService failed: %s", exc)
+            logger.warning("Azure get_resources AppService failed: %s", exc)
 
         # AKS Clusters
         try:
@@ -212,7 +212,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources AKS failed: %s", exc)
+            logger.warning("Azure get_resources AKS failed: %s", exc)
 
         # NSGs (security rules summary)
         try:
@@ -234,7 +234,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources NSG failed: %s", exc)
+            logger.warning("Azure get_resources NSG failed: %s", exc)
 
         # Container Registries
         try:
@@ -252,7 +252,7 @@ class AzureConnector(BaseConnector):
                     },
                 })
         except Exception as exc:
-            logger.debug("Azure get_resources ACR failed: %s", exc)
+            logger.warning("Azure get_resources ACR failed: %s", exc)
 
         return resources
 
