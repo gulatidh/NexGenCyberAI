@@ -168,14 +168,18 @@ def _parse_resource(connector_type: ConnectorType, resource: Dict[str, Any]) -> 
 async def sync_connector_assets(
     db: Session,
     connector_db: Connector,
-    mark_stale: bool = True,
+    mark_stale: bool = False,
 ) -> Tuple[int, int, int]:
     """Pull resources from one connector and upsert them into the assets table.
 
-    mark_stale=True (default for explicit syncs): assets absent from the live
-    API response are marked STALE so the inventory stays accurate.
-    mark_stale=False (used for pre-scan syncs): only discover and update assets;
-    never demote existing ACTIVE assets so a transient API gap doesn't wipe them.
+    By default (mark_stale=False) this function only ADDS new assets and UPDATES
+    existing ones.  It never demotes ACTIVE assets to STALE automatically.
+    Cloud APIs are unreliable — a single incomplete API response should not cause
+    assets to silently disappear from the inventory.
+
+    Pass mark_stale=True only when the caller has explicitly verified a full,
+    complete API response and wants to reconcile the inventory (e.g. a dedicated
+    "Audit inventory" action triggered by the user).
 
     Returns (created, updated, marked_stale).
     """
