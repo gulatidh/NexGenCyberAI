@@ -93,14 +93,18 @@ class AzureConnector(BaseConnector):
         cred = self._build_credential()
         sub_id = self.credentials["subscription_id"]
         resources = []
+        # Track IDs enriched by typed clients so the generic fallback skips them
+        enriched_ids: set = set()
 
         # Storage accounts
         try:
             from azure.mgmt.storage import StorageManagementClient
             sc = StorageManagementClient(cred, sub_id)
             for sa in sc.storage_accounts.list():
+                rid = sa.id or ""
+                enriched_ids.add(rid.lower())
                 resources.append({
-                    "id": sa.id or "", "name": sa.name or "",
+                    "id": rid, "name": sa.name or "",
                     "type": "Microsoft.Storage/storageAccounts",
                     "location": sa.location or "",
                     "config": {
@@ -119,9 +123,11 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.keyvault import KeyVaultManagementClient
             kvc = KeyVaultManagementClient(cred, sub_id)
             for kv in kvc.vaults.list():
+                rid = kv.id or ""
+                enriched_ids.add(rid.lower())
                 props = getattr(kv, "properties", None)
                 resources.append({
-                    "id": kv.id or "", "name": kv.name or "",
+                    "id": rid, "name": kv.name or "",
                     "type": "Microsoft.KeyVault/vaults",
                     "location": kv.location or "",
                     "config": {
@@ -139,12 +145,14 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.compute import ComputeManagementClient
             cc = ComputeManagementClient(cred, sub_id)
             for vm in cc.virtual_machines.list_all():
+                rid = vm.id or ""
+                enriched_ids.add(rid.lower())
                 sp = getattr(vm, "storage_profile", None)
                 os_disk = getattr(sp, "os_disk", None) if sp else None
                 enc = getattr(os_disk, "encryption_settings", None) if os_disk else None
                 os_profile = getattr(vm, "os_profile", None)
                 resources.append({
-                    "id": vm.id or "", "name": vm.name or "",
+                    "id": rid, "name": vm.name or "",
                     "type": "Microsoft.Compute/virtualMachines",
                     "location": vm.location or "",
                     "config": {
@@ -161,8 +169,10 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.sql import SqlManagementClient
             sql = SqlManagementClient(cred, sub_id)
             for server in sql.servers.list():
+                rid = server.id or ""
+                enriched_ids.add(rid.lower())
                 resources.append({
-                    "id": server.id or "", "name": server.name or "",
+                    "id": rid, "name": server.name or "",
                     "type": "Microsoft.Sql/servers",
                     "location": server.location or "",
                     "config": {
@@ -179,8 +189,10 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.web import WebSiteManagementClient
             wc = WebSiteManagementClient(cred, sub_id)
             for app in wc.web_apps.list():
+                rid = app.id or ""
+                enriched_ids.add(rid.lower())
                 resources.append({
-                    "id": app.id or "", "name": app.name or "",
+                    "id": rid, "name": app.name or "",
                     "type": "Microsoft.Web/sites",
                     "location": app.location or "",
                     "config": {
@@ -198,10 +210,12 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.containerservice import ContainerServiceClient
             csc = ContainerServiceClient(cred, sub_id)
             for cluster in csc.managed_clusters.list():
+                rid = cluster.id or ""
+                enriched_ids.add(rid.lower())
                 np = getattr(cluster, "network_profile", None)
                 api_profile = getattr(cluster, "api_server_access_profile", None)
                 resources.append({
-                    "id": cluster.id or "", "name": cluster.name or "",
+                    "id": rid, "name": cluster.name or "",
                     "type": "Microsoft.ContainerService/managedClusters",
                     "location": cluster.location or "",
                     "config": {
@@ -219,13 +233,15 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.network import NetworkManagementClient
             nc = NetworkManagementClient(cred, sub_id)
             for nsg in nc.network_security_groups.list_all():
+                rid = nsg.id or ""
+                enriched_ids.add(rid.lower())
                 inbound_allow_any = any(
                     r.direction == "Inbound" and r.access == "Allow" and
                     (getattr(r, "source_address_prefix", "") or "").lower() in ("*", "0.0.0.0/0", "internet", "any")
                     for r in (nsg.security_rules or [])
                 )
                 resources.append({
-                    "id": nsg.id or "", "name": nsg.name or "",
+                    "id": rid, "name": nsg.name or "",
                     "type": "Microsoft.Network/networkSecurityGroups",
                     "location": nsg.location or "",
                     "config": {
@@ -241,8 +257,10 @@ class AzureConnector(BaseConnector):
             from azure.mgmt.containerregistry import ContainerRegistryManagementClient
             rc = ContainerRegistryManagementClient(cred, sub_id)
             for reg in rc.registries.list():
+                rid = reg.id or ""
+                enriched_ids.add(rid.lower())
                 resources.append({
-                    "id": reg.id or "", "name": reg.name or "",
+                    "id": rid, "name": reg.name or "",
                     "type": "Microsoft.ContainerRegistry/registries",
                     "location": reg.location or "",
                     "config": {
@@ -253,6 +271,24 @@ class AzureConnector(BaseConnector):
                 })
         except Exception as exc:
             logger.warning("Azure get_resources ACR failed: %s", exc)
+
+        # Generic fallback — catches everything not covered by typed clients above
+        # (Redis, Logic Apps, Service Bus, Event Hub, Cosmos DB, etc.)
+        try:
+            rm = ResourceManagementClient(cred, sub_id)
+            for r in rm.resources.list():
+                rid = r.id or ""
+                if rid.lower() in enriched_ids:
+                    continue
+                resources.append({
+                    "id": rid,
+                    "name": r.name or "",
+                    "type": r.type or "",
+                    "location": r.location or "",
+                    "tags": r.tags or {},
+                })
+        except Exception as exc:
+            logger.warning("Azure get_resources generic fallback failed: %s", exc)
 
         return resources
 
