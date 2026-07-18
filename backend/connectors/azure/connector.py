@@ -254,7 +254,7 @@ class AzureConnector(BaseConnector):
         except Exception as exc:
             logger.debug("Azure get_resources ACR failed: %s", exc)
 
-        return resources[:200]
+        return resources
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

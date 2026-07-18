@@ -244,6 +244,12 @@ async def sync_connector_assets(
                 existing_row.reappeared_at = now  # "R" badge on the frontend
             updated += 1
 
+    # Stamp last_synced_at on ALL assets for this connector so the Assets page
+    # always shows a fresh "last synced" time — even for assets the API didn't
+    # return this round (e.g. beyond a pagination cap or temporarily missing).
+    for row in existing.values():
+        row.last_synced_at = now
+
     marked_stale = 0
     if mark_stale:
         for ext, row in existing.items():
