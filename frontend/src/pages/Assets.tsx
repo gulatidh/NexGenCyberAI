@@ -89,23 +89,6 @@ export default function Assets() {
     },
   });
 
-  // Count how many stale assets exist for this client (query with status=all, client scope)
-  const { data: allAssets = [] } = useQuery<Asset[]>({
-    queryKey: ["assets-all-status", clientId],
-    queryFn: () => assetsApi.list(clientId, { status: "all" }),
-    enabled: !!clientId,
-    refetchInterval: 30000,
-  });
-  const staleCount = allAssets.filter((a) => a.status === "stale").length;
-
-  const restoreStaleMutation = useMutation({
-    mutationFn: () => assetsApi.restoreStale(clientId, connectorId || undefined),
-    onSuccess: (resp: any) => {
-      qc.invalidateQueries({ queryKey: ["assets"] });
-      qc.invalidateQueries({ queryKey: ["assets-all-status"] });
-    },
-  });
-
   const scanMutation = useMutation({
     mutationFn: (assetId: string) => assetsApi.scan(clientId, assetId),
     onSuccess: () => {
@@ -191,23 +174,6 @@ export default function Assets() {
               ))}
             </Select>
           </FormControl>
-          {staleCount > 0 && (
-            <Tooltip title={`${staleCount} asset(s) were incorrectly marked stale (likely by a scan sync with an incomplete API response). Click to restore them to Active.`}>
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={restoreStaleMutation.isPending}
-                onClick={() => restoreStaleMutation.mutate()}
-                sx={{
-                  color: "#ff9800", borderColor: "#ff9800",
-                  "&:hover": { bgcolor: "rgba(255,152,0,0.08)", borderColor: "#ff9800" },
-                  textTransform: "none",
-                }}
-              >
-                Restore {staleCount} stale
-              </Button>
-            </Tooltip>
-          )}
           <Button
             variant="contained"
             startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}

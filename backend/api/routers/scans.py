@@ -212,8 +212,8 @@ async def _execute_scan(
                     # Else: stay in RUNNING — workflow will mark COMPLETED via ingest.
                     return
 
-                # Refresh asset inventory before the scan — discover new assets and
-                # update existing ones.  Never marks STALE (default mark_stale=False).
+                # Refresh asset inventory before the scan — found assets go ACTIVE,
+                # missing assets go STALE automatically.
                 try:
                     await sync_connector_assets(db, connector_db)
                 except Exception as exc:
