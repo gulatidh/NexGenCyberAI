@@ -48,6 +48,7 @@ async def _execute_scan(
             return
         scan.status = ScanStatus.RUNNING
         scan.started_at = datetime.now(timezone.utc)
+        scan.progress_message = "Preparing scan..."
         db.commit()
 
         all_findings = []
@@ -214,6 +215,8 @@ async def _execute_scan(
 
                 # Refresh asset inventory before the scan — found assets go ACTIVE,
                 # missing assets go STALE automatically.
+                scan.progress_message = "Syncing asset inventory..."
+                db.commit()
                 try:
                     await sync_connector_assets(db, connector_db)
                 except Exception as exc:
@@ -224,9 +227,13 @@ async def _execute_scan(
                 creds = json.loads(decrypt(connector_db.credentials_enc))
                 connector = get_connector(connector_db.connector_type, creds, connector_db.config or {})
                 if scan.scan_type in ("vulnerability", "full"):
+                    scan.progress_message = "Running vulnerability scan..."
+                    db.commit()
                     vuln_findings = await connector.run_vulnerability_scan()
                     all_findings.extend(vuln_findings)
                 if scan.scan_type in ("configuration", "compliance", "full"):
+                    scan.progress_message = "Running configuration review..."
+                    db.commit()
                     config_findings = await connector.run_configuration_review()
                     all_findings.extend(config_findings)
 
@@ -256,6 +263,9 @@ async def _execute_scan(
                 return False
 
             all_findings = [f for f in all_findings if _matches(f)]
+
+        scan.progress_message = f"Saving {len(all_findings)} finding{'s' if len(all_findings) != 1 else ''}..."
+        db.commit()
 
         # Persist findings with cross-scan deduplication.
         # Canonical findings (duplicate_of_id IS NULL) are updated in-place when
@@ -334,6 +344,8 @@ async def _execute_scan(
         db.commit()
 
         # Run AI agents orchestration
+        scan.progress_message = f"Analysing {len(all_findings)} finding{'s' if len(all_findings) != 1 else ''} with AI agents..."
+        db.commit()
         client = db.query(Client).filter(Client.id == scan.client_id).first()
         findings_dicts = [
             {
@@ -393,6 +405,8 @@ async def _execute_scan(
                 _lg.getLogger(__name__).debug("raw_context collection failed (non-fatal): %s", _rc_exc)
 
         # Re-derive framework compliance from the new findings
+        scan.progress_message = "Recomputing framework compliance..."
+        db.commit()
         try:
             from api.models.models import FrameworkType, ConnectorType
             from services.compliance import apply_defender_evaluations

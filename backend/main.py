@@ -219,6 +219,17 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.raw_context ALTER failed: %s", exc)
 
+        if "progress_message" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD progress_message NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN progress_message TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.progress_message column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.progress_message ALTER failed: %s", exc)
+
         # Add scheduled_mission_runs.report — structured LLM report per run.
         try:
             run_cols = {c["name"] for c in inspector.get_columns("scheduled_mission_runs")}

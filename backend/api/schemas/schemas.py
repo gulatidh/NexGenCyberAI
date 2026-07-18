@@ -141,6 +141,7 @@ class ScanResponse(BaseModel):
     completed_at: Optional[datetime]
     summary: Optional[Dict[str, Any]]
     error_message: Optional[str]
+    progress_message: Optional[str]
     created_at: Optional[datetime]
     model_config = {"from_attributes": True}
 

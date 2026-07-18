@@ -346,7 +346,7 @@ export default function Scans() {
               ? (tile.duration_seconds >= 60
                   ? `${Math.round(tile.duration_seconds / 60)} min`
                   : `${tile.duration_seconds}s`)
-              : (status === "running" ? "Running…" : "—");
+              : (status === "running" ? (tile.progress_message || "Running…") : "—");
             // Distinct buddies that ran — prefer the friendly catalog name so
             // advisory buddies (all stored as agent_type="orchestrator") don't
             // collapse into one entry.

@@ -293,6 +293,7 @@ class Scan(Base):
     # version history for a target.
     parent_scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
     raw_context = Column(Text)  # JSON resource inventory collected at scan time
+    progress_message = Column(Text)  # live status shown to the user while status=running
 
     client = relationship("Client", back_populates="scans")
     project = relationship("Project", back_populates="scans")
