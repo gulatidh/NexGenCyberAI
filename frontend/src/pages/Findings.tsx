@@ -5,9 +5,12 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip, IconButton,
-  Snackbar,
+  Snackbar, Switch, FormControlLabel, TextField, Collapse,
 } from "@mui/material";
-import { BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel } from "@mui/icons-material";
+import {
+  BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel,
+  VisibilityOff, Visibility, AutoAwesome, ExpandMore, ExpandLess, Refresh,
+} from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
@@ -17,6 +20,33 @@ import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+
+// Add suppress/playbook endpoints to findingsApi locally
+async function suppressFinding(clientId: string, findingId: string, reason: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/clients/${clientId}/findings/${findingId}/suppress`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) throw new Error("Suppress failed");
+}
+
+async function unsuppressFinding(clientId: string, findingId: string, token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/clients/${clientId}/findings/${findingId}/suppress`, {
+    method: "DELETE",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error("Unsuppress failed");
+}
+
+async function generatePlaybook(clientId: string, findingId: string, token: string): Promise<Finding> {
+  const res = await fetch(`${API_BASE}/clients/${clientId}/findings/${findingId}/playbook`, {
+    method: "POST",
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error("Playbook generation failed");
+  return res.json();
+}
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -160,6 +190,7 @@ export default function Findings() {
   const [section, setSection] = useState("security_posture");
   const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
+  const [showSuppressed, setShowSuppressed] = React.useState(false);
 
   const handleExport = async () => {
     const account = accounts[0];
@@ -204,8 +235,22 @@ export default function Findings() {
     enabled: !!clientId,
   });
   const { data: findings = [], isLoading } = useQuery<Finding[]>({
-    queryKey: ["findings-all", clientId, projectId, scanId, sevFilter, statusFilter, section, category],
-    queryFn: () => findingsApi.listAll(clientId, sevFilter || undefined, statusFilter || undefined, projectId || undefined, section, category || undefined, scanId || undefined),
+    queryKey: ["findings-all", clientId, projectId, scanId, sevFilter, statusFilter, section, category, showSuppressed],
+    queryFn: async () => {
+      const params: Record<string, any> = {};
+      if (sevFilter) params.severity = sevFilter;
+      if (statusFilter) params.status = statusFilter;
+      if (projectId) params.project_id = projectId;
+      if (section) params.section = section;
+      if (category) params.category = category;
+      if (scanId) params.scan_id = scanId;
+      if (showSuppressed) params.include_suppressed = true;
+      const { data } = await (await import("../services/api")).apiClient.get(
+        `/clients/${clientId}/findings/`,
+        { params }
+      );
+      return data;
+    },
     enabled: !!clientId,
   });
 
@@ -287,6 +332,80 @@ export default function Findings() {
       setSnack(`Deleted ${resp?.deleted ?? 0} blank finding(s)`);
     },
   });
+
+  // Suppress dialog state
+  const [suppressTarget, setSuppressTarget] = React.useState<Finding | null>(null);
+  const [suppressReason, setSuppressReason] = React.useState("");
+
+  // Playbook state
+  const [playbookFindingId, setPlaybookFindingId] = React.useState<string | null>(null);
+  const [playbookLoading, setPlaybookLoading] = React.useState(false);
+  const [playbookData, setPlaybookData] = React.useState<Record<string, string>>({});
+  const [playbookOpen, setPlaybookOpen] = React.useState<Record<string, boolean>>({});
+
+  const suppressMutation = useMutation({
+    mutationFn: async ({ finding, reason }: { finding: Finding; reason: string }) => {
+      const account = accounts[0];
+      let token = "";
+      if (account) {
+        try { const r = await instance.acquireTokenSilent({ ...loginRequest, account }); token = r.accessToken; } catch { }
+      }
+      await suppressFinding(clientId, finding.id, reason, token);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings-all"] });
+      qc.invalidateQueries({ queryKey: ["findings-categories"] });
+      setSuppressTarget(null);
+      setSuppressReason("");
+      setSnack("Finding suppressed");
+    },
+  });
+
+  const unsuppressMutation = useMutation({
+    mutationFn: async (findingId: string) => {
+      const account = accounts[0];
+      let token = "";
+      if (account) {
+        try { const r = await instance.acquireTokenSilent({ ...loginRequest, account }); token = r.accessToken; } catch { }
+      }
+      await unsuppressFinding(clientId, findingId, token);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings-all"] });
+      qc.invalidateQueries({ queryKey: ["findings-categories"] });
+      setSnack("Finding unsuppressed");
+    },
+  });
+
+  const handleGeneratePlaybook = async (f: Finding) => {
+    // If playbook already exists on the finding object, just toggle panel
+    if (f.playbook && !playbookData[f.id]) {
+      setPlaybookData(prev => ({ ...prev, [f.id]: f.playbook! }));
+    }
+    setPlaybookOpen(prev => ({ ...prev, [f.id]: !prev[f.id] }));
+    if (!f.playbook && !playbookData[f.id]) {
+      setPlaybookLoading(true);
+      setPlaybookFindingId(f.id);
+      try {
+        const account = accounts[0];
+        let token = "";
+        if (account) {
+          try { const r = await instance.acquireTokenSilent({ ...loginRequest, account }); token = r.accessToken; } catch { }
+        }
+        const updated = await generatePlaybook(clientId, f.id, token);
+        if (updated.playbook) {
+          setPlaybookData(prev => ({ ...prev, [f.id]: updated.playbook! }));
+          setPlaybookOpen(prev => ({ ...prev, [f.id]: true }));
+          qc.invalidateQueries({ queryKey: ["findings-all"] });
+        }
+      } catch {
+        setSnack("Failed to generate playbook");
+      } finally {
+        setPlaybookLoading(false);
+        setPlaybookFindingId(null);
+      }
+    }
+  };
 
   const [sortKey, setSortKey] = React.useState<string>("first_seen_at");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("desc");
@@ -371,6 +490,20 @@ export default function Findings() {
               <MenuItem value="false_positive">False Positive</MenuItem>
             </Select>
           </FormControl>
+          <Chip
+            icon={showSuppressed ? <Visibility sx={{ fontSize: 14 }} /> : <VisibilityOff sx={{ fontSize: 14 }} />}
+            label={showSuppressed ? "Suppressed shown" : "Show suppressed"}
+            size="small"
+            onClick={() => setShowSuppressed(v => !v)}
+            variant={showSuppressed ? "filled" : "outlined"}
+            sx={{
+              cursor: "pointer",
+              bgcolor: showSuppressed ? "rgba(255,255,255,0.1)" : "transparent",
+              color: showSuppressed ? "text.primary" : "text.secondary",
+              borderColor: "divider",
+              "& .MuiChip-icon": { color: "inherit" },
+            }}
+          />
           <Button
             size="small"
             variant="outlined"
@@ -582,6 +715,7 @@ export default function Findings() {
                   <TableCell><TableSortLabel active={sortKey === "first_seen_at"} direction={sortDir} onClick={() => setSort("first_seen_at")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
                   <TableCell align="right" sx={{ width: 44 }} />
+                  <TableCell align="right" sx={{ width: 220, whiteSpace: "nowrap" }} />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -654,6 +788,118 @@ export default function Findings() {
                             <DeleteOutlined sx={{ fontSize: 18 }} />
                           </IconButton>
                         </Tooltip>
+                      </TableCell>
+                      {/* Actions: Suppress + Playbook */}
+                      <TableCell align="right" sx={{ width: 220, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                        <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", alignItems: "center" }}>
+                          {/* Playbook button */}
+                          <Tooltip title={playbookData[f.id] || f.playbook ? "Toggle playbook" : "Generate AI playbook"}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={
+                                playbookLoading && playbookFindingId === f.id
+                                  ? <CircularProgress size={12} sx={{ color: "#FBBC04" }} />
+                                  : <AutoAwesome sx={{ fontSize: 13 }} />
+                              }
+                              onClick={(e) => { e.stopPropagation(); handleGeneratePlaybook(f); }}
+                              disabled={playbookLoading && playbookFindingId === f.id}
+                              sx={{
+                                fontSize: 10,
+                                py: 0.25,
+                                px: 0.75,
+                                color: "#FBBC04",
+                                borderColor: "rgba(251,188,4,0.3)",
+                                textTransform: "none",
+                                minWidth: 0,
+                                "&:hover": { borderColor: "#FBBC04", bgcolor: "rgba(251,188,4,0.06)" },
+                              }}
+                            >
+                              {playbookData[f.id] || f.playbook
+                                ? (playbookOpen[f.id] ? "Hide" : "Playbook")
+                                : "Playbook"}
+                            </Button>
+                          </Tooltip>
+
+                          {/* Suppress / Unsuppress */}
+                          {f.status === "false_positive" ? (
+                            <Tooltip title="Unsuppress this finding">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<Visibility sx={{ fontSize: 13 }} />}
+                                disabled={unsuppressMutation.isPending}
+                                onClick={(e) => { e.stopPropagation(); unsuppressMutation.mutate(f.id); }}
+                                sx={{
+                                  fontSize: 10, py: 0.25, px: 0.75,
+                                  color: "#4285F4", borderColor: "rgba(66,133,244,0.3)",
+                                  textTransform: "none", minWidth: 0,
+                                  "&:hover": { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
+                                }}
+                              >
+                                Unsuppress
+                              </Button>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Mark as false positive / suppress">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<VisibilityOff sx={{ fontSize: 13 }} />}
+                                onClick={(e) => { e.stopPropagation(); setSuppressTarget(f); setSuppressReason(""); }}
+                                sx={{
+                                  fontSize: 10, py: 0.25, px: 0.75,
+                                  color: "text.secondary", borderColor: "divider",
+                                  textTransform: "none", minWidth: 0,
+                                  "&:hover": { borderColor: "rgba(255,255,255,0.3)", color: "text.primary" },
+                                }}
+                              >
+                                Suppress
+                              </Button>
+                            </Tooltip>
+                          )}
+                        </Box>
+
+                        {/* Playbook expansion panel */}
+                        <Collapse in={!!(playbookOpen[f.id] && (playbookData[f.id] || f.playbook))} unmountOnExit>
+                          <Box
+                            sx={{
+                              mt: 1, p: 1.25, borderRadius: 1,
+                              bgcolor: "rgba(251,188,4,0.06)",
+                              border: "1px solid rgba(251,188,4,0.2)",
+                              textAlign: "left",
+                              maxWidth: 420,
+                              ml: "auto",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
+                              <AutoAwesome sx={{ fontSize: 13, color: "#FBBC04" }} />
+                              <Typography variant="caption" sx={{ color: "#FBBC04", fontWeight: 700, fontSize: 10 }}>
+                                AI REMEDIATION PLAYBOOK
+                              </Typography>
+                              <Box sx={{ flex: 1 }} />
+                              <Tooltip title="Regenerate playbook">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setPlaybookData(prev => { const n = { ...prev }; delete n[f.id]; return n; });
+                                    handleGeneratePlaybook({ ...f, playbook: undefined });
+                                  }}
+                                  sx={{ color: "rgba(251,188,4,0.5)", "&:hover": { color: "#FBBC04" }, p: 0.25 }}
+                                >
+                                  <Refresh sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: "text.secondary", fontSize: 11, whiteSpace: "pre-wrap", lineHeight: 1.6 }}
+                            >
+                              {playbookData[f.id] || f.playbook}
+                            </Typography>
+                          </Box>
+                        </Collapse>
                       </TableCell>
                     </TableRow>
                   );
@@ -788,6 +1034,52 @@ export default function Findings() {
             sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Suppress dialog */}
+      <Dialog open={!!suppressTarget} onClose={() => { setSuppressTarget(null); setSuppressReason(""); }}
+        maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Suppress finding</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+            Suppressing marks this finding as a false positive and hides it from the default view. Provide a reason so your team understands why it was suppressed.
+          </Typography>
+          {suppressTarget && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{suppressTarget.title || "(no title)"}</Typography>
+            </Box>
+          )}
+          <TextField
+            label="Reason for suppression"
+            value={suppressReason}
+            onChange={(e) => setSuppressReason(e.target.value)}
+            multiline
+            rows={3}
+            fullWidth
+            placeholder="e.g. Confirmed not exploitable in this environment, test artifact, accepted risk..."
+            slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "text.primary",
+                "& fieldset": { borderColor: "divider" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                "&.Mui-focused fieldset": { borderColor: "#4285F4" },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setSuppressTarget(null); setSuppressReason(""); }} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!suppressReason.trim() || suppressMutation.isPending}
+            onClick={() => suppressTarget && suppressMutation.mutate({ finding: suppressTarget, reason: suppressReason })}
+            sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "text.primary", "&:hover": { bgcolor: "rgba(255,255,255,0.15)" } }}
+          >
+            Suppress
           </Button>
         </DialogActions>
       </Dialog>

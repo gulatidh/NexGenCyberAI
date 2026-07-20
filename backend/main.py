@@ -53,6 +53,14 @@ try:
     from api.routers import documents as _documents
 except ImportError:
     _documents = None
+try:
+    from api.routers import compliance_heatmap as _compliance_heatmap
+except ImportError:
+    _compliance_heatmap = None
+try:
+    from api.routers import client_comparison as _client_comparison
+except ImportError:
+    _client_comparison = None
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -478,12 +486,15 @@ def _ensure_added_columns() -> None:
         except Exception:
             finding_cols = set()
         _finding_additions = [
-            ("assignee_email",   "NVARCHAR(200) NULL",  "VARCHAR(200)"),
-            ("due_date",         "NVARCHAR(32) NULL",   "VARCHAR(32)"),
-            ("remediated_at",    "DATETIME2 NULL",      "TIMESTAMP"),
-            ("duplicate_of_id",  "NVARCHAR(36) NULL",   "VARCHAR(36)"),
-            ("occurrence_count", "INT NULL",             "INTEGER"),
-            ("last_seen_at",     "DATETIME2 NULL",      "TIMESTAMP"),
+            ("assignee_email",      "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("due_date",            "NVARCHAR(32) NULL",   "VARCHAR(32)"),
+            ("remediated_at",       "DATETIME2 NULL",      "TIMESTAMP"),
+            ("duplicate_of_id",     "NVARCHAR(36) NULL",   "VARCHAR(36)"),
+            ("occurrence_count",    "INT NULL",             "INTEGER"),
+            ("last_seen_at",        "DATETIME2 NULL",      "TIMESTAMP"),
+            ("suppressed_at",       "DATETIME2 NULL",      "TIMESTAMP"),
+            ("suppression_reason",  "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("playbook",            "NVARCHAR(MAX) NULL",  "TEXT"),
         ]
         for col, mssql_type, sqlite_type in _finding_additions:
             if finding_cols and col not in finding_cols:
@@ -1045,6 +1056,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Simple in-memory rate limiter — no external dependency
+import time as _time_mod
+from collections import defaultdict as _defaultdict
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse as _JSONResponse
+
+_RATE_LIMIT_WINDOW = 60      # seconds
+_RATE_LIMIT_MAX = 120        # requests per window per IP (generous for normal use)
+_SCAN_RATE_LIMIT_MAX = 5     # scan/agent starts per window per IP
+_rate_buckets: dict = _defaultdict(list)
+
+
+class _RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        ip = request.client.host if request.client else "unknown"
+        now = _time_mod.time()
+        window_start = now - _RATE_LIMIT_WINDOW
+        path = request.url.path
+
+        # Tighter limit for expensive endpoints
+        if request.method == "POST" and any(
+            seg in path for seg in ("/scans/", "/agents/run", "/assistant/chat", "/findings/", "/playbook")
+        ):
+            bucket_key = f"expensive:{ip}"
+            limit = _SCAN_RATE_LIMIT_MAX
+        else:
+            bucket_key = f"global:{ip}"
+            limit = _RATE_LIMIT_MAX
+
+        hits = _rate_buckets[bucket_key]
+        hits[:] = [t for t in hits if t > window_start]
+        if len(hits) >= limit:
+            return _JSONResponse(
+                {"detail": "Rate limit exceeded. Please slow down."},
+                status_code=429,
+                headers={"Retry-After": "60"},
+            )
+        hits.append(now)
+        return await call_next(request)
+
+
+app.add_middleware(_RateLimitMiddleware)
+
 def _record_access(token: str | None, method: str, path: str, status: int, ip: str | None, ua: str | None) -> None:
     """Best-effort: persist one access_logs row for an authenticated request.
 
@@ -1154,7 +1209,8 @@ app.include_router(users.router, prefix="/api/v1")
 
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
-             _comments, _webhooks, _ctem, _evidence, _documents):
+             _comments, _webhooks, _ctem, _evidence, _documents,
+             _compliance_heatmap, _client_comparison):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router, prefix="/api/v1")
 

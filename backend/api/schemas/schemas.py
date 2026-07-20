@@ -174,11 +174,15 @@ class FindingResponse(BaseModel):
     occurrence_count: Optional[int] = 1
     last_seen_at: Optional[datetime] = None
     duplicate_of_id: Optional[str] = None
+    suppressed_at: Optional[datetime] = None
+    suppression_reason: Optional[str] = None
+    playbook: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class FindingUpdate(BaseModel):
     status: Optional[str] = None
     remediation: Optional[str] = None
+    suppression_reason: Optional[str] = None
 
 
 # ── Risk ───────────────────────────────────────────────────────────────────────

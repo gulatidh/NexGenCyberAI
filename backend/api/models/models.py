@@ -322,6 +322,9 @@ class Finding(Base):
     assignee_email = Column(String(200), nullable=True)
     due_date = Column(String(32), nullable=True)          # ISO date string e.g. "2026-09-30"
     remediated_at = Column(DateTime(timezone=True), nullable=True)
+    suppressed_at = Column(DateTime(timezone=True), nullable=True)
+    suppression_reason = Column(Text, nullable=True)
+    playbook = Column(Text, nullable=True)
     # Deduplication: duplicate_of_id links a re-detection to the canonical finding.
     # NULL = canonical; non-NULL = this row is a duplicate created by a later scan.
     duplicate_of_id = Column(String(36), nullable=True)

@@ -82,6 +82,191 @@ const FEATURES = [
   },
 ];
 
+const PRODUCT_TOUR_TABS = [
+  "Dashboard",
+  "Scan Progress",
+  "Compliance Heatmap",
+  "AI Playbook",
+  "Client Comparison",
+] as const;
+
+const PRODUCT_TOUR_SCREENS: React.FC<{ color: string }>[] = [
+  // 1 — Dashboard
+  ({ color }) => (
+    <Box sx={{ p: 2.5 }}>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Security Dashboard</Typography>
+      <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+        {[
+          { label: "Critical", val: "12", color: DANGER },
+          { label: "High", val: "47", color: "#F97316" },
+          { label: "Risk Score", val: "73", color: AMBER },
+          { label: "Compliance", val: "68%", color: "#4285F4" },
+        ].map((m) => (
+          <Box key={m.label} sx={{ flex: 1, minWidth: 80, p: 1.5, bgcolor: "rgba(0,0,0,0.25)", borderRadius: 2, border: `1px solid rgba(255,255,255,0.07)` }}>
+            <Typography sx={{ fontSize: 9, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 0.7, mb: 0.25 }}>{m.label}</Typography>
+            <Typography sx={{ fontSize: 22, fontWeight: 800, color: m.color, lineHeight: 1 }}>{m.val}</Typography>
+          </Box>
+        ))}
+      </Box>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.28)", textTransform: "uppercase", letterSpacing: 0.8, mb: 1 }}>Attack path count: 3 chains detected</Typography>
+      {[
+        { sev: "CRIT", title: "SQL Injection in auth endpoint", file: "api/auth.py:127", color: DANGER },
+        { sev: "HIGH", title: "Reflected XSS in search param", file: "frontend/search.js:48", color: "#F97316" },
+        { sev: "HIGH", title: "Hardcoded API key in config", file: "config/settings.py:12", color: "#F97316" },
+      ].map((f, i) => (
+        <Box key={i} sx={{ mb: 0.75, p: 1, bgcolor: `${f.color}08`, border: `1px solid ${f.color}20`, borderRadius: 1.5 }}>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 0.25 }}>
+            <Chip label={f.sev} size="small" sx={{ bgcolor: `${f.color}25`, color: f.color, fontSize: 9, height: 15, "& .MuiChip-label": { px: 0.75 } }} />
+            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 500, flex: 1 }}>{f.title}</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 9, color: "rgba(255,255,255,0.28)", fontFamily: "monospace" }}>{f.file}</Typography>
+        </Box>
+      ))}
+    </Box>
+  ),
+  // 2 — Scan + Live Progress
+  ({ color }) => (
+    <Box sx={{ p: 2.5 }}>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Live Scan Progress</Typography>
+      <Box sx={{ mb: 2, p: 1.75, bgcolor: "rgba(0,0,0,0.3)", borderRadius: 2, border: `1px solid rgba(255,255,255,0.07)`, fontFamily: "monospace" }}>
+        {[
+          { t: "$ aegis scan start --type ai_code_review --repo github.com/org/api", c: CYAN },
+          { t: "", c: "" },
+          { t: "[1/4] Triaging 847 files by risk score...", c: "rgba(255,255,255,0.55)" },
+          { t: "[2/4] Reviewing 127 high-risk chunks with LLM...", c: "rgba(255,255,255,0.55)" },
+          { t: "[3/4] Self-critique pass — pruning false positives...", c: AMBER },
+          { t: "[4/4] Cross-file taint tracing (SQLi → XSS paths)...", c: AMBER },
+          { t: "", c: "" },
+          { t: "✅  127 findings · 12 critical · 34 high · AI enriched", c: GREEN },
+          { t: "📋  Registers populated — MITRE ATT&CK mapped", c: GREEN },
+        ].map((ln, i) => (
+          <Typography key={i} sx={{ fontSize: 11, lineHeight: 1.7, color: ln.c || "transparent", fontFamily: "monospace" }}>
+            {ln.t || " "}
+          </Typography>
+        ))}
+        <Box sx={{ display: "inline-block", width: 7, height: 13, bgcolor: CYAN, animation: "blink 1s step-end infinite", "@keyframes blink": { "0%,100%": { opacity: 1 }, "50%": { opacity: 0 } } }} />
+      </Box>
+      <Box sx={{ p: 1.5, bgcolor: `${CYAN}08`, border: `1px solid ${CYAN}25`, borderRadius: 1.5 }}>
+        <Typography sx={{ fontSize: 11, color: `${CYAN}CC` }}>Threat Intel agent — mapping 127 findings to MITRE ATT&CK...</Typography>
+      </Box>
+    </Box>
+  ),
+  // 3 — Compliance Heatmap
+  ({ color }) => (
+    <Box sx={{ p: 2.5, overflowX: "auto" }}>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Compliance Heatmap</Typography>
+      {/* Header row */}
+      <Box sx={{ display: "flex", mb: 1, gap: 0.5 }}>
+        <Box sx={{ minWidth: 110 }} />
+        {["NIST CSF", "ISO 27001", "PCI DSS", "GDPR"].map((fw) => (
+          <Box key={fw} sx={{ flex: 1, textAlign: "center" }}>
+            <Typography sx={{ fontSize: 9, color: "#82b1ff", fontWeight: 700, textTransform: "uppercase" }}>{fw}</Typography>
+          </Box>
+        ))}
+      </Box>
+      {[
+        { domain: "Identity", rates: [82, 74, 55, 88] },
+        { domain: "Cloud Security", rates: [78, 61, 44, 70] },
+        { domain: "Data Protection", rates: [91, 83, 67, 95] },
+        { domain: "Network", rates: [65, 52, 38, 60] },
+        { domain: "Logging", rates: [45, 39, 28, 52] },
+      ].map(({ domain, rates }) => (
+        <Box key={domain} sx={{ display: "flex", gap: 0.5, mb: 0.75, alignItems: "center" }}>
+          <Typography sx={{ minWidth: 110, fontSize: 10, color: "rgba(255,255,255,0.55)", fontWeight: 500 }}>{domain}</Typography>
+          {rates.map((r, i) => {
+            const bg = r >= 80 ? "rgba(52,168,83,0.25)" : r >= 40 ? "rgba(251,188,4,0.25)" : "rgba(234,67,53,0.25)";
+            const tc = r >= 80 ? "#34A853" : r >= 40 ? "#FBBC04" : "#EA4335";
+            return (
+              <Box key={i} sx={{ flex: 1, height: 28, borderRadius: 0.75, bgcolor: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: tc }}>{r}%</Typography>
+              </Box>
+            );
+          })}
+        </Box>
+      ))}
+      <Box sx={{ display: "flex", gap: 0.5, mt: 1.5, borderTop: "1px solid rgba(255,255,255,0.07)", pt: 1 }}>
+        <Typography sx={{ minWidth: 110, fontSize: 9, color: "rgba(255,255,255,0.35)", fontWeight: 700, textTransform: "uppercase" }}>Overall</Typography>
+        {[72, 62, 46, 73].map((s, i) => {
+          const sc = s >= 80 ? "#34A853" : s >= 40 ? "#FBBC04" : "#EA4335";
+          return (
+            <Box key={i} sx={{ flex: 1, textAlign: "center" }}>
+              <Chip label={`${s}%`} size="small" sx={{ bgcolor: `${sc}20`, color: sc, fontWeight: 700, fontSize: 10, height: 18 }} />
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  ),
+  // 4 — AI Remediation Playbook
+  ({ color }) => (
+    <Box sx={{ p: 2.5 }}>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>AI Remediation Playbook</Typography>
+      <Box sx={{ mb: 2, p: 1.5, bgcolor: `${DANGER}08`, border: `1px solid ${DANGER}25`, borderRadius: 1.5 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 0.5 }}>
+          <Chip label="CRITICAL" size="small" sx={{ bgcolor: `${DANGER}25`, color: DANGER, fontSize: 9, height: 16, fontWeight: 700 }} />
+          <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>SQL Injection in auth endpoint</Typography>
+        </Box>
+        <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.38)", fontFamily: "monospace" }}>api/auth.py:127 · CWE-89 · CVSS 9.8</Typography>
+      </Box>
+      <Box sx={{ p: 1.5, bgcolor: "rgba(251,188,4,0.06)", border: "1px solid rgba(251,188,4,0.25)", borderRadius: 1.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
+          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: AMBER, boxShadow: `0 0 6px ${AMBER}` }} />
+          <Typography sx={{ fontSize: 10, color: AMBER, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8 }}>AI Remediation Playbook</Typography>
+        </Box>
+        {[
+          "1. Use parameterised queries: replace string interpolation with db.execute(sql, params)",
+          "2. Add input validation layer before the ORM call",
+          "3. Enable WAF rule for SQLi patterns at API Gateway",
+          "4. Rotate DB credentials — assume compromise",
+          "5. Add regression test with malicious payloads to CI pipeline",
+        ].map((step, i) => (
+          <Typography key={i} sx={{ fontSize: 10, color: "rgba(255,255,255,0.55)", lineHeight: 1.65, mb: 0.25 }}>{step}</Typography>
+        ))}
+        <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+          <Chip label="NIST SI-10" size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontSize: 9, height: 16 }} />
+          <Chip label="PCI DSS 6.3.1" size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontSize: 9, height: 16 }} />
+        </Box>
+      </Box>
+    </Box>
+  ),
+  // 5 — Client Comparison
+  ({ color }) => (
+    <Box sx={{ p: 2.5 }}>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Client Comparison</Typography>
+      <Box sx={{ display: "flex", gap: 1, mb: 1.5, pb: 0.75, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+        <Typography sx={{ flex: 2, fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>CLIENT</Typography>
+        {["CRIT", "HIGH", "MED", "RISKS", "COMP"].map((h) => (
+          <Typography key={h} sx={{ flex: 1, fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700, textAlign: "center" }}>{h}</Typography>
+        ))}
+      </Box>
+      {[
+        { name: "Acme Corp", crit: 12, high: 47, med: 93, risks: 8, comp: "68%", compC: AMBER, border: DANGER },
+        { name: "TechStart Ltd", crit: 3, high: 18, med: 41, risks: 3, comp: "79%", compC: AMBER, border: "transparent" },
+        { name: "FinServ Group", crit: 0, high: 7, med: 22, risks: 1, comp: "91%", compC: GREEN, border: "transparent" },
+      ].map((row) => (
+        <Box key={row.name} sx={{ display: "flex", gap: 1, py: 1, borderLeft: `3px solid ${row.border}`, pl: row.border !== "transparent" ? 0.75 : 0, mb: 0.5, borderBottom: "1px solid rgba(255,255,255,0.04)", alignItems: "center" }}>
+          <Box sx={{ flex: 2 }}>
+            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>{row.name}</Typography>
+          </Box>
+          {[
+            { val: row.crit, color: DANGER },
+            { val: row.high, color: "#F97316" },
+            { val: row.med, color: AMBER },
+            { val: row.risks, color: "#4285F4" },
+          ].map(({ val, color: c }, i) => (
+            <Box key={i} sx={{ flex: 1, textAlign: "center" }}>
+              <Chip label={val} size="small" sx={{ bgcolor: val > 0 ? `${c}20` : "rgba(255,255,255,0.04)", color: val > 0 ? c : "rgba(255,255,255,0.2)", fontSize: 10, height: 18, fontWeight: 700 }} />
+            </Box>
+          ))}
+          <Box sx={{ flex: 1, textAlign: "center" }}>
+            <Chip label={row.comp} size="small" sx={{ bgcolor: `${row.compC}20`, color: row.compC, fontSize: 10, height: 18, fontWeight: 700 }} />
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  ),
+];
+
 const SCANNER_GROUPS = [
   { label: "SAST", color: CYAN, items: ["Semgrep", "CodeQL", "SonarQube", "AI Code Review"] },
   { label: "DAST", color: PURPLE, items: ["OWASP ZAP"] },
@@ -259,6 +444,7 @@ export default function LandingPage() {
   const [terminalLines, setTerminalLines] = useState<typeof TERMINAL_LINES>([]);
   const [terminalStarted, setTerminalStarted] = useState(false);
   const [useCaseTab, setUseCaseTab] = useState(0);
+  const [tourTab, setTourTab] = useState(0);
   const [statCounts, setStatCounts] = useState([0, 0, 0]);
   const statsRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -667,6 +853,70 @@ export default function LandingPage() {
               </Grid>
             ))}
           </Grid>
+        </Container>
+      </Box>
+
+      {/* ── Product Tour ───────────────────────────────────────────────────── */}
+      <Box id="product-tour" sx={{ py: { xs: 8, md: 14 }, borderTop: `1px solid ${BORDER}` }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", mb: 6 }}>
+            <Chip label="Product tour" size="small" sx={{ mb: 2.5, background: `rgba(0,212,255,0.08)`, border: `1px solid rgba(0,212,255,0.22)`, color: CYAN, fontWeight: 600, fontSize: 12 }} />
+            <Typography sx={{ fontSize: { xs: 26, md: 38 }, fontWeight: 800, letterSpacing: "-0.02em", mb: 2 }}>
+              See it in action
+            </Typography>
+            <Typography sx={{ color: "rgba(255,255,255,0.38)", fontSize: 16, maxWidth: 520, mx: "auto" }}>
+              Explore the key views that security teams use every day — from finding triage to compliance coverage.
+            </Typography>
+          </Box>
+
+          {/* Tab selector */}
+          <Box sx={{ borderBottom: `1px solid ${BORDER}`, mb: 0 }}>
+            <Tabs
+              value={tourTab}
+              onChange={(_, v) => setTourTab(v)}
+              variant="scrollable"
+              scrollButtons="auto"
+              sx={{
+                "& .MuiTab-root": { color: "rgba(255,255,255,0.38)", textTransform: "none", fontSize: 13, fontWeight: 600, minWidth: 0 },
+                "& .Mui-selected": { color: CYAN },
+                "& .MuiTabs-indicator": { background: `linear-gradient(90deg, ${CYAN}, ${PURPLE})`, height: 2 },
+              }}
+            >
+              {PRODUCT_TOUR_TABS.map((label) => (
+                <Tab key={label} label={label} />
+              ))}
+            </Tabs>
+          </Box>
+
+          {/* Screen mockup */}
+          <Box
+            sx={{
+              background: "#0a0e1a",
+              border: `1px solid rgba(255,255,255,0.08)`,
+              borderTop: "none",
+              borderRadius: "0 0 16px 16px",
+              overflow: "hidden",
+              boxShadow: "0 40px 80px rgba(0,0,0,0.5)",
+              minHeight: 340,
+            }}
+          >
+            {/* Window chrome */}
+            <Box sx={{ px: 2.5, py: 1.25, display: "flex", alignItems: "center", gap: 1.5, background: "rgba(0,0,0,0.25)", borderBottom: `1px solid rgba(255,255,255,0.07)` }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FF5F57" }} />
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E" }} />
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840" }} />
+              <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.22)", ml: 1, fontFamily: "monospace" }}>
+                Aegis AI — {PRODUCT_TOUR_TABS[tourTab]}
+              </Typography>
+            </Box>
+
+            {/* Screen content */}
+            {PRODUCT_TOUR_SCREENS.map((Screen, idx) => (
+              <Box key={idx} sx={{ display: tourTab === idx ? "block" : "none" }}>
+                <Screen color={CYAN} />
+              </Box>
+            ))}
+          </Box>
         </Container>
       </Box>
 

@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any
 from collections import defaultdict
 import csv
 import io
+from pydantic import BaseModel
 from api.models.models import Finding, Scan, FrameworkType
 from api.schemas.schemas import FindingResponse, FindingUpdate
 from db.database import get_db
@@ -18,6 +19,10 @@ from services.finding_classifier import classify, SECTIONS, CATEGORY_TO_SECTION
 router = APIRouter(prefix="/clients/{client_id}/findings", tags=["findings"])
 
 
+class SuppressPayload(BaseModel):
+    reason: str = ""
+
+
 @router.get("/", response_model=List[FindingResponse])
 async def list_findings(
     client_id: str,
@@ -27,6 +32,7 @@ async def list_findings(
     scan_id: Optional[str] = None,
     section: Optional[str] = None,
     category: Optional[str] = None,
+    include_suppressed: bool = False,
     limit: int = 300,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -45,6 +51,9 @@ async def list_findings(
         q = q.filter(Scan.project_id == project_id)
     if scan_id:
         q = q.filter(Finding.scan_id == scan_id)
+    # Filter out suppressed (false positive) findings by default.
+    if not include_suppressed:
+        q = q.filter(Finding.suppressed_at.is_(None))
     # For the global (cross-scan) view, filter to canonical findings only.
     # Duplicate marker rows (duplicate_of_id IS NOT NULL) represent re-detections
     # of an already-known issue; they are counted on the canonical row via
@@ -214,6 +223,123 @@ async def update_finding_status(
             recompute_client_framework(db, client_id, FrameworkType(fv))
         except Exception:
             pass
+    return f
+
+
+@router.post("/{finding_id}/suppress", response_model=FindingResponse, dependencies=[Depends(require_editor_anywhere)])
+async def suppress_finding(
+    client_id: str,
+    finding_id: str,
+    payload: SuppressPayload,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Mark a finding as a false positive / suppressed."""
+    from datetime import datetime, timezone
+    f = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Finding.id == finding_id, Scan.client_id == client_id)
+        .first()
+    )
+    if not f:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    f.suppressed_at = datetime.now(timezone.utc)
+    f.suppression_reason = payload.reason
+    f.status = "false_positive"
+    db.commit()
+    db.refresh(f)
+    return f
+
+
+@router.delete("/{finding_id}/suppress", response_model=FindingResponse, dependencies=[Depends(require_editor_anywhere)])
+async def unsuppress_finding(
+    client_id: str,
+    finding_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Remove a false-positive suppression and reopen the finding."""
+    f = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Finding.id == finding_id, Scan.client_id == client_id)
+        .first()
+    )
+    if not f:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    f.suppressed_at = None
+    f.suppression_reason = None
+    f.status = "open"
+    db.commit()
+    db.refresh(f)
+    return f
+
+
+@router.post("/{finding_id}/playbook", response_model=FindingResponse, dependencies=[Depends(require_editor_anywhere)])
+async def generate_playbook(
+    client_id: str,
+    finding_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Generate a step-by-step remediation runbook for this finding using LLM."""
+    f = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Finding.id == finding_id, Scan.client_id == client_id)
+        .first()
+    )
+    if not f:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    from core.ai_providers import get_llm, ProviderUnavailableError
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    sev = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+    prompt = f"""You are a senior security engineer. Generate a detailed, actionable remediation runbook for the following security finding.
+
+Finding: {f.title}
+Severity: {sev}
+Resource: {f.resource_id or "N/A"} ({f.resource_type or "N/A"})
+CVE: {f.cve_id or "N/A"} | CVSS: {f.cvss_score or "N/A"}
+Description: {f.description or "N/A"}
+Current remediation note: {f.remediation or "N/A"}
+
+Write a playbook with these sections:
+## Summary
+One paragraph explaining the risk and business impact.
+
+## Prerequisites
+Bullet list of what you need before starting (tools, access, backups).
+
+## Step-by-Step Fix
+Numbered steps with exact commands where applicable.
+
+## Verification
+How to confirm the fix worked (tests, commands, checks).
+
+## Rollback
+Steps to undo the fix if something breaks.
+
+## References
+Links or standards (CVE, CWE, OWASP, framework control IDs).
+
+Be specific and technical. Include real commands where possible."""
+
+    try:
+        llm = get_llm()
+        response = await llm.ainvoke([
+            SystemMessage(content="You are a senior security engineer generating remediation playbooks."),
+            HumanMessage(content=prompt),
+        ])
+        playbook_text = response.content if hasattr(response, "content") else str(response)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"LLM unavailable: {exc}")
+
+    f.playbook = playbook_text
+    db.commit()
+    db.refresh(f)
     return f
 
 

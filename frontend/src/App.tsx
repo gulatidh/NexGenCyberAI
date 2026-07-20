@@ -57,6 +57,8 @@ import APIKeysPage from "./pages/APIKeysPage";
 import AttackPaths from "./pages/AttackPaths";
 import NLQuery from "./pages/NLQuery";
 import PostureTrends from "./pages/PostureTrends";
+import ComplianceHeatmap from "./pages/ComplianceHeatmap";
+import ClientComparison from "./pages/ClientComparison";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -176,6 +178,8 @@ function ProtectedApp() {
           <Route path="/attack-paths" element={<AttackPaths />} />
           <Route path="/nl-query" element={<NLQuery />} />
           <Route path="/posture-trends" element={<PostureTrends />} />
+          <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
+          <Route path="/client-comparison" element={<ClientComparison />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>

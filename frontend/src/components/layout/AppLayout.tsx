@@ -15,7 +15,7 @@ import {
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, Assignment, AccountTree, Psychology, Description,
-  Notifications, VpnKey, TrendingUp,
+  Notifications, VpnKey, TrendingUp, GridView, CompareArrows,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -88,16 +88,18 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Intelligence",
     items: [
-      { label: "Attack Paths",   icon: <AccountTree />,  path: "/attack-paths" },
-      { label: "Ask Your Data",  icon: <Psychology />,   path: "/nl-query" },
-      { label: "Security Docs",  icon: <Description />,  path: "/security-docs" },
+      { label: "Attack Paths",        icon: <AccountTree />,  path: "/attack-paths" },
+      { label: "Ask Your Data",       icon: <Psychology />,   path: "/nl-query" },
+      { label: "Security Docs",       icon: <Description />,  path: "/security-docs" },
+      { label: "Compliance Heatmap",  icon: <GridView />,     path: "/compliance-heatmap" },
     ],
   },
   {
     section: "Governance",
     items: [
-      { label: "Posture Trends", icon: <TrendingUp />,   path: "/posture-trends" },
-      { label: "CTEM Programs",  icon: <Radar />,        path: "/ctem" },
+      { label: "Posture Trends",    icon: <TrendingUp />,     path: "/posture-trends" },
+      { label: "CTEM Programs",     icon: <Radar />,          path: "/ctem" },
+      { label: "Client Comparison", icon: <CompareArrows />,  path: "/client-comparison" },
     ],
   },
   {

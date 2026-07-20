@@ -114,6 +114,12 @@ export interface Finding {
   occurrence_count?: number;
   last_seen_at?: string;
   duplicate_of_id?: string;
+  playbook?: string;
+  control_mappings?: any;
+  evidence?: any;
+  assignee_email?: string;
+  due_date?: string;
+  remediated_at?: string;
 }
 
 export interface Risk {
