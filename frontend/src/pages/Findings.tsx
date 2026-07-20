@@ -5,11 +5,11 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
   FormControl, InputLabel, Select, MenuItem, Button, Tabs, Tab, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, Alert, Tooltip, IconButton,
-  Snackbar, Switch, FormControlLabel, TextField, Collapse,
+  Snackbar, TextField, Collapse,
 } from "@mui/material";
 import {
   BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel,
-  VisibilityOff, Visibility, AutoAwesome, ExpandMore, ExpandLess, Refresh,
+  VisibilityOff, Visibility, AutoAwesome, Refresh,
 } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
