@@ -5,15 +5,17 @@ JWT validation against Azure Entra ID OIDC tokens.
 Multi-tenant support: tokens from ANY work/school Azure AD tenant are accepted.
 The issuer is validated dynamically against the tid claim in the token, which
 prevents token confusion attacks while allowing external users (e.g. accenture.com)
-to authenticate. Platform-owner tenant users are auto-granted admin; external
-users get access only if an admin has created a grant for their email.
+to authenticate. Access is gated — only users with an explicit UserAccess grant
+(or listed in INITIAL_ADMIN_EMAILS for first-run bootstrap) can reach the API.
 """
 import jwt
 from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 from core.config import get_settings
+from db.database import get_db
 
 settings = get_settings()
 bearer_scheme = HTTPBearer()
@@ -73,8 +75,46 @@ def decode_azure_token(token: str) -> Dict[str, Any]:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    return decode_azure_token(credentials.credentials)
+    """Validate JWT and enforce that the caller has at least one access grant.
+
+    Users in INITIAL_ADMIN_EMAILS are allowed through even before their grant
+    row exists (the grant is created lazily by GET /admin/me on first call).
+    All other users with no grant receive HTTP 403.
+    """
+    user = decode_azure_token(credentials.credentials)
+
+    # Identify the caller's email (same logic as authz._user_email)
+    email = (
+        user.get("upn")
+        or user.get("preferred_username")
+        or user.get("email")
+        or user.get("unique_name", "")
+    ).strip().lower()
+
+    if not email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not identify user email from token")
+
+    # Allow initial admins through (grant row created on first /admin/me call)
+    initial_admins = {
+        e.strip().lower()
+        for e in (settings.INITIAL_ADMIN_EMAILS or "").split(",")
+        if e.strip()
+    }
+    if email in initial_admins:
+        return user
+
+    # All other users must have at least one explicit grant
+    from api.models.models import UserAccess
+    has_grant = db.query(UserAccess).filter(UserAccess.email == email).first()
+    if not has_grant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access not granted. Contact your administrator to request access.",
+        )
+
+    return user
 
 
 async def require_admin(user: Dict = Depends(get_current_user)) -> Dict:

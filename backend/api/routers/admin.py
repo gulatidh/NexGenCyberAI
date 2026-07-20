@@ -231,14 +231,19 @@ async def get_my_access(
     decide whether write actions are visible. Always succeeds for an
     authenticated user, even if they have no grants.
 
-    Same-tenant users (tid matches AZURE_TENANT_ID) are auto-bootstrapped as
-    global admin on first call so they can manage grants without a manual
-    bootstrap step."""
+    Users listed in INITIAL_ADMIN_EMAILS env var are auto-bootstrapped as
+    global admin on first login. Everyone else must be explicitly granted
+    access by an existing admin."""
     email = _user_email(user)
-    tid = user.get("tid", "")
 
-    # Auto-bootstrap: same-tenant admin with no DB grant yet → create one now
-    if _settings.AZURE_TENANT_ID and tid == _settings.AZURE_TENANT_ID:
+    # Auto-bootstrap only for explicitly named initial admins (env var).
+    # Never grant based on tenant ID alone — that lets any tenant member in.
+    initial_admins = {
+        e.strip().lower()
+        for e in (_settings.INITIAL_ADMIN_EMAILS or "").split(",")
+        if e.strip()
+    }
+    if email and email in initial_admins:
         existing = db.query(UserAccess).filter(
             UserAccess.email == email,
             UserAccess.scope_type == AccessScope.GLOBAL,
@@ -251,7 +256,7 @@ async def get_my_access(
                     role=AccessRole.ADMIN,
                     scope_type=AccessScope.GLOBAL,
                     scope_id=None,
-                    granted_by="auto-tenant-admin",
+                    granted_by="initial-admin-bootstrap",
                     granted_at=datetime.now(timezone.utc),
                 ))
                 db.commit()

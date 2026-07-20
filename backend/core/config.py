@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     NVD_API_KEY: str = ""
     SCAN_INGEST_SECRET: str = ""
 
+    # Access control — comma-separated list of UPNs that are automatically
+    # bootstrapped as global admins on first login (no DB grant needed yet).
+    # Example: "dheeraj@gretagulati.com,alice@gretagulati.com"
+    # Leave empty after bootstrapping; do not use as a permanent bypass.
+    INITIAL_ADMIN_EMAILS: str = ""
+
     class Config:
         env_file = ".env"
         case_sensitive = True
