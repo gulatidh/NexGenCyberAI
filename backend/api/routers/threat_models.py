@@ -158,6 +158,11 @@ class ThreatModelDetail(ThreatModelSummary):
     maturity_scores: Dict[str, float] = {}
     analyst_notes: Optional[str] = None
     components_pinned: bool = False
+    # Phase 9
+    attack_trees_json: List[Dict[str, Any]] = []
+    adversary_profiles_json: List[Dict[str, Any]] = []
+    sigma_rules_json: List[Dict[str, Any]] = []
+    auto_remodel: bool = False
 
 
 class ConvertResult(BaseModel):
@@ -216,6 +221,11 @@ def _detail_from(tm: ThreatModel, db: Optional[Session] = None) -> Dict[str, Any
         "maturity_scores": tm.maturity_scores or {},
         "analyst_notes": tm.analyst_notes,
         "components_pinned": bool(tm.components_pinned),
+        # Phase 9
+        "attack_trees_json": tm.attack_trees_json or [],
+        "adversary_profiles_json": tm.adversary_profiles_json or [],
+        "sigma_rules_json": tm.sigma_rules_json or [],
+        "auto_remodel": bool(tm.auto_remodel),
     }
 
 
