@@ -1182,73 +1182,158 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
     }
 
 
-def _derive_attack_trees(threats: List[Dict[str, Any]], components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Build attack chain trees from threat blast_radius chaining.
+def _derive_attack_trees(
+    threats: List[Dict[str, Any]],
+    components: List[Dict[str, Any]],
+    data_flows: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Build attack chain trees from threats.
 
-    For each critical/high threat, walk the blast_radius → find other threats
-    that target those components → chain them into a multi-step attack path.
-    Returns up to 5 distinct attack trees.
+    Strategy 1 (preferred): blast_radius chaining — follow each threat's
+    blast_radius list to find threats on downstream components.
+
+    Strategy 2 (fallback for old models): trust-zone + data-flow adjacency.
+    The canonical attack path goes public → dmz → private → data-tier, so
+    we chain threats that target components in successive zones, connected by
+    a data flow edge.  If no data_flows are available, we rely on zone order
+    alone.
+
+    Returns up to 5 distinct attack trees with ≥ 2 steps each.
     """
+    import functools
+
     if not threats:
         return []
 
-    # Index: component_id → [threat] that targets it
+    # Index: component_id → [threat]
     comp_to_threats: Dict[str, List[Dict]] = {}
     for t in threats:
-        aid = t.get("asset_id", "")
-        comp_to_threats.setdefault(aid, []).append(t)
+        aid = _str(t.get("asset_id"))
+        if aid:
+            comp_to_threats.setdefault(aid, []).append(t)
 
-    # High-value targets: database, storage, secret, auth components
-    _HV_KEYWORDS = {"db", "database", "storage", "secret", "vault", "auth", "identity", "payment", "prod"}
-    high_value_ids = {
-        c["id"] for c in components
-        if any(kw in (c.get("name") or "").lower() or kw in (c.get("type") or "").lower()
-               for kw in _HV_KEYWORDS)
-    }
+    comp_info: Dict[str, Dict] = {_str(c.get("id")): c for c in components if c.get("id")}
+
+    # Data-flow adjacency: component_id → set of reachable component_ids
+    flow_adj: Dict[str, set] = {}
+    for f in (data_flows or []):
+        frm, to = _str(f.get("from")), _str(f.get("to"))
+        if frm and to:
+            flow_adj.setdefault(frm, set()).add(to)
+            if f.get("direction") == "bidirectional":
+                flow_adj.setdefault(to, set()).add(frm)
+
+    # Trust zone ordering (lower index = more exposed)
+    _ZONE_ORDER = ["public", "dmz", "partner", "private", "management", "data-tier"]
+
+    def _zone_rank(cid: str) -> int:
+        zone = _str((comp_info.get(cid) or {}).get("trust_zone")).lower()
+        try:
+            return _ZONE_ORDER.index(zone)
+        except ValueError:
+            return 2  # default to middle
+
+    def _find_follow_ons(root_id: str, used_ids: set) -> List[Dict]:
+        """Find threats on components reachable from root_id."""
+        # Try blast_radius first
+        root_threat = next((t for t in threats if t.get("asset_id") == root_id), None)
+        blast = (root_threat or {}).get("blast_radius") or []
+
+        candidates: List[str] = []
+        if blast:
+            candidates = [b for b in blast if b != root_id]
+        else:
+            # Fallback: data-flow neighbours deeper into the trust zone
+            neighbours = flow_adj.get(root_id, set())
+            root_rank = _zone_rank(root_id)
+            deeper = sorted(
+                [n for n in neighbours if _zone_rank(n) > root_rank],
+                key=_zone_rank,
+            )
+            # Also add same-zone neighbours if nothing deeper
+            if not deeper:
+                deeper = [n for n in neighbours if n != root_id]
+            candidates = deeper[:5]
+
+            # If still nothing via flows, pick threats on components in the next zone
+            if not candidates:
+                root_rank = _zone_rank(root_id)
+                next_rank = root_rank + 1
+                candidates = [
+                    cid for cid in comp_info
+                    if _zone_rank(cid) == next_rank and cid != root_id
+                ]
+
+        result = []
+        for cid in candidates[:5]:
+            for ft in comp_to_threats.get(cid, []):
+                if ft["id"] not in used_ids:
+                    result.append(ft)
+                    break  # one threat per downstream component
+        return result[:3]
 
     trees = []
-    seen_roots = set()
-    for t in threats:
-        if t.get("severity") not in ("critical", "high"):
-            continue
-        if t["id"] in seen_roots:
-            continue
-        seen_roots.add(t["id"])
+    seen_roots: set = set()
 
-        blast = t.get("blast_radius") or []
-        # Find follow-on threats targeting blasted components
-        chain_steps = [{"step": 1, "threat_id": t["id"], "title": t.get("title", ""),
-                         "severity": t.get("severity", ""), "likelihood": t.get("likelihood", 5)}]
-        for bid in blast[:5]:
-            follow_ons = [ft for ft in comp_to_threats.get(bid, []) if ft["id"] != t["id"]]
-            for fo in follow_ons[:2]:
-                chain_steps.append({
-                    "step": len(chain_steps) + 1,
-                    "threat_id": fo["id"],
-                    "title": fo.get("title", ""),
-                    "severity": fo.get("severity", ""),
-                    "likelihood": fo.get("likelihood", 5),
-                })
+    # Start chains from entry-point-facing threats (internet-exposed / critical)
+    sorted_threats = sorted(
+        [t for t in threats if t.get("severity") in ("critical", "high")],
+        key=lambda t: (_zone_rank(t.get("asset_id", "")), -int(t.get("likelihood") or 5)),
+    )
+
+    for root_t in sorted_threats:
+        if root_t["id"] in seen_roots:
+            continue
+        seen_roots.add(root_t["id"])
+
+        used = {root_t["id"]}
+        chain_steps = [{
+            "step": 1,
+            "threat_id": root_t["id"],
+            "title": root_t.get("title", ""),
+            "severity": root_t.get("severity", ""),
+            "likelihood": int(root_t.get("likelihood") or 5),
+            "asset_id": root_t.get("asset_id", ""),
+        }]
+
+        current_asset = root_t.get("asset_id", "")
+        for _ in range(4):  # up to 4 more steps
+            follow_ons = _find_follow_ons(current_asset, used)
+            if not follow_ons:
+                break
+            fo = follow_ons[0]
+            used.add(fo["id"])
+            chain_steps.append({
+                "step": len(chain_steps) + 1,
+                "threat_id": fo["id"],
+                "title": fo.get("title", ""),
+                "severity": fo.get("severity", ""),
+                "likelihood": int(fo.get("likelihood") or 5),
+                "asset_id": fo.get("asset_id", ""),
+            })
+            current_asset = fo.get("asset_id", "")
+
         if len(chain_steps) < 2:
             continue
 
-        # Combined probability = product of (likelihood/10) per step
         probs = [s["likelihood"] / 10 for s in chain_steps]
-        combined = round(__import__("functools").reduce(lambda a, b: a * b, probs, 1.0), 3)
+        combined = round(functools.reduce(lambda a, b: a * b, probs, 1.0), 3)
+
+        mitre = list({
+            tech
+            for step in chain_steps
+            for threat_obj in [next((x for x in threats if x["id"] == step["threat_id"]), {})]
+            for tech in (threat_obj.get("attack_techniques") or [])
+        })
 
         trees.append({
             "id": f"AT{len(trees)+1:02d}",
-            "root_goal": f"Reach {t.get('asset_id', 'target')} via {t.get('title', '')}",
-            "root_threat_id": t["id"],
+            "root_goal": f"Compromise {root_t.get('asset_id', 'system')} → lateral movement to deeper tiers",
+            "root_threat_id": root_t["id"],
             "steps": chain_steps,
             "combined_probability": combined,
-            "impact": t.get("severity", "high"),
-            "mitre_chain": list({
-                tech
-                for step in chain_steps
-                for threat_obj in [next((x for x in threats if x["id"] == step["threat_id"]), {})]
-                for tech in (threat_obj.get("attack_techniques") or [])
-            }),
+            "impact": root_t.get("severity", "high"),
+            "mitre_chain": mitre,
         })
         if len(trees) >= 5:
             break
@@ -1658,7 +1743,8 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         # Phase 9 — attack trees (derived from blast_radius chaining)
         try:
             tm.attack_trees_json = _derive_attack_trees(
-                model.get("threats") or [], model.get("components") or []
+                model.get("threats") or [], model.get("components") or [],
+                data_flows=model.get("data_flows") or [],
             )
         except Exception:
             logger.exception("attack tree derivation failed (continuing)")

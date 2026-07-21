@@ -375,7 +375,8 @@ async def get_threat_model(
             from services.threat_modeler import _derive_attack_trees, _extract_sigma_rules
             from sqlalchemy.orm.attributes import flag_modified
             tm.attack_trees_json = _derive_attack_trees(
-                tm.threats_json or [], tm.components_json or []
+                tm.threats_json or [], tm.components_json or [],
+                data_flows=tm.data_flows_json or [],
             )
             flag_modified(tm, "attack_trees_json")
             _dirty = True
