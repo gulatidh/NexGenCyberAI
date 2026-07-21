@@ -16,7 +16,6 @@ import {
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
   Dialog, DialogTitle, DialogContent, TextField, Select, FormControl, InputLabel,
-  Switch, FormControlLabel,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
