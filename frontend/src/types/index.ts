@@ -541,3 +541,60 @@ export interface DashboardSummary {
   recent_findings: any[];
   agent_runs_total: number;
 }
+
+// ── Phase 9 Threat Modeling types ─────────────────────────────────────────────
+
+export interface AttackTreeStep {
+  step: number;
+  threat_id: string;
+  title: string;
+  severity: string;
+  likelihood: number;
+}
+
+export interface AttackTree {
+  id: string;
+  root_goal: string;
+  root_threat_id: string;
+  steps: AttackTreeStep[];
+  combined_probability: number;
+  impact: string;
+  mitre_chain: string[];
+}
+
+export interface AdversaryProfile {
+  id: string;
+  name: string;
+  type: string;
+  motivation: string;
+  sophistication: string;
+  targeted_assets: string[];
+  likely_techniques: string[];
+  threat_ids: string[];
+  likelihood: number;
+  rationale: string;
+}
+
+export interface SigmaRule {
+  threat_id: string;
+  threat_title: string;
+  platform: string;
+  rule_id: string;
+  severity: string;
+  status: string;
+  sigma_yaml: string;
+}
+
+export interface ThreatModel {
+  id: string;
+  client_id: string;
+  name?: string | null;
+  scope_type: string;
+  framework?: string | null;
+  methodology: string;
+  status: string;
+  attack_trees_json?: AttackTree[];
+  adversary_profiles_json?: AdversaryProfile[];
+  sigma_rules_json?: SigmaRule[];
+  auto_remodel?: boolean;
+}

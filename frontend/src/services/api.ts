@@ -281,6 +281,34 @@ export const threatModelsApi = {
   },
   startModeling: (clientId: string, modelId: string, body: any = {}) =>
     apiClient.post(`/clients/${clientId}/threat-models/${modelId}/start-modeling`, body).then((r) => r.data),
+  // Phase 9 — Sigma rule endpoints
+  validateSigmaRule: (clientId: string, modelId: string, index: number) =>
+    apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/sigma-rules/${index}/validate`).then((r) => r.data),
+  downloadSigmaRules: async (clientId: string, modelId: string) => {
+    const url = `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/sigma-rules?format=yaml`;
+    // Acquire auth token the same way the interceptor does
+    const { msalInstance } = await import("../auth/AuthProvider");
+    const { loginRequest } = await import("../auth/msalConfig");
+    await msalInstance.initialize();
+    const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+    let token = "";
+    if (account) {
+      try {
+        const resp = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
+        token = resp.accessToken;
+      } catch {
+        // proceed without token; backend will 401
+      }
+    }
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `sigma-rules-${modelId}.yaml`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  },
 };
 
 export const adminApi = {

@@ -16,15 +16,18 @@ import {
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
   Dialog, DialogTitle, DialogContent, TextField, Select, FormControl, InputLabel,
+  Switch, FormControlLabel,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
+  Security, AccountTree, Verified, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
+import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdDiagram from "../components/DfdDiagram";
 import DrawioDiagram from "../components/DrawioDiagram";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
@@ -95,6 +98,11 @@ interface ThreatModelDetailData {
   entry_points?: any[];
   coverage_decisions?: CoverageDecision[];
   maturity_scores?: Record<string, number>;
+  // Phase 9
+  attack_trees_json?: AttackTree[];
+  adversary_profiles_json?: AdversaryProfile[];
+  sigma_rules_json?: SigmaRule[];
+  auto_remodel?: boolean;
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -601,6 +609,9 @@ export default function ThreatModelDetail() {
         <Tab value="coverage" label="Coverage" />
         <Tab value="maturity" label="Maturity" />
         <Tab value="mitigations" label={`Mitigations (${data.mitigation_count})`} />
+        <Tab value="attack_chains" label={`Attack Chains (${(data.attack_trees_json || []).length})`} />
+        <Tab value="adversaries" label={`Adversaries (${(data.adversary_profiles_json || []).length})`} />
+        <Tab value="detection_rules" label={`Detection Rules (${(data.sigma_rules_json || []).length})`} />
       </Tabs>
 
       {/* DIAGRAM */}
@@ -959,6 +970,26 @@ export default function ThreatModelDetail() {
           </CardContent>
         </Card>
         </Box>
+      )}
+
+      {/* ATTACK CHAINS */}
+      {tab === "attack_chains" && (
+        <AttackChainsView attackTrees={data.attack_trees_json || []} />
+      )}
+
+      {/* ADVERSARIES */}
+      {tab === "adversaries" && (
+        <AdversariesView profiles={data.adversary_profiles_json || []} />
+      )}
+
+      {/* DETECTION RULES */}
+      {tab === "detection_rules" && (
+        <DetectionRulesView
+          rules={data.sigma_rules_json || []}
+          clientId={clientId}
+          modelId={modelId!}
+          onValidated={() => qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] })}
+        />
       )}
     </Box>
   );
@@ -1380,5 +1411,419 @@ function ThreatRow({ threat: t, sc, compName, converted, onConvert, convertPendi
         </Box>
       )}
     </Box>
+  );
+}
+
+
+// ── Phase 9 sub-views ─────────────────────────────────────────────────────────
+
+const ADVERSARY_TYPE_COLOR: Record<string, string> = {
+  nation_state: "#EA4335",
+  criminal: "#FF7043",
+  hacktivist: "#FBBC04",
+  insider: "#9C27B0",
+  opportunistic: "#4285F4",
+};
+
+// Attack Chains ───────────────────────────────────────────────────────────────
+
+function AttackChainsView({ attackTrees }: { attackTrees: AttackTree[] }) {
+  if (attackTrees.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <AccountTree sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          No attack chains yet — re-generate this model to produce attack trees.
+        </Typography>
+      </Card>
+    );
+  }
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {attackTrees.map((tree) => (
+        <AttackTreeCard key={tree.id} tree={tree} />
+      ))}
+    </Box>
+  );
+}
+
+function AttackTreeCard({ tree }: { tree: AttackTree }) {
+  const impactColor = SEV_COLOR[tree.impact] || "rgba(255,255,255,0.4)";
+  const probPct = Math.round(tree.combined_probability * 100);
+  return (
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <CardContent>
+        {/* Header */}
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+          <AccountTree sx={{ color: "#4285F4", fontSize: 22, mt: 0.25, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 200 }}>
+            <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.4, mb: 0.5 }}>
+              {tree.root_goal}
+            </Typography>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+              <Chip label={`Chain probability: ${probPct}%`}
+                sx={{ bgcolor: probPct >= 60 ? "rgba(234,67,53,0.15)" : probPct >= 30 ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)",
+                  color: probPct >= 60 ? "#EA4335" : probPct >= 30 ? "#FBBC04" : "#34A853",
+                  fontWeight: 700, height: 20, fontSize: 11 }} />
+              <Chip label={`Impact: ${tree.impact}`}
+                sx={{ bgcolor: `${impactColor}20`, color: impactColor, fontWeight: 700, height: 20, fontSize: 11, textTransform: "uppercase" }} />
+              <Chip label={`ID: ${tree.id}`}
+                sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", height: 20, fontSize: 10, fontFamily: "monospace" }} />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Step chain */}
+        <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0.5, mb: 2 }}>
+          {tree.steps.map((step, idx) => {
+            const sc = SEV_COLOR[step.severity] || "rgba(255,255,255,0.4)";
+            const likPct = Math.round(step.likelihood * 10);
+            return (
+              <React.Fragment key={step.step}>
+                <Box sx={{
+                  border: `1.5px solid ${sc}`,
+                  borderRadius: 1.5,
+                  p: 1, px: 1.5,
+                  bgcolor: `${sc}12`,
+                  minWidth: 120,
+                  maxWidth: 200,
+                }}>
+                  <Typography sx={{ color: "text.secondary", fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", mb: 0.25 }}>
+                    Step {step.step}
+                  </Typography>
+                  <Typography sx={{ color: "text.primary", fontSize: 12.5, fontWeight: 600, lineHeight: 1.3, mb: 0.5 }}>
+                    {step.title}
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                    <Chip label={step.severity.toUpperCase()} size="small"
+                      sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: `${sc}25`, color: sc }} />
+                    <Chip label={`${likPct}%`} size="small"
+                      sx={{ height: 16, fontSize: 9, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
+                  </Box>
+                </Box>
+                {idx < tree.steps.length - 1 && (
+                  <Typography sx={{ color: "text.secondary", fontSize: 18, fontWeight: 300, px: 0.25 }}>→</Typography>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </Box>
+
+        {/* MITRE chain */}
+        {tree.mitre_chain.length > 0 && (
+          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", mr: 0.5 }}>
+              MITRE chain
+            </Typography>
+            {tree.mitre_chain.map((tid) => (
+              <Chip key={tid} label={tid} size="small"
+                sx={{ height: 18, fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+                  bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335" }} />
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Adversaries ─────────────────────────────────────────────────────────────────
+
+function AdversariesView({ profiles }: { profiles: AdversaryProfile[] }) {
+  if (profiles.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Security sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          No adversary profiles yet — re-generate this model to produce adversary analysis.
+        </Typography>
+      </Card>
+    );
+  }
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {profiles.map((profile) => (
+        <AdversaryCard key={profile.id} profile={profile} />
+      ))}
+    </Box>
+  );
+}
+
+function AdversaryCard({ profile }: { profile: AdversaryProfile }) {
+  const typeColor = ADVERSARY_TYPE_COLOR[profile.type] || "#4285F4";
+  return (
+    <Card sx={{ bgcolor: "background.paper", border: `1px solid ${typeColor}30`, borderRadius: 2 }}>
+      <CardContent>
+        {/* Header */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5, flexWrap: "wrap" }}>
+          <Security sx={{ color: typeColor, fontSize: 22, flexShrink: 0 }} />
+          <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, flex: 1 }}>
+            {profile.name}
+          </Typography>
+          <Chip label={profile.type.replace(/_/g, " ")} size="small"
+            sx={{ bgcolor: `${typeColor}22`, color: typeColor, fontWeight: 700, height: 22, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }} />
+        </Box>
+
+        {/* Key attributes row */}
+        <Box sx={{ display: "flex", gap: 2, mb: 1.5, flexWrap: "wrap" }}>
+          <Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
+              Motivation
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 600, textTransform: "capitalize" }}>
+              {profile.motivation}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
+              Sophistication
+            </Typography>
+            <Chip label={profile.sophistication} size="small"
+              sx={{ height: 20, fontSize: 11, fontWeight: 700,
+                bgcolor: profile.sophistication === "high" ? "rgba(234,67,53,0.15)" : profile.sophistication === "medium" ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)",
+                color: profile.sophistication === "high" ? "#EA4335" : profile.sophistication === "medium" ? "#FBBC04" : "#34A853",
+                textTransform: "capitalize" }} />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block" }}>
+              Likelihood
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 600 }}>
+              {profile.likelihood} / 10
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Techniques */}
+        {profile.likely_techniques.length > 0 && (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
+              Likely Techniques
+            </Typography>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+              {profile.likely_techniques.map((t) => (
+                <Chip key={t} label={t} size="small"
+                  sx={{ height: 18, fontSize: 10, fontFamily: "monospace", fontWeight: 700,
+                    bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335" }} />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Targeted assets */}
+        {profile.targeted_assets.length > 0 && (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
+              Targeted Assets
+            </Typography>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+              {profile.targeted_assets.map((a) => (
+                <Chip key={a} label={a} size="small"
+                  sx={{ height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Threat IDs */}
+        {profile.threat_ids.length > 0 && (
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", display: "block", mb: 0.5 }}>
+              Related Threats
+            </Typography>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+              {profile.threat_ids.map((tid) => (
+                <Chip key={tid} label={tid} size="small"
+                  sx={{ height: 18, fontSize: 10, fontFamily: "monospace", bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04" }} />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Rationale */}
+        {profile.rationale && (
+          <Box sx={{ p: 1.25, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12.5, lineHeight: 1.55 }}>
+              {profile.rationale}
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Detection Rules ─────────────────────────────────────────────────────────────
+
+function DetectionRulesView({
+  rules, clientId, modelId, onValidated,
+}: {
+  rules: SigmaRule[];
+  clientId: string;
+  modelId: string;
+  onValidated: () => void;
+}) {
+  const qc = useQueryClient();
+  const [expandedIdx, setExpandedIdx] = React.useState<Set<number>>(new Set());
+
+  const toggleExpand = (idx: number) => {
+    setExpandedIdx((prev) => {
+      const next = new Set(prev);
+      next.has(idx) ? next.delete(idx) : next.add(idx);
+      return next;
+    });
+  };
+
+  const validateMutation = useMutation({
+    mutationFn: (index: number) =>
+      threatModelsApi.validateSigmaRule(clientId, modelId, index),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      onValidated();
+      toast.success("Rule marked as validated");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Validation failed"),
+  });
+
+  const downloadSigmaRules = () => {
+    threatModelsApi.downloadSigmaRules(clientId, modelId);
+  };
+
+  if (rules.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Verified sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          No detection rules yet — re-generate this model to produce Sigma rule stubs.
+        </Typography>
+      </Card>
+    );
+  }
+
+  const validated = rules.filter((r) => r.status === "validated").length;
+  const advisory = rules.filter((r) => r.status === "advisory").length;
+
+  return (
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <CardContent>
+        {/* Summary row */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+          <Verified sx={{ color: "#34A853", fontSize: 22 }} />
+          <Typography sx={{ color: "text.primary", fontWeight: 700 }}>
+            {rules.length} rule{rules.length === 1 ? "" : "s"}
+          </Typography>
+          <Chip label={`${validated} validated`}
+            sx={{ bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontWeight: 700, height: 20, fontSize: 11 }} />
+          <Chip label={`${advisory} advisory`}
+            sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700, height: 20, fontSize: 11 }} />
+          <Box sx={{ flex: 1 }} />
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<Download sx={{ fontSize: 16 }} />}
+            onClick={downloadSigmaRules}
+            sx={{
+              color: "text.secondary",
+              borderColor: "divider",
+              textTransform: "none",
+              fontWeight: 600,
+              "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
+            }}
+          >
+            Download YAML
+          </Button>
+        </Box>
+
+        {/* Rules list */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {rules.map((rule, idx) => {
+            const sc = SEV_COLOR[rule.severity] || "rgba(255,255,255,0.4)";
+            const isValidated = rule.status === "validated";
+            const isExpanded = expandedIdx.has(idx);
+            return (
+              <Box key={`${rule.rule_id}-${idx}`} sx={{
+                border: `1px solid ${isValidated ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.08)"}`,
+                borderRadius: 1.5,
+                overflow: "hidden",
+              }}>
+                {/* Rule header row */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.25, flexWrap: "wrap",
+                  bgcolor: isValidated ? "rgba(52,168,83,0.05)" : "rgba(255,255,255,0.02)" }}>
+                  <Chip label={rule.platform} size="small"
+                    sx={{ height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontFamily: "monospace", fontWeight: 700 }} />
+                  <Chip label={rule.severity} size="small"
+                    sx={{ height: 18, fontSize: 10, bgcolor: `${sc}20`, color: sc, fontWeight: 700, textTransform: "uppercase" }} />
+                  <Typography sx={{ color: "text.primary", fontSize: 12.5, fontWeight: 600, flex: 1, minWidth: 160 }}>
+                    {rule.threat_title || rule.rule_id}
+                  </Typography>
+                  <Typography sx={{ color: "text.secondary", fontSize: 10.5, fontFamily: "monospace" }}>
+                    {rule.rule_id}
+                  </Typography>
+                  <Chip
+                    label={isValidated ? "Validated" : "Advisory"}
+                    size="small"
+                    sx={{
+                      height: 18, fontSize: 10, fontWeight: 700,
+                      bgcolor: isValidated ? "rgba(52,168,83,0.18)" : "rgba(251,188,4,0.18)",
+                      color: isValidated ? "#34A853" : "#FBBC04",
+                      textTransform: "uppercase", letterSpacing: 0.3,
+                    }}
+                  />
+                  {!isValidated && (
+                    <Tooltip title="Mark this rule as validated — confirms the detection logic has been reviewed">
+                      <span>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={validateMutation.isPending}
+                          onClick={() => validateMutation.mutate(idx)}
+                          startIcon={validateMutation.isPending && validateMutation.variables === idx
+                            ? <CircularProgress size={12} sx={{ color: "#34A853" }} />
+                            : <Verified sx={{ fontSize: 14 }} />}
+                          sx={{
+                            color: "#34A853", borderColor: "rgba(52,168,83,0.4)", textTransform: "none",
+                            fontSize: 11, fontWeight: 700, height: 24, px: 1,
+                            "&:hover": { borderColor: "#34A853", bgcolor: "rgba(52,168,83,0.08)" },
+                          }}
+                        >
+                          Validate
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                  <IconButton size="small" onClick={() => toggleExpand(idx)} sx={{ color: "text.secondary" }}>
+                    {isExpanded ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
+                  </IconButton>
+                </Box>
+
+                {/* Collapsible YAML */}
+                <Collapse in={isExpanded} unmountOnExit>
+                  <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", bgcolor: "rgba(0,0,0,0.3)", p: 0 }}>
+                    <Box
+                      component="pre"
+                      sx={{
+                        m: 0,
+                        p: 2,
+                        fontSize: 11.5,
+                        fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+                        color: "#B0BEC5",
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowX: "auto",
+                        maxHeight: 400,
+                        overflowY: "auto",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {rule.sigma_yaml}
+                    </Box>
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
+        </Box>
+      </CardContent>
+    </Card>
   );
 }

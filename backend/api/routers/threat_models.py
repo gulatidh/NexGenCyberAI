@@ -110,6 +110,7 @@ class ThreatModelCreate(BaseModel):
     methodology: Optional[str] = None  # stride | pasta | linddun | mitre_attack | kill_chain
     analyst_notes: Optional[str] = None  # free-text guidance for the model
     components: Optional[List[Dict[str, Any]]] = None  # optional curated component set (pinned)
+    auto_remodel: bool = False  # Phase 9 — auto re-generate on new scan completion
 
 
 class ThreatModelSummary(BaseModel):
@@ -318,6 +319,7 @@ async def create_threat_model(
         analyst_notes=(payload.analyst_notes or "").strip() or None,
         components_json=curated,
         components_pinned=bool(curated),
+        auto_remodel=bool(payload.auto_remodel),
         status="pending",
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
     )
@@ -1179,3 +1181,59 @@ async def delete_threat_model(
         raise HTTPException(status_code=404, detail="Threat model not found")
     db.delete(tm)
     db.commit()
+
+
+@router.get("/{model_id}/sigma-rules")
+async def export_sigma_rules(
+    client_id: str,
+    model_id: str,
+    format: str = "json",  # "json" | "yaml"
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Export Sigma detection rule stubs from a threat model."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id,
+        ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    rules = getattr(tm, "sigma_rules_json", None) or []
+    if format == "yaml":
+        import io
+        output = io.StringIO()
+        for r in rules:
+            output.write(f"# Rule: {r.get('rule_id', '')} — {r.get('threat_title', '')}\n")
+            output.write(r.get("sigma_yaml", "") + "\n---\n")
+        return Response(
+            content=output.getvalue(),
+            media_type="text/yaml",
+            headers={"Content-Disposition": f"attachment; filename=sigma-rules-{model_id[:8]}.yaml"},
+        )
+    return {"rules": rules, "count": len(rules)}
+
+
+@router.patch("/{model_id}/sigma-rules/{rule_index}/validate")
+async def validate_sigma_rule(
+    client_id: str,
+    model_id: str,
+    rule_index: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_editor_anywhere),
+):
+    """Mark a Sigma rule stub as analyst-validated."""
+    from sqlalchemy.orm.attributes import flag_modified
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id,
+        ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    rules = list(getattr(tm, "sigma_rules_json", None) or [])
+    if rule_index < 0 or rule_index >= len(rules):
+        raise HTTPException(status_code=404, detail="Rule index out of range")
+    rules[rule_index]["status"] = "validated"
+    tm.sigma_rules_json = rules
+    flag_modified(tm, "sigma_rules_json")
+    db.commit()
+    return rules[rule_index]

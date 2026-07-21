@@ -618,6 +618,14 @@ class ThreatModel(Base):
     # Phase 8E — per-STRIDE-category maturity scores (0..5) derived from
     # framework control coverage. Computed at generation time + on demand.
     maturity_scores = Column(JSON, default=dict)
+    # Phase 9 — attack chain trees derived from blast_radius chaining
+    attack_trees_json = Column(JSON, default=list)
+    # Phase 9 — adversary profiles (actor → TTPs → targeted assets)
+    adversary_profiles_json = Column(JSON, default=list)
+    # Phase 9 — structured Sigma/KQL rule stubs from detection_rule_refs
+    sigma_rules_json = Column(JSON, default=list)
+    # Phase 9 — auto re-generate when a new scan completes for this client
+    auto_remodel = Column(Boolean, default=False)
 
     ai_provider = Column(String(64))
     ai_model = Column(String(128))

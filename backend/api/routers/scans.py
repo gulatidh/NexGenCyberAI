@@ -404,6 +404,25 @@ async def _execute_scan(
                 import logging as _lg
                 _lg.getLogger(__name__).debug("raw_context collection failed (non-fatal): %s", _rc_exc)
 
+        # Phase 9 — auto re-model: if this client has threat models with
+        # auto_remodel=True, queue a re-generation now that scan data is fresh.
+        try:
+            from api.models.models import ThreatModel as _TM
+            from services.threat_modeler import generate_threat_model_bg
+            auto_models = db.query(_TM).filter(
+                _TM.client_id == scan.client_id,
+                _TM.auto_remodel == True,
+                _TM.status == "completed",
+            ).all()
+            for _atm in auto_models:
+                _atm.status = "pending"
+                db.commit()
+                import threading as _thr
+                _thr.Thread(target=generate_threat_model_bg, args=(_atm.id,), daemon=True).start()
+        except Exception as _arm_exc:
+            import logging as _lg
+            _lg.getLogger(__name__).debug("auto-remodel trigger failed (non-fatal): %s", _arm_exc)
+
         # Re-derive framework compliance from the new findings
         scan.progress_message = "Recomputing framework compliance..."
         db.commit()

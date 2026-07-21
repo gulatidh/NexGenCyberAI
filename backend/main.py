@@ -311,6 +311,28 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("threat_models.components_pinned ALTER failed: %s", exc)
 
+        # threat_models Phase 9 columns
+        try:
+            tm_cols = {c["name"] for c in inspector.get_columns("threat_models")}
+        except Exception:
+            tm_cols = set()
+        for _col, _ddl_type in [
+            ("attack_trees_json", "TEXT"),
+            ("adversary_profiles_json", "TEXT"),
+            ("sigma_rules_json", "TEXT"),
+            ("auto_remodel", "INTEGER DEFAULT 0"),
+        ]:
+            if _col not in tm_cols:
+                _ddl = (f"ALTER TABLE threat_models ADD {_col} NVARCHAR(MAX) NULL"
+                        if dialect == "mssql"
+                        else f"ALTER TABLE threat_models ADD COLUMN {_col} {_ddl_type}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(_ddl))
+                    logger.info("Added threat_models.%s column (%s)", _col, dialect)
+                except Exception as _exc:
+                    logger.warning("threat_models.%s ALTER failed: %s", _col, _exc)
+
         # Add risks.source_threat_model_id + risks.source_threat_id — pin a
         # Risk row back to the threat it was converted from so the UI can
         # disable the convert button on already-converted threats.

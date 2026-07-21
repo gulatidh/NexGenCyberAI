@@ -16,7 +16,7 @@ import {
   Box, Typography, Card, CardContent, Button, Chip, Grid, IconButton,
   Tooltip, FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, CircularProgress, Alert,
-  LinearProgress, Checkbox, ListItemText,
+  LinearProgress, Checkbox, ListItemText, Switch, FormControlLabel,
 } from "@mui/material";
 import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -76,6 +76,7 @@ export default function ThreatModels() {
   const [methodology, setMethodology] = useState<string>("stride");
   const [scanIds, setScanIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [autoRemodel, setAutoRemodel] = useState(false);
 
   // ── Upload-dialog form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -109,6 +110,7 @@ export default function ThreatModels() {
       scan_ids: scanIds.length ? scanIds : undefined,
       methodology,
       analyst_notes: notes.trim() || undefined,
+      auto_remodel: autoRemodel,
     }),
     onSuccess: (created: ThreatModelSummary) => {
       qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
@@ -116,6 +118,7 @@ export default function ThreatModels() {
       setTmName("");
       setScanIds([]);
       setNotes("");
+      setAutoRemodel(false);
       toast.success("Threat model generation started");
       // Auto-open detail so the user sees the generating state.
       setTimeout(() => navigate(`/threat-models/${created.id}?client=${selectedClientId}`), 200);
@@ -392,6 +395,30 @@ export default function ThreatModels() {
                 placeholder="Guidance for the AI — e.g. 'the payments API is internet-facing', 'ignore the legacy batch job', 'focus on data exfiltration paths'."
                 slotProps={{ htmlInput: { style: { color: "white" } } }}
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "flex-start", flexDirection: "column", gap: 0.5 }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoRemodel}
+                    onChange={(e) => setAutoRemodel(e.target.checked)}
+                    size="small"
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#4285F4" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#4285F4" },
+                    }}
+                  />
+                }
+                label={
+                  <Typography sx={{ color: "text.primary", fontSize: 13.5, fontWeight: 500 }}>
+                    Auto re-generate on new scan
+                  </Typography>
+                }
+              />
+              <Typography variant="caption" sx={{ color: "text.secondary", ml: 4.5 }}>
+                When enabled, the threat model will automatically re-run whenever a new scan completes for this client.
+              </Typography>
             </Box>
 
             <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)" }}>

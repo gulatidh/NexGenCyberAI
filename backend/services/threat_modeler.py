@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 _COMPONENT_FIELDS = ("id", "name", "type", "trust_zone", "criticality", "notes")
-_DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes")
+_DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
+                     "port", "direction", "trust_boundary_crossing", "exposure",
+                     "authentication_required")
 # Phase 8 — expanded threat shape. Required: id, category, asset_id, title,
 # severity, evidence_refs, rationale. Strongly encouraged: capec/attack/cwe
 # refs, attack_narrative, blast_radius, owner_role, detection_status.
@@ -323,9 +325,15 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
   ],
   "data_flows": [
     {{ "from": "<component id>", "to": "<component id>",
-      "protocol": "<https|sql|ssh|smb|grpc|amqp|other>",
+      "protocol": "<https|sql|ssh|smb|grpc|amqp|dns|other>",
+      "port": "<port number e.g. 443, 5432, 8080>",
       "data": "<credentials|pii|financial|telemetry|config|other>",
-      "encrypted": <true|false>, "notes": "<one-line>" }}
+      "encrypted": <true|false>,
+      "direction": "<ingress|egress|internal|bidirectional>",
+      "trust_boundary_crossing": <true|false>,
+      "exposure": "<internet_facing|private|partner_network>",
+      "authentication_required": <true|false>,
+      "notes": "<one-line>" }}
   ],
   "trust_boundaries": [
     {{ "id": "tb1", "name": "Internet → DMZ",
@@ -381,6 +389,19 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "state": "threat|considered|not_applicable",
       "threat_id": "<T0N if state=threat, else null>",
       "rationale": "<required when state != threat — one sentence explaining why no threat>" }}
+  ],
+  "adversary_profiles": [
+    {{ "id": "AP01",
+      "name": "<threat actor name e.g. APT29 / FIN7 / ransomware-generic / insider>",
+      "type": "nation_state|criminal|hacktivist|insider|opportunistic",
+      "motivation": "espionage|financial|disruption|activism|sabotage",
+      "sophistication": "high|medium|low",
+      "targeted_assets": ["<component_id>"],
+      "likely_techniques": ["T1566.001", "T1078"],
+      "threat_ids": ["T01", "T03"],
+      "likelihood": "<1-10>",
+      "rationale": "<2-3 sentences grounding this actor in the client's sector and asset inventory>"
+    }}
   ],
   "dfd_mermaid": "flowchart TD\\n  ..."
 }}
@@ -441,6 +462,19 @@ CRITICAL rules (these are gates, not preferences):
 11. Use category values ONLY from this set for {label}: {categories_csv}.
 
 12. Third-person, executive tone. No greetings, no questions, no 'I can also', no apologies.
+
+13. ADVERSARY PROFILES — produce 2-4 adversary_profiles entries representing realistic threat actors
+    for this client's sector and asset profile. At least one must be a criminal/opportunistic actor.
+    Ground each actor in the supplied asset inventory — cite real component IDs in targeted_assets.
+
+14. TRAFFIC FLOW DIRECTION — classify EVERY data_flow with direction:
+    - ingress: traffic entering the system from outside (users, internet APIs, third-party webhooks)
+    - egress: traffic leaving the system to external services (SaaS APIs, cloud services, CDN)
+    - internal: component-to-component within the same trust zone
+    - bidirectional: two-way (e.g. database queries + results, synchronous RPC)
+    Set trust_boundary_crossing=true for any flow that crosses between trust zones (e.g. DMZ → private).
+    Set exposure=internet_facing for components reachable from the public internet.
+    Always populate the port field where the protocol has a well-known port (443, 5432, 22, etc.).
 """
 
 
@@ -796,16 +830,25 @@ def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, 
             lines.append(f'    {nid}["{label}"]')
         lines.append("  end")
 
+    _DIR_ICON = {"ingress": "⬇", "egress": "⬆", "bidirectional": "⇅", "internal": ""}
     for f in data_flows or []:
         frm, to = _str(f.get("from")), _str(f.get("to"))
         if not frm or not to:
             continue
         a = id_map.get(frm) or _mm_id(frm)
         b = id_map.get(to) or _mm_id(to)
-        bits = [x for x in (_str(f.get("protocol")), _str(f.get("data"))) if x]
-        if f.get("encrypted") is True:
-            bits.append("encrypted")
-        lbl = _mm_label(", ".join(bits))
+        direction = _str(f.get("direction")) or "internal"
+        port = _str(f.get("port"))
+        proto = _str(f.get("protocol"))
+        proto_port = f"{proto}:{port}" if proto and port else proto or port or ""
+        icon = _DIR_ICON.get(direction, "")
+        prefix = "🔴 " if f.get("trust_boundary_crossing") else ""
+        bits = [x for x in (proto_port, _str(f.get("data"))) if x]
+        if f.get("encrypted") is True and "encrypted" not in " ".join(bits):
+            bits.append("🔒")
+        lbl_inner = ", ".join(bits)
+        lbl_parts = [x for x in (prefix, icon, lbl_inner) if x]
+        lbl = _mm_label(" ".join(lbl_parts))
         lines.append(f'  {a} -->|"{lbl}"| {b}' if lbl else f"  {a} --> {b}")
 
     return "\n".join(lines)
@@ -823,7 +866,24 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
 
     components = [_pick_fields(c, _COMPONENT_FIELDS) for c in (raw.get("components") or [])][:60]
     component_ids = {str(c.get("id") or "") for c in components}
-    data_flows = [_pick_fields(d, _DATA_FLOW_FIELDS) for d in (raw.get("data_flows") or [])][:80]
+    _raw_flows = raw.get("data_flows") or []
+    data_flows = []
+    for _df in _raw_flows[:80]:
+        if not isinstance(_df, dict):
+            continue
+        data_flows.append({
+            "from": _str(_df.get("from")),
+            "to": _str(_df.get("to")),
+            "protocol": _str(_df.get("protocol")),
+            "port": _str(_df.get("port")),
+            "data": _str(_df.get("data")),
+            "encrypted": bool(_df.get("encrypted", True)),
+            "direction": _str(_df.get("direction")) or "internal",
+            "trust_boundary_crossing": bool(_df.get("trust_boundary_crossing", False)),
+            "exposure": _str(_df.get("exposure")) or "private",
+            "authentication_required": bool(_df.get("authentication_required", True)),
+            "notes": _str(_df.get("notes")),
+        })
     crit_map = {str(c.get("id") or ""): _str(c.get("criticality")).lower() or "medium" for c in components}
 
     # ── Trust boundaries (Phase 8 — new) ──────────────────────────────────
@@ -1088,6 +1148,25 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
     # control guarantees valid Mermaid.
     dfd = _build_mermaid(components, data_flows)
 
+    # ── Adversary profiles (Phase 9) ──────────────────────────────────────
+    adversary_profiles_raw = raw.get("adversary_profiles") or []
+    adversary_profiles = []
+    for i, ap in enumerate(adversary_profiles_raw[:10], 1):
+        if not isinstance(ap, dict):
+            continue
+        adversary_profiles.append({
+            "id": _str(ap.get("id")) or f"AP{i:02d}",
+            "name": _str(ap.get("name"), default=f"Threat Actor {i}"),
+            "type": _str(ap.get("type")).lower() or "unknown",
+            "motivation": _str(ap.get("motivation")) or "unknown",
+            "sophistication": _str(ap.get("sophistication")).lower() or "medium",
+            "targeted_assets": ap.get("targeted_assets") if isinstance(ap.get("targeted_assets"), list) else [],
+            "likely_techniques": ap.get("likely_techniques") if isinstance(ap.get("likely_techniques"), list) else [],
+            "threat_ids": ap.get("threat_ids") if isinstance(ap.get("threat_ids"), list) else [],
+            "likelihood": _clip(ap.get("likelihood"), 1, 10, 5),
+            "rationale": _str(ap.get("rationale")),
+        })
+
     return {
         "executive_summary": _str(raw.get("executive_summary")) or
             f"Threat model covers {len(components)} component(s) with {len(threats)} threats.",
@@ -1099,7 +1178,115 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
         "mitigations": mitigations,
         "coverage_decisions": coverage_decisions,
         "dfd_mermaid": dfd,
+        "adversary_profiles": adversary_profiles,
     }
+
+
+def _derive_attack_trees(threats: List[Dict[str, Any]], components: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Build attack chain trees from threat blast_radius chaining.
+
+    For each critical/high threat, walk the blast_radius → find other threats
+    that target those components → chain them into a multi-step attack path.
+    Returns up to 5 distinct attack trees.
+    """
+    if not threats:
+        return []
+
+    # Index: component_id → [threat] that targets it
+    comp_to_threats: Dict[str, List[Dict]] = {}
+    for t in threats:
+        aid = t.get("asset_id", "")
+        comp_to_threats.setdefault(aid, []).append(t)
+
+    # High-value targets: database, storage, secret, auth components
+    _HV_KEYWORDS = {"db", "database", "storage", "secret", "vault", "auth", "identity", "payment", "prod"}
+    high_value_ids = {
+        c["id"] for c in components
+        if any(kw in (c.get("name") or "").lower() or kw in (c.get("type") or "").lower()
+               for kw in _HV_KEYWORDS)
+    }
+
+    trees = []
+    seen_roots = set()
+    for t in threats:
+        if t.get("severity") not in ("critical", "high"):
+            continue
+        if t["id"] in seen_roots:
+            continue
+        seen_roots.add(t["id"])
+
+        blast = t.get("blast_radius") or []
+        # Find follow-on threats targeting blasted components
+        chain_steps = [{"step": 1, "threat_id": t["id"], "title": t.get("title", ""),
+                         "severity": t.get("severity", ""), "likelihood": t.get("likelihood", 5)}]
+        for bid in blast[:5]:
+            follow_ons = [ft for ft in comp_to_threats.get(bid, []) if ft["id"] != t["id"]]
+            for fo in follow_ons[:2]:
+                chain_steps.append({
+                    "step": len(chain_steps) + 1,
+                    "threat_id": fo["id"],
+                    "title": fo.get("title", ""),
+                    "severity": fo.get("severity", ""),
+                    "likelihood": fo.get("likelihood", 5),
+                })
+        if len(chain_steps) < 2:
+            continue
+
+        # Combined probability = product of (likelihood/10) per step
+        probs = [s["likelihood"] / 10 for s in chain_steps]
+        combined = round(__import__("functools").reduce(lambda a, b: a * b, probs, 1.0), 3)
+
+        trees.append({
+            "id": f"AT{len(trees)+1:02d}",
+            "root_goal": f"Reach {t.get('asset_id', 'target')} via {t.get('title', '')}",
+            "root_threat_id": t["id"],
+            "steps": chain_steps,
+            "combined_probability": combined,
+            "impact": t.get("severity", "high"),
+            "mitre_chain": list({
+                tech
+                for step in chain_steps
+                for threat_obj in [next((x for x in threats if x["id"] == step["threat_id"]), {})]
+                for tech in (threat_obj.get("attack_techniques") or [])
+            }),
+        })
+        if len(trees) >= 5:
+            break
+
+    return trees
+
+
+def _extract_sigma_rules(threats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Convert detection_rule_refs stubs into structured Sigma-like rule dicts."""
+    rules = []
+    for t in threats:
+        for ref in (t.get("detection_rule_refs") or []):
+            if not isinstance(ref, dict):
+                continue
+            rules.append({
+                "threat_id": t["id"],
+                "threat_title": t.get("title", ""),
+                "platform": ref.get("platform", "generic"),
+                "rule_id": ref.get("rule_id", ""),
+                "severity": t.get("severity", "medium"),
+                "status": "advisory",
+                "sigma_yaml": (
+                    f"title: {t.get('title', 'Detection Rule')}\n"
+                    f"status: experimental\n"
+                    f"level: {t.get('severity', 'medium')}\n"
+                    f"description: Detect {t.get('title', '')} — {t.get('attack_narrative', '')[:200]}\n"
+                    f"references:\n"
+                    + "".join(f"  - {tech}\n" for tech in (t.get("attack_techniques") or []))
+                    + f"logsource:\n  product: {ref.get('platform', 'windows')}\n"
+                    f"detection:\n  keywords:\n"
+                    + "".join(f"    - '{kw}'\n" for kw in (t.get("cwe_refs") or t.get("capec_refs") or ["*"]))[:3]
+                    + "  condition: keywords\n"
+                    f"falsepositives:\n  - Legitimate administrative activity\n"
+                    f"tags:\n"
+                    + "".join(f"  - attack.{tech.lower().replace('-', '_')}\n" for tech in (t.get("attack_techniques") or [])[:3])
+                ),
+            })
+    return rules
 
 
 # ── LLM call ─────────────────────────────────────────────────────────────────
@@ -1466,6 +1653,22 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         except Exception:
             logger.exception("maturity score computation failed (continuing)")
             tm.maturity_scores = {}
+        # Phase 9 — adversary profiles
+        tm.adversary_profiles_json = model.get("adversary_profiles") or []
+        # Phase 9 — attack trees (derived from blast_radius chaining)
+        try:
+            tm.attack_trees_json = _derive_attack_trees(
+                model.get("threats") or [], model.get("components") or []
+            )
+        except Exception:
+            logger.exception("attack tree derivation failed (continuing)")
+            tm.attack_trees_json = []
+        # Phase 9 — Sigma rule stubs
+        try:
+            tm.sigma_rules_json = _extract_sigma_rules(model.get("threats") or [])
+        except Exception:
+            logger.exception("sigma rule extraction failed (continuing)")
+            tm.sigma_rules_json = []
         tm.ai_provider = meta.get("provider")
         tm.ai_model = meta.get("model")
         tm.tokens_used = int(meta.get("tokens") or 0)
@@ -1480,6 +1683,39 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         tm.generated_at = datetime.now(timezone.utc)
         if meta.get("error"):
             tm.error_message = meta["error"]
+        # Phase 9 — seed Risk register from high/critical threat model threats
+        try:
+            from api.models.models import Risk, RiskLevel
+            existing_titles = {r.title for r in db.query(Risk).filter(
+                Risk.client_id == tm.client_id, Risk.status == "open"
+            ).all()}
+            for threat in (tm.threats_json or []):
+                if threat.get("severity") not in ("critical", "high"):
+                    continue
+                title = f"[TM] {threat.get('title', '')}"[:500]
+                if title in existing_titles:
+                    continue
+                lh = int(threat.get("likelihood") or 5)
+                imp = int(threat.get("impact") or 5)
+                rl = RiskLevel.CRITICAL if threat.get("severity") == "critical" else RiskLevel.HIGH
+                db.add(Risk(
+                    client_id=tm.client_id,
+                    title=title,
+                    description=(
+                        f"Source: Threat Model — {tm.name or tm.id}\n\n"
+                        f"{threat.get('rationale', '')}"
+                    ),
+                    risk_level=rl,
+                    likelihood=lh,
+                    impact=imp,
+                    risk_score=round(lh * imp / 10, 1),
+                    category=threat.get("category", "threat_model"),
+                    status="open",
+                    finding_ids=[],
+                ))
+                existing_titles.add(title)
+        except Exception:
+            logger.exception("Risk seeding from threat model failed (continuing)")
         db.commit()
         db.refresh(tm)
         return tm
