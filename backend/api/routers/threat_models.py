@@ -368,6 +368,33 @@ async def get_threat_model(
     ).first()
     if not tm:
         raise HTTPException(status_code=404, detail="Threat model not found")
+    # Backfill Phase 9 fields for models generated before this feature
+    _dirty = False
+    if tm.status == "completed" and not (tm.attack_trees_json or []):
+        try:
+            from services.threat_modeler import _derive_attack_trees, _extract_sigma_rules
+            from sqlalchemy.orm.attributes import flag_modified
+            tm.attack_trees_json = _derive_attack_trees(
+                tm.threats_json or [], tm.components_json or []
+            )
+            flag_modified(tm, "attack_trees_json")
+            _dirty = True
+        except Exception:
+            pass
+    if tm.status == "completed" and not (tm.sigma_rules_json or []):
+        try:
+            from services.threat_modeler import _extract_sigma_rules
+            from sqlalchemy.orm.attributes import flag_modified
+            tm.sigma_rules_json = _extract_sigma_rules(tm.threats_json or [])
+            flag_modified(tm, "sigma_rules_json")
+            _dirty = True
+        except Exception:
+            pass
+    if _dirty:
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
     return _detail_from(tm, db=db)
 
 
