@@ -61,15 +61,15 @@ try:
     from api.routers import client_comparison as _client_comparison
 except ImportError:
     _client_comparison = None
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logger = logging.getLogger("nexgencyberai")
+
 try:
     from api.routers.scan_import import router as scan_import_router
     logger.info("scan_import router loaded")
 except Exception as _e:
     scan_import_router = None
     logger.warning("scan_import router not loaded: %s", _e)
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger("nexgencyberai")
 
 settings = get_settings()
 

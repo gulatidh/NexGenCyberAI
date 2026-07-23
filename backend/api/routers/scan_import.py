@@ -168,6 +168,7 @@ async def commit_scan_import(
     scan = Scan(
         id=str(uuid.uuid4()),
         client_id=client_id,
+        connector_type=ConnectorType.UPLOAD,
         scan_type=ScanType.VULNERABILITY,
         status=ScanStatus.COMPLETED,
         target=file.filename or "uploaded_file",
