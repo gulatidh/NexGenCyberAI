@@ -12,7 +12,9 @@ export type ConnectorType =
   // AI-powered local code review
   | "ai_code_review"
   // Enterprise professional scanners
-  | "tenable" | "burp_enterprise" | "snyk" | "rapid7" | "qualys" | "invicti" | "acunetix";
+  | "tenable" | "burp_enterprise" | "snyk" | "rapid7" | "qualys" | "invicti" | "acunetix"
+  // Import / offline upload
+  | "upload";
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";
 export type ScanType = "vulnerability" | "configuration" | "compliance" | "full";
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";

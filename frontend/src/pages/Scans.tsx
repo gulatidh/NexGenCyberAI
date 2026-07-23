@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
@@ -7,8 +7,13 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress,
   Tabs, Tab, Stack, Tooltip, Divider, IconButton, Badge,
   Table, TableHead, TableRow, TableCell, TableBody,
+  Accordion, AccordionSummary, AccordionDetails,
+  LinearProgress, TablePagination, Snackbar, Alert,
 } from "@mui/material";
-import { PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows } from "@mui/icons-material";
+import {
+  PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
+  ExpandMore, CloudUpload, Upload, Storage, Business,
+} from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -27,15 +32,12 @@ const SEV_COLOR: Record<string, string> = {
 };
 
 // ── Scanner catalog ──────────────────────────────────────────────────────────
-// Drives the category → scanner cascade in the New Scan dialog. `connectorType`
-// must match a backend ConnectorType value. `status` controls whether the row
-// is selectable (Live) or shown as a teaser (Soon).
 type ScannerStatus = "live" | "soon";
 type ScanCategory = "cloud" | "dast" | "sast" | "network" | "dependency" | "enterprise";
 type ScannerDef = {
-  id: string;             // unique key
-  name: string;           // display label
-  connectorType: string;  // backend ConnectorType.value
+  id: string;
+  name: string;
+  connectorType: string;
   category: ScanCategory;
   status: ScannerStatus;
   description: string;
@@ -51,12 +53,12 @@ const CATEGORY_LABEL: Record<ScanCategory, string> = {
 };
 
 const CATEGORY_COLOR: Record<ScanCategory, string> = {
-  cloud: "#4285F4",       // Google Blue
-  dast: "#FBBC04",        // Google Yellow — dynamic
-  sast: "#4285F4",        // Google Blue — static
-  network: "#34A853",     // Google Green — infra
-  dependency: "#EA4335",  // Google Red — secrets / deps
-  enterprise: "#9C27B0",  // Purple — enterprise tools
+  cloud: "#4285F4",
+  dast: "#FBBC04",
+  sast: "#4285F4",
+  network: "#34A853",
+  dependency: "#EA4335",
+  enterprise: "#9C27B0",
 };
 
 const SCANNERS: ScannerDef[] = [
@@ -105,6 +107,446 @@ const SCANNERS: ScannerDef[] = [
 
 const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dependency", "enterprise"];
 
+// Scanner groups for the top-level accordion sections
+const PLATFORM_SCANNER_TYPES = new Set([
+  "web", "nmap", "openvas", "trivy", "semgrep", "codeql", "sonarqube",
+  "owasp_dc", "gitleaks", "trufflehog", "ai_code_review",
+]);
+const ENTERPRISE_SCANNER_TYPES = new Set([
+  "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
+]);
+
+// ── Confidence chip colours ────────────────────────────────────────────────
+function confidenceColor(pct: number): string {
+  if (pct >= 85) return "#34A853";
+  if (pct >= 60) return "#FBBC04";
+  return "#EA4335";
+}
+
+// ── ScanImportPanel ───────────────────────────────────────────────────────
+interface ImportPreview {
+  detected_format: string;
+  finding_count: number;
+  avg_confidence: number;
+  new_count: number;
+  fixed_count: number;
+  persisting_count: number;
+  severity_breakdown: { critical: number; high: number; medium: number; low: number; info: number };
+  findings: {
+    confidence: number;
+    severity: string;
+    title: string;
+    resource: string;
+    cve_id?: string;
+  }[];
+}
+
+interface ImportHistoryRow {
+  id: string;
+  scan_name: string;
+  detected_format: string;
+  finding_count: number;
+  created_at: string;
+}
+
+interface ScanImportPanelProps {
+  clientId: string;
+}
+
+function ScanImportPanel({ clientId }: ScanImportPanelProps) {
+  const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [toolHint, setToolHint] = useState("");
+  const [importName, setImportName] = useState("");
+  const [parsing, setParsing] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [successSnack, setSuccessSnack] = useState<string | null>(null);
+
+  // Findings table pagination
+  const [page, setPage] = useState(0);
+  const ROWS_PER_PAGE = 10;
+
+  const { data: historyData = [] } = useQuery<ImportHistoryRow[]>({
+    queryKey: ["import-history", clientId],
+    queryFn: () => scansApi.importHistory(clientId),
+    enabled: !!clientId,
+  });
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreview(null);
+      setParseError(null);
+    }
+  }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+    setPreview(null);
+    setParseError(null);
+  };
+
+  const clearPreview = () => {
+    setPreview(null);
+    setSelectedFile(null);
+    setImportName("");
+    setToolHint("");
+    setParseError(null);
+    setPage(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleParse = async () => {
+    if (!selectedFile || !clientId) return;
+    setParsing(true);
+    setParseError(null);
+    try {
+      const result = await scansApi.parseScanImport(clientId, selectedFile, toolHint);
+      setPreview(result as ImportPreview);
+      setPage(0);
+    } catch (e: any) {
+      setParseError(e?.response?.data?.detail || e?.message || "Failed to parse file");
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleCommit = async () => {
+    if (!selectedFile || !clientId) return;
+    setCommitting(true);
+    try {
+      const result: any = await scansApi.commitScanImport(clientId, selectedFile, toolHint, importName);
+      const count = result?.finding_count ?? preview?.finding_count ?? 0;
+      setSuccessSnack(`${count} findings imported`);
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      qc.invalidateQueries({ queryKey: ["import-history", clientId] });
+      clearPreview();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || e?.message || "Import failed");
+    } finally {
+      setCommitting(false);
+    }
+  };
+
+  const FILE_TYPE_CHIPS = ["SARIF", "Nessus", "Burp", "OpenVAS", "Qualys", "Checkmarx", "CSV", "JSON", "PDF"];
+
+  return (
+    <Box>
+      {/* Drag-and-drop zone */}
+      <Box
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onDragLeave={handleDragLeave}
+        onClick={() => !selectedFile && fileInputRef.current?.click()}
+        sx={{
+          border: `2px dashed ${dragOver ? "#4285F4" : "rgba(255,255,255,0.2)"}`,
+          borderRadius: 2,
+          p: 4,
+          textAlign: "center",
+          bgcolor: dragOver ? "rgba(66,133,244,0.08)" : "rgba(255,255,255,0.02)",
+          cursor: selectedFile ? "default" : "pointer",
+          transition: "border-color 0.15s, background-color 0.15s",
+          "&:hover": !selectedFile ? { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.04)" } : {},
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          hidden
+          accept=".sarif,.json,.xml,.nessus,.csv,.pdf,.txt"
+          onChange={handleFileChange}
+        />
+        <CloudUpload sx={{ fontSize: 40, color: dragOver ? "#4285F4" : "text.secondary", mb: 1 }} />
+        {selectedFile ? (
+          <Box>
+            <Typography sx={{ color: "text.primary", fontWeight: 600, mb: 0.5 }}>
+              {selectedFile.name}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {(selectedFile.size / 1024).toFixed(1)} KB
+            </Typography>
+            <Box sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11 }}
+                onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setPreview(null); setParseError(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+              >
+                Change file
+              </Button>
+            </Box>
+          </Box>
+        ) : (
+          <Box>
+            <Typography sx={{ color: "text.secondary", mb: 0.5 }}>
+              Drag and drop a scan file here, or click to browse
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: "center", mt: 1.5 }}>
+              {FILE_TYPE_CHIPS.map((t) => (
+                <Chip key={t} label={t} size="small"
+                  sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", height: 20, fontSize: 10 }} />
+              ))}
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Tool hint + parse button */}
+      <Box sx={{ display: "flex", gap: 2, mt: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <FormControl size="small" sx={{ minWidth: 240 }}>
+          <InputLabel sx={{ color: "text.secondary" }}>Source tool (optional hint for AI)</InputLabel>
+          <Select
+            value={toolHint}
+            onChange={(e) => setToolHint(e.target.value)}
+            label="Source tool (optional hint for AI)"
+            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+          >
+            <MenuItem value="">Auto-detect</MenuItem>
+            <MenuItem value="Nessus">Tenable Nessus</MenuItem>
+            <MenuItem value="Burp Suite">Burp Suite</MenuItem>
+            <MenuItem value="OpenVAS">OpenVAS / Greenbone</MenuItem>
+            <MenuItem value="Qualys">Qualys VMDR</MenuItem>
+            <MenuItem value="Checkmarx">Checkmarx</MenuItem>
+            <MenuItem value="OWASP ZAP">OWASP ZAP</MenuItem>
+            <MenuItem value="Rapid7">Rapid7 InsightVM</MenuItem>
+            <MenuItem value="Other">Other</MenuItem>
+          </Select>
+        </FormControl>
+
+        <Button
+          variant="contained"
+          disabled={!selectedFile || parsing || !clientId}
+          onClick={handleParse}
+          startIcon={parsing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Visibility />}
+          sx={{ height: 40 }}
+        >
+          {parsing ? "Parsing…" : "Preview"}
+        </Button>
+      </Box>
+
+      {parsing && (
+        <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
+          <CircularProgress size={20} sx={{ color: "#4285F4" }} />
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>Parsing your scan file…</Typography>
+        </Box>
+      )}
+
+      {parseError && (
+        <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 1 }}>
+          <Typography variant="body2" sx={{ color: "#EA4335" }}>{parseError}</Typography>
+        </Box>
+      )}
+
+      {/* Preview results */}
+      {preview && (
+        <Box sx={{ mt: 3 }}>
+          <Divider sx={{ borderColor: "divider", mb: 2 }} />
+
+          {/* Header summary */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", mb: 2 }}>
+            <Chip label={`Detected: ${preview.detected_format}`} size="small"
+              sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+            <Chip label={`${preview.finding_count} findings`} size="small"
+              sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary", fontWeight: 700 }} />
+            <Chip label={`Avg confidence: ${preview.avg_confidence}%`} size="small"
+              sx={{ bgcolor: `${confidenceColor(preview.avg_confidence)}20`, color: confidenceColor(preview.avg_confidence), fontWeight: 700 }} />
+          </Box>
+
+          {/* Delta summary chips */}
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+            <Chip label={`New  ${preview.new_count}`} size="small"
+              sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+            <Chip label={`Fixed  ${preview.fixed_count}`} size="small"
+              sx={{ bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontWeight: 700 }} />
+            <Chip label={`Persisting  ${preview.persisting_count}`} size="small"
+              sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700 }} />
+          </Box>
+
+          {/* Severity breakdown bar */}
+          <Box sx={{ mb: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.06)" }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 1 }}>SEVERITY BREAKDOWN</Typography>
+            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              {(["critical", "high", "medium", "low", "info"] as const).map((sev) => (
+                <Box key={sev} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: SEV_COLOR[sev] }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "capitalize" }}>{sev}:</Typography>
+                  <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 700 }}>
+                    {preview.severity_breakdown[sev] ?? 0}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            {/* Visual bar */}
+            <Box sx={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", mt: 1.5, bgcolor: "rgba(255,255,255,0.06)" }}>
+              {(["critical", "high", "medium", "low", "info"] as const).map((sev) => {
+                const count = preview.severity_breakdown[sev] ?? 0;
+                const pct = preview.finding_count > 0 ? (count / preview.finding_count) * 100 : 0;
+                return pct > 0 ? (
+                  <Box key={sev} sx={{ width: `${pct}%`, bgcolor: SEV_COLOR[sev] }} />
+                ) : null;
+              })}
+            </Box>
+          </Box>
+
+          {/* Findings table */}
+          <Box sx={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, overflow: "hidden", mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "rgba(255,255,255,0.04)", "& th": { borderColor: "rgba(255,255,255,0.08)", color: "text.secondary", fontSize: 11, fontWeight: 600, py: 1 } }}>
+                  <TableCell sx={{ width: 80 }}>Confidence</TableCell>
+                  <TableCell sx={{ width: 90 }}>Severity</TableCell>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Resource</TableCell>
+                  <TableCell sx={{ width: 110 }}>CVE</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {preview.findings.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE).map((f, i) => {
+                  const confColor = confidenceColor(f.confidence);
+                  return (
+                    <TableRow key={i} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.06)", fontSize: 12, py: 0.75 } }}>
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: confColor, flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: confColor, fontWeight: 700 }}>{f.confidence}%</Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={f.severity} size="small"
+                          sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18, fontWeight: 700 }} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ color: "text.primary", display: "block", fontWeight: 500 }}>
+                          {f.title}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>{f.resource || "—"}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <TablePagination
+              component="div"
+              count={preview.findings.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={ROWS_PER_PAGE}
+              rowsPerPageOptions={[ROWS_PER_PAGE]}
+              sx={{ color: "text.secondary", "& .MuiToolbar-root": { minHeight: 40 }, fontSize: 12,
+                "& .MuiTablePagination-selectIcon": { color: "text.secondary" } }}
+            />
+          </Box>
+
+          {/* Import name + confirm */}
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+            <TextField
+              size="small"
+              label="Import name (optional)"
+              placeholder="e.g. Nessus scan - July 2026"
+              value={importName}
+              onChange={(e) => setImportName(e.target.value)}
+              sx={{ flex: 1, minWidth: 240, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+            />
+            <Button
+              variant="contained"
+              disabled={committing}
+              startIcon={committing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Upload />}
+              onClick={handleCommit}
+            >
+              {committing ? "Importing…" : "Confirm Import"}
+            </Button>
+            <Button variant="outlined" sx={{ borderColor: "divider", color: "text.secondary" }} onClick={clearPreview}>
+              Cancel
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {/* Recent imports history */}
+      {historyData.length > 0 && (
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, letterSpacing: 1, display: "block", mb: 1.5 }}>
+            RECENT IMPORTS
+          </Typography>
+          <Box sx={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, overflow: "hidden" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: "rgba(255,255,255,0.04)", "& th": { borderColor: "rgba(255,255,255,0.08)", color: "text.secondary", fontSize: 11, fontWeight: 600, py: 1 } }}>
+                  <TableCell>Import name</TableCell>
+                  <TableCell>Format</TableCell>
+                  <TableCell>Findings</TableCell>
+                  <TableCell>Date</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {historyData.map((row) => (
+                  <TableRow key={row.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.06)", fontSize: 12, py: 0.75 } }}>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 500 }}>
+                        {row.scan_name || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={row.detected_format || "—"} size="small"
+                        sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 18, fontWeight: 700 }} />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.primary" }}>{row.finding_count}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {row.created_at ? new Date(row.created_at).toLocaleDateString() : "—"}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+        </Box>
+      )}
+
+      <Snackbar
+        open={!!successSnack}
+        autoHideDuration={4000}
+        onClose={() => setSuccessSnack(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert severity="success" onClose={() => setSuccessSnack(null)} sx={{ fontWeight: 600 }}>
+          {successSnack}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}
+
+// ── Main Scans page ───────────────────────────────────────────────────────
 export default function Scans() {
   const { canAct } = useViewMode();
   const qc = useQueryClient();
@@ -130,6 +572,8 @@ export default function Scans() {
   const [acrRepoUrl, setAcrRepoUrl] = useState("");
   const [acrGitToken, setAcrGitToken] = useState("");
   const [codeArchive, setCodeArchive] = useState<File | null>(null);
+  // Top-level section accordion state
+  const [sectionExpanded, setSectionExpanded] = useState<"platform" | "enterprise" | "import" | false>("platform");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
@@ -142,16 +586,14 @@ export default function Scans() {
     enabled: !!selectedClientId,
   });
 
-  // Cross-client tile feed (default view). Refetches every 5s while any tile
-  // is still running.
+  // Cross-client tile feed (default view). Refetches every 5s while any tile is still running.
   const { data: tilesData, isLoading: tilesLoading, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
     queryKey: ["assessments-tiles"],
     queryFn: () => assessmentsApi.listAll(),
     refetchInterval: (q) => ((q.state.data as any)?.scans || []).some((s: any) => s.status === "running") ? 5000 : false,
   });
-  // Group scans by version root (parent_scan_id ?? id). Only the newest
-  // sibling in each group renders as its own tile — older versions live in
-  // the History dialog accessible via the yellow badge.
+
+  // Group scans by version root (parent_scan_id ?? id).
   const { tiles, versionMap: _versionMap } = React.useMemo(() => {
     const allScans = (tilesData?.scans || []) as any[];
     const groups = new Map<string, any[]>();
@@ -167,7 +609,6 @@ export default function Scans() {
         return bt - at;
       });
     });
-    // Keep only the newest sibling per group, then apply user filters.
     const latestIds = new Set<string>();
     groups.forEach((arr) => { if (arr[0]) latestIds.add(arr[0].id); });
     const filtered = allScans
@@ -232,8 +673,13 @@ export default function Scans() {
   const versionMap = _versionMap;
   const [historyOpenForRoot, setHistoryOpenForRoot] = useState<string | null>(null);
 
+  // Helper to decide which top-level group a scanner belongs to
+  const platformScanners = SCANNERS.filter((s) => PLATFORM_SCANNER_TYPES.has(s.connectorType));
+  const enterpriseScanners = SCANNERS.filter((s) => ENTERPRISE_SCANNER_TYPES.has(s.connectorType));
+
   return (
     <Box>
+      {/* ── Page header ─────────────────────────────────────────────────── */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
           <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Assessments</Typography>
@@ -260,7 +706,139 @@ export default function Scans() {
         </Box>
       </Box>
 
-      {/* Tile filter chips */}
+      {/* ── Top-level scanner / import groups ──────────────────────────── */}
+      <Box sx={{ mb: 3 }}>
+        {/* Group 1: Platform Scanners */}
+        <Accordion
+          expanded={sectionExpanded === "platform"}
+          onChange={(_, exp) => setSectionExpanded(exp ? "platform" : false)}
+          sx={{
+            bgcolor: "background.paper",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "8px !important",
+            mb: 1,
+            "&:before": { display: "none" },
+            boxShadow: "none",
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />} sx={{ minHeight: 52, px: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Storage sx={{ color: "#34A853", fontSize: 20 }} />
+              <Box>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Platform Scanners</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Built-in scanners: DAST, SAST, network, dependency, secrets, and AI code review
+                  ({platformScanners.filter(s => s.status === "live").length} live)
+                </Typography>
+              </Box>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+              Click "New Assessment" above and select a category to launch any of these scanners.
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {platformScanners.map((s) => (
+                <Chip
+                  key={s.id}
+                  label={s.name}
+                  size="small"
+                  sx={{
+                    bgcolor: s.status === "live" ? "rgba(52,168,83,0.12)" : "rgba(255,255,255,0.04)",
+                    color: s.status === "live" ? "#34A853" : "text.secondary",
+                    border: s.status === "live" ? "1px solid rgba(52,168,83,0.3)" : "1px solid transparent",
+                    fontWeight: 600,
+                  }}
+                />
+              ))}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Group 2: Enterprise Integrations */}
+        <Accordion
+          expanded={sectionExpanded === "enterprise"}
+          onChange={(_, exp) => setSectionExpanded(exp ? "enterprise" : false)}
+          sx={{
+            bgcolor: "background.paper",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "8px !important",
+            mb: 1,
+            "&:before": { display: "none" },
+            boxShadow: "none",
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />} sx={{ minHeight: 52, px: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Business sx={{ color: "#9C27B0", fontSize: 20 }} />
+              <Box>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Enterprise Integrations</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Direct API integrations: Tenable, Burp Enterprise, Snyk, Rapid7, Qualys, Invicti, Acunetix
+                  ({enterpriseScanners.filter(s => s.status === "live").length} live)
+                </Typography>
+              </Box>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+              Configure credentials under Connections, then launch via "New Assessment" and select the Enterprise tab.
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {enterpriseScanners.map((s) => (
+                <Chip
+                  key={s.id}
+                  label={s.name}
+                  size="small"
+                  sx={{
+                    bgcolor: "rgba(156,39,176,0.12)",
+                    color: "#9C27B0",
+                    border: "1px solid rgba(156,39,176,0.3)",
+                    fontWeight: 600,
+                  }}
+                />
+              ))}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Group 3: Import Results */}
+        <Accordion
+          expanded={sectionExpanded === "import"}
+          onChange={(_, exp) => setSectionExpanded(exp ? "import" : false)}
+          sx={{
+            bgcolor: "background.paper",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "8px !important",
+            mb: 1,
+            "&:before": { display: "none" },
+            boxShadow: "none",
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />} sx={{ minHeight: 52, px: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <CloudUpload sx={{ color: "#4285F4", fontSize: 20 }} />
+              <Box>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Import Results</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Upload offline scan files — SARIF, Nessus, Burp, OpenVAS, Qualys, Checkmarx, CSV, JSON, PDF
+                </Typography>
+              </Box>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 3 }}>
+            {!selectedClientId ? (
+              <Box sx={{ p: 3, textAlign: "center", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 1.5, color: "text.secondary" }}>
+                <Typography variant="body2">Select a client from the top toolbar to import results.</Typography>
+              </Box>
+            ) : (
+              <ScanImportPanel clientId={selectedClientId} />
+            )}
+          </AccordionDetails>
+        </Accordion>
+      </Box>
+
+      {/* ── Tile filter chips ────────────────────────────────────────────── */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
         <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>STATUS</Typography>
         {["completed", "running", "failed", "pending", "cancelled"].map((s) => (
@@ -299,6 +877,7 @@ export default function Scans() {
         </Typography>
       </Box>
 
+      {/* ── Scan tiles ───────────────────────────────────────────────────── */}
       {tilesLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
           <CircularProgress sx={{ color: "#4285F4" }} />
@@ -347,9 +926,6 @@ export default function Scans() {
                   ? `${Math.round(tile.duration_seconds / 60)} min`
                   : `${tile.duration_seconds}s`)
               : (status === "running" ? (tile.progress_message || "Running…") : "—");
-            // Distinct buddies that ran — prefer the friendly catalog name so
-            // advisory buddies (all stored as agent_type="orchestrator") don't
-            // collapse into one entry.
             const agentRuns = (tile.agents_ran || []) as any[];
             const agentNames = Array.from(new Set(agentRuns.map((a) => a.agent_name || a.agent_type)));
             const anyAgentFailed = agentRuns.some(
@@ -373,9 +949,6 @@ export default function Scans() {
                       const root = tile.parent_scan_id || tile.id;
                       const versions = versionMap.get(root) || [];
                       const versionCount = versions.length;
-                      // Only render the version icon on the newest tile in
-                      // the group — older ones already show as siblings in
-                      // the history dialog.
                       const isLive = versions[0]?.id === tile.id;
                       return (
                         <>
@@ -529,7 +1102,7 @@ export default function Scans() {
         </Grid>
       )}
 
-      {/* Start scan dialog — category → scanner cascade */}
+      {/* ── Start scan dialog — category → scanner cascade ──────────────── */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>
@@ -539,8 +1112,7 @@ export default function Scans() {
           </Typography>
         </DialogTitle>
         <DialogContent dividers sx={{ borderColor: "divider" }}>
-          {/* Client picker — required first step. Allows starting a scan
-              from this dialog even when no tile-grid client filter is set. */}
+          {/* Client picker */}
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
             <Select
@@ -640,9 +1212,8 @@ export default function Scans() {
               </Grid>
             </Grid>
           ) : (
-            // Scanner-driven categories (DAST/SAST/Network/Dependency)
+            // Scanner-driven categories (DAST/SAST/Network/Dependency/Enterprise)
             <Box>
-              {/* Scanner cards */}
               <Stack spacing={1} sx={{ mb: 2 }}>
                 {SCANNERS.filter((s) => s.category === category).map((s) => {
                   const isPicked = scannerId === s.id;
@@ -746,9 +1317,7 @@ export default function Scans() {
                         <>
                           <Grid size={{ xs: 12 }}>
                             <TextField
-                              fullWidth
-                              size="small"
-                              label="Repository URL"
+                              fullWidth size="small" label="Repository URL"
                               placeholder="https://github.com/owner/repo"
                               value={acrRepoUrl}
                               onChange={(e) => setAcrRepoUrl(e.target.value)}
@@ -757,9 +1326,7 @@ export default function Scans() {
                           </Grid>
                           <Grid size={{ xs: 12 }}>
                             <TextField
-                              fullWidth
-                              size="small"
-                              type="password"
+                              fullWidth size="small" type="password"
                               label="Access Token (optional — required for private repos)"
                               placeholder="ghp_xxxxxxxxxxxx"
                               value={acrGitToken}
@@ -774,25 +1341,18 @@ export default function Scans() {
                         <Grid size={{ xs: 12 }}>
                           <Box sx={{ p: 1.5, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 1.5 }}>
                             <Button
-                              component="label"
-                              size="small"
-                              variant="outlined"
+                              component="label" size="small" variant="outlined"
                               sx={{ borderColor: "divider", color: "text.secondary" }}
                             >
                               {codeArchive ? "Change archive" : "Choose code archive"}
-                              <input
-                                hidden
-                                type="file"
-                                accept=".zip,.tar.gz,.tgz,.tar"
-                                onChange={(e) => setCodeArchive(e.target.files?.[0] || null)}
-                              />
+                              <input hidden type="file" accept=".zip,.tar.gz,.tgz,.tar"
+                                onChange={(e) => setCodeArchive(e.target.files?.[0] || null)} />
                             </Button>
-                            {codeArchive && (
+                            {codeArchive ? (
                               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 <b>{codeArchive.name}</b> · {(codeArchive.size / 1024 / 1024).toFixed(2)} MB
                               </Typography>
-                            )}
-                            {!codeArchive && (
+                            ) : (
                               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 Accepts .zip, .tar.gz, or .tar archives of your source code.
                               </Typography>
@@ -841,25 +1401,19 @@ export default function Scans() {
                         <Grid size={{ xs: 12 }}>
                           <Box sx={{ p: 1.5, border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 1.5 }}>
                             <Button
-                              component="label"
-                              size="small"
-                              variant="outlined"
+                              component="label" size="small" variant="outlined"
                               sx={{ borderColor: "divider", color: "text.secondary" }}
                             >
                               {binaryFile ? "Change file" : "Choose binary archive"}
-                              <input
-                                hidden
-                                type="file"
+                              <input hidden type="file"
                                 accept=".jar,.war,.ear,.zip,.tar,.tar.gz,.tgz,.dll,.exe"
-                                onChange={(e) => setBinaryFile(e.target.files?.[0] || null)}
-                              />
+                                onChange={(e) => setBinaryFile(e.target.files?.[0] || null)} />
                             </Button>
-                            {binaryFile && (
+                            {binaryFile ? (
                               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 <b>{binaryFile.name}</b> · {(binaryFile.size / 1024 / 1024).toFixed(2)} MB
                               </Typography>
-                            )}
-                            {!binaryFile && (
+                            ) : (
                               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1 }}>
                                 Accepts JAR / WAR / EAR / ZIP / tar.gz / DLL / EXE up to 500 MB.
                               </Typography>
@@ -891,8 +1445,6 @@ export default function Scans() {
               const isAcrArchive = scannerId === "ai_code_review" && acrMode === "archive" && codeArchive;
               if (isBinary) {
                 try {
-                  // Two-step: create scan with defer_dispatch=true so the
-                  // workflow only fires AFTER the binary upload lands.
                   const created = await scansApi.start(selectedClientId, {
                     scan_type: scanType,
                     connector_id: connectorId || undefined,
@@ -915,8 +1467,6 @@ export default function Scans() {
                 }
               } else if (isAcrArchive) {
                 try {
-                  // Two-step: create scan (deferred), then upload archive which
-                  // fires the AI review pipeline as a background task.
                   const created = await scansApi.start(selectedClientId, {
                     scan_type: scanType,
                     connector_id: connectorId || undefined,
@@ -954,7 +1504,7 @@ export default function Scans() {
         </DialogActions>
       </Dialog>
 
-      {/* Findings dialog */}
+      {/* ── Findings dialog ────────────────────────────────────────────────── */}
       <Dialog open={!!viewScan} onClose={() => setViewScan(null)} maxWidth="md" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1036,7 +1586,7 @@ export default function Scans() {
         </DialogActions>
       </Dialog>
 
-      {/* Version history — all rescans of the same assessment, newest first */}
+      {/* ── Version history dialog ─────────────────────────────────────────── */}
       <Dialog open={!!historyOpenForRoot} onClose={() => setHistoryOpenForRoot(null)} maxWidth="sm" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1104,7 +1654,7 @@ export default function Scans() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm assessment (scan) delete */}
+      {/* ── Confirm assessment delete ──────────────────────────────────────── */}
       <Dialog open={!!pendingDeleteScan} onClose={() => setPendingDeleteScan(null)}
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete assessment?</DialogTitle>
@@ -1135,7 +1685,7 @@ export default function Scans() {
         </DialogActions>
       </Dialog>
 
-      {/* Confirm finding delete */}
+      {/* ── Confirm finding delete ─────────────────────────────────────────── */}
       <Dialog open={!!pendingDeleteFinding} onClose={() => setPendingDeleteFinding(null)}
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete finding?</DialogTitle>

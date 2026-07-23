@@ -59,6 +59,8 @@ class ConnectorType(str, enum.Enum):
     QUALYS = "qualys"
     INVICTI = "invicti"
     ACUNETIX = "acunetix"
+    # Offline scan result import (SARIF, Nessus, Burp, OpenVAS, Qualys, CSV, PDF, …)
+    UPLOAD = "upload"
 
 
 class ScannerCategory(str, enum.Enum):
@@ -96,6 +98,7 @@ CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
     ConnectorType.QUALYS: ScannerCategory.ENTERPRISE,
     ConnectorType.INVICTI: ScannerCategory.ENTERPRISE,
     ConnectorType.ACUNETIX: ScannerCategory.ENTERPRISE,
+    ConnectorType.UPLOAD: "import",
 }
 
 class ConnectorStatus(str, enum.Enum):
@@ -322,6 +325,8 @@ class Finding(Base):
     assignee_email = Column(String(200), nullable=True)
     due_date = Column(String(32), nullable=True)          # ISO date string e.g. "2026-09-30"
     remediated_at = Column(DateTime(timezone=True), nullable=True)
+    source_format = Column(String(50), nullable=True)   # sarif/nessus/burp/openvas/qualys/csv/json/pdf/llm
+    import_confidence = Column(Float, nullable=True)     # 0.0-1.0 AI confidence in normalization
     suppressed_at = Column(DateTime(timezone=True), nullable=True)
     suppression_reason = Column(Text, nullable=True)
     playbook = Column(Text, nullable=True)

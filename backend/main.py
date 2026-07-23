@@ -61,6 +61,12 @@ try:
     from api.routers import client_comparison as _client_comparison
 except ImportError:
     _client_comparison = None
+try:
+    from api.routers.scan_import import router as scan_import_router
+    logger.info("scan_import router loaded")
+except Exception as _e:
+    scan_import_router = None
+    logger.warning("scan_import router not loaded: %s", _e)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
@@ -511,6 +517,8 @@ def _ensure_added_columns() -> None:
             ("assignee_email",      "NVARCHAR(200) NULL",  "VARCHAR(200)"),
             ("due_date",            "NVARCHAR(32) NULL",   "VARCHAR(32)"),
             ("remediated_at",       "DATETIME2 NULL",      "TIMESTAMP"),
+            ("source_format",       "NVARCHAR(50) NULL",   "VARCHAR(50)"),
+            ("import_confidence",   "FLOAT NULL",          "FLOAT"),
             ("duplicate_of_id",     "NVARCHAR(36) NULL",   "VARCHAR(36)"),
             ("occurrence_count",    "INT NULL",             "INTEGER"),
             ("last_seen_at",        "DATETIME2 NULL",      "TIMESTAMP"),
@@ -1235,6 +1243,9 @@ for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _compliance_heatmap, _client_comparison):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router, prefix="/api/v1")
+
+if scan_import_router is not None:
+    app.include_router(scan_import_router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

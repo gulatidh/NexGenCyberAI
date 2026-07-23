@@ -51,6 +51,7 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   ai_code_review: "sast",
   tenable: "enterprise", burp_enterprise: "enterprise", snyk: "enterprise",
   rapid7: "enterprise", qualys: "enterprise", invicti: "enterprise", acunetix: "enterprise",
+  upload: "import",
 };
 
 const CONNECTOR_ICONS: Record<ConnectorType, string> = {
@@ -66,6 +67,7 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   tenable: "🔴 Tenable.io", burp_enterprise: "🟠 Burp Enterprise", snyk: "💜 Snyk",
   rapid7: "🔵 Rapid7 InsightVM", qualys: "🟢 Qualys VMDR",
   invicti: "⚪ Invicti", acunetix: "🔺 Acunetix Enterprise",
+  upload: "📤 Import / Upload",
 };
 
 const DISABLED_CONNECTOR_TYPES = new Set<string>(["sonarqube", "openvas"]);
@@ -248,6 +250,7 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "host", label: "Acunetix Host URL", placeholder: "https://acunetix.company.com", help: "Your Acunetix Enterprise server (port 3443 is used automatically)" },
     { key: "api_key", label: "API Key", secret: true, placeholder: "1/xxxx...", help: "Acunetix → Profile → API Key" },
   ],
+  upload: [],
 };
 
 // ── Type help banners ─────────────────────────────────────────────────────────

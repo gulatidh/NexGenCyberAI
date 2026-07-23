@@ -136,6 +136,25 @@ export const scansApi = {
     apiClient.post(`/clients/${clientId}/scans/${scanId}/rescan`).then((r) => r.data),
   versions: (clientId: string, scanId: string) =>
     apiClient.get(`/clients/${clientId}/scans/${scanId}/versions`).then((r) => r.data),
+  parseScanImport: (clientId: string, file: File, toolHint: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("tool_hint", toolHint);
+    return apiClient.post(`/clients/${clientId}/scans/import/parse`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+  commitScanImport: (clientId: string, file: File, toolHint: string, scanName: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("tool_hint", toolHint);
+    form.append("scan_name", scanName);
+    return apiClient.post(`/clients/${clientId}/scans/import/commit`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+  importHistory: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/scans/import/history`).then((r) => r.data),
 };
 
 export const findingsApi = {
