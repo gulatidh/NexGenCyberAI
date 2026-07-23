@@ -8,7 +8,7 @@ import {
   Tabs, Tab, Stack, Tooltip, Divider, IconButton, Badge,
   Table, TableHead, TableRow, TableCell, TableBody,
   Accordion, AccordionSummary, AccordionDetails,
-  LinearProgress, TablePagination, Snackbar, Alert,
+  TablePagination, Snackbar, Alert,
 } from "@mui/material";
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
