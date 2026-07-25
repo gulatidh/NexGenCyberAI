@@ -1,16 +1,16 @@
 /**
- * Connections — unified hub for AI providers, platform connectors, and scanners.
- * Section 1: AI Providers (read-only status, links to /ai-settings)
- * Section 2: Platform Connectors (cloud / identity — full CRUD)
- * Section 3: Scanners (DAST / SAST / Network / Dependency — full CRUD)
+ * Connections — unified hub for AI providers, platform connectors, and scanner connectors.
+ * Tab 1: Platform Connectors (cloud / identity — full CRUD)
+ * Tab 2: Scanner Connectors (enterprise security tools — full CRUD)
+ * Tab 3: AI Providers (read-only status, links to /ai-settings)
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, Select, MenuItem, FormControl, InputLabel,
-  CircularProgress, Alert,
+  CircularProgress, Alert, Tabs, Tab,
 } from "@mui/material";
 import {
   Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable, Edit, Delete,
@@ -18,10 +18,11 @@ import {
 } from "@mui/icons-material";
 import { Cancel } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { connectorsApi, projectsApi, aiApi } from "../services/api";
 import { Connector, ConnectorType, Project, AIProvider } from "../types";
 import { toast } from "react-toastify";
+
 // ── AI provider display map ───────────────────────────────────────────────────
 
 const PROVIDER_LOGOS: Record<string, string> = {
@@ -38,6 +39,10 @@ const PROVIDER_LOGOS: Record<string, string> = {
 const PLATFORM_TYPES = new Set<ConnectorType>([
   "azure", "aws", "gcp", "onprem", "servicenow", "okta", "cyberark", "entraid",
   "containers", "github", "jira",
+]);
+
+const ENTERPRISE_SCANNER_TYPES = new Set<ConnectorType>([
+  "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
 ]);
 
 const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
@@ -96,7 +101,7 @@ const STATUS_PROPS: Record<string, any> = {
 
 type CredField = { key: string; label: string; secret?: boolean; placeholder?: string; help?: string };
 
-const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
+export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
   azure: [
     { key: "tenant_id",       label: "Tenant ID" },
     { key: "client_id",       label: "Client ID" },
@@ -275,11 +280,43 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   acunetix:       "Connects to your Acunetix Enterprise instance to create a scan target and launch a full vulnerability scan. Ingests web application vulnerabilities, misconfigurations, and OWASP Top 10 issues.",
 };
 
+// ── Tab panel helper ──────────────────────────────────────────────────────────
+
+function TabPanel({ children, value, index }: { children: React.ReactNode; value: number; index: number }) {
+  return value === index ? <Box sx={{ pt: 3 }}>{children}</Box> : null;
+}
+
+// ── Hash → tab index mapping ──────────────────────────────────────────────────
+function hashToTab(hash: string): number {
+  if (hash === "#scanner") return 1;
+  if (hash === "#ai") return 2;
+  return 0; // default: platform
+}
+
+function tabToHash(tab: number): string {
+  if (tab === 1) return "#scanner";
+  if (tab === 2) return "#ai";
+  return "#platform";
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Connections() {
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
+
+  // ── Tab state driven by URL hash ────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState(() => hashToTab(location.hash));
+
+  useEffect(() => {
+    setActiveTab(hashToTab(location.hash));
+  }, [location.hash]);
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+    navigate(`/connections${tabToHash(newValue)}`, { replace: true });
+  };
 
   // ── Client / project selection ──────────────────────────────────────────────
   const { clientId: selectedClientId } = useActiveClient();
@@ -333,7 +370,8 @@ export default function Connections() {
 
   // ── Derived lists ────────────────────────────────────────────────────────────
   const platformConnectors = connectors.filter((c) => PLATFORM_TYPES.has(c.connector_type));
-  const scannerConnectors  = connectors.filter((c) => !PLATFORM_TYPES.has(c.connector_type));
+  // Scanner tab: only enterprise scanner connectors (other scanners run via GitHub Actions, no saved connector needed)
+  const scannerConnectors = connectors.filter((c) => ENTERPRISE_SCANNER_TYPES.has(c.connector_type));
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -387,7 +425,7 @@ export default function Connections() {
     setEditing(null);
     setAddMode(mode);
     setConnName("");
-    setConnectorType(mode === "platform" ? "azure" : "web");
+    setConnectorType(mode === "platform" ? "azure" : "tenable");
     setCredentials({});
     setTestResults({});
     setWebTargetUrl("");
@@ -417,9 +455,9 @@ export default function Connections() {
   // Filtered type options for the dialog's type picker
   const dialogTypeOptions = Object.entries(CONNECTOR_ICONS).filter(([k]) => {
     if (DISABLED_CONNECTOR_TYPES.has(k)) return false;
-    if (editing) return true; // show all when editing
+    if (editing) return true;
     if (addMode === "platform") return PLATFORM_TYPES.has(k as ConnectorType);
-    if (addMode === "scanner")  return !PLATFORM_TYPES.has(k as ConnectorType);
+    if (addMode === "scanner")  return ENTERPRISE_SCANNER_TYPES.has(k as ConnectorType);
     return true;
   });
 
@@ -451,9 +489,10 @@ export default function Connections() {
 
   // ── Sub-components ────────────────────────────────────────────────────────────
 
-  const ConnectorCard = ({ conn }: { conn: Connector }) => {
+  const ConnectorCard = ({ conn, showScanReadyChip }: { conn: Connector; showScanReadyChip?: boolean }) => {
     const sp = STATUS_PROPS[conn.status] || STATUS_PROPS.inactive;
     const tr = testResults[conn.id];
+    const isActive = conn.status === "active";
     return (
       <Card
         sx={{
@@ -475,9 +514,16 @@ export default function Connections() {
               sx={{ bgcolor: `${sp.color === "text.secondary" ? "rgba(255,255,255,0.08)" : sp.color + "20"}`, color: sp.color, fontSize: 11, flexShrink: 0, ml: 1 }}
             />
           </Box>
-          <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5, fontSize: 13 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 1, fontSize: 13 }}>
             {CONNECTOR_ICONS[conn.connector_type] || conn.connector_type}
           </Typography>
+          {showScanReadyChip && isActive && (
+            <Chip
+              size="small"
+              label="Ready to use in Scans"
+              sx={{ mb: 1, height: 20, fontSize: 10, fontWeight: 700, bgcolor: "rgba(0,230,118,0.12)", color: "#00e676" }}
+            />
+          )}
           {conn.error_message && (
             <Typography variant="caption" sx={{ color: "#f44336", display: "block", mb: 1 }}>
               {conn.error_message}
@@ -531,60 +577,6 @@ export default function Connections() {
     );
   };
 
-  const SectionHeader = ({
-    icon,
-    title,
-    subtitle,
-    count,
-    onAdd,
-    addLabel,
-    disabled,
-  }: {
-    icon: React.ReactNode;
-    title: string;
-    subtitle: string;
-    count: number;
-    onAdd: () => void;
-    addLabel: string;
-    disabled: boolean;
-  }) => (
-    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Box sx={{
-          width: 40, height: 40, borderRadius: 2,
-          bgcolor: "rgba(66,133,244,0.12)", display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          {icon}
-        </Box>
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 16 }}>{title}</Typography>
-            {count > 0 && (
-              <Chip
-                label={count}
-                size="small"
-                sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }}
-              />
-            )}
-          </Box>
-          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12 }}>{subtitle}</Typography>
-        </Box>
-      </Box>
-      <Button
-        variant="outlined" size="small" startIcon={<Add />}
-        onClick={onAdd}
-        disabled={disabled}
-        sx={{
-          borderColor: "#4285F4", color: "#4285F4", fontSize: 12,
-          "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
-          "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
-        }}
-      >
-        {addLabel}
-      </Button>
-    </Box>
-  );
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <Box>
@@ -595,135 +587,93 @@ export default function Connections() {
             Connections
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            All integrations in one place — AI providers, cloud platforms, and security scanners
+            All integrations in one place — cloud platforms, enterprise scanners, and AI providers
           </Typography>
         </Box>
         {/* Project selector */}
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
-            <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
-            <Select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              label="Project"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-            >
-              <MenuItem value="">All projects</MenuItem>
-              {projects.map((p) => (
-                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
+        <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
+          <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
+          <Select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            label="Project"
+            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+          >
+            <MenuItem value="">All projects</MenuItem>
+            {projects.map((p) => (
+              <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      {/* ── Tabs ── */}
+      <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 0 }}>
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          sx={{
+            "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600, minHeight: 44, fontSize: 14 },
+            "& .Mui-selected": { color: "#4285F4" },
+            "& .MuiTabs-indicator": { backgroundColor: "#4285F4" },
+          }}
+        >
+          <Tab
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Cloud sx={{ fontSize: 18 }} />
+                Platform Connectors
+                {platformConnectors.length > 0 && (
+                  <Chip label={platformConnectors.length} size="small"
+                    sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
+                )}
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Hub sx={{ fontSize: 18 }} />
+                Scanner Connectors
+                {scannerConnectors.length > 0 && (
+                  <Chip label={scannerConnectors.length} size="small"
+                    sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(156,39,176,0.15)", color: "#9C27B0" }} />
+                )}
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Psychology sx={{ fontSize: 18 }} />
+                AI Providers
+              </Box>
+            }
+          />
+        </Tabs>
       </Box>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 1 — AI Providers
+          TAB 0 — Platform Connectors
       ══════════════════════════════════════════════════════════════════════ */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Box sx={{
-              width: 40, height: 40, borderRadius: 2,
-              bgcolor: "rgba(66,133,244,0.12)", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Psychology sx={{ color: "#4285F4", fontSize: 22 }} />
-            </Box>
-            <Box>
-              <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 16 }}>AI Providers</Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12 }}>
-                Language models powering Monitara AI agents
-              </Typography>
-            </Box>
-          </Box>
+      <TabPanel value={activeTab} index={0}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Cloud platforms, identity providers, and SaaS integrations that provide asset data for AI agents.
+          </Typography>
           <Button
-            variant="outlined" size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-            onClick={() => navigate("/ai-settings")}
+            variant="outlined" size="small" startIcon={<Add />}
+            onClick={() => openAdd("platform")}
+            disabled={!selectedClientId || projects.length === 0}
             sx={{
-              borderColor: "#4285F4", color: "#4285F4", fontSize: 12,
+              borderColor: "#4285F4", color: "#4285F4", fontSize: 12, flexShrink: 0,
               "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
+              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
             }}
           >
-            Configure
+            Add Platform Connector
           </Button>
         </Box>
-
-        {/* Horizontal scrollable row of provider cards */}
-        <Box sx={{ display: "flex", gap: 2, overflowX: "auto", pb: 1, "&::-webkit-scrollbar": { height: 4 }, "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.15)", borderRadius: 2 } }}>
-          {aiProviders.length === 0 ? (
-            <Typography variant="body2" sx={{ color: "text.secondary", py: 2 }}>
-              Loading AI providers…
-            </Typography>
-          ) : (
-            aiProviders.map((provider) => {
-              const isDefault = aiConfig?.default_provider === provider.provider;
-              const label = PROVIDER_LOGOS[provider.provider] || provider.provider;
-              return (
-                <Card
-                  key={provider.provider}
-                  sx={{
-                    bgcolor: "background.paper",
-                    border: `1px solid ${provider.available ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.08)"}`,
-                    borderRadius: 2,
-                    minWidth: 200,
-                    flexShrink: 0,
-                  }}
-                >
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                      <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 13 }}>
-                        {label}
-                      </Typography>
-                      {provider.available
-                        ? <CheckCircle sx={{ fontSize: 18, color: "#00e676" }} />
-                        : <Cancel     sx={{ fontSize: 18, color: "#f44336" }} />
-                      }
-                    </Box>
-                    {isDefault && (
-                      <Chip
-                        label="Active"
-                        size="small"
-                        sx={{
-                          mb: 1, height: 18, fontSize: 10, fontWeight: 700,
-                          bgcolor: "rgba(0,230,118,0.12)", color: "#00e676",
-                        }}
-                      />
-                    )}
-                    <Button
-                      size="small" variant="text" endIcon={<OpenInNew sx={{ fontSize: 12 }} />}
-                      onClick={() => navigate("/ai-settings")}
-                      sx={{ color: "#4285F4", fontSize: 11, p: 0, minWidth: 0, mt: isDefault ? 0 : 1 }}
-                    >
-                      Configure →
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </Box>
-      </Box>
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 2 — Platform Connectors
-      ══════════════════════════════════════════════════════════════════════ */}
-      <Box
-        sx={{
-          mb: 4, p: 3, borderRadius: 2,
-          bgcolor: "background.paper",
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <SectionHeader
-          icon={<Cloud sx={{ color: "#4285F4", fontSize: 22 }} />}
-          title="Platform Connectors"
-          subtitle="Cloud platforms, identity providers, and SaaS integrations"
-          count={platformConnectors.length}
-          onAdd={() => openAdd("platform")}
-          addLabel="Add Platform Connector"
-          disabled={!selectedClientId || projects.length === 0}
-        />
 
         {!selectedClientId ? (
           <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
@@ -752,35 +702,46 @@ export default function Connections() {
             ))}
           </Grid>
         )}
-      </Box>
+      </TabPanel>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          SECTION 3 — Scanners
+          TAB 1 — Scanner Connectors
       ══════════════════════════════════════════════════════════════════════ */}
-      <Box
-        sx={{
-          mb: 4, p: 3, borderRadius: 2,
-          bgcolor: "background.paper",
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <SectionHeader
-          icon={<Hub sx={{ color: "#4285F4", fontSize: 22 }} />}
-          title="Scanners"
-          subtitle="Security scanners use Platform Connector credentials to find vulnerabilities"
-          count={scannerConnectors.length}
-          onAdd={() => openAdd("scanner")}
-          addLabel="Add Scanner"
-          disabled={!selectedClientId || projects.length === 0}
-        />
+      <TabPanel value={activeTab} index={1}>
+        <Alert
+          severity="info"
+          sx={{
+            mb: 2,
+            bgcolor: "rgba(156,39,176,0.08)",
+            color: "text.primary",
+            border: "1px solid rgba(156,39,176,0.25)",
+            "& .MuiAlert-icon": { color: "#9C27B0" },
+          }}
+        >
+          Scanner connectors store credentials for enterprise security tools. Once configured, select them when launching a new assessment from the Assessments page.
+        </Alert>
+
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+          <Button
+            variant="outlined" size="small" startIcon={<Add />}
+            onClick={() => openAdd("scanner")}
+            disabled={!selectedClientId || projects.length === 0}
+            sx={{
+              borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12,
+              "&:hover": { bgcolor: "rgba(156,39,176,0.08)" },
+              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
+            }}
+          >
+            Add Scanner Connector
+          </Button>
+        </Box>
 
         {!selectedClientId ? (
           <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
-            Select a client to view scanners.
+            Select a client to view scanner connectors.
           </Alert>
         ) : connectorsLoading ? (
-          <CircularProgress size={24} sx={{ color: "#4285F4" }} />
+          <CircularProgress size={24} sx={{ color: "#9C27B0" }} />
         ) : scannerConnectors.length === 0 ? (
           <Card
             sx={{
@@ -789,18 +750,21 @@ export default function Connections() {
             }}
           >
             <Hub sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
-            <Typography sx={{ color: "text.secondary", fontSize: 14 }}>
-              No scanners yet. Add one to start running security scans.
+            <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 1 }}>
+              No enterprise scanner connectors yet.
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              Add connectors for Tenable, Burp Enterprise, Snyk, Rapid7, Qualys, Invicti, or Acunetix
+              to launch scans directly from the Assessments page.
             </Typography>
           </Card>
         ) : (
           <Box>
-            {SCANNER_CATEGORIES.map((cat) => {
+            {SCANNER_CATEGORIES.filter((cat) => cat === "enterprise").map((cat) => {
               const group = scannerConnectors.filter((c) => CONNECTOR_CATEGORY[c.connector_type] === cat);
               if (group.length === 0) return null;
               return (
-                <Box key={cat} sx={{ mb: 3 }}>
-                  {/* Category sub-header */}
+                <Box key={cat}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
                     <Typography sx={{
                       color: "text.secondary", fontWeight: 700, fontSize: 12,
@@ -811,14 +775,14 @@ export default function Connections() {
                     <Chip
                       label={group.length}
                       size="small"
-                      sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }}
+                      sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(156,39,176,0.12)", color: "#9C27B0" }}
                     />
                     <Box sx={{ flex: 1, height: 1, bgcolor: "rgba(255,255,255,0.08)" }} />
                   </Box>
                   <Grid container spacing={2}>
                     {group.map((conn) => (
                       <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
-                        <ConnectorCard conn={conn} />
+                        <ConnectorCard conn={conn} showScanReadyChip />
                       </Grid>
                     ))}
                   </Grid>
@@ -827,7 +791,89 @@ export default function Connections() {
             })}
           </Box>
         )}
-      </Box>
+      </TabPanel>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          TAB 2 — AI Providers
+      ══════════════════════════════════════════════════════════════════════ */}
+      <TabPanel value={activeTab} index={2}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Language models powering Aegis AI agents. Configure API keys in AI Settings.
+          </Typography>
+          <Button
+            variant="outlined" size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+            onClick={() => navigate("/ai-settings")}
+            sx={{
+              borderColor: "#4285F4", color: "#4285F4", fontSize: 12,
+              "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
+            }}
+          >
+            Configure in AI Settings
+          </Button>
+        </Box>
+
+        {aiProviders.length === 0 ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={24} sx={{ color: "#4285F4" }} />
+          </Box>
+        ) : (
+          <Grid container spacing={2}>
+            {aiProviders.map((provider) => {
+              const isDefault = aiConfig?.default_provider === provider.provider;
+              const label = PROVIDER_LOGOS[provider.provider] || provider.provider;
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.provider}>
+                  <Card
+                    sx={{
+                      bgcolor: "background.paper",
+                      border: `1px solid ${provider.available ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.08)"}`,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                        <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14 }}>
+                          {label}
+                        </Typography>
+                        {provider.available
+                          ? <CheckCircle sx={{ fontSize: 20, color: "#00e676" }} />
+                          : <Cancel     sx={{ fontSize: 20, color: "#f44336" }} />
+                        }
+                      </Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <Chip
+                          label={provider.available ? "Configured" : "Not configured"}
+                          size="small"
+                          sx={{
+                            height: 20, fontSize: 10, fontWeight: 700,
+                            bgcolor: provider.available ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.06)",
+                            color: provider.available ? "#00e676" : "text.secondary",
+                          }}
+                        />
+                        {isDefault && (
+                          <Chip
+                            label="Active"
+                            size="small"
+                            sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }}
+                          />
+                        )}
+                      </Box>
+                      <Button
+                        size="small" variant="text" endIcon={<OpenInNew sx={{ fontSize: 12 }} />}
+                        onClick={() => navigate("/ai-settings")}
+                        sx={{ color: "#4285F4", fontSize: 11, p: 0, minWidth: 0 }}
+                      >
+                        Configure →
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
+      </TabPanel>
 
       {/* ══════════════════════════════════════════════════════════════════════
           CRUD Dialog (shared for platform + scanner)
@@ -846,7 +892,7 @@ export default function Connections() {
             ? `Edit Connector — ${editing.name}`
             : addMode === "platform"
               ? "Add Platform Connector"
-              : "Add Scanner"}
+              : "Add Scanner Connector"}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>

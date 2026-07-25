@@ -8,11 +8,12 @@ import {
   Tabs, Tab, Stack, Tooltip, Divider, IconButton, Badge,
   Table, TableHead, TableRow, TableCell, TableBody,
   Accordion, AccordionSummary, AccordionDetails,
-  TablePagination, Snackbar, Alert,
+  TablePagination, Snackbar, Alert, ToggleButton, ToggleButtonGroup,
+  Switch, FormControlLabel,
 } from "@mui/material";
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
-  ExpandMore, CloudUpload, Upload, Storage, Business,
+  ExpandMore, CloudUpload, Upload, Storage, Business, Link as LinkIcon,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
@@ -20,6 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
+import { CREDENTIAL_FIELDS } from "./Connections";
 
 const STATUS_COLOR: Record<string, string> = {
   pending: "#ff9800", running: "#4285F4", completed: "#00e676",
@@ -575,6 +577,18 @@ export default function Scans() {
   // Top-level section accordion state
   const [sectionExpanded, setSectionExpanded] = useState<"platform" | "enterprise" | "import" | false>("platform");
 
+  // Enterprise scanner dialog state
+  const [enterpriseDialogOpen, setEnterpriseDialogOpen] = useState(false);
+  const [enterpriseScanner, setEnterpriseScanner] = useState<ScannerDef | null>(null);
+  // "pick" = choose which scanner, "configure" = connector/manual form
+  const [enterpriseStep, setEnterpriseStep] = useState<"pick" | "configure">("pick");
+  const [enterpriseMode, setEnterpriseMode] = useState<"saved" | "manual">("saved");
+  const [enterpriseSelectedConnId, setEnterpriseSelectedConnId] = useState("");
+  const [enterpriseManualCreds, setEnterpriseManualCreds] = useState<Record<string, string>>({});
+  const [enterpriseScanName, setEnterpriseScanName] = useState("");
+  const [enterpriseSaveConnector, setEnterpriseSaveConnector] = useState(true);
+  const [enterpriseNewConnName, setEnterpriseNewConnName] = useState("");
+
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: frameworkCatalog = [] } = useQuery<FrameworkCatalogEntry[]>({
     queryKey: ["framework-catalog"],
@@ -677,6 +691,85 @@ export default function Scans() {
   const platformScanners = SCANNERS.filter((s) => PLATFORM_SCANNER_TYPES.has(s.connectorType));
   const enterpriseScanners = SCANNERS.filter((s) => ENTERPRISE_SCANNER_TYPES.has(s.connectorType));
 
+  // ── Enterprise scanner dialog helpers ──────────────────────────────────────
+  const openEnterpriseDialog = (scanner?: ScannerDef) => {
+    if (scanner) {
+      setEnterpriseScanner(scanner);
+      setEnterpriseStep("configure");
+    } else {
+      setEnterpriseScanner(null);
+      setEnterpriseStep("pick");
+    }
+    setEnterpriseMode("saved");
+    setEnterpriseSelectedConnId("");
+    setEnterpriseManualCreds({});
+    setEnterpriseScanName("");
+    setEnterpriseSaveConnector(true);
+    setEnterpriseNewConnName("");
+    setEnterpriseDialogOpen(true);
+  };
+
+  const closeEnterpriseDialog = () => {
+    setEnterpriseDialogOpen(false);
+    setEnterpriseScanner(null);
+    setEnterpriseStep("pick");
+    setEnterpriseMode("saved");
+    setEnterpriseSelectedConnId("");
+    setEnterpriseManualCreds({});
+    setEnterpriseScanName("");
+    setEnterpriseSaveConnector(true);
+    setEnterpriseNewConnName("");
+  };
+
+  // Connectors for the currently selected enterprise scanner type
+  const enterpriseConnectors = connectors.filter(
+    (c) => enterpriseScanner && c.connector_type === enterpriseScanner.connectorType
+  );
+
+  const enterpriseStartMutation = useMutation({
+    mutationFn: async () => {
+      if (!enterpriseScanner) return;
+      let resolvedConnectorId = enterpriseSelectedConnId;
+
+      if (enterpriseMode === "manual") {
+        // Optionally save the connector first
+        if (enterpriseSaveConnector && enterpriseNewConnName.trim()) {
+          try {
+            const newConn = await connectorsApi.create(selectedClientId, {
+              name: enterpriseNewConnName.trim(),
+              connector_type: enterpriseScanner.connectorType,
+              project_id: "",
+              credentials: enterpriseManualCreds,
+            });
+            resolvedConnectorId = newConn.id;
+            qc.invalidateQueries({ queryKey: ["connectors"] });
+          } catch {
+            // Failed to save — proceed with inline credentials
+            resolvedConnectorId = "";
+          }
+        }
+        return scansApi.start(selectedClientId, {
+          scan_type: "full",
+          connector_id: resolvedConnectorId || undefined,
+          name: enterpriseScanName.trim() || undefined,
+          credentials: resolvedConnectorId ? undefined : enterpriseManualCreds,
+        });
+      } else {
+        return scansApi.start(selectedClientId, {
+          scan_type: "full",
+          connector_id: enterpriseSelectedConnId || undefined,
+          name: enterpriseScanName.trim() || undefined,
+        });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      closeEnterpriseDialog();
+      toast.success("Assessment started");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
+  });
+
   return (
     <Box>
       {/* ── Page header ─────────────────────────────────────────────────── */}
@@ -722,20 +815,39 @@ export default function Scans() {
           }}
         >
           <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />} sx={{ minHeight: 52, px: 2.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, mr: 1 }}>
               <Storage sx={{ color: "#34A853", fontSize: 20 }} />
-              <Box>
+              <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Platform Scanners</Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Built-in scanners: DAST, SAST, network, dependency, secrets, and AI code review
                   ({platformScanners.filter(s => s.status === "live").length} live)
                 </Typography>
               </Box>
+              <Chip
+                label={`${platformScanners.filter(s => s.status === "live").length} live`}
+                size="small"
+                sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontWeight: 700, fontSize: 10 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Add sx={{ fontSize: 14 }} />}
+                disabled={!canAct || clients.length === 0}
+                onClick={(e) => { e.stopPropagation(); setOpen(true); setCategory("dast"); setScannerId(""); }}
+                sx={{
+                  borderColor: "#34A853", color: "#34A853", fontSize: 11, ml: 1,
+                  "&:hover": { bgcolor: "rgba(52,168,83,0.08)" },
+                  "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
+                }}
+              >
+                New Assessment
+              </Button>
             </Box>
           </AccordionSummary>
           <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-              Click "New Assessment" above and select a category to launch any of these scanners.
+              Click "New Assessment" to launch any of these scanners. Platform scanners run via GitHub Actions.
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
               {platformScanners.map((s) => (
@@ -769,20 +881,39 @@ export default function Scans() {
           }}
         >
           <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />} sx={{ minHeight: 52, px: 2.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, mr: 1 }}>
               <Business sx={{ color: "#9C27B0", fontSize: 20 }} />
-              <Box>
+              <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Enterprise Integrations</Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Direct API integrations: Tenable, Burp Enterprise, Snyk, Rapid7, Qualys, Invicti, Acunetix
                   ({enterpriseScanners.filter(s => s.status === "live").length} live)
                 </Typography>
               </Box>
+              <Chip
+                label={`${enterpriseScanners.filter(s => s.status === "live").length} live`}
+                size="small"
+                sx={{ bgcolor: "rgba(156,39,176,0.12)", color: "#9C27B0", fontWeight: 700, fontSize: 10 }}
+              />
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Add sx={{ fontSize: 14 }} />}
+                disabled={!canAct || clients.length === 0}
+                onClick={(e) => { e.stopPropagation(); openEnterpriseDialog(); }}
+                sx={{
+                  borderColor: "#9C27B0", color: "#9C27B0", fontSize: 11, ml: 1,
+                  "&:hover": { bgcolor: "rgba(156,39,176,0.08)" },
+                  "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
+                }}
+              >
+                New Assessment
+              </Button>
             </Box>
           </AccordionSummary>
           <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-              Configure credentials under Connections, then launch via "New Assessment" and select the Enterprise tab.
+              Click a scanner below or "New Assessment" to launch. Use saved connectors or enter credentials inline.
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
               {enterpriseScanners.map((s) => (
@@ -790,11 +921,14 @@ export default function Scans() {
                   key={s.id}
                   label={s.name}
                   size="small"
+                  onClick={() => canAct && selectedClientId && openEnterpriseDialog(s)}
                   sx={{
                     bgcolor: "rgba(156,39,176,0.12)",
                     color: "#9C27B0",
                     border: "1px solid rgba(156,39,176,0.3)",
                     fontWeight: 600,
+                    cursor: canAct && selectedClientId ? "pointer" : "default",
+                    "&:hover": canAct && selectedClientId ? { bgcolor: "rgba(156,39,176,0.22)" } : {},
                   }}
                 />
               ))}
@@ -1501,6 +1635,313 @@ export default function Scans() {
             }}>
             {startMutation.isPending ? <CircularProgress size={18} /> : "Start Scan"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Enterprise scanner dialog ──────────────────────────────────────── */}
+      <Dialog
+        open={enterpriseDialogOpen}
+        onClose={closeEnterpriseDialog}
+        maxWidth="sm"
+        fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          {enterpriseStep === "pick" ? (
+            <>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Select Enterprise Scanner</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                Choose which scanner to launch a new assessment with.
+              </Typography>
+            </>
+          ) : (
+            <>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Business sx={{ color: "#9C27B0" }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                    {enterpriseScanner?.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    New Assessment
+                  </Typography>
+                </Box>
+              </Box>
+            </>
+          )}
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: "divider" }}>
+          {enterpriseStep === "pick" ? (
+            /* ── Scanner picker grid ── */
+            <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
+              {enterpriseScanners.map((s) => (
+                <Grid size={{ xs: 12, sm: 6 }} key={s.id}>
+                  <Card
+                    onClick={() => {
+                      setEnterpriseScanner(s);
+                      setEnterpriseStep("configure");
+                      setEnterpriseMode("saved");
+                      setEnterpriseSelectedConnId("");
+                      setEnterpriseManualCreds({});
+                      setEnterpriseNewConnName(`${s.name} — ${new Date().toLocaleDateString()}`);
+                    }}
+                    sx={{
+                      bgcolor: "transparent",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 2, p: 1.5, cursor: "pointer",
+                      transition: "all 0.15s",
+                      "&:hover": { borderColor: "#9C27B0", bgcolor: "rgba(156,39,176,0.06)" },
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 600, fontSize: 14, color: "text.primary", mb: 0.5 }}>
+                      {s.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
+                      {s.description.slice(0, 90)}{s.description.length > 90 ? "…" : ""}
+                    </Typography>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            /* ── Configure step ── */
+            <Box sx={{ mt: 0.5 }}>
+              {/* Client selector */}
+              <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
+                <Select
+                  value={selectedClientId}
+                  onChange={(e) => {
+                    setSelectedClientId(e.target.value);
+                    localStorage.setItem("monitara-active-client", e.target.value);
+                    setEnterpriseSelectedConnId("");
+                  }}
+                  label="Client"
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                >
+                  {clients.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+                  ))}
+                  {clients.length === 0 && (
+                    <MenuItem value="" disabled>No clients — ask an admin for a grant</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+
+              {/* Mode toggle */}
+              <Box sx={{ mb: 2 }}>
+                <ToggleButtonGroup
+                  value={enterpriseMode}
+                  exclusive
+                  onChange={(_, v) => { if (v) { setEnterpriseMode(v); setEnterpriseSelectedConnId(""); setEnterpriseManualCreds({}); } }}
+                  size="small"
+                  fullWidth
+                  sx={{
+                    "& .MuiToggleButton-root": {
+                      color: "text.secondary", borderColor: "rgba(255,255,255,0.12)",
+                      textTransform: "none", fontWeight: 600, fontSize: 13,
+                    },
+                    "& .Mui-selected": { color: "#9C27B0", bgcolor: "rgba(156,39,176,0.1) !important" },
+                  }}
+                >
+                  <ToggleButton value="saved">
+                    <LinkIcon sx={{ fontSize: 16, mr: 0.75 }} />
+                    Use Saved Connector
+                  </ToggleButton>
+                  <ToggleButton value="manual">
+                    <Add sx={{ fontSize: 16, mr: 0.75 }} />
+                    Enter Manually
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+
+              {/* ── Saved connector mode ── */}
+              {enterpriseMode === "saved" && (
+                <Box>
+                  {enterpriseConnectors.length === 0 ? (
+                    <Box
+                      sx={{
+                        p: 2.5, borderRadius: 1.5, textAlign: "center",
+                        border: "1px dashed rgba(255,255,255,0.2)",
+                        bgcolor: "rgba(255,255,255,0.02)",
+                      }}
+                    >
+                      <Typography sx={{ color: "text.secondary", fontSize: 14, mb: 1 }}>
+                        No saved connectors for {enterpriseScanner?.name} yet.
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+                        Switch to "Enter Manually" or configure one in Connections first.
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => navigate("/connections#scanner")}
+                        sx={{ borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12 }}
+                      >
+                        Go to Scanner Connectors
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 1, letterSpacing: 0.5 }}>
+                        SELECT CONNECTOR
+                      </Typography>
+                      <Stack spacing={1} sx={{ mb: 2 }}>
+                        {enterpriseConnectors.map((conn) => {
+                          const isPicked = enterpriseSelectedConnId === conn.id;
+                          return (
+                            <Box
+                              key={conn.id}
+                              onClick={() => setEnterpriseSelectedConnId(conn.id)}
+                              sx={{
+                                p: 1.5, borderRadius: 1.5, cursor: "pointer",
+                                border: `1px solid ${isPicked ? "#9C27B0" : "rgba(255,255,255,0.1)"}`,
+                                bgcolor: isPicked ? "rgba(156,39,176,0.08)" : "rgba(255,255,255,0.02)",
+                                "&:hover": { borderColor: "#9C27B0", bgcolor: "rgba(156,39,176,0.05)" },
+                              }}
+                            >
+                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <Typography sx={{ fontWeight: 600, fontSize: 13, color: "text.primary" }}>
+                                  {conn.name}
+                                </Typography>
+                                <Chip
+                                  size="small"
+                                  label={conn.status === "active" ? "Active" : conn.status}
+                                  sx={{
+                                    height: 18, fontSize: 10, fontWeight: 700,
+                                    bgcolor: conn.status === "active" ? "rgba(0,230,118,0.12)" : "rgba(255,255,255,0.06)",
+                                    color: conn.status === "active" ? "#00e676" : "text.secondary",
+                                  }}
+                                />
+                              </Box>
+                              {conn.created_at && (
+                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                  Added {new Date(conn.created_at).toLocaleDateString()}
+                                </Typography>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* ── Manual credentials mode ── */}
+              {enterpriseMode === "manual" && enterpriseScanner && (
+                <Box>
+                  {(() => {
+                    const fields = CREDENTIAL_FIELDS[enterpriseScanner.connectorType as keyof typeof CREDENTIAL_FIELDS] || [];
+                    return (
+                      <Grid container spacing={1.5}>
+                        {fields.map(({ key, label, secret, placeholder, help }) => (
+                          <Grid size={{ xs: 12 }} key={key}>
+                            <TextField
+                              fullWidth size="small" label={label}
+                              type={secret ? "password" : "text"}
+                              placeholder={placeholder}
+                              helperText={help}
+                              value={enterpriseManualCreds[key] || ""}
+                              onChange={(e) => setEnterpriseManualCreds({ ...enterpriseManualCreds, [key]: e.target.value })}
+                              slotProps={{
+                                inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
+                                htmlInput: { style: { color: "white" } },
+                                formHelperText: { sx: { color: "text.secondary", fontSize: 11 } },
+                              }}
+                              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                            />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    );
+                  })()}
+
+                  {/* Save connector toggle */}
+                  <Box
+                    sx={{
+                      mt: 2, p: 1.5, borderRadius: 1.5,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      bgcolor: "rgba(255,255,255,0.02)",
+                    }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={enterpriseSaveConnector}
+                          onChange={(e) => setEnterpriseSaveConnector(e.target.checked)}
+                          size="small"
+                          sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: "#9C27B0" }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#9C27B0" } }}
+                        />
+                      }
+                      label={
+                        <Typography sx={{ fontSize: 13, color: "text.primary", fontWeight: 600 }}>
+                          Save connector for future use
+                        </Typography>
+                      }
+                    />
+                    {enterpriseSaveConnector && (
+                      <TextField
+                        fullWidth size="small" label="Connector name"
+                        value={enterpriseNewConnName}
+                        onChange={(e) => setEnterpriseNewConnName(e.target.value)}
+                        sx={{ mt: 1.5, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                        slotProps={{
+                          inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
+                          htmlInput: { style: { color: "white" } },
+                        }}
+                      />
+                    )}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Scan name */}
+              <TextField
+                fullWidth size="small" label="Scan name (optional)"
+                value={enterpriseScanName}
+                onChange={(e) => setEnterpriseScanName(e.target.value)}
+                placeholder={`${enterpriseScanner?.name || "Enterprise"} — ${new Date().toLocaleDateString()}`}
+                sx={{ mt: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                slotProps={{
+                  inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
+                  htmlInput: { style: { color: "white" } },
+                }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => {
+              if (enterpriseStep === "configure" && !enterpriseScanner) {
+                closeEnterpriseDialog();
+              } else if (enterpriseStep === "configure") {
+                setEnterpriseStep("pick");
+                setEnterpriseScanner(null);
+              } else {
+                closeEnterpriseDialog();
+              }
+            }}
+            sx={{ color: "text.secondary" }}
+          >
+            {enterpriseStep === "configure" ? "Back" : "Cancel"}
+          </Button>
+          {enterpriseStep === "configure" && (
+            <Button
+              variant="contained"
+              startIcon={enterpriseStartMutation.isPending ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <PlayArrow />}
+              disabled={
+                !selectedClientId ||
+                enterpriseStartMutation.isPending ||
+                (enterpriseMode === "saved" && !enterpriseSelectedConnId && enterpriseConnectors.length > 0)
+              }
+              onClick={() => enterpriseStartMutation.mutate()}
+              sx={{ bgcolor: "#9C27B0", "&:hover": { bgcolor: "#7b1fa2" } }}
+            >
+              {enterpriseStartMutation.isPending ? "Starting…" : "Launch Scan"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
