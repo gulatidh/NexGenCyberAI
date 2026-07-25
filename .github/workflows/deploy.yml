@@ -204,7 +204,7 @@ jobs:
               --resource-group "$AZ_RESOURCE_GROUP" \
               --settings \
                 SCM_DO_BUILD_DURING_DEPLOYMENT=false \
-                WEBSITES_CONTAINER_START_TIME_LIMIT=600 \
+                WEBSITES_CONTAINER_START_TIME_LIMIT=1800 \
               --output none && { ok=true; break; }
             echo "Attempt $attempt failed, retrying in 20s..."
             sleep 20
