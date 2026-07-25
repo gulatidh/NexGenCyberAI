@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import {
   BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel,
-  VisibilityOff, Visibility, AutoAwesome, Refresh,
+  VisibilityOff, Visibility, AutoAwesome, Refresh, AssignmentTurnedIn,
 } from "@mui/icons-material";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -39,6 +39,27 @@ async function unsuppressFinding(clientId: string, findingId: string, token: str
   if (!res.ok) throw new Error("Unsuppress failed");
 }
 
+async function acceptFinding(
+  clientId: string,
+  findingId: string,
+  justification: string,
+  expiresAt: string | undefined,
+  token: string,
+): Promise<Finding> {
+  const body: Record<string, any> = {
+    status: "accepted",
+    acceptance_justification: justification,
+  };
+  if (expiresAt) body.acceptance_expires_at = expiresAt;
+  const res = await fetch(`${API_BASE}/clients/${clientId}/findings/${findingId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Accept failed");
+  return res.json();
+}
+
 async function generatePlaybook(clientId: string, findingId: string, token: string): Promise<Finding> {
   const res = await fetch(`${API_BASE}/clients/${clientId}/findings/${findingId}/playbook`, {
     method: "POST",
@@ -52,7 +73,7 @@ const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
 const STATUS_COLOR: Record<string, string> = {
-  open: "#ff9800", remediated: "#00e676", accepted: "#34A853", false_positive: "rgba(255,255,255,0.4)",
+  open: "#ff9800", remediated: "#00e676", accepted: "#FF9800", false_positive: "rgba(255,255,255,0.4)",
 };
 
 function CatIcon({ name, sx }: { name: string; sx?: any }) {
@@ -337,6 +358,11 @@ export default function Findings() {
   const [suppressTarget, setSuppressTarget] = React.useState<Finding | null>(null);
   const [suppressReason, setSuppressReason] = React.useState("");
 
+  // Accept Risk dialog state
+  const [acceptTarget, setAcceptTarget] = React.useState<Finding | null>(null);
+  const [acceptJustification, setAcceptJustification] = React.useState("");
+  const [acceptExpiresAt, setAcceptExpiresAt] = React.useState("");
+
   // Playbook state
   const [playbookFindingId, setPlaybookFindingId] = React.useState<string | null>(null);
   const [playbookLoading, setPlaybookLoading] = React.useState(false);
@@ -374,6 +400,25 @@ export default function Findings() {
       qc.invalidateQueries({ queryKey: ["findings-all"] });
       qc.invalidateQueries({ queryKey: ["findings-categories"] });
       setSnack("Finding unsuppressed");
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async ({ finding, justification, expiresAt }: { finding: Finding; justification: string; expiresAt: string }) => {
+      const account = accounts[0];
+      let token = "";
+      if (account) {
+        try { const r = await instance.acquireTokenSilent({ ...loginRequest, account }); token = r.accessToken; } catch { }
+      }
+      await acceptFinding(clientId, finding.id, justification, expiresAt || undefined, token);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["findings-all"] });
+      qc.invalidateQueries({ queryKey: ["findings-categories"] });
+      setAcceptTarget(null);
+      setAcceptJustification("");
+      setAcceptExpiresAt("");
+      setSnack("Finding accepted as known risk");
     },
   });
 
@@ -765,9 +810,18 @@ export default function Findings() {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip label={f.status || "open"} size="small"
-                          sx={{ bgcolor: `${STATUS_COLOR[f.status || "open"] || "#888"}20`,
-                            color: STATUS_COLOR[f.status || "open"] || "#888", fontSize: 10, height: 18 }} />
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
+                          <Chip label={f.status === "accepted" ? "ACCEPTED" : (f.status || "open")} size="small"
+                            sx={{ bgcolor: `${STATUS_COLOR[f.status || "open"] || "#888"}20`,
+                              color: STATUS_COLOR[f.status || "open"] || "#888", fontSize: 10, height: 18 }} />
+                          {f.status === "accepted" && (f.accepted_by || f.acceptance_expires_at) && (
+                            <Typography variant="caption" sx={{ color: "rgba(255,152,0,0.7)", fontSize: 9, lineHeight: 1.2 }}>
+                              {f.accepted_by ? `by ${f.accepted_by}` : ""}
+                              {f.accepted_by && f.acceptance_expires_at ? " · " : ""}
+                              {f.acceptance_expires_at ? `exp ${new Date(f.acceptance_expires_at).toLocaleDateString()}` : ""}
+                            </Typography>
+                          )}
+                        </Box>
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                         {(() => {
@@ -789,8 +843,8 @@ export default function Findings() {
                           </IconButton>
                         </Tooltip>
                       </TableCell>
-                      {/* Actions: Suppress + Playbook */}
-                      <TableCell align="right" sx={{ width: 220, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                      {/* Actions: Accept Risk + Suppress + Playbook */}
+                      <TableCell align="right" sx={{ width: 260, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                         <Box sx={{ display: "flex", gap: 0.5, justifyContent: "flex-end", alignItems: "center" }}>
                           {/* Playbook button */}
                           <Tooltip title={playbookData[f.id] || f.playbook ? "Toggle playbook" : "Generate AI playbook"}>
@@ -821,6 +875,26 @@ export default function Findings() {
                             </Button>
                           </Tooltip>
 
+                          {/* Accept Risk — only shown when not already accepted/false_positive */}
+                          {f.status !== "accepted" && f.status !== "false_positive" && (
+                            <Tooltip title="Accept as known risk (won't fix now)">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<AssignmentTurnedIn sx={{ fontSize: 13 }} />}
+                                onClick={(e) => { e.stopPropagation(); setAcceptTarget(f); setAcceptJustification(""); setAcceptExpiresAt(""); }}
+                                sx={{
+                                  fontSize: 10, py: 0.25, px: 0.75,
+                                  color: "#FF9800", borderColor: "rgba(255,152,0,0.3)",
+                                  textTransform: "none", minWidth: 0,
+                                  "&:hover": { borderColor: "#FF9800", bgcolor: "rgba(255,152,0,0.06)" },
+                                }}
+                              >
+                                Accept
+                              </Button>
+                            </Tooltip>
+                          )}
+
                           {/* Suppress / Unsuppress */}
                           {f.status === "false_positive" ? (
                             <Tooltip title="Unsuppress this finding">
@@ -840,7 +914,7 @@ export default function Findings() {
                                 Unsuppress
                               </Button>
                             </Tooltip>
-                          ) : (
+                          ) : f.status !== "accepted" ? (
                             <Tooltip title="Mark as false positive / suppress">
                               <Button
                                 size="small"
@@ -857,7 +931,7 @@ export default function Findings() {
                                 Suppress
                               </Button>
                             </Tooltip>
-                          )}
+                          ) : null}
                         </Box>
 
                         {/* Playbook expansion panel */}
@@ -1080,6 +1154,82 @@ export default function Findings() {
             sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "text.primary", "&:hover": { bgcolor: "rgba(255,255,255,0.15)" } }}
           >
             Suppress
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Accept Risk dialog */}
+      <Dialog open={!!acceptTarget} onClose={() => { setAcceptTarget(null); setAcceptJustification(""); setAcceptExpiresAt(""); }}
+        maxWidth="sm" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <AssignmentTurnedIn sx={{ fontSize: 20, color: "#FF9800" }} />
+            Accept Risk
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+            This finding will be marked as <strong style={{ color: "#FF9800" }}>accepted</strong> — a known risk the team has acknowledged and decided not to remediate right now. This is separate from suppression (false positive).
+          </Typography>
+          {acceptTarget && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: "rgba(255,152,0,0.06)", borderRadius: 1, border: "1px solid rgba(255,152,0,0.2)" }}>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{acceptTarget.title || "(no title)"}</Typography>
+              {acceptTarget.resource_id && (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>{acceptTarget.resource_id}</Typography>
+              )}
+            </Box>
+          )}
+          <TextField
+            label="Justification"
+            value={acceptJustification}
+            onChange={(e) => setAcceptJustification(e.target.value)}
+            multiline
+            rows={3}
+            fullWidth
+            required
+            placeholder="e.g. Risk mitigated by compensating control X, reviewed by CISO, low exploitability in this environment..."
+            slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
+            sx={{
+              mb: 2,
+              "& .MuiOutlinedInput-root": {
+                color: "text.primary",
+                "& fieldset": { borderColor: "divider" },
+                "&:hover fieldset": { borderColor: "rgba(255,152,0,0.4)" },
+                "&.Mui-focused fieldset": { borderColor: "#FF9800" },
+              },
+            }}
+          />
+          <TextField
+            label="Expires on (optional)"
+            type="date"
+            value={acceptExpiresAt}
+            onChange={(e) => setAcceptExpiresAt(e.target.value)}
+            fullWidth
+            helperText="After this date the acceptance lapses and the finding re-enters the open queue."
+            slotProps={{
+              inputLabel: { shrink: true, sx: { color: "text.secondary" } },
+              formHelperText: { sx: { color: "rgba(255,255,255,0.4)", fontSize: 11 } },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                color: "text.primary",
+                "& fieldset": { borderColor: "divider" },
+                "&:hover fieldset": { borderColor: "rgba(255,152,0,0.4)" },
+                "&.Mui-focused fieldset": { borderColor: "#FF9800" },
+              },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setAcceptTarget(null); setAcceptJustification(""); setAcceptExpiresAt(""); }} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!acceptJustification.trim() || acceptMutation.isPending}
+            onClick={() => acceptTarget && acceptMutation.mutate({ finding: acceptTarget, justification: acceptJustification, expiresAt: acceptExpiresAt })}
+            sx={{ bgcolor: "#FF9800", color: "#000", fontWeight: 600, "&:hover": { bgcolor: "#e65100" }, "&.Mui-disabled": { bgcolor: "rgba(255,152,0,0.2)", color: "rgba(255,255,255,0.3)" } }}
+          >
+            Accept Risk
           </Button>
         </DialogActions>
       </Dialog>

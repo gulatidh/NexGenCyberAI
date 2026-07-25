@@ -179,12 +179,18 @@ class FindingResponse(BaseModel):
     suppressed_at: Optional[datetime] = None
     suppression_reason: Optional[str] = None
     playbook: Optional[str] = None
+    acceptance_justification: Optional[str] = None
+    accepted_by: Optional[str] = None
+    acceptance_expires_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class FindingUpdate(BaseModel):
     status: Optional[str] = None
     remediation: Optional[str] = None
     suppression_reason: Optional[str] = None
+    acceptance_justification: Optional[str] = None
+    accepted_by: Optional[str] = None
+    acceptance_expires_at: Optional[datetime] = None
 
 
 # ── Risk ───────────────────────────────────────────────────────────────────────

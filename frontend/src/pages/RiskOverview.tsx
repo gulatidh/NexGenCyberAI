@@ -5,7 +5,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   LinearProgress, Tooltip,
 } from "@mui/material";
-import { OpenInNew, TrendingUp } from "@mui/icons-material";
+import { OpenInNew, Assessment } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { riskPortfolioApi } from "../services/api";
@@ -188,12 +188,15 @@ export default function RiskOverview() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : portfolio.risks.length === 0 ? (
-        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <TrendingUp sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary" }}>
-            No risks yet. Run the Risk Manager agent from the Agents page to generate the portfolio.
+        <Box sx={{ textAlign: "center", py: 8, px: 4 }}>
+          <Assessment sx={{ fontSize: 56, color: "text.disabled", mb: 2 }} />
+          <Typography variant="h6" sx={{ color: "text.secondary", fontWeight: 700, mb: 1 }}>
+            No risks in portfolio
           </Typography>
-        </Card>
+          <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 400, mx: "auto" }}>
+            Risks are seeded automatically when the Risk Manager or Orchestrator agent runs on a scan.
+          </Typography>
+        </Box>
       ) : (
         <>
           {/* KPI strip */}

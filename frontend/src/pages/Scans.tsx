@@ -9,7 +9,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody,
   Accordion, AccordionSummary, AccordionDetails,
   TablePagination, Snackbar, Alert, ToggleButton, ToggleButtonGroup,
-  Switch, FormControlLabel,
+  Switch, FormControlLabel, LinearProgress,
 } from "@mui/material";
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
@@ -631,7 +631,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
           <Typography variant="caption" sx={{ color: catColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{cat}</Typography>
         </Box>
         <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>{tile.tile_name}</Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.25 }}>
+        <Typography variant="caption" sx={{ color: status === "running" ? "#FBBC04" : "text.secondary", display: "block", mb: 1.25, fontWeight: status === "running" ? 600 : 400 }}>
           {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
         </Typography>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
@@ -661,6 +661,17 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
           )}
         </Box>
       </Box>
+      {status === "running" && (
+        <LinearProgress
+          variant="indeterminate"
+          sx={{
+            height: 3,
+            borderRadius: "0 0 8px 8px",
+            bgcolor: "rgba(251,188,4,0.15)",
+            "& .MuiLinearProgress-bar": { bgcolor: "#FBBC04" },
+          }}
+        />
+      )}
     </Card>
   );
 }

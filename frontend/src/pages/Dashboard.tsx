@@ -11,7 +11,7 @@ import {
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { dashboardApi, trendsApi } from "../services/api";
+import { dashboardApi, trendsApi, connectorsApi } from "../services/api";
 import { DashboardSummary } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -176,6 +176,13 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
+  const { data: connectorHealth = [] } = useQuery({
+    queryKey: ["connector-health", clientId],
+    queryFn: () => connectorsApi.health(clientId!),
+    enabled: !!clientId,
+    staleTime: 60_000,
+  });
+
   if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   if (!data) return null;
 
@@ -223,6 +230,43 @@ export default function Dashboard() {
           </Grid>
         ))}
       </Grid>
+
+      {/* Connector Health */}
+      {clientId && (connectorHealth as any[]).length > 0 && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 1, fontSize: 11, textTransform: "uppercase", mb: 1.5 }}>
+            Connector Health
+          </Typography>
+          <Grid container spacing={1}>
+            {(connectorHealth as any[]).map((c: any) => {
+              const daysSince = c.last_scan_at
+                ? Math.floor((Date.now() - new Date(c.last_scan_at).getTime()) / 86400000)
+                : null;
+              const dot = c.last_scan_status === "failed" ? "#EA4335"
+                : daysSince === null ? "rgba(255,255,255,0.3)"
+                : daysSince <= 7 ? "#34A853"
+                : "#FBBC04";
+              return (
+                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={c.id}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.5, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: dot, flexShrink: 0 }} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
+                        {c.connector_type} · {daysSince === null ? "Never scanned" : daysSince === 0 ? "Today" : `${daysSince}d ago`}
+                        {c.last_scan_finding_count > 0 ? ` · ${c.last_scan_finding_count} findings` : ""}
+                      </Typography>
+                    </Box>
+                    {c.last_scan_status === "failed" && (
+                      <Chip label="Failed" size="small" sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335" }} />
+                    )}
+                  </Box>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+      )}
 
       {/* Charts Row */}
       <Grid container spacing={2} sx={{ mb: 2 }}>

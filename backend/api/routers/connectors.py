@@ -54,6 +54,39 @@ async def create_connector(
     return connector
 
 
+@router.get("/health")
+def connector_health(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return health summary per connector: last scan time, status, finding count."""
+    from api.models.models import Scan
+
+    connectors = db.query(Connector).filter(
+        Connector.client_id == client_id,
+    ).all()
+
+    results = []
+    for c in connectors:
+        last_scan = (
+            db.query(Scan)
+            .filter(Scan.client_id == client_id, Scan.connector_id == c.id)
+            .order_by(Scan.created_at.desc())
+            .first()
+        )
+        results.append({
+            "id": c.id,
+            "name": c.name,
+            "connector_type": c.connector_type,
+            "status": c.status,
+            "last_scan_at": last_scan.completed_at if last_scan else None,
+            "last_scan_status": last_scan.status if last_scan else None,
+            "last_scan_finding_count": (last_scan.summary or {}).get("total", 0) if last_scan else 0,
+        })
+    return results
+
+
 @router.get("/{connector_id}", response_model=ConnectorResponse)
 async def get_connector_detail(client_id: str, connector_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
     c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()

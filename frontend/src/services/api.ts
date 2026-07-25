@@ -97,6 +97,8 @@ export const connectorsApi = {
     apiClient.patch(`/clients/${clientId}/connectors/${connectorId}`, data).then((r) => r.data),
   delete: (clientId: string, connectorId: string) =>
     apiClient.delete(`/clients/${clientId}/connectors/${connectorId}`),
+  health: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/connectors/health`).then((r) => r.data),
 };
 
 export const projectsApi = {

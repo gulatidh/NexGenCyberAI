@@ -6,7 +6,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Menu, MenuItem as MuiMenuItem,
 } from "@mui/material";
-import { Refresh, MoreVert, BugReport } from "@mui/icons-material";
+import { Refresh, MoreVert, Security } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatRegisterApi } from "../services/api";
 import { toast } from "react-toastify";
@@ -147,18 +147,21 @@ export default function ThreatRegister() {
       )}
 
       {!clientId && (
-        <Alert severity="info">Select a client to view their threat register.</Alert>
+        <Alert severity="info">Select a client from the top toolbar to view the threat register.</Alert>
       )}
 
       {clientId && isLoading && <CircularProgress size={24} />}
 
       {clientId && !isLoading && entries.length === 0 && (
-        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
-          <BugReport sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary" }}>
-            No threat entries yet. Run the <strong>Threat Intel</strong> agent on a completed scan to populate this register.
+        <Box sx={{ textAlign: "center", py: 8, px: 4 }}>
+          <Security sx={{ fontSize: 56, color: "text.disabled", mb: 2 }} />
+          <Typography variant="h6" sx={{ color: "text.secondary", fontWeight: 700, mb: 1 }}>
+            No threat intelligence yet
           </Typography>
-        </Card>
+          <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 400, mx: "auto" }}>
+            Run the Threat Intel or Orchestrator agent on a completed scan to populate this register.
+          </Typography>
+        </Box>
       )}
 
       {clientId && !isLoading && entries.length > 0 && (

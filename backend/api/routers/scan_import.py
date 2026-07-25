@@ -87,32 +87,26 @@ async def parse_scan_file(
     for f in findings:
         sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
 
+    avg_conf_pct = (
+        round(sum(f.confidence for f in findings) / len(findings) * 100) if findings else 0
+    )
+
     return {
-        "format": fmt,
-        "filename": file.filename,
+        # Field names match the frontend ImportPreview interface exactly
+        "detected_format": fmt,
         "finding_count": len(findings),
-        "severity_counts": sev_counts,
-        "average_confidence": (
-            round(sum(f.confidence for f in findings) / len(findings), 2) if findings else 0
-        ),
-        "delta": {
-            "new": delta.new_count,
-            "fixed": delta.fixed_count,
-            "persisting": delta.persisting_count,
-            "new_titles": delta.new_titles,
-            "fixed_titles": delta.fixed_titles,
-        },
+        "severity_breakdown": sev_counts,
+        "avg_confidence": avg_conf_pct,
+        "new_count": delta.new_count,
+        "fixed_count": delta.fixed_count,
+        "persisting_count": delta.persisting_count,
         "findings": [
             {
                 "title": f.title,
                 "severity": f.severity,
-                "resource_id": f.resource_id,
-                "resource_type": f.resource_type,
+                "resource": f.resource_id,
                 "cve_id": f.cve_id,
-                "cvss_score": f.cvss_score,
-                "description": f.description[:500],
-                "remediation": f.remediation[:300],
-                "confidence": f.confidence,
+                "confidence": round(f.confidence * 100),
             }
             for f in findings
         ],
@@ -242,11 +236,11 @@ def import_history(
             ctx = {}
         finding_count = db.query(Finding).filter(Finding.scan_id == s.id).count()
         results.append({
-            "scan_id": s.id,
-            "name": s.name,
+            "id": s.id,
+            "scan_name": s.name,
             "target": s.target,
             "finding_count": finding_count,
-            "format": ctx.get("source_format", "unknown"),
+            "detected_format": ctx.get("source_format", "unknown"),
             "tool_hint": ctx.get("tool_hint", ""),
             "created_at": s.created_at,
         })

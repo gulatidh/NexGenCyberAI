@@ -522,9 +522,12 @@ def _ensure_added_columns() -> None:
             ("duplicate_of_id",     "NVARCHAR(36) NULL",   "VARCHAR(36)"),
             ("occurrence_count",    "INT NULL",             "INTEGER"),
             ("last_seen_at",        "DATETIME2 NULL",      "TIMESTAMP"),
-            ("suppressed_at",       "DATETIME2 NULL",      "TIMESTAMP"),
-            ("suppression_reason",  "NVARCHAR(MAX) NULL",  "TEXT"),
-            ("playbook",            "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("suppressed_at",           "DATETIME2 NULL",      "TIMESTAMP"),
+            ("suppression_reason",      "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("playbook",               "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("acceptance_justification","NVARCHAR(MAX) NULL",  "TEXT"),
+            ("accepted_by",            "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("acceptance_expires_at",  "DATETIME2 NULL",      "TIMESTAMP"),
         ]
         for col, mssql_type, sqlite_type in _finding_additions:
             if finding_cols and col not in finding_cols:

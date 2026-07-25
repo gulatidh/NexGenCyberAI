@@ -219,7 +219,7 @@ async def update_finding_status(
     finding_id: str,
     payload: FindingUpdate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     f = (
         db.query(Finding)
@@ -231,6 +231,21 @@ async def update_finding_status(
         raise HTTPException(status_code=404, detail="Finding not found")
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(f, k, v)
+    # When transitioning to "accepted", stamp acceptance metadata
+    if payload.status == "accepted":
+        if payload.acceptance_justification is not None:
+            f.acceptance_justification = payload.acceptance_justification
+        if payload.accepted_by is not None:
+            f.accepted_by = payload.accepted_by
+        else:
+            f.accepted_by = (
+                user.get("preferred_username")
+                or user.get("upn")
+                or user.get("email")
+                or user.get("unique_name")
+            )
+        if payload.acceptance_expires_at is not None:
+            f.acceptance_expires_at = payload.acceptance_expires_at
     db.commit()
     db.refresh(f)
     if f.framework:

@@ -122,6 +122,11 @@ export interface Finding {
   assignee_email?: string;
   due_date?: string;
   remediated_at?: string;
+  suppressed_at?: string;
+  suppression_reason?: string;
+  acceptance_justification?: string;
+  accepted_by?: string;
+  acceptance_expires_at?: string;
 }
 
 export interface Risk {

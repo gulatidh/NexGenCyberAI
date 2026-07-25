@@ -6,7 +6,7 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   LinearProgress, Menu, MenuItem as MuiMenuItem,
 } from "@mui/material";
-import { Refresh, GppBad } from "@mui/icons-material";
+import { Refresh, CheckCircleOutlined } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { controlDeficienciesApi } from "../services/api";
 import { toast } from "react-toastify";
@@ -177,16 +177,19 @@ export default function ControlDeficiencies() {
         </Box>
       )}
 
-      {!clientId && <Alert severity="info">Select a client to view their compliance gaps.</Alert>}
+      {!clientId && <Alert severity="info">Select a client from the top toolbar to view control deficiencies.</Alert>}
       {clientId && isLoading && <CircularProgress size={24} />}
 
       {clientId && !isLoading && entries.length === 0 && (
-        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
-          <GppBad sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary" }}>
-            No compliance gaps yet. Run the <strong>Compliance Monitor</strong> agent on a completed scan.
+        <Box sx={{ textAlign: "center", py: 8, px: 4 }}>
+          <CheckCircleOutlined sx={{ fontSize: 56, color: "success.light", mb: 2, opacity: 0.7 }} />
+          <Typography variant="h6" sx={{ color: "text.secondary", fontWeight: 700, mb: 1 }}>
+            No control gaps detected
           </Typography>
-        </Card>
+          <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 400, mx: "auto" }}>
+            Run the Compliance Monitor or Orchestrator agent with a framework selected to identify control deficiencies.
+          </Typography>
+        </Box>
       )}
 
       {clientId && !isLoading && entries.length > 0 && (

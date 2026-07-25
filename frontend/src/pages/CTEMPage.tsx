@@ -11,7 +11,7 @@ import {
   Select, MenuItem, FormControl, InputLabel, LinearProgress,
 } from "@mui/material";
 import {
-  Add, Delete, CheckCircle, RadioButtonUnchecked, Radar,
+  Add, Delete, CheckCircle, RadioButtonUnchecked, AccountTree,
   AutoAwesome, ExpandMore, Lock, ArrowUpward, ArrowDownward,
   FileDownload, Edit, Save,
 } from "@mui/icons-material";
@@ -1122,14 +1122,18 @@ export default function CTEMPage() {
       {clientId && isLoading && <CircularProgress size={24} />}
 
       {clientId && !isLoading && programs.length === 0 && (
-        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
-          <Radar sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary", mb: 1 }}>No CTEM programs yet.</Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Create a program to begin a structured exposure management cycle.
-            Each phase pulls live platform data and provides AI-assisted analysis — you stay in control.
+        <Box sx={{ textAlign: "center", py: 8, px: 4 }}>
+          <AccountTree sx={{ fontSize: 56, color: "text.disabled", mb: 2 }} />
+          <Typography variant="h6" sx={{ color: "text.secondary", fontWeight: 700, mb: 1 }}>
+            No CTEM programs yet
           </Typography>
-        </Card>
+          <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 400, mx: "auto", mb: 3 }}>
+            Create a program to track your Continuous Threat Exposure Management lifecycle: Scope → Discover → Prioritise → Validate → Mobilise.
+          </Typography>
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+            Create Program
+          </Button>
+        </Box>
       )}
 
       {clientId && !isLoading && programs.map(p => (

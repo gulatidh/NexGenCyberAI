@@ -8,7 +8,7 @@ import {
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
-  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined,
+  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -73,7 +73,7 @@ interface ScanDetailData {
   category: string; tile_name: string; name?: string;
   scan_type: string; framework?: string; status: string;
   started_at?: string; completed_at?: string; duration_seconds?: number;
-  summary?: any; error_message?: string;
+  summary?: any; error_message?: string; progress_message?: string;
   findings: Finding[]; agent_runs: AgentRunRow[];
   ai_verdict?: Verdict;
   ai_verdict_generated_at?: string;
@@ -498,6 +498,7 @@ export default function ScanDetail() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to queue agent"),
   });
 
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<Finding | null>(null);
   const deleteFinding = useMutation({
     mutationFn: ({ clientId, findingId }: { clientId: string; findingId: string }) =>
@@ -629,6 +630,53 @@ export default function ScanDetail() {
           </Button>
         </Box>
       </Box>
+
+      {/* Running-scan progress banner */}
+      {data.status === "running" && !bannerDismissed && (
+        <Box
+          className="no-print"
+          sx={{
+            mb: 2,
+            borderLeft: "3px solid #FBBC04",
+            bgcolor: "rgba(251,188,4,0.06)",
+            borderRadius: "0 8px 8px 0",
+            overflow: "hidden",
+          }}
+        >
+          <LinearProgress
+            variant="indeterminate"
+            sx={{
+              height: 3,
+              bgcolor: "rgba(251,188,4,0.15)",
+              "& .MuiLinearProgress-bar": { bgcolor: "#FBBC04" },
+            }}
+          />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1 }}>
+            <Chip
+              label="Scanning…"
+              size="small"
+              sx={{
+                bgcolor: "rgba(251,188,4,0.18)",
+                color: "#FBBC04",
+                fontWeight: 700,
+                fontSize: 10,
+                height: 20,
+                letterSpacing: 0.5,
+              }}
+            />
+            <Typography variant="body2" sx={{ color: "#FBBC04", fontWeight: 500, flex: 1 }}>
+              {data.progress_message || "Scan in progress…"}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => setBannerDismissed(true)}
+              sx={{ color: "rgba(251,188,4,0.6)", "&:hover": { color: "#FBBC04" } }}
+            >
+              <Close sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Box>
+        </Box>
+      )}
 
       {/* Top-level tabs: Verdict | Findings | one tab per agent run */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)}

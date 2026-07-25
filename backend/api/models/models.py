@@ -338,6 +338,10 @@ class Finding(Base):
     occurrence_count = Column(Integer, default=1)
     # Timestamp of the most recent scan confirmation (updated on each re-detection).
     last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    # Risk acceptance (separate from suppress/false-positive)
+    acceptance_justification = Column(Text, nullable=True)
+    accepted_by = Column(String(200), nullable=True)
+    acceptance_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

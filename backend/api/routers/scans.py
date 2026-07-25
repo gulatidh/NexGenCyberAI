@@ -631,7 +631,16 @@ async def delete_scan(
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
-    db.delete(scan)  # cascade removes findings
+    # Clean up polymorphic comments that reference findings from this scan
+    # (no DB FK — must be purged explicitly before the finding rows vanish)
+    from api.models.models import Comment, Finding as F
+    finding_ids = [f.id for f in db.query(F.id).filter(F.scan_id == scan_id).all()]
+    if finding_ids:
+        db.query(Comment).filter(
+            Comment.entity_type == "finding",
+            Comment.entity_id.in_(finding_ids),
+        ).delete(synchronize_session=False)
+    db.delete(scan)  # ORM cascade removes findings + agent runs
     db.commit()
 
 
