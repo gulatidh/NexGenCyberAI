@@ -295,6 +295,7 @@ class Scan(Base):
     # same connector + scan_type + framework. UI walks the chain to build
     # version history for a target.
     parent_scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    is_live = Column(Boolean, default=True, nullable=False)
     raw_context = Column(Text)  # JSON resource inventory collected at scan time
     progress_message = Column(Text)  # live status shown to the user while status=running
 

@@ -578,6 +578,28 @@ def _ensure_added_columns() -> None:
                 except Exception as exc:
                     logger.warning("ctem_phase_notes.%s ALTER failed: %s", col, exc)
 
+        # scans: is_live flag (True = canonical live version, False = superseded by rescan)
+        try:
+            scan_cols = {c["name"] for c in inspector.get_columns("scans")}
+        except Exception:
+            scan_cols = set()
+        if scan_cols and "is_live" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD is_live BIT NOT NULL DEFAULT 1"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN is_live INTEGER NOT NULL DEFAULT 1")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                # Backfill: scans that have been superseded (another scan has this as parent) → not live
+                with engine.begin() as conn:
+                    conn.execute(text(
+                        "UPDATE scans SET is_live = 0 "
+                        "WHERE id IN (SELECT DISTINCT parent_scan_id FROM scans WHERE parent_scan_id IS NOT NULL)"
+                    ))
+                logger.info("Added scans.is_live column and backfilled superseded versions (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.is_live ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

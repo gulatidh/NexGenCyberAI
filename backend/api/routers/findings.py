@@ -51,6 +51,13 @@ async def list_findings(
         q = q.filter(Scan.project_id == project_id)
     if scan_id:
         q = q.filter(Finding.scan_id == scan_id)
+    else:
+        # Global view: only show findings from the live version of each scan chain.
+        # When is_live column doesn't exist yet (pre-migration), default to all scans.
+        try:
+            q = q.filter(Scan.is_live == True)  # noqa: E712
+        except Exception:
+            pass
     # Filter out suppressed (false positive) findings by default.
     if not include_suppressed:
         q = q.filter(Finding.suppressed_at.is_(None))
@@ -130,6 +137,10 @@ async def get_finding_categories(
         q = q.filter(Finding.status == status)
     if project_id:
         q = q.filter(Scan.project_id == project_id)
+    try:
+        q = q.filter(Scan.is_live == True)  # noqa: E712
+    except Exception:
+        pass
 
     counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for f in q.all():
@@ -167,12 +178,17 @@ async def export_findings_csv(
         .join(Scan, Finding.scan_id == Scan.id)
         .filter(Scan.client_id == client_id)
     )
+    if scan_id:
+        q = q.filter(Finding.scan_id == scan_id)
+    else:
+        try:
+            q = q.filter(Scan.is_live == True)  # noqa: E712
+        except Exception:
+            pass
     if severity:
         q = q.filter(Finding.severity == severity)
     if status:
         q = q.filter(Finding.status == status)
-    if scan_id:
-        q = q.filter(Finding.scan_id == scan_id)
     rows = q.order_by(desc(Finding.cvss_score), desc(Finding.created_at)).limit(10000).all()
 
     output = io.StringIO()

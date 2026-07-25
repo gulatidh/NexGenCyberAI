@@ -1952,35 +1952,40 @@ export default function Scans() {
             const versions = versionMap.get(historyOpenForRoot) || [];
             return (
               <Box>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-                  {versions.length} run{versions.length === 1 ? "" : "s"} for this assessment, newest first. v{versions.length} is the live tile; older runs stay queryable for comparison.
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
+                  {versions.length} run{versions.length === 1 ? "" : "s"} — the <b>LIVE</b> version's findings show in the global view.
+                  Click "Set as Live" on any version to promote it.
+                </Typography>
+                <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.3)", display: "block", mb: 1.5, fontSize: 11 }}>
+                  Previous findings are never deleted — they become active again if you restore an older version.
                 </Typography>
                 {versions.map((v: any, idx: number) => {
-                  const isLatest = idx === 0;
+                  const isLive = v.is_live === true || (v.is_live === undefined && idx === 0);
                   const versionNum = versions.length - idx;
                   const vStatus = (v.status || "").toLowerCase();
                   const vColor = STATUS_COLOR[vStatus] || "rgba(255,255,255,0.4)";
                   return (
                     <Box
                       key={v.id}
-                      onClick={() => { setHistoryOpenForRoot(null); navigate(`/scans/${v.id}`); }}
                       sx={{
                         display: "flex", alignItems: "center", gap: 1.5, p: 1.25, mb: 0.75,
-                        borderRadius: 1, cursor: "pointer",
-                        bgcolor: isLatest ? "rgba(66,133,244,0.08)" : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${isLatest ? "rgba(66,133,244,0.3)" : "rgba(255,255,255,0.06)"}`,
-                        "&:hover": { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.12)" },
+                        borderRadius: 1,
+                        bgcolor: isLive ? "rgba(52,168,83,0.06)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isLive ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.06)"}`,
                       }}
                     >
                       <Chip
-                        label={`v${versionNum}${isLatest ? " · LIVE" : ""}`}
+                        label={isLive ? `v${versionNum} · LIVE` : `v${versionNum}`}
                         size="small"
                         sx={{
                           height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.5, minWidth: 78,
-                          bgcolor: isLatest ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.06)",
-                          color: isLatest ? "#4285F4" : "text.secondary",
+                          bgcolor: isLive ? "rgba(52,168,83,0.2)" : "rgba(255,255,255,0.06)",
+                          color: isLive ? "#34A853" : "text.secondary",
                         }} />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box
+                        sx={{ flex: 1, minWidth: 0, cursor: "pointer", "&:hover": { opacity: 0.8 } }}
+                        onClick={() => { setHistoryOpenForRoot(null); navigate(`/scans/${v.id}`); }}
+                      >
                         <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>
                           {v.started_at ? new Date(v.started_at).toLocaleString() : (v.created_at ? new Date(v.created_at).toLocaleString() : "—")}
                         </Typography>
@@ -1994,6 +1999,28 @@ export default function Scans() {
                       <Chip label={vStatus} size="small"
                         sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
                           bgcolor: `${vColor}25`, color: vColor }} />
+                      {!isLive && (
+                        <Tooltip title="Promote this version to live — its findings become the active set">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              scansApi.setLive(v.client_id || "", v.id).then(() => {
+                                qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+                                qc.invalidateQueries({ queryKey: ["scans-for-findings"] });
+                                qc.invalidateQueries({ queryKey: ["findings-all"] });
+                                setHistoryOpenForRoot(null);
+                                toast.success(`v${versionNum} is now the live version`);
+                              }).catch(() => toast.error("Failed to set live version"));
+                            }}
+                            sx={{ fontSize: 11, py: 0.25, px: 1, minWidth: 0, borderColor: "#34A853", color: "#34A853",
+                              whiteSpace: "nowrap", "&:hover": { bgcolor: "rgba(52,168,83,0.08)" } }}
+                          >
+                            Set as Live
+                          </Button>
+                        </Tooltip>
+                      )}
                     </Box>
                   );
                 })}

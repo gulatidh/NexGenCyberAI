@@ -155,6 +155,8 @@ export const scansApi = {
   },
   importHistory: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/scans/import/history`).then((r) => r.data),
+  setLive: (clientId: string, scanId: string) =>
+    apiClient.patch(`/clients/${clientId}/scans/${scanId}/set-live`).then((r) => r.data),
 };
 
 export const findingsApi = {

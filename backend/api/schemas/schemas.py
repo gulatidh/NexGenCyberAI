@@ -143,6 +143,8 @@ class ScanResponse(BaseModel):
     error_message: Optional[str]
     progress_message: Optional[str]
     created_at: Optional[datetime]
+    parent_scan_id: Optional[str] = None
+    is_live: bool = True
     model_config = {"from_attributes": True}
 
 

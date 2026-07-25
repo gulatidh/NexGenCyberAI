@@ -461,7 +461,7 @@ export default function Findings() {
             <Select value={scanId} onChange={(e) => setScanId(e.target.value)} label="Scan"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All scans</MenuItem>
-              {scans.map((s) => (
+              {scans.filter((s) => (s as any).is_live !== false).map((s) => (
                 <MenuItem key={s.id} value={s.id}>
                   {(s as any).name || (s as any).scan_type || s.id.slice(0, 8)}
                   {(s as any).findings_count ? ` (${(s as any).findings_count})` : ""}

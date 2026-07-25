@@ -669,6 +669,11 @@ async def rescan(
     if orig_summary.get("git_token_enc"):
         inherited_summary["git_token_enc"] = orig_summary["git_token_enc"]
 
+    # Mark every scan in the chain as not-live — the new scan will be the live version
+    db.query(Scan).filter(
+        (Scan.id == root_id) | (Scan.parent_scan_id == root_id)
+    ).update({"is_live": False}, synchronize_session=False)
+
     new = Scan(
         client_id=client_id,
         project_id=original.project_id,
@@ -679,6 +684,7 @@ async def rescan(
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
         status=ScanStatus.PENDING,
         parent_scan_id=root_id,
+        is_live=True,
         summary=inherited_summary or None,
     )
     db.add(new)
@@ -711,6 +717,30 @@ async def list_scan_versions(
         .order_by(Scan.created_at.desc())
         .all()
     )
+
+
+@router.patch("/{scan_id}/set-live", response_model=ScanResponse, dependencies=[Depends(require_editor_anywhere)])
+def set_live_version(
+    client_id: str,
+    scan_id: str,
+    db: Session = Depends(get_db),
+):
+    """Promote a scan version to live. Demotes every other version in the same
+    chain. The live version's findings become the default in the Findings view."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    root_id = scan.parent_scan_id or scan.id
+    # Demote all versions in the chain
+    db.query(Scan).filter(
+        (Scan.id == root_id) | (Scan.parent_scan_id == root_id)
+    ).update({"is_live": False}, synchronize_session=False)
+    # Promote this version
+    scan.is_live = True
+    db.add(scan)
+    db.commit()
+    db.refresh(scan)
+    return scan
 
 
 @router.post("/{scan_id}/upload-binary", status_code=201, dependencies=[Depends(require_editor_anywhere)])
