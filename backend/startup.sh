@@ -2,43 +2,45 @@
 set -e
 cd /home/site/wwwroot
 
-ANTENV=/home/site/wwwroot/antenv
+# /home/data/ is Azure Files persistent storage — survives zip-deploys.
+# antenv inside wwwroot gets wiped every deployment; /home/data does not.
+ANTENV=/home/data/antenv
 PYTHON3=/opt/python/3.12.13/bin/python3
+REQS=/home/site/wwwroot/requirements.txt
+HASH_FILE=/home/data/antenv/.reqs_hash
 
-CORE_PACKAGES=(
-    "fastapi==0.115.12"
-    "uvicorn==0.34.0"
-    "gunicorn==23.0.0"
-    "sqlalchemy==2.0.40"
-    "azure-identity==1.25.3"
-    "azure-mgmt-authorization==4.0.0"
-    "azure-mgmt-sql==3.0.1"
-    "azure-mgmt-web==7.3.1"
-    "azure-mgmt-containerservice==32.0.0"
-    "azure-mgmt-containerregistry==10.3.0"
-    "azure-mgmt-loganalytics==13.1.0"
-    "google-cloud-asset==4.3.0"
-    "google-cloud-securitycenter==1.44.0"
-    "langchain==1.2.17"
-    "langchain-openai==1.2.1"
-    "langchain-community==0.4.1"
-)
+mkdir -p /home/data
 
-if ! $ANTENV/bin/python3 -c "import fastapi" 2>/dev/null; then
-    echo "[startup] antenv missing or broken — installing core packages (~4 min)..."
-    rm -rf $ANTENV
-    $PYTHON3 -m venv $ANTENV
-    $ANTENV/bin/pip install "${CORE_PACKAGES[@]}" \
-        -q --no-cache-dir
-    echo "[startup] Core install complete — app will start; background features load on first use"
-elif ! $ANTENV/bin/python3 -c "import azure.identity; import langchain; import google.cloud.asset_v1; import azure.mgmt.sql; import azure.mgmt.web; import azure.mgmt.containerservice; import azure.mgmt.containerregistry; import azure.mgmt.loganalytics" 2>/dev/null; then
-    echo "[startup] Some packages missing — targeted install..."
-    $ANTENV/bin/pip install "${CORE_PACKAGES[@]}" \
-        -q --no-cache-dir
-    echo "[startup] Targeted install complete"
+CURRENT_HASH=$(md5sum "$REQS" 2>/dev/null | cut -d' ' -f1)
+STORED_HASH=$(cat "$HASH_FILE" 2>/dev/null || echo "none")
+
+needs_install=false
+
+if ! "$ANTENV/bin/python3" -c "import fastapi" 2>/dev/null; then
+    echo "[startup] antenv missing or broken — full install required"
+    needs_install=true
+elif [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
+    echo "[startup] requirements.txt changed ($STORED_HASH → $CURRENT_HASH) — reinstalling"
+    needs_install=true
 fi
 
-exec $ANTENV/bin/gunicorn main:app \
+if $needs_install; then
+    echo "[startup] Installing packages from requirements.txt (~4-6 min first time)..."
+    rm -rf "$ANTENV"
+    "$PYTHON3" -m venv "$ANTENV"
+    # pymssql needs build tools; install it separately with a fallback so it
+    # doesn't block the whole install (SQLite is used in this deployment).
+    "$ANTENV/bin/pip" install -r "$REQS" -q --no-cache-dir \
+        --extra-index-url https://pypi.org/simple/ || {
+        echo "[startup] Full install failed — retrying without pymssql..."
+        grep -v "^pymssql" "$REQS" > /tmp/reqs_filtered.txt
+        "$ANTENV/bin/pip" install -r /tmp/reqs_filtered.txt -q --no-cache-dir
+    }
+    echo "$CURRENT_HASH" > "$HASH_FILE"
+    echo "[startup] Package install complete"
+fi
+
+exec "$ANTENV/bin/gunicorn" main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers 1 \
     --bind 0.0.0.0:8000 \

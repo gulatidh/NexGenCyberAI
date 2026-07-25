@@ -160,11 +160,13 @@ jobs:
   # ── 3. Deploy Backend ──────────────────────────────────────────────────────
   # Runs in PARALLEL with deploy-frontend after backend-test passes.
   # Strategy: simple zip deploy (no Oryx build) — fast (~30s). The antenv
-  # lives at /home/site/wwwroot/antenv and survives because clean=false is set
-  # on the zipdeploy URL — DO NOT remove that flag or antenv will be wiped.
-  # startup.sh self-heals: if packages are missing it pip-installs core packages
-  # (~4 min) before starting gunicorn.  SCM_DO_BUILD_DURING_DEPLOYMENT=false
-  # ensures Kudu never attempts an Oryx build (which times out on this package set).
+  # lives at /home/data/antenv — Azure Files persistent storage that is NOT
+  # inside wwwroot, so zip-deploys never wipe it. startup.sh installs packages
+  # only when requirements.txt hash changes (first deploy ≈ 4-6 min; all
+  # subsequent deploys ≈ instant). WEBSITES_CONTAINER_START_TIME_LIMIT=600
+  # gives 10 min headroom for the hash-miss case.
+  # SCM_DO_BUILD_DURING_DEPLOYMENT=false stops Kudu/Oryx from attempting a
+  # build (which times out on this package set).
   deploy-backend:
     name: Deploy — Backend
     needs: [changes, backend-test]
@@ -200,12 +202,14 @@ jobs:
             az webapp config appsettings set \
               --name "$AZ_BACKEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
-              --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+              --settings \
+                SCM_DO_BUILD_DURING_DEPLOYMENT=false \
+                WEBSITES_CONTAINER_START_TIME_LIMIT=600 \
               --output none && { ok=true; break; }
             echo "Attempt $attempt failed, retrying in 20s..."
             sleep 20
           done
-          $ok || { echo "ERROR: SCM_DO_BUILD_DURING_DEPLOYMENT=false failed after 3 attempts — aborting"; exit 1; }
+          $ok || { echo "ERROR: appsettings config failed after 3 attempts — aborting"; exit 1; }
 
       - name: Generate deploy info
         env:
