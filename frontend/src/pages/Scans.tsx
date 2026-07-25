@@ -548,6 +548,123 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
   );
 }
 
+// ── AssessmentTileCard ────────────────────────────────────────────────────
+interface AssessmentTileCardProps {
+  tile: any;
+  versionMap: Map<string, any[]>;
+  navigate: ReturnType<typeof useNavigate>;
+  rescanMutation: any;
+  setPendingDeleteScan: (tile: any) => void;
+  setHistoryOpenForRoot: (root: string | null) => void;
+}
+
+function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot }: AssessmentTileCardProps) {
+  const status = tile.status as string;
+  const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
+  const cat = (tile.category as string) || "Other";
+  const catColor = CATEGORY_COLOR[cat.toLowerCase() as ScanCategory] || "#4285F4";
+  const dur = tile.duration_seconds != null
+    ? (tile.duration_seconds >= 60 ? `${Math.round(tile.duration_seconds / 60)} min` : `${tile.duration_seconds}s`)
+    : (status === "running" ? (tile.progress_message || "Running…") : "—");
+  const agentRuns = (tile.agents_ran || []) as any[];
+  const agentNames = Array.from(new Set(agentRuns.map((a: any) => a.agent_name || a.agent_type)));
+  const anyAgentFailed = agentRuns.some((a: any) => /fail|error/i.test(String(a.status || "")));
+  const root = tile.parent_scan_id || tile.id;
+  const versions = versionMap.get(root) || [];
+  const versionCount = versions.length;
+  const isLive = versions[0]?.id === tile.id;
+
+  return (
+    <Card
+      onClick={() => navigate(`/scans/${tile.id}`)}
+      sx={{
+        bgcolor: "background.paper",
+        border: `1px solid ${statusColor}40`,
+        borderRadius: 2,
+        cursor: "pointer",
+        transition: "transform 0.12s, border-color 0.12s, background-color 0.12s",
+        height: "100%",
+        "&:hover": { borderColor: statusColor, bgcolor: "rgba(255,255,255,0.02)", transform: "translateY(-1px)" },
+      }}>
+      <Box sx={{ p: 2, position: "relative" }}>
+        <Tooltip title="Delete assessment">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
+            sx={{ position: "absolute", top: 6, right: 6, color: "text.secondary", "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" } }}>
+            <DeleteOutlined sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={status === "running" ? "Rescan disabled while a run is in progress" : "Rescan — keeps history of this assessment"}>
+          <span>
+            <IconButton size="small" disabled={status === "running" || rescanMutation.isPending}
+              onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
+              sx={{ position: "absolute", top: 6, right: 32, color: "text.secondary", "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" }, "&.Mui-disabled": { color: "text.secondary" } }}>
+              <Replay sx={{ fontSize: 16 }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        {isLive && versionCount > 1 && (
+          <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
+              sx={{ position: "absolute", top: 6, right: 58, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
+              <Badge badgeContent={versionCount}
+                sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}>
+                <History sx={{ fontSize: 16 }} />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+        )}
+        {tile.parent_scan_id && (
+          <Tooltip title="View diff — compare with previous scan">
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/scans/${tile.id}/diff`); }}
+              sx={{ position: "absolute", top: 6, right: 84, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
+              <CompareArrows sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        )}
+        <Chip label={status} size="small" sx={{
+          position: "absolute", top: 12, right: tile.parent_scan_id ? 110 : 84,
+          bgcolor: `${statusColor}20`, color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
+          textTransform: "uppercase", letterSpacing: 0.5,
+        }} />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, pr: 9 }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: catColor, flexShrink: 0 }} />
+          <Typography variant="caption" sx={{ color: catColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{cat}</Typography>
+        </Box>
+        <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>{tile.tile_name}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.25 }}>
+          {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
+        </Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
+          {tile.name || `${tile.scan_type} scan`}
+          {tile.findings_count > 0 ? ` · ${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}` : ""}
+          {tile.framework ? ` · ${tile.framework}` : ""}
+        </Typography>
+        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
+          {tile.summary?.critical > 0 && <Chip size="small" label={`${tile.summary.critical}C`} sx={{ bgcolor: "rgba(234,67,53,0.18)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />}
+          {tile.summary?.high > 0 && <Chip size="small" label={`${tile.summary.high}H`} sx={{ bgcolor: "rgba(255,112,67,0.18)", color: "#FF7043", height: 18, fontSize: 10, fontWeight: 700 }} />}
+          {tile.summary?.medium > 0 && <Chip size="small" label={`${tile.summary.medium}M`} sx={{ bgcolor: "rgba(251,188,4,0.18)", color: "#FBBC04", height: 18, fontSize: 10, fontWeight: 700 }} />}
+          {tile.has_verdict && <Chip size="small" label="AI verdict" sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />}
+          {tile.summary?.tokens_used != null && (() => {
+            const used = tile.summary.tokens_used as number;
+            const pct = tile.summary.budget_pct as number;
+            const label = `${(used / 1000).toFixed(0)}k tokens`;
+            const color = pct >= 90 ? "#EA4335" : pct >= 70 ? "#FBBC04" : "#34A853";
+            const bg = pct >= 90 ? "rgba(234,67,53,0.15)" : pct >= 70 ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)";
+            return <Tooltip title={`${used.toLocaleString()} tokens used`}><Chip size="small" label={label} sx={{ bgcolor: bg, color, height: 18, fontSize: 10, fontWeight: 700 }} /></Tooltip>;
+          })()}
+          <Box sx={{ flex: 1 }} />
+          {agentNames.length > 0 && (
+            <Tooltip title={`${anyAgentFailed ? "Some agent runs failed. " : ""}Agents: ${agentNames.join(", ")}`}>
+              <Chip size="small" label={`${agentNames.length} agent${agentNames.length === 1 ? "" : "s"}`}
+                sx={{ bgcolor: anyAgentFailed ? "rgba(234,67,53,0.18)" : "rgba(124,77,255,0.15)", color: anyAgentFailed ? "#EA4335" : "#9C27B0", height: 18, fontSize: 10, fontWeight: 700 }} />
+            </Tooltip>
+          )}
+        </Box>
+      </Box>
+    </Card>
+  );
+}
+
 // ── Main Scans page ───────────────────────────────────────────────────────
 export default function Scans() {
   const { canAct } = useViewMode();
@@ -556,9 +673,6 @@ export default function Scans() {
   const { clientId: selectedClientId, setClientId: setSelectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
-  // Tile filter state
-  const [tileStatusFilter, setTileStatusFilter] = useState<string>("");
-  const [tileCategoryFilter, setTileCategoryFilter] = useState<string>("");
   const [scanType, setScanType] = useState<ScanType>("full");
   const [connectorId, setConnectorId] = useState("");
   const [framework, setFramework] = useState<FrameworkType | "">("");
@@ -601,7 +715,7 @@ export default function Scans() {
   });
 
   // Cross-client tile feed (default view). Refetches every 5s while any tile is still running.
-  const { data: tilesData, isLoading: tilesLoading, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
+  const { data: tilesData, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
     queryKey: ["assessments-tiles"],
     queryFn: () => assessmentsApi.listAll(),
     refetchInterval: (q) => ((q.state.data as any)?.scans || []).some((s: any) => s.status === "running") ? 5000 : false,
@@ -628,13 +742,11 @@ export default function Scans() {
     const filtered = allScans
       .filter((t) => latestIds.has(t.id))
       .filter((t) => {
-        if (tileStatusFilter && t.status !== tileStatusFilter) return false;
-        if (tileCategoryFilter && t.category !== tileCategoryFilter) return false;
         if (selectedClientId && t.client_id !== selectedClientId) return false;
         return true;
       });
     return { tiles: filtered, versionMap: groups };
-  }, [tilesData, tileStatusFilter, tileCategoryFilter, selectedClientId]);
+  }, [tilesData, selectedClientId]);
 
   const { data: findings = [], isLoading: findingsLoading } = useQuery<any[]>({
     queryKey: ["findings", selectedClientId, viewScan?.id],
@@ -801,7 +913,7 @@ export default function Scans() {
 
       {/* ── Top-level scanner / import groups ──────────────────────────── */}
       <Box sx={{ mb: 3 }}>
-        {/* Group 1: Platform Scanners */}
+        {/* Group 1: Inbuilt Scanners */}
         <Accordion
           expanded={sectionExpanded === "platform"}
           onChange={(_, exp) => setSectionExpanded(exp ? "platform" : false)}
@@ -818,7 +930,7 @@ export default function Scans() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, mr: 1 }}>
               <Storage sx={{ color: "#34A853", fontSize: 20 }} />
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Platform Scanners</Typography>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 15 }}>Inbuilt Scanners</Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Built-in scanners: DAST, SAST, network, dependency, secrets, and AI code review
                   ({platformScanners.filter(s => s.status === "live").length} live)
@@ -864,26 +976,24 @@ export default function Scans() {
                 />
               ))}
             </Box>
-            {/* Recent platform assessments */}
+            {/* Inbuilt assessments — full tiles */}
             {(() => {
-              const platformTiles = tiles.filter((t) => PLATFORM_SCANNER_TYPES.has(t.connector_type));
+              const platformTiles = tiles.filter((t) => !ENTERPRISE_SCANNER_TYPES.has(t.connector_type) && t.connector_type !== "upload");
               if (!platformTiles.length) return null;
               return (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
-                    Recent Assessments
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10, display: "block", mb: 1.5 }}>
+                    Assessments ({platformTiles.length})
                   </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
-                    {platformTiles.slice(0, 5).map((tile) => (
-                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
-                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.connector_type}</Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
-                      </Box>
+                  <Grid container spacing={1.5}>
+                    {platformTiles.map((tile) => (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
+                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                          rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                      </Grid>
                     ))}
-                  </Box>
+                  </Grid>
                 </Box>
               );
             })()}
@@ -956,26 +1066,24 @@ export default function Scans() {
                 />
               ))}
             </Box>
-            {/* Recent enterprise assessments */}
+            {/* Enterprise assessments — full tiles */}
             {(() => {
               const entTiles = tiles.filter((t) => ENTERPRISE_SCANNER_TYPES.has(t.connector_type));
               if (!entTiles.length) return null;
               return (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
-                    Recent Assessments
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10, display: "block", mb: 1.5 }}>
+                    Assessments ({entTiles.length})
                   </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
-                    {entTiles.slice(0, 5).map((tile) => (
-                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
-                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.connector_type}</Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
-                      </Box>
+                  <Grid container spacing={1.5}>
+                    {entTiles.map((tile) => (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
+                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                          rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                      </Grid>
                     ))}
-                  </Box>
+                  </Grid>
                 </Box>
               );
             })()}
@@ -1014,295 +1122,30 @@ export default function Scans() {
             ) : (
               <ScanImportPanel clientId={selectedClientId} />
             )}
-            {/* Recent import assessments */}
+            {/* Import assessments — full tiles */}
             {(() => {
               const importTiles = tiles.filter((t) => t.connector_type === "upload");
               if (!importTiles.length) return null;
               return (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
-                    Recent Imports
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10, display: "block", mb: 1.5 }}>
+                    Imported Assessments ({importTiles.length})
                   </Typography>
-                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
-                    {importTiles.slice(0, 5).map((tile) => (
-                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
-                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
-                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
-                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
-                      </Box>
+                  <Grid container spacing={1.5}>
+                    {importTiles.map((tile) => (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
+                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                          rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                      </Grid>
                     ))}
-                  </Box>
+                  </Grid>
                 </Box>
               );
             })()}
           </AccordionDetails>
         </Accordion>
       </Box>
-
-      {/* ── Tile filter chips ────────────────────────────────────────────── */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mb: 2 }}>
-        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>STATUS</Typography>
-        {["completed", "running", "failed", "pending", "cancelled"].map((s) => (
-          <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
-            onClick={() => setTileStatusFilter(tileStatusFilter === s ? "" : s)}
-            sx={{
-              cursor: "pointer",
-              bgcolor: tileStatusFilter === s ? `${STATUS_COLOR[s] || "#888"}25` : "rgba(255,255,255,0.04)",
-              color: tileStatusFilter === s ? (STATUS_COLOR[s] || "#888") : "text.secondary",
-              border: tileStatusFilter === s ? `1px solid ${STATUS_COLOR[s] || "#888"}` : "1px solid transparent",
-              fontWeight: tileStatusFilter === s ? 700 : 400,
-            }} />
-        ))}
-        <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
-        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>CATEGORY</Typography>
-        {["DAST", "SAST", "Network", "Dependency", "Cloud", "Other"].map((c) => (
-          <Chip key={c} size="small" label={c}
-            onClick={() => setTileCategoryFilter(tileCategoryFilter === c ? "" : c)}
-            sx={{
-              cursor: "pointer",
-              bgcolor: tileCategoryFilter === c ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.04)",
-              color: tileCategoryFilter === c ? "#4285F4" : "text.secondary",
-              border: tileCategoryFilter === c ? "1px solid #4285F4" : "1px solid transparent",
-              fontWeight: tileCategoryFilter === c ? 700 : 400,
-            }} />
-        ))}
-        {(tileStatusFilter || tileCategoryFilter) && (
-          <Button size="small" sx={{ ml: 0.5, color: "text.secondary", fontSize: 11 }}
-            onClick={() => { setTileStatusFilter(""); setTileCategoryFilter(""); }}>
-            Clear
-          </Button>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Showing {tiles.length} of {tilesData?.scans?.length || 0} assessments
-        </Typography>
-      </Box>
-
-      {/* ── Scan tiles ───────────────────────────────────────────────────── */}
-      {tilesLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", mt: 6 }}>
-          <CircularProgress sx={{ color: "#4285F4" }} />
-        </Box>
-      ) : tiles.length === 0 ? (
-        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
-          <Visibility sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          {clients.length === 0 ? (
-            <>
-              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
-                No accessible clients
-              </Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Your account has no RBAC grants yet. Ask a global admin to grant you reader / editor / admin access from <b>Settings → Administration → Grant access</b>.
-              </Typography>
-            </>
-          ) : (tilesData?.scans?.length || 0) === 0 ? (
-            <>
-              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
-                No assessments yet
-              </Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Click "New Assessment" to run your first scan.
-              </Typography>
-            </>
-          ) : (
-            <>
-              <Typography sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5 }}>
-                No assessments match the current filters
-              </Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                {tilesData?.scans?.length} assessment{(tilesData?.scans?.length || 0) === 1 ? "" : "s"} exist for clients you have access to — clear the Client / Status / Category filters above to see them.
-              </Typography>
-            </>
-          )}
-        </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {tiles.map((tile) => {
-            const status = tile.status as string;
-            const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
-            const cat = (tile.category as string) || "Other";
-            const catColor = CATEGORY_COLOR[cat.toLowerCase() as ScanCategory] || "#4285F4";
-            const dur = tile.duration_seconds != null
-              ? (tile.duration_seconds >= 60
-                  ? `${Math.round(tile.duration_seconds / 60)} min`
-                  : `${tile.duration_seconds}s`)
-              : (status === "running" ? (tile.progress_message || "Running…") : "—");
-            const agentRuns = (tile.agents_ran || []) as any[];
-            const agentNames = Array.from(new Set(agentRuns.map((a) => a.agent_name || a.agent_type)));
-            const anyAgentFailed = agentRuns.some(
-              (a) => /fail|error/i.test(String(a.status || "")),
-            );
-            return (
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
-                <Card
-                  onClick={() => navigate(`/scans/${tile.id}`)}
-                  sx={{
-                    bgcolor: "background.paper",
-                    border: `1px solid ${statusColor}40`,
-                    borderRadius: 2,
-                    cursor: "pointer",
-                    transition: "transform 0.12s, border-color 0.12s, background-color 0.12s",
-                    height: "100%",
-                    "&:hover": { borderColor: statusColor, bgcolor: "rgba(255,255,255,0.02)", transform: "translateY(-1px)" },
-                  }}>
-                  <Box sx={{ p: 2, position: "relative" }}>
-                    {(() => {
-                      const root = tile.parent_scan_id || tile.id;
-                      const versions = versionMap.get(root) || [];
-                      const versionCount = versions.length;
-                      const isLive = versions[0]?.id === tile.id;
-                      return (
-                        <>
-                          <Tooltip title="Delete assessment">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); setPendingDeleteScan(tile); }}
-                              sx={{
-                                position: "absolute", top: 6, right: 6,
-                                color: "text.secondary",
-                                "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-                              }}
-                            >
-                              <DeleteOutlined sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title={status === "running" ? "Rescan disabled while a run is in progress" : "Rescan — keeps history of this assessment"}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                disabled={status === "running" || rescanMutation.isPending}
-                                onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
-                                sx={{
-                                  position: "absolute", top: 6, right: 32,
-                                  color: "text.secondary",
-                                  "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-                                  "&.Mui-disabled": { color: "text.secondary" },
-                                }}
-                              >
-                                <Replay sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                          {isLive && versionCount > 1 && (
-                            <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
-                                sx={{
-                                  position: "absolute", top: 6, right: 58,
-                                  color: "#FBBC04",
-                                  bgcolor: "rgba(251,188,4,0.10)",
-                                  "&:hover": { bgcolor: "rgba(251,188,4,0.22)" },
-                                  pr: 0.5,
-                                }}
-                              >
-                                <Badge
-                                  badgeContent={versionCount}
-                                  sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}
-                                >
-                                  <History sx={{ fontSize: 16 }} />
-                                </Badge>
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {tile.parent_scan_id && (
-                            <Tooltip title="View diff — compare with previous scan">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); navigate(`/scans/${tile.id}/diff`); }}
-                                sx={{
-                                  position: "absolute", top: 6, right: 84,
-                                  color: "#34A853",
-                                  bgcolor: "rgba(52,168,83,0.10)",
-                                  "&:hover": { bgcolor: "rgba(52,168,83,0.22)" },
-                                }}
-                              >
-                                <CompareArrows sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </>
-                      );
-                    })()}
-                    <Chip
-                      label={status}
-                      size="small"
-                      sx={{
-                        position: "absolute", top: 12, right: tile.parent_scan_id ? 110 : 84,
-                        bgcolor: `${statusColor}20`,
-                        color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
-                        textTransform: "uppercase", letterSpacing: 0.5,
-                      }} />
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, pr: 9 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: catColor, flexShrink: 0 }} />
-                      <Typography variant="caption"
-                        sx={{ color: catColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-                        {cat}
-                      </Typography>
-                    </Box>
-                    <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>
-                      {tile.tile_name}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.25 }}>
-                      {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
-                      {tile.name || `${tile.scan_type} scan`}
-                      {tile.findings_count > 0 ? ` · ${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}` : ""}
-                      {tile.framework ? ` · ${tile.framework}` : ""}
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
-                      {tile.summary?.critical > 0 && (
-                        <Chip size="small" label={`${tile.summary.critical}C`}
-                          sx={{ bgcolor: "rgba(234,67,53,0.18)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />
-                      )}
-                      {tile.summary?.high > 0 && (
-                        <Chip size="small" label={`${tile.summary.high}H`}
-                          sx={{ bgcolor: "rgba(255,112,67,0.18)", color: "#FF7043", height: 18, fontSize: 10, fontWeight: 700 }} />
-                      )}
-                      {tile.summary?.medium > 0 && (
-                        <Chip size="small" label={`${tile.summary.medium}M`}
-                          sx={{ bgcolor: "rgba(251,188,4,0.18)", color: "#FBBC04", height: 18, fontSize: 10, fontWeight: 700 }} />
-                      )}
-                      {tile.has_verdict && (
-                        <Chip size="small" label="AI verdict"
-                          sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", height: 18, fontSize: 10, fontWeight: 700 }} />
-                      )}
-                      {tile.summary?.tokens_used != null && (() => {
-                        const used = tile.summary.tokens_used as number;
-                        const budget = tile.summary.token_budget as number;
-                        const pct = tile.summary.budget_pct as number;
-                        const label = `${(used / 1000).toFixed(0)}k tokens`;
-                        const tipText = `${used.toLocaleString()} / ${budget.toLocaleString()} tokens used (${pct}% of budget)`;
-                        const color = pct >= 90 ? "#EA4335" : pct >= 70 ? "#FBBC04" : "#34A853";
-                        const bg = pct >= 90 ? "rgba(234,67,53,0.15)" : pct >= 70 ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)";
-                        return (
-                          <Tooltip title={tipText}>
-                            <Chip size="small" label={label}
-                              sx={{ bgcolor: bg, color, height: 18, fontSize: 10, fontWeight: 700 }} />
-                          </Tooltip>
-                        );
-                      })()}
-                      <Box sx={{ flex: 1 }} />
-                      {agentNames.length > 0 && (
-                        <Tooltip title={`${anyAgentFailed ? "Some agent runs failed. " : ""}Agents that ran: ${agentNames.join(", ")}`}>
-                          <Chip size="small" label={`${agentNames.length} agent${agentNames.length === 1 ? "" : "s"}`}
-                            sx={{
-                              bgcolor: anyAgentFailed ? "rgba(234,67,53,0.18)" : "rgba(124,77,255,0.15)",
-                              color: anyAgentFailed ? "#EA4335" : "#9C27B0",
-                              height: 18, fontSize: 10, fontWeight: 700,
-                            }} />
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </Box>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
 
       {/* ── Start scan dialog — category → scanner cascade ──────────────── */}
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth
