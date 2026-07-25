@@ -864,6 +864,29 @@ export default function Scans() {
                 />
               ))}
             </Box>
+            {/* Recent platform assessments */}
+            {(() => {
+              const platformTiles = tiles.filter((t) => PLATFORM_SCANNER_TYPES.has(t.connector_type));
+              if (!platformTiles.length) return null;
+              return (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
+                    Recent Assessments
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
+                    {platformTiles.slice(0, 5).map((tile) => (
+                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
+                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.connector_type}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
           </AccordionDetails>
         </Accordion>
 
@@ -933,6 +956,29 @@ export default function Scans() {
                 />
               ))}
             </Box>
+            {/* Recent enterprise assessments */}
+            {(() => {
+              const entTiles = tiles.filter((t) => ENTERPRISE_SCANNER_TYPES.has(t.connector_type));
+              if (!entTiles.length) return null;
+              return (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
+                    Recent Assessments
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
+                    {entTiles.slice(0, 5).map((tile) => (
+                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
+                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.connector_type}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
           </AccordionDetails>
         </Accordion>
 
@@ -968,6 +1014,28 @@ export default function Scans() {
             ) : (
               <ScanImportPanel clientId={selectedClientId} />
             )}
+            {/* Recent import assessments */}
+            {(() => {
+              const importTiles = tiles.filter((t) => t.connector_type === "upload");
+              if (!importTiles.length) return null;
+              return (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", fontSize: 10 }}>
+                    Recent Imports
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mt: 1 }}>
+                    {importTiles.slice(0, 5).map((tile) => (
+                      <Box key={tile.id} onClick={() => setViewScan(tile)} sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, borderRadius: 1, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.06)" } }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: STATUS_COLOR[tile.status] || "#888", flexShrink: 0 }} />
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 12, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tile.name || tile.target}</Typography>
+                        <Chip label={tile.status} size="small" sx={{ fontSize: 10, height: 18, bgcolor: `${STATUS_COLOR[tile.status] || "#888"}18`, color: STATUS_COLOR[tile.status] || "#888" }} />
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, flexShrink: 0 }}>{tile.finding_count ?? 0} findings</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
           </AccordionDetails>
         </Accordion>
       </Box>

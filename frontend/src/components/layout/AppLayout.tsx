@@ -9,13 +9,13 @@ import {
 import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle,
-  BarChart, SettingsSuggest, Menu as MenuIcon, Storage, Insights, Apps,
+  BarChart, Menu as MenuIcon, Storage, Insights, Apps,
   Schedule, AutoStories, MenuBook, Hub,
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, Assignment, AccountTree, Psychology, Description,
-  Notifications, VpnKey, TrendingUp, GridView, CompareArrows,
+  TrendingUp, GridView, CompareArrows,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -51,9 +51,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Clients",          icon: <People />,   path: "/clients" },
       { label: "Connections",      icon: <Cable />,    path: "/connections", children: [
-        { label: "All Connections", icon: <Cable />,          path: "/connections" },
-        { label: "AI Settings",     icon: <SettingsSuggest />, path: "/ai-settings" },
-        { label: "Ticket Sync",     icon: <SyncAlt />,        path: "/ticket-sync" },
+        { label: "All Connections", icon: <Cable />,   path: "/connections" },
+        { label: "Ticket Sync",     icon: <SyncAlt />, path: "/ticket-sync" },
       ] },
       { label: "Assets", icon: <Storage />, path: "/assets", children: [
         { label: "Asset Inventory", icon: <Storage />, path: "/assets" },
@@ -106,8 +105,6 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Settings",
     items: [
       { label: "Settings",     icon: <Settings />,       path: "/settings" },
-      { label: "Webhooks",     icon: <Notifications />,  path: "/webhooks" },
-      { label: "API Keys",     icon: <VpnKey />,         path: "/api-keys" },
       { label: "Access Logs",  icon: <Assignment />,     path: "/access-logs", adminOnly: true },
       { label: "Help",         icon: <MenuBook />,       path: "/help" },
     ],

@@ -25,7 +25,7 @@ import {
   Visibility, VisibilityOff, LinkOutlined,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
-  NewReleases,
+  NewReleases, Psychology, Webhook, VpnKey,
 } from "@mui/icons-material";
 import Skeleton from "@mui/material/Skeleton";
 import LinearProgress from "@mui/material/LinearProgress";
@@ -33,6 +33,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi } from "../services/api";
 import { MyAccess, AccessRole, AccessScope, Client, Project, UserAccessSummary } from "../types";
+import AISettings from "./AISettings";
+import Webhooks from "./Webhooks";
+import APIKeysPage from "./APIKeysPage";
 import { fmt, fromNow } from "../utils/datetime";
 
 const ACCENT = "#4285F4";
@@ -942,6 +945,9 @@ const TABS = [
   { label: "What's New",       icon: <NewReleases fontSize="small" /> },
   { label: "Email",            icon: <MarkEmailRead fontSize="small" /> },
   { label: "SSO / Identity",   icon: <Security fontSize="small" /> },
+  { label: "AI Providers",     icon: <Psychology fontSize="small" /> },
+  { label: "Webhooks",         icon: <Webhook fontSize="small" /> },
+  { label: "API Keys",         icon: <VpnKey fontSize="small" /> },
   { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
   { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
   { label: "Users",            icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
@@ -1001,10 +1007,13 @@ export default function Settings() {
       <TabPanel value={tab} index={1}><WhatsNewTab /></TabPanel>
       <TabPanel value={tab} index={2}><EmailTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={3}><SsoTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={4}><SyncTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={5}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={6}><UsersTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={7}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={4}><AISettings /></TabPanel>
+      <TabPanel value={tab} index={5}><Webhooks /></TabPanel>
+      <TabPanel value={tab} index={6}><APIKeysPage /></TabPanel>
+      <TabPanel value={tab} index={7}><SyncTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={8}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={9}><UsersTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={10}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

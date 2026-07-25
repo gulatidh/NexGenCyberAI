@@ -156,7 +156,7 @@ function ProtectedApp() {
           <Route path="/frameworks" element={<Frameworks />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/ai-settings" element={<AISettings />} />
+          <Route path="/ai-settings" element={<Navigate to="/settings" replace />} />
           <Route path="/email-settings" element={<EmailSettings />} />
           <Route path="/access-logs" element={<AccessLogs />} />
           <Route path="/admin" element={<Admin />} />
@@ -173,8 +173,8 @@ function ProtectedApp() {
           <Route path="/ticket-sync" element={<TicketSyncPage />} />
           <Route path="/ctem" element={<CTEMPage />} />
           <Route path="/security-docs" element={<SecurityDocs />} />
-          <Route path="/webhooks" element={<Webhooks />} />
-          <Route path="/api-keys" element={<APIKeysPage />} />
+          <Route path="/webhooks" element={<Navigate to="/settings" replace />} />
+          <Route path="/api-keys" element={<Navigate to="/settings" replace />} />
           <Route path="/attack-paths" element={<AttackPaths />} />
           <Route path="/nl-query" element={<NLQuery />} />
           <Route path="/posture-trends" element={<PostureTrends />} />
