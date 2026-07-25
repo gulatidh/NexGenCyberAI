@@ -49,15 +49,19 @@ if $needs_install; then
         rm -rf "$ANTENV"
         "$PYTHON3" -m venv "$ANTENV"
     fi
-    # Install packages. pip skips already-installed packages, so this is safe
-    # to interrupt and resume — each restart picks up where it left off.
+    # Clear PYTHONPATH so Oryx's wwwroot/antenv injection doesn't fool pip into
+    # thinking packages are already installed (causing it to skip entry-point creation).
     echo "[startup] Running pip install from requirements.txt..."
-    "$ANTENV/bin/pip" install -r "$REQS" -q \
-        --extra-index-url https://pypi.org/simple/ || {
+    PYTHONPATH="" "$ANTENV/bin/pip" install -r "$REQS" || {
         echo "[startup] Full install had errors — retrying without pymssql..."
         grep -v "^pymssql" "$REQS" > /tmp/reqs_filtered.txt
-        "$ANTENV/bin/pip" install -r /tmp/reqs_filtered.txt -q
+        PYTHONPATH="" "$ANTENV/bin/pip" install -r /tmp/reqs_filtered.txt || true
     }
+    # Explicit check: pip can skip entry-point creation if PYTHONPATH pollutes its view.
+    if [ ! -x "$ANTENV/bin/gunicorn" ]; then
+        echo "[startup] gunicorn binary missing — force-installing gunicorn+uvicorn..."
+        PYTHONPATH="" "$ANTENV/bin/pip" install "gunicorn>=21" "uvicorn[standard]>=0.24"
+    fi
     echo "$CURRENT_HASH" > "$HASH_FILE"
     echo "[startup] Package install complete"
 fi
