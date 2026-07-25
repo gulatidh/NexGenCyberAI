@@ -25,8 +25,11 @@ mkdir -p /home/data
 CURRENT_HASH=$(md5sum "$REQS" 2>/dev/null | cut -d' ' -f1 || echo "nohash")
 STORED_HASH=$(cat "$HASH_FILE" 2>/dev/null || echo "none")
 
+# Oryx sets PYTHONPATH to include wwwroot/antenv site-packages, which can make
+# the import check pass even when /home/data/antenv packages are missing.
+# Clear PYTHONPATH before the check and also verify the binary exists.
 venv_ok=false
-if "$ANTENV/bin/python3" -c "import fastapi, gunicorn" 2>/dev/null; then
+if [ -x "$ANTENV/bin/gunicorn" ] && PYTHONPATH="" "$ANTENV/bin/python3" -c "import fastapi, gunicorn" 2>/dev/null; then
     venv_ok=true
 fi
 
