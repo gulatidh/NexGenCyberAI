@@ -5,41 +5,61 @@ cd /home/site/wwwroot
 # /home/data/ is Azure Files persistent storage — survives zip-deploys.
 # antenv inside wwwroot gets wiped every deployment; /home/data does not.
 ANTENV=/home/data/antenv
-PYTHON3=/opt/python/3.12.13/bin/python3
 REQS=/home/site/wwwroot/requirements.txt
-HASH_FILE=/home/data/antenv/.reqs_hash
+HASH_FILE=/home/data/.reqs_hash
+
+# Find the system Python 3.12 binary (path may vary by patch version)
+if [ -x "/opt/python/3.12.13/bin/python3" ]; then
+    PYTHON3="/opt/python/3.12.13/bin/python3"
+elif [ -x "/opt/python/3.12.10/bin/python3" ]; then
+    PYTHON3="/opt/python/3.12.10/bin/python3"
+elif command -v python3.12 &>/dev/null; then
+    PYTHON3="$(command -v python3.12)"
+else
+    PYTHON3="$(command -v python3)"
+fi
+echo "[startup] Using Python: $PYTHON3 ($($PYTHON3 --version 2>&1))"
 
 mkdir -p /home/data
 
-CURRENT_HASH=$(md5sum "$REQS" 2>/dev/null | cut -d' ' -f1)
+CURRENT_HASH=$(md5sum "$REQS" 2>/dev/null | cut -d' ' -f1 || echo "nohash")
 STORED_HASH=$(cat "$HASH_FILE" 2>/dev/null || echo "none")
 
-needs_install=false
+venv_ok=false
+if "$ANTENV/bin/python3" -c "import fastapi, gunicorn" 2>/dev/null; then
+    venv_ok=true
+fi
 
-if ! "$ANTENV/bin/python3" -c "import fastapi" 2>/dev/null; then
+needs_install=false
+if ! $venv_ok; then
     echo "[startup] antenv missing or broken — full install required"
     needs_install=true
 elif [ "$CURRENT_HASH" != "$STORED_HASH" ]; then
-    echo "[startup] requirements.txt changed ($STORED_HASH → $CURRENT_HASH) — reinstalling"
+    echo "[startup] requirements.txt changed — updating packages"
     needs_install=true
 fi
 
 if $needs_install; then
-    echo "[startup] Installing packages from requirements.txt (~4-6 min first time)..."
-    rm -rf "$ANTENV"
-    "$PYTHON3" -m venv "$ANTENV"
-    # pymssql needs build tools; install it separately with a fallback so it
-    # doesn't block the whole install (SQLite is used in this deployment).
-    "$ANTENV/bin/pip" install -r "$REQS" -q --no-cache-dir \
+    if ! $venv_ok; then
+        # Venv is broken/absent — delete and recreate
+        echo "[startup] Creating fresh venv at $ANTENV..."
+        rm -rf "$ANTENV"
+        "$PYTHON3" -m venv "$ANTENV"
+    fi
+    # Install packages. pip skips already-installed packages, so this is safe
+    # to interrupt and resume — each restart picks up where it left off.
+    echo "[startup] Running pip install from requirements.txt..."
+    "$ANTENV/bin/pip" install -r "$REQS" -q \
         --extra-index-url https://pypi.org/simple/ || {
-        echo "[startup] Full install failed — retrying without pymssql..."
+        echo "[startup] Full install had errors — retrying without pymssql..."
         grep -v "^pymssql" "$REQS" > /tmp/reqs_filtered.txt
-        "$ANTENV/bin/pip" install -r /tmp/reqs_filtered.txt -q --no-cache-dir
+        "$ANTENV/bin/pip" install -r /tmp/reqs_filtered.txt -q
     }
     echo "$CURRENT_HASH" > "$HASH_FILE"
     echo "[startup] Package install complete"
 fi
 
+echo "[startup] Starting gunicorn..."
 exec "$ANTENV/bin/gunicorn" main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers 1 \
