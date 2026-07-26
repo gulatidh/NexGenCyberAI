@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import {
   Accordion, AccordionDetails, AccordionSummary, Alert, Box,
-  Card, CardContent, InputAdornment, Tab, Tabs, TextField, Typography,
+  Tab, Tabs, TextField, Typography,
 } from "@mui/material";
 import {
   AdminPanelSettings, AutoStories, BarChart, BugReport, ExpandMore,

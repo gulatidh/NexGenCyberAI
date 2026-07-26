@@ -46,7 +46,6 @@ import Missions from "./pages/Missions";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
 import Settings from "./pages/Settings";
-import LandingPage from "./pages/LandingPage";
 import LandingV2 from "./pages/LandingV2";
 import ThreatRegister from "./pages/ThreatRegister";
 import ControlDeficiencies from "./pages/ControlDeficiencies";

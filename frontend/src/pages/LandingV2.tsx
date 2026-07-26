@@ -4,7 +4,7 @@
  */
 import { Box, Typography, Button, Card, CardContent, Chip } from "@mui/material";
 import {
-  Shield, Radar, BugReport, GppBad, SmartToy, Psychology,
+  Shield, Radar, BugReport, GppBad, SmartToy,
   PlaylistAddCheck, Assessment, ArrowForward, Security,
   CheckCircleOutlined,
 } from "@mui/icons-material";
