@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardActionArea, Avatar,
   List, ListItemButton, ListItemText, Divider,
+  FormControl, Select, MenuItem, InputLabel,
 } from "@mui/material";
 import {
   Shield, BugReport, VerifiedUser, Psychology,
@@ -11,8 +12,9 @@ import {
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
-import { adminApi } from "../services/api";
-import { MyAccess } from "../types";
+import { adminApi, clientsApi } from "../services/api";
+import { MyAccess, Client } from "../types";
+import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Product catalogue ────────────────────────────────────────────────────────
 
@@ -135,6 +137,45 @@ const CATEGORIES: Category[] = [
     ],
   },
 ];
+
+// ── Client picker ────────────────────────────────────────────────────────────
+
+function ClientPicker() {
+  const { clientId, setClientId } = useActiveClient();
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.list(),
+    staleTime: 60_000,
+  });
+
+  return (
+    <Box sx={{ px: 1.5, py: 1 }}>
+      <FormControl fullWidth size="small">
+        <InputLabel sx={{ fontSize: 12 }}>Active Client</InputLabel>
+        <Select
+          label="Active Client"
+          value={clientId || ""}
+          onChange={(e) => setClientId(e.target.value as string)}
+          disabled={isLoading || clients.length === 0}
+          sx={{
+            fontSize: 13,
+            bgcolor: "background.default",
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+          }}
+        >
+          {clients.length === 0 && (
+            <MenuItem value="" disabled>
+              <em>{isLoading ? "Loading…" : "No clients yet"}</em>
+            </MenuItem>
+          )}
+          {clients.map((c) => (
+            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
+  );
+}
 
 // ── Subcomponents ────────────────────────────────────────────────────────────
 
@@ -269,7 +310,12 @@ export default function Hub() {
           </Box>
         </Box>
 
-        <Divider sx={{ mb: 1.5 }} />
+        <Divider />
+
+        {/* Client picker */}
+        <ClientPicker />
+
+        <Divider sx={{ mb: 1 }} />
 
         {/* Category nav */}
         <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>

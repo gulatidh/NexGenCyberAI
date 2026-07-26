@@ -49,19 +49,19 @@ interface Props {
 
 function ClientSelector() {
   const { clientId, setClientId } = useActiveClient();
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["clients"],
     queryFn: () => clientsApi.list(),
     staleTime: 60_000,
   });
 
-  if (clients.length === 0) return null;
   return (
     <FormControl size="small" sx={{ minWidth: 180, maxWidth: 240 }}>
       <Select
         value={clientId || ""}
         onChange={(e) => setClientId(e.target.value as string)}
         displayEmpty
+        disabled={isLoading}
         sx={{
           fontSize: 13, fontWeight: 500,
           bgcolor: "background.paper",
@@ -69,7 +69,9 @@ function ClientSelector() {
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "primary.main" },
         }}
       >
-        <MenuItem value="" disabled><em>Select client…</em></MenuItem>
+        <MenuItem value="" disabled>
+          <em>{isLoading ? "Loading…" : clients.length === 0 ? "No clients" : "Select client…"}</em>
+        </MenuItem>
         {clients.map((c) => (
           <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>
         ))}
