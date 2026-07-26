@@ -8,7 +8,9 @@ import {
   PlaylistAddCheck, Assessment, ArrowForward, Security,
   CheckCircleOutlined,
 } from "@mui/icons-material";
-import { useMsal } from "@azure/msal-react";
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { loginRequest } from "../auth/msalConfig";
 
 // ── Feature tiles ──────────────────────────────────────────────────────────
@@ -300,9 +302,18 @@ function Footer() {
 
 export default function LandingV2() {
   const { instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) navigate("/hub", { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const handleSignIn = () => {
-    instance.loginRedirect(loginRequest).catch(console.error);
+    instance.loginRedirect({
+      ...loginRequest,
+      redirectStartPage: `${window.location.origin}/hub`,
+    }).catch(console.error);
   };
 
   return (
