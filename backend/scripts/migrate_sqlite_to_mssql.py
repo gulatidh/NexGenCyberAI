@@ -61,7 +61,7 @@ for table in tables:
         continue
 
     # Get PK columns for skip-existing logic
-    pk_cols = [c["name"] for c in src_inspector.get_pk_constraint(table).get("constrained_columns", [])]
+    pk_cols = src_inspector.get_pk_constraint(table).get("constrained_columns", [])
 
     inserted = 0
     skipped = 0
