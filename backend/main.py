@@ -1035,6 +1035,7 @@ def _fail_stale_scans() -> None:
         "azure", "entraid", "aws", "gcp",
         "tenable", "burp_enterprise", "snyk", "rapid7",
         "qualys", "invicti", "acunetix",
+        "ai_code_review",  # BackgroundTask — killed if container restarts
     }
 
     now = datetime.now(timezone.utc)
