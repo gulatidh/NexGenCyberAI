@@ -237,18 +237,21 @@ export default function AppLayout() {
         gap: 1, justifyContent: expanded ? "space-between" : "center",
         borderBottom: "1px solid", borderColor: "divider", minHeight: 64,
       }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
-          <Box component="img" src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Monitara AI"
-            sx={{ width: 32, height: 32, flexShrink: 0 }} />
-          {expanded && (
-            <Box sx={{ whiteSpace: "nowrap" }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: "#4285F4", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
-                Monitara<span style={{ color: "#FFFFFF" }}>&nbsp;AI</span>
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
-                AI Security Posture
-              </Typography>
-            </Box>
+        <Box sx={{ display: "flex", alignItems: "center", overflow: "hidden" }}>
+          {expanded ? (
+            <Box
+              component="img"
+              src={`${process.env.PUBLIC_URL}/aegis-logo.svg`}
+              alt="Monitara AI"
+              sx={{ height: 42, width: "auto", maxWidth: 190, flexShrink: 0 }}
+            />
+          ) : (
+            <Box
+              component="img"
+              src={`${process.env.PUBLIC_URL}/aegis-icon.svg`}
+              alt="Monitara AI"
+              sx={{ width: 36, height: 36, flexShrink: 0 }}
+            />
           )}
         </Box>
         {expanded && (
