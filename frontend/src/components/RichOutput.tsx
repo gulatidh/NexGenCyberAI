@@ -15,7 +15,7 @@
  *     code block (still inside the markdown styling)
  */
 import React from "react";
-import { Box, Typography, Divider, Link as MuiLink, Chip } from "@mui/material";
+import { Box, Typography, Divider, Link as MuiLink, Chip, Tab, Tabs } from "@mui/material";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -514,10 +514,127 @@ function MetadataList({ data }: { data: Record<string, any> }) {
   );
 }
 
+// ── Orchestrator multi-section renderer ─────────────────────────────────────
+
+const ORCH_SECTIONS: Array<{ key: string; label: string; color: string }> = [
+  { key: "va_analysis",       label: "Vulnerability Analysis", color: "#EA4335" },
+  { key: "framework_analysis",label: "Framework Mapping",      color: "#4285F4" },
+  { key: "threat_intel",      label: "Threat Intelligence",    color: "#FF7043" },
+  { key: "risk_analysis",     label: "Risk Assessment",        color: "#FBBC04" },
+  { key: "remediation",       label: "Remediation Playbook",   color: "#34A853" },
+  { key: "audit_report",      label: "Compliance Audit",       color: "#9C27B0" },
+];
+
+function isOrchestratorOutput(v: any): boolean {
+  return v && typeof v === "object" &&
+    ("va_analysis" in v || "framework_analysis" in v) &&
+    ("risk_analysis" in v || "remediation" in v);
+}
+
+function OrchestratorSection({ data }: { data: any }) {
+  if (!data || typeof data !== "object") return null;
+  const narrative = typeof data.output === "string" ? stripConversational(data.output) : "";
+  const execSummary = data.executive_summary_structured;
+  const findings: any[] = Array.isArray(data.findings) ? data.findings : [];
+  const recs: any[] = Array.isArray(data.recommendations) ? data.recommendations : [];
+  const maturity = data.maturity_indicators;
+
+  return (
+    <Box>
+      {narrative && (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as any}>
+          {narrative}
+        </ReactMarkdown>
+      )}
+      {execSummary && <StructuredExecSummary data={execSummary} />}
+      {findings.length > 0 && <StructuredFindings rows={findings} />}
+      {recs.length > 0 && <StructuredRecommendations rows={recs} />}
+      {maturity && <StructuredMaturity data={maturity} />}
+      {!narrative && !execSummary && !findings.length && !recs.length && !maturity && (
+        <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+          No output for this section.
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+function OrchestratorOutput({ value }: { value: any }) {
+  const [tab, setTab] = React.useState(0);
+
+  const visibleSections = ORCH_SECTIONS.filter(s => value[s.key]);
+
+  const risksCreated: number = value.risks_created ?? 0;
+  const threatsCreated: number = value.threats_created ?? 0;
+  const defCreated: number = value.deficiencies_created ?? 0;
+  const actionsCreated: number = value.actions_created ?? 0;
+
+  return (
+    <Box>
+      {/* Summary stat chips */}
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1.5 }}>
+        {risksCreated > 0 && (
+          <Chip label={`${risksCreated} risks`} size="small"
+            sx={{ bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04", fontSize: 11, fontWeight: 700 }} />
+        )}
+        {threatsCreated > 0 && (
+          <Chip label={`${threatsCreated} threats`} size="small"
+            sx={{ bgcolor: "rgba(255,112,67,0.12)", color: "#FF7043", fontSize: 11, fontWeight: 700 }} />
+        )}
+        {defCreated > 0 && (
+          <Chip label={`${defCreated} control gaps`} size="small"
+            sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 11, fontWeight: 700 }} />
+        )}
+        {actionsCreated > 0 && (
+          <Chip label={`${actionsCreated} actions`} size="small"
+            sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 11, fontWeight: 700 }} />
+        )}
+        {value.findings_count != null && (
+          <Chip label={`${value.findings_count} findings analysed`} size="small"
+            sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 11 }} />
+        )}
+      </Box>
+
+      {/* Section tabs */}
+      <Tabs
+        value={Math.min(tab, visibleSections.length - 1)}
+        onChange={(_e, v) => setTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{
+          minHeight: 32, mb: 1.5,
+          "& .MuiTab-root": { minHeight: 32, fontSize: 11, fontWeight: 700, textTransform: "none", px: 1.5, py: 0.5 },
+          "& .MuiTabs-indicator": { bgcolor: visibleSections[tab]?.color ?? "#4285F4" },
+        }}
+      >
+        {visibleSections.map((s, i) => (
+          <Tab key={s.key} label={s.label}
+            sx={{ color: tab === i ? s.color : "text.secondary" }} />
+        ))}
+      </Tabs>
+
+      {visibleSections.map((s, i) => (
+        <Box key={s.key} hidden={tab !== i}>
+          {tab === i && <OrchestratorSection data={value[s.key]} />}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export default function RichOutput({ value, maxHeight }: { value: any; maxHeight?: number | string }) {
   if (value === null || value === undefined) {
     return <Typography variant="caption" sx={{ color: "text.secondary" }}>No output yet.</Typography>;
   }
+
+  if (isOrchestratorOutput(value)) {
+    return (
+      <Box sx={{ maxHeight: maxHeight ?? "none", overflow: maxHeight ? "auto" : "visible" }}>
+        <OrchestratorOutput value={value} />
+      </Box>
+    );
+  }
+
   const { text, rest } = pickNarrative(value);
 
   // Pull risk_register out of rest and render as a structured table.
