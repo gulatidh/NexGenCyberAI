@@ -1,4 +1,5 @@
 #!/bin/bash
+# v2 — pre-bundled packages path added
 set -e
 cd /home/site/wwwroot
 
