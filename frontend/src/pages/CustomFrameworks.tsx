@@ -4,11 +4,11 @@ import {
   Box, Typography, Button, Card, CardContent, IconButton, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   FormControl, InputLabel, Select, MenuItem, Checkbox, CircularProgress,
-  Alert, Tooltip, LinearProgress, InputAdornment, Divider,
+  Alert, Tooltip, LinearProgress, InputAdornment, Divider, Tabs, Tab,
 } from "@mui/material";
 import {
   Add, Delete, Refresh, Search, CheckBox, CheckBoxOutlineBlank,
-  LibraryAdd, ArrowBack,
+  LibraryAdd, ArrowBack, Category, Build,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFrameworksApi } from "../services/api";
@@ -32,12 +32,37 @@ interface PickerControl {
   weight: number;
 }
 
+interface DomainItem {
+  id: string;
+  name: string;
+  description?: string;
+  sort_order: number;
+}
+
+interface NativeControlItem {
+  id: string;
+  control_id: string;
+  title: string;
+  description?: string;
+  weight: number;
+  sort_order: number;
+  domain_id?: string;
+  domain_name?: string;
+}
+
+interface MappedControl extends PickerControl {
+  reference_id?: string;
+  control_domain?: string;
+}
+
 interface CustomFrameworkDetail {
   id: string;
   name: string;
   slug: string;
   description?: string;
-  controls: PickerControl[];
+  controls: MappedControl[];
+  domains: DomainItem[];
+  native_controls: NativeControlItem[];
 }
 
 const SOURCE_FRAMEWORKS = [
@@ -115,11 +140,10 @@ function ControlPickerDialog({
       <DialogTitle sx={{ pb: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>Add Controls from Existing Frameworks</Typography>
         <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-          Browse and select controls from any loaded framework to include in your custom standard.
+          Browse and select controls from any loaded framework to include in your custom policy.
         </Typography>
       </DialogTitle>
       <DialogContent>
-        {/* Filters */}
         <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>Source Framework</InputLabel>
@@ -146,7 +170,6 @@ function ControlPickerDialog({
 
         {isFetching && <LinearProgress sx={{ mb: 1 }} />}
 
-        {/* Select-all row */}
         {addable.length > 0 && (
           <Box sx={{ display: "flex", alignItems: "center", px: 1, py: 0.5, mb: 1,
             bgcolor: "action.hover", borderRadius: 1, cursor: "pointer" }}
@@ -164,7 +187,6 @@ function ControlPickerDialog({
           </Box>
         )}
 
-        {/* Control list */}
         <Box sx={{ maxHeight: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 0.5 }}>
           {controls.length === 0 && !isFetching && (
             <Typography sx={{ color: "text.secondary", p: 2, textAlign: "center" }}>
@@ -223,7 +245,6 @@ function ControlPickerDialog({
           })}
         </Box>
 
-        {/* Pagination */}
         {controls.length === 100 && (
           <Box sx={{ display: "flex", justifyContent: "center", gap: 1, mt: 1 }}>
             <Button size="small" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Prev</Button>
@@ -244,11 +265,189 @@ function ControlPickerDialog({
   );
 }
 
+// ── Native control dialog ─────────────────────────────────────────────────────
+
+function NativeControlDialog({
+  cfId,
+  domains,
+  onClose,
+}: {
+  cfId: string;
+  domains: DomainItem[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [controlId, setControlId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [weight, setWeight] = useState(1);
+  const [domainId, setDomainId] = useState("");
+
+  const createMut = useMutation({
+    mutationFn: () => customFrameworksApi.createNativeControl(cfId, {
+      control_id: controlId.trim(),
+      title: title.trim(),
+      description: description.trim() || undefined,
+      weight,
+      domain_id: domainId || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["custom-framework", cfId] });
+      qc.invalidateQueries({ queryKey: ["custom-frameworks"] });
+      toast.success("Custom control added");
+      onClose();
+    },
+    onError: () => toast.error("Failed to add control"),
+  });
+
+  return (
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
+      <DialogTitle sx={{ fontWeight: 700 }}>Add Custom Control</DialogTitle>
+      <DialogContent>
+        <Alert severity="info" sx={{ mb: 2, mt: 0.5 }}>
+          Custom controls are standalone — not tied to any existing framework. Use them to represent
+          requirements unique to your policy (e.g. MAS-specific timelines, internal SLAs).
+        </Alert>
+        <TextField fullWidth label="Control ID" value={controlId}
+          onChange={(e) => setControlId(e.target.value)} autoFocus
+          placeholder="e.g. MAS-7.1 or ORG-POL-01" sx={{ mb: 2 }} />
+        <TextField fullWidth label="Title" value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Short name for this control" sx={{ mb: 2 }} />
+        <TextField fullWidth label="Description (optional)" value={description}
+          onChange={(e) => setDescription(e.target.value)} multiline rows={3}
+          placeholder="Detail the requirement, acceptance criteria, or guidance" sx={{ mb: 2 }} />
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Criticality</InputLabel>
+            <Select label="Criticality" value={weight} onChange={(e) => setWeight(Number(e.target.value))}>
+              <MenuItem value={1}>Standard</MenuItem>
+              <MenuItem value={2}>Important</MenuItem>
+              <MenuItem value={3}>Critical</MenuItem>
+            </Select>
+          </FormControl>
+          {domains.length > 0 && (
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Domain (optional)</InputLabel>
+              <Select label="Domain (optional)" value={domainId} onChange={(e) => setDomainId(e.target.value)}>
+                <MenuItem value=""><em>No domain</em></MenuItem>
+                {domains.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" disabled={!controlId.trim() || !title.trim() || createMut.isPending}
+          onClick={() => createMut.mutate()}
+          startIcon={createMut.isPending ? <CircularProgress size={14} /> : <Add />}>
+          Add Control
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+// ── Domain manager dialog ─────────────────────────────────────────────────────
+
+function DomainManagerDialog({
+  cfId,
+  domains,
+  onClose,
+}: {
+  cfId: string;
+  domains: DomainItem[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const createMut = useMutation({
+    mutationFn: () => customFrameworksApi.createDomain(cfId, {
+      name: name.trim(),
+      description: description.trim() || undefined,
+      sort_order: domains.length,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["custom-framework", cfId] });
+      toast.success("Domain added");
+      setName("");
+      setDescription("");
+    },
+    onError: () => toast.error("Failed to create domain"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (domainId: string) => customFrameworksApi.deleteDomain(cfId, domainId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["custom-framework", cfId] });
+      toast.success("Domain removed");
+    },
+    onError: () => toast.error("Failed to remove domain"),
+  });
+
+  return (
+    <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
+      <DialogTitle sx={{ fontWeight: 700 }}>Manage Domains</DialogTitle>
+      <DialogContent>
+        <Alert severity="info" sx={{ mb: 2, mt: 0.5 }}>
+          Domains group controls into categories (e.g. Governance, Access Control). Custom controls
+          can be assigned to a domain; mapped controls are grouped by their source framework domain.
+        </Alert>
+
+        {domains.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            {domains.map((d) => (
+              <Box key={d.id} sx={{ display: "flex", alignItems: "center", gap: 1,
+                py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                <Category sx={{ fontSize: 16, color: "primary.main" }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{d.name}</Typography>
+                  {d.description && (
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>{d.description}</Typography>
+                  )}
+                </Box>
+                <Tooltip title="Remove domain (does not delete controls)">
+                  <IconButton size="small" sx={{ color: "error.main" }}
+                    onClick={() => deleteMut.mutate(d.id)} disabled={deleteMut.isPending}>
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Add New Domain</Typography>
+        <TextField fullWidth label="Domain name" value={name}
+          onChange={(e) => setName(e.target.value)} size="small"
+          placeholder="e.g. Governance, Access Control, Cyber Hygiene" sx={{ mb: 1.5 }} />
+        <TextField fullWidth label="Description (optional)" value={description}
+          onChange={(e) => setDescription(e.target.value)} size="small"
+          placeholder="What this domain covers" />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose}>Close</Button>
+        <Button variant="contained" disabled={!name.trim() || createMut.isPending}
+          onClick={() => createMut.mutate()}
+          startIcon={createMut.isPending ? <CircularProgress size={14} /> : <Add />}>
+          Add Domain
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ── Detail view ───────────────────────────────────────────────────────────────
 
 function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void }) {
   const qc = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [nativeOpen, setNativeOpen] = useState(false);
+  const [domainOpen, setDomainOpen] = useState(false);
+  const [tab, setTab] = useState(0);
 
   const { data: cf, isLoading } = useQuery<CustomFrameworkDetail>({
     queryKey: ["custom-framework", cfId],
@@ -264,88 +463,200 @@ function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void })
     onError: () => toast.error("Failed to remove control"),
   });
 
+  const removeNativeMut = useMutation({
+    mutationFn: (ncId: string) => customFrameworksApi.deleteNativeControl(cfId, ncId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["custom-framework", cfId] });
+      qc.invalidateQueries({ queryKey: ["custom-frameworks"] });
+    },
+    onError: () => toast.error("Failed to remove control"),
+  });
+
   if (isLoading) return <CircularProgress size={24} />;
   if (!cf) return null;
 
   const existingIds = new Set(cf.controls.map((c) => c.id));
-  const byDomain = cf.controls.reduce<Record<string, PickerControl[]>>((acc, c) => {
-    const d = c.domain || "Uncategorized";
+  const totalControls = cf.controls.length + cf.native_controls.length;
+
+  const byDomain = cf.controls.reduce<Record<string, MappedControl[]>>((acc, c) => {
+    const d = c.control_domain || c.domain || "Uncategorized";
     if (!acc[d]) acc[d] = [];
     acc[d].push(c);
     return acc;
   }, {});
 
+  const nativeByDomain = cf.native_controls.reduce<Record<string, NativeControlItem[]>>((acc, nc) => {
+    const d = nc.domain_name || "Uncategorized";
+    if (!acc[d]) acc[d] = [];
+    acc[d].push(nc);
+    return acc;
+  }, {});
+
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
         <IconButton onClick={onBack} size="small"><ArrowBack /></IconButton>
         <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>{cf.name}</Typography>
           {cf.description && (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>{cf.description}</Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 700 }}>{cf.description}</Typography>
           )}
         </Box>
-        <Chip label={`${cf.controls.length} controls`} size="small" sx={{ mr: 1 }} />
-        <Chip label={cf.slug} size="small" variant="outlined" sx={{ fontFamily: "monospace", mr: 1 }} />
+        <Chip label={`${totalControls} controls`} size="small" sx={{ mr: 0.5 }} />
+        {cf.domains.length > 0 && (
+          <Chip label={`${cf.domains.length} domains`} size="small" color="primary" variant="outlined" sx={{ mr: 0.5 }} />
+        )}
+        <Chip label={cf.slug} size="small" variant="outlined" sx={{ fontFamily: "monospace" }} />
+      </Box>
+
+      {/* Action buttons */}
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
         <Button variant="contained" startIcon={<LibraryAdd />} size="small"
           onClick={() => setPickerOpen(true)}>
-          Add Controls
+          Add from Standards
+        </Button>
+        <Button variant="outlined" startIcon={<Build />} size="small"
+          onClick={() => setNativeOpen(true)}>
+          Add Custom Control
+        </Button>
+        <Button variant="outlined" startIcon={<Category />} size="small"
+          onClick={() => setDomainOpen(true)}>
+          {cf.domains.length > 0 ? `Domains (${cf.domains.length})` : "Add Domains"}
         </Button>
       </Box>
 
-      {cf.controls.length === 0 && (
-        <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
-          <LibraryAdd sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary" }}>
-            No controls yet. Click <strong>Add Controls</strong> to browse and select from existing frameworks.
-          </Typography>
-        </Card>
+      {/* Tabs: Mapped controls | Custom controls */}
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+        <Tab label={`From Standards (${cf.controls.length})`} />
+        <Tab label={`Custom Controls (${cf.native_controls.length})`} />
+      </Tabs>
+
+      {/* Tab 0: Mapped controls from existing frameworks */}
+      {tab === 0 && (
+        <>
+          {cf.controls.length === 0 && (
+            <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+              <LibraryAdd sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>
+                No mapped controls yet. Click <strong>Add from Standards</strong> to pick from NIST, ISO 27001, PCI DSS, and more.
+              </Typography>
+            </Card>
+          )}
+          {Object.entries(byDomain).map(([domain, controls]) => (
+            <Box key={domain} sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "text.secondary",
+                textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11, mb: 1 }}>
+                {domain} <Chip label={controls.length} size="small" sx={{ ml: 0.5, height: 16, fontSize: 10 }} />
+              </Typography>
+              <Card variant="outlined">
+                {controls.map((c, idx) => (
+                  <Box key={c.id}>
+                    {idx > 0 && <Divider />}
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, px: 2, py: 1.5 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontFamily: "monospace" }}>
+                            {c.framework.toUpperCase()} · {c.control_id}
+                          </Typography>
+                          {c.reference_id && (
+                            <Chip label={c.reference_id} size="small"
+                              sx={{ height: 16, fontSize: 9, bgcolor: "#E3F2FD", color: "#1565C0", fontWeight: 700, fontFamily: "monospace" }} />
+                          )}
+                          {c.weight >= 2 && (
+                            <Chip label={WEIGHT_LABEL[c.weight]} size="small"
+                              sx={{ height: 16, fontSize: 9, bgcolor: `${WEIGHT_COLOR[c.weight]}22`,
+                                color: WEIGHT_COLOR[c.weight], fontWeight: 700 }} />
+                          )}
+                        </Box>
+                        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{c.title}</Typography>
+                        {c.description && (
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.description}</Typography>
+                        )}
+                      </Box>
+                      <Tooltip title="Remove from policy">
+                        <IconButton size="small" onClick={() => removeMut.mutate(c.id)}
+                          disabled={removeMut.isPending}
+                          sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                ))}
+              </Card>
+            </Box>
+          ))}
+        </>
       )}
 
-      {Object.entries(byDomain).map(([domain, controls]) => (
-        <Box key={domain} sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "text.secondary",
-            textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11, mb: 1 }}>
-            {domain} <Chip label={controls.length} size="small" sx={{ ml: 0.5, height: 16, fontSize: 10 }} />
-          </Typography>
-          <Card variant="outlined">
-            {controls.map((c, idx) => (
-              <Box key={c.id}>
-                {idx > 0 && <Divider />}
-                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, px: 2, py: 1.5 }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontFamily: "monospace" }}>
-                        {c.framework.toUpperCase()} · {c.control_id}
-                      </Typography>
-                      {c.weight >= 2 && (
-                        <Chip label={WEIGHT_LABEL[c.weight]} size="small"
-                          sx={{ height: 16, fontSize: 9, bgcolor: `${WEIGHT_COLOR[c.weight]}22`,
-                            color: WEIGHT_COLOR[c.weight], fontWeight: 700 }} />
-                      )}
+      {/* Tab 1: Native custom controls */}
+      {tab === 1 && (
+        <>
+          {cf.native_controls.length === 0 && (
+            <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
+              <Build sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+              <Typography sx={{ color: "text.secondary" }}>
+                No custom controls yet. Click <strong>Add Custom Control</strong> to define requirements
+                not covered by existing standards (e.g. specific RTO thresholds, regulator timelines).
+              </Typography>
+            </Card>
+          )}
+          {Object.entries(nativeByDomain).map(([domain, controls]) => (
+            <Box key={domain} sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "text.secondary",
+                textTransform: "uppercase", letterSpacing: 0.5, fontSize: 11, mb: 1 }}>
+                {domain} <Chip label={controls.length} size="small" sx={{ ml: 0.5, height: 16, fontSize: 10 }} />
+              </Typography>
+              <Card variant="outlined">
+                {controls.map((nc, idx) => (
+                  <Box key={nc.id}>
+                    {idx > 0 && <Divider />}
+                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, px: 2, py: 1.5 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#6A1B9A", fontFamily: "monospace" }}>
+                            {nc.control_id}
+                          </Typography>
+                          <Chip label="Custom" size="small"
+                            sx={{ height: 16, fontSize: 9, bgcolor: "#F3E5F5", color: "#6A1B9A", fontWeight: 700 }} />
+                          {nc.weight >= 2 && (
+                            <Chip label={WEIGHT_LABEL[nc.weight]} size="small"
+                              sx={{ height: 16, fontSize: 9, bgcolor: `${WEIGHT_COLOR[nc.weight]}22`,
+                                color: WEIGHT_COLOR[nc.weight], fontWeight: 700 }} />
+                          )}
+                        </Box>
+                        <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{nc.title}</Typography>
+                        {nc.description && (
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>{nc.description}</Typography>
+                        )}
+                      </Box>
+                      <Tooltip title="Remove control">
+                        <IconButton size="small" onClick={() => removeNativeMut.mutate(nc.id)}
+                          disabled={removeNativeMut.isPending}
+                          sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{c.title}</Typography>
-                    {c.description && (
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.description}</Typography>
-                    )}
                   </Box>
-                  <Tooltip title="Remove from framework">
-                    <IconButton size="small" onClick={() => removeMut.mutate(c.id)}
-                      disabled={removeMut.isPending}
-                      sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            ))}
-          </Card>
-        </Box>
-      ))}
+                ))}
+              </Card>
+            </Box>
+          ))}
+        </>
+      )}
 
       {pickerOpen && (
         <ControlPickerDialog cfId={cfId} existingIds={existingIds}
           onClose={() => setPickerOpen(false)} />
+      )}
+      {nativeOpen && (
+        <NativeControlDialog cfId={cfId} domains={cf.domains}
+          onClose={() => setNativeOpen(false)} />
+      )}
+      {domainOpen && (
+        <DomainManagerDialog cfId={cfId} domains={cf.domains}
+          onClose={() => setDomainOpen(false)} />
       )}
     </Box>
   );
@@ -375,16 +686,16 @@ export default function CustomFrameworks() {
       setNewDesc("");
       setSelectedCf(created.id);
     },
-    onError: () => toast.error("Failed to create framework"),
+    onError: () => toast.error("Failed to create policy"),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => customFrameworksApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["custom-frameworks"] });
-      toast.success("Framework deleted");
+      toast.success("Policy deleted");
     },
-    onError: () => toast.error("Failed to delete framework"),
+    onError: () => toast.error("Failed to delete policy"),
   });
 
   const handleDelete = useCallback((e: React.MouseEvent, id: string, name: string) => {
@@ -404,15 +715,16 @@ export default function CustomFrameworks() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Custom Standards</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Custom Policy</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Build your own compliance standard by selecting controls from NIST, ISO 27001, CIS, PCI DSS, GDPR, and more.
+            Build custom compliance policies by combining controls from NIST, ISO 27001, CIS, PCI DSS, GDPR,
+            and your own custom requirements with named domains.
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <IconButton onClick={() => refetch()}><Refresh /></IconButton>
           <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-            New Standard
+            New Policy
           </Button>
         </Box>
       </Box>
@@ -422,13 +734,13 @@ export default function CustomFrameworks() {
       {!isLoading && frameworks.length === 0 && (
         <Card variant="outlined" sx={{ p: 5, textAlign: "center" }}>
           <LibraryAdd sx={{ fontSize: 52, color: "text.secondary", mb: 1.5 }} />
-          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>No custom standards yet</Typography>
-          <Typography sx={{ color: "text.secondary", mb: 2.5, maxWidth: 480, mx: "auto" }}>
-            Create a named standard and pick controls from any loaded framework —
-            NIST CSF, ISO 27001:2022, PCI DSS v4.0, GDPR, CIS Controls, and more.
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>No custom policies yet</Typography>
+          <Typography sx={{ color: "text.secondary", mb: 2.5, maxWidth: 520, mx: "auto" }}>
+            Create a named policy and pick controls from any loaded framework.
+            Add your own domains and custom controls to fill gaps not covered by existing standards.
           </Typography>
           <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-            Create Your First Standard
+            Create Your First Policy
           </Button>
         </Card>
       )}
@@ -451,7 +763,7 @@ export default function CustomFrameworks() {
                   <Chip label={cf.slug} size="small" sx={{ fontFamily: "monospace", fontSize: 10 }} />
                 </Box>
               </Box>
-              <Tooltip title="Delete standard">
+              <Tooltip title="Delete policy">
                 <IconButton size="small" onClick={(e) => handleDelete(e, cf.id, cf.name)}
                   sx={{ color: "error.main" }}>
                   <Delete fontSize="small" />
@@ -464,17 +776,18 @@ export default function CustomFrameworks() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 700 }}>Create Custom Standard</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Create Custom Policy</DialogTitle>
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2, mt: 0.5 }}>
-            After creating, you'll be taken to the builder to select controls from existing frameworks.
+            After creating, you'll be taken to the builder to add domains, select controls from
+            existing frameworks, and define your own custom controls.
           </Alert>
-          <TextField fullWidth label="Standard name" value={newName}
+          <TextField fullWidth label="Policy name" value={newName}
             onChange={(e) => setNewName(e.target.value)} autoFocus
-            placeholder="e.g. Accenture Security Baseline" sx={{ mb: 2 }} />
+            placeholder="e.g. MAS TRM, Accenture Security Baseline" sx={{ mb: 2 }} />
           <TextField fullWidth label="Description (optional)" value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)} multiline rows={2}
-            placeholder="Describe what this standard covers and who it applies to" />
+            placeholder="Describe what this policy covers and who it applies to" />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>

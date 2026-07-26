@@ -603,6 +603,25 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.is_live ALTER failed: %s", exc)
 
+    # custom_framework_controls — reference_id, sort_order, domain (added for MAS TRM policy mapping)
+    insp = inspect(engine)
+    cfc_cols = {c["name"] for c in insp.get_columns("custom_framework_controls")}
+    for col_name, ddl_sqlite, ddl_mssql in [
+        ("reference_id", "TEXT",                        "NVARCHAR(20)"),
+        ("sort_order",   "INTEGER NOT NULL DEFAULT 0",  "INT NOT NULL DEFAULT 0"),
+        ("domain",       "TEXT",                        "NVARCHAR(100)"),
+    ]:
+        if col_name not in cfc_cols:
+            ddl = (f"ALTER TABLE custom_framework_controls ADD {col_name} {ddl_mssql}"
+                   if dialect == "mssql"
+                   else f"ALTER TABLE custom_framework_controls ADD COLUMN {col_name} {ddl_sqlite}")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added custom_framework_controls.%s column", col_name)
+            except Exception as exc:
+                logger.warning("custom_framework_controls.%s ALTER failed: %s", col_name, exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
@@ -919,6 +938,254 @@ def _migrate_risk_scale_v2() -> None:
         lf.close()
 
 
+def _seed_mas_trm_custom_policy() -> None:
+    """Idempotent: create the 'MAS TRM' custom policy if it does not yet exist.
+
+    Builds the framework by selecting controls from NIST CSF 2.0, ISO 27001:2022,
+    PCI DSS v4.0, and CIS Controls v8 that map to MAS Technology Risk Management
+    Guidelines 2021 domains.  Running this again after the slug exists is a no-op.
+    """
+    from api.models.models import CustomFramework, CustomFrameworkControl, FrameworkControl
+    from sqlalchemy.orm import Session
+
+    # (mas_trm_ref, framework_id, control_id) — each row links one standard control to a MAS TRM requirement
+    # Gaps noted where no standard control fully addresses the MAS requirement:
+    #   MAS-7.1  (RTO ≤ 4 hrs for critical systems) — no standard specifies the 4-hour threshold;
+    #            RC.RP-02 + ISO 8.14 cover the intent but not the specific SLA.
+    #   MAS-14.1 (report to MAS within prescribed hours) — no generic standard covers regulator-specific
+    #            notification timelines; RS.CO-02 + ISO 5.26 cover incident notification generally.
+    #   MAS-12.5 (technology concentration risk) — partially covered by GV.SC-04 + ID.BE-05 but no
+    #            standard addresses concentration thresholds explicitly.
+    #   MAS-13.3 (Singapore open banking / data sharing) — no direct equivalent; ISO 5.14 + 5.23 cover intent.
+    CONTROL_MAP: list[tuple[str, str, str]] = [
+        # MAS-4.1  Board oversight of technology risk
+        ("MAS-4.1",  "nist_csf", "GV.OC-01"), ("MAS-4.1",  "nist_csf", "GV.RR-01"),
+        ("MAS-4.1",  "nist_csf", "GV.OV-01"), ("MAS-4.1",  "nist_csf", "GV.OV-02"),
+        ("MAS-4.1",  "iso_27001", "5.1"),
+        # MAS-4.2  Senior management responsibilities
+        ("MAS-4.2",  "nist_csf", "GV.RR-02"), ("MAS-4.2",  "nist_csf", "GV.RR-03"),
+        ("MAS-4.2",  "nist_csf", "GV.OC-02"), ("MAS-4.2",  "nist_csf", "GV.OC-03"),
+        ("MAS-4.2",  "iso_27001", "5.2"),  ("MAS-4.2",  "iso_27001", "5.4"),
+        # MAS-4.4  Technology risk culture / awareness
+        ("MAS-4.4",  "nist_csf", "PR.AT-01"), ("MAS-4.4",  "nist_csf", "PR.AT-04"),
+        ("MAS-4.4",  "cis_v8",   "CIS-14.1"),
+        # MAS-5.1  Technology risk framework
+        ("MAS-5.1",  "nist_csf", "GV.PO-01"), ("MAS-5.1",  "nist_csf", "GV.PO-02"),
+        ("MAS-5.1",  "nist_csf", "GV.RM-01"),
+        # MAS-5.2  Technology risk appetite
+        ("MAS-5.2",  "nist_csf", "GV.RM-02"), ("MAS-5.2",  "nist_csf", "GV.RM-03"),
+        ("MAS-5.2",  "nist_csf", "GV.RM-04"),
+        # MAS-5.3  Technology risk register
+        ("MAS-5.3",  "nist_csf", "ID.RA-06"),
+        # MAS-5.4  Technology risk reporting
+        ("MAS-5.4",  "nist_csf", "GV.OV-03"), ("MAS-5.4",  "nist_csf", "GV.RM-05"),
+        # MAS-6.1  Periodic risk assessment
+        ("MAS-6.1",  "nist_csf", "ID.RA-03"), ("MAS-6.1",  "nist_csf", "ID.RA-04"),
+        ("MAS-6.1",  "pci_dss",  "REQ-12-2"),
+        # MAS-6.2  Critical system identification
+        ("MAS-6.2",  "nist_csf", "ID.AM-05"), ("MAS-6.2",  "nist_csf", "ID.BE-04"),
+        ("MAS-6.2",  "nist_csf", "ID.BE-05"),
+        # MAS-6.3  Threat and vulnerability management
+        ("MAS-6.3",  "nist_csf", "ID.RA-01"), ("MAS-6.3",  "nist_csf", "ID.RA-02"),
+        ("MAS-6.3",  "nist_csf", "PR.IP-12"),
+        ("MAS-6.3",  "iso_27001", "8.8"),
+        # MAS-7.2  Disaster recovery planning
+        ("MAS-7.2",  "nist_csf", "RC.RP-01"), ("MAS-7.2",  "nist_csf", "RC.RP-02"),
+        ("MAS-7.2",  "iso_27001", "5.29"),
+        # MAS-7.3  Disaster recovery testing
+        ("MAS-7.3",  "nist_csf", "RC.RP-05"), ("MAS-7.3",  "nist_csf", "PR.IP-10"),
+        ("MAS-7.3",  "cis_v8",   "CIS-11.3"), ("MAS-7.3",  "cis_v8",   "CIS-11.4"),
+        # MAS-7.4  Business continuity planning
+        ("MAS-7.4",  "nist_csf", "PR.IP-09"),
+        ("MAS-7.4",  "iso_27001", "5.30"), ("MAS-7.4",  "iso_27001", "5.29"),
+        # MAS-7.5  Redundancy and high availability
+        ("MAS-7.5",  "nist_csf", "PR.IR-03"), ("MAS-7.5",  "nist_csf", "PR.IR-04"),
+        ("MAS-7.5",  "iso_27001", "8.14"),
+        # MAS-7.6  Backup and restoration
+        ("MAS-7.6",  "nist_csf", "PR.IP-04"), ("MAS-7.6",  "nist_csf", "PR.DS-11"),
+        ("MAS-7.6",  "nist_csf", "RC.RP-03"),
+        ("MAS-7.6",  "iso_27001", "8.13"),
+        ("MAS-7.6",  "cis_v8",   "CIS-11.1"), ("MAS-7.6",  "cis_v8",   "CIS-11.2"),
+        # MAS-8.1  User access management
+        ("MAS-8.1",  "nist_csf", "PR.AA-01"), ("MAS-8.1",  "nist_csf", "PR.AA-05"),
+        ("MAS-8.1",  "nist_csf", "PR.AC-01"), ("MAS-8.1",  "nist_csf", "PR.AC-04"),
+        ("MAS-8.1",  "iso_27001", "5.15"),   ("MAS-8.1",  "iso_27001", "5.18"),
+        ("MAS-8.1",  "pci_dss",  "REQ-7-1"), ("MAS-8.1",  "pci_dss",  "REQ-7-2"),
+        ("MAS-8.1",  "pci_dss",  "REQ-7-4"), ("MAS-8.1",  "pci_dss",  "REQ-7-5"),
+        # MAS-8.2  Privileged access management
+        ("MAS-8.2",  "nist_csf", "PR.AA-02"), ("MAS-8.2",  "nist_csf", "PR.AA-03"),
+        ("MAS-8.2",  "iso_27001", "8.2"),
+        ("MAS-8.2",  "pci_dss",  "REQ-7-3"), ("MAS-8.2",  "pci_dss",  "REQ-8-7"),
+        # MAS-8.3  Multi-factor authentication
+        ("MAS-8.3",  "nist_csf", "PR.AC-07"),
+        ("MAS-8.3",  "iso_27001", "5.17"),   ("MAS-8.3",  "iso_27001", "8.5"),
+        ("MAS-8.3",  "pci_dss",  "REQ-8-4"),
+        # MAS-8.4  Remote access security
+        ("MAS-8.4",  "nist_csf", "PR.AC-03"),
+        ("MAS-8.4",  "iso_27001", "6.7"),
+        ("MAS-8.4",  "pci_dss",  "REQ-8-8"),
+        # MAS-8.5  Customer authentication
+        ("MAS-8.5",  "iso_27001", "5.16"),   ("MAS-8.5",  "iso_27001", "8.3"),
+        ("MAS-8.5",  "pci_dss",  "REQ-8-3"),
+        # MAS-8.6  Access reviews and recertification
+        ("MAS-8.6",  "nist_csf", "PR.AC-01"),
+        ("MAS-8.6",  "pci_dss",  "REQ-7-4"),
+        # MAS-9.1  Patch and vulnerability management
+        ("MAS-9.1",  "nist_csf", "PR.PS-02"), ("MAS-9.1",  "nist_csf", "DE.CM-08"),
+        ("MAS-9.1",  "iso_27001", "8.8"),
+        ("MAS-9.1",  "pci_dss",  "REQ-6-1"), ("MAS-9.1",  "pci_dss",  "REQ-6-2"),
+        ("MAS-9.1",  "cis_v8",   "CIS-7.1"), ("MAS-9.1",  "cis_v8",   "CIS-7.2"),
+        # MAS-9.2  Anti-malware
+        ("MAS-9.2",  "nist_csf", "DE.CM-04"),
+        ("MAS-9.2",  "iso_27001", "8.7"),
+        ("MAS-9.2",  "pci_dss",  "REQ-5-1"), ("MAS-9.2",  "pci_dss",  "REQ-5-2"),
+        ("MAS-9.2",  "cis_v8",   "CIS-10.1"),
+        # MAS-9.3  Network security
+        ("MAS-9.3",  "nist_csf", "PR.IR-01"), ("MAS-9.3",  "nist_csf", "PR.PT-04"),
+        ("MAS-9.3",  "iso_27001", "8.20"),   ("MAS-9.3",  "iso_27001", "8.22"),
+        ("MAS-9.3",  "cis_v8",   "CIS-12.1"),
+        # MAS-9.4  Security monitoring and SIEM
+        ("MAS-9.4",  "nist_csf", "DE.CM-01"), ("MAS-9.4",  "nist_csf", "DE.CM-03"),
+        ("MAS-9.4",  "nist_csf", "DE.AE-03"),
+        ("MAS-9.4",  "cis_v8",   "CIS-13.1"),
+        # MAS-9.5  Penetration testing
+        ("MAS-9.5",  "nist_csf", "ID.IM-02"),
+        ("MAS-9.5",  "pci_dss",  "REQ-11-2"), ("MAS-9.5",  "pci_dss",  "REQ-11-3"),
+        ("MAS-9.5",  "cis_v8",   "CIS-18.1"),
+        # MAS-9.7  Data loss prevention
+        ("MAS-9.7",  "nist_csf", "PR.DS-05"),
+        ("MAS-9.7",  "iso_27001", "8.12"),
+        # MAS-9.8  Cryptography and encryption
+        ("MAS-9.8",  "nist_csf", "PR.DS-01"), ("MAS-9.8",  "nist_csf", "PR.DS-02"),
+        ("MAS-9.8",  "iso_27001", "8.24"),
+        # MAS-9.9  Cyber incident response
+        ("MAS-9.9",  "nist_csf", "RS.RP-01"), ("MAS-9.9",  "nist_csf", "RS.AN-01"),
+        ("MAS-9.9",  "nist_csf", "RS.MI-01"), ("MAS-9.9",  "nist_csf", "RS.MI-02"),
+        ("MAS-9.9",  "iso_27001", "5.24"),   ("MAS-9.9",  "iso_27001", "5.25"),
+        ("MAS-9.9",  "iso_27001", "5.26"),   ("MAS-9.9",  "iso_27001", "5.27"),
+        ("MAS-9.9",  "pci_dss",  "REQ-12-5"),
+        ("MAS-9.9",  "cis_v8",   "CIS-17.1"),
+        # MAS-9.10 Threat intelligence
+        ("MAS-9.10", "nist_csf", "ID.RA-02"), ("MAS-9.10", "nist_csf", "DE.AE-07"),
+        ("MAS-9.10", "iso_27001", "5.7"),
+        # MAS-10.1 Change management
+        ("MAS-10.1", "nist_csf", "PR.IP-03"),
+        ("MAS-10.1", "iso_27001", "8.32"),
+        ("MAS-10.1", "pci_dss",  "REQ-6-8"),
+        ("MAS-10.1", "cis_v8",   "CIS-4.1"),
+        # MAS-10.2 Configuration management
+        ("MAS-10.2", "nist_csf", "PR.IP-01"), ("MAS-10.2", "nist_csf", "PR.PS-01"),
+        ("MAS-10.2", "iso_27001", "8.9"),
+        ("MAS-10.2", "cis_v8",   "CIS-4.2"),
+        # MAS-10.3 Capacity management
+        ("MAS-10.3", "nist_csf", "PR.DS-04"),
+        ("MAS-10.3", "iso_27001", "8.6"),
+        # MAS-10.4 Incident management
+        ("MAS-10.4", "nist_csf", "RS.AN-01"), ("MAS-10.4", "nist_csf", "RS.MA-01"),
+        ("MAS-10.4", "nist_csf", "RS.CO-02"), ("MAS-10.4", "nist_csf", "RS.CO-03"),
+        # MAS-10.6 Audit logging and monitoring
+        ("MAS-10.6", "nist_csf", "PR.PS-04"), ("MAS-10.6", "nist_csf", "DE.CM-03"),
+        ("MAS-10.6", "iso_27001", "8.15"),   ("MAS-10.6", "iso_27001", "8.16"), ("MAS-10.6", "iso_27001", "8.17"),
+        ("MAS-10.6", "pci_dss",  "REQ-10-1"), ("MAS-10.6", "pci_dss",  "REQ-10-2"),
+        ("MAS-10.6", "pci_dss",  "REQ-10-3"), ("MAS-10.6", "pci_dss",  "REQ-10-5"),
+        ("MAS-10.6", "cis_v8",   "CIS-8.1"),
+        # MAS-11.2 System development life cycle
+        ("MAS-11.2", "nist_csf", "PR.IP-02"),
+        ("MAS-11.2", "iso_27001", "5.8"),    ("MAS-11.2", "iso_27001", "8.25"),
+        ("MAS-11.2", "iso_27001", "8.31"),
+        # MAS-11.3 Security in application development
+        ("MAS-11.3", "nist_csf", "PR.PS-06"),
+        ("MAS-11.3", "iso_27001", "8.26"),   ("MAS-11.3", "iso_27001", "8.27"),
+        ("MAS-11.3", "iso_27001", "8.28"),   ("MAS-11.3", "iso_27001", "8.29"),
+        ("MAS-11.3", "pci_dss",  "REQ-6-3"), ("MAS-11.3", "pci_dss",  "REQ-6-4"),
+        ("MAS-11.3", "cis_v8",   "CIS-16.1"),
+        # MAS-12.1 Vendor risk assessment
+        ("MAS-12.1", "nist_csf", "GV.SC-06"), ("MAS-12.1", "nist_csf", "ID.RA-10"),
+        ("MAS-12.1", "nist_csf", "GV.SC-07"),
+        # MAS-12.3 Contract and SLA management
+        ("MAS-12.3", "nist_csf", "GV.SC-05"),
+        ("MAS-12.3", "iso_27001", "5.20"),
+        # MAS-12.4 Ongoing vendor monitoring
+        ("MAS-12.4", "nist_csf", "GV.SC-04"), ("MAS-12.4", "nist_csf", "DE.CM-06"),
+        ("MAS-12.4", "iso_27001", "5.22"),
+        ("MAS-12.4", "pci_dss",  "REQ-12-4"),
+        # MAS-12.6 Exit planning and sub-outsourcing
+        ("MAS-12.6", "nist_csf", "GV.SC-01"), ("MAS-12.6", "nist_csf", "GV.SC-02"),
+        ("MAS-12.6", "iso_27001", "5.19"),   ("MAS-12.6", "iso_27001", "5.21"),
+        ("MAS-12.6", "cis_v8",   "CIS-15.1"),
+        # MAS-13.1 Cloud computing risk management
+        ("MAS-13.1", "nist_csf", "GV.SC-09"),
+        ("MAS-13.1", "iso_27001", "5.23"),
+        # MAS-13.2 API security
+        ("MAS-13.2", "nist_csf", "DE.CM-09"),
+        ("MAS-13.2", "iso_27001", "8.23"),
+        # MAS-13.3 Open banking / data sharing (partial — no direct standard)
+        ("MAS-13.3", "iso_27001", "5.14"),
+        # MAS-14.2 IT audit function
+        ("MAS-14.2", "iso_27001", "5.35"),
+        ("MAS-14.2", "cis_v8",   "CIS-18.1"),
+        # MAS-14.4 Audit trail and evidence retention
+        ("MAS-14.4", "nist_csf", "GV.OV-03"),
+        ("MAS-14.4", "iso_27001", "5.36"),
+        ("MAS-14.4", "pci_dss",  "REQ-10-5"),
+        # MAS-14.1 Incident reporting to regulator (partial — no standard covers MAS-specific timelines)
+        ("MAS-14.1", "nist_csf", "RS.CO-02"), ("MAS-14.1", "nist_csf", "RS.CO-03"),
+        ("MAS-14.1", "iso_27001", "5.26"),
+        ("MAS-14.1", "pci_dss",  "REQ-12-6"),
+    ]
+
+    with SessionLocal() as db:
+        if db.query(CustomFramework).filter_by(slug="mas-trm").first():
+            return  # already seeded
+
+        cf = CustomFramework(
+            name="MAS TRM",
+            slug="mas-trm",
+            description=(
+                "Singapore MAS Technology Risk Management Guidelines 2021. "
+                "Controls mapped from NIST CSF 2.0, ISO/IEC 27001:2022, PCI DSS v4.0, and CIS Controls v8. "
+                "Each control tagged with its MAS TRM reference ID. "
+                "Partial gaps: MAS-7.1 (4-hr RTO SLA), MAS-12.5 (concentration risk), "
+                "MAS-13.3 (open banking), MAS-14.1 (MAS-specific notification timelines) — "
+                "no existing standard fully addresses these; add custom controls via Custom Policy."
+            ),
+            created_by="system",
+        )
+        db.add(cf)
+        db.flush()
+
+        seen_pairs: set[tuple] = set()
+        inserted = 0
+        missing: list[str] = []
+        for sort_order, (mas_ref, fw_id, ctrl_id) in enumerate(CONTROL_MAP):
+            pair = (fw_id, ctrl_id)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            fc = (
+                db.query(FrameworkControl)
+                .filter_by(framework=fw_id, control_id=ctrl_id)
+                .first()
+            )
+            if fc:
+                db.add(CustomFrameworkControl(
+                    custom_framework_id=cf.id,
+                    framework_control_id=fc.id,
+                    reference_id=mas_ref,
+                    sort_order=sort_order,
+                ))
+                inserted += 1
+            else:
+                missing.append(f"{mas_ref}→{fw_id}/{ctrl_id}")
+        db.commit()
+        if missing:
+            logger.warning(
+                "MAS TRM seed: %d control(s) not found in DB (framework not yet seeded or ID mismatch): %s",
+                len(missing), ", ".join(missing),
+            )
+        logger.info("Seeded MAS TRM custom policy with %d controls (reference_ids tagged).", inserted)
+
+
 def _prune_access_logs(retention_days: int = 90) -> None:
     """Delete access_logs rows older than the retention window. Runs at
     startup (workers recycle periodically, so this fires often enough)."""
@@ -1087,6 +1354,7 @@ _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
 _seed_framework_controls()
+_seed_mas_trm_custom_policy()
 _migrate_risk_scale_v2()
 _bootstrap_initial_admin()
 _fail_stale_threat_models()

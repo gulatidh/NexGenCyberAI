@@ -457,6 +457,8 @@ class CustomFramework(Base):
     created_by = Column(String(255))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     controls = relationship("CustomFrameworkControl", back_populates="custom_framework", cascade="all, delete-orphan")
+    domains = relationship("CustomFrameworkDomain", back_populates="custom_framework", cascade="all, delete-orphan", order_by="CustomFrameworkDomain.sort_order")
+    native_controls = relationship("CustomNativeControl", back_populates="custom_framework", cascade="all, delete-orphan", order_by="CustomNativeControl.sort_order")
 
 
 class CustomFrameworkControl(Base):
@@ -468,9 +470,43 @@ class CustomFrameworkControl(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     custom_framework_id = Column(String(36), ForeignKey("custom_frameworks.id"), nullable=False, index=True)
     framework_control_id = Column(String(36), ForeignKey("framework_controls.id"), nullable=False)
+    reference_id = Column(String(20), nullable=True)   # e.g. "MAS-4.1" — policy control this maps to
+    domain = Column(String(100), nullable=True)        # optional grouping label for this mapped control
+    sort_order = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     custom_framework = relationship("CustomFramework", back_populates="controls")
     framework_control = relationship("FrameworkControl")
+
+
+class CustomFrameworkDomain(Base):
+    """User-defined domain category within a custom framework."""
+    __tablename__ = "custom_framework_domains"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    custom_framework_id = Column(String(36), ForeignKey("custom_frameworks.id"), nullable=False, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    custom_framework = relationship("CustomFramework", back_populates="domains")
+    native_controls = relationship("CustomNativeControl", back_populates="domain", cascade="all, delete-orphan")
+
+
+class CustomNativeControl(Base):
+    """A fully custom control not tied to any standard framework control."""
+    __tablename__ = "custom_native_controls"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    custom_framework_id = Column(String(36), ForeignKey("custom_frameworks.id"), nullable=False, index=True)
+    domain_id = Column(String(36), ForeignKey("custom_framework_domains.id"), nullable=True, index=True)
+    control_id = Column(String(50), nullable=False)    # user-defined, e.g. "MAS-7.1"
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    weight = Column(Integer, default=1)
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    custom_framework = relationship("CustomFramework", back_populates="native_controls")
+    domain = relationship("CustomFrameworkDomain", back_populates="native_controls")
 
 
 class ClientControlStatus(Base):

@@ -60,7 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
         { label: "Stale Assets",    icon: <History />, path: "/stale-assets" },
       ] },
       { label: "Frameworks",       icon: <Policy />,      path: "/frameworks" },
-      { label: "Custom Standards", icon: <LibraryAdd />, path: "/custom-frameworks" },
+      { label: "Custom Policy", icon: <LibraryAdd />, path: "/custom-frameworks" },
     ],
   },
   {
