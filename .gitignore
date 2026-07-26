@@ -19,6 +19,7 @@ build/
 *.sqlite3
 # Pre-built packages bundled by CI — never commit (large, platform-specific)
 backend/.bundled-packages/
+backend/.bundled-packages.tar.gz
 
 # Node / React
 node_modules/

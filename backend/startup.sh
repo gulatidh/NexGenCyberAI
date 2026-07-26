@@ -1,5 +1,5 @@
 #!/bin/bash
-# v2 — pre-bundled packages path added
+# v3 — tar.gz bundle extracted to /tmp (ephemeral disk, fast)
 set -e
 cd /home/site/wwwroot
 
@@ -15,29 +15,34 @@ else
 fi
 echo "[startup] Using Python: $PYTHON3 ($($PYTHON3 --version 2>&1))"
 
-# ── Fast path: pre-bundled packages shipped in the deployment zip ─────────────
-# CI builds site-packages into .bundled-packages/ and includes it in backend.zip.
-# These land in wwwroot (local disk, NOT Azure Files) so there is zero install
-# time — the packages are already extracted by the time startup.sh runs.
-# We invoke gunicorn via `python -m gunicorn` to avoid shebang path issues
-# (the CI-built bin/ scripts reference the CI Python path, not Azure's).
-BUNDLED=/home/site/wwwroot/.bundled-packages
-if [ -d "$BUNDLED" ] && PYTHONPATH="$BUNDLED" "$PYTHON3" -c "import gunicorn, fastapi, uvicorn" 2>/dev/null; then
-    echo "[startup] Pre-bundled packages found — starting immediately (no pip install)"
-    exec PYTHONPATH="$BUNDLED" "$PYTHON3" -m gunicorn main:app \
-        --worker-class uvicorn.workers.UvicornWorker \
-        --workers 1 \
-        --bind 0.0.0.0:8000 \
-        --timeout 300 \
-        --graceful-timeout 60 \
-        --max-requests 600 \
-        --max-requests-jitter 150 \
-        --log-file -
+# ── Fast path: pre-bundled packages shipped as a single tar.gz ───────────────
+# CI creates .bundled-packages.tar.gz from site-packages and includes it in the
+# deployment zip. Kudu writes ONE large file to wwwroot (fast). We extract it
+# to /tmp/aegis-packages (ephemeral local disk, NOT Azure Files) — takes ~20s.
+# Then run gunicorn via PYTHONPATH — no pip install, no Azure Files writes.
+BUNDLED_TAR=/home/site/wwwroot/.bundled-packages.tar.gz
+BUNDLED_EXTRACT=/tmp/aegis-packages
+
+if [ -f "$BUNDLED_TAR" ]; then
+    echo "[startup] Extracting pre-bundled packages to /tmp (~20s)..."
+    mkdir -p "$BUNDLED_EXTRACT"
+    tar -xzf "$BUNDLED_TAR" -C "$BUNDLED_EXTRACT"
+    if PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -c "import gunicorn, fastapi, uvicorn" 2>/dev/null; then
+        echo "[startup] Pre-bundled packages ready — starting immediately (no pip install)"
+        exec PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -m gunicorn main:app \
+            --worker-class uvicorn.workers.UvicornWorker \
+            --workers 1 \
+            --bind 0.0.0.0:8000 \
+            --timeout 300 \
+            --graceful-timeout 60 \
+            --max-requests 600 \
+            --max-requests-jitter 150 \
+            --log-file -
+    fi
+    echo "[startup] Bundled packages incomplete — falling through to antenv"
 fi
 
 # ── Fallback: persistent venv at /home/data/antenv (Azure Files) ──────────────
-# Used when deploying from a branch/commit that predates bundled packages,
-# or if the bundled packages are somehow absent or broken.
 echo "[startup] No bundled packages — using /home/data/antenv (pip install on first run)"
 
 ANTENV=/home/data/antenv

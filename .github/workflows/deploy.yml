@@ -225,21 +225,20 @@ jobs:
         id: cache-bundled
         uses: actions/cache@v5
         with:
-          path: backend/.bundled-packages
-          key: bundled-pkgs-py${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements.txt') }}
+          path: backend/.bundled-packages.tar.gz
+          key: bundled-tar-py${{ env.PYTHON_VERSION }}-${{ hashFiles('backend/requirements.txt') }}
 
       - name: Pre-build Python packages
         if: steps.cache-bundled.outputs.cache-hit != 'true'
         run: |
           python3.12 -m venv /tmp/prebuild-venv
           /tmp/prebuild-venv/bin/pip install -r backend/requirements.txt --quiet
-          # Copy only site-packages — no Python binary symlinks needed since
-          # startup.sh uses `python3 -m gunicorn` with PYTHONPATH instead.
-          mkdir -p backend/.bundled-packages/
-          cp -r /tmp/prebuild-venv/lib/python3.12/site-packages/. backend/.bundled-packages/
-          find backend/.bundled-packages/ -name "*.pyc" -delete 2>/dev/null || true
-          find backend/.bundled-packages/ -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-          echo "Bundled packages: $(du -sh backend/.bundled-packages/ | cut -f1)"
+          # Bundle as a single tar.gz — one large file in the zip instead of
+          # thousands of small files. Kudu writes one file to wwwroot (fast).
+          # startup.sh extracts to /tmp (ephemeral local disk, ~20s, not Azure Files).
+          tar -czf backend/.bundled-packages.tar.gz \
+            -C /tmp/prebuild-venv/lib/python3.12/site-packages/ .
+          echo "Bundled tar.gz: $(du -sh backend/.bundled-packages.tar.gz | cut -f1)"
 
       - name: Generate deploy info
         env:
