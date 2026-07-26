@@ -7,7 +7,7 @@ from api.models.models import WebhookConfig, WebhookDelivery
 from api.schemas.schemas import WebhookCreate, WebhookResponse
 from db.database import get_db
 from core.security import get_current_user
-from core.authz import require_editor_anywhere
+from core.authz import require_editor_anywhere, require_scoped_role, AccessRole, AccessScope
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -16,8 +16,10 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 async def list_webhooks(
     client_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    if client_id:
+        require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     q = db.query(WebhookConfig)
     if client_id:
         q = q.filter((WebhookConfig.client_id == client_id) | (WebhookConfig.client_id.is_(None)))
@@ -25,7 +27,9 @@ async def list_webhooks(
 
 
 @router.post("/", response_model=WebhookResponse, dependencies=[Depends(require_editor_anywhere)])
-async def create_webhook(payload: WebhookCreate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def create_webhook(payload: WebhookCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if payload.client_id:
+        require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, payload.client_id, db, user)
     wh = WebhookConfig(**payload.model_dump())
     db.add(wh)
     db.commit()
@@ -34,10 +38,12 @@ async def create_webhook(payload: WebhookCreate, db: Session = Depends(get_db), 
 
 
 @router.patch("/{webhook_id}", response_model=WebhookResponse, dependencies=[Depends(require_editor_anywhere)])
-async def toggle_webhook(webhook_id: str, is_active: bool, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def toggle_webhook(webhook_id: str, is_active: bool, db: Session = Depends(get_db), user=Depends(get_current_user)):
     wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
     if not wh:
         raise HTTPException(status_code=404, detail="Webhook not found")
+    if wh.client_id:
+        require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, wh.client_id, db, user)
     wh.is_active = is_active
     db.commit()
     db.refresh(wh)
@@ -45,17 +51,24 @@ async def toggle_webhook(webhook_id: str, is_active: bool, db: Session = Depends
 
 
 @router.delete("/{webhook_id}", dependencies=[Depends(require_editor_anywhere)])
-async def delete_webhook(webhook_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def delete_webhook(webhook_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
     wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
     if not wh:
         raise HTTPException(status_code=404, detail="Webhook not found")
+    if wh.client_id:
+        require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, wh.client_id, db, user)
     db.delete(wh)
     db.commit()
     return {"deleted": True}
 
 
 @router.get("/{webhook_id}/deliveries")
-async def list_deliveries(webhook_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def list_deliveries(webhook_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
+    if not wh:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+    if wh.client_id:
+        require_scoped_role(AccessRole.READER, AccessScope.CLIENT, wh.client_id, db, user)
     return (
         db.query(WebhookDelivery)
         .filter(WebhookDelivery.webhook_id == webhook_id)
@@ -66,11 +79,13 @@ async def list_deliveries(webhook_id: str, db: Session = Depends(get_db), _=Depe
 
 
 @router.post("/{webhook_id}/test", dependencies=[Depends(require_editor_anywhere)])
-async def test_webhook(webhook_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def test_webhook(webhook_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db), user=Depends(get_current_user)):
     """Fire a test event to the webhook URL."""
     wh = db.query(WebhookConfig).filter(WebhookConfig.id == webhook_id).first()
     if not wh:
         raise HTTPException(status_code=404, detail="Webhook not found")
+    if wh.client_id:
+        require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, wh.client_id, db, user)
     from services.webhook_dispatcher import dispatch_event
     background_tasks.add_task(dispatch_event, "webhook.test", {"message": "Test event from Monitara"}, wh.client_id)
     return {"queued": True}

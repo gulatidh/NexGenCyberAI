@@ -13,6 +13,7 @@ from connectors.saas.servicenow.connector import ServiceNowConnector
 from connectors.saas.jira.connector import JiraConnector
 from core.encryption import decrypt
 from core.security import get_current_user
+from core.authz import require_scoped_role, AccessRole, AccessScope
 from db.database import get_db
 
 router = APIRouter(prefix="/clients/{client_id}/tickets", tags=["tickets"])
@@ -124,9 +125,10 @@ def _severity_from_finding(finding: Finding) -> str:
 async def list_ticket_connectors(
     client_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """List configured ServiceNow/Jira connectors for this client."""
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     rows = db.query(Connector).filter(
         Connector.client_id == client_id,
         Connector.connector_type.in_(["servicenow", "jira"]),
@@ -148,12 +150,17 @@ async def create_ticket_from_finding(
     client_id: str,
     payload: CreateFromFindingRequest,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """Create a ServiceNow incident or Jira issue from an existing Finding."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     finding = db.query(Finding).filter(Finding.id == payload.finding_id).first()
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
+    from api.models.models import Scan as _Scan
+    _scan = db.query(_Scan).filter(_Scan.id == finding.scan_id).first()
+    if not _scan or _scan.client_id != client_id:
+        raise HTTPException(status_code=403, detail="Finding does not belong to this client")
 
     conn = _load_connector(client_id, payload.connector_id, db)
     creds = _decrypt_creds(conn)
@@ -197,9 +204,10 @@ async def create_ticket_from_remediation(
     client_id: str,
     payload: CreateFromRemediationRequest,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """Create a ServiceNow incident or Jira issue from a RemediationAction."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     action = db.query(RemediationAction).filter(
         RemediationAction.id == payload.remediation_action_id,
         RemediationAction.client_id == client_id,
@@ -256,9 +264,10 @@ async def create_ticket_from_remediation(
 async def list_ticket_syncs(
     client_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """List all ticket syncs for this client (newest first, max 100)."""
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     return (
         db.query(TicketSync)
         .filter(TicketSync.client_id == client_id)
@@ -273,9 +282,10 @@ async def sync_ticket_status(
     client_id: str,
     ticket_sync_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """Fetch the current status from the ticketing system and update the TicketSync record."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     sync = db.query(TicketSync).filter(
         TicketSync.id == ticket_sync_id,
         TicketSync.client_id == client_id,

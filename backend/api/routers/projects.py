@@ -9,12 +9,14 @@ from api.models.models import Asset, AssetStatus, Client, Connector, Project, Sc
 from api.schemas.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_scoped_role, AccessRole, AccessScope
 
 router = APIRouter(prefix="/clients/{client_id}/projects", tags=["projects"])
 
 
 @router.get("/", response_model=List[ProjectResponse])
-async def list_projects(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def list_projects(client_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     return db.query(Project).filter(Project.client_id == client_id).order_by(Project.name.asc()).all()
 
 
@@ -23,8 +25,9 @@ async def create_project(
     client_id: str,
     payload: ProjectCreate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     if not db.query(Client).filter(Client.id == client_id).first():
         raise HTTPException(status_code=404, detail="Client not found")
     project = Project(
@@ -47,8 +50,9 @@ async def create_project(
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
-    client_id: str, project_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)
+    client_id: str, project_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)
 ):
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     p = db.query(Project).filter(Project.id == project_id, Project.client_id == client_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -61,8 +65,9 @@ async def update_project(
     project_id: str,
     payload: ProjectUpdate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     p = db.query(Project).filter(Project.id == project_id, Project.client_id == client_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -82,8 +87,9 @@ async def update_project(
 
 @router.delete("/{project_id}", status_code=204)
 async def delete_project(
-    client_id: str, project_id: str, db: Session = Depends(get_db), _=Depends(get_current_user),
+    client_id: str, project_id: str, db: Session = Depends(get_db), user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     p = db.query(Project).filter(Project.id == project_id, Project.client_id == client_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -97,8 +103,9 @@ async def delete_project(
 
 @router.get("/{project_id}/summary")
 async def project_summary(
-    client_id: str, project_id: str, db: Session = Depends(get_db), _=Depends(get_current_user),
+    client_id: str, project_id: str, db: Session = Depends(get_db), user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     p = db.query(Project).filter(Project.id == project_id, Project.client_id == client_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Project not found")

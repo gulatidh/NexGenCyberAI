@@ -7,6 +7,7 @@ from api.models.models import Connector, ConnectorStatus, Project
 from api.schemas.schemas import ConnectorCreate, ConnectorUpdate, ConnectorResponse
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_scoped_role, AccessRole, AccessScope
 from core.encryption import encrypt, decrypt
 from connectors.factory import get_connector
 from connectors.sync import sync_connector_assets_bg
@@ -19,8 +20,9 @@ async def list_connectors(
     client_id: str,
     project_id: str = None,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     q = db.query(Connector).filter(Connector.client_id == client_id)
     if project_id:
         q = q.filter(Connector.project_id == project_id)
@@ -33,8 +35,9 @@ async def create_connector(
     payload: ConnectorCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     project = db.query(Project).filter(Project.id == payload.project_id, Project.client_id == client_id).first()
     if not project:
         raise HTTPException(status_code=400, detail="project_id is required and must belong to this client")
@@ -58,9 +61,10 @@ async def create_connector(
 def connector_health(
     client_id: str,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     """Return health summary per connector: last scan time, status, finding count."""
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     from api.models.models import Scan
 
     connectors = db.query(Connector).filter(
@@ -88,7 +92,8 @@ def connector_health(
 
 
 @router.get("/{connector_id}", response_model=ConnectorResponse)
-async def get_connector_detail(client_id: str, connector_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def get_connector_detail(client_id: str, connector_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -101,8 +106,9 @@ async def test_connector(
     connector_id: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -124,8 +130,9 @@ async def update_connector(
     connector_id: str,
     payload: ConnectorUpdate,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Connector not found")
@@ -148,7 +155,8 @@ async def update_connector(
 
 
 @router.delete("/{connector_id}", status_code=204)
-async def delete_connector(client_id: str, connector_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def delete_connector(client_id: str, connector_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Connector not found")

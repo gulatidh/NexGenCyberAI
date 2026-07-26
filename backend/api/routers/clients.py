@@ -7,6 +7,7 @@ from api.models.models import Client
 from api.schemas.schemas import ClientCreate, ClientUpdate, ClientResponse, DashboardSummary
 from db.database import get_db
 from core.security import get_current_user
+from core.authz import require_editor_anywhere, require_scoped_role, AccessRole, AccessScope
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -17,7 +18,7 @@ async def list_clients(db: Session = Depends(get_db), _=Depends(get_current_user
 
 
 @router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
-async def create_client(payload: ClientCreate, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def create_client(payload: ClientCreate, db: Session = Depends(get_db), user: dict = Depends(require_editor_anywhere)):
     if db.query(Client).filter(Client.slug == payload.slug).first():
         raise HTTPException(status_code=400, detail="Slug already exists")
     client = Client(**payload.model_dump())
@@ -36,7 +37,8 @@ async def get_client(client_id: str, db: Session = Depends(get_db), _=Depends(ge
 
 
 @router.patch("/{client_id}", response_model=ClientResponse)
-async def update_client(client_id: str, payload: ClientUpdate, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def update_client(client_id: str, payload: ClientUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -48,7 +50,8 @@ async def update_client(client_id: str, payload: ClientUpdate, db: Session = Dep
 
 
 @router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_client(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def delete_client(client_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
     client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
