@@ -27,7 +27,9 @@ if [ -f "$BUNDLED_TAR" ]; then
     echo "[startup] Extracting pre-bundled packages to /tmp (~20s)..."
     mkdir -p "$BUNDLED_EXTRACT"
     tar -xzf "$BUNDLED_TAR" -C "$BUNDLED_EXTRACT"
-    if PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -c "import gunicorn, fastapi, uvicorn" 2>/dev/null; then
+    # Include cryptography (Rust/C extension) in the check — it will fail with a
+    # GLIBC version error if the bundle was built on a newer OS than Azure's container.
+    if PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -c "import gunicorn, fastapi, uvicorn, cryptography, pydantic_core" 2>/dev/null; then
         echo "[startup] Pre-bundled packages ready — starting immediately (no pip install)"
         export PYTHONPATH="$BUNDLED_EXTRACT"
         exec "$PYTHON3" -m gunicorn main:app \

@@ -231,13 +231,18 @@ jobs:
       - name: Pre-build Python packages
         if: steps.cache-bundled.outputs.cache-hit != 'true'
         run: |
-          python3.12 -m venv /tmp/prebuild-venv
-          /tmp/prebuild-venv/bin/pip install -r backend/requirements.txt --quiet
-          # Bundle as a single tar.gz — one large file in the zip instead of
-          # thousands of small files. Kudu writes one file to wwwroot (fast).
-          # startup.sh extracts to /tmp (ephemeral local disk, ~20s, not Azure Files).
-          tar -czf backend/.bundled-packages.tar.gz \
-            -C /tmp/prebuild-venv/lib/python3.12/site-packages/ .
+          # Build inside python:3.12-slim-bullseye (Debian 11, GLIBC 2.31) so
+          # native extensions (cryptography, pydantic-core) match Azure App Service.
+          # ubuntu-latest is 24.04 (GLIBC 2.39) which produces binaries that crash
+          # on Azure's GLIBC 2.31 container.
+          docker run --rm \
+            -v "$PWD/backend:/work" \
+            python:3.12-slim-bullseye \
+            bash -c "
+              pip install -r /work/requirements.txt --target /tmp/pkgs --quiet 2>&1 | tail -5
+              tar -czf /work/.bundled-packages.tar.gz -C /tmp/pkgs .
+              echo 'Bundled: '$(du -sh /work/.bundled-packages.tar.gz | cut -f1)
+            "
           echo "Bundled tar.gz: $(du -sh backend/.bundled-packages.tar.gz | cut -f1)"
 
       - name: Generate deploy info
