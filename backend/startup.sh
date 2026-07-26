@@ -29,7 +29,8 @@ if [ -f "$BUNDLED_TAR" ]; then
     tar -xzf "$BUNDLED_TAR" -C "$BUNDLED_EXTRACT"
     if PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -c "import gunicorn, fastapi, uvicorn" 2>/dev/null; then
         echo "[startup] Pre-bundled packages ready — starting immediately (no pip install)"
-        exec PYTHONPATH="$BUNDLED_EXTRACT" "$PYTHON3" -m gunicorn main:app \
+        export PYTHONPATH="$BUNDLED_EXTRACT"
+        exec "$PYTHON3" -m gunicorn main:app \
             --worker-class uvicorn.workers.UvicornWorker \
             --workers 1 \
             --bind 0.0.0.0:8000 \
