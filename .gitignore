@@ -12,10 +12,13 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+antenv/
 dist/
 build/
 *.db
 *.sqlite3
+# Pre-built packages bundled by CI — never commit (large, platform-specific)
+backend/.bundled-packages/
 
 # Node / React
 node_modules/
