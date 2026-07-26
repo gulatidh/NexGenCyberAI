@@ -102,9 +102,9 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    section: "Settings",
+    section: "Configure",
     items: [
-      { label: "Settings",     icon: <Settings />,       path: "/settings" },
+      { label: "Configure",    icon: <Settings />,       path: "/settings" },
       { label: "Help",         icon: <MenuBook />,       path: "/help" },
     ],
   },

@@ -11,6 +11,12 @@ import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./auth/AuthProvider";
 import { loginRequest } from "./auth/msalConfig";
 import AppLayout from "./components/layout/AppLayout";
+import ProductLayout from "./components/layout/ProductLayout";
+import Hub from "./pages/Hub";
+import {
+  THREAT_INTEL, RISK_MANAGER, VULN_MGMT, PEN_TEST,
+  COMPLIANCE_MONITOR, GOVERNANCE, AI_ADVISOR, INTELLIGENCE,
+} from "./products";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
@@ -41,6 +47,7 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import ScanDetail from "./pages/ScanDetail";
 import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
+import LandingV2 from "./pages/LandingV2";
 import ThreatRegister from "./pages/ThreatRegister";
 import ControlDeficiencies from "./pages/ControlDeficiencies";
 import RemediationTracker from "./pages/RemediationTracker";
@@ -128,8 +135,68 @@ function ProtectedApp() {
       errorComponent={AuthError}
     >
       <Routes>
+        {/* ── v2 Hub ─────────────────────────────────────────────────────── */}
+        <Route path="/hub" element={<Hub />} />
+
+        {/* ── v2 Products ────────────────────────────────────────────────── */}
+        <Route path="/threat-intel" element={<ProductLayout product={THREAT_INTEL} />}>
+          <Route index element={<Navigate to="register" replace />} />
+          <Route path="register" element={<ThreatRegister />} />
+          <Route path="attack-paths" element={<AttackPaths />} />
+        </Route>
+
+        <Route path="/risk" element={<ProductLayout product={RISK_MANAGER} />}>
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<RiskOverviewPage />} />
+          <Route path="register" element={<Risks />} />
+        </Route>
+
+        <Route path="/vulnerability" element={<ProductLayout product={VULN_MGMT} />}>
+          <Route index element={<Navigate to="scans" replace />} />
+          <Route path="scans" element={<Scans />} />
+          <Route path="scans/:scanId" element={<ScanDetail />} />
+          <Route path="scans/:scanId/diff" element={<ScanDiff />} />
+          <Route path="findings" element={<Findings />} />
+          <Route path="posture" element={<PostureTrends />} />
+        </Route>
+
+        <Route path="/vapt" element={<ProductLayout product={PEN_TEST} />}>
+          <Route index element={<Navigate to="reports" replace />} />
+          <Route path="reports" element={<VAPTReports />} />
+          <Route path="reports/:reportId" element={<VAPTReportDetail />} />
+        </Route>
+
+        <Route path="/compliance" element={<ProductLayout product={COMPLIANCE_MONITOR} />}>
+          <Route index element={<Navigate to="deficiencies" replace />} />
+          <Route path="deficiencies" element={<ControlDeficiencies />} />
+          <Route path="frameworks" element={<Frameworks />} />
+          <Route path="custom-frameworks" element={<CustomFrameworks />} />
+          <Route path="evidence" element={<Navigate to="deficiencies" replace />} />
+        </Route>
+
+        <Route path="/governance" element={<ProductLayout product={GOVERNANCE} />}>
+          <Route index element={<Navigate to="ctem" replace />} />
+          <Route path="ctem" element={<CTEMPage />} />
+          <Route path="remediation" element={<RemediationTracker />} />
+        </Route>
+
+        <Route path="/ai-advisor" element={<ProductLayout product={AI_ADVISOR} />}>
+          <Route index element={<Navigate to="agents" replace />} />
+          <Route path="agents" element={<Agents />} />
+          <Route path="workflows" element={<Missions />} />
+        </Route>
+
+        <Route path="/intelligence" element={<ProductLayout product={INTELLIGENCE} />}>
+          <Route index element={<Navigate to="nl-query" replace />} />
+          <Route path="nl-query" element={<NLQuery />} />
+          <Route path="security-docs" element={<SecurityDocs />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="knowledge" element={<KnowledgeBase />} />
+        </Route>
+
+        {/* ── v1 AppLayout routes (unchanged) ────────────────────────────── */}
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Navigate to="/hub" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/risk-overview" element={<RiskOverviewPage />} />
           <Route path="/threat-register" element={<ThreatRegister />} />
@@ -193,8 +260,8 @@ export default function App() {
             <ToastContainer theme="dark" position="bottom-right" autoClose={3000} />
             <BrowserRouter>
               <Routes>
-                {/* Public landing page — no auth required */}
-                <Route path="/" element={<LandingPage />} />
+                {/* Public landing page — v2 light theme */}
+                <Route path="/" element={<LandingV2 />} />
                 {/* All other routes require Microsoft Entra ID sign-in */}
                 <Route path="/*" element={<ProtectedApp />} />
               </Routes>
