@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
-  SyncAlt, Assignment, AccountTree, Psychology, Description,
+  SyncAlt, AccountTree, Psychology, Description,
   TrendingUp, GridView, CompareArrows,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -105,7 +105,6 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Settings",
     items: [
       { label: "Settings",     icon: <Settings />,       path: "/settings" },
-      { label: "Access Logs",  icon: <Assignment />,     path: "/access-logs", adminOnly: true },
       { label: "Help",         icon: <MenuBook />,       path: "/help" },
     ],
   },

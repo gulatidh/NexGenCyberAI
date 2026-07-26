@@ -65,16 +65,16 @@ async def compare_clients(
         )
 
         result.append({
-            "id": client.id,
-            "name": client.name,
-            "industry": getattr(client, "industry", None),
-            "findings": counts,
+            "client_id": client.id,
+            "client_name": client.name,
+            "critical": counts["critical"],
+            "high": counts["high"],
+            "medium": counts["medium"],
+            "low": counts["low"],
             "total_open": sum(counts.values()),
-            "avg_risk_score": avg_risk,
-            "framework_score": fw_score,
-            "framework_name": fw_name,
-            "last_scan_at": last_scan.completed_at.isoformat() if last_scan and last_scan.completed_at else None,
             "open_risks": len(risks),
+            "compliance_score": fw_score,
+            "last_scan_at": last_scan.completed_at.isoformat() if last_scan and last_scan.completed_at else None,
         })
 
     # Sort by total open findings descending
