@@ -234,7 +234,6 @@ function AttackGraph({ data }: { data: AttackPathData }) {
   const positions = useMemo(() => {
     const pos = new Map<string, { x: number; y: number }>();
     byCol.forEach((colNodes, ci) => {
-      const colH = colNodes.length * (CARD_H + ROW_GAP) - ROW_GAP;
       const startY = PAD_Y;
       colNodes.forEach((n, ri) => {
         pos.set(n.id, {
