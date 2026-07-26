@@ -1,11 +1,12 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box, Typography, Chip, CircularProgress, Alert, Card, CardContent,
+  FormControl, InputLabel, Select, MenuItem,
 } from "@mui/material";
 import { AccountTree } from "@mui/icons-material";
-import { attackPathApi } from "../services/api";
+import { attackPathApi, scansApi, projectsApi } from "../services/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -264,15 +265,38 @@ const LEGEND_ITEMS = [
 
 export default function AttackPaths() {
   const { clientId } = useActiveClient();
+  const [scanId, setScanId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("");
+
+  const { data: scans = [] } = useQuery<any[]>({
+    queryKey: ["scans", clientId],
+    queryFn: () => scansApi.list(clientId),
+    enabled: !!clientId,
+    select: (s) => s.filter((x: any) => x.status === "completed" && x.is_live !== false),
+  });
+
+  const { data: projects = [] } = useQuery<any[]>({
+    queryKey: ["projects", clientId],
+    queryFn: () => projectsApi.list(clientId),
+    enabled: !!clientId,
+  });
 
   const { data, isLoading, isError, error } = useQuery<AttackPathData>({
-    queryKey: ["attack-paths", clientId],
-    queryFn: () => attackPathApi.get(clientId),
+    queryKey: ["attack-paths", clientId, scanId, projectId],
+    queryFn: () => attackPathApi.get(clientId, scanId || undefined, projectId || undefined),
     enabled: !!clientId,
   });
 
   const isEmpty = !isLoading && !isError && data && data.nodes.length === 0;
   const hasData = !!data && data.nodes.length > 0;
+
+  const selectSx = {
+    fontSize: 13,
+    color: "text.primary",
+    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" },
+    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.3)" },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#4285F4" },
+  };
 
   return (
     <Box>
@@ -284,6 +308,32 @@ export default function AttackPaths() {
             Visualise how an attacker can chain findings into a full compromise path
           </Typography>
         </Box>
+
+        {/* Scope selectors */}
+        {clientId && (
+          <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel sx={{ fontSize: 13 }}>Scan</InputLabel>
+              <Select value={scanId} label="Scan" onChange={(e) => { setScanId(e.target.value); setProjectId(""); }} sx={selectSx}>
+                <MenuItem value=""><em>All Scans</em></MenuItem>
+                {scans.map((s: any) => (
+                  <MenuItem key={s.id} value={s.id} sx={{ fontSize: 13 }}>
+                    {s.name} <Typography component="span" variant="caption" sx={{ ml: 1, color: "text.secondary" }}>({s.connector_type})</Typography>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel sx={{ fontSize: 13 }}>Project</InputLabel>
+              <Select value={projectId} label="Project" onChange={(e) => { setProjectId(e.target.value); setScanId(""); }} sx={selectSx}>
+                <MenuItem value=""><em>All Projects</em></MenuItem>
+                {projects.map((p: any) => (
+                  <MenuItem key={p.id} value={p.id} sx={{ fontSize: 13 }}>{p.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        )}
       </Box>
 
       {!clientId && (

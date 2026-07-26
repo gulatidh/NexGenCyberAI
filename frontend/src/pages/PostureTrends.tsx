@@ -4,14 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Box, Typography, Button, Alert, CircularProgress, Card,
   Grid, Chip, Table, TableHead, TableRow, TableCell, TableBody,
-  TableContainer,
+  TableContainer, FormControl, InputLabel, Select, MenuItem,
 } from "@mui/material";
 import { Refresh, TrendingUp, CheckCircle, Cancel } from "@mui/icons-material";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, AreaChart, Area,
 } from "recharts";
-import { postureApi } from "../services/api";
+import { postureApi, scansApi } from "../services/api";
 import { toast } from "react-toastify";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -149,15 +149,91 @@ function MttrTable({ latest, prev }: { latest: PostureSnapshot | null; prev: Pos
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+interface ScanSummary {
+  scan_id: string; scan_name: string; connector_type: string;
+  status: string; completed_at: string | null;
+  total_findings: number; total_open: number;
+  by_severity: Record<string, number>;
+  open_by_severity: Record<string, number>;
+}
+
+const SEV_COLORS: Record<string, string> = {
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#9e9e9e",
+};
+
+function ScanPostureSummary({ summary }: { summary: ScanSummary }) {
+  const sevs = ["critical", "high", "medium", "low", "info"];
+  return (
+    <Box>
+      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+        {[
+          { label: "Total Findings", value: summary.total_findings, color: "#4285F4" },
+          { label: "Open Findings", value: summary.total_open, color: "#f44336" },
+        ].map((s) => (
+          <Card key={s.label} variant="outlined" sx={{ minWidth: 140 }}>
+            <Box sx={{ p: 2 }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: s.color }}>{s.value}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>{s.label}</Typography>
+            </Box>
+          </Card>
+        ))}
+      </Box>
+      <Grid container spacing={2}>
+        {["by_severity", "open_by_severity"].map((key) => (
+          <Grid key={key} size={{ xs: 12, md: 6 }}>
+            <Card variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+                {key === "by_severity" ? "All Findings by Severity" : "Open Findings by Severity"}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+                {sevs.map((sev) => {
+                  const count = (summary as any)[key][sev] ?? 0;
+                  const color = SEV_COLORS[sev];
+                  return (
+                    <Box key={sev} sx={{ textAlign: "center" }}>
+                      <Typography variant="h5" sx={{ fontWeight: 700, color: count > 0 ? color : "text.disabled" }}>
+                        {count}
+                      </Typography>
+                      <Chip label={sev} size="small" sx={{
+                        bgcolor: count > 0 ? `${color}20` : "rgba(255,255,255,0.04)",
+                        color: count > 0 ? color : "text.disabled",
+                        fontSize: 10, height: 18, textTransform: "capitalize",
+                      }} />
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
+}
+
 export default function PostureTrends() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
   const [days, setDays] = useState(90);
+  const [scanId, setScanId] = useState<string>("");
+
+  const { data: scans = [] } = useQuery<any[]>({
+    queryKey: ["scans", clientId],
+    queryFn: () => scansApi.list(clientId),
+    enabled: !!clientId,
+    select: (s) => s.filter((x: any) => x.status === "completed" && x.is_live !== false),
+  });
+
+  const { data: scanSummary, isLoading: summaryLoading } = useQuery<ScanSummary>({
+    queryKey: ["posture-scan-summary", clientId, scanId],
+    queryFn: () => postureApi.getScanSummary(clientId, scanId),
+    enabled: !!clientId && !!scanId,
+  });
 
   const { data: snapshots = [], isLoading, isError, error } = useQuery<PostureSnapshot[]>({
     queryKey: ["posture-history", clientId, days],
     queryFn: () => postureApi.getHistory(clientId, days),
-    enabled: !!clientId,
+    enabled: !!clientId && !scanId,
   });
 
   const snapshotMut = useMutation({
@@ -203,46 +279,67 @@ export default function PostureTrends() {
             Track your security posture over time — findings, risks, MTTR, and compliance
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
-          {/* Day selector chips */}
-          <Box sx={{ display: "flex", gap: 0.5 }}>
-            {DAY_OPTIONS.map((d) => (
-              <Chip
-                key={d}
-                label={`${d}d`}
-                size="small"
-                clickable
-                onClick={() => setDays(d)}
-                sx={{
-                  bgcolor: days === d ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)",
-                  color: days === d ? "#82b1ff" : "text.secondary",
-                  border: days === d ? "1px solid rgba(66,133,244,0.5)" : "1px solid transparent",
-                  fontWeight: days === d ? 700 : 400,
-                }}
-              />
-            ))}
-          </Box>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={
-              snapshotMut.isPending ? (
-                <CircularProgress size={14} />
-              ) : (
-                <Refresh sx={{ fontSize: 16 }} />
-              )
-            }
-            disabled={!clientId || snapshotMut.isPending}
-            onClick={() => snapshotMut.mutate()}
-            sx={{
-              textTransform: "none",
-              borderColor: "divider",
-              color: "text.secondary",
-              "&:hover": { borderColor: "#4285F4", color: "#4285F4" },
-            }}
-          >
-            Take Snapshot Now
-          </Button>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+          {/* Scan selector */}
+          {clientId && (
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel sx={{ fontSize: 13 }}>Scope</InputLabel>
+              <Select
+                value={scanId} label="Scope"
+                onChange={(e) => setScanId(e.target.value)}
+                sx={{ fontSize: 13, "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" } }}
+              >
+                <MenuItem value=""><em>All Scans (trend view)</em></MenuItem>
+                {scans.map((s: any) => (
+                  <MenuItem key={s.id} value={s.id} sx={{ fontSize: 13 }}>
+                    {s.name}
+                    <Typography component="span" variant="caption" sx={{ ml: 1, color: "text.secondary" }}>
+                      ({s.connector_type})
+                    </Typography>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {/* Day selector — only relevant in trend mode */}
+          {!scanId && (
+            <Box sx={{ display: "flex", gap: 0.5 }}>
+              {DAY_OPTIONS.map((d) => (
+                <Chip
+                  key={d}
+                  label={`${d}d`}
+                  size="small"
+                  clickable
+                  onClick={() => setDays(d)}
+                  sx={{
+                    bgcolor: days === d ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)",
+                    color: days === d ? "#82b1ff" : "text.secondary",
+                    border: days === d ? "1px solid rgba(66,133,244,0.5)" : "1px solid transparent",
+                    fontWeight: days === d ? 700 : 400,
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+
+          {!scanId && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={snapshotMut.isPending ? <CircularProgress size={14} /> : <Refresh sx={{ fontSize: 16 }} />}
+              disabled={!clientId || snapshotMut.isPending}
+              onClick={() => snapshotMut.mutate()}
+              sx={{
+                textTransform: "none",
+                borderColor: "divider",
+                color: "text.secondary",
+                "&:hover": { borderColor: "#4285F4", color: "#4285F4" },
+              }}
+            >
+              Take Snapshot Now
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -265,7 +362,28 @@ export default function PostureTrends() {
         </Box>
       )}
 
-      {clientId && !isLoading && !isError && !hasData && (
+      {/* ── Scan posture summary mode ── */}
+      {clientId && scanId && summaryLoading && (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
+          <CircularProgress sx={{ color: "#4285F4" }} />
+        </Box>
+      )}
+
+      {clientId && scanId && !summaryLoading && scanSummary && (
+        <>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+              Showing posture for scan: <strong style={{ color: "#fff" }}>{scanSummary.scan_name}</strong>
+              {" "}· {scanSummary.connector_type}
+              {scanSummary.completed_at && ` · completed ${new Date(scanSummary.completed_at).toLocaleDateString()}`}
+            </Typography>
+          </Box>
+          <ScanPostureSummary summary={scanSummary} />
+        </>
+      )}
+
+      {/* ── Trend mode (no scan selected) ── */}
+      {clientId && !scanId && !isLoading && !isError && !hasData && (
         <Card
           variant="outlined"
           sx={{ p: 6, textAlign: "center", borderStyle: "dashed" }}
@@ -277,7 +395,7 @@ export default function PostureTrends() {
         </Card>
       )}
 
-      {clientId && !isLoading && hasData && (
+      {clientId && !scanId && !isLoading && hasData && (
         <>
           {/* Row 1 — Open Findings + Open Risks */}
           <Grid container spacing={3} sx={{ mb: 3 }}>

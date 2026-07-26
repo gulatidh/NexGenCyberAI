@@ -565,13 +565,20 @@ export const usersApi = {
 export const postureApi = {
   getHistory: (clientId: string, days = 90) =>
     apiClient.get(`/clients/${clientId}/posture-history/?days=${days}`).then((r) => r.data),
+  getScanSummary: (clientId: string, scanId: string) =>
+    apiClient.get(`/clients/${clientId}/posture-history/scan-summary?scan_id=${scanId}`).then((r) => r.data),
   triggerSnapshot: (clientId: string) =>
     apiClient.post(`/clients/${clientId}/posture-history/snapshot`).then((r) => r.data),
 };
 
 export const attackPathApi = {
-  get: (clientId: string) =>
-    apiClient.get(`/clients/${clientId}/attack-paths/`).then((r) => r.data),
+  get: (clientId: string, scanId?: string, projectId?: string) => {
+    const params = new URLSearchParams();
+    if (scanId) params.set("scan_id", scanId);
+    if (projectId) params.set("project_id", projectId);
+    const qs = params.toString();
+    return apiClient.get(`/clients/${clientId}/attack-paths/${qs ? `?${qs}` : ""}`).then((r) => r.data);
+  },
 };
 
 export const nlQueryApi = {
