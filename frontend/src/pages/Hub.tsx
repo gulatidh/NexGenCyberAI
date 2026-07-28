@@ -9,6 +9,7 @@ import {
   Shield, BugReport, VerifiedUser, Psychology,
   Radar, Assessment, GppBad, PlaylistAddCheck,
   SmartToy, Search, MenuBook, TrendingUp, Cable, Settings,
+  Tune, Restore,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -133,6 +134,22 @@ const CATEGORIES: Category[] = [
         icon: <Psychology />,
         color: "#E65100",
         bgColor: "#FBE9E7",
+      },
+    ],
+  },
+  {
+    id: "platform",
+    label: "Platform",
+    color: "#37474F",
+    products: [
+      {
+        abbrev: "PL",
+        name: "Platform",
+        description: "Clients, assets, connectors, and ticket sync configuration",
+        route: "/platform",
+        icon: <Tune />,
+        color: "#37474F",
+        bgColor: "#ECEFF1",
       },
     ],
   },
@@ -270,12 +287,12 @@ export default function Hub() {
   };
 
   const NAV_EXTRA = [
-    { label: "Clients",            icon: <VerifiedUser sx={{ fontSize: 16 }} />, route: "/clients" },
-    { label: "Connections",        icon: <Cable       sx={{ fontSize: 16 }} />, route: "/connections" },
-    { label: "Reports",            icon: <TrendingUp  sx={{ fontSize: 16 }} />, route: "/reports" },
-    { label: "Knowledge Base",     icon: <MenuBook    sx={{ fontSize: 16 }} />, route: "/knowledge" },
-    { label: "Search Data",        icon: <Search      sx={{ fontSize: 16 }} />, route: "/intelligence/nl-query" },
-    { label: "Settings",           icon: <Settings    sx={{ fontSize: 16 }} />, route: "/settings" },
+    { label: "Clients",        icon: <VerifiedUser sx={{ fontSize: 16 }} />, route: "/platform/clients" },
+    { label: "Connections",    icon: <Cable        sx={{ fontSize: 16 }} />, route: "/platform/connections" },
+    { label: "Reports",        icon: <TrendingUp   sx={{ fontSize: 16 }} />, route: "/reports" },
+    { label: "Knowledge Base", icon: <MenuBook     sx={{ fontSize: 16 }} />, route: "/knowledge" },
+    { label: "Search Data",    icon: <Search       sx={{ fontSize: 16 }} />, route: "/intelligence/nl-query" },
+    { label: "Settings",       icon: <Settings     sx={{ fontSize: 16 }} />, route: "/settings" },
   ];
 
   const navigate = useNavigate();
@@ -366,8 +383,20 @@ export default function Hub() {
           ))}
         </List>
 
+        {/* Classic View */}
+        <Divider sx={{ mt: 1 }} />
+        <List dense disablePadding sx={{ px: 1, pb: 0.5 }}>
+          <ListItemButton
+            onClick={() => navigate("/dashboard")}
+            sx={{ borderRadius: 1.5, gap: 1, opacity: 0.65, "&:hover": { opacity: 1 } }}
+          >
+            <Box sx={{ color: "text.secondary" }}><Restore sx={{ fontSize: 16 }} /></Box>
+            <ListItemText primary="Classic View" slotProps={{ primary: { sx: { fontSize: 12, color: "text.secondary" } } }} />
+          </ListItemButton>
+        </List>
+
         {/* User footer */}
-        <Box sx={{ mt: "auto", pt: 2, px: 2, borderTop: "1px solid", borderColor: "divider" }}>
+        <Box sx={{ pt: 1.5, px: 2, borderTop: "1px solid", borderColor: "divider" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "#1565C0" }}>
               {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
@@ -412,7 +441,7 @@ export default function Hub() {
             </Box>.
             &nbsp;
             <Box component="span"
-              onClick={() => navigate("/clients")}
+              onClick={() => navigate("/platform/clients")}
               sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
               Clients & Projects
             </Box>{" "}

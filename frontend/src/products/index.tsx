@@ -8,6 +8,7 @@ import {
   PlaylistAddCheck, SmartToy, Psychology, TrendingUp,
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
+  People, Storage, Cable, SyncAlt, Tune,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -120,9 +121,25 @@ export const INTELLIGENCE: ProductDef = {
   ],
 };
 
+export const PLATFORM: ProductDef = {
+  name: "Platform",
+  abbrev: "PL",
+  icon: <Tune />,
+  color: "#37474F",
+  bgColor: "#ECEFF1",
+  basePath: "/platform",
+  nav: [
+    { label: "Clients",     icon: <People />,   path: "/clients" },
+    { label: "Assets",      icon: <Storage />,  path: "/assets" },
+    { label: "Connections", icon: <Cable />,    path: "/connections" },
+    { label: "Ticket Sync", icon: <SyncAlt />,  path: "/ticket-sync" },
+  ],
+};
+
 export const ALL_PRODUCTS = [
   THREAT_INTEL, RISK_MANAGER,
   VULN_MGMT, PEN_TEST,
   COMPLIANCE_MONITOR, GOVERNANCE,
   AI_ADVISOR, INTELLIGENCE,
+  PLATFORM,
 ];

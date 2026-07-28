@@ -19,7 +19,7 @@ import {
   Tooltip, Select, MenuItem, FormControl, Menu,
 } from "@mui/material";
 import {
-  Apps as WaffleIcon, ChevronLeft,
+  Apps as WaffleIcon, ChevronLeft, Restore,
   DarkMode, LightMode, Palette, Logout, Settings, AccountCircle,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -278,7 +278,7 @@ export default function ProductLayout({ product }: Props) {
             })}
           </List>
 
-          {/* Back to all products link */}
+          {/* Back to all products / Classic View */}
           <Divider sx={{ mt: "auto", mb: 0.5 }} />
           <Box sx={{ px: 1 }}>
             <ListItemButton
@@ -289,6 +289,15 @@ export default function ProductLayout({ product }: Props) {
                 <ChevronLeft />
               </ListItemIcon>
               <ListItemText primary="All Products" slotProps={{ primary: { sx: { fontSize: 12.5, color: "text.secondary" } } }} />
+            </ListItemButton>
+            <ListItemButton
+              onClick={() => navigate("/dashboard")}
+              sx={{ borderRadius: 1.5, gap: 0.5, opacity: 0.6, "&:hover": { opacity: 1 } }}
+            >
+              <ListItemIcon sx={{ minWidth: 32, color: "text.secondary", "& svg": { fontSize: 16 } }}>
+                <Restore />
+              </ListItemIcon>
+              <ListItemText primary="Classic View" slotProps={{ primary: { sx: { fontSize: 12, color: "text.secondary" } } }} />
             </ListItemButton>
           </Box>
         </Box>

@@ -15,7 +15,7 @@ import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
 import {
   THREAT_INTEL, RISK_MANAGER, VULN_MGMT, PEN_TEST,
-  COMPLIANCE_MONITOR, GOVERNANCE, AI_ADVISOR, INTELLIGENCE,
+  COMPLIANCE_MONITOR, GOVERNANCE, AI_ADVISOR, INTELLIGENCE, PLATFORM,
 } from "./products";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
@@ -195,7 +195,19 @@ function ProtectedApp() {
           <Route path="knowledge" element={<KnowledgeBase />} />
         </Route>
 
-        {/* ── v1 AppLayout routes (unchanged) ────────────────────────────── */}
+        {/* ── Platform product (Clients / Assets / Connections / Ticket Sync) ── */}
+        <Route path="/platform" element={<ProductLayout product={PLATFORM} />}>
+          <Route index element={<Navigate to="clients" replace />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="clients/:clientId" element={<ClientDetail />} />
+          <Route path="assets" element={<Assets />} />
+          <Route path="assets/technologies" element={<Technologies />} />
+          <Route path="assets/:assetId" element={<AssetDetail />} />
+          <Route path="connections" element={<Connections />} />
+          <Route path="ticket-sync" element={<TicketSyncPage />} />
+        </Route>
+
+        {/* ── v1 AppLayout routes (classic view — still accessible) ─────── */}
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/hub" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
