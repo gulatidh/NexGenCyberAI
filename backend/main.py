@@ -1136,7 +1136,7 @@ def _seed_mas_trm_custom_policy() -> None:
         ("MAS-14.1", "pci_dss",  "REQ-12-6"),
     ]
 
-    with SessionLocal() as db:
+    with Session(engine) as db:
         if db.query(CustomFramework).filter_by(slug="mas-trm").first():
             return  # already seeded
 
