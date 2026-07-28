@@ -16,8 +16,6 @@
 name: Monitara v2 — Deploy
 
 on:
-  push:
-    branches: [v2-redesign]
   workflow_dispatch:
 
 concurrency:
