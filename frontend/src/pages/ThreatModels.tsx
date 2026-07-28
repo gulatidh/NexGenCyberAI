@@ -312,7 +312,7 @@ export default function ThreatModels() {
             <TextField size="small" label="Name (optional)" value={tmName}
               onChange={(e) => setTmName(e.target.value)}
               placeholder='e.g. "Q2 2026 review"'
-              slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+              
               sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
 
             <Box>
@@ -393,7 +393,7 @@ export default function ThreatModels() {
               <TextField fullWidth multiline minRows={2} size="small" value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Guidance for the AI — e.g. 'the payments API is internet-facing', 'ignore the legacy batch job', 'focus on data exfiltration paths'."
-                slotProps={{ htmlInput: { style: { color: "white" } } }}
+                
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
             </Box>
 
@@ -494,7 +494,7 @@ export default function ThreatModels() {
             <TextField size="small" label="Name (optional)" value={uploadName}
               onChange={(e) => setUploadName(e.target.value)}
               placeholder='e.g. "Payment platform architecture"'
-              slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+              
               sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
 
             <FormControl size="small">

@@ -506,7 +506,7 @@ export default function Connectors() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth size="small" label="Connector Name" value={connName} onChange={(e) => setConnName(e.target.value)}
-                slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -535,8 +535,6 @@ export default function Connectors() {
                   helperText={help}
                   value={credentials[key] || ""} onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
                   slotProps={{
-                    inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } },
-                    htmlInput: { style: { color: 'white' } },
                     formHelperText: { sx: { color: "text.secondary", fontSize: 11 } },
                   }}
                   sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />

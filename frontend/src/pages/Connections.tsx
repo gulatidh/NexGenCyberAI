@@ -923,10 +923,6 @@ export default function Connections() {
               <TextField
                 fullWidth size="small" label="Connector Name"
                 value={connName} onChange={(e) => setConnName(e.target.value)}
-                slotProps={{
-                  inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
-                  htmlInput:  { style: { color: "white" } },
-                }}
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
               />
             </Grid>
@@ -976,8 +972,6 @@ export default function Connections() {
                     value={credentials[key] || ""}
                     onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
                     slotProps={{
-                      inputLabel:    { sx: { color: "rgba(255,255,255,0.5)" } },
-                      htmlInput:     { style: { color: "white" } },
                       formHelperText:{ sx: { color: "text.secondary", fontSize: 11 } },
                     }}
                     sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
@@ -996,7 +990,6 @@ export default function Connections() {
                     value={webTargetUrl} onChange={(e) => setWebTargetUrl(e.target.value)}
                     slotProps={{
                       inputLabel: { sx: { color: "text.secondary" } },
-                      htmlInput:  { style: { color: "white" } },
                     }}
                     sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                   />
@@ -1036,7 +1029,7 @@ export default function Connections() {
                     <TextField
                       fullWidth size="small" type="password" label="Bearer token"
                       value={webAuth.token || ""} onChange={(e) => setWebAuth({ ...webAuth, token: e.target.value })}
-                      slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                      slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                       sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                     />
                   </Grid>
@@ -1048,7 +1041,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Cookie name" placeholder="sessionid"
                         value={webAuth.cookie_name || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_name: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1056,7 +1049,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" type="password" label="Cookie value"
                         value={webAuth.cookie_value || ""} onChange={(e) => setWebAuth({ ...webAuth, cookie_value: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1069,7 +1062,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Login URL" placeholder="https://app.example.com/login"
                         value={webAuth.login_url || ""} onChange={(e) => setWebAuth({ ...webAuth, login_url: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1077,7 +1070,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Username"
                         value={webAuth.username || ""} onChange={(e) => setWebAuth({ ...webAuth, username: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1085,7 +1078,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" type="password" label="Password"
                         value={webAuth.password || ""} onChange={(e) => setWebAuth({ ...webAuth, password: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1093,7 +1086,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Username field name" placeholder="username"
                         value={webAuth.username_field || ""} onChange={(e) => setWebAuth({ ...webAuth, username_field: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1101,7 +1094,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Password field name" placeholder="password"
                         value={webAuth.password_field || ""} onChange={(e) => setWebAuth({ ...webAuth, password_field: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1115,7 +1108,7 @@ export default function Connections() {
                         fullWidth size="small" label="Token endpoint URL"
                         placeholder="https://login.example.com/oauth/token"
                         value={webAuth.token_url || ""} onChange={(e) => setWebAuth({ ...webAuth, token_url: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1123,7 +1116,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Client ID"
                         value={webAuth.client_id || ""} onChange={(e) => setWebAuth({ ...webAuth, client_id: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1131,7 +1124,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" type="password" label="Client secret"
                         value={webAuth.client_secret || ""} onChange={(e) => setWebAuth({ ...webAuth, client_secret: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1139,7 +1132,7 @@ export default function Connections() {
                       <TextField
                         fullWidth size="small" label="Scope (optional)" placeholder="api:read"
                         value={webAuth.scope || ""} onChange={(e) => setWebAuth({ ...webAuth, scope: e.target.value })}
-                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                        slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                         sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                       />
                     </Grid>
@@ -1152,7 +1145,7 @@ export default function Connections() {
                     label="Exclude paths (one per line, optional)"
                     placeholder={"/logout\n/payment"}
                     value={webExcludes} onChange={(e) => setWebExcludes(e.target.value)}
-                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "white" } } }}
+                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
                     sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                   />
                 </Grid>

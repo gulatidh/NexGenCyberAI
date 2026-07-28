@@ -676,7 +676,7 @@ export default function AISettings() {
                       label="Test Prompt"
                       value={testPrompt}
                       onChange={(e) => setTestPrompt(e.target.value)}
-                      slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                      
                       sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                     />
                   </Grid>
