@@ -164,7 +164,6 @@ const QUICK_ACCESS = [
   { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
   { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
   { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/help" },
-  { label: "AI Assistant",   icon: <AutoAwesome sx={{ fontSize: 16 }} />,    route: "__assistant__" },
 ];
 
 // ── Client picker ────────────────────────────────────────────────────────────

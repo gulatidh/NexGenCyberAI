@@ -83,13 +83,11 @@ export default function AssistantWidget() {
             bottom: 24,
             right: 24,
             zIndex: 1400,
-            bgcolor: open ? "#4285F4" : "rgba(15,15,15,0.9)",
+            bgcolor: open ? "#4285F4" : "background.paper",
             color: open ? "#fff" : "#4285F4",
             border: "1px solid",
             borderColor: open ? "#4285F4" : "rgba(66,133,244,0.5)",
-            boxShadow: open
-              ? "0 0 0 4px rgba(66,133,244,0.15)"
-              : "0 4px 20px rgba(0,0,0,0.5)",
+            boxShadow: open ? "0 0 0 4px rgba(66,133,244,0.15)" : 4,
             "&:hover": { bgcolor: "#4285F4", color: "#fff", borderColor: "#4285F4" },
             transition: "all 0.2s ease",
           }}
@@ -109,12 +107,13 @@ export default function AssistantWidget() {
             height: 520,
             display: "flex",
             flexDirection: "column",
-            bgcolor: "#111",
-            border: "1px solid rgba(66,133,244,0.35)",
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "rgba(66,133,244,0.35)",
             borderRadius: 2,
             overflow: "hidden",
             zIndex: 1399,
-            boxShadow: "0 8px 40px rgba(0,0,0,0.7)",
+            boxShadow: 8,
           }}
         >
           {/* Header */}
@@ -122,7 +121,8 @@ export default function AssistantWidget() {
             sx={{
               px: 2, py: 1.25,
               display: "flex", alignItems: "center", gap: 1,
-              borderBottom: "1px solid rgba(255,255,255,0.07)",
+              borderBottom: "1px solid",
+              borderColor: "divider",
               bgcolor: "rgba(66,133,244,0.07)",
               flexShrink: 0,
             }}
@@ -159,7 +159,7 @@ export default function AssistantWidget() {
               gap: 1,
               "&::-webkit-scrollbar": { width: 4 },
               "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-              "&::-webkit-scrollbar-thumb": { bgcolor: "rgba(255,255,255,0.1)", borderRadius: 2 },
+              "&::-webkit-scrollbar-thumb": { bgcolor: "action.selected", borderRadius: 2 },
             }}
           >
             {messages.length === 0 && (
@@ -214,9 +214,9 @@ export default function AssistantWidget() {
                   sx={{
                     px: 1.5, py: 1,
                     borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "2px 12px 12px 12px",
-                    bgcolor: msg.role === "user" ? "rgba(66,133,244,0.18)" : "rgba(255,255,255,0.05)",
+                    bgcolor: msg.role === "user" ? "rgba(66,133,244,0.18)" : "action.hover",
                     border: "1px solid",
-                    borderColor: msg.role === "user" ? "rgba(66,133,244,0.35)" : "rgba(255,255,255,0.08)",
+                    borderColor: msg.role === "user" ? "rgba(66,133,244,0.35)" : "divider",
                   }}
                 >
                   <Typography
@@ -251,7 +251,7 @@ export default function AssistantWidget() {
 
           {/* Input */}
           <Box
-            sx={{ px: 1.5, py: 1.25, borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}
+            sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider", flexShrink: 0 }}
           >
             <TextField
               inputRef={inputRef}
@@ -292,8 +292,6 @@ export default function AssistantWidget() {
                 "& .MuiOutlinedInput-root": {
                   color: "text.primary",
                   fontSize: 13,
-                  bgcolor: "rgba(255,255,255,0.04)",
-                  "& fieldset": { borderColor: "rgba(255,255,255,0.1)" },
                   "&:hover fieldset": { borderColor: "rgba(66,133,244,0.4)" },
                   "&.Mui-focused fieldset": { borderColor: "#4285F4" },
                 },
