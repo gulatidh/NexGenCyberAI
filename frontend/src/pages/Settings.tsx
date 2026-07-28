@@ -528,22 +528,32 @@ const SCOPE_ICON: Record<AccessScope, React.ReactNode> = {
 function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<{ email: string; role: AccessRole; scope: AccessScope; client_id: string; project_id: string }>({ email: "", role: "reader", scope: "global", client_id: "", project_id: "" });
+  const EMPTY_FORM = { email: "", role: "reader" as AccessRole, scope_type: "global" as AccessScope, client_id: "", project_id: "" };
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const { data: users = [] } = useQuery<UserAccessSummary[]>({ queryKey: ["admin-users"], queryFn: adminApi.listUsers, enabled: isAdmin });
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: () => clientsApi.list(), enabled: isAdmin && form.scope !== "global" });
-  const { data: projects = [] } = useQuery<Project[]>({ queryKey: ["projects", form.client_id], queryFn: () => projectsApi.list(form.client_id), enabled: isAdmin && form.scope === "project" && !!form.client_id });
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: () => clientsApi.list(), enabled: isAdmin && form.scope_type !== "global" });
+  const { data: projects = [] } = useQuery<Project[]>({ queryKey: ["projects", form.client_id], queryFn: () => projectsApi.list(form.client_id), enabled: isAdmin && form.scope_type === "project" && !!form.client_id });
 
   const grant = useMutation({
-    mutationFn: (d: any) => adminApi.createGrant(d),
-    onSuccess: () => { toast.success("Access granted"); qc.invalidateQueries({ queryKey: ["admin-users"] }); setOpen(false); setForm({ email: "", role: "reader", scope: "global", client_id: "", project_id: "" }); },
-    onError: () => toast.error("Failed to grant access"),
+    mutationFn: () => {
+      const payload: any = { email: form.email.trim(), role: form.role, scope_type: form.scope_type };
+      if (form.scope_type === "client") payload.scope_id = form.client_id;
+      if (form.scope_type === "project") payload.scope_id = form.project_id;
+      return adminApi.createGrant(payload);
+    },
+    onSuccess: () => { toast.success("Access granted"); qc.invalidateQueries({ queryKey: ["admin-users"] }); setOpen(false); setForm(EMPTY_FORM); },
+    onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to grant access"),
   });
   const revoke = useMutation({
     mutationFn: (id: string) => adminApi.deleteGrant(id),
     onSuccess: () => { toast.success("Access revoked"); qc.invalidateQueries({ queryKey: ["admin-users"] }); },
     onError: () => toast.error("Failed to revoke access"),
   });
+
+  const submitDisabled = !form.email.trim() || grant.isPending
+    || (form.scope_type === "client" && !form.client_id)
+    || (form.scope_type === "project" && !form.project_id);
 
   if (!isAdmin) return <Alert severity="warning">Admin access required to manage users.</Alert>;
 
@@ -572,10 +582,10 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "text.secondary" }}>
-                    {SCOPE_ICON[g.scope as AccessScope]}<Typography variant="caption">{g.scope}</Typography>
+                    {SCOPE_ICON[g.scope_type as AccessScope]}<Typography variant="caption">{g.scope_type}</Typography>
                   </Box>
                 </TableCell>
-                <TableCell sx={{ fontSize: 11 }}>{g.client_name || g.project_name || "—"}</TableCell>
+                <TableCell sx={{ fontSize: 11 }}>{g.scope_label || "—"}</TableCell>
                 <TableCell sx={{ fontSize: 11 }}>{g.granted_at ? fmt(g.granted_at) : "—"}</TableCell>
                 <TableCell>
                   <Tooltip title="Revoke">
@@ -591,43 +601,50 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Grant access</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
-          <TextField size="small" label="Email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} fullWidth />
+          <TextField size="small" label="Email / UPN" value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} fullWidth
+            placeholder="user@company.com" />
           <FormControl size="small" fullWidth>
             <InputLabel>Role</InputLabel>
             <Select value={form.role} label="Role" onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as AccessRole }))}>
-              <MenuItem value="reader">Reader</MenuItem>
-              <MenuItem value="editor">Editor</MenuItem>
-              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="reader">Reader — read-only</MenuItem>
+              <MenuItem value="editor">Editor — read + write</MenuItem>
+              <MenuItem value="admin">Admin — editor + manage users</MenuItem>
             </Select>
           </FormControl>
           <FormControl size="small" fullWidth>
             <InputLabel>Scope</InputLabel>
-            <Select value={form.scope} label="Scope" onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value as AccessScope, client_id: "", project_id: "" }))}>
-              <MenuItem value="global">Global</MenuItem>
-              <MenuItem value="client">Client</MenuItem>
-              <MenuItem value="project">Project</MenuItem>
+            <Select value={form.scope_type} label="Scope"
+              onChange={(e) => setForm((f) => ({ ...f, scope_type: e.target.value as AccessScope, client_id: "", project_id: "" }))}>
+              <MenuItem value="global">Global — applies everywhere</MenuItem>
+              <MenuItem value="client">Specific client</MenuItem>
+              <MenuItem value="project">Specific project</MenuItem>
             </Select>
           </FormControl>
-          {form.scope === "client" && (
+          {(form.scope_type === "client" || form.scope_type === "project") && (
             <FormControl size="small" fullWidth>
               <InputLabel>Client</InputLabel>
-              <Select value={form.client_id} label="Client" onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))}>
+              <Select value={form.client_id} label="Client"
+                onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value, project_id: "" }))}>
                 {(clients as Client[]).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
               </Select>
             </FormControl>
           )}
-          {form.scope === "project" && (
+          {form.scope_type === "project" && form.client_id && (
             <FormControl size="small" fullWidth>
               <InputLabel>Project</InputLabel>
-              <Select value={form.project_id} label="Project" onChange={(e) => setForm((f) => ({ ...f, project_id: e.target.value }))}>
-                {(projects as Project[]).map((p: any) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+              <Select value={form.project_id} label="Project"
+                onChange={(e) => setForm((f) => ({ ...f, project_id: e.target.value }))}>
+                {(projects as any[]).map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
               </Select>
             </FormControl>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={() => grant.mutate(form)} disabled={!form.email || grant.isPending}>Grant</Button>
+          <Button variant="contained" onClick={() => grant.mutate()} disabled={submitDisabled}>
+            {grant.isPending ? <CircularProgress size={16} /> : "Grant"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

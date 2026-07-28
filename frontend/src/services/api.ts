@@ -556,6 +556,19 @@ export const customFrameworksApi = {
     apiClient.delete(`/frameworks/custom/${id}/controls/${fkCtrlId}/`),
   pickerControls: (params: { framework?: string; domain?: string; search?: string; page?: number }) =>
     apiClient.get("/frameworks/controls/", { params }).then((r) => r.data),
+  // Domains
+  listDomains: (cfId: string) => apiClient.get(`/frameworks/custom/${cfId}/domains/`).then((r) => r.data),
+  createDomain: (cfId: string, data: { name: string; description?: string; sort_order?: number }) =>
+    apiClient.post(`/frameworks/custom/${cfId}/domains/`, data).then((r) => r.data),
+  deleteDomain: (cfId: string, domainId: string) =>
+    apiClient.delete(`/frameworks/custom/${cfId}/domains/${domainId}/`),
+  // Native custom controls
+  createNativeControl: (cfId: string, data: {
+    control_id: string; title: string; description?: string;
+    weight?: number; domain_id?: string; sort_order?: number;
+  }) => apiClient.post(`/frameworks/custom/${cfId}/native-controls/`, data).then((r) => r.data),
+  deleteNativeControl: (cfId: string, ncId: string) =>
+    apiClient.delete(`/frameworks/custom/${cfId}/native-controls/${ncId}/`),
 };
 
 export const usersApi = {

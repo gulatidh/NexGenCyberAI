@@ -1,0 +1,125 @@
+##############################################################################
+# Monitara v2 — Deploy to monitara-ai App Service
+#
+# Triggers on push to v2-redesign branch.
+# Shares the same backend as v1 (nexgencyberai-dev-okxksu-api).
+# No backend deploy — frontend only.
+#
+# Required GitHub Secrets (same as main deploy.yml):
+#   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
+#   REACT_APP_AZURE_CLIENT_ID   – Frontend Entra App Registration client ID
+#   REACT_APP_AZURE_TENANT_ID
+#   REACT_APP_BACKEND_CLIENT_ID
+#   REACT_APP_API_URL (optional — defaults to backend URL below)
+##############################################################################
+
+name: Monitara v2 — Deploy
+
+on:
+  push:
+    branches: [v2-redesign]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-v2-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  AZ_RESOURCE_GROUP: "nexgencyberai-dev-rg"
+  AZ_FRONTEND_APP: "monitara-ai"
+
+jobs:
+
+  # ── 1. Type Check + Build ──────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — Type Check + Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
+          REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
+          REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: "https://monitara-ai.azurewebsites.net"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: v2-frontend-build
+          path: frontend/build/
+          retention-days: 1
+
+  # ── 2. Deploy to monitara-ai ───────────────────────────────────────────────
+  deploy:
+    name: Deploy — monitara-ai
+    needs: frontend-build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: v2-frontend-build
+          path: frontend/build
+
+      - name: Set startup command
+        run: |
+          ok=false
+          for attempt in 1 2 3; do
+            az webapp config set \
+              --name "$AZ_FRONTEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --startup-file "npx --yes serve -s . -l 8080" \
+              --output none && { ok=true; break; }
+            echo "Attempt $attempt failed, retrying in 20s..."
+            sleep 20
+          done
+          $ok || { echo "ERROR: startup-file config failed after 3 attempts"; exit 1; }
+
+      - name: Package and deploy
+        run: |
+          set -euo pipefail
+
+          cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
+          echo "Frontend zip: $(du -sh frontend.zip | cut -f1)"
+
+          for attempt in $(seq 1 5); do
+            echo "Attempt $attempt — deploying to $AZ_FRONTEND_APP..."
+            az webapp deploy \
+              --name "$AZ_FRONTEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --src-path frontend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Deployed successfully to https://monitara-ai.azurewebsites.net"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30s before retry"
+            sleep 30
+          done
+          echo "Deploy failed after 5 attempts"; exit 1
