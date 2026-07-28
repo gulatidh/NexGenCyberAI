@@ -15,7 +15,7 @@ import {
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, AccountTree, Psychology, Description,
-  TrendingUp, GridView, CompareArrows,
+  TrendingUp, GridView, CompareArrows, VpnKey, Webhook,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,16 +41,15 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Overview",
     items: [
-      { label: "Dashboard",      icon: <Dashboard />,  path: "/dashboard" },
-      { label: "Risk Overview",  icon: <Insights />,   path: "/risk-overview" },
-      { label: "Reports",        icon: <BarChart />,   path: "/reports" },
+      { label: "Dashboard", icon: <Dashboard />, path: "/dashboard" },
+      { label: "Reports",   icon: <BarChart />,  path: "/reports" },
     ],
   },
   {
     section: "Foundation",
     items: [
-      { label: "Clients",          icon: <People />,   path: "/clients" },
-      { label: "Connections",      icon: <Cable />,    path: "/connections", children: [
+      { label: "Clients",     icon: <People />,  path: "/clients" },
+      { label: "Connections", icon: <Cable />,   path: "/connections", children: [
         { label: "All Connections", icon: <Cable />,   path: "/connections" },
         { label: "Ticket Sync",     icon: <SyncAlt />, path: "/ticket-sync" },
       ] },
@@ -59,21 +58,33 @@ const NAV_GROUPS: NavGroup[] = [
         { label: "Technologies",    icon: <Apps />,    path: "/assets/technologies" },
         { label: "Stale Assets",    icon: <History />, path: "/stale-assets" },
       ] },
-      { label: "Frameworks",       icon: <Policy />,      path: "/frameworks" },
+      { label: "Frameworks",    icon: <Policy />,     path: "/frameworks" },
       { label: "Custom Policy", icon: <LibraryAdd />, path: "/custom-frameworks" },
     ],
   },
   {
-    section: "Security",
+    section: "Scanning",
     items: [
-      { label: "Scans",         icon: <BugReport />, path: "/scans" },
-      { label: "Findings",      icon: <Security />,  path: "/findings" },
-      { label: "Threat Models", icon: <Hub />,       path: "/threat-models" },
-      { label: "Risk Register", icon: <Assessment />, path: "/risks" },
-      { label: "AI Threat Intelligence", icon: <Radar />,            path: "/threat-register" },
-      { label: "Compliance Gaps",        icon: <GppBad />,          path: "/control-deficiencies" },
-      { label: "Remediation",            icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
-      { label: "VAPT Reports",           icon: <GppGood />,          path: "/vapt-reports" },
+      { label: "Scans",        icon: <BugReport />, path: "/scans" },
+      { label: "Findings",     icon: <Security />,  path: "/findings" },
+      { label: "VAPT Reports", icon: <GppGood />,   path: "/vapt-reports" },
+    ],
+  },
+  {
+    section: "Threat & Risk",
+    items: [
+      { label: "Risk Overview",       icon: <Insights />,   path: "/risk-overview" },
+      { label: "Threat Models",       icon: <Hub />,        path: "/threat-models" },
+      { label: "Threat Intelligence", icon: <Radar />,      path: "/threat-register" },
+      { label: "Risk Register",       icon: <Assessment />, path: "/risks" },
+    ],
+  },
+  {
+    section: "Compliance",
+    items: [
+      { label: "Compliance Gaps", icon: <GppBad />,          path: "/control-deficiencies" },
+      { label: "Remediation",     icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
+      { label: "CTEM Programs",   icon: <Radar />,            path: "/ctem" },
     ],
   },
   {
@@ -87,25 +98,27 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Intelligence",
     items: [
-      { label: "Attack Paths",        icon: <AccountTree />,  path: "/attack-paths" },
-      { label: "Ask Your Data",       icon: <Psychology />,   path: "/nl-query" },
-      { label: "Security Docs",       icon: <Description />,  path: "/security-docs" },
-      { label: "Compliance Heatmap",  icon: <GridView />,     path: "/compliance-heatmap" },
+      { label: "Attack Paths",       icon: <AccountTree />, path: "/attack-paths" },
+      { label: "Ask Your Data",      icon: <Psychology />,  path: "/nl-query" },
+      { label: "Security Docs",      icon: <Description />, path: "/security-docs" },
+      { label: "Compliance Heatmap", icon: <GridView />,    path: "/compliance-heatmap" },
     ],
   },
   {
     section: "Governance",
     items: [
-      { label: "Posture Trends",    icon: <TrendingUp />,     path: "/posture-trends" },
-      { label: "CTEM Programs",     icon: <Radar />,          path: "/ctem" },
-      { label: "Client Comparison", icon: <CompareArrows />,  path: "/client-comparison" },
+      { label: "Posture Trends",    icon: <TrendingUp />,    path: "/posture-trends" },
+      { label: "Client Comparison", icon: <CompareArrows />, path: "/client-comparison" },
     ],
   },
   {
+    // Bottom-pinned configure group — Settings, integrations, help
     section: "Configure",
     items: [
-      { label: "Configure",    icon: <Settings />,       path: "/settings" },
-      { label: "Help",         icon: <MenuBook />,       path: "/help" },
+      { label: "Settings", icon: <Settings />, path: "/settings" },
+      { label: "Webhooks", icon: <Webhook />,  path: "/webhooks" },
+      { label: "API Keys", icon: <VpnKey />,   path: "/api-keys" },
+      { label: "Help",     icon: <MenuBook />, path: "/help" },
     ],
   },
 ];
