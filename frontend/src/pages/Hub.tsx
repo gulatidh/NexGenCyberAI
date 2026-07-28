@@ -8,7 +8,7 @@ import {
 import {
   Shield, BugReport, VerifiedUser, Psychology,
   Radar, Assessment, GppBad, PlaylistAddCheck,
-  SmartToy, Search, MenuBook, TrendingUp,
+  SmartToy, Search, MenuBook, TrendingUp, Cable, Settings,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -270,10 +270,12 @@ export default function Hub() {
   };
 
   const NAV_EXTRA = [
-    { label: "Clients & Projects", icon: <VerifiedUser sx={{ fontSize: 16 }} />, route: "/clients" },
-    { label: "Reports", icon: <TrendingUp sx={{ fontSize: 16 }} />, route: "/reports" },
-    { label: "Knowledge Base", icon: <MenuBook sx={{ fontSize: 16 }} />, route: "/knowledge" },
-    { label: "Search Data", icon: <Search sx={{ fontSize: 16 }} />, route: "/intelligence/nl-query" },
+    { label: "Clients",            icon: <VerifiedUser sx={{ fontSize: 16 }} />, route: "/clients" },
+    { label: "Connections",        icon: <Cable       sx={{ fontSize: 16 }} />, route: "/connections" },
+    { label: "Reports",            icon: <TrendingUp  sx={{ fontSize: 16 }} />, route: "/reports" },
+    { label: "Knowledge Base",     icon: <MenuBook    sx={{ fontSize: 16 }} />, route: "/knowledge" },
+    { label: "Search Data",        icon: <Search      sx={{ fontSize: 16 }} />, route: "/intelligence/nl-query" },
+    { label: "Settings",           icon: <Settings    sx={{ fontSize: 16 }} />, route: "/settings" },
   ];
 
   const navigate = useNavigate();
