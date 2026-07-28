@@ -7,7 +7,7 @@ import {
   Radar, Assessment, BugReport, Shield, GppBad,
   PlaylistAddCheck, SmartToy, Psychology, TrendingUp,
   Security, FindInPage, Policy, LibraryAdd, Description,
-  Hub, Search, MenuBook, VerifiedUser, AccountTree,
+  Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -19,8 +19,9 @@ export const THREAT_INTEL: ProductDef = {
   bgColor: "#E3F2FD",
   basePath: "/threat-intel",
   nav: [
-    { label: "Threat Register", icon: <Radar />, path: "/register" },
-    { label: "Attack Paths", icon: <Hub />, path: "/attack-paths" },
+    { label: "Threat Register",  icon: <Radar />,     path: "/register" },
+    { label: "Threat Models",    icon: <DeviceHub />, path: "/threat-models" },
+    { label: "Attack Paths",     icon: <Hub />,       path: "/attack-paths" },
   ],
 };
 
@@ -73,7 +74,7 @@ export const COMPLIANCE_MONITOR: ProductDef = {
   nav: [
     { label: "Control Deficiencies", icon: <GppBad />, path: "/deficiencies" },
     { label: "Frameworks", icon: <Policy />, path: "/frameworks" },
-    { label: "Custom Standards", icon: <LibraryAdd />, path: "/custom-frameworks" },
+    { label: "Custom Policy",    icon: <LibraryAdd />, path: "/custom-frameworks" },
     { label: "Evidence Package", icon: <VerifiedUser />, path: "/evidence" },
   ],
 };

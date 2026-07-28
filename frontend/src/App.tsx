@@ -141,6 +141,8 @@ function ProtectedApp() {
         <Route path="/threat-intel" element={<ProductLayout product={THREAT_INTEL} />}>
           <Route index element={<Navigate to="register" replace />} />
           <Route path="register" element={<ThreatRegister />} />
+          <Route path="threat-models" element={<ThreatModels />} />
+          <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
           <Route path="attack-paths" element={<AttackPaths />} />
         </Route>
 

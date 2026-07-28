@@ -11,19 +11,24 @@
  *     <Routes>...</Routes>
  *   </ProductLayout>
  */
-import React from "react";
+import React, { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Typography, Avatar, IconButton, Divider,
   List, ListItemButton, ListItemIcon, ListItemText,
-  Tooltip, Select, MenuItem, FormControl,
+  Tooltip, Select, MenuItem, FormControl, Menu,
 } from "@mui/material";
-import { Apps as WaffleIcon, ChevronLeft } from "@mui/icons-material";
+import {
+  Apps as WaffleIcon, ChevronLeft,
+  DarkMode, LightMode, Palette, Logout, Settings, AccountCircle,
+} from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
 import { clientsApi } from "../../services/api";
 import { Client } from "../../types";
 import { useActiveClient } from "../../contexts/ClientContext";
+import { useThemeMode } from "../../theme/ThemeModeContext";
+import NotificationBell from "./NotificationBell";
 
 export interface ProductNavItem {
   label: string;
@@ -85,7 +90,10 @@ function ClientSelector() {
 export default function ProductLayout({ product }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { accounts } = useMsal();
+  const { instance, accounts } = useMsal();
+  const { mode, setMode } = useThemeMode();
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [themeMenuAnchor, setThemeMenuAnchor] = useState<null | HTMLElement>(null);
 
   const displayName = accounts[0]?.name || accounts[0]?.username || "User";
   const initials = displayName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -155,10 +163,48 @@ export default function ProductLayout({ product }: Props) {
         {/* Client selector */}
         <ClientSelector />
 
-        {/* User avatar */}
-        <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: product.color, ml: 1 }}>
-          {initials}
-        </Avatar>
+        {/* Notifications */}
+        <NotificationBell />
+
+        {/* Theme toggle */}
+        <Tooltip title="Theme">
+          <IconButton size="small" onClick={(e) => setThemeMenuAnchor(e.currentTarget)} sx={{ color: "text.secondary" }}>
+            {mode === "light" ? <LightMode fontSize="small" /> : mode === "custom" ? <Palette fontSize="small" /> : <DarkMode fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+        <Menu anchorEl={themeMenuAnchor} open={Boolean(themeMenuAnchor)} onClose={() => setThemeMenuAnchor(null)}>
+          <MenuItem onClick={() => { setMode("dark");   setThemeMenuAnchor(null); }}><DarkMode  fontSize="small" sx={{ mr: 1 }} />Dark</MenuItem>
+          <MenuItem onClick={() => { setMode("light");  setThemeMenuAnchor(null); }}><LightMode fontSize="small" sx={{ mr: 1 }} />Light</MenuItem>
+          <MenuItem onClick={() => { setMode("custom"); setThemeMenuAnchor(null); }}><Palette   fontSize="small" sx={{ mr: 1 }} />Custom</MenuItem>
+        </Menu>
+
+        {/* Settings shortcut */}
+        <Tooltip title="Settings">
+          <IconButton size="small" onClick={() => navigate("/settings")} sx={{ color: "text.secondary" }}>
+            <Settings fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        {/* User menu */}
+        <Tooltip title={displayName}>
+          <Avatar
+            onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+            sx={{ width: 30, height: 30, fontSize: 12, bgcolor: product.color, ml: 0.5, cursor: "pointer" }}
+          >
+            {initials}
+          </Avatar>
+        </Tooltip>
+        <Menu anchorEl={userMenuAnchor} open={Boolean(userMenuAnchor)} onClose={() => setUserMenuAnchor(null)}>
+          <MenuItem disabled><AccountCircle sx={{ mr: 1 }} fontSize="small" />{displayName}</MenuItem>
+          <Divider />
+          <MenuItem onClick={() => { setUserMenuAnchor(null); navigate("/settings"); }}>
+            <Settings sx={{ mr: 1 }} fontSize="small" />Settings
+          </MenuItem>
+          <Divider />
+          <MenuItem onClick={() => instance.logoutRedirect({ postLogoutRedirectUri: "/" })}>
+            <Logout sx={{ mr: 1 }} fontSize="small" />Logout
+          </MenuItem>
+        </Menu>
       </Box>
 
       <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
