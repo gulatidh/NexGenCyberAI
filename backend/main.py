@@ -603,24 +603,26 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.is_live ALTER failed: %s", exc)
 
-    # custom_framework_controls — reference_id, sort_order, domain (added for MAS TRM policy mapping)
-    insp = inspect(engine)
-    cfc_cols = {c["name"] for c in insp.get_columns("custom_framework_controls")}
-    for col_name, ddl_sqlite, ddl_mssql in [
-        ("reference_id", "TEXT",                        "NVARCHAR(20)"),
-        ("sort_order",   "INTEGER NOT NULL DEFAULT 0",  "INT NOT NULL DEFAULT 0"),
-        ("domain",       "TEXT",                        "NVARCHAR(100)"),
-    ]:
-        if col_name not in cfc_cols:
-            ddl = (f"ALTER TABLE custom_framework_controls ADD {col_name} {ddl_mssql}"
-                   if dialect == "mssql"
-                   else f"ALTER TABLE custom_framework_controls ADD COLUMN {col_name} {ddl_sqlite}")
-            try:
-                with engine.begin() as conn:
-                    conn.execute(text(ddl))
-                logger.info("Added custom_framework_controls.%s column", col_name)
-            except Exception as exc:
-                logger.warning("custom_framework_controls.%s ALTER failed: %s", col_name, exc)
+        # custom_framework_controls — reference_id, sort_order, domain (added for MAS TRM policy mapping)
+        try:
+            cfc_cols = {c["name"] for c in inspector.get_columns("custom_framework_controls")}
+        except Exception:
+            cfc_cols = set()
+        for col_name, ddl_sqlite, ddl_mssql in [
+            ("reference_id", "TEXT",                        "NVARCHAR(20)"),
+            ("sort_order",   "INTEGER NOT NULL DEFAULT 0",  "INT NOT NULL DEFAULT 0"),
+            ("domain",       "TEXT",                        "NVARCHAR(100)"),
+        ]:
+            if cfc_cols and col_name not in cfc_cols:
+                ddl = (f"ALTER TABLE custom_framework_controls ADD {col_name} {ddl_mssql}"
+                       if dialect == "mssql"
+                       else f"ALTER TABLE custom_framework_controls ADD COLUMN {col_name} {ddl_sqlite}")
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(ddl))
+                    logger.info("Added custom_framework_controls.%s column", col_name)
+                except Exception as exc:
+                    logger.warning("custom_framework_controls.%s ALTER failed: %s", col_name, exc)
 
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
