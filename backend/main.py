@@ -406,6 +406,8 @@ def _ensure_added_columns() -> None:
             ("avatar_url",          "NVARCHAR(512) NULL", "VARCHAR(512)"),
             ("signature_opening",   "NVARCHAR(300) NULL", "VARCHAR(300)"),
             ("accent_color",        "NVARCHAR(16) NULL",  "VARCHAR(16)"),
+            # input_schema — JSON list describing what inputs this agent accepts
+            ("input_schema",        "NVARCHAR(MAX) NULL", "TEXT"),
         ]
         for col, mssql_type, sqlite_type in _agent_additions:
             if agent_cols and col not in agent_cols:

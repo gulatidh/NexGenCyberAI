@@ -6,6 +6,7 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Switch, IconButton, Tooltip, Drawer, Divider, LinearProgress, Collapse,
+  Avatar,
 } from "@mui/material";
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
@@ -44,6 +45,15 @@ interface Agent {
   avatar_url?: string;
   signature_opening?: string;
   accent_color?: string;
+  // Input wizard schema
+  input_schema?: InputField[];
+}
+
+interface InputField {
+  type: "scan" | "framework" | "custom_prompt" | "text_context";
+  label: string;
+  required: boolean;
+  description?: string;
 }
 
 interface AgentGroup { key: string; label: string; agents: Agent[]; }
@@ -307,16 +317,151 @@ function RecentRunRow({ run }: { run: AgentRun }) {
   );
 }
 
+// ── Agent Run Wizard ─────────────────────────────────────────────────────────
+
+const DEFAULT_SCHEMA: InputField[] = [
+  { type: "custom_prompt", label: "Instructions (optional)", required: false,
+    description: "Any specific instructions or context for this agent" },
+];
+
+function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy, onRunCatalog }: {
+  agent: Agent;
+  scans: Scan[];
+  frameworks: any[];
+  color: string;
+  onClose: () => void;
+  onRunLegacy: (scanId: string, framework: string) => void;
+  onRunCatalog: (agentId: string, prompt: string, scanId: string) => void;
+}) {
+  const schema = agent.input_schema?.length ? agent.input_schema : DEFAULT_SCHEMA;
+
+  const [scanId, setScanId] = useState("");
+  const [framework, setFramework] = useState("nist_csf");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [textContext, setTextContext] = useState("");
+
+  const canRun = schema.every((f) => {
+    if (!f.required) return true;
+    if (f.type === "scan") return !!scanId;
+    if (f.type === "framework") return !!framework;
+    if (f.type === "custom_prompt") return !!customPrompt.trim();
+    if (f.type === "text_context") return !!textContext.trim();
+    return true;
+  });
+
+  const handleRun = () => {
+    if (agent.legacy_orchestrator) {
+      onRunLegacy(scanId, framework);
+    } else {
+      const parts: string[] = [];
+      if (textContext.trim()) parts.push(`Context:\n${textContext.trim()}`);
+      if (customPrompt.trim()) parts.push(customPrompt.trim());
+      onRunCatalog(agent.id, parts.join("\n\n"), scanId);
+    }
+    onClose();
+  };
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth
+      slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
+      <DialogTitle sx={{ pb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          {agent.avatar_url ? (
+            <Avatar src={agent.avatar_url} sx={{ width: 36, height: 36 }} />
+          ) : (
+            <Box sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: `${color}1F`,
+              display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <SmartToy sx={{ color, fontSize: 20 }} />
+            </Box>
+          )}
+          <Box>
+            <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{agent.name}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {agent.domain || agent.group_label}
+            </Typography>
+          </Box>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ borderColor: "divider", display: "flex", flexDirection: "column", gap: 2.5, pt: 2 }}>
+        {agent.description && (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>{agent.description}</Typography>
+        )}
+
+        {schema.map((field, i) => {
+          if (field.type === "scan") return (
+            <FormControl key={i} fullWidth size="small">
+              <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
+              <Select value={scanId} label={field.label + (field.required ? " *" : "")}
+                onChange={(e) => setScanId(e.target.value)}>
+                {!field.required && <MenuItem value="">— none —</MenuItem>}
+                {scans.filter((s) => s.status === "completed" || (s as any).is_live !== false)
+                  .map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
+              </Select>
+              {field.description && (
+                <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
+              )}
+            </FormControl>
+          );
+
+          if (field.type === "framework") return (
+            <FormControl key={i} fullWidth size="small">
+              <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
+              <Select value={framework} label={field.label + (field.required ? " *" : "")}
+                onChange={(e) => setFramework(e.target.value)}>
+                {frameworks.map((f: any) => (
+                  <MenuItem key={f.value} value={f.value}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {f.label}
+                      {f.is_custom && <Chip label="Custom" size="small"
+                        sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+              {field.description && (
+                <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
+              )}
+            </FormControl>
+          );
+
+          if (field.type === "text_context") return (
+            <TextField key={i} fullWidth size="small" multiline minRows={4}
+              label={field.label + (field.required ? " *" : "")}
+              placeholder={field.description}
+              value={textContext} onChange={(e) => setTextContext(e.target.value)} />
+          );
+
+          if (field.type === "custom_prompt") return (
+            <TextField key={i} fullWidth size="small" multiline minRows={3}
+              label={field.label + (field.required ? " *" : "")}
+              placeholder={field.description || "Any specific instructions or focus area…"}
+              value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
+          );
+
+          return null;
+        })}
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ color: "text.secondary" }}>Cancel</Button>
+        <Button variant="contained" disabled={!canRun} startIcon={<PlayArrow />}
+          onClick={handleRun}
+          sx={{ bgcolor: color, "&:hover": { bgcolor: color, filter: "brightness(0.9)" } }}>
+          Run Agent
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function Agents() {
   const qc = useQueryClient();
   const { canAct } = useViewMode();
   const { clientId: selectedClientId } = useActiveClient();
-  const [selectedScanId, setSelectedScanId] = useState("");
-  const [selectedFramework, setSelectedFramework] = useState("nist_csf");
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [briefingAgent, setBriefingAgent] = useState<Agent | null>(null);
-  const [briefingPrompt, setBriefingPrompt] = useState("");
+  const [wizardAgent, setWizardAgent] = useState<Agent | null>(null);
   const [briefingOutput, setBriefingOutput] = useState<{ output: string; provider: string; model?: string; tokens_used: number; duration_ms: number } | null>(null);
   const [briefingError, setBriefingError] = useState<string>("");
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
@@ -327,6 +472,7 @@ export default function Agents() {
   const { data: scans = [] } = useQuery<Scan[]>({
     queryKey: ["scans-for-agents", selectedClientId],
     queryFn: () => scansApi.list(selectedClientId),
+    select: (data) => data.filter((s) => s.status === "completed"),
     enabled: !!selectedClientId,
   });
 
@@ -373,27 +519,27 @@ export default function Agents() {
   });
 
   const runMutation = useMutation({
-    mutationFn: (agentType: AgentType) =>
+    mutationFn: ({ agentType, scanId, framework }: { agentType: AgentType; scanId?: string; framework?: string }) =>
       agentsApi.run(selectedClientId, {
         agent_type: agentType,
-        scan_id: selectedScanId || undefined,
-        input_data: { framework: selectedFramework },
+        scan_id: scanId || undefined,
+        input_data: { framework: framework || "nist_csf" },
       }),
-    onSuccess: (run, agentType) => {
+    onSuccess: (run, vars) => {
       if (run?.id) {
         setPollingRunId(run.id);
-        toast.info(`${agentType} queued — polling for result…`);
+        toast.info(`${vars.agentType} queued — polling for result…`);
       } else {
         qc.invalidateQueries({ queryKey: ["agent-runs"] });
-        toast.success(`${agentType} started`);
+        toast.success(`${vars.agentType} started`);
       }
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Agent run failed"),
   });
 
   const briefingMutation = useMutation({
-    mutationFn: ({ agentId, prompt }: { agentId: string; prompt?: string }) =>
-      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined, selectedScanId || undefined),
+    mutationFn: ({ agentId, prompt, scanId }: { agentId: string; prompt?: string; scanId?: string }) =>
+      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined, scanId || undefined),
     onSuccess: (data) => { setBriefingOutput(data); setBriefingError(""); },
     onError: (e: any) => {
       setBriefingError(e.response?.data?.detail || e.message || "Briefing failed");
@@ -431,31 +577,6 @@ export default function Agents() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }} disabled={!selectedClientId}>
-            <InputLabel sx={{ color: "text.secondary" }}>Scan (optional)</InputLabel>
-            <Select value={selectedScanId} onChange={(e) => setSelectedScanId(e.target.value)} label="Scan (optional)"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              <MenuItem value="">No scan</MenuItem>
-              {scans.map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
-            <Select value={selectedFramework} onChange={(e) => setSelectedFramework(e.target.value)} label="Framework"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {allFrameworks.map((f: any) => (
-                <MenuItem key={f.value} value={f.value}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {f.label}
-                    {f.is_custom && (
-                      <Chip label="Custom" size="small"
-                        sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
-                    )}
-                  </Box>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           {isAdmin && (
             <Button variant="contained" startIcon={<Add />} onClick={() => setNewOpen(true)}>
               New Agent
@@ -519,34 +640,20 @@ export default function Agents() {
                           {agent.description}
                         </Typography>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-                          {agent.legacy_orchestrator ? (
-                            <Tooltip title={!canAct ? "Switch to Analyst mode (top-right toggle) to run agents" : !selectedClientId ? "Select a client from the dropdown above first" : ""}>
-                              <span>
-                                <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                                  disabled={!selectedClientId || runMutation.isPending || !canAct || !!pollingRunId}
-                                  onClick={() => runMutation.mutate(agent.key as AgentType)}
-                                  sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
-                                  {pollingRunId ? "Running…" : "Run"}
-                                </Button>
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip title={!canAct ? "Switch to Analyst mode (top-right toggle) to run agents" : !agent.is_enabled ? "Agent is disabled — enable it via the configure button" : ""}>
-                              <span>
-                                <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
-                                  disabled={!agent.is_enabled || !canAct}
-                                  onClick={() => {
-                                    setBriefingAgent(agent);
-                                    setBriefingPrompt("");
-                                    setBriefingOutput(null);
-                                    setBriefingError("");
-                                  }}
-                                  sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
-                                  Run
-                                </Button>
-                              </span>
-                            </Tooltip>
-                          )}
+                          <Tooltip title={
+                            !canAct ? "Switch to Analyst mode (top-right toggle) to run agents" :
+                            !selectedClientId ? "Select a client first" :
+                            !agent.is_enabled ? "Agent is disabled — enable it via configure" : ""
+                          }>
+                            <span>
+                              <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
+                                disabled={!selectedClientId || !canAct || !agent.is_enabled || (agent.legacy_orchestrator && (runMutation.isPending || !!pollingRunId))}
+                                onClick={() => { setBriefingOutput(null); setBriefingError(""); setWizardAgent(agent); }}
+                                sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
+                                {agent.legacy_orchestrator && pollingRunId ? "Running…" : "Run"}
+                              </Button>
+                            </span>
+                          </Tooltip>
                           <Box sx={{ flex: 1 }} />
                           <Tooltip title={isAdmin ? "Configure" : "View configuration"}>
                             <IconButton size="small" onClick={() => setConfiguring(agent)}
@@ -626,67 +733,61 @@ export default function Agents() {
         existingGroups={groupOptions}
       />
 
-      {/* Briefing drawer — invoke a catalog agent and view its LLM-generated output */}
-      <Drawer anchor="right" open={!!briefingAgent} onClose={() => setBriefingAgent(null)}
+      {/* Agent Run Wizard */}
+      {wizardAgent && (
+        <AgentRunWizard
+          agent={wizardAgent}
+          scans={scans}
+          frameworks={allFrameworks}
+          color={GROUP_COLOR[wizardAgent.group_key] || "#4285F4"}
+          onClose={() => setWizardAgent(null)}
+          onRunLegacy={(scanId, framework) =>
+            runMutation.mutate({ agentType: wizardAgent.key as AgentType, scanId, framework })
+          }
+          onRunCatalog={(agentId, prompt, scanId) =>
+            briefingMutation.mutate({ agentId, prompt, scanId })
+          }
+        />
+      )}
+
+      {/* Catalog agent output drawer */}
+      <Drawer anchor="right" open={briefingMutation.isPending || !!briefingOutput || !!briefingError}
+        onClose={() => { setBriefingOutput(null); setBriefingError(""); }}
         slotProps={{ paper: { sx: { width: { xs: "100%", sm: 540 }, bgcolor: "background.paper", color: "text.primary" } } }}>
-        {briefingAgent && (
-          <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>{briefingAgent.name}</Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary", mb: 2 }}>
-              {briefingAgent.group_label} · {briefingAgent.domain || briefingAgent.description}
-            </Typography>
-            <Divider sx={{ borderColor: "divider", mb: 2 }} />
-            <TextField
-              fullWidth size="small" multiline minRows={3} label="Your instruction (optional)"
-              placeholder="Leave blank for a standard briefing on this agent's domain."
-              value={briefingPrompt} onChange={(e) => setBriefingPrompt(e.target.value)}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
-              sx={{ mb: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
-            <Button variant="contained" startIcon={<PlayArrow />}
-              disabled={briefingMutation.isPending}
-              onClick={() => briefingMutation.mutate({ agentId: briefingAgent.id, prompt: briefingPrompt || undefined })}
-              sx={{ mb: 2 }}>
-              {briefingMutation.isPending ? <CircularProgress size={18} /> : "Generate Briefing"}
-            </Button>
-            <Box sx={{ flex: 1, overflow: "auto", borderTop: "1px solid rgba(255,255,255,0.06)", pt: 2 }}>
-              {briefingMutation.isPending && (
-                <Box sx={{ textAlign: "center", py: 4 }}>
-                  <CircularProgress size={28} sx={{ color: "#4285F4" }} />
-                  <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 1 }}>
-                    Calling the AI engine…
-                  </Typography>
-                </Box>
-              )}
-              {briefingError && (
-                <Alert severity="error" sx={{ mb: 1 }}>{briefingError}</Alert>
-              )}
-              {briefingOutput && (
-                <>
-                  <Box sx={{ display: "flex", gap: 1, mb: 1.5, flexWrap: "wrap" }}>
-                    <Chip size="small" label={`Provider: ${briefingOutput.provider}`}
-                      sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 20 }} />
-                    {briefingOutput.model && (
-                      <Chip size="small" label={`Model: ${briefingOutput.model}`}
-                        sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 10, height: 20 }} />
-                    )}
-                    {briefingOutput.tokens_used > 0 && (
-                      <Chip size="small" label={`${briefingOutput.tokens_used} tokens`}
-                        sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
-                    )}
-                    <Chip size="small" label={`${briefingOutput.duration_ms} ms`}
-                      sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 10, height: 20 }} />
-                  </Box>
-                  <RichOutput value={briefingOutput.output} />
-                </>
-              )}
-              {!briefingMutation.isPending && !briefingOutput && !briefingError && (
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Click "Generate Briefing" to invoke this agent.
+        <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", height: "100%" }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>Agent Output</Typography>
+          <Divider sx={{ borderColor: "divider", my: 1.5 }} />
+          <Box sx={{ flex: 1, overflow: "auto" }}>
+            {briefingMutation.isPending && (
+              <Box sx={{ textAlign: "center", py: 6 }}>
+                <CircularProgress size={28} sx={{ color: "#4285F4" }} />
+                <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 1 }}>
+                  Calling the AI engine…
                 </Typography>
-              )}
-            </Box>
+              </Box>
+            )}
+            {briefingError && <Alert severity="error">{briefingError}</Alert>}
+            {briefingOutput && (
+              <>
+                <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+                  <Chip size="small" label={`Provider: ${briefingOutput.provider}`}
+                    sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 20 }} />
+                  {briefingOutput.model && (
+                    <Chip size="small" label={`Model: ${briefingOutput.model}`}
+                      sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 10, height: 20 }} />
+                  )}
+                  {briefingOutput.tokens_used > 0 && (
+                    <Chip size="small" label={`${briefingOutput.tokens_used} tokens`}
+                      sx={{ bgcolor: "action.hover", color: "text.secondary", fontSize: 10, height: 20 }} />
+                  )}
+                  <Chip size="small" label={`${briefingOutput.duration_ms} ms`}
+                    sx={{ bgcolor: "action.hover", color: "text.secondary", fontSize: 10, height: 20 }} />
+                </Box>
+                <RichOutput value={briefingOutput.output} />
+              </>
+            )}
           </Box>
-        )}
+        </Box>
       </Drawer>
     </Box>
   );

@@ -955,6 +955,7 @@ class AIAgent(Base):
     # JSON list of tool identifiers + knowledge file IDs
     tools_enabled = Column(JSON, default=list)
     knowledge_file_ids = Column(JSON, default=list)
+    input_schema = Column(JSON, default=list)
     # Flags
     is_builtin = Column(Boolean, default=False, nullable=False)
     is_enabled = Column(Boolean, default=True, nullable=False)

@@ -1296,6 +1296,64 @@ _BUDDY_PERSONALITY: dict = {
 }
 
 
+_DEFAULT_INPUT_SCHEMA = [
+    {
+        "type": "custom_prompt",
+        "label": "Instructions (optional)",
+        "required": False,
+        "description": "Any specific instructions or context for this agent",
+    }
+]
+
+_AGENT_INPUT_SCHEMAS: dict = {
+    # Legacy orchestrator agents
+    "risk_manager": [
+        {"type": "scan", "label": "Scan", "required": False, "description": "Optional scan to score risks from"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Risk framework"},
+    ],
+    "va_scanner": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to analyze vulnerabilities from"},
+    ],
+    "framework_analyst": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to map to framework controls"},
+        {"type": "framework", "label": "Framework", "required": True, "description": "Target compliance framework"},
+    ],
+    "compliance_monitor": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to generate compliance report from"},
+        {"type": "framework", "label": "Framework", "required": True, "description": "Compliance framework to evaluate against"},
+    ],
+    "threat_intel": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to correlate with MITRE ATT&CK"},
+    ],
+    "remediation": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to generate remediation playbooks for"},
+        {"type": "custom_prompt", "label": "Focus area (optional)", "required": False, "description": "e.g. 'focus on cloud misconfigurations'"},
+    ],
+    "orchestrator": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Scan to run the full agent pipeline against"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Compliance framework"},
+    ],
+    # Catalog agents with identity/access context
+    "iga_advisor": [
+        {"type": "text_context", "label": "Identity & Access configuration", "required": False, "description": "Paste IAM roles, permission policies, user-to-role assignments, or access review data"},
+        {"type": "custom_prompt", "label": "Specific question or focus area", "required": False},
+    ],
+    "access_risk_advisor": [
+        {"type": "text_context", "label": "Access control data", "required": False, "description": "Paste RBAC config, access logs, or permission matrix"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False},
+    ],
+    # Cloud/infra agents
+    "cloud_security_advisor": [
+        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Cloud security scan results"},
+        {"type": "custom_prompt", "label": "Cloud environment context", "required": False, "description": "e.g. AWS account IDs, regions, key services in use"},
+    ],
+    "network_exposure_analyzer": [
+        {"type": "scan", "label": "Scan (optional)", "required": False},
+        {"type": "custom_prompt", "label": "Network topology notes", "required": False},
+    ],
+}
+
+
 def seed_agent_catalog() -> None:
     """Insert any agents whose `key` doesn't already exist. Idempotent.
 
@@ -1332,6 +1390,7 @@ def seed_agent_catalog() -> None:
                 signature_opening=persona.get("signature_opening"),
                 avatar_url=persona.get("avatar_url"),
                 accent_color=persona.get("accent_color"),
+                input_schema=_AGENT_INPUT_SCHEMAS.get(entry["key"], _DEFAULT_INPUT_SCHEMA),
             ))
             inserted += 1
         db.commit()
@@ -1376,6 +1435,23 @@ def seed_agent_catalog() -> None:
         if backfilled:
             db.commit()
             logger.info("Backfilled Phase 7 personality on %d existing buddies", backfilled)
+
+        # Backfill input_schema on existing built-in agents — only fills rows
+        # where input_schema is still NULL or an empty list so admin edits are
+        # never overwritten.
+        schema_backfilled = 0
+        try:
+            all_agents = db.query(AIAgent).filter(AIAgent.is_builtin == True).all()
+            for a in all_agents:
+                if a.input_schema:          # already set — leave it alone
+                    continue
+                a.input_schema = _AGENT_INPUT_SCHEMAS.get(a.key, _DEFAULT_INPUT_SCHEMA)
+                schema_backfilled += 1
+            if schema_backfilled:
+                db.commit()
+                logger.info("Backfilled input_schema on %d existing built-in agents", schema_backfilled)
+        except Exception:
+            logger.exception("input_schema backfill failed (non-fatal)")
 
         # Upgrade stale system prompts on existing built-in catalog agents.
         # Any agent whose stored prompt is shorter than 500 chars still has

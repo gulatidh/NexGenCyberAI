@@ -74,6 +74,10 @@ class AgentBase(BaseModel):
     avatar_url: Optional[str] = None
     signature_opening: Optional[str] = None
     accent_color: Optional[str] = None
+    # Input schema — declares what inputs (scan, framework, text_context, etc.)
+    # this agent expects. Each entry is a dict with keys: type, label, required,
+    # description. Frontend uses this to render the run-agent dialog dynamically.
+    input_schema: Optional[List[Dict]] = None
 
 
 class AgentCreate(AgentBase):
@@ -100,6 +104,7 @@ class AgentUpdate(BaseModel):
     avatar_url: Optional[str] = None
     signature_opening: Optional[str] = None
     accent_color: Optional[str] = None
+    input_schema: Optional[List[Dict]] = None
 
 
 class AgentResponse(AgentBase):
