@@ -11,7 +11,7 @@ import {
   Radar, Assessment, GppBad, PlaylistAddCheck,
   SmartToy, Search, Cable, Settings,
   Tune, Restore, Storage, Menu as MenuIcon,
-  Help as HelpOutline, AutoAwesome,
+  Help as HelpOutline,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
