@@ -205,6 +205,7 @@ function ProtectedApp() {
           <Route path="assets/:assetId" element={<AssetDetail />} />
           <Route path="connections" element={<Connections />} />
           <Route path="ticket-sync" element={<TicketSyncPage />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* ── v1 AppLayout routes (classic view — still accessible) ─────── */}

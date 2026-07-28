@@ -9,7 +9,7 @@ import {
   OpenInNew, Add, Delete,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { clientsApi, connectorsApi, scansApi, projectsApi, assetsApi } from "../services/api";
 import { Client, Connector, Scan, Project, ProjectSummary, Asset } from "../types";
 import { fromNow } from "../utils/datetime";
@@ -94,6 +94,8 @@ function ProjectCardCompact({ project, clientId, onDelete }: {
 export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const scansBase = location.pathname.startsWith("/platform") ? "/vulnerability/scans" : "/scans";
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -473,7 +475,7 @@ export default function ClientDetail() {
               {scans.length} scan{scans.length === 1 ? "" : "s"}
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-              onClick={() => navigate(`/scans?clientId=${clientId}`)}
+              onClick={() => navigate(`${scansBase}?clientId=${clientId}`)}
               sx={{ color: "#4285F4", fontSize: 11 }}>
               Manage Scans
             </Button>

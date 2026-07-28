@@ -8,7 +8,7 @@ import {
   PlaylistAddCheck, SmartToy, Psychology, TrendingUp,
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
-  People, Storage, Cable, SyncAlt, Tune,
+  People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -122,17 +122,18 @@ export const INTELLIGENCE: ProductDef = {
 };
 
 export const PLATFORM: ProductDef = {
-  name: "Platform",
-  abbrev: "PL",
+  name: "Setup",
+  abbrev: "ST",
   icon: <Tune />,
   color: "#37474F",
   bgColor: "#ECEFF1",
   basePath: "/platform",
   nav: [
-    { label: "Clients",     icon: <People />,   path: "/clients" },
-    { label: "Assets",      icon: <Storage />,  path: "/assets" },
-    { label: "Connections", icon: <Cable />,    path: "/connections" },
-    { label: "Ticket Sync", icon: <SyncAlt />,  path: "/ticket-sync" },
+    { label: "Clients",     icon: <People />,        path: "/clients" },
+    { label: "Assets",      icon: <Storage />,        path: "/assets" },
+    { label: "Connections", icon: <Cable />,          path: "/connections" },
+    { label: "Ticket Sync", icon: <SyncAlt />,        path: "/ticket-sync" },
+    { label: "Settings",    icon: <SettingsIcon />,   path: "/settings" },
   ],
 };
 

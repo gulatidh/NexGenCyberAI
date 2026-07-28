@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Chip, Button, CircularProgress, Tabs, Tab,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Alert, Grid,
@@ -446,6 +446,8 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
 export default function ScanDetail() {
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("verdict");
   const [agentMenuAnchor, setAgentMenuAnchor] = useState<null | HTMLElement>(null);
@@ -566,7 +568,7 @@ export default function ScanDetail() {
 
       <Box className="no-print" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
         <Button startIcon={<ArrowBack />} size="small"
-          onClick={() => navigate("/scans")}
+          onClick={() => navigate(scansBase)}
           sx={{ color: "text.secondary" }}>
           Assessments
         </Button>

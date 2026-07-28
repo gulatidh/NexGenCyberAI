@@ -17,7 +17,7 @@ import {
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
 import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
@@ -559,6 +559,8 @@ interface AssessmentTileCardProps {
 }
 
 function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot }: AssessmentTileCardProps) {
+  const location = useLocation();
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
   const status = tile.status as string;
   const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
   const cat = (tile.category as string) || "Other";
@@ -576,7 +578,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
 
   return (
     <Card
-      onClick={() => navigate(`/scans/${tile.id}`)}
+      onClick={() => navigate(`${scansBase}/${tile.id}`)}
       sx={{
         bgcolor: "background.paper",
         border: `1px solid ${statusColor}40`,
@@ -615,7 +617,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
         )}
         {tile.parent_scan_id && (
           <Tooltip title="View diff — compare with previous scan">
-            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`/scans/${tile.id}/diff`); }}
+            <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`${scansBase}/${tile.id}/diff`); }}
               sx={{ position: "absolute", top: 6, right: 84, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
               <CompareArrows sx={{ fontSize: 16 }} />
             </IconButton>
@@ -681,6 +683,9 @@ export default function Scans() {
   const { canAct } = useViewMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
+  const connBase = location.pathname.startsWith("/vulnerability") ? "/platform/connections" : "/connections";
   const { clientId: selectedClientId, setClientId: setSelectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [open, setOpen] = useState(false);
@@ -1697,7 +1702,7 @@ export default function Scans() {
                       <Button
                         size="small"
                         variant="outlined"
-                        onClick={() => navigate("/connections#scanner")}
+                        onClick={() => navigate(`${connBase}#scanner`)}
                         sx={{ borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12 }}
                       >
                         Go to Scanner Connectors
@@ -1995,7 +2000,7 @@ export default function Scans() {
                         }} />
                       <Box
                         sx={{ flex: 1, minWidth: 0, cursor: "pointer", "&:hover": { opacity: 0.8 } }}
-                        onClick={() => { setHistoryOpenForRoot(null); navigate(`/scans/${v.id}`); }}
+                        onClick={() => { setHistoryOpenForRoot(null); navigate(`${scansBase}/${v.id}`); }}
                       >
                         <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>
                           {v.started_at ? new Date(v.started_at).toLocaleString() : (v.created_at ? new Date(v.created_at).toLocaleString() : "—")}

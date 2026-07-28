@@ -139,13 +139,13 @@ const CATEGORIES: Category[] = [
   },
   {
     id: "platform",
-    label: "Platform",
+    label: "Setup",
     color: "#37474F",
     products: [
       {
-        abbrev: "PL",
-        name: "Platform",
-        description: "Clients, assets, connectors, and ticket sync configuration",
+        abbrev: "ST",
+        name: "Setup",
+        description: "Clients, assets, connectors, ticket sync, and platform settings",
         route: "/platform",
         icon: <Tune />,
         color: "#37474F",

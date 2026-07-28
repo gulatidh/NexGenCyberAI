@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box,
@@ -137,6 +137,8 @@ export default function ScanDiff() {
   const { scanId } = useParams<{ scanId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
   const { clientId } = useActiveClient();
   const [tab, setTab] = useState(0);
 
@@ -161,7 +163,7 @@ export default function ScanDiff() {
         <Button
           variant="text"
           startIcon={<ArrowBack />}
-          onClick={() => navigate("/scans")}
+          onClick={() => navigate(scansBase)}
           sx={{ color: "text.secondary", textTransform: "none" }}
         >
           Back to Scans

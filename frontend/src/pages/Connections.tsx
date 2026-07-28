@@ -315,7 +315,8 @@ export default function Connections() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
-    navigate(`/connections${tabToHash(newValue)}`, { replace: true });
+    const connBase = location.pathname.startsWith("/platform") ? "/platform/connections" : "/connections";
+    navigate(`${connBase}${tabToHash(newValue)}`, { replace: true });
   };
 
   // ── Client / project selection ──────────────────────────────────────────────
