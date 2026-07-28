@@ -19,13 +19,13 @@ const CLASS_COLOR: Record<string, string> = {
   database: "#00e676",
   identity: "#f06292",
   keyvault: "#ffd54f",
-  other: "rgba(255,255,255,0.5)",
+  other: "#9e9e9e",
 };
 
 const STATUS_COLOR: Record<string, string> = {
   active: "#00e676",
   stale: "#ff9800",
-  deleted: "rgba(255,255,255,0.4)",
+  deleted: "#9e9e9e",
   new: "#4285F4",
   reappeared: "#ce93d8",
 };

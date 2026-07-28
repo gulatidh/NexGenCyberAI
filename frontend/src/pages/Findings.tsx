@@ -169,8 +169,9 @@ function CategoryTile({ cat, active, onClick }: {
   return (
     <Card onClick={onClick}
       sx={{
-        bgcolor: active ? `${color}15` : "#1E1E1E",
-        border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,0.08)",
+        bgcolor: active ? `${color}15` : "background.paper",
+        border: "1px solid",
+        borderColor: active ? color : "divider",
         borderRadius: 2, cursor: "pointer", height: "100%",
         transition: "transform .12s, border-color .12s, background-color .12s",
         opacity: empty && !active ? 0.6 : 1,
@@ -186,7 +187,7 @@ function CategoryTile({ cat, active, onClick }: {
             display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CatIcon name={cat.icon} sx={{ fontSize: 18, color }} />
           </Box>
-          <Typography sx={{ color: empty ? "rgba(255,255,255,0.5)" : "text.secondary",
+          <Typography sx={{ color: empty ? "text.disabled" : "text.primary",
             fontSize: 26, fontWeight: 700, lineHeight: 1, ml: "auto" }}>
             {cat.count}
           </Typography>

@@ -11,7 +11,7 @@
  * Each report has CSV download and Print (browser PDF).
  */
 import React, { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
@@ -67,6 +67,8 @@ function downloadCSV(filename: string, rows: Record<string, any>[]) {
 
 export default function Reports() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const vaptBase = location.pathname.startsWith("/intelligence") ? "/vapt/reports" : "/vapt-reports";
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [reportType, setReportType] = useState<ReportType>("executive");
@@ -302,7 +304,7 @@ export default function Reports() {
             Full penetration test reports with findings, methodology, retest tracking and PDF/DOCX export
           </Typography>
         </Box>
-        <Button variant="outlined" size="small" onClick={() => navigate("/vapt-reports")}
+        <Button variant="outlined" size="small" onClick={() => navigate(vaptBase)}
           sx={{ borderColor: "#4285F4", color: "#4285F4", whiteSpace: "nowrap" }}>
           Open VAPT Reports
         </Button>

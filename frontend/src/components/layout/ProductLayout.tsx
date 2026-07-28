@@ -29,6 +29,7 @@ import { Client } from "../../types";
 import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import NotificationBell from "./NotificationBell";
+import AssistantWidget from "../AssistantWidget";
 
 export interface ProductNavItem {
   label: string;
@@ -104,6 +105,7 @@ export default function ProductLayout({ product }: Props) {
   };
 
   return (
+    <>
     <Box sx={{ display: "flex", height: "100vh", flexDirection: "column", bgcolor: "background.default" }}>
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
@@ -309,5 +311,7 @@ export default function ProductLayout({ product }: Props) {
 
       </Box>
     </Box>
+    <AssistantWidget />
+    </>
   );
 }

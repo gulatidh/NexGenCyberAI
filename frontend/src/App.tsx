@@ -62,6 +62,7 @@ import NLQuery from "./pages/NLQuery";
 import PostureTrends from "./pages/PostureTrends";
 import ComplianceHeatmap from "./pages/ComplianceHeatmap";
 import ClientComparison from "./pages/ClientComparison";
+import EvidencePackage from "./pages/EvidencePackage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -172,7 +173,7 @@ function ProtectedApp() {
           <Route path="deficiencies" element={<ControlDeficiencies />} />
           <Route path="frameworks" element={<Frameworks />} />
           <Route path="custom-frameworks" element={<CustomFrameworks />} />
-          <Route path="evidence" element={<Navigate to="deficiencies" replace />} />
+          <Route path="evidence" element={<EvidencePackage />} />
         </Route>
 
         <Route path="/governance" element={<ProductLayout product={GOVERNANCE} />}>

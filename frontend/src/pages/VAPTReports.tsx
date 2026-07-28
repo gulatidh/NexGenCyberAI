@@ -11,7 +11,7 @@ import {
   HourglassEmpty, Shield, AutoAwesome, Article,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
 import { vaptApi, scansApi } from "../services/api";
 
@@ -82,6 +82,8 @@ const EMPTY_FORM = {
 
 export default function VAPTReports() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const vaptBase = location.pathname.startsWith("/vapt") ? "/vapt/reports" : "/vapt-reports";
   const { clientId } = useActiveClient();
   const qc = useQueryClient();
 
@@ -110,7 +112,7 @@ export default function VAPTReports() {
     onSuccess: (newReport) => {
       qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
       handleClose();
-      navigate(`/vapt-reports/${newReport.id}`);
+      navigate(`${vaptBase}/${newReport.id}`);
     },
   });
 
@@ -119,7 +121,7 @@ export default function VAPTReports() {
     onSuccess: (newReport) => {
       qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
       handleClose();
-      navigate(`/vapt-reports/${newReport.id}`);
+      navigate(`${vaptBase}/${newReport.id}`);
     },
   });
 
@@ -255,7 +257,7 @@ export default function VAPTReports() {
                     key={report.id}
                     hover
                     sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.04)" } }}
-                    onClick={() => navigate(`/vapt-reports/${report.id}`)}
+                    onClick={() => navigate(`${vaptBase}/${report.id}`)}
                   >
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -295,7 +297,7 @@ export default function VAPTReports() {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Box sx={{ display: "flex", gap: 0.5 }}>
                         <Tooltip title="View / Edit">
-                          <IconButton size="small" onClick={() => navigate(`/vapt-reports/${report.id}`)}>
+                          <IconButton size="small" onClick={() => navigate(`${vaptBase}/${report.id}`)}>
                             <Visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>

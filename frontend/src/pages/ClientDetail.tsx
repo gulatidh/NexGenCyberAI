@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box, Typography, Button, Card, CardContent, Chip, Grid, Avatar, IconButton,
   Table, TableHead, TableRow, TableCell, TableBody, CircularProgress, Divider,
-  Tabs, Tab,
+  Tabs, Tab, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
 } from "@mui/material";
 import {
   ArrowBack, Cable, Scanner, Security, FolderOpen, Storage as StorageIcon,
@@ -136,6 +136,18 @@ export default function ClientDetail() {
     queryKey: ["assets", clientId],
     queryFn: () => assetsApi.list(clientId!),
     enabled: !!clientId && tab === "assets",
+  });
+
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [projectForm, setProjectForm] = useState({ name: "", description: "" });
+
+  const createProjectMutation = useMutation({
+    mutationFn: (data: any) => projectsApi.create(clientId!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", clientId] });
+      setCreateProjectOpen(false);
+      setProjectForm({ name: "", description: "" });
+    },
   });
 
   const deleteProjectMutation = useMutation({
@@ -310,7 +322,7 @@ export default function ClientDetail() {
               {projects.length} project{projects.length === 1 ? "" : "s"}
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
-              onClick={() => navigate(`/projects?clientId=${clientId}`)}
+              onClick={() => setCreateProjectOpen(true)}
               sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
               New Project
             </Button>
@@ -336,7 +348,7 @@ export default function ClientDetail() {
               {connectors.length} connector{connectors.length === 1 ? "" : "s"}
             </Typography>
             <Button variant="contained" size="small" startIcon={<Add />}
-              onClick={() => navigate(`/connectors?clientId=${clientId}`)}
+              onClick={() => navigate(`${location.pathname.startsWith("/platform") ? "/platform/connections" : "/connections"}`)}
               sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
               Add Connector
             </Button>
@@ -375,7 +387,7 @@ export default function ClientDetail() {
                       <Box sx={{ display: "flex", gap: 0.75, mt: 1.5, flexWrap: "wrap" }}>
                         <Button
                           size="small" variant="outlined" startIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                          onClick={() => navigate(`/connectors?clientId=${clientId}`)}
+                          onClick={() => navigate(location.pathname.startsWith("/platform") ? "/platform/connections" : "/connections")}
                           sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11,
                             "&:hover": { borderColor: "#4285F4", color: "#4285F4" } }}>
                           Manage
@@ -525,6 +537,25 @@ export default function ClientDetail() {
           )}
         </>
       )}
+      {/* Create Project dialog */}
+      <Dialog open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>New Project</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <TextField fullWidth size="small" label="Project Name *"
+              value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} />
+            <TextField fullWidth size="small" label="Description" multiline rows={2}
+              value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCreateProjectOpen(false)} color="inherit">Cancel</Button>
+          <Button variant="contained" disabled={!projectForm.name || createProjectMutation.isPending}
+            onClick={() => createProjectMutation.mutate(projectForm)}>
+            {createProjectMutation.isPending ? <CircularProgress size={18} /> : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

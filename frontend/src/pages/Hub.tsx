@@ -11,10 +11,12 @@ import {
   Radar, Assessment, GppBad, PlaylistAddCheck,
   SmartToy, Search, Cable, Settings,
   Tune, Restore, Storage, Menu as MenuIcon,
+  Help as HelpOutline, AutoAwesome,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
 import { adminApi, clientsApi } from "../services/api";
+import AssistantWidget from "../components/AssistantWidget";
 import { MyAccess, Client } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
 
@@ -157,10 +159,12 @@ const CATEGORIES: Category[] = [
 ];
 
 const QUICK_ACCESS = [
-  { label: "Connectors",   icon: <Cable sx={{ fontSize: 16 }} />,    route: "/platform/connections" },
-  { label: "Assets",       icon: <Storage sx={{ fontSize: 16 }} />,  route: "/platform/assets" },
-  { label: "Search Data",  icon: <Search sx={{ fontSize: 16 }} />,   route: "/intelligence/nl-query" },
-  { label: "Settings",     icon: <Settings sx={{ fontSize: 16 }} />, route: "/platform/settings" },
+  { label: "Connectors",     icon: <Cable sx={{ fontSize: 16 }} />,         route: "/platform/connections" },
+  { label: "Assets",         icon: <Storage sx={{ fontSize: 16 }} />,        route: "/platform/assets" },
+  { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
+  { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
+  { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/help" },
+  { label: "AI Assistant",   icon: <AutoAwesome sx={{ fontSize: 16 }} />,    route: "__assistant__" },
 ];
 
 // ── Client picker ────────────────────────────────────────────────────────────
@@ -341,7 +345,10 @@ function SidebarContent({
         {QUICK_ACCESS.map((item) => (
           <ListItemButton
             key={item.label}
-            onClick={action(() => navigate(item.route))}
+            onClick={action(() => {
+              if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("aegis:open-assistant"));
+              else navigate(item.route);
+            })}
             sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}
           >
             <Box sx={{ color: "text.secondary" }}>{item.icon}</Box>
@@ -409,6 +416,7 @@ export default function Hub() {
   const sidebarProps = { accounts, me, activeCategory, scrollTo, navigate };
 
   return (
+    <>
     <Box sx={{ display: "flex", height: "100%", bgcolor: "background.default", flexDirection: "column" }}>
 
       {/* ── Mobile drawer ──────────────────────────────────────────────────── */}
@@ -493,7 +501,10 @@ export default function Hub() {
                     key={item.label}
                     icon={item.icon as any}
                     label={item.label}
-                    onClick={() => navigate(item.route)}
+                    onClick={() => {
+                      if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("aegis:open-assistant"));
+                      else navigate(item.route);
+                    }}
                     size="small"
                     sx={{
                       flexShrink: 0,
@@ -572,5 +583,7 @@ export default function Hub() {
         </Box>
       </Box>
     </Box>
+    <AssistantWidget />
+    </>
   );
 }

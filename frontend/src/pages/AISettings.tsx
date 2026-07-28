@@ -297,8 +297,9 @@ export default function AISettings() {
               <Grid size={{ xs: 12, sm: 6, md: expanded ? 12 : 4 }} key={provider.provider}>
                 <Card
                   sx={{
-                    bgcolor: provider.available ? "rgba(52,168,83,0.04)" : "#1E1E1E",
-                    border: `1px solid ${expanded ? "#4285F4" : (provider.available ? "rgba(52,168,83,0.3)" : "rgba(255,255,255,0.08)")}`,
+                    bgcolor: provider.available ? "rgba(52,168,83,0.04)" : "background.default",
+                    border: `1px solid ${expanded ? "#4285F4" : (provider.available ? "rgba(52,168,83,0.3)" : "divider")}`,
+                    borderColor: expanded ? "#4285F4" : (provider.available ? "rgba(52,168,83,0.3)" : "divider"),
                     borderRadius: 2,
                     transition: "border-color .15s ease",
                   }}
@@ -342,7 +343,7 @@ export default function AISettings() {
                         <Box sx={{ mt: 0.5, mb: 0.5 }}>
                           {provider.models.slice(0, expanded ? 6 : 3).map((m) => (
                             <Chip key={m} label={m} size="small"
-                              sx={{ mr: 0.5, mb: 0.5, bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 10, height: 20 }} />
+                              sx={{ mr: 0.5, mb: 0.5, bgcolor: "action.hover", color: "text.secondary", fontSize: 10, height: 20 }} />
                           ))}
                         </Box>
                       </Box>

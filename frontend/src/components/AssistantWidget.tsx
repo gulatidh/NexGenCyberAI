@@ -36,6 +36,12 @@ export default function AssistantWidget() {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("aegis:open-assistant", handler);
+    return () => window.removeEventListener("aegis:open-assistant", handler);
+  }, []);
+
   const mutation = useMutation({
     mutationFn: (message: string) =>
       assistantApi.chat({

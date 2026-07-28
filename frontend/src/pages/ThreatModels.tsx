@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { threatModelsApi, scansApi } from "../services/api";
 import { Scan } from "../types";
@@ -65,6 +65,8 @@ const ACCEPTED_UPLOAD = ".drawio,.xml,.pdf,.jpg,.jpeg,.png";
 export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const tmBase = location.pathname.startsWith("/threat-intel") ? "/threat-intel/threat-models" : "/threat-models";
   const { canAct } = useViewMode();
   const { clientId: selectedClientId } = useActiveClient();
   const [openCreate, setOpenCreate] = useState(false);
@@ -121,7 +123,7 @@ export default function ThreatModels() {
       setAutoRemodel(false);
       toast.success("Threat model generation started");
       // Auto-open detail so the user sees the generating state.
-      setTimeout(() => navigate(`/threat-models/${created.id}?client=${selectedClientId}`), 200);
+      setTimeout(() => navigate(`${tmBase}/${created.id}?client=${selectedClientId}`), 200);
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to start threat model"),
   });
@@ -138,7 +140,7 @@ export default function ThreatModels() {
       setUploadName("");
       const warnSuffix = (resp?.warnings || []).length ? ` (${resp.warnings.length} warning)` : "";
       toast.success(`Extracted ${resp?.components?.length || 0} components${warnSuffix} — review and start modelling`);
-      setTimeout(() => navigate(`/threat-models/${resp.model_id}?client=${selectedClientId}`), 200);
+      setTimeout(() => navigate(`${tmBase}/${resp.model_id}?client=${selectedClientId}`), 200);
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to extract diagram"),
   });
@@ -223,7 +225,7 @@ export default function ThreatModels() {
             return (
               <Grid key={m.id} size={{ xs: 12, sm: 6, md: 4 }}>
                 <Card
-                  onClick={() => navigate(`/threat-models/${m.id}?client=${m.client_id}`)}
+                  onClick={() => navigate(`${tmBase}/${m.id}?client=${m.client_id}`)}
                   sx={{
                     bgcolor: "background.paper",
                     border: `1px solid ${sc}40`,
