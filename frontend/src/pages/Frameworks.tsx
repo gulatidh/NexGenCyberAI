@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { connectorsApi, frameworksApi, projectsApi, scansApi } from "../services/api";
 import {
   Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
@@ -74,6 +74,8 @@ function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
 export default function Frameworks() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const assetsBase = location.pathname.startsWith("/compliance") ? "/platform/assets" : "/assets";
   const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [framework, setFramework] = useState("");
@@ -729,7 +731,7 @@ export default function Frameworks() {
                           </Typography>
                           {f.asset_id ? (
                             <Typography variant="caption" component="span"
-                              onClick={() => navigate(`/assets/${f.asset_id}`)}
+                              onClick={() => navigate(`${assetsBase}/${f.asset_id}`)}
                               sx={{ color: "#4285F4", fontSize: 11, cursor: "pointer",
                                 "&:hover": { textDecoration: "underline" } }}>
                               {f.asset_name || f.resource_id} →

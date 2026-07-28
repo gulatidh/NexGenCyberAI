@@ -6,7 +6,7 @@ import {
   Checkbox, Tabs, Tab,
 } from "@mui/material";
 import { Storage, Refresh, PlayArrow, CheckCircle } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, connectorsApi, assetsApi, projectsApi } from "../services/api";
 import { Client, Connector, Asset, Project } from "../types";
@@ -37,6 +37,8 @@ type ActiveTab = "active" | "new" | "reappeared" | "stale";
 export default function Assets() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
+  const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
 
   const [clientId, setClientId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -423,7 +425,7 @@ export default function Assets() {
                         "& td": { borderColor: "divider", py: 1 },
                         ...(isSelected ? { bgcolor: "rgba(0,230,118,0.05)" } : {}),
                       }}
-                      onClick={() => showCheckboxes ? toggleSelect(a.id) : navigate(`/assets/${a.id}`)}>
+                      onClick={() => showCheckboxes ? toggleSelect(a.id) : navigate(`${assetsBase}/${a.id}`)}>
                       {showCheckboxes && (
                         <TableCell padding="checkbox" onClick={(e) => { e.stopPropagation(); toggleSelect(a.id); }}>
                           <Checkbox

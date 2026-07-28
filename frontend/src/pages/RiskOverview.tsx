@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import { OpenInNew, Assessment } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { riskPortfolioApi } from "../services/api";
 import { useActiveClient } from "../contexts/ClientContext";
 
@@ -146,6 +146,8 @@ function DomainBar({ rows, total }: { rows: DomainRow[]; total: number }) {
 
 export default function RiskOverview() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const findingsBase = location.pathname.startsWith("/risk") ? "/vulnerability/findings" : "/findings";
   const { clientId } = useActiveClient();
   const [severityFilter, setSeverityFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -368,7 +370,7 @@ export default function RiskOverview() {
                         {r.finding_count > 0 ? (
                           <Tooltip title="Open scan findings linked to this risk">
                             <Button size="small" startIcon={<OpenInNew sx={{ fontSize: 12 }} />}
-                              onClick={() => navigate(`/findings?clientId=${clientId}&risk_id=${r.id}`)}
+                              onClick={() => navigate(`${findingsBase}?clientId=${clientId}&risk_id=${r.id}`)}
                               sx={{ color: "#4285F4", fontSize: 10, minWidth: 0, px: 1 }}>
                               Findings
                             </Button>

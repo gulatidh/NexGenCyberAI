@@ -5,7 +5,7 @@ import {
   Grid, Alert, Tooltip,
 } from "@mui/material";
 import { ArrowBack, PlayArrow, Refresh } from "@mui/icons-material";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, assetsApi, connectorsApi } from "../services/api";
 import { Client, Connector, AssetDetail, Finding, Risk } from "../types";
@@ -28,6 +28,8 @@ const STATUS_COLOR: Record<string, string> = {
 export default function AssetDetailPage() {
   const { assetId = "" } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
 
@@ -103,7 +105,7 @@ export default function AssetDetailPage() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        <IconButton onClick={() => navigate("/assets")} sx={{ color: "text.secondary" }}>
+        <IconButton onClick={() => navigate(assetsBase)} sx={{ color: "text.secondary" }}>
           <ArrowBack />
         </IconButton>
         <Typography variant="caption" sx={{ color: "text.secondary" }}>Asset Inventory</Typography>

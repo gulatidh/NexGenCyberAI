@@ -473,7 +473,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
               value={importName}
               onChange={(e) => setImportName(e.target.value)}
               sx={{ flex: 1, minWidth: 240, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-              slotProps={{ inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } }, htmlInput: { style: { color: "white" } } }}
+              
             />
             <Button
               variant="contained"
@@ -1230,7 +1230,7 @@ export default function Scans() {
                 <TextField fullWidth size="small" label="Scan name (optional)"
                   value={scanName} onChange={(e) => setScanName(e.target.value)}
                   placeholder='e.g. "Weekly Azure prod compliance"'
-                  slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                  
                   sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
@@ -1318,7 +1318,7 @@ export default function Scans() {
                   <Grid size={{ xs: 12 }}>
                     <TextField fullWidth size="small" label="Scan name (optional)"
                       value={scanName} onChange={(e) => setScanName(e.target.value)}
-                      slotProps={{ inputLabel: { sx: { color: 'rgba(255,255,255,0.5)' } }, htmlInput: { style: { color: 'white' } } }}
+                      
                       sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
                   </Grid>
                   {scannerId !== "ai_code_review" && (
@@ -1772,8 +1772,6 @@ export default function Scans() {
                               value={enterpriseManualCreds[key] || ""}
                               onChange={(e) => setEnterpriseManualCreds({ ...enterpriseManualCreds, [key]: e.target.value })}
                               slotProps={{
-                                inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
-                                htmlInput: { style: { color: "white" } },
                                 formHelperText: { sx: { color: "text.secondary", fontSize: 11 } },
                               }}
                               sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
@@ -1813,10 +1811,6 @@ export default function Scans() {
                         value={enterpriseNewConnName}
                         onChange={(e) => setEnterpriseNewConnName(e.target.value)}
                         sx={{ mt: 1.5, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-                        slotProps={{
-                          inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
-                          htmlInput: { style: { color: "white" } },
-                        }}
                       />
                     )}
                   </Box>
@@ -1830,10 +1824,6 @@ export default function Scans() {
                 onChange={(e) => setEnterpriseScanName(e.target.value)}
                 placeholder={`${enterpriseScanner?.name || "Enterprise"} — ${new Date().toLocaleDateString()}`}
                 sx={{ mt: 2, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-                slotProps={{
-                  inputLabel: { sx: { color: "rgba(255,255,255,0.5)" } },
-                  htmlInput: { style: { color: "white" } },
-                }}
               />
             </Box>
           )}

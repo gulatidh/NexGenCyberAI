@@ -95,7 +95,9 @@ export default function ClientDetail() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const scansBase = location.pathname.startsWith("/platform") ? "/vulnerability/scans" : "/scans";
+  const scansBase   = location.pathname.startsWith("/platform") ? "/vulnerability/scans" : "/scans";
+  const assetsBase  = location.pathname.startsWith("/platform") ? "/platform/assets"     : "/assets";
+  const clientsBase = location.pathname.startsWith("/platform") ? "/platform/clients"    : "/clients";
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -160,7 +162,7 @@ export default function ClientDetail() {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate("/clients")}
+        <Button startIcon={<ArrowBack />} onClick={() => navigate(clientsBase)}
           sx={{ color: "text.secondary", textTransform: "none", minWidth: 0 }}>
           Clients
         </Button>
@@ -409,7 +411,7 @@ export default function ClientDetail() {
               {assets.length} asset{assets.length === 1 ? "" : "s"} discovered
             </Typography>
             <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-              onClick={() => navigate(`/assets?clientId=${clientId}`)}
+              onClick={() => navigate(`${assetsBase}?clientId=${clientId}`)}
               sx={{ color: "#4285F4", fontSize: 11 }}>
               Open Asset Inventory
             </Button>
@@ -436,7 +438,7 @@ export default function ClientDetail() {
                 <TableBody>
                   {assets.slice(0, 50).map((a) => (
                     <TableRow key={a.id} hover sx={{ cursor: "pointer", "& td": { color: "text.primary", fontSize: 12, borderColor: "divider" } }}
-                      onClick={() => navigate(`/assets/${a.id}`)}>
+                      onClick={() => navigate(`${assetsBase}/${a.id}`)}>
                       <TableCell sx={{ maxWidth: 280 }}>
                         <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {a.name}
