@@ -7,7 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.models.models import CustomFramework, CustomFrameworkControl, FrameworkControl
+from api.models.models import (
+    CustomFramework, CustomFrameworkControl, CustomFrameworkDomain,
+    CustomNativeControl, FrameworkControl,
+)
 from db.database import get_db
 from core.security import get_current_user
 
@@ -31,6 +34,32 @@ class CustomFrameworkControlItem(BaseModel):
     title: str
     description: Optional[str]
     weight: int
+    reference_id: Optional[str] = None   # MAS TRM ref / custom policy ref
+    control_domain: Optional[str] = None  # domain grouping label on the junction row
+
+    class Config:
+        from_attributes = True
+
+
+class DomainItem(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    sort_order: int
+
+    class Config:
+        from_attributes = True
+
+
+class NativeControlItem(BaseModel):
+    id: str
+    control_id: str
+    title: str
+    description: Optional[str]
+    weight: int
+    sort_order: int
+    domain_id: Optional[str]
+    domain_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -43,6 +72,8 @@ class CustomFrameworkDetail(BaseModel):
     description: Optional[str]
     created_by: Optional[str]
     controls: List[CustomFrameworkControlItem]
+    domains: List[DomainItem] = []
+    native_controls: List[NativeControlItem] = []
 
     class Config:
         from_attributes = True
@@ -61,6 +92,21 @@ class CustomFrameworkSummary(BaseModel):
 
 class AddControlsRequest(BaseModel):
     control_ids: List[str] = Field(..., description="List of FrameworkControl.id values to add")
+
+
+class CreateDomainRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    sort_order: int = 0
+
+
+class CreateNativeControlRequest(BaseModel):
+    control_id: str = Field(..., min_length=1, max_length=50)
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    weight: int = Field(default=1, ge=1, le=5)
+    domain_id: Optional[str] = None
+    sort_order: int = 0
 
 
 class FrameworkControlPickerItem(BaseModel):
@@ -214,7 +260,23 @@ async def get_custom_framework(
                 title=fc.title,
                 description=fc.description,
                 weight=fc.weight if fc.weight is not None else 1,
+                reference_id=link.reference_id,
+                control_domain=link.domain,
             ))
+
+    domains = [
+        DomainItem(id=d.id, name=d.name, description=d.description, sort_order=d.sort_order)
+        for d in fw.domains
+    ]
+    native_controls = [
+        NativeControlItem(
+            id=nc.id, control_id=nc.control_id, title=nc.title,
+            description=nc.description, weight=nc.weight, sort_order=nc.sort_order,
+            domain_id=nc.domain_id,
+            domain_name=nc.domain.name if nc.domain else None,
+        )
+        for nc in fw.native_controls
+    ]
 
     return CustomFrameworkDetail(
         id=fw.id,
@@ -223,6 +285,8 @@ async def get_custom_framework(
         description=fw.description,
         created_by=fw.created_by,
         controls=controls,
+        domains=domains,
+        native_controls=native_controls,
     )
 
 
@@ -355,3 +419,115 @@ async def list_framework_controls_picker(
             weight=fc.weight if fc.weight is not None else 1,
         ))
     return result
+
+
+# ── Custom domains ────────────────────────────────────────────────────────────
+
+@router.get("/frameworks/custom/{cf_id}/domains/", response_model=List[DomainItem])
+async def list_domains(
+    cf_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    fw = db.query(CustomFramework).filter(CustomFramework.id == cf_id).first()
+    if not fw:
+        raise HTTPException(status_code=404, detail="Custom framework not found")
+    return [DomainItem(id=d.id, name=d.name, description=d.description, sort_order=d.sort_order) for d in fw.domains]
+
+
+@router.post("/frameworks/custom/{cf_id}/domains/", response_model=DomainItem, status_code=201)
+async def create_domain(
+    cf_id: str,
+    payload: CreateDomainRequest,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    fw = db.query(CustomFramework).filter(CustomFramework.id == cf_id).first()
+    if not fw:
+        raise HTTPException(status_code=404, detail="Custom framework not found")
+    d = CustomFrameworkDomain(
+        custom_framework_id=cf_id,
+        name=payload.name,
+        description=payload.description,
+        sort_order=payload.sort_order,
+    )
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    return DomainItem(id=d.id, name=d.name, description=d.description, sort_order=d.sort_order)
+
+
+@router.delete("/frameworks/custom/{cf_id}/domains/{domain_id}/", status_code=204)
+async def delete_domain(
+    cf_id: str,
+    domain_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    d = (
+        db.query(CustomFrameworkDomain)
+        .filter(CustomFrameworkDomain.id == domain_id, CustomFrameworkDomain.custom_framework_id == cf_id)
+        .first()
+    )
+    if not d:
+        raise HTTPException(status_code=404, detail="Domain not found")
+    db.delete(d)
+    db.commit()
+
+
+# ── Native (fully custom) controls ────────────────────────────────────────────
+
+@router.post("/frameworks/custom/{cf_id}/native-controls/", response_model=NativeControlItem, status_code=201)
+async def create_native_control(
+    cf_id: str,
+    payload: CreateNativeControlRequest,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    fw = db.query(CustomFramework).filter(CustomFramework.id == cf_id).first()
+    if not fw:
+        raise HTTPException(status_code=404, detail="Custom framework not found")
+    if payload.domain_id:
+        d = (
+            db.query(CustomFrameworkDomain)
+            .filter(CustomFrameworkDomain.id == payload.domain_id, CustomFrameworkDomain.custom_framework_id == cf_id)
+            .first()
+        )
+        if not d:
+            raise HTTPException(status_code=400, detail="Domain not found in this framework")
+    nc = CustomNativeControl(
+        custom_framework_id=cf_id,
+        domain_id=payload.domain_id or None,
+        control_id=payload.control_id,
+        title=payload.title,
+        description=payload.description,
+        weight=payload.weight,
+        sort_order=payload.sort_order,
+    )
+    db.add(nc)
+    db.commit()
+    db.refresh(nc)
+    domain_name = nc.domain.name if nc.domain else None
+    return NativeControlItem(
+        id=nc.id, control_id=nc.control_id, title=nc.title,
+        description=nc.description, weight=nc.weight, sort_order=nc.sort_order,
+        domain_id=nc.domain_id, domain_name=domain_name,
+    )
+
+
+@router.delete("/frameworks/custom/{cf_id}/native-controls/{nc_id}/", status_code=204)
+async def delete_native_control(
+    cf_id: str,
+    nc_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    nc = (
+        db.query(CustomNativeControl)
+        .filter(CustomNativeControl.id == nc_id, CustomNativeControl.custom_framework_id == cf_id)
+        .first()
+    )
+    if not nc:
+        raise HTTPException(status_code=404, detail="Native control not found")
+    db.delete(nc)
+    db.commit()
