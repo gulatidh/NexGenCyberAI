@@ -2127,20 +2127,34 @@ def seed_agent_catalog() -> None:
             db.commit()
             logger.info("Backfilled Phase 7 personality on %d existing buddies", backfilled)
 
-        # Backfill input_schema on existing built-in agents — only fills rows
-        # where input_schema is still NULL or an empty list so admin edits are
-        # never overwritten.
+        # Backfill input_schema on existing built-in agents.
+        # Overwrites agents that still carry the generic single-field default
+        # ("Instructions (optional)") — those were auto-filled by the previous
+        # pass and are not meaningful customisations. Agents where an admin has
+        # set a real schema (more than one field, or a non-default type) are
+        # left untouched.
         schema_backfilled = 0
         try:
             all_agents = db.query(AIAgent).filter(AIAgent.is_builtin == True).all()
             for a in all_agents:
-                if a.input_schema:          # already set — leave it alone
-                    continue
-                a.input_schema = _AGENT_INPUT_SCHEMAS.get(a.key, _DEFAULT_INPUT_SCHEMA)
-                schema_backfilled += 1
+                # Skip if the agent has a real, non-default schema
+                is_generic_default = (
+                    not a.input_schema
+                    or (
+                        len(a.input_schema) == 1
+                        and a.input_schema[0].get("type") == "custom_prompt"
+                        and a.input_schema[0].get("label") == "Instructions (optional)"
+                    )
+                )
+                if not is_generic_default:
+                    continue  # admin-customised schema — leave alone
+                new_schema = _AGENT_INPUT_SCHEMAS.get(a.key, _DEFAULT_INPUT_SCHEMA)
+                if new_schema != (a.input_schema or []):
+                    a.input_schema = new_schema
+                    schema_backfilled += 1
             if schema_backfilled:
                 db.commit()
-                logger.info("Backfilled input_schema on %d existing built-in agents", schema_backfilled)
+                logger.info("Upgraded input_schema on %d existing built-in agents", schema_backfilled)
         except Exception:
             logger.exception("input_schema backfill failed (non-fatal)")
 
