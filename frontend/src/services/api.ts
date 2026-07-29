@@ -455,12 +455,20 @@ export const agentCatalogApi = {
   update: (agentId: string, data: any) =>
     apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
   delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
-  run: (agentId: string, prompt?: string, clientId?: string, scanId?: string) =>
+  run: (agentId: string, prompt?: string, clientId?: string, scanId?: string, assetIds?: string[]) =>
     apiClient.post(`/agents/catalog/${agentId}/run`, {
       prompt,
       client_id: clientId,
       scan_id: scanId,
+      asset_ids: assetIds?.length ? assetIds : undefined,
     }).then((r) => r.data),
+  extractFile: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return apiClient.post(`/agents/catalog/extract-file`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data as { filename: string; char_count: number; text: string; truncated: boolean });
+  },
   // Phase 7A — one-click apply for a buddy-produced artifact
   applyArtifact: (runId: string, idx: number) =>
     apiClient.post(`/agents/catalog/runs/${runId}/artifacts/${idx}/apply`).then((r) => r.data),

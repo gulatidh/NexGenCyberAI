@@ -16,7 +16,7 @@ import {
   AddCircle, DoNotDisturb,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
+import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi, assetsApi, connectorsApi } from "../services/api";
 import { Scan, AgentType, MyAccess } from "../types";
 import { toast } from "react-toastify";
 import RichOutput from "../components/RichOutput";
@@ -60,7 +60,7 @@ interface SelectOption {
 }
 
 interface InputField {
-  type: "scan" | "framework" | "custom_prompt" | "text_context" | "select";
+  type: "scan" | "framework" | "custom_prompt" | "text_context" | "select" | "file_upload" | "asset_select" | "platform_data";
   label: string;
   required: boolean;
   description?: string;
@@ -201,11 +201,14 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin, hideSensitive 
 
 // ── Schema field types available in the builder ───────────────────────────────
 const FIELD_TYPE_OPTIONS = [
-  { value: "scan",          label: "Scan Selector",     description: "Dropdown to pick a completed scan" },
+  { value: "scan",          label: "Scan Selector",      description: "Dropdown to pick a completed scan" },
   { value: "framework",     label: "Framework Selector", description: "Dropdown to pick a compliance framework" },
   { value: "select",        label: "Choice (Select)",    description: "Radio cards — user picks one option from a list" },
   { value: "text_context",  label: "Paste / Data",       description: "Multi-line paste area for raw data (logs, configs, metrics)" },
   { value: "custom_prompt", label: "Instructions",       description: "Free-text instructions or focus area" },
+  { value: "file_upload",   label: "File Upload",        description: "Upload a file — PDF, DOCX, CSV, JSON, TXT (text extracted automatically)" },
+  { value: "asset_select",  label: "Asset Selection",    description: "Multi-select from the client asset inventory" },
+  { value: "platform_data", label: "Platform Data",      description: "Select a connected platform and pull its latest scan data" },
 ];
 
 interface SchemaFieldDraft {
@@ -566,14 +569,15 @@ const DEFAULT_SCHEMA: InputField[] = [
     description: "Any specific instructions or context for this agent" },
 ];
 
-function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy, onRunCatalog }: {
+function AgentRunWizard({ agent, scans, frameworks, clientId, color, onClose, onRunLegacy, onRunCatalog }: {
   agent: Agent;
   scans: Scan[];
   frameworks: any[];
+  clientId: string;
   color: string;
   onClose: () => void;
   onRunLegacy: (scanId: string, framework: string) => void;
-  onRunCatalog: (agentId: string, prompt: string, scanId: string) => void;
+  onRunCatalog: (agentId: string, prompt: string, scanId: string, assetIds?: string[]) => void;
 }) {
   const navigate = useNavigate();
   const schema = agent.input_schema?.length ? agent.input_schema : DEFAULT_SCHEMA;
@@ -582,13 +586,74 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
   const [framework, setFramework] = useState("nist_csf");
   const [customPrompt, setCustomPrompt] = useState("");
   const [textContext, setTextContext] = useState("");
-  // keyed by field index for select-type fields
   const [selectValues, setSelectValues] = useState<Record<number, string>>({});
 
-  // Detect data gaps: required scan field but no completed scans exist
+  // file_upload state — keyed by field index
+  const [fileData, setFileData] = useState<Record<number, { text: string; name: string; chars: number; truncated: boolean }>>({});
+  const [fileLoading, setFileLoading] = useState<Record<number, boolean>>({});
+
+  // asset_select state — keyed by field index
+  const [selectedAssets, setSelectedAssets] = useState<Record<number, string[]>>({});
+  const [assetSearch, setAssetSearch] = useState("");
+
+  // platform_data state — keyed by field index (stores connector_type + auto-picked scan)
+  const [platformPick, setPlatformPick] = useState<Record<number, string>>({});  // connector_type
+
+  // Fetch assets and connectors only when the schema needs them
+  const needsAssets = schema.some((f) => f.type === "asset_select");
+  const needsPlatform = schema.some((f) => f.type === "platform_data");
+
+  const { data: assets = [] } = useQuery<any[]>({
+    queryKey: ["wizard-assets", clientId],
+    queryFn: () => assetsApi.list(clientId),
+    enabled: !!clientId && needsAssets,
+  });
+
+  const { data: connectors = [] } = useQuery<any[]>({
+    queryKey: ["wizard-connectors", clientId],
+    queryFn: () => connectorsApi.list(clientId),
+    enabled: !!clientId && needsPlatform,
+  });
+
+  const handleFileUpload = async (fieldIdx: number, file: File) => {
+    setFileLoading((v) => ({ ...v, [fieldIdx]: true }));
+    try {
+      const result = await agentCatalogApi.extractFile(file);
+      setFileData((v) => ({ ...v, [fieldIdx]: { text: result.text, name: result.filename, chars: result.char_count, truncated: result.truncated } }));
+    } catch {
+      toast.error("Could not extract text from file");
+    } finally {
+      setFileLoading((v) => ({ ...v, [fieldIdx]: false }));
+    }
+  };
+
+  const toggleAsset = (fieldIdx: number, assetId: string) => {
+    setSelectedAssets((v) => {
+      const cur = v[fieldIdx] || [];
+      return { ...v, [fieldIdx]: cur.includes(assetId) ? cur.filter((id) => id !== assetId) : [...cur, assetId] };
+    });
+  };
+
   const needsScan = schema.some((f) => f.type === "scan" && f.required);
   const hasScanData = scans.length > 0;
   const missingRequiredScan = needsScan && !hasScanData && !textContext.trim();
+
+  // Collect all selected asset IDs across all asset_select fields
+  const allSelectedAssetIds = Object.values(selectedAssets).flat();
+
+  // Auto-resolve platform_data: find latest completed scan matching connector_type
+  const resolvedPlatformScanId = (() => {
+    const platformField = schema.findIndex((f) => f.type === "platform_data");
+    if (platformField < 0) return "";
+    const connType = platformPick[platformField];
+    if (!connType) return "";
+    const match = scans
+      .filter((s) => (s as any).connector_type === connType || (s as any).scan_type === connType)
+      .sort((a, b) => new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime())[0];
+    return match?.id || "";
+  })();
+
+  const effectiveScanId = resolvedPlatformScanId || scanId;
 
   const canRun = !missingRequiredScan && schema.every((f, i) => {
     if (!f.required) return true;
@@ -597,24 +662,33 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
     if (f.type === "custom_prompt") return !!customPrompt.trim();
     if (f.type === "text_context") return !!textContext.trim();
     if (f.type === "select") return !!selectValues[i];
+    if (f.type === "file_upload") return !!fileData[i]?.text;
+    if (f.type === "asset_select") return (selectedAssets[i]?.length || 0) > 0;
+    if (f.type === "platform_data") return !!platformPick[i];
     return true;
   });
 
   const handleRun = () => {
     if (agent.legacy_orchestrator) {
-      onRunLegacy(scanId, framework);
+      onRunLegacy(effectiveScanId, framework);
     } else {
       const parts: string[] = [];
-      // Include select field choices as structured context
       schema.forEach((f, i) => {
         if (f.type === "select" && selectValues[i]) {
           const opt = f.options?.find((o) => o.value === selectValues[i]);
           parts.push(`${f.label}: ${opt?.label || selectValues[i]}${opt?.description ? ` — ${opt.description}` : ""}`);
         }
+        if (f.type === "file_upload" && fileData[i]?.text) {
+          parts.push(`## Uploaded File: ${fileData[i].name}\n${fileData[i].text}`);
+        }
+        if (f.type === "platform_data" && platformPick[i]) {
+          const conn = connectors.find((c: any) => c.connector_type === platformPick[i]);
+          parts.push(`Platform data source: ${conn?.name || platformPick[i]} (${platformPick[i]})`);
+        }
       });
       if (textContext.trim()) parts.push(`Data / Context:\n${textContext.trim()}`);
       if (customPrompt.trim()) parts.push(customPrompt.trim());
-      onRunCatalog(agent.id, parts.join("\n\n"), scanId);
+      onRunCatalog(agent.id, parts.join("\n\n"), effectiveScanId, allSelectedAssetIds.length ? allSelectedAssetIds : undefined);
     }
     onClose();
   };
@@ -774,6 +848,180 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
               value={customPrompt} onChange={(e) => setCustomPrompt(e.target.value)} />
           );
 
+          // ── File upload ────────────────────────────────────────────────────
+          if (field.type === "file_upload") {
+            const fd = fileData[i];
+            const loading = fileLoading[i];
+            return (
+              <Box key={i}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5, display: "block" }}>
+                  {field.label}{field.required ? " *" : ""}
+                </Typography>
+                {field.description && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>{field.description}</Typography>
+                )}
+                <Box
+                  component="label"
+                  sx={{
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    border: "2px dashed", borderColor: fd ? "#34A853" : "divider",
+                    borderRadius: 1.5, p: 2, cursor: "pointer", minHeight: 80,
+                    bgcolor: fd ? "rgba(52,168,83,0.06)" : "transparent",
+                    transition: "all 0.15s",
+                    "&:hover": { borderColor: color, bgcolor: `${color}08` },
+                  }}>
+                  <input type="file" hidden accept=".pdf,.docx,.txt,.csv,.json,.xlsx,.log"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(i, f); }} />
+                  {loading ? (
+                    <CircularProgress size={24} sx={{ color }} />
+                  ) : fd ? (
+                    <Box sx={{ textAlign: "center" }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#34A853" }}>✓ {fd.name}</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {fd.chars.toLocaleString()} characters extracted{fd.truncated ? " (truncated to 12k)" : ""}
+                      </Typography>
+                      <Box sx={{ mt: 1, p: 1, bgcolor: "action.hover", borderRadius: 1, maxHeight: 60, overflow: "hidden" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace", fontSize: 10 }}>
+                          {fd.text.slice(0, 200)}…
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <Box sx={{ textAlign: "center" }}>
+                      <CloudUpload sx={{ color: "text.disabled", fontSize: 32, mb: 0.5 }} />
+                      <Typography variant="body2" sx={{ color: "text.secondary" }}>Click or drag to upload</Typography>
+                      <Typography variant="caption" sx={{ color: "text.disabled" }}>PDF, DOCX, TXT, CSV, JSON, XLSX — max 20 MB</Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+            );
+          }
+
+          // ── Asset select ───────────────────────────────────────────────────
+          if (field.type === "asset_select") {
+            const picked = selectedAssets[i] || [];
+            const filtered = assets.filter((a: any) =>
+              !assetSearch || [a.name, a.hostname, a.ip_address, a.resource_id]
+                .some((v) => v?.toLowerCase().includes(assetSearch.toLowerCase()))
+            );
+            return (
+              <Box key={i}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    {field.label}{field.required ? " *" : ""} {picked.length > 0 && <Chip label={`${picked.length} selected`} size="small" sx={{ ml: 1, height: 16, fontSize: 10, bgcolor: `${color}20`, color }} />}
+                  </Typography>
+                </Box>
+                {field.description && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>{field.description}</Typography>
+                )}
+                <TextField fullWidth size="small" placeholder="Search assets…"
+                  value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
+                  sx={{ mb: 1, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                <Box sx={{ maxHeight: 200, overflowY: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                  {assets.length === 0 ? (
+                    <Typography variant="caption" sx={{ p: 2, display: "block", color: "text.disabled", textAlign: "center" }}>
+                      No assets found for this client
+                    </Typography>
+                  ) : filtered.map((a: any) => {
+                    const checked = picked.includes(a.id);
+                    return (
+                      <Box key={a.id} onClick={() => toggleAsset(i, a.id)}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1,
+                          cursor: "pointer", borderBottom: 1, borderColor: "divider",
+                          bgcolor: checked ? `${color}12` : "transparent",
+                          "&:hover": { bgcolor: checked ? `${color}18` : "action.hover" },
+                        }}>
+                        <Switch size="small" checked={checked} readOnly
+                          sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color }, pointerEvents: "none" }} />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 600 }} noWrap>{a.name || a.resource_id}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }} noWrap>
+                            {[a.asset_class, a.ip_address || a.hostname, a.region].filter(Boolean).join(" · ")}
+                          </Typography>
+                        </Box>
+                        {a.criticality && (
+                          <Chip label={a.criticality} size="small"
+                            sx={{ height: 16, fontSize: 9, bgcolor: a.criticality === "critical" ? "#EA433520" : "action.hover", color: a.criticality === "critical" ? "#EA4335" : "text.secondary" }} />
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            );
+          }
+
+          // ── Platform data ──────────────────────────────────────────────────
+          if (field.type === "platform_data") {
+            const picked = platformPick[i];
+            // Group connectors by connector_type, keep unique types
+            const platforms = connectors.reduce((acc: any[], c: any) => {
+              if (!acc.find((x) => x.connector_type === c.connector_type)) acc.push(c);
+              return acc;
+            }, []);
+            // Find latest scan for the picked connector type
+            const latestScan = picked
+              ? scans.filter((s) => (s as any).connector_type === picked || (s as any).scan_type === picked)
+                .sort((a, b) => new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime())[0]
+              : null;
+            return (
+              <Box key={i}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 0.5, display: "block" }}>
+                  {field.label}{field.required ? " *" : ""}
+                </Typography>
+                {field.description && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>{field.description}</Typography>
+                )}
+                {platforms.length === 0 ? (
+                  <Alert severity="info" sx={{ fontSize: 12 }}>
+                    No platform connectors configured for this client.{" "}
+                    <Button size="small" onClick={() => { onClose(); navigate("/platform/connections"); }} sx={{ p: 0, minWidth: 0, fontSize: 12 }}>
+                      Add a connector
+                    </Button>
+                  </Alert>
+                ) : (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {platforms.map((c: any) => {
+                      const ctype = c.connector_type;
+                      const isSelected = picked === ctype;
+                      const lastScan = scans.filter((s) => (s as any).connector_type === ctype || (s as any).scan_type === ctype)
+                        .sort((a, b) => new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime())[0];
+                      return (
+                        <Box key={ctype} onClick={() => setPlatformPick((v) => ({ ...v, [i]: isSelected ? "" : ctype }))}
+                          sx={{
+                            border: 1.5, borderColor: isSelected ? color : "divider",
+                            borderRadius: 1.5, px: 2, py: 1.5, cursor: "pointer", minWidth: 120,
+                            bgcolor: isSelected ? `${color}12` : "transparent",
+                            "&:hover": { borderColor: color, bgcolor: `${color}08` },
+                          }}>
+                          <Typography sx={{ fontSize: 13, fontWeight: 700, textTransform: "capitalize" }}>{ctype}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }} noWrap>
+                            {c.name}
+                          </Typography>
+                          <Typography variant="caption" sx={{ display: "block", color: lastScan ? "#34A853" : "text.disabled", fontSize: 10 }}>
+                            {lastScan ? `Last scan: ${new Date((lastScan as any).created_at).toLocaleDateString()}` : "No scans yet"}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                )}
+                {latestScan && (
+                  <Alert severity="success" sx={{ mt: 1, fontSize: 12, py: 0.5 }}>
+                    Will use scan: <strong>{(latestScan as any).name || latestScan.id.slice(0, 8)}</strong> — {(latestScan as any).findings_count ?? "?"} findings
+                  </Alert>
+                )}
+                {picked && !latestScan && (
+                  <Alert severity="warning" sx={{ mt: 1, fontSize: 12, py: 0.5 }}>
+                    No completed scans for {picked}. Run a scan first or switch to a different platform.
+                  </Alert>
+                )}
+              </Box>
+            );
+          }
+
           return null;
         })}
       </DialogContent>
@@ -877,8 +1125,8 @@ export default function Agents() {
   });
 
   const briefingMutation = useMutation({
-    mutationFn: ({ agentId, prompt, scanId }: { agentId: string; prompt?: string; scanId?: string }) =>
-      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined, scanId || undefined),
+    mutationFn: ({ agentId, prompt, scanId, assetIds }: { agentId: string; prompt?: string; scanId?: string; assetIds?: string[] }) =>
+      agentCatalogApi.run(agentId, prompt, selectedClientId || undefined, scanId || undefined, assetIds),
     onSuccess: (data) => { setBriefingOutput(data); setBriefingError(""); },
     onError: (e: any) => {
       setBriefingError(e.response?.data?.detail || e.message || "Briefing failed");
@@ -1078,13 +1326,14 @@ export default function Agents() {
           agent={wizardAgent}
           scans={scans}
           frameworks={allFrameworks}
+          clientId={selectedClientId || ""}
           color={GROUP_COLOR[wizardAgent.group_key] || "#4285F4"}
           onClose={() => setWizardAgent(null)}
           onRunLegacy={(scanId, framework) =>
             runMutation.mutate({ agentType: wizardAgent.key as AgentType, scanId, framework })
           }
-          onRunCatalog={(agentId, prompt, scanId) =>
-            briefingMutation.mutate({ agentId, prompt, scanId })
+          onRunCatalog={(agentId, prompt, scanId, assetIds) =>
+            briefingMutation.mutate({ agentId, prompt, scanId, assetIds })
           }
         />
       )}

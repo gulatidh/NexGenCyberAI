@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -204,9 +204,10 @@ async def delete_agent(
 
 
 class AgentRunRequest(BaseModel):
-    prompt: Optional[str] = None  # user instruction; default is "Provide your standard briefing."
-    client_id: Optional[str] = None  # optional context anchor
-    scan_id: Optional[str] = None  # if set, agent reads findings + verdict and run is attached to scan
+    prompt: Optional[str] = None       # user instruction; default is "Provide your standard briefing."
+    client_id: Optional[str] = None    # optional context anchor
+    scan_id: Optional[str] = None      # if set, agent reads findings + verdict and run is attached to scan
+    asset_ids: Optional[List[str]] = None  # if set, agent receives asset details as context
 
 
 class AgentRunResponse(BaseModel):
@@ -315,6 +316,38 @@ async def run_agent(
             lines.append(f"- [{f['severity']}] {f['title']} on `{f['resource'] or 'n/a'}`{tail}")
         context_block = "\n".join(lines)
 
+    # ── Build asset context if asset_ids are supplied ──────────────────────
+    asset_context_block = ""
+    if payload.asset_ids:
+        from api.models.models import Asset
+        assets = (
+            db.query(Asset)
+            .filter(Asset.id.in_(payload.asset_ids))
+            .all()
+        )
+        if assets:
+            asset_lines = ["## Selected Assets"]
+            for ast in assets:
+                parts = [f"**{ast.name or ast.resource_id}**"]
+                if ast.asset_class:
+                    parts.append(f"type={ast.asset_class}")
+                if ast.ip_address:
+                    parts.append(f"ip={ast.ip_address}")
+                if ast.hostname:
+                    parts.append(f"host={ast.hostname}")
+                if ast.region:
+                    parts.append(f"region={ast.region}")
+                if ast.resource_group:
+                    parts.append(f"rg={ast.resource_group}")
+                criticality = getattr(ast, "criticality", None)
+                if criticality:
+                    parts.append(f"criticality={criticality}")
+                tags = getattr(ast, "tags", None)
+                if tags and isinstance(tags, dict):
+                    parts.append(f"tags={tags}")
+                asset_lines.append(f"- {' | '.join(parts)}")
+            asset_context_block = "\n".join(asset_lines)
+
     # ── Build the instruction ───────────────────────────────────────────────
     base_instruction = (payload.prompt or "").strip()
     if not base_instruction:
@@ -337,7 +370,8 @@ async def run_agent(
         "no questions to the user, no offers like 'If you want, I can also'."
     )
 
-    instruction = (context_block + "\n\n" + base_instruction + formatting_guidance) if context_block \
+    combined_context = "\n\n".join(filter(None, [context_block, asset_context_block]))
+    instruction = (combined_context + "\n\n" + base_instruction + formatting_guidance) if combined_context \
         else base_instruction + formatting_guidance
 
     # ── Retrieval-augmented context — prepend top-k semantically similar
@@ -853,3 +887,42 @@ def _post_run_learning_and_blackboard(
             logger.exception("learning extraction failed for agent_run %s", agent_run_id)
     finally:
         bg_db.close()
+
+
+
+# ── File text extraction endpoint ─────────────────────────────────────────────
+
+class FileExtractResponse(BaseModel):
+    filename: str
+    char_count: int
+    text: str
+    truncated: bool
+
+
+@router.post("/extract-file", response_model=FileExtractResponse)
+async def extract_file_for_agent(
+    file: UploadFile = File(...),
+    _user: dict = Depends(get_current_user),
+):
+    """Extract text from an uploaded file (PDF, DOCX, TXT, CSV, JSON) for
+    use as agent context. Returns up to 12,000 characters of extracted text."""
+    MAX_CHARS = 12_000
+    MAX_BYTES = 20 * 1024 * 1024  # 20 MB
+
+    content = await file.read()
+    if len(content) > MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File too large — maximum 20 MB")
+
+    try:
+        from services.rag_service import extract_text
+        text = extract_text(content, file.filename or "upload", file.content_type or "")
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not extract text: {exc}")
+
+    truncated = len(text) > MAX_CHARS
+    return FileExtractResponse(
+        filename=file.filename or "upload",
+        char_count=min(len(text), MAX_CHARS),
+        text=text[:MAX_CHARS],
+        truncated=truncated,
+    )
