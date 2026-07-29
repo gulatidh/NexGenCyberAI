@@ -1306,10 +1306,11 @@ _DEFAULT_INPUT_SCHEMA = [
 ]
 
 _AGENT_INPUT_SCHEMAS: dict = {
-    # Legacy orchestrator agents
+
+    # ── Operational (legacy orchestrator-backed) ───────────────────────────────
     "risk_manager": [
-        {"type": "scan", "label": "Scan", "required": False, "description": "Optional scan to score risks from"},
-        {"type": "framework", "label": "Framework", "required": False, "description": "Risk framework"},
+        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Scan to score risks from — leave blank to score from all findings"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Risk framework to map controls against"},
     ],
     "va_scanner": [
         {"type": "scan", "label": "Scan", "required": True, "description": "Scan to analyze vulnerabilities from"},
@@ -1327,13 +1328,704 @@ _AGENT_INPUT_SCHEMAS: dict = {
     ],
     "remediation": [
         {"type": "scan", "label": "Scan", "required": True, "description": "Scan to generate remediation playbooks for"},
-        {"type": "custom_prompt", "label": "Focus area (optional)", "required": False, "description": "e.g. 'focus on cloud misconfigurations'"},
+        {"type": "custom_prompt", "label": "Focus area (optional)", "required": False, "description": "e.g. 'focus on cloud misconfigurations' or 'prioritize patch-able CVEs'"},
     ],
     "orchestrator": [
         {"type": "scan", "label": "Scan", "required": True, "description": "Scan to run the full agent pipeline against"},
-        {"type": "framework", "label": "Framework", "required": False, "description": "Compliance framework"},
+        {"type": "framework", "label": "Framework (optional)", "required": False, "description": "Compliance framework — defaults to NIST CSF if not set"},
     ],
-    # Catalog agents with identity/access context
+
+    # ── Core Advisory ─────────────────────────────────────────────────────────
+    "partner_advisor": [
+        {
+            "type": "select",
+            "label": "Engagement Type",
+            "required": True,
+            "description": "What kind of conversation or deliverable do you need?",
+            "options": [
+                {"value": "qbr", "label": "QBR / Security Review", "description": "Quarterly business review — posture narrative for CISO or VP"},
+                {"value": "board_prep", "label": "Board Presentation", "description": "Board-level risk summary — financial impact framing, no jargon"},
+                {"value": "investment_case", "label": "Security Investment Case", "description": "Business case for a security initiative — ROI, risk reduction, regulatory upside"},
+                {"value": "ma_due_diligence", "label": "M&A Due Diligence", "description": "Rapid security risk assessment of an acquisition target"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Current findings to anchor the narrative"},
+        {"type": "text_context", "label": "Client / org context", "required": False, "description": "Industry, recent incidents, regulatory deadlines, key stakeholders, budget envelope"},
+        {"type": "custom_prompt", "label": "Specific ask", "required": False, "description": "e.g. 'board meeting in 2 weeks, CFO focused on ransomware risk'"},
+    ],
+    "iga_architect": [
+        {
+            "type": "select",
+            "label": "IGA Deliverable",
+            "required": True,
+            "description": "What phase of the IGA program are you working on?",
+            "options": [
+                {"value": "jml_design", "label": "JML Workflow Design", "description": "Joiner/Mover/Leaver automation — provisioning, de-provisioning, role-change workflows"},
+                {"value": "access_cert", "label": "Access Certification", "description": "Certification campaign design — scheduling, risk-based review, attestation evidence"},
+                {"value": "sod_matrix", "label": "SoD Conflict Matrix", "description": "Segregation of Duties conflict definition and compensating controls"},
+                {"value": "tool_selection", "label": "Platform Selection", "description": "IGA platform evaluation (SailPoint, Saviynt, Entra ID Governance)"},
+            ],
+        },
+        {"type": "text_context", "label": "Identity environment", "required": False, "description": "Paste identity data sources (HR system, AD/LDAP, apps), user count, app count, current tooling"},
+        {"type": "custom_prompt", "label": "Specific question or constraint", "required": False, "description": "e.g. 'we have SAP SoD complexity, 45,000 users, must integrate with ServiceNow'"},
+    ],
+    "soc_strategist": [
+        {
+            "type": "select",
+            "label": "SOC Model",
+            "required": True,
+            "description": "Which operating model are you designing or evaluating?",
+            "options": [
+                {"value": "in_house", "label": "In-House SOC", "description": "Build and run internally — staffing, tooling, shift model, escalation"},
+                {"value": "mssp", "label": "MSSP / MDR", "description": "Managed service selection — scope definition, SLA design, transition"},
+                {"value": "hybrid", "label": "Hybrid Co-Managed", "description": "Split model — MSSP for Tier 1, internal for Tier 2/3 and threat hunting"},
+                {"value": "maturity_uplift", "label": "SOC Maturity Uplift", "description": "Improve an existing SOC — detection coverage gaps, analyst efficiency, use case backlog"},
+            ],
+        },
+        {"type": "text_context", "label": "Current SOC state", "required": False, "description": "Paste current team size, tools (SIEM/SOAR/EDR), alert volumes, pain points, budget range"},
+        {"type": "custom_prompt", "label": "Constraints or goals", "required": False, "description": "e.g. '8-person team, Sentinel + Defender, 2,000 alerts/day, board wants 24x7 coverage'"},
+    ],
+    "phishing_analyst": [
+        {
+            "type": "select",
+            "label": "Analysis Task",
+            "required": True,
+            "description": "What do you need analyzed?",
+            "options": [
+                {"value": "triage", "label": "Phishing Email Triage", "description": "Assess a reported email — verdict, IOC extraction, user response guidance"},
+                {"value": "campaign_analysis", "label": "Campaign Pattern Analysis", "description": "Multiple samples — identify campaign TTP, actor attribution clues, detection rules"},
+                {"value": "program_review", "label": "Awareness Program Review", "description": "Evaluate click-rate data, training completion, and recommended improvements"},
+            ],
+        },
+        {"type": "text_context", "label": "Email headers / content / IOCs", "required": False, "description": "Paste raw email headers, body text, URLs, sender info, or simulated phishing data"},
+        {"type": "custom_prompt", "label": "Context", "required": False, "description": "e.g. 'finance team targeting, 3 users clicked, we use O365 and Proofpoint'"},
+    ],
+    "vuln_commander": [
+        {
+            "type": "select",
+            "label": "Leadership Focus",
+            "required": True,
+            "description": "Which VM program dimension do you need advice on?",
+            "options": [
+                {"value": "sla_design", "label": "SLA Design", "description": "Define patching SLAs by severity — timelines, exception process, escalation"},
+                {"value": "prioritization", "label": "Prioritization Strategy", "description": "Risk-based prioritization beyond CVSS — asset criticality, exploitability, business impact"},
+                {"value": "stakeholder_reporting", "label": "Stakeholder Reporting", "description": "Executive and operational reporting cadence, KPIs, and metrics"},
+                {"value": "exception_governance", "label": "Exception Governance", "description": "Exception approval workflow, risk acceptance criteria, aging backlog management"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Current findings to ground the advice"},
+        {"type": "text_context", "label": "VM program context", "required": False, "description": "Paste current SLAs, team structure, asset count, MTTR data, exception backlog size"},
+        {"type": "custom_prompt", "label": "Specific challenge", "required": False, "description": "e.g. '12,000 assets, 6-week MTTR for highs, board asking for risk posture in 2 weeks'"},
+    ],
+    "grc_advisor": [
+        {
+            "type": "select",
+            "label": "GRC Focus",
+            "required": True,
+            "description": "Which area of GRC do you need support with?",
+            "options": [
+                {"value": "gap_assessment", "label": "Control Gap Assessment", "description": "Identify gaps against a framework and prioritize remediation"},
+                {"value": "reporting_cadence", "label": "Reporting Cadence Design", "description": "Structure board, committee, and operational reporting"},
+                {"value": "risk_register", "label": "Risk Register Review", "description": "Review and score a risk register entry or full register"},
+                {"value": "audit_prep", "label": "Audit Preparation", "description": "Evidence gathering strategy and audit readiness checklist"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Security findings to map to controls"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Primary compliance framework for this engagement"},
+        {"type": "text_context", "label": "Organization context", "required": False, "description": "Paste current control inventory, risk register excerpts, or audit findings"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False, "description": "e.g. 'PCI DSS 4.0 gap assessment, Level 1 merchant, external QSA audit in 6 months'"},
+    ],
+    "security_rationalist": [
+        {
+            "type": "select",
+            "label": "Analysis Type",
+            "required": True,
+            "description": "What kind of security economics analysis do you need?",
+            "options": [
+                {"value": "tool_roi", "label": "Tool ROI Analysis", "description": "Evaluate the return on a specific security tool investment"},
+                {"value": "consolidation", "label": "Tool Consolidation", "description": "Identify redundant tools and build a rationalization roadmap"},
+                {"value": "investment_justification", "label": "Investment Justification", "description": "Build a business case for a new security capability"},
+                {"value": "spend_benchmark", "label": "Spend Benchmarking", "description": "Compare current security spend to industry peers by percentage of IT budget"},
+            ],
+        },
+        {"type": "text_context", "label": "Security tool / spend data", "required": False, "description": "Paste current tool stack, annual costs, headcount, license counts, or tool overlap notes"},
+        {"type": "custom_prompt", "label": "Decision context", "required": False, "description": "e.g. 'evaluating whether to renew Crowdstrike + add Wiz, or consolidate on Microsoft E5'"},
+    ],
+    "policy_miner": [
+        {
+            "type": "select",
+            "label": "Policy Type",
+            "required": True,
+            "description": "What kind of document are you extracting controls from?",
+            "options": [
+                {"value": "regulation", "label": "Regulation / Law", "description": "Extract concrete requirements from regulatory text (GDPR, HIPAA, DORA, NIS2)"},
+                {"value": "standard", "label": "Industry Standard", "description": "Parse a framework or standard (PCI DSS, ISO 27001, NIST CSF)"},
+                {"value": "internal_policy", "label": "Internal Security Policy", "description": "Extract testable control statements from an internal policy document"},
+                {"value": "contract", "label": "Contract / SLA", "description": "Identify security obligations from a vendor contract or customer SLA"},
+            ],
+        },
+        {"type": "text_context", "label": "Policy / regulation text", "required": True, "description": "Paste the policy, regulatory article, or contract clause to extract controls from"},
+        {"type": "custom_prompt", "label": "Extraction focus", "required": False, "description": "e.g. 'focus on technical controls only, skip administrative' or 'map to ISO 27001 annex A'"},
+    ],
+    "migration_manager": [
+        {
+            "type": "select",
+            "label": "Migration Type",
+            "required": True,
+            "description": "What kind of security migration are you planning?",
+            "options": [
+                {"value": "siem", "label": "SIEM Migration", "description": "Move from one SIEM to another — detection rule porting, data source cutover, coverage gap analysis"},
+                {"value": "edr", "label": "EDR / XDR Migration", "description": "Replace endpoint detection platform — agent rollout, policy migration, detection gap bridge"},
+                {"value": "iam", "label": "IAM / IdP Migration", "description": "Move identity provider or IAM platform — app re-integration, SSO reconfiguration"},
+                {"value": "general", "label": "General Platform Migration", "description": "Any security tool transition — coverage continuity, parallel-run planning, rollback"},
+            ],
+        },
+        {"type": "text_context", "label": "Current and target stack", "required": False, "description": "Paste: current tool name, target tool name, asset count, timeline, team size, key integrations"},
+        {"type": "custom_prompt", "label": "Migration constraints", "required": False, "description": "e.g. 'must complete in 90 days, can't have >4h detection gap, 8,000 endpoints, 3 SOC engineers'"},
+    ],
+
+    # ── Architecture & Engineering ────────────────────────────────────────────
+    "cloud_security_architect": [
+        {
+            "type": "select",
+            "label": "Cloud Provider / Scope",
+            "required": True,
+            "description": "Which cloud environment are you designing for?",
+            "options": [
+                {"value": "aws", "label": "AWS", "description": "AWS landing zone, SCPs, GuardDuty, Security Hub, IAM architecture"},
+                {"value": "azure", "label": "Azure", "description": "Azure landing zone, Defender for Cloud, Entra ID, Policy, Sentinel integration"},
+                {"value": "gcp", "label": "GCP", "description": "GCP org hierarchy, Security Command Center, VPC SC, IAM binding"},
+                {"value": "multi_cloud", "label": "Multi-Cloud / Hybrid", "description": "Consistent controls across 2+ providers — CSPM, CNAPP, unified identity"},
+            ],
+        },
+        {"type": "scan", "label": "Cloud security scan (optional)", "required": False, "description": "CSPM or cloud security findings to incorporate"},
+        {"type": "text_context", "label": "Current cloud architecture", "required": False, "description": "Paste account structure, key services, existing controls, compliance requirements (SOC 2, FedRAMP, etc.)"},
+        {"type": "custom_prompt", "label": "Design constraints", "required": False, "description": "e.g. '200 AWS accounts, Terraform IaC, FedRAMP Moderate target, 18-month runway'"},
+    ],
+    "zero_trust_architect": [
+        {
+            "type": "select",
+            "label": "ZT Pillar Focus",
+            "required": True,
+            "description": "Which Zero Trust pillar are you prioritizing?",
+            "options": [
+                {"value": "identity", "label": "Identity", "description": "MFA, conditional access, passwordless, privileged access — NIST SP 800-207 identity pillar"},
+                {"value": "network", "label": "Network", "description": "Microsegmentation, ZTNA, SD-WAN replacement, lateral movement prevention"},
+                {"value": "device", "label": "Device", "description": "Device health attestation, MDM/UEM integration, compliance gating"},
+                {"value": "full_roadmap", "label": "Full ZT Roadmap", "description": "Cross-pillar maturity assessment using CISA ZT Maturity Model v2"},
+            ],
+        },
+        {"type": "text_context", "label": "Current ZT posture", "required": False, "description": "Paste existing controls, MFA coverage, network segmentation state, device management tools"},
+        {"type": "custom_prompt", "label": "Constraints and goals", "required": False, "description": "e.g. '18-month roadmap, legacy on-prem ERP can't be moved, CISA ZTMM level 2 target'"},
+    ],
+    "appsec_advisor": [
+        {
+            "type": "select",
+            "label": "AppSec Focus",
+            "required": True,
+            "description": "What part of the application security program do you need help with?",
+            "options": [
+                {"value": "sdlc_integration", "label": "SDLC Integration", "description": "Embed security gates in CI/CD — SAST, DAST, SCA placement, developer training"},
+                {"value": "tool_strategy", "label": "SAST / DAST / SCA Strategy", "description": "Tool selection and configuration for code scanning, API testing, dependency analysis"},
+                {"value": "threat_model", "label": "Threat Modelling", "description": "STRIDE/PASTA/attack tree for a specific application or feature"},
+                {"value": "pentest_prep", "label": "Pen Test Scoping", "description": "Define scope, rules of engagement, and remediation SLAs for a penetration test"},
+            ],
+        },
+        {"type": "scan", "label": "SAST / DAST scan results (optional)", "required": False, "description": "Existing code or web scan findings to review"},
+        {"type": "text_context", "label": "Application context", "required": False, "description": "Tech stack, CI/CD platform, team size, deployment cadence, current AppSec tooling"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False, "description": "e.g. 'React + Node.js + AWS, weekly deploys, 20 devs, no DAST today, need to pass SOC 2 Type II'"},
+    ],
+    "ot_ics_security_advisor": [
+        {
+            "type": "select",
+            "label": "OT/ICS Standard",
+            "required": True,
+            "description": "Which framework or context applies?",
+            "options": [
+                {"value": "iec_62443", "label": "ISA/IEC 62443", "description": "Industrial cybersecurity standard — zone/conduit model, security levels, IACS protection"},
+                {"value": "nist_800_82", "label": "NIST SP 800-82", "description": "Guide to Industrial Control Systems Security — risk assessment, architecture recommendations"},
+                {"value": "purdue_model", "label": "Purdue Model Architecture", "description": "Purdue hierarchy segmentation — L0–L5 separation, DMZ design, historian security"},
+                {"value": "ot_incident", "label": "OT Incident Response", "description": "OT-specific IR playbook — detection constraints, safe shutdown, recovery sequencing"},
+            ],
+        },
+        {"type": "text_context", "label": "OT environment description", "required": False, "description": "Paste OT asset inventory, network topology, PLC/SCADA types, historian, existing IT/OT segmentation"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'water treatment plant, Siemens PLCs, no air gap, recent ransomware in sector'"},
+    ],
+    "ai_security_advisor": [
+        {
+            "type": "select",
+            "label": "AI Security Focus",
+            "required": True,
+            "description": "Which aspect of AI/ML security are you addressing?",
+            "options": [
+                {"value": "model_risk", "label": "Model Risk", "description": "Data poisoning, model theft, adversarial inputs, evasion attacks"},
+                {"value": "mlops_controls", "label": "MLOps Controls", "description": "Pipeline security — training data integrity, model registry signing, deployment guardrails"},
+                {"value": "llm_security", "label": "LLM / GenAI Security", "description": "OWASP LLM Top 10 — prompt injection, data leakage, insecure plugins"},
+                {"value": "ai_governance", "label": "AI Governance", "description": "AI risk policy, model inventory, NIST AI RMF, EU AI Act readiness"},
+            ],
+        },
+        {"type": "scan", "label": "Security scan (optional)", "required": False, "description": "Existing AppSec or infrastructure scan findings related to AI systems"},
+        {"type": "text_context", "label": "AI/ML system description", "required": False, "description": "Paste ML stack (frameworks, training platform, serving infra), use case, data sensitivity, deployment context"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'GPT-4 in customer-facing chatbot, accesses CRM data, SOC 2 scope, 500k users'"},
+    ],
+    "orchestration_architect": [
+        {
+            "type": "select",
+            "label": "Automation Focus",
+            "required": True,
+            "description": "What kind of security automation are you designing?",
+            "options": [
+                {"value": "soar_playbook", "label": "SOAR Playbook", "description": "Automated response playbooks — phishing triage, alert enrichment, containment actions"},
+                {"value": "iac_security", "label": "IaC Security Pipeline", "description": "Terraform/CloudFormation security scanning, policy-as-code, drift detection"},
+                {"value": "detection_pipeline", "label": "Detection Engineering", "description": "SIEM rule lifecycle — development, testing, tuning, retirement process"},
+                {"value": "vuln_automation", "label": "VM Automation", "description": "Automated vulnerability triage, ITSM ticket creation, SLA tracking, exception workflows"},
+            ],
+        },
+        {"type": "text_context", "label": "Current tool stack", "required": False, "description": "Paste SIEM, SOAR, ticketing, EDR, cloud tools, and current automation coverage"},
+        {"type": "custom_prompt", "label": "Automation goals", "required": False, "description": "e.g. 'Sentinel + Logic Apps + Jira, want to automate phishing triage from 45 min to <5 min'"},
+    ],
+    "agentic_identity_architect": [
+        {
+            "type": "select",
+            "label": "Agent Identity Pattern",
+            "required": True,
+            "description": "Which aspect of agent identity are you designing?",
+            "options": [
+                {"value": "a2a_authn", "label": "A2A Authentication", "description": "How agents authenticate to each other — OAuth 2.0, mTLS, JWT SVID"},
+                {"value": "scoped_tokens", "label": "Scoped Token Design", "description": "Minimal-privilege token design for agent API access — scope binding, lifetime, rotation"},
+                {"value": "audit_trail", "label": "Agent Audit Trail", "description": "Logging agent actions for accountability — what agent did what, on whose behalf"},
+                {"value": "full_identity_arch", "label": "Full Agent Identity Architecture", "description": "End-to-end identity design for a multi-agent system — authn, authz, audit, revocation"},
+            ],
+        },
+        {"type": "text_context", "label": "Agent system description", "required": False, "description": "Paste agent topology — how many agents, what APIs they call, trust boundaries, current auth approach"},
+        {"type": "custom_prompt", "label": "Constraints", "required": False, "description": "e.g. 'Claude + OpenAI agents, Azure APIM, Entra ID workload identities, zero-trust network'"},
+    ],
+
+    # ── Threat & Incident Response ────────────────────────────────────────────
+    "ir_advisor": [
+        {
+            "type": "select",
+            "label": "IR Phase",
+            "required": True,
+            "description": "Where in the incident lifecycle do you need support?",
+            "options": [
+                {"value": "program_design", "label": "Program Design", "description": "Build or improve an IR program — NIST SP 800-61 alignment, retainer scoping, tabletop design"},
+                {"value": "active_incident", "label": "Active Incident", "description": "Live-incident command support — containment, eradication, communication, evidence preservation"},
+                {"value": "post_incident", "label": "Post-Incident Review", "description": "PIR facilitation — root cause analysis, lessons learned, control gap closure"},
+                {"value": "tabletop", "label": "Tabletop Exercise", "description": "Design and run a tabletop — scenario selection, inject sequencing, debrief template"},
+            ],
+        },
+        {"type": "text_context", "label": "Incident or program context", "required": False, "description": "Paste incident timeline, IOCs, affected systems, current playbooks, or IR program documentation"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False, "description": "e.g. 'ransomware hit 3 servers, AD may be compromised, insurance requires forensics, 2h into incident'"},
+    ],
+    "threat_intel_strategist": [
+        {
+            "type": "select",
+            "label": "CTI Program Maturity",
+            "required": True,
+            "description": "What stage of your threat intelligence program are you at?",
+            "options": [
+                {"value": "build", "label": "Build from Scratch", "description": "No CTI program today — define requirements, sources, collection, analysis, dissemination"},
+                {"value": "uplift", "label": "Uplift Existing Program", "description": "CTI exists but isn't actionable — improve analyst workflows, platform integration, reporting"},
+                {"value": "actor_profile", "label": "Threat Actor Profiling", "description": "Profile a specific threat actor — TTPs, targeting, infrastructure, detection opportunities"},
+                {"value": "sector_threats", "label": "Sector Threat Landscape", "description": "Current threat landscape for a specific industry — top actors, TTPs, recent campaigns"},
+            ],
+        },
+        {"type": "text_context", "label": "Current CTI state", "required": False, "description": "Paste intel feeds subscribed to, current tooling (MISP, ThreatConnect, ISAC membership), analyst team size"},
+        {"type": "custom_prompt", "label": "Focus area", "required": False, "description": "e.g. 'financial services sector, concerned about FIN7 and Lazarus targeting, OSINT only budget'"},
+    ],
+    "offensive_security_advisor": [
+        {
+            "type": "select",
+            "label": "Engagement Type",
+            "required": True,
+            "description": "What kind of offensive security work are you scoping or reviewing?",
+            "options": [
+                {"value": "pentest", "label": "Penetration Test", "description": "External / internal / web app pentest — scope, rules of engagement, methodology"},
+                {"value": "red_team", "label": "Red Team Exercise", "description": "Full adversary simulation — objectives, TTPs, deconfliction, purple team debrief"},
+                {"value": "purple_team", "label": "Purple Team", "description": "Joint red/blue exercise — detection validation, MITRE ATT&CK coverage mapping"},
+                {"value": "program_design", "label": "Offensive Security Program", "description": "Build an ongoing offensive program — frequency, scope rotation, finding management"},
+            ],
+        },
+        {"type": "scan", "label": "Previous findings (optional)", "required": False, "description": "Prior pentest or red team findings to build on"},
+        {"type": "text_context", "label": "Scope and environment", "required": False, "description": "Paste target environment, asset types, out-of-scope items, business-critical systems to protect"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'external pentest, AWS + on-prem, no social engineering, compliance driver: PCI DSS Req 11'"},
+    ],
+    "soc_triage_analyst": [
+        {
+            "type": "select",
+            "label": "Triage Task",
+            "required": True,
+            "description": "What kind of triage or analysis do you need?",
+            "options": [
+                {"value": "alert_triage", "label": "Alert Triage", "description": "Assess specific SIEM alerts — true positive / false positive verdict, priority, response"},
+                {"value": "fp_tuning", "label": "False Positive Tuning", "description": "Reduce noise — identify noisy rules, recommend suppression logic, document exceptions"},
+                {"value": "risk_prioritization", "label": "Risk-Based Prioritization", "description": "Re-order alert queue by asset criticality and threat context"},
+                {"value": "use_case_review", "label": "Detection Use Case Review", "description": "Audit current detection rules for coverage gaps against MITRE ATT&CK"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Vulnerability findings to correlate with alerts"},
+        {"type": "text_context", "label": "Alert data / SIEM output", "required": False, "description": "Paste raw alerts, log excerpts, detection rule names, or incident queue summary"},
+        {"type": "custom_prompt", "label": "SIEM and environment context", "required": False, "description": "e.g. 'Sentinel, 2,000 alerts/day, 4-analyst team, financial services, Tier 1 handles triage'"},
+    ],
+    "cloud_security_triage_analyst": [
+        {
+            "type": "select",
+            "label": "Cloud Alert Source",
+            "required": True,
+            "description": "Which cloud security platform are these alerts from?",
+            "options": [
+                {"value": "defender_cloud", "label": "Microsoft Defender for Cloud", "description": "Azure CNAPP alerts — misconfiguration, anomaly, attack path findings"},
+                {"value": "aws_security_hub", "label": "AWS Security Hub", "description": "GuardDuty, Inspector, Macie, and third-party findings aggregated"},
+                {"value": "wiz", "label": "Wiz / CNAPP", "description": "Cloud-native CNAPP alerts — toxic combinations, attack paths, secrets exposure"},
+                {"value": "multi_cloud", "label": "Multi-Cloud / SIEM", "description": "Correlated cloud alerts from multiple providers or ingested into SIEM"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Cloud security scan results to correlate"},
+        {"type": "text_context", "label": "Cloud alert data", "required": False, "description": "Paste cloud security alerts, CNAPP findings, or SIEM rule hits from cloud sources"},
+        {"type": "custom_prompt", "label": "Environment context", "required": False, "description": "e.g. 'AWS multi-account, 500 EC2 instances, Wiz + Security Hub, SOC team of 3'"},
+    ],
+
+    # ── Risk, Compliance & Governance ─────────────────────────────────────────
+    "data_protection_advisor": [
+        {
+            "type": "select",
+            "label": "Privacy Regulation",
+            "required": True,
+            "description": "Which privacy regulation or data protection context applies?",
+            "options": [
+                {"value": "gdpr", "label": "GDPR", "description": "EU General Data Protection Regulation — data subject rights, lawful basis, cross-border transfers"},
+                {"value": "ccpa", "label": "CCPA / CPRA", "description": "California Consumer Privacy Act — opt-out rights, data sale, contractor obligations"},
+                {"value": "hipaa", "label": "HIPAA", "description": "US healthcare privacy — PHI handling, BAA requirements, breach notification"},
+                {"value": "multi_jurisdiction", "label": "Multi-Jurisdiction", "description": "Operating across GDPR + CCPA + others — unified data protection program design"},
+            ],
+        },
+        {"type": "text_context", "label": "Data processing context", "required": False, "description": "Paste data flows, processing activities, data categories, third-party processors, transfer mechanisms"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False, "description": "e.g. 'EU SaaS, processing employee data, US parent company, SCCs in place, DPA audit upcoming'"},
+    ],
+    "supply_chain_risk_manager": [
+        {
+            "type": "select",
+            "label": "Supply Chain Focus",
+            "required": True,
+            "description": "What aspect of supply chain risk are you assessing?",
+            "options": [
+                {"value": "vendor_assessment", "label": "Vendor Risk Assessment", "description": "Tier and assess a specific vendor or full vendor portfolio"},
+                {"value": "sbom_analysis", "label": "SBOM / Software Supply Chain", "description": "Software Bill of Materials review — open source dependencies, transitive risk, SLSA compliance"},
+                {"value": "c_scrm_program", "label": "C-SCRM Program Design", "description": "Build a Cyber Supply Chain Risk Management program — NIST SP 800-161 alignment"},
+                {"value": "incident_response", "label": "Supplier Breach Response", "description": "How to respond when a key supplier is breached — notification, containment, continuity"},
+            ],
+        },
+        {"type": "text_context", "label": "Supplier / software data", "required": False, "description": "Paste vendor list, SBOM output, contract obligations, existing questionnaire responses, or tiering criteria"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'SolarWinds-style risk, 200 vendors, critical infra sector, no current TPRM program'"},
+    ],
+    "nist_assessment_advisor": [
+        {
+            "type": "select",
+            "label": "NIST Framework",
+            "required": True,
+            "description": "Which NIST framework are you assessing against?",
+            "options": [
+                {"value": "nist_csf", "label": "NIST CSF 2.0", "description": "Cybersecurity Framework — Govern, Identify, Protect, Detect, Respond, Recover"},
+                {"value": "nist_800_53", "label": "NIST SP 800-53", "description": "Security and Privacy Controls — full control catalog for federal / high-assurance environments"},
+                {"value": "nist_800_171", "label": "NIST SP 800-171", "description": "CUI protection — DoD/federal contractor requirements, SPRS scoring, CMMC readiness"},
+                {"value": "nist_ai_rmf", "label": "NIST AI RMF", "description": "AI Risk Management Framework — Govern, Map, Measure, Manage for AI systems"},
+            ],
+        },
+        {"type": "scan", "label": "Security scan (optional)", "required": False, "description": "Findings to map to NIST controls"},
+        {"type": "text_context", "label": "Assessment evidence", "required": False, "description": "Paste existing policy list, control inventory, prior assessment scores, or interview notes"},
+        {"type": "custom_prompt", "label": "Assessment scope", "required": False, "description": "e.g. 'NIST CSF 2.0, financial services, 1,200 employees, targeting Tier 3 across all functions'"},
+    ],
+    "cmmc_assessment_advisor": [
+        {
+            "type": "select",
+            "label": "CMMC Level",
+            "required": True,
+            "description": "Which CMMC 2.0 level are you targeting?",
+            "options": [
+                {"value": "level_1", "label": "Level 1 — Foundational", "description": "17 practices, annual self-assessment, basic cyber hygiene for FCI"},
+                {"value": "level_2", "label": "Level 2 — Advanced", "description": "110 practices (NIST SP 800-171), triennial C3PAO assessment for CUI"},
+                {"value": "level_3", "label": "Level 3 — Expert", "description": "110+ practices, DIBCAC-led assessment, highest CUI protection"},
+            ],
+        },
+        {"type": "scan", "label": "Security scan (optional)", "required": False, "description": "Existing findings to map to CMMC practices"},
+        {"type": "text_context", "label": "CMMC scope context", "required": False, "description": "Paste SPRS score, CUI categories handled, enclave description, existing NIST 800-171 SSP excerpts"},
+        {"type": "custom_prompt", "label": "Assessment constraints", "required": False, "description": "e.g. 'prime contractor, handling ITAR CUI, targeting Level 2, C3PAO assessment in 8 months'"},
+    ],
+    "iam_posture_advisor": [
+        {
+            "type": "select",
+            "label": "IAM Focus Area",
+            "required": True,
+            "description": "Which aspect of IAM posture do you need reviewed?",
+            "options": [
+                {"value": "least_privilege", "label": "Least Privilege", "description": "Identify over-privileged accounts, roles, and service principals — remediation roadmap"},
+                {"value": "privileged_access", "label": "Privileged Access Management", "description": "PAM controls — just-in-time access, privileged account inventory, session recording"},
+                {"value": "mfa_coverage", "label": "MFA Coverage", "description": "MFA deployment gaps — identify unprotected accounts and recommend enforcement policies"},
+                {"value": "cloud_iam", "label": "Cloud IAM Review", "description": "AWS IAM / Azure RBAC / GCP IAM — permission sprawl, service account risks, admin role exposure"},
+            ],
+        },
+        {"type": "scan", "label": "IAM / security scan (optional)", "required": False, "description": "Findings related to identity or access control"},
+        {"type": "text_context", "label": "IAM environment data", "required": False, "description": "Paste role/group assignments, privileged account list, SSO config, current MFA coverage stats"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. '300 admin accounts in Azure, Entra ID, no PIM, SOX ITGC audit next quarter'"},
+    ],
+    "compensating_control_analyst": [
+        {
+            "type": "select",
+            "label": "Control Gap Scenario",
+            "required": True,
+            "description": "What type of control gap needs a compensating control?",
+            "options": [
+                {"value": "technical_infeasible", "label": "Technically Infeasible", "description": "Primary control can't be implemented — legacy system, OT constraint, vendor limitation"},
+                {"value": "cost_prohibitive", "label": "Cost-Prohibitive", "description": "Primary control exceeds budget — need equivalent risk reduction at lower cost"},
+                {"value": "regulatory_exception", "label": "Regulatory Exception", "description": "Formal exception required — document compensating controls for auditor acceptance"},
+                {"value": "interim_bridge", "label": "Interim / Bridge Control", "description": "Gap between now and when the primary control will be ready — bridge coverage"},
+            ],
+        },
+        {"type": "scan", "label": "Scan findings (optional)", "required": False, "description": "Findings related to the control gap"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Compliance framework the control must satisfy"},
+        {"type": "text_context", "label": "Control gap details", "required": False, "description": "Paste: which control is missing, why it can't be implemented, existing mitigating factors"},
+        {"type": "custom_prompt", "label": "Auditor / regulatory context", "required": False, "description": "e.g. 'PCI DSS Req 8.3 MFA on legacy SCADA, QSA needs documented compensating control'"},
+    ],
+
+    # ── Vulnerability Management ───────────────────────────────────────────────
+    "vuln_remediation_orchestrator": [
+        {
+            "type": "select",
+            "label": "Remediation Phase",
+            "required": True,
+            "description": "Where in the remediation lifecycle do you need orchestration?",
+            "options": [
+                {"value": "prioritize", "label": "Prioritize & Assign", "description": "Triage the finding backlog — rank by risk, assign to teams with context and SLAs"},
+                {"value": "in_flight", "label": "In-Flight Tracking", "description": "Status review — SLA breaches, blocked items, escalation decisions"},
+                {"value": "exception_review", "label": "Exception Review", "description": "Evaluate exception requests — assess residual risk, recommend approval/denial"},
+                {"value": "closure_validation", "label": "Closure Validation", "description": "Verify remediation completeness — re-scan readiness, closure evidence checklist"},
+            ],
+        },
+        {"type": "scan", "label": "Scan", "required": True, "description": "VM scan output to orchestrate remediation from"},
+        {"type": "text_context", "label": "Team structure (optional)", "required": False, "description": "Paste team names, asset ownership map, escalation contacts, current exception backlog"},
+        {"type": "custom_prompt", "label": "Focus constraint", "required": False, "description": "e.g. 'prioritize Windows patch-able CVEs for infrastructure team, 2-week sprint'"},
+    ],
+    "vm_operations_synthesizer": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "VM scan output to convert into operational work queues"},
+        {"type": "text_context", "label": "Team / asset owner context", "required": False, "description": "Paste team names, asset groups, patch windows, escalation contacts, ITSM tool"},
+        {"type": "custom_prompt", "label": "Output format preference", "required": False, "description": "e.g. 'split by Windows / Linux / cloud, include CVE IDs, Jira-ticket format'"},
+    ],
+    "vm_capacity_analyst": [
+        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Current scan data for capacity baseline"},
+        {"type": "text_context", "label": "VM team & asset data", "required": False, "description": "Paste headcount, patch throughput rate, asset count growth projections, exception backlog size, MTTR"},
+        {"type": "custom_prompt", "label": "Planning horizon & constraints", "required": False, "description": "e.g. '6-month forecast, team of 4 FTEs, 8,000 assets growing 20% YoY, no budget increase'"},
+    ],
+    "vm_governance_synthesizer": [
+        {
+            "type": "select",
+            "label": "Report Tier",
+            "required": True,
+            "description": "Select the audience and format for this report",
+            "options": [
+                {"value": "operational", "label": "Operational", "description": "Weekly — VM team: finding counts, SLA breaches, in-flight remediation, patch throughput"},
+                {"value": "management", "label": "Management", "description": "Monthly — CISOs & IT Directors: MTTR trends, SLA compliance rate, exception backlog aging"},
+                {"value": "board", "label": "Board / Audit", "description": "Quarterly — Board & Audit committee: posture trend, critical finding coverage, top 5 risks by business impact"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Select a completed scan to pull VM findings from"},
+        {"type": "text_context", "label": "VM metrics / data", "required": False, "description": "Paste MTTR numbers, SLA breach counts, exception backlog, finding counts by severity, asset count, or any VM KPI data"},
+        {"type": "custom_prompt", "label": "Reporting period & context", "required": False, "description": "e.g. 'Q3 2025, 12,400 assets, financial services, PCI DSS scope, MTTR critical: 18h vs 24h SLA'"},
+    ],
+    "crown_jewel_adjacency_analyst": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Vulnerability scan to score by crown jewel adjacency"},
+        {"type": "text_context", "label": "Crown jewel asset list", "required": False, "description": "Paste critical asset names, IPs, or resource IDs — the analyst weights paths to these"},
+        {"type": "custom_prompt", "label": "Adjacency context", "required": False, "description": "e.g. 'domain controller at 10.0.0.5, payment DB at rds-prod-001, segment firewall at 10.0.0.1'"},
+    ],
+
+    # ── Agentic & AI Security ─────────────────────────────────────────────────
+    "a2a_protocol_advisor": [
+        {
+            "type": "select",
+            "label": "Protocol Security Focus",
+            "required": True,
+            "description": "Which A2A security concern are you addressing?",
+            "options": [
+                {"value": "authn_design", "label": "Authentication Design", "description": "OAuth 2.0, mTLS, JWT assertions — which mechanism for which trust boundary"},
+                {"value": "authz_model", "label": "Authorization Model", "description": "What an agent can do on behalf of whom — ABAC, capability scoping, delegation chains"},
+                {"value": "integrity_replay", "label": "Message Integrity & Replay", "description": "HMAC signing, nonces, timestamp windows — prevent tampering and replay attacks"},
+                {"value": "threat_model", "label": "A2A Threat Model", "description": "Adversarial scenarios — prompt injection via A2A, tool result tampering, capability escalation"},
+            ],
+        },
+        {"type": "text_context", "label": "Agent architecture description", "required": False, "description": "Paste agent topology — agent types, trust boundaries, what APIs they call, current auth approach"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'orchestrator agent delegates to 5 sub-agents, each calls external APIs, using MCP protocol'"},
+    ],
+    "llm_runtime_advisor": [
+        {
+            "type": "select",
+            "label": "Runtime Security Focus",
+            "required": True,
+            "description": "Which LLM runtime security concern are you addressing?",
+            "options": [
+                {"value": "prompt_injection", "label": "Prompt Injection Defense", "description": "Direct and indirect prompt injection — input validation, output filtering, sandboxing"},
+                {"value": "tool_use_security", "label": "Tool / Function Call Security", "description": "Secure tool definitions, output validation, privilege minimization for function calls"},
+                {"value": "data_exfil", "label": "Data Leakage Prevention", "description": "Prevent PII/IP extraction via LLM — output scanning, context isolation, access controls"},
+                {"value": "guardrails", "label": "Output Guardrails", "description": "Content filtering, response grounding, hallucination mitigation at production scale"},
+            ],
+        },
+        {"type": "scan", "label": "AppSec scan (optional)", "required": False, "description": "Code security findings related to the LLM application"},
+        {"type": "text_context", "label": "LLM system description", "required": False, "description": "Paste system architecture — which LLM, tool integrations, RAG setup, user data access, deployment env"},
+        {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. 'GPT-4 with function calling, reads Salesforce and emails, 10k daily users, SOC 2 in scope'"},
+    ],
+    "agentic_ai_program_strategist": [
+        {
+            "type": "select",
+            "label": "Program Stage",
+            "required": True,
+            "description": "Where is your organization in the agentic AI security journey?",
+            "options": [
+                {"value": "policy", "label": "Policy & Governance", "description": "Define agentic AI security policy, acceptable use, and risk appetite"},
+                {"value": "controls_catalog", "label": "Controls Catalog", "description": "Build the technical and operational controls catalog for agentic AI systems"},
+                {"value": "operating_model", "label": "Operating Model", "description": "Who owns agentic AI security — CISO, AI governance team, product security"},
+                {"value": "assessment", "label": "Current State Assessment", "description": "Inventory existing agentic AI systems and assess against emerging standards"},
+            ],
+        },
+        {"type": "text_context", "label": "AI program context", "required": False, "description": "Paste current AI initiatives, deployed agent types, existing AI governance policies, risk appetite"},
+        {"type": "custom_prompt", "label": "Specific challenge", "required": False, "description": "e.g. '50+ internal AI agents, no security review process, board asked for AI risk report in 30 days'"},
+    ],
+    "frontier_ai_readiness_advisor": [
+        {
+            "type": "select",
+            "label": "Frontier Risk Focus",
+            "required": True,
+            "description": "Which frontier AI risk are you assessing readiness for?",
+            "options": [
+                {"value": "autonomy_risk", "label": "Autonomy Risk", "description": "Risks from AI agents acting without human oversight — escalation, containment, kill-switch"},
+                {"value": "deception_persuasion", "label": "Deception & Persuasion", "description": "AI that manipulates users or other systems — detection, monitoring, policy controls"},
+                {"value": "dual_use", "label": "Dual-Use Governance", "description": "Internal AI that could be weaponized — access controls, misuse detection, policy"},
+                {"value": "eu_ai_act", "label": "EU AI Act Readiness", "description": "High-risk AI system requirements — transparency, human oversight, technical documentation"},
+            ],
+        },
+        {"type": "text_context", "label": "AI system inventory", "required": False, "description": "Paste your frontier AI system types, autonomy levels, data access, deployment scale"},
+        {"type": "custom_prompt", "label": "Regulatory or org context", "required": False, "description": "e.g. 'EU domicile, deploying autonomous trading agent, regulators asking about AI governance'"},
+    ],
+
+    # ── Business & Reporting ──────────────────────────────────────────────────
+    "brain_explainer": [
+        {
+            "type": "select",
+            "label": "Explanation Format",
+            "required": True,
+            "description": "Who will read this explanation?",
+            "options": [
+                {"value": "technical", "label": "Technical Team", "description": "Full reasoning trace — which data points, scoring logic, confidence factors"},
+                {"value": "management", "label": "Management", "description": "Plain-language summary — what the AI found, why it matters, what to do about it"},
+                {"value": "audit", "label": "Audit / Compliance", "description": "Explainability evidence — inputs, methodology, output, human review points"},
+            ],
+        },
+        {"type": "text_context", "label": "AI output to explain", "required": True, "description": "Paste the AI-generated recommendation, risk score, finding, or report you want explained"},
+        {"type": "custom_prompt", "label": "Context", "required": False, "description": "e.g. 'explain why the orchestrator scored this finding as critical when CVSS is only 6.5'"},
+    ],
+    "board_packet_translator": [
+        {
+            "type": "select",
+            "label": "Report Format",
+            "required": True,
+            "description": "Target audience for the board packet",
+            "options": [
+                {"value": "board_narrative", "label": "Board Narrative", "description": "Risk-framed prose for non-technical board members — P&L and reputational language"},
+                {"value": "audit_committee", "label": "Audit Committee", "description": "Control effectiveness evidence with regulatory framing — for NED audit committee members"},
+                {"value": "executive_summary", "label": "Executive Summary", "description": "1-page CISO brief with key metrics, trend indicators, and top 3 asks"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Findings to translate into board language"},
+        {"type": "text_context", "label": "Security metrics / KPIs", "required": False, "description": "Paste MTTR, incident counts, risk scores, compliance rates, SLA data, posture trend"},
+        {"type": "custom_prompt", "label": "Business context", "required": False, "description": "e.g. 'Q4 2025, financial services, upcoming PCI audit in March, board focused on ransomware'"},
+    ],
+    "insurance_premium_analyst": [
+        {
+            "type": "select",
+            "label": "Insurance Analysis Type",
+            "required": True,
+            "description": "What cyber insurance question are you trying to answer?",
+            "options": [
+                {"value": "premium_impact", "label": "Control Change Impact", "description": "Estimate how a specific control improvement moves the premium at renewal"},
+                {"value": "underwriting_prep", "label": "Underwriting Preparation", "description": "Prepare for underwriter questionnaire — which controls matter most to insurers"},
+                {"value": "coverage_review", "label": "Coverage Gap Review", "description": "Assess whether current policy covers the actual risk profile — sublimits, exclusions"},
+                {"value": "post_incident", "label": "Post-Incident Premium Modeling", "description": "Estimate premium impact after a breach or ransomware event"},
+            ],
+        },
+        {"type": "scan", "label": "Security scan (optional)", "required": False, "description": "Current findings — underwriters care about MFA gaps, unpatched criticals, EDR coverage"},
+        {"type": "text_context", "label": "Insurance & security context", "required": False, "description": "Paste current policy limits, coverage type, industry, revenue, existing controls, prior claims"},
+        {"type": "custom_prompt", "label": "Specific question", "required": False, "description": "e.g. '$200M revenue, manufacturing, Travelers cyber policy renewing in 3 months, added MFA last year'"},
+    ],
+    "compliance_penalty_calculator": [
+        {
+            "type": "select",
+            "label": "Regulation",
+            "required": True,
+            "description": "Which regulatory penalty exposure are you modeling?",
+            "options": [
+                {"value": "gdpr", "label": "GDPR", "description": "Up to €20M or 4% of global annual turnover — supervisory authority fines"},
+                {"value": "pci_dss", "label": "PCI DSS", "description": "Card brand fines $5k–$100k/month — acquirer pass-through, forensic cost exposure"},
+                {"value": "hipaa", "label": "HIPAA", "description": "HHS OCR tiers $100–$1.9M per violation category — state AG exposure"},
+                {"value": "multi_reg", "label": "Multi-Regulation", "description": "Combined exposure across 2+ applicable regulations"},
+            ],
+        },
+        {"type": "scan", "label": "Compliance scan (optional)", "required": False, "description": "Control deficiency findings to map to penalty exposure"},
+        {"type": "framework", "label": "Framework", "required": False, "description": "Compliance framework to assess gaps against"},
+        {"type": "text_context", "label": "Org and gap context", "required": False, "description": "Paste annual revenue/turnover, data subjects affected, open control gaps, breach history, jurisdiction"},
+        {"type": "custom_prompt", "label": "Specific scenario", "required": False, "description": "e.g. 'GDPR, €500M EU revenue, 3 open Art. 32 gaps, no DPA notification process yet'"},
+    ],
+    "mythos_automation_planner": [
+        {
+            "type": "select",
+            "label": "Automation Horizon",
+            "required": True,
+            "description": "What automation planning timeframe and scope are you working on?",
+            "options": [
+                {"value": "quick_wins", "label": "Quick Wins (0–90 days)", "description": "High-ROI, low-complexity automations — alert triage, ticket enrichment, report generation"},
+                {"value": "strategic_roadmap", "label": "Strategic Roadmap (6–18 months)", "description": "Full automation program — sequenced by dependency, ROI, and team capability"},
+                {"value": "tool_selection", "label": "Tool Selection", "description": "Evaluate automation platforms — SOAR, RPA, IaC, or custom scripts for specific use cases"},
+                {"value": "roi_case", "label": "ROI Business Case", "description": "Quantify automation savings — analyst hours, error reduction, SLA improvement"},
+            ],
+        },
+        {"type": "scan", "label": "Security scan (optional)", "required": False, "description": "Current findings to identify automation opportunities in remediation"},
+        {"type": "text_context", "label": "Current tooling & manual processes", "required": False, "description": "Paste current tools, manual workflows, analyst time estimates, SOAR/automation already deployed"},
+        {"type": "custom_prompt", "label": "Automation constraints", "required": False, "description": "e.g. 'Sentinel + no SOAR, 4-person SOC, 3h/day on manual triage, ServiceNow for ticketing'"},
+    ],
+
+    # ── Specialized / Readiness ───────────────────────────────────────────────
+    "rex_jr_orchestrator": [
+        {
+            "type": "select",
+            "label": "Engagement Type",
+            "required": True,
+            "description": "What kind of multi-agent engagement are you running?",
+            "options": [
+                {"value": "full_assessment", "label": "Full Security Assessment", "description": "Orchestrate: risk scoring → compliance mapping → threat intel → remediation plan"},
+                {"value": "targeted_review", "label": "Targeted Review", "description": "Specific domain deep-dive using 2–3 specialist agents in sequence"},
+                {"value": "board_reporting", "label": "Board Reporting Package", "description": "Orchestrate advisory + reporting agents to produce a board-ready security narrative"},
+            ],
+        },
+        {"type": "scan", "label": "Scan", "required": False, "description": "Primary scan to ground the multi-agent engagement"},
+        {"type": "framework", "label": "Framework (optional)", "required": False, "description": "Compliance framework to thread through the engagement"},
+        {"type": "text_context", "label": "Engagement brief", "required": False, "description": "Paste client context, objectives, key stakeholders, timeline, and any existing findings"},
+        {"type": "custom_prompt", "label": "Specific orchestration instruction", "required": False, "description": "e.g. 'run risk + compliance first, use results to brief the partner advisor'"},
+    ],
+    "quiltworks_readiness_advisor": [
+        {
+            "type": "select",
+            "label": "Assessment Scope",
+            "required": True,
+            "description": "Which QuiltWorks domains are you assessing?",
+            "options": [
+                {"value": "full_assessment", "label": "Full 7-Domain Assessment", "description": "All QuiltWorks domains — produces radar chart and full maturity scorecard"},
+                {"value": "targeted_domain", "label": "Targeted Domain", "description": "Deep-dive on 1–2 specific QuiltWorks domains — faster, more detailed output"},
+                {"value": "gap_roadmap", "label": "Gap-to-Roadmap", "description": "Existing scores provided — produce prioritized improvement roadmap"},
+                {"value": "peer_benchmark", "label": "Peer Benchmark", "description": "Compare domain scores against sector norms — identify relative strengths and weaknesses"},
+            ],
+        },
+        {"type": "text_context", "label": "Evidence and current practices", "required": False, "description": "Paste: existing domain scores, policy documentation, interview notes, control inventory, or prior assessment excerpts"},
+        {"type": "custom_prompt", "label": "Assessment context", "required": False, "description": "e.g. 'financial services, 2,000 employees, prior QuiltWorks score: Identity 2.1, Cloud 1.4, IR 2.8'"},
+    ],
+
+    # ── Legacy catalog agent schemas (kept for backward compat) ───────────────
     "iga_advisor": [
         {"type": "text_context", "label": "Identity & Access configuration", "required": False, "description": "Paste IAM roles, permission policies, user-to-role assignments, or access review data"},
         {"type": "custom_prompt", "label": "Specific question or focus area", "required": False},
@@ -1342,7 +2034,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "Access control data", "required": False, "description": "Paste RBAC config, access logs, or permission matrix"},
         {"type": "custom_prompt", "label": "Specific question", "required": False},
     ],
-    # Cloud/infra agents
     "cloud_security_advisor": [
         {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Cloud security scan results"},
         {"type": "custom_prompt", "label": "Cloud environment context", "required": False, "description": "e.g. AWS account IDs, regions, key services in use"},
@@ -1350,84 +2041,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
     "network_exposure_analyzer": [
         {"type": "scan", "label": "Scan (optional)", "required": False},
         {"type": "custom_prompt", "label": "Network topology notes", "required": False},
-    ],
-    # VM Governance — 3-tier reporting
-    "vm_governance_synthesizer": [
-        {
-            "type": "select",
-            "label": "Report Tier",
-            "required": True,
-            "description": "Select the audience and format for this report",
-            "options": [
-                {
-                    "value": "operational",
-                    "label": "Operational",
-                    "description": "Weekly — VM team: finding counts, SLA breaches, in-flight remediation, patch throughput",
-                },
-                {
-                    "value": "management",
-                    "label": "Management",
-                    "description": "Monthly — CISOs & IT Directors: MTTR trends, SLA compliance rate, exception backlog aging",
-                },
-                {
-                    "value": "board",
-                    "label": "Board / Audit",
-                    "description": "Quarterly — Board & Audit committee: posture trend, critical finding coverage, top 5 risks by business impact",
-                },
-            ],
-        },
-        {
-            "type": "scan",
-            "label": "Scan data (optional)",
-            "required": False,
-            "description": "Select a completed scan to pull VM findings from",
-        },
-        {
-            "type": "text_context",
-            "label": "VM metrics / data",
-            "required": False,
-            "description": "Paste MTTR numbers, SLA breach counts, exception backlog, finding counts by severity, asset count, or any VM KPI data. Used when no scan is selected.",
-        },
-        {
-            "type": "custom_prompt",
-            "label": "Reporting period & context",
-            "required": False,
-            "description": "e.g. 'Q3 2025, 12,400 assets, financial services, PCI DSS scope, MTTR critical: 18h vs 24h SLA'",
-        },
-    ],
-    # VM Operations
-    "vm_operations_synthesizer": [
-        {"type": "scan", "label": "Scan", "required": True, "description": "VM scan output to convert into operational work queues"},
-        {"type": "custom_prompt", "label": "Team / asset owner context", "required": False, "description": "e.g. team names, asset groups, escalation contacts"},
-    ],
-    # VM Capacity
-    "vm_capacity_analyst": [
-        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Current scan data for capacity baseline"},
-        {"type": "text_context", "label": "VM team & asset data", "required": False, "description": "Paste headcount, patch throughput rate, asset growth projections, exception backlog size"},
-        {"type": "custom_prompt", "label": "Planning horizon & constraints", "required": False, "description": "e.g. '6-month forecast, team of 4, 8,000 assets growing 20% YoY'"},
-    ],
-    # Crown jewel adjacency
-    "crown_jewel_adjacency_analyst": [
-        {"type": "scan", "label": "Scan", "required": True, "description": "Vulnerability scan to score by crown jewel adjacency"},
-        {"type": "text_context", "label": "Crown jewel asset list", "required": False, "description": "Paste critical asset names, IPs, or resource IDs — the analyst will weight paths to these"},
-        {"type": "custom_prompt", "label": "Adjacency context", "required": False, "description": "e.g. 'domain controller at 10.0.0.5, payment DB at rds-prod-001'"},
-    ],
-    # Board-level reporting
-    "board_packet_translator": [
-        {
-            "type": "select",
-            "label": "Report Format",
-            "required": True,
-            "description": "Target audience for the board packet",
-            "options": [
-                {"value": "board_narrative", "label": "Board Narrative", "description": "Risk-framed prose for non-technical board members"},
-                {"value": "audit_committee", "label": "Audit Committee", "description": "Control effectiveness evidence with regulatory framing"},
-                {"value": "executive_summary", "label": "Executive Summary", "description": "1-page CISO briefing with key metrics and trend indicators"},
-            ],
-        },
-        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Findings to translate into board language"},
-        {"type": "text_context", "label": "Security metrics / KPIs", "required": False, "description": "Paste MTTR, incident counts, risk scores, compliance rates, or any dashboard data"},
-        {"type": "custom_prompt", "label": "Business context", "required": False, "description": "e.g. 'Q4 2025, financial services, upcoming PCI audit in March, recent ransomware incident in sector'"},
     ],
 }
 
