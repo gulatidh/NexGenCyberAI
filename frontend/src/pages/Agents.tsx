@@ -7,11 +7,13 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Switch, IconButton, Tooltip, Drawer, Divider, LinearProgress, Collapse,
-  Avatar, RadioGroup, FormControlLabel, Radio, FormLabel,
+  Avatar, RadioGroup, FormControlLabel, Radio, FormLabel, Stepper, Step, StepLabel,
+  Paper,
 } from "@mui/material";
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
-  CloudUpload, OpenInNew,
+  CloudUpload, OpenInNew, ArrowBack, ArrowForward, DragIndicator,
+  AddCircle, DoNotDisturb,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
@@ -197,72 +199,303 @@ function ConfigureDialog({ open, agent, onClose, onSave, isAdmin, hideSensitive 
 
 // ── New Agent dialog ────────────────────────────────────────────────────────
 
+// ── Schema field types available in the builder ───────────────────────────────
+const FIELD_TYPE_OPTIONS = [
+  { value: "scan",          label: "Scan Selector",     description: "Dropdown to pick a completed scan" },
+  { value: "framework",     label: "Framework Selector", description: "Dropdown to pick a compliance framework" },
+  { value: "select",        label: "Choice (Select)",    description: "Radio cards — user picks one option from a list" },
+  { value: "text_context",  label: "Paste / Data",       description: "Multi-line paste area for raw data (logs, configs, metrics)" },
+  { value: "custom_prompt", label: "Instructions",       description: "Free-text instructions or focus area" },
+];
+
+interface SchemaFieldDraft {
+  id: number; // local key for React
+  type: string;
+  label: string;
+  required: boolean;
+  description: string;
+  options: { value: string; label: string; description: string }[];
+}
+
+let _fieldId = 0;
+const mkField = (type = "custom_prompt"): SchemaFieldDraft => ({
+  id: ++_fieldId, type, label: "", required: false, description: "", options: [],
+});
+
+function SchemaFieldEditor({ field, onChange, onDelete, accentColor }: {
+  field: SchemaFieldDraft;
+  onChange: (f: SchemaFieldDraft) => void;
+  onDelete: () => void;
+  accentColor: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const set = (patch: Partial<SchemaFieldDraft>) => onChange({ ...field, ...patch });
+
+  const addOption = () => set({ options: [...field.options, { value: "", label: "", description: "" }] });
+  const setOption = (i: number, patch: Partial<typeof field.options[0]>) => {
+    const opts = field.options.map((o, idx) => idx === i ? { ...o, ...patch } : o);
+    set({ options: opts });
+  };
+  const removeOption = (i: number) => set({ options: field.options.filter((_, idx) => idx !== i) });
+
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, borderColor: "divider", position: "relative" }}>
+      {/* Header row */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: expanded ? 1.5 : 0 }}>
+        <DragIndicator sx={{ color: "text.disabled", fontSize: 18, cursor: "grab" }} />
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <Select value={field.type} onChange={(e) => set({ type: e.target.value })}
+            sx={{ fontSize: 13 }}>
+            {FIELD_TYPE_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                <Box>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{o.label}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{o.description}</Typography>
+                </Box>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField size="small" placeholder="Field label *" value={field.label}
+          onChange={(e) => set({ label: e.target.value })}
+          sx={{ flex: 1, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+        <Tooltip title={field.required ? "Required" : "Optional"}>
+          <Switch size="small" checked={field.required}
+            onChange={(e) => set({ required: e.target.checked })}
+            sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: accentColor } }} />
+        </Tooltip>
+        <IconButton size="small" onClick={() => setExpanded((v) => !v)} sx={{ color: "text.secondary" }}>
+          {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+        </IconButton>
+        <IconButton size="small" onClick={onDelete} sx={{ color: "error.main" }}>
+          <Delete fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <Box sx={{ pl: 4 }}>
+          <TextField fullWidth size="small" placeholder="Helper text shown below the field (optional)"
+            value={field.description} onChange={(e) => set({ description: e.target.value })}
+            sx={{ mb: field.type === "select" ? 1.5 : 0, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+
+          {field.type === "select" && (
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, mb: 0.5, display: "block" }}>
+                OPTIONS — users see these as clickable radio cards
+              </Typography>
+              {field.options.map((opt, i) => (
+                <Box key={i} sx={{ display: "flex", gap: 1, mb: 1, alignItems: "flex-start" }}>
+                  <TextField size="small" placeholder="value (slug)" value={opt.value}
+                    onChange={(e) => setOption(i, { value: e.target.value.toLowerCase().replace(/\s+/g, "_") })}
+                    sx={{ width: 130, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                  <TextField size="small" placeholder="Label" value={opt.label}
+                    onChange={(e) => setOption(i, { label: e.target.value })}
+                    sx={{ width: 150, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                  <TextField size="small" placeholder="Description (shown under label)" value={opt.description}
+                    onChange={(e) => setOption(i, { description: e.target.value })}
+                    sx={{ flex: 1, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                  <IconButton size="small" onClick={() => removeOption(i)} sx={{ color: "error.main", mt: 0.25 }}>
+                    <DoNotDisturb fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              <Button size="small" startIcon={<AddCircle />} onClick={addOption}
+                sx={{ color: accentColor, fontSize: 12 }}>
+                Add option
+              </Button>
+            </Box>
+          )}
+        </Box>
+      )}
+    </Paper>
+  );
+}
+
 function NewAgentDialog({ open, onClose, onCreate, existingGroups }: {
   open: boolean; onClose: () => void; onCreate: (data: any) => void;
   existingGroups: { key: string; label: string }[];
 }) {
+  const [step, setStep] = useState(0);
   const [data, setData] = useState<any>({
     key: "", name: "", group_key: existingGroups[0]?.key || "core_advisory",
     group_label: existingGroups[0]?.label || "Core Advisory",
-    description: "", system_prompt: "", temperature: 0.1, max_tokens: 4096, is_enabled: true,
+    description: "", objective: "", domain: "", system_prompt: "",
+    temperature: 0.1, max_tokens: 4096, is_enabled: true,
   });
+  const [fields, setFields] = useState<SchemaFieldDraft[]>([
+    mkField("custom_prompt"),
+  ]);
+
   React.useEffect(() => {
-    if (open) setData({
-      key: "", name: "", group_key: existingGroups[0]?.key || "core_advisory",
-      group_label: existingGroups[0]?.label || "Core Advisory",
-      description: "", system_prompt: "", temperature: 0.1, max_tokens: 4096, is_enabled: true,
-    });
+    if (open) {
+      setStep(0);
+      setData({
+        key: "", name: "", group_key: existingGroups[0]?.key || "core_advisory",
+        group_label: existingGroups[0]?.label || "Core Advisory",
+        description: "", objective: "", domain: "", system_prompt: "",
+        temperature: 0.1, max_tokens: 4096, is_enabled: true,
+      });
+      setFields([mkField("custom_prompt")]);
+    }
   }, [open, existingGroups]);
 
+  const accentColor = "#4285F4";
+  const step1Valid = !!data.key && !!data.name;
+  const step2Valid = fields.every((f) => !!f.label.trim());
+
+  const handleCreate = () => {
+    const input_schema = fields.map(({ type, label, required, description, options }) => {
+      const field: any = { type, label, required };
+      if (description.trim()) field.description = description.trim();
+      if (type === "select" && options.length) {
+        field.options = options.map(({ value, label: l, description: d }) => {
+          const o: any = { value: value || l.toLowerCase().replace(/\s+/g, "_"), label: l };
+          if (d.trim()) o.description = d.trim();
+          return o;
+        });
+      }
+      return field;
+    });
+    onCreate({ ...data, input_schema });
+  };
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth
       slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
-      <DialogTitle>New Agent</DialogTitle>
-      <DialogContent dividers sx={{ borderColor: "divider" }}>
-        <Grid container spacing={2} sx={{ mt: 0.5 }}>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField fullWidth size="small" label="Key (slug, unique)" required
-              value={data.key} onChange={(e) => setData({ ...data, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+      <DialogTitle sx={{ pb: 0 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 18 }}>New Agent</Typography>
+        <Stepper activeStep={step} sx={{ mt: 2, mb: 0 }}>
+          <Step><StepLabel>Agent Details</StepLabel></Step>
+          <Step><StepLabel>Input Schema</StepLabel></Step>
+        </Stepper>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ borderColor: "divider", minHeight: 380 }}>
+
+        {/* ── Step 1: Agent Details ────────────────────────────────────── */}
+        {step === 0 && (
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField fullWidth size="small" label="Key (slug, unique)" required
+                value={data.key}
+                onChange={(e) => setData({ ...data, key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") })}
+                helperText="snake_case, used internally"
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField fullWidth size="small" label="Display Name" required
+                value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: "text.secondary" }}>Group</InputLabel>
+                <Select value={data.group_key} label="Group"
+                  onChange={(e) => {
+                    const g = existingGroups.find((x) => x.key === e.target.value);
+                    setData({ ...data, group_key: e.target.value, group_label: g?.label || e.target.value });
+                  }}
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                  {existingGroups.map((g) => <MenuItem key={g.key} value={g.key}>{g.label}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField fullWidth size="small" label="Domain / Specialty"
+                placeholder="e.g. Cloud Security, IAM, Threat Intel"
+                value={data.domain} onChange={(e) => setData({ ...data, domain: e.target.value })}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="Description"
+                placeholder="One-line summary shown on the agent card"
+                value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="Objective"
+                placeholder="What does this agent produce? (shown in detail panel)"
+                value={data.objective} onChange={(e) => setData({ ...data, objective: e.target.value })}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <TextField fullWidth size="small" label="System Prompt" multiline minRows={5}
+                placeholder="The AI instructions — role, expertise, methodology, conduct rules…"
+                value={data.system_prompt} onChange={(e) => setData({ ...data, system_prompt: e.target.value })}
+                slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            </Grid>
           </Grid>
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField fullWidth size="small" label="Display Name" required
-              value={data.name} onChange={(e) => setData({ ...data, name: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
-          </Grid>
-          <Grid size={{ xs: 12 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel sx={{ color: "text.secondary" }}>Group</InputLabel>
-              <Select value={data.group_key} label="Group"
-                onChange={(e) => {
-                  const g = existingGroups.find((x) => x.key === e.target.value);
-                  setData({ ...data, group_key: e.target.value, group_label: g?.label || e.target.value });
-                }}
-                sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                {existingGroups.map((g) => <MenuItem key={g.key} value={g.key}>{g.label}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12 }}>
-            <TextField fullWidth size="small" label="Description"
-              value={data.description} onChange={(e) => setData({ ...data, description: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary" } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
-          </Grid>
-          <Grid size={{ xs: 12 }}>
-            <TextField fullWidth size="small" label="System Prompt" multiline minRows={4}
-              value={data.system_prompt} onChange={(e) => setData({ ...data, system_prompt: e.target.value })}
-              slotProps={{ inputLabel: { sx: { color: "text.secondary" } }, htmlInput: { style: { color: "text.primary", fontFamily: "monospace", fontSize: 12 } } }}
-              sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
-          </Grid>
-        </Grid>
+        )}
+
+        {/* ── Step 2: Input Schema Builder ─────────────────────────────── */}
+        {step === 1 && (
+          <Box>
+            <Alert severity="info" sx={{ mb: 2, fontSize: 13 }}>
+              Define what information the wizard will collect when someone runs this agent.
+              Fields appear in order — drag to reorder. Leave empty to skip the wizard entirely.
+            </Alert>
+
+            {fields.map((field, i) => (
+              <SchemaFieldEditor
+                key={field.id}
+                field={field}
+                accentColor={accentColor}
+                onChange={(updated) => setFields((fs) => fs.map((f) => f.id === field.id ? updated : f))}
+                onDelete={() => setFields((fs) => fs.filter((f) => f.id !== field.id))}
+              />
+            ))}
+
+            {/* Quick-add buttons */}
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+              {FIELD_TYPE_OPTIONS.map((opt) => (
+                <Button key={opt.value} size="small" variant="outlined"
+                  startIcon={<Add sx={{ fontSize: 14 }} />}
+                  onClick={() => setFields((fs) => [...fs, mkField(opt.value)])}
+                  sx={{ fontSize: 11, borderColor: "divider", color: "text.secondary",
+                    "&:hover": { borderColor: accentColor, color: accentColor } }}>
+                  {opt.label}
+                </Button>
+              ))}
+            </Box>
+
+            {fields.length === 0 && (
+              <Typography variant="body2" sx={{ color: "text.disabled", mt: 2, textAlign: "center" }}>
+                No fields — the wizard will not appear when running this agent.
+              </Typography>
+            )}
+          </Box>
+        )}
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
+
+      <DialogActions sx={{ p: 2, gap: 1 }}>
         <Button onClick={onClose} sx={{ color: "text.secondary" }}>Cancel</Button>
-        <Button variant="contained" disabled={!data.key || !data.name}
-          onClick={() => onCreate(data)}>Create</Button>
+        <Box sx={{ flex: 1 }} />
+        {step > 0 && (
+          <Button startIcon={<ArrowBack />} onClick={() => setStep(0)} sx={{ color: "text.secondary" }}>
+            Back
+          </Button>
+        )}
+        {step === 0 && (
+          <Button variant="contained" disabled={!step1Valid} endIcon={<ArrowForward />}
+            onClick={() => setStep(1)}
+            sx={{ bgcolor: accentColor, "&:hover": { bgcolor: accentColor, filter: "brightness(0.9)" } }}>
+            Next: Input Schema
+          </Button>
+        )}
+        {step === 1 && (
+          <Button variant="contained" disabled={!step2Valid}
+            startIcon={<Add />} onClick={handleCreate}
+            sx={{ bgcolor: "#34A853", "&:hover": { bgcolor: "#34A853", filter: "brightness(0.9)" } }}>
+            Create Agent
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );
