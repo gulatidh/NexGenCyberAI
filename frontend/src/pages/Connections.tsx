@@ -41,10 +41,6 @@ const PLATFORM_TYPES = new Set<ConnectorType>([
   "containers", "github", "jira",
 ]);
 
-const ENTERPRISE_SCANNER_TYPES = new Set<ConnectorType>([
-  "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
-]);
-
 // All scanner types — inbuilt (GitHub Actions) + enterprise (direct API)
 const ALL_SCANNER_TYPES = new Set<ConnectorType>([
   "web", "semgrep", "codeql", "nmap", "trivy", "owasp_dc", "gitleaks", "trufflehog",
