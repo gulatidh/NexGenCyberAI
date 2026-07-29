@@ -1351,6 +1351,84 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "scan", "label": "Scan (optional)", "required": False},
         {"type": "custom_prompt", "label": "Network topology notes", "required": False},
     ],
+    # VM Governance — 3-tier reporting
+    "vm_governance_synthesizer": [
+        {
+            "type": "select",
+            "label": "Report Tier",
+            "required": True,
+            "description": "Select the audience and format for this report",
+            "options": [
+                {
+                    "value": "operational",
+                    "label": "Operational",
+                    "description": "Weekly — VM team: finding counts, SLA breaches, in-flight remediation, patch throughput",
+                },
+                {
+                    "value": "management",
+                    "label": "Management",
+                    "description": "Monthly — CISOs & IT Directors: MTTR trends, SLA compliance rate, exception backlog aging",
+                },
+                {
+                    "value": "board",
+                    "label": "Board / Audit",
+                    "description": "Quarterly — Board & Audit committee: posture trend, critical finding coverage, top 5 risks by business impact",
+                },
+            ],
+        },
+        {
+            "type": "scan",
+            "label": "Scan data (optional)",
+            "required": False,
+            "description": "Select a completed scan to pull VM findings from",
+        },
+        {
+            "type": "text_context",
+            "label": "VM metrics / data",
+            "required": False,
+            "description": "Paste MTTR numbers, SLA breach counts, exception backlog, finding counts by severity, asset count, or any VM KPI data. Used when no scan is selected.",
+        },
+        {
+            "type": "custom_prompt",
+            "label": "Reporting period & context",
+            "required": False,
+            "description": "e.g. 'Q3 2025, 12,400 assets, financial services, PCI DSS scope, MTTR critical: 18h vs 24h SLA'",
+        },
+    ],
+    # VM Operations
+    "vm_operations_synthesizer": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "VM scan output to convert into operational work queues"},
+        {"type": "custom_prompt", "label": "Team / asset owner context", "required": False, "description": "e.g. team names, asset groups, escalation contacts"},
+    ],
+    # VM Capacity
+    "vm_capacity_analyst": [
+        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Current scan data for capacity baseline"},
+        {"type": "text_context", "label": "VM team & asset data", "required": False, "description": "Paste headcount, patch throughput rate, asset growth projections, exception backlog size"},
+        {"type": "custom_prompt", "label": "Planning horizon & constraints", "required": False, "description": "e.g. '6-month forecast, team of 4, 8,000 assets growing 20% YoY'"},
+    ],
+    # Crown jewel adjacency
+    "crown_jewel_adjacency_analyst": [
+        {"type": "scan", "label": "Scan", "required": True, "description": "Vulnerability scan to score by crown jewel adjacency"},
+        {"type": "text_context", "label": "Crown jewel asset list", "required": False, "description": "Paste critical asset names, IPs, or resource IDs — the analyst will weight paths to these"},
+        {"type": "custom_prompt", "label": "Adjacency context", "required": False, "description": "e.g. 'domain controller at 10.0.0.5, payment DB at rds-prod-001'"},
+    ],
+    # Board-level reporting
+    "board_packet_translator": [
+        {
+            "type": "select",
+            "label": "Report Format",
+            "required": True,
+            "description": "Target audience for the board packet",
+            "options": [
+                {"value": "board_narrative", "label": "Board Narrative", "description": "Risk-framed prose for non-technical board members"},
+                {"value": "audit_committee", "label": "Audit Committee", "description": "Control effectiveness evidence with regulatory framing"},
+                {"value": "executive_summary", "label": "Executive Summary", "description": "1-page CISO briefing with key metrics and trend indicators"},
+            ],
+        },
+        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Findings to translate into board language"},
+        {"type": "text_context", "label": "Security metrics / KPIs", "required": False, "description": "Paste MTTR, incident counts, risk scores, compliance rates, or any dashboard data"},
+        {"type": "custom_prompt", "label": "Business context", "required": False, "description": "e.g. 'Q4 2025, financial services, upcoming PCI audit in March, recent ransomware incident in sector'"},
+    ],
 }
 
 

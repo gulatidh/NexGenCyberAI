@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
@@ -6,10 +7,11 @@ import {
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Switch, IconButton, Tooltip, Drawer, Divider, LinearProgress, Collapse,
-  Avatar,
+  Avatar, RadioGroup, FormControlLabel, Radio, FormLabel,
 } from "@mui/material";
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
+  CloudUpload, OpenInNew,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi } from "../services/api";
@@ -49,11 +51,18 @@ interface Agent {
   input_schema?: InputField[];
 }
 
+interface SelectOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
 interface InputField {
-  type: "scan" | "framework" | "custom_prompt" | "text_context";
+  type: "scan" | "framework" | "custom_prompt" | "text_context" | "select";
   label: string;
   required: boolean;
   description?: string;
+  options?: SelectOption[];
 }
 
 interface AgentGroup { key: string; label: string; agents: Agent[]; }
@@ -333,19 +342,28 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
   onRunLegacy: (scanId: string, framework: string) => void;
   onRunCatalog: (agentId: string, prompt: string, scanId: string) => void;
 }) {
+  const navigate = useNavigate();
   const schema = agent.input_schema?.length ? agent.input_schema : DEFAULT_SCHEMA;
 
   const [scanId, setScanId] = useState("");
   const [framework, setFramework] = useState("nist_csf");
   const [customPrompt, setCustomPrompt] = useState("");
   const [textContext, setTextContext] = useState("");
+  // keyed by field index for select-type fields
+  const [selectValues, setSelectValues] = useState<Record<number, string>>({});
 
-  const canRun = schema.every((f) => {
+  // Detect data gaps: required scan field but no completed scans exist
+  const needsScan = schema.some((f) => f.type === "scan" && f.required);
+  const hasScanData = scans.length > 0;
+  const missingRequiredScan = needsScan && !hasScanData && !textContext.trim();
+
+  const canRun = !missingRequiredScan && schema.every((f, i) => {
     if (!f.required) return true;
-    if (f.type === "scan") return !!scanId;
+    if (f.type === "scan") return !!scanId || !!textContext.trim();
     if (f.type === "framework") return !!framework;
     if (f.type === "custom_prompt") return !!customPrompt.trim();
     if (f.type === "text_context") return !!textContext.trim();
+    if (f.type === "select") return !!selectValues[i];
     return true;
   });
 
@@ -354,7 +372,14 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
       onRunLegacy(scanId, framework);
     } else {
       const parts: string[] = [];
-      if (textContext.trim()) parts.push(`Context:\n${textContext.trim()}`);
+      // Include select field choices as structured context
+      schema.forEach((f, i) => {
+        if (f.type === "select" && selectValues[i]) {
+          const opt = f.options?.find((o) => o.value === selectValues[i]);
+          parts.push(`${f.label}: ${opt?.label || selectValues[i]}${opt?.description ? ` — ${opt.description}` : ""}`);
+        }
+      });
+      if (textContext.trim()) parts.push(`Data / Context:\n${textContext.trim()}`);
       if (customPrompt.trim()) parts.push(customPrompt.trim());
       onRunCatalog(agent.id, parts.join("\n\n"), scanId);
     }
@@ -388,22 +413,97 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
           <Typography variant="body2" sx={{ color: "text.secondary" }}>{agent.description}</Typography>
         )}
 
+        {/* Data availability alert — shown when scan is required but none exist */}
+        {needsScan && !hasScanData && (
+          <Alert severity="warning" sx={{ fontSize: 13 }}
+            action={
+              <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                onClick={() => { onClose(); navigate("/platform/scans"); }}>
+                Import data
+              </Button>
+            }>
+            <strong>No completed scans found.</strong> You can paste your data in the text field below,
+            or import scan data first.
+          </Alert>
+        )}
+
         {schema.map((field, i) => {
-          if (field.type === "scan") return (
-            <FormControl key={i} fullWidth size="small">
-              <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
-              <Select value={scanId} label={field.label + (field.required ? " *" : "")}
-                onChange={(e) => setScanId(e.target.value)}>
-                {!field.required && <MenuItem value="">— none —</MenuItem>}
-                {scans.filter((s) => s.status === "completed" || (s as any).is_live !== false)
-                  .map((s) => <MenuItem key={s.id} value={s.id}>{s.name || s.id.slice(0, 8)}</MenuItem>)}
-              </Select>
+          // ── Select (radio group with visible descriptions) ──────────────────
+          if (field.type === "select") return (
+            <Box key={i}>
+              <FormLabel sx={{ fontSize: 13, color: "text.secondary", mb: 0.5, display: "block" }}>
+                {field.label}{field.required ? " *" : ""}
+              </FormLabel>
               {field.description && (
-                <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
+                  {field.description}
+                </Typography>
               )}
-            </FormControl>
+              <RadioGroup value={selectValues[i] || ""}
+                onChange={(e) => setSelectValues((v) => ({ ...v, [i]: e.target.value }))}>
+                {(field.options || []).map((opt) => (
+                  <Box key={opt.value} onClick={() => setSelectValues((v) => ({ ...v, [i]: opt.value }))}
+                    sx={{
+                      border: 1,
+                      borderColor: selectValues[i] === opt.value ? color : "divider",
+                      borderRadius: 1, p: 1.5, mb: 1, cursor: "pointer",
+                      bgcolor: selectValues[i] === opt.value ? `${color}12` : "transparent",
+                      transition: "all 0.15s",
+                      "&:hover": { borderColor: color, bgcolor: `${color}08` },
+                    }}>
+                    <FormControlLabel
+                      value={opt.value}
+                      control={<Radio size="small" sx={{ color, "&.Mui-checked": { color } }} />}
+                      label={
+                        <Box>
+                          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{opt.label}</Typography>
+                          {opt.description && (
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              {opt.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      }
+                      sx={{ m: 0, width: "100%" }}
+                    />
+                  </Box>
+                ))}
+              </RadioGroup>
+            </Box>
           );
 
+          // ── Scan dropdown ──────────────────────────────────────────────────
+          if (field.type === "scan") {
+            if (!hasScanData) return (
+              <Alert key={i} severity="info" icon={<CloudUpload />} sx={{ fontSize: 12 }}>
+                Paste your scan/VM data in the field below, or use the "Import data" button above
+                to load findings from a scanner export (SARIF, Nessus, Burp, CSV…).
+              </Alert>
+            );
+            return (
+              <FormControl key={i} fullWidth size="small">
+                <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
+                <Select value={scanId} label={field.label + (field.required ? " *" : "")}
+                  onChange={(e) => setScanId(e.target.value)}>
+                  {!field.required && <MenuItem value="">— none —</MenuItem>}
+                  {scans.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>
+                      {s.name || s.id.slice(0, 8)}
+                      {(s as any).connector_type && (
+                        <Chip label={(s as any).connector_type} size="small"
+                          sx={{ ml: 1, height: 16, fontSize: 10 }} />
+                      )}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {field.description && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
+                )}
+              </FormControl>
+            );
+          }
+
+          // ── Framework dropdown ─────────────────────────────────────────────
           if (field.type === "framework") return (
             <FormControl key={i} fullWidth size="small">
               <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
@@ -425,6 +525,7 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
             </FormControl>
           );
 
+          // ── Text context (paste data) ──────────────────────────────────────
           if (field.type === "text_context") return (
             <TextField key={i} fullWidth size="small" multiline minRows={4}
               label={field.label + (field.required ? " *" : "")}
@@ -432,6 +533,7 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
               value={textContext} onChange={(e) => setTextContext(e.target.value)} />
           );
 
+          // ── Custom prompt ──────────────────────────────────────────────────
           if (field.type === "custom_prompt") return (
             <TextField key={i} fullWidth size="small" multiline minRows={3}
               label={field.label + (field.required ? " *" : "")}
@@ -443,13 +545,17 @@ function AgentRunWizard({ agent, scans, frameworks, color, onClose, onRunLegacy,
         })}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2 }}>
+      <DialogActions sx={{ p: 2, gap: 1 }}>
         <Button onClick={onClose} sx={{ color: "text.secondary" }}>Cancel</Button>
-        <Button variant="contained" disabled={!canRun} startIcon={<PlayArrow />}
-          onClick={handleRun}
-          sx={{ bgcolor: color, "&:hover": { bgcolor: color, filter: "brightness(0.9)" } }}>
-          Run Agent
-        </Button>
+        <Tooltip title={missingRequiredScan ? "Paste data above or import a scan first" : ""}>
+          <span>
+            <Button variant="contained" disabled={!canRun} startIcon={<PlayArrow />}
+              onClick={handleRun}
+              sx={{ bgcolor: color, "&:hover": { bgcolor: color, filter: "brightness(0.9)" } }}>
+              Run Agent
+            </Button>
+          </span>
+        </Tooltip>
       </DialogActions>
     </Dialog>
   );
