@@ -45,6 +45,13 @@ const ENTERPRISE_SCANNER_TYPES = new Set<ConnectorType>([
   "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
 ]);
 
+// All scanner types — inbuilt (GitHub Actions) + enterprise (direct API)
+const ALL_SCANNER_TYPES = new Set<ConnectorType>([
+  "web", "semgrep", "codeql", "nmap", "trivy", "owasp_dc", "gitleaks", "trufflehog",
+  "ai_code_review",
+  "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
+]);
+
 const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   azure: "cloud", aws: "cloud", gcp: "cloud", onprem: "cloud",
   servicenow: "cloud", okta: "cloud", cyberark: "cloud", entraid: "cloud",
@@ -372,7 +379,7 @@ export default function Connections() {
   // ── Derived lists ────────────────────────────────────────────────────────────
   const platformConnectors = connectors.filter((c) => PLATFORM_TYPES.has(c.connector_type));
   // Scanner tab: only enterprise scanner connectors (other scanners run via GitHub Actions, no saved connector needed)
-  const scannerConnectors = connectors.filter((c) => ENTERPRISE_SCANNER_TYPES.has(c.connector_type));
+  const scannerConnectors = connectors.filter((c) => ALL_SCANNER_TYPES.has(c.connector_type));
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -458,7 +465,7 @@ export default function Connections() {
     if (DISABLED_CONNECTOR_TYPES.has(k)) return false;
     if (editing) return true;
     if (addMode === "platform") return PLATFORM_TYPES.has(k as ConnectorType);
-    if (addMode === "scanner")  return ENTERPRISE_SCANNER_TYPES.has(k as ConnectorType);
+    if (addMode === "scanner")  return ALL_SCANNER_TYPES.has(k as ConnectorType);
     return true;
   });
 
@@ -665,7 +672,7 @@ export default function Connections() {
           <Button
             variant="outlined" size="small" startIcon={<Add />}
             onClick={() => openAdd("platform")}
-            disabled={!selectedClientId || projects.length === 0}
+            disabled={!selectedClientId}
             sx={{
               borderColor: "#4285F4", color: "#4285F4", fontSize: 12, flexShrink: 0,
               "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
@@ -726,7 +733,7 @@ export default function Connections() {
           <Button
             variant="outlined" size="small" startIcon={<Add />}
             onClick={() => openAdd("scanner")}
-            disabled={!selectedClientId || projects.length === 0}
+            disabled={!selectedClientId}
             sx={{
               borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12,
               "&:hover": { bgcolor: "rgba(156,39,176,0.08)" },
