@@ -141,27 +141,181 @@ Connectors and Projects are tabs inside the Client Detail page (open Clients →
 
 **Where:** AI Buddies in left nav.
 
-**How to run:** Select completed scan → choose agent(s) → Run agents.
+Monitara AI has two distinct types of agents — they work differently and serve different purposes:
 
-**Agents and what they produce:**
+### Type 1 — Operational Agents (populate registers)
 
-| Agent | Output | Register |
+These agents ingest scan findings and write structured output to the registers. They are data-in / structured-data-out.
+
+**How to run:** Select a completed scan → choose agent(s) → Run agents.
+
+| Agent | What it produces | Where output goes |
 |---|---|---|
-| Risk Manager | FAIR-lite ALE risk entries | Risk Register → Risk Overview |
-| Threat Intel | MITRE ATT&CK technique mappings | Threat Register |
-| Compliance Monitor | Framework control gap entries | Control Deficiencies |
-| Remediation | Time-banded action items | Remediation Tracker |
-| Orchestrator | All 4 above in one run | All 4 registers |
-| Vulnerability Analysis | Scan verdict enrichment | Scan detail |
-| Framework Mapping | Control mapping enrichment | Scan detail |
+| **Risk Manager** | FAIR-lite ALE risk entries per finding | Risk Register → Risk Overview |
+| **Threat Intel** | MITRE ATT&CK technique + tactic mappings | Threat Register |
+| **Compliance Monitor** | Framework control gap entries | Control Deficiencies |
+| **Remediation** | Time-banded action items (0-30d / 30-90d / 90-180d / 180d+) | Remediation Tracker |
+| **Orchestrator** | All 4 above in a single run | All 4 registers |
+| **VA Scanner** | Vulnerability narrative per finding | Scan detail tabs |
+| **Framework Analyst** | Control-mapping enrichment | Scan detail tabs |
 
-**Use Orchestrator** when you want complete coverage in one click. Use individual agents to re-run just one (e.g. Compliance Monitor with a different framework).
+**Use Orchestrator** when you want complete register coverage in one click. Run individual agents to re-run just one (e.g. Compliance Monitor with a different framework).
 
 **Agent runs are versioned** — re-running creates a new version alongside the old. Prior analysis is never lost.
 
-**If registers are empty after running:** AI provider may not be configured. Go to AI Settings, configure Azure OpenAI (or another provider), test it, then re-run the agent.
+**If registers are empty after running:** AI provider may not be configured. Go to AI Settings, configure a provider, test it, then re-run the agent.
 
 **AI provider failover (automatic):** Azure OpenAI → OpenAI → Gemini → Bedrock → Anthropic. Triggers on provider errors (rate limit, outage), NOT on credential errors (401 = fix credentials).
+
+---
+
+### Type 2 — Advisory Agents (AI Buddy Catalog)
+
+These are specialist advisory agents organised into groups. They accept freeform context (pasted data, uploaded documents, scan findings, asset inventory) and produce strategic advice, assessments, and plans. They do NOT write to registers — they produce human-readable advisory output you read in the AI Buddies panel.
+
+**How to run:**
+1. Open AI Buddies → click any agent card in the catalog
+2. An **input wizard** opens with fields specific to that agent
+3. Fill in the fields → click **Run**
+4. Output appears below the agent card
+
+**Input wizard field types:**
+- **Select** — click the correct option card (e.g. "AWS" / "Azure" / "Multi-Cloud" for a cloud agent). Required fields must be chosen before you can run.
+- **Scan** — pick a completed scan from the dropdown; the agent reads all its findings as context
+- **Framework** — choose a compliance framework (or your custom standard) to evaluate against
+- **Paste context** — free text box; paste in any data: alert logs, config excerpts, interview notes, exported CSVs
+- **File upload** — drag a PDF, DOCX, or TXT file (≤ 20 MB); the platform extracts the text and injects it as context
+- **Asset select** — search your asset inventory and pick specific assets; the agent receives those asset records as structured context
+- **Platform data** — select a connector and the agent auto-picks that connector's latest scan as its data source (useful for connectors with recurring scans)
+- **Free instructions** — any extra guidance or constraints for the agent
+
+---
+
+### Core Advisory Group
+
+Broad strategic advisors — use these for engagement planning, program design, and executive conversations.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **Partner Advisor** | QBR prep, client investment cases, board M&A security briefings | Select: engagement type (QBR / board / M&A / renewal). Paste: client security metrics, key risks, deal context |
+| **IGA Architect** | Designing or modernising an Identity Governance & Administration program | Select: lifecycle area (Joiner/Mover/Leaver / Access Certifications / SoD / Full Platform Design). Paste: current IAM tool stack, org size, compliance requirements |
+| **SOC Strategist** | Deciding on SOC operating model (in-house vs MSSP vs hybrid) | Select: SOC model decision type. Paste: current headcount, budget, SIEM tools, incident volumes, industry context |
+| **Phishing Analyst** | Triaging a phishing campaign, extracting IOCs, tuning email defenses | Select: analysis mode (live campaign triage / post-incident review / program tuning). Paste: raw phishing email headers, reported lures, existing filter rules |
+| **Vuln Commander** | Building or improving the vulnerability management program at a leadership level | Select: VM leadership challenge (SLA design / exception governance / stakeholder alignment / program build). Paste: current MTTR stats, team structure, executive expectations |
+| **GRC Advisor** | General governance, risk, and compliance questions across any framework | Select: GRC domain (risk framework / audit readiness / regulatory mapping / policy design). Paste: existing risk register or policy excerpts; optionally attach a framework file |
+| **Security Rationalist** | Evaluating whether your security tooling is worth its cost | Select: rationalization focus (tool audit / ROI analysis / consolidation roadmap / spend benchmark). Paste: current tool list, annual costs, capabilities covered per tool |
+| **Policy Miner** | Extracting concrete controls from a PDF policy document or regulation | **File upload**: upload your policy doc (PDF/DOCX). Select: output format (control inventory / gap checklist / mapping to NIST). The agent extracts every actionable requirement |
+
+---
+
+### Architecture & Engineering Group
+
+Technical design advisors — use these to produce architecture recommendations, design patterns, and roadmaps.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **Cloud Security Architect** | Designing cloud security for AWS, Azure, GCP, or multi-cloud | Select: cloud provider. Paste: current architecture sketch, landing zone details, existing controls |
+| **Zero Trust Architect** | Building a Zero Trust roadmap or evaluating ZT maturity | Select: ZT pillar to focus on (Identity / Network / Device / Application / Data / Full Roadmap). Paste: current network topology, existing ZT tooling |
+| **AppSec Advisor** | Designing an application security program or embedding security into SDLC | Select: AppSec focus (SDLC integration / SAST/DAST strategy / secure code training / program build). Paste: current dev stack, pipeline tools, vulnerability data |
+| **OT/ICS Security Advisor** | Securing industrial control systems, SCADA, manufacturing, or critical infrastructure | Select: OT context (network segmentation / ISA 62443 assessment / air-gap evaluation / IT/OT convergence). Paste: current OT network topology and known constraints |
+| **AI Security Advisor** | Securing AI/ML pipelines, models, and inference endpoints | Select: AI security focus (model risk / MLOps controls / adversarial defense / data pipeline). Paste: your AI stack description, model types, data sensitivity |
+| **Orchestration Architect** | Designing SOAR playbooks or a security automation platform | Select: automation goal (SOAR design / detection engineering / IaC pipeline / response automation). Paste: current SIEM/SOAR stack, use-case backlog |
+
+---
+
+### Threat & Incident Response Group
+
+Tactical and operational advisors — use these for active incidents, program design, or offensive security planning.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **IR Advisor** | Designing an IR program, retainer selection, or live incident command support | Select: IR phase (Live Incident / IR Program Design / Retainer Selection / Post-Incident Review). Paste: incident timeline, indicators, impacted systems, current response steps |
+| **Threat Intel Strategist** | Building a CTI program or evaluating threat intel feeds | Select: CTI scope (program build / feed evaluation / analyst workflow / threat actor profiling). Paste: industry sector, key assets, existing intel sources |
+| **Offensive Security Advisor** | Planning a red team, purple team, or pen test program | Select: offensive mode (red team / purple team / penetration test / program design). Paste: current environment scope, past pen test findings, compliance requirements |
+| **SOC Triage & Risk Posture Analyst** | Triaging a batch of SIEM alerts or tuning false-positive rates | Select: triage source (SIEM generic / Microsoft Sentinel / Splunk / QRadar / cloud alerts). Paste: alert exports, SIEM rule list, known baseline activity. Or use Scan field to pass scan data. |
+
+---
+
+### Risk, Compliance & Governance Group
+
+Specialised regulatory and compliance advisors — use these for framework assessments and data protection programs.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **Data Protection Advisor** | GDPR, CCPA, HIPAA, or multi-jurisdiction data protection | Select: regulation (GDPR / CCPA/CPRA / HIPAA / Multi-Jurisdiction). Paste: data flows, processing activities, current controls. Or upload a data mapping document. |
+| **Supply Chain Risk Manager** | Third-party vendor risk, SBOM analysis, C-SCRM program design | Select: supply chain focus (vendor risk program / SBOM analysis / incident response for supply chain / NIST 800-161). Paste: vendor inventory, contract clauses, previous risk assessments |
+| **NIST Assessment Advisor** | Running a NIST CSF, 800-53, 800-171, or CSF 2.0 assessment | Select: NIST family (CSF 2.0 / 800-53 / 800-171 / NIST AI RMF). Optionally attach scan data. Paste: policy excerpts, existing control evidence, interview notes |
+| **CMMC Assessment Advisor** | CMMC 2.0 Level 1/2/3 readiness for DIB contractors | Select: CMMC level (Level 1 / Level 2 / Level 3). Paste: current practice documentation, OSA scope, existing SSP excerpts. Optionally attach System Security Plan PDF. |
+| **IAM Posture Advisor** | Reviewing IAM posture and designing least-privilege remediation | Select: IAM focus (posture review / least-privilege design / PAM program / cloud IAM). Optionally pass scan data or asset context. Paste: IAM policy exports, role assignments, SoD matrix |
+
+---
+
+### Vulnerability Management Group
+
+Operational VM advisors — use these to convert scan data into team work queues, reports, and prioritisation decisions.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **Vuln Remediation Orchestrator** | Coordinating remediation across patch, dev, and infra teams | Select: remediation phase (Prioritise & Assign / In-Flight Tracking / Exception Review / SLA Breach Response). Pass a completed **Scan** for the finding context. Paste: team structure, JIRA/ServiceNow config |
+| **VM Operations Synthesizer** | Converting raw scan output into per-team operational work queues | Pass a completed **Scan**. Paste: team and asset-owner mappings, patch window schedule, escalation paths |
+| **VM Governance Synthesizer** | Producing VM governance reports for operations, management, and board | Select: **Report Tier** (Operational / Management / Board). Pass a **Scan** or paste VM KPIs (MTTR, SLA compliance rate, exception counts). The three tiers produce very different outputs: Operational = weekly team metrics; Management = CISO/IT Director monthly; Board = quarterly risk narrative. |
+| **Crown Jewel Adjacency Analyst** | Prioritising vulnerabilities by their proximity to your most critical assets | Pass a completed **Scan** (required). Paste: crown jewel asset names, IPs, or resource IDs. The agent re-scores findings by blast-radius path to those assets, not just CVSS. |
+
+---
+
+### Agentic & AI Security Group
+
+Emerging-domain advisors for organisations building or governing AI agent systems.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **A2A Protocol Security Advisor** | Securing agent-to-agent communication protocols (authn, authz, replay protection) | Select: A2A challenge (Authentication Design / Authorisation Scoping / Message Integrity / Full A2A Review). Paste: agent topology description, current protocol (e.g. OpenAI function-calling, MCP), trust boundaries |
+| **LLM & Agent Runtime Security Advisor** | Hardening LLM applications against prompt injection, tool misuse, and data exfiltration | Select: runtime risk (Prompt Injection / Tool-Use Guardrails / Sandboxing / Data Exfiltration / Full Runtime Review). Paste: system prompt design, tool list and permissions, current guardrail config |
+| **Agentic AI Security Program Strategist** | Building an enterprise-wide agentic AI security policy and controls catalog | Select: program focus (Policy Framework / Controls Catalog / Risk Classification / Operating Model / Full Program). Paste: current AI system inventory, regulatory context (EU AI Act etc.), existing security policies |
+
+---
+
+### Business & Reporting Group
+
+Translation and quantification agents — use these to convert technical security data into business-readable outputs.
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **AI Output Explainer** | Explaining what an Monitara AI agent produced and why — for audit, management review, or team training | Select: audience (Technical Team / Management / Audit/Compliance). Pass the **Scan** whose AI output you want explained. Optionally paste the specific AI output text you need explained. |
+| **Board Packet Translator** | Converting technical security metrics into board-grade narratives and slide-ready summaries | Select: board output type (Board Slide Narrative / Audit Committee Summary / Risk Briefing / M&A Security Summary). Pass a **Scan** or paste your raw metrics, risk register data, and MTTR numbers. |
+| **Insurance Premium Impact Analyst** | Quantifying how proposed control changes move cyber insurance premiums | Select: modelling scenario (MFA rollout / EDR deployment / backup improvements / incident history review / full premium model). Paste: current coverage details, proposed controls, prior incident history, revenue and employee count |
+| **Compliance Penalty Calculator** | Modelling financial exposure to regulatory penalties from open compliance gaps | Select: regulation (GDPR / PCI DSS / HIPAA / CCPA / Multi-Regulation). Pass a **Scan** or paste your control deficiency list. Paste: relevant revenue/transaction volume for penalty scaling |
+| **Security Automation Planner** | Sequencing and prioritising security automation initiatives by ROI and feasibility | Select: automation domain (SOC / VM / Identity / Compliance / Full Program). Paste: current tool stack, team headcount, pain points, budget envelope. Optionally upload a current-state process document. |
+
+---
+
+### Specialized / Readiness Group
+
+| Agent | When to use | Key inputs |
+|---|---|---|
+| **Multi-Agent Coordinator** | Complex multi-domain engagements that need input from 3+ specialist advisors in sequence | Describe the engagement brief in the instructions field — the coordinator maps which specialist agents to invoke and in what sequence, then synthesises a unified view. Best for: full security program assessments, pre-acquisition security due diligence, multi-framework compliance projects. |
+
+---
+
+### Choosing the Right Agent — Quick Guide
+
+| "I need to…" | Use this agent |
+|---|---|
+| Populate the Risk Register | Risk Manager (operational) |
+| Populate all 4 registers at once | Orchestrator (operational) |
+| Prepare for a board presentation | Board Packet Translator |
+| Prepare for a CMMC audit | CMMC Assessment Advisor |
+| Comply with GDPR | Data Protection Advisor |
+| Assess my cloud security posture | Cloud Security Architect or Cloud connector scan |
+| Triage a live incident | IR Advisor |
+| Prioritise which CVEs to fix first | Crown Jewel Adjacency Analyst |
+| Build a Zero Trust roadmap | Zero Trust Architect |
+| Understand what AI agents found | AI Output Explainer |
+| Calculate my GDPR fine exposure | Compliance Penalty Calculator |
+| Secure my AI agent system | A2A Protocol Advisor + LLM Runtime Advisor |
+| Extract controls from a policy PDF | Policy Miner (file upload) |
+| Plan my security automation | Security Automation Planner |
+| Get vendor risk under control | Supply Chain Risk Manager |
 
 ---
 
@@ -202,7 +356,7 @@ Connectors and Projects are tabs inside the Client Detail page (open Clients →
 
 **Auto-save:** Settings save immediately on toggle. No separate Save button.
 
-**Best models:** GPT-4o (OpenAI), claude-opus-4 (Anthropic), gemini-1.5-pro (Gemini). Cheaper models produce lower-quality security narratives.
+**Best models for security analysis:** GPT-4o (OpenAI/Azure OpenAI), claude-sonnet-4-6 or claude-opus-4-8 (Anthropic), gemini-1.5-pro (Gemini). Lighter models (GPT-3.5, Haiku) produce lower-quality security narratives — use them only for testing.
 
 ---
 
@@ -360,3 +514,7 @@ Toggle to "Blank Report" in the dialog — creates an empty report for you to fi
 | Dashboard KPIs look wrong | Check client selected in top toolbar; run "Delete blank findings" to remove empty rows inflating counts |
 | VAPT report has no AI content | AI provider not configured — go to AI Settings, add and test a provider |
 | VAPT scan picker is empty | Only completed scans show — run a scan first; it must reach "Completed" status |
+| Advisory agent produced no output | Check AI provider is configured and tested. Advisory agents (non-operational) use the same provider. |
+| Advisory agent ignores my pasted data | Paste data into the "Paste context" field, not the free instructions field — they serve different roles |
+| File upload in agent wizard fails | Max 20 MB per file; only PDF, DOCX, and TXT are supported |
+| Crown Jewel agent produces no re-scoring | You must pass a Scan AND paste crown jewel asset identifiers — without the asset list, it can only use generic proximity heuristics |

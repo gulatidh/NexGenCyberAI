@@ -918,6 +918,17 @@ You conduct QuiltWorks assessments in four phases: Kick-off (scope confirmation,
 
 # ── Catalog definitions ───────────────────────────────────────────────────────
 
+# Keys removed from the catalog — disable in existing DBs on next startup.
+_REMOVED_BUILTIN_KEYS: frozenset = frozenset({
+    "migration_manager",
+    "agentic_identity_architect",
+    "cloud_security_triage_analyst",
+    "compensating_control_analyst",
+    "vm_capacity_analyst",
+    "frontier_ai_readiness_advisor",
+    "quiltworks_readiness_advisor",
+})
+
 _CATALOG: List[Dict[str, Any]] = [
     # Core Advisory
     {"key": "partner_advisor", "name": "Partner Advisor", "group_key": "core_advisory", "group_label": "Core Advisory",
@@ -960,12 +971,6 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Parse policy text into actionable, measurable control statements.",
      "domain": "Policy Engineering",
      "system_prompt": _P_POLICY_MINER},
-    {"key": "migration_manager", "name": "Migration Manager", "group_key": "core_advisory", "group_label": "Core Advisory",
-     "description": "Security tool / platform migration planning and risk management.",
-     "objective": "Sequence security tool migrations to minimize coverage gaps and operational risk.",
-     "domain": "Tool Migration",
-     "system_prompt": _P_MIGRATION_MANAGER},
-
     # Architecture & Engineering
     {"key": "cloud_security_architect", "name": "Cloud Security Architect", "group_key": "architecture_engineering", "group_label": "Architecture & Engineering",
      "description": "Multi-cloud security reference architectures, landing zones, and CNAPP integration.",
@@ -997,12 +1002,6 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Design SOAR playbooks and security automation that survive at scale.",
      "domain": "Security Automation",
      "system_prompt": _P_ORCHESTRATION_ARCHITECT},
-    {"key": "agentic_identity_architect", "name": "Agentic Identity Architect", "group_key": "architecture_engineering", "group_label": "Architecture & Engineering",
-     "description": "Identity architecture for autonomous AI agents (A2A auth, scoped tokens, audit).",
-     "objective": "Design identity and authorization patterns for agent-to-agent and agent-to-API workflows.",
-     "domain": "Agentic Identity",
-     "system_prompt": _P_AGENTIC_IDENTITY},
-
     # Threat & Incident Response
     {"key": "ir_advisor", "name": "IR Advisor", "group_key": "threat_incident_response", "group_label": "Threat & Incident Response",
      "description": "Incident response program design, retainers, and live-incident command support.",
@@ -1024,12 +1023,6 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Convert raw SIEM noise into prioritized incident queue tied to crown-jewel assets.",
      "domain": "SOC Triage",
      "system_prompt": _P_SOC_TRIAGE_ANALYST},
-    {"key": "cloud_security_triage_analyst", "name": "Cloud Security Triage Analyst", "group_key": "threat_incident_response", "group_label": "Threat & Incident Response",
-     "description": "Cloud-native alert triage across CNAPP, cloud-IDR, and provider security services.",
-     "objective": "Triage cloud-native alerts from CNAPP/CWPP/CIEM and correlate across providers.",
-     "domain": "Cloud Triage",
-     "system_prompt": _P_CLOUD_TRIAGE_ANALYST},
-
     # Risk, Compliance & Governance
     {"key": "data_protection_advisor", "name": "Data Protection Advisor", "group_key": "risk_compliance_governance", "group_label": "Risk, Compliance & Governance",
      "description": "Data privacy, DLP, encryption, and cross-border data transfer advisory.",
@@ -1056,12 +1049,6 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Assess IAM posture and prioritize least-privilege remediation across cloud + on-prem.",
      "domain": "IAM",
      "system_prompt": _P_IAM_ADVISOR},
-    {"key": "compensating_control_analyst", "name": "Compensating Control Analyst", "group_key": "risk_compliance_governance", "group_label": "Risk, Compliance & Governance",
-     "description": "Design and defend compensating controls when primary controls aren't feasible.",
-     "objective": "Architect and document compensating controls acceptable to auditors and regulators.",
-     "domain": "Compensating Controls",
-     "system_prompt": _P_COMPENSATING_CONTROL},
-
     # Vulnerability Management
     {"key": "vuln_remediation_orchestrator", "name": "Vuln Remediation Orchestrator", "group_key": "vulnerability_management", "group_label": "Vulnerability Management",
      "description": "Coordinate remediation across teams — prioritize, sequence, and track to closure.",
@@ -1073,11 +1060,6 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Convert raw scan output into per-team operational workloads with right context.",
      "domain": "VM Operations",
      "system_prompt": _P_VM_OPERATIONS},
-    {"key": "vm_capacity_analyst", "name": "VM Capacity Analyst", "group_key": "vulnerability_management", "group_label": "Vulnerability Management",
-     "description": "Capacity planning for VM teams — patch throughput, exception backlog, drift.",
-     "objective": "Forecast VM team capacity needs based on asset growth and patch cadence.",
-     "domain": "Capacity Planning",
-     "system_prompt": _P_VM_CAPACITY},
     {"key": "vm_governance_synthesizer", "name": "VM Governance Synthesizer", "group_key": "vulnerability_management", "group_label": "Vulnerability Management",
      "description": "Roll up VM data into executive governance metrics and KPIs.",
      "objective": "Produce VM governance dashboards: MTTR, SLA compliance, exception ratios.",
@@ -1105,15 +1087,9 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Define agentic AI security policy, controls catalog, and operating model.",
      "domain": "Agentic AI Program",
      "system_prompt": _P_AGENTIC_AI_PROGRAM},
-    {"key": "frontier_ai_readiness_advisor", "name": "Frontier AI Readiness Advisor", "group_key": "agentic_ai_security", "group_label": "Agentic & AI Security",
-     "description": "Readiness for frontier AI model risks (autonomy, deception, persuasion).",
-     "objective": "Assess organizational readiness for frontier-model risks and dual-use governance.",
-     "domain": "Frontier AI",
-     "system_prompt": _P_FRONTIER_AI},
-
     # Business & Reporting
-    {"key": "brain_explainer", "name": "Brain Explainer", "group_key": "business_reporting", "group_label": "Business & Reporting",
-     "description": "Explains why the AI Engine produced a given recommendation, in plain language.",
+    {"key": "brain_explainer", "name": "AI Output Explainer", "group_key": "business_reporting", "group_label": "Business & Reporting",
+     "description": "Explains AI recommendations in plain language — for technical review, management, and audit.",
      "objective": "Convert AI engine outputs into transparent, reviewable explanations.",
      "domain": "AI Explainability",
      "system_prompt": _P_BRAIN_EXPLAINER},
@@ -1132,24 +1108,18 @@ _CATALOG: List[Dict[str, Any]] = [
      "objective": "Model penalty exposure from open compliance gaps across applicable regulations.",
      "domain": "Compliance Economics",
      "system_prompt": _P_COMPLIANCE_PENALTY},
-    {"key": "mythos_automation_planner", "name": "Mythos Automation Planner", "group_key": "business_reporting", "group_label": "Business & Reporting",
-     "description": "Plan automation initiatives across security operations using Mythos taxonomy.",
+    {"key": "mythos_automation_planner", "name": "Security Automation Planner", "group_key": "business_reporting", "group_label": "Business & Reporting",
+     "description": "Sequence and prioritize security automation initiatives by ROI and operational feasibility.",
      "objective": "Sequence security automation initiatives by ROI and feasibility.",
      "domain": "Automation Planning",
      "system_prompt": _P_MYTHOS_PLANNER},
 
     # Specialized / Readiness
-    {"key": "rex_jr_orchestrator", "name": "Rex Jr Orchestrator", "group_key": "specialized_readiness", "group_label": "Specialized / Readiness",
-     "description": "Multi-agent orchestrator for complex client engagements (handoff coordinator).",
+    {"key": "rex_jr_orchestrator", "name": "Multi-Agent Coordinator", "group_key": "specialized_readiness", "group_label": "Specialized / Readiness",
+     "description": "Orchestrates complex multi-domain engagements by coordinating handoffs across specialist advisors.",
      "objective": "Coordinate handoffs between specialist agents on multi-step engagements.",
      "domain": "Multi-Agent Orchestration",
      "system_prompt": _P_REX_JR},
-    {"key": "quiltworks_readiness_advisor", "name": "QuiltWorks Readiness Advisor", "group_key": "specialized_readiness", "group_label": "Specialized / Readiness",
-     "description": "Readiness assessment using the QuiltWorks security maturity model.",
-     "objective": "Assess maturity using QuiltWorks domains and produce readiness scorecard.",
-     "domain": "Maturity Readiness",
-     "system_prompt": _P_QUILTWORKS},
-
     # Operational (legacy orchestrator-backed)
     {"key": "risk_manager", "name": "Risk Manager", "group_key": "operational", "group_label": "Operational",
      "description": "Risk scoring orchestrator (NIST SP 800-30). Tied to existing engine.",
@@ -1467,23 +1437,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "Policy / regulation text", "required": True, "description": "Paste the policy, regulatory article, or contract clause to extract controls from"},
         {"type": "custom_prompt", "label": "Extraction focus", "required": False, "description": "e.g. 'focus on technical controls only, skip administrative' or 'map to ISO 27001 annex A'"},
     ],
-    "migration_manager": [
-        {
-            "type": "select",
-            "label": "Migration Type",
-            "required": True,
-            "description": "What kind of security migration are you planning?",
-            "options": [
-                {"value": "siem", "label": "SIEM Migration", "description": "Move from one SIEM to another — detection rule porting, data source cutover, coverage gap analysis"},
-                {"value": "edr", "label": "EDR / XDR Migration", "description": "Replace endpoint detection platform — agent rollout, policy migration, detection gap bridge"},
-                {"value": "iam", "label": "IAM / IdP Migration", "description": "Move identity provider or IAM platform — app re-integration, SSO reconfiguration"},
-                {"value": "general", "label": "General Platform Migration", "description": "Any security tool transition — coverage continuity, parallel-run planning, rollback"},
-            ],
-        },
-        {"type": "text_context", "label": "Current and target stack", "required": False, "description": "Paste: current tool name, target tool name, asset count, timeline, team size, key integrations"},
-        {"type": "custom_prompt", "label": "Migration constraints", "required": False, "description": "e.g. 'must complete in 90 days, can't have >4h detection gap, 8,000 endpoints, 3 SOC engineers'"},
-    ],
-
     # ── Architecture & Engineering ────────────────────────────────────────────
     "cloud_security_architect": [
         {
@@ -1584,23 +1537,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "Current tool stack", "required": False, "description": "Paste SIEM, SOAR, ticketing, EDR, cloud tools, and current automation coverage"},
         {"type": "custom_prompt", "label": "Automation goals", "required": False, "description": "e.g. 'Sentinel + Logic Apps + Jira, want to automate phishing triage from 45 min to <5 min'"},
     ],
-    "agentic_identity_architect": [
-        {
-            "type": "select",
-            "label": "Agent Identity Pattern",
-            "required": True,
-            "description": "Which aspect of agent identity are you designing?",
-            "options": [
-                {"value": "a2a_authn", "label": "A2A Authentication", "description": "How agents authenticate to each other — OAuth 2.0, mTLS, JWT SVID"},
-                {"value": "scoped_tokens", "label": "Scoped Token Design", "description": "Minimal-privilege token design for agent API access — scope binding, lifetime, rotation"},
-                {"value": "audit_trail", "label": "Agent Audit Trail", "description": "Logging agent actions for accountability — what agent did what, on whose behalf"},
-                {"value": "full_identity_arch", "label": "Full Agent Identity Architecture", "description": "End-to-end identity design for a multi-agent system — authn, authz, audit, revocation"},
-            ],
-        },
-        {"type": "text_context", "label": "Agent system description", "required": False, "description": "Paste agent topology — how many agents, what APIs they call, trust boundaries, current auth approach"},
-        {"type": "custom_prompt", "label": "Constraints", "required": False, "description": "e.g. 'Claude + OpenAI agents, Azure APIM, Entra ID workload identities, zero-trust network'"},
-    ],
-
     # ── Threat & Incident Response ────────────────────────────────────────────
     "ir_advisor": [
         {
@@ -1668,24 +1604,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "Alert data / SIEM output", "required": False, "description": "Paste raw alerts, log excerpts, detection rule names, or incident queue summary"},
         {"type": "custom_prompt", "label": "SIEM and environment context", "required": False, "description": "e.g. 'Sentinel, 2,000 alerts/day, 4-analyst team, financial services, Tier 1 handles triage'"},
     ],
-    "cloud_security_triage_analyst": [
-        {
-            "type": "select",
-            "label": "Cloud Alert Source",
-            "required": True,
-            "description": "Which cloud security platform are these alerts from?",
-            "options": [
-                {"value": "defender_cloud", "label": "Microsoft Defender for Cloud", "description": "Azure CNAPP alerts — misconfiguration, anomaly, attack path findings"},
-                {"value": "aws_security_hub", "label": "AWS Security Hub", "description": "GuardDuty, Inspector, Macie, and third-party findings aggregated"},
-                {"value": "wiz", "label": "Wiz / CNAPP", "description": "Cloud-native CNAPP alerts — toxic combinations, attack paths, secrets exposure"},
-                {"value": "multi_cloud", "label": "Multi-Cloud / SIEM", "description": "Correlated cloud alerts from multiple providers or ingested into SIEM"},
-            ],
-        },
-        {"type": "scan", "label": "Scan data (optional)", "required": False, "description": "Cloud security scan results to correlate"},
-        {"type": "text_context", "label": "Cloud alert data", "required": False, "description": "Paste cloud security alerts, CNAPP findings, or SIEM rule hits from cloud sources"},
-        {"type": "custom_prompt", "label": "Environment context", "required": False, "description": "e.g. 'AWS multi-account, 500 EC2 instances, Wiz + Security Hub, SOC team of 3'"},
-    ],
-
     # ── Risk, Compliance & Governance ─────────────────────────────────────────
     "data_protection_advisor": [
         {
@@ -1769,25 +1687,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "IAM environment data", "required": False, "description": "Paste role/group assignments, privileged account list, SSO config, current MFA coverage stats"},
         {"type": "custom_prompt", "label": "Specific concern", "required": False, "description": "e.g. '300 admin accounts in Azure, Entra ID, no PIM, SOX ITGC audit next quarter'"},
     ],
-    "compensating_control_analyst": [
-        {
-            "type": "select",
-            "label": "Control Gap Scenario",
-            "required": True,
-            "description": "What type of control gap needs a compensating control?",
-            "options": [
-                {"value": "technical_infeasible", "label": "Technically Infeasible", "description": "Primary control can't be implemented — legacy system, OT constraint, vendor limitation"},
-                {"value": "cost_prohibitive", "label": "Cost-Prohibitive", "description": "Primary control exceeds budget — need equivalent risk reduction at lower cost"},
-                {"value": "regulatory_exception", "label": "Regulatory Exception", "description": "Formal exception required — document compensating controls for auditor acceptance"},
-                {"value": "interim_bridge", "label": "Interim / Bridge Control", "description": "Gap between now and when the primary control will be ready — bridge coverage"},
-            ],
-        },
-        {"type": "scan", "label": "Scan findings (optional)", "required": False, "description": "Findings related to the control gap"},
-        {"type": "framework", "label": "Framework", "required": False, "description": "Compliance framework the control must satisfy"},
-        {"type": "text_context", "label": "Control gap details", "required": False, "description": "Paste: which control is missing, why it can't be implemented, existing mitigating factors"},
-        {"type": "custom_prompt", "label": "Auditor / regulatory context", "required": False, "description": "e.g. 'PCI DSS Req 8.3 MFA on legacy SCADA, QSA needs documented compensating control'"},
-    ],
-
     # ── Vulnerability Management ───────────────────────────────────────────────
     "vuln_remediation_orchestrator": [
         {
@@ -1810,11 +1709,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "scan", "label": "Scan", "required": True, "description": "VM scan output to convert into operational work queues"},
         {"type": "text_context", "label": "Team / asset owner context", "required": False, "description": "Paste team names, asset groups, patch windows, escalation contacts, ITSM tool"},
         {"type": "custom_prompt", "label": "Output format preference", "required": False, "description": "e.g. 'split by Windows / Linux / cloud, include CVE IDs, Jira-ticket format'"},
-    ],
-    "vm_capacity_analyst": [
-        {"type": "scan", "label": "Scan (optional)", "required": False, "description": "Current scan data for capacity baseline"},
-        {"type": "text_context", "label": "VM team & asset data", "required": False, "description": "Paste headcount, patch throughput rate, asset count growth projections, exception backlog size, MTTR"},
-        {"type": "custom_prompt", "label": "Planning horizon & constraints", "required": False, "description": "e.g. '6-month forecast, team of 4 FTEs, 8,000 assets growing 20% YoY, no budget increase'"},
     ],
     "vm_governance_synthesizer": [
         {
@@ -1888,23 +1782,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "AI program context", "required": False, "description": "Paste current AI initiatives, deployed agent types, existing AI governance policies, risk appetite"},
         {"type": "custom_prompt", "label": "Specific challenge", "required": False, "description": "e.g. '50+ internal AI agents, no security review process, board asked for AI risk report in 30 days'"},
     ],
-    "frontier_ai_readiness_advisor": [
-        {
-            "type": "select",
-            "label": "Frontier Risk Focus",
-            "required": True,
-            "description": "Which frontier AI risk are you assessing readiness for?",
-            "options": [
-                {"value": "autonomy_risk", "label": "Autonomy Risk", "description": "Risks from AI agents acting without human oversight — escalation, containment, kill-switch"},
-                {"value": "deception_persuasion", "label": "Deception & Persuasion", "description": "AI that manipulates users or other systems — detection, monitoring, policy controls"},
-                {"value": "dual_use", "label": "Dual-Use Governance", "description": "Internal AI that could be weaponized — access controls, misuse detection, policy"},
-                {"value": "eu_ai_act", "label": "EU AI Act Readiness", "description": "High-risk AI system requirements — transparency, human oversight, technical documentation"},
-            ],
-        },
-        {"type": "text_context", "label": "AI system inventory", "required": False, "description": "Paste your frontier AI system types, autonomy levels, data access, deployment scale"},
-        {"type": "custom_prompt", "label": "Regulatory or org context", "required": False, "description": "e.g. 'EU domicile, deploying autonomous trading agent, regulators asking about AI governance'"},
-    ],
-
     # ── Business & Reporting ──────────────────────────────────────────────────
     "brain_explainer": [
         {
@@ -2008,23 +1885,6 @@ _AGENT_INPUT_SCHEMAS: dict = {
         {"type": "text_context", "label": "Engagement brief", "required": False, "description": "Paste client context, objectives, key stakeholders, timeline, and any existing findings"},
         {"type": "custom_prompt", "label": "Specific orchestration instruction", "required": False, "description": "e.g. 'run risk + compliance first, use results to brief the partner advisor'"},
     ],
-    "quiltworks_readiness_advisor": [
-        {
-            "type": "select",
-            "label": "Assessment Scope",
-            "required": True,
-            "description": "Which QuiltWorks domains are you assessing?",
-            "options": [
-                {"value": "full_assessment", "label": "Full 7-Domain Assessment", "description": "All QuiltWorks domains — produces radar chart and full maturity scorecard"},
-                {"value": "targeted_domain", "label": "Targeted Domain", "description": "Deep-dive on 1–2 specific QuiltWorks domains — faster, more detailed output"},
-                {"value": "gap_roadmap", "label": "Gap-to-Roadmap", "description": "Existing scores provided — produce prioritized improvement roadmap"},
-                {"value": "peer_benchmark", "label": "Peer Benchmark", "description": "Compare domain scores against sector norms — identify relative strengths and weaknesses"},
-            ],
-        },
-        {"type": "text_context", "label": "Evidence and current practices", "required": False, "description": "Paste: existing domain scores, policy documentation, interview notes, control inventory, or prior assessment excerpts"},
-        {"type": "custom_prompt", "label": "Assessment context", "required": False, "description": "e.g. 'financial services, 2,000 employees, prior QuiltWorks score: Identity 2.1, Cloud 1.4, IR 2.8'"},
-    ],
-
     # ── Legacy catalog agent schemas (kept for backward compat) ───────────────
     "iga_advisor": [
         {"type": "text_context", "label": "Identity & Access configuration", "required": False, "description": "Paste IAM roles, permission policies, user-to-role assignments, or access review data"},
@@ -2178,6 +2038,31 @@ def seed_agent_catalog() -> None:
         if upgraded:
             db.commit()
             logger.info("Upgraded system_prompt on %d built-in catalog agents", upgraded)
+
+        # Disable built-in agents that have been removed from the catalog.
+        disabled = (
+            db.query(AIAgent)
+            .filter(AIAgent.is_builtin == True, AIAgent.key.in_(_REMOVED_BUILTIN_KEYS), AIAgent.is_enabled == True)
+            .all()
+        )
+        if disabled:
+            for a in disabled:
+                a.is_enabled = False
+            db.commit()
+            logger.info("Disabled %d retired built-in agents: %s", len(disabled), [a.key for a in disabled])
+
+        # Sync display names of renamed built-in agents.
+        _RENAMED_BUILTINS = {entry["key"]: entry["name"] for entry in _CATALOG}
+        name_synced = 0
+        for key, new_name in _RENAMED_BUILTINS.items():
+            a = db.query(AIAgent).filter(AIAgent.key == key, AIAgent.is_builtin == True).first()
+            if a and a.name != new_name:
+                a.name = new_name
+                name_synced += 1
+        if name_synced:
+            db.commit()
+            logger.info("Synced display names on %d built-in agents", name_synced)
+
     except Exception:
         db.rollback()
         logger.exception("Agent catalog seed failed")
