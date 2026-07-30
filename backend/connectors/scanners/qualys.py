@@ -28,34 +28,39 @@ class QualysConnector(BaseConnector):
 
         try:
             async with httpx.AsyncClient(timeout=30, verify=True) as client:
-                # Use scan/list as the auth probe — universally accessible on all
-                # Qualys subscriptions (unlike user/list which needs admin access)
+                # Auth probe: VM Detection API — same endpoint the scanner uses,
+                # confirmed working for this account/platform in prior testing.
+                # truncation_limit=1 returns at most 1 host record (minimal data).
                 resp = await client.post(
-                    f"{api_url}/api/2.0/fo/scan/",
+                    f"{api_url}/api/4.0/fo/asset/host/vm/detection/",
                     auth=(username, password),
                     headers=_HEADERS,
-                    data={"action": "list"},
+                    data={
+                        "action": "list",
+                        "output_format": "XML",
+                        "truncation_limit": "1",
+                    },
                 )
 
                 if resp.status_code == 401:
                     return ConnectorTestResult(success=False, message="Authentication failed — check username and password")
                 if resp.status_code == 403:
-                    return ConnectorTestResult(success=False, message="Access denied — account may lack API access permissions")
+                    return ConnectorTestResult(success=False, message="Access denied — account may lack VMDR API permissions")
                 if resp.status_code not in (200, 201):
                     return ConnectorTestResult(success=False, message=f"Qualys API returned HTTP {resp.status_code}")
 
-                # Parse scan count from response
-                scan_count = 0
+                # Parse host count from response
+                host_count = 0
                 try:
                     root = ET.fromstring(resp.text)
-                    scan_count = len(root.findall(".//SCAN"))
+                    host_count = len(root.findall(".//HOST"))
                 except ET.ParseError:
                     if "Invalid credentials" in resp.text or "authentication" in resp.text.lower():
                         return ConnectorTestResult(success=False, message="Authentication failed")
 
                 details: Dict[str, Any] = {
                     "platform": api_url,
-                    "scan_history_count": scan_count,
+                    "hosts_with_detections": host_count,
                 }
 
                 # Check scoped host count (best-effort, non-blocking)
@@ -71,7 +76,7 @@ class QualysConnector(BaseConnector):
                         hosts = hroot.findall(".//HOST")
                         details["scoped_hosts"] = len(hosts)
                         if len(hosts) == 0:
-                            details["note"] = "No hosts in scope yet — import mode will return 0 findings until hosts are added to a Qualys asset group"
+                            details["note"] = "No hosts in scope — import scan will return 0 findings until hosts are scanned in Qualys"
                 except Exception:
                     pass
 
