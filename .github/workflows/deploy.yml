@@ -149,7 +149,7 @@ jobs:
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
-          REACT_APP_REDIRECT_URI: ${{ secrets.REACT_APP_REDIRECT_URI || 'https://monitara-ai.azurewebsites.net' }}
+          REACT_APP_REDIRECT_URI: "https://monitara-ai.azurewebsites.net"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
