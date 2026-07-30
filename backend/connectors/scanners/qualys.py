@@ -92,9 +92,26 @@ class QualysConnector(BaseConnector):
                 except Exception:
                     pass
 
+                # Best-effort TotalCloud probe — detect if CSPM module is available
+                try:
+                    tc_resp = await client.post(
+                        f"{api_url}/cloudview-api/rest/v1/failures",
+                        auth=(username, password),
+                        headers={"X-Requested-With": "NexGenCyberAI", "Content-Type": "application/json", "Accept": "application/json"},
+                        json={"filter": "cloudType:AZURE", "pageNo": 0, "pageSize": 1},
+                        timeout=15,
+                    )
+                    if tc_resp.status_code == 200:
+                        details["totalcloud_cspm"] = True
+                        details["note"] = "VMDR + TotalCloud CSPM enabled — scans will include Azure cloud posture findings"
+                    else:
+                        details["totalcloud_cspm"] = False
+                except Exception:
+                    details["totalcloud_cspm"] = False
+
                 return ConnectorTestResult(
                     success=True,
-                    message=f"Connected to Qualys VMDR at {api_url}",
+                    message=f"Connected to Qualys {'VMDR + TotalCloud CSPM' if details.get('totalcloud_cspm') else 'VMDR'} at {api_url}",
                     details=details,
                 )
 

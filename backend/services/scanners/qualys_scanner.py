@@ -1,9 +1,10 @@
-"""Qualys VMDR scanner integration.
+"""Qualys VMDR + TotalCloud (CSPM) scanner integration.
 
-Two operating modes:
+Three operating modes:
   Import mode  (no targets in config): pulls existing host detections from the
-               Qualys portal using the VM Detection + KnowledgeBase APIs.
-               This is the primary mode for existing Qualys customers.
+               Qualys portal using the VM Detection + KnowledgeBase APIs, AND
+               attempts to pull TotalCloud/CloudView CSPM control failures for
+               Azure cloud resources (gracefully skipped if module not enabled).
 
   Scan mode    (targets provided): launches a new Qualys scan against the
                supplied IPs/CIDR and waits for results (legacy behaviour).
@@ -16,8 +17,10 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-_HEADERS = {"X-Requested-With": "Monitara", "Content-Type": "application/x-www-form-urlencoded"}
+_HEADERS = {"X-Requested-With": "NexGenCyberAI", "Content-Type": "application/x-www-form-urlencoded"}
+_JSON_HEADERS = {"X-Requested-With": "NexGenCyberAI", "Content-Type": "application/json", "Accept": "application/json"}
 _KB_BATCH = 300   # QIDs per KnowledgeBase lookup request
+_TC_PAGE_SIZE = 200  # TotalCloud results per page
 
 
 # ── Severity mapping ──────────────────────────────────────────────────────────
@@ -285,6 +288,130 @@ async def _launch_new_scan(api_url: str, auth, targets: str, config: dict, scan_
         return _parse_qualys_csv(fetch_resp.text)
 
 
+# ── TotalCloud (CSPM) — control failure import ────────────────────────────────
+
+def _tc_severity(criticality: str) -> str:
+    c = (criticality or "").upper()
+    if c == "CRITICAL":
+        return "critical"
+    if c == "HIGH":
+        return "high"
+    if c == "MEDIUM":
+        return "medium"
+    if c == "LOW":
+        return "low"
+    return "info"
+
+
+async def _import_totalcloud_findings(api_url: str, auth) -> list:
+    """Pull Azure control failures from Qualys TotalCloud (CloudView API).
+
+    Returns empty list if the TotalCloud module is not enabled for this account
+    (HTTP 404) or if no failures exist. Never raises.
+    """
+    findings = []
+    page = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=60, verify=True) as client:
+            while True:
+                resp = await client.post(
+                    f"{api_url}/cloudview-api/rest/v1/failures",
+                    auth=auth,
+                    headers=_JSON_HEADERS,
+                    json={
+                        "filter": "cloudType:AZURE",
+                        "pageNo": page,
+                        "pageSize": _TC_PAGE_SIZE,
+                    },
+                )
+
+                if resp.status_code == 404:
+                    # TotalCloud module not provisioned — silently skip
+                    logger.info("Qualys TotalCloud API returned 404 — module not enabled, skipping CSPM findings")
+                    return []
+
+                if resp.status_code in (401, 403):
+                    logger.warning("Qualys TotalCloud: auth denied (%d) — skipping", resp.status_code)
+                    return []
+
+                resp.raise_for_status()
+
+                try:
+                    body = resp.json()
+                except Exception:
+                    logger.warning("Qualys TotalCloud: non-JSON response — skipping")
+                    return []
+
+                if body.get("responseCode") != "SUCCESS":
+                    logger.warning("Qualys TotalCloud: unexpected responseCode: %s", body.get("responseCode"))
+                    return []
+
+                records = body.get("data") or []
+                if not records:
+                    break  # no more pages
+
+                for rec in records:
+                    resource = rec.get("resource") or rec
+                    resource_name = (
+                        resource.get("resourceName")
+                        or resource.get("name")
+                        or resource.get("resourceId")
+                        or "unknown"
+                    )
+                    resource_type = (
+                        resource.get("resourceType")
+                        or resource.get("type")
+                        or "azure_resource"
+                    )
+                    region = resource.get("region", "")
+                    cloud_type = resource.get("cloudType", "AZURE")
+
+                    control_id = rec.get("controlId", "")
+                    control_name = rec.get("controlName", "") or rec.get("controlTitle", "")
+                    criticality = rec.get("criticality") or rec.get("severity", "MEDIUM")
+                    first_detected = rec.get("firstDetectedOn", "")
+                    last_detected = rec.get("lastDetectedOn", "")
+                    remediation = rec.get("remediationSteps") or rec.get("remediation", "")
+                    description = rec.get("reason") or rec.get("description") or f"Control '{control_name}' failed on {resource_name}"
+
+                    findings.append({
+                        "title": f"[CSPM] {control_name or control_id}",
+                        "description": description,
+                        "severity": _tc_severity(criticality),
+                        "resource_id": resource_name,
+                        "resource_type": f"azure_{resource_type.lower().replace(' ', '_')}",
+                        "framework": "qualys_cspm",
+                        "control_id": control_id,
+                        "remediation": remediation,
+                        "evidence": {
+                            "qualys_control_id": control_id,
+                            "cloud_type": cloud_type,
+                            "region": region,
+                            "first_detected": first_detected,
+                            "last_detected": last_detected,
+                            "criticality": criticality,
+                        },
+                        "status": "open",
+                    })
+
+                # Pagination: stop if fewer results than page size
+                if len(records) < _TC_PAGE_SIZE:
+                    break
+                page += 1
+
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            logger.info("Qualys TotalCloud module not available for this account")
+        else:
+            logger.warning("Qualys TotalCloud HTTP error: %s", exc)
+    except Exception as exc:
+        logger.warning("Qualys TotalCloud import failed (non-fatal): %s", exc)
+
+    logger.info("Qualys TotalCloud: %d CSPM findings imported", len(findings))
+    return findings
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 async def run_qualys_scan(scan_id: str, db_url: str, creds: dict, config: dict) -> None:
@@ -307,21 +434,41 @@ async def run_qualys_scan(scan_id: str, db_url: str, creds: dict, config: dict) 
         auth = (username, password)
         targets = config.get("targets") or config.get("target", "")
 
+        vmdr_count = 0
+        cspm_count = 0
+
         if targets:
             logger.info("Qualys scan %s: scan mode → targets: %s", scan_id, targets)
             findings_data = await _launch_new_scan(
-                api_url, auth, targets, config, f"Monitara-{scan_id[:8]}"
+                api_url, auth, targets, config, f"NexGen-{scan_id[:8]}"
             )
+            vmdr_count = len(findings_data)
         else:
-            logger.info("Qualys scan %s: import mode → pulling existing portal detections", scan_id)
-            findings_data = await _import_existing_detections(api_url, auth)
+            logger.info("Qualys scan %s: import mode → pulling VMDR detections + TotalCloud CSPM", scan_id)
+            # Run both in parallel; TotalCloud gracefully returns [] if module not enabled
+            vmdr_findings, cspm_findings = await asyncio.gather(
+                _import_existing_detections(api_url, auth),
+                _import_totalcloud_findings(api_url, auth),
+            )
+            findings_data = vmdr_findings + cspm_findings
+            vmdr_count = len(vmdr_findings)
+            cspm_count = len(cspm_findings)
+            logger.info(
+                "Qualys scan %s: %d VMDR + %d CSPM = %d total",
+                scan_id, vmdr_count, cspm_count, len(findings_data),
+            )
 
         for f in findings_data:
             db.add(Finding(scan_id=scan_id, **f))
 
         scan.status = ScanStatus.COMPLETED
         scan.completed_at = datetime.now(timezone.utc)
-        scan.summary = {**(scan.summary or {}), "finding_count": len(findings_data)}
+        scan.summary = {
+            **(scan.summary or {}),
+            "finding_count": len(findings_data),
+            "vmdr_count": vmdr_count,
+            "cspm_count": cspm_count,
+        }
         db.commit()
         logger.info("Qualys scan %s completed — %d findings ingested", scan_id, len(findings_data))
 
