@@ -26,6 +26,13 @@ from connectors.scanners.owasp_dc import OwaspDependencyCheckConnector
 from connectors.scanners.gitleaks import GitleaksConnector
 from connectors.scanners.trufflehog import TruffleHogConnector
 from connectors.scanners.ai_code_review import AICodeReviewConnector
+from connectors.scanners.qualys import QualysConnector
+from connectors.scanners.tenable import TenableConnector
+from connectors.scanners.burp_enterprise import BurpEnterpriseConnector
+from connectors.scanners.snyk import SnykConnector
+from connectors.scanners.rapid7 import Rapid7Connector
+from connectors.scanners.invicti import InvictiConnector
+from connectors.scanners.acunetix import AcunetixConnector
 
 
 _REGISTRY = {
@@ -54,6 +61,14 @@ _REGISTRY = {
     ConnectorType.TRUFFLEHOG: TruffleHogConnector,
     # AI-powered local code review (runs in-process, not via GitHub Actions)
     ConnectorType.AI_CODE_REVIEW: AICodeReviewConnector,
+    # Enterprise scanners (direct API, BackgroundTask execution)
+    ConnectorType.QUALYS: QualysConnector,
+    ConnectorType.TENABLE: TenableConnector,
+    ConnectorType.BURP_ENTERPRISE: BurpEnterpriseConnector,
+    ConnectorType.SNYK: SnykConnector,
+    ConnectorType.RAPID7: Rapid7Connector,
+    ConnectorType.INVICTI: InvictiConnector,
+    ConnectorType.ACUNETIX: AcunetixConnector,
 }
 
 

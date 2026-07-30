@@ -24,7 +24,6 @@ import {
   useMediaQuery,
   useTheme,
   Divider,
-  Stack,
 } from "@mui/material";
 import {
   AutoFixHigh,
