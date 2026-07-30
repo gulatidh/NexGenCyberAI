@@ -28,12 +28,13 @@ class QualysConnector(BaseConnector):
 
         try:
             async with httpx.AsyncClient(timeout=30, verify=True) as client:
-                # Lightweight auth check: fetch current user info
+                # Use scan/list as the auth probe — universally accessible on all
+                # Qualys subscriptions (unlike user/list which needs admin access)
                 resp = await client.post(
-                    f"{api_url}/api/2.0/fo/user/",
+                    f"{api_url}/api/2.0/fo/scan/",
                     auth=(username, password),
                     headers=_HEADERS,
-                    data={"action": "list"},
+                    data={"action": "list", "state": "Running,Paused,Cancelled,Finished"},
                 )
 
                 if resp.status_code == 401:
@@ -43,23 +44,21 @@ class QualysConnector(BaseConnector):
                 if resp.status_code not in (200, 201):
                     return ConnectorTestResult(success=False, message=f"Qualys API returned HTTP {resp.status_code}")
 
-                # Try to parse response to confirm it's valid XML from Qualys
+                # Parse scan count from response
+                scan_count = 0
                 try:
                     root = ET.fromstring(resp.text)
-                    # Count users returned (confirms auth + API access)
-                    users = root.findall(".//USER")
-                    user_count = len(users)
+                    scan_count = len(root.findall(".//SCAN"))
                 except ET.ParseError:
-                    # Not XML — could be a JSON error or HTML page
                     if "Invalid credentials" in resp.text or "authentication" in resp.text.lower():
                         return ConnectorTestResult(success=False, message="Authentication failed")
-                    user_count = 0
 
-                # Also check how many hosts are in scope (non-blocking)
                 details: Dict[str, Any] = {
                     "platform": api_url,
-                    "authenticated_users": user_count,
+                    "scan_history_count": scan_count,
                 }
+
+                # Check scoped host count (best-effort, non-blocking)
                 try:
                     hosts_resp = await client.post(
                         f"{api_url}/api/2.0/fo/asset/host/",
@@ -72,7 +71,7 @@ class QualysConnector(BaseConnector):
                         hosts = hroot.findall(".//HOST")
                         details["scoped_hosts"] = len(hosts)
                         if len(hosts) == 0:
-                            details["note"] = "No hosts currently in scope — import mode will return 0 findings until hosts are added to a Qualys asset group"
+                            details["note"] = "No hosts in scope yet — import mode will return 0 findings until hosts are added to a Qualys asset group"
                 except Exception:
                     pass
 
