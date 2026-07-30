@@ -49,10 +49,22 @@ class QualysConnector(BaseConnector):
                 if resp.status_code not in (200, 201):
                     return ConnectorTestResult(success=False, message=f"Qualys API returned HTTP {resp.status_code}")
 
-                # Parse host count from response
+                # Qualys returns HTTP 200 even for auth/routing errors — parse XML body
                 host_count = 0
                 try:
                     root = ET.fromstring(resp.text)
+                    # Check for Qualys error response (CODE + TEXT inside SIMPLE_RETURN)
+                    err_text = root.findtext(".//TEXT") or ""
+                    err_code = root.findtext(".//CODE") or ""
+                    if err_text and not root.findall(".//HOST"):
+                        # "not authenticated to url" means wrong API URL (qualysguard vs qualysapi)
+                        if "not authenticated" in err_text.lower():
+                            return ConnectorTestResult(
+                                success=False,
+                                message=f"Wrong API URL — use qualysapi.qg3.apps.qualys.com not qualysguard. Qualys error: {err_text}",
+                            )
+                        if err_code in ("999", "1000") or "authentication" in err_text.lower() or "invalid" in err_text.lower():
+                            return ConnectorTestResult(success=False, message=f"Qualys rejected credentials: {err_text}")
                     host_count = len(root.findall(".//HOST"))
                 except ET.ParseError:
                     if "Invalid credentials" in resp.text or "authentication" in resp.text.lower():
