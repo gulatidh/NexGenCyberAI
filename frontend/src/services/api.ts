@@ -715,3 +715,19 @@ export const evidenceApi = {
   downloadUrl: (clientId: string, framework?: string) =>
     `${API_BASE}/clients/${clientId}/evidence/package${framework ? `?framework=${framework}` : ''}`,
 };
+
+export const remediationJobsApi = {
+  list: (clientId: string) =>
+    api.get(`/clients/${clientId}/remediation-jobs/`).then(r => r.data),
+  get: (clientId: string, jobId: string) =>
+    api.get(`/clients/${clientId}/remediation-jobs/${jobId}`).then(r => r.data),
+  create: (clientId: string, findingIds: string[], scanId?: string) =>
+    api.post(`/clients/${clientId}/remediation-jobs/`, {
+      finding_ids: findingIds,
+      ...(scanId ? { scan_id: scanId } : {}),
+    }).then(r => r.data),
+  verify: (clientId: string, jobId: string) =>
+    api.post(`/clients/${clientId}/remediation-jobs/${jobId}/verify`).then(r => r.data),
+  delete: (clientId: string, jobId: string) =>
+    api.delete(`/clients/${clientId}/remediation-jobs/${jobId}`).then(r => r.data),
+};

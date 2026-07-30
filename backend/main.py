@@ -61,6 +61,10 @@ try:
     from api.routers import client_comparison as _client_comparison
 except ImportError:
     _client_comparison = None
+try:
+    from api.routers import remediation_jobs as _remediation_jobs
+except ImportError:
+    _remediation_jobs = None
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
 
@@ -1538,7 +1542,7 @@ app.include_router(users.router, prefix="/api/v1")
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _comments, _webhooks, _ctem, _evidence, _documents,
-             _compliance_heatmap, _client_comparison):
+             _compliance_heatmap, _client_comparison, _remediation_jobs):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router, prefix="/api/v1")
 

@@ -1378,3 +1378,42 @@ class APIKey(Base):
     scopes = Column(JSON, default=list)    # ["read:findings","read:risks","read:dashboard"]
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+
+# ── Remediation Jobs ──────────────────────────────────────────────────────────
+
+class RemediationJobStatus(str, enum.Enum):
+    PENDING    = "pending"
+    ANALYZING  = "analyzing"
+    READY      = "ready"
+    VERIFYING  = "verifying"
+    VERIFIED   = "verified"
+    PARTIAL    = "partial"
+    UNRESOLVED = "unresolved"
+    FAILED     = "failed"
+
+class RemediationJob(Base):
+    """AI-generated remediation plan for one or more findings."""
+    __tablename__ = "remediation_jobs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    finding_ids = Column(JSON, default=list)       # list of Finding.id strings
+    status = Column(SAEnum(RemediationJobStatus, values_callable=_ev), default=RemediationJobStatus.PENDING)
+
+    # LLM-generated plan — list of per-finding plan dicts
+    plans = Column(JSON)
+    overall_summary = Column(Text)
+    overall_confidence = Column(Float)
+    overall_risk_level = Column(String(20))        # low / medium / high
+    recommended_order = Column(JSON, default=list) # ordered list of finding_ids
+
+    # Verification
+    verification_scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    verification_results = Column(JSON)            # {finding_id: "resolved"|"unresolved"}
+
+    error_message = Column(Text)
+    created_by = Column(String(200))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
+

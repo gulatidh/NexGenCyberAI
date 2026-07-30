@@ -605,3 +605,48 @@ export interface ThreatModel {
   sigma_rules_json?: SigmaRule[];
   auto_remodel?: boolean;
 }
+
+// ── AI Remediation Jobs ────────────────────────────────────────────────────
+
+export type RemediationJobStatus =
+  | 'pending'
+  | 'analyzing'
+  | 'ready'
+  | 'verifying'
+  | 'verified'
+  | 'partial'
+  | 'unresolved'
+  | 'failed';
+
+export interface FindingRemediationPlan {
+  finding_id: string;
+  confidence_score: number;
+  automatable: 'yes' | 'partial' | 'no';
+  estimated_downtime: 'none' | 'minimal' | 'maintenance_window';
+  risk_level: 'low' | 'medium' | 'high';
+  step_by_step_plan: string[];
+  artifact_type: 'bash' | 'powershell' | 'aws_cli' | 'azure_cli' | 'terraform' | 'code_patch' | 'manual';
+  artifact_content: string;
+  what_could_go_wrong: string;
+  rollback_steps: string[];
+  verification_status?: 'resolved' | 'unresolved' | null;
+}
+
+export interface RemediationJob {
+  id: string;
+  client_id: string;
+  scan_id?: string | null;
+  finding_ids: string[];
+  status: RemediationJobStatus;
+  plans?: FindingRemediationPlan[] | null;
+  overall_summary?: string | null;
+  overall_confidence?: number | null;
+  overall_risk_level?: string | null;
+  recommended_order?: string[] | null;
+  verification_scan_id?: string | null;
+  verification_results?: Record<string, 'resolved' | 'unresolved'> | null;
+  error_message?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}

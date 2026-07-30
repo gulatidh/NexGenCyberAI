@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
-  SyncAlt, AccountTree, Psychology, Description,
+  SyncAlt, AccountTree, Psychology, Description, AutoFixHigh,
   TrendingUp, GridView, CompareArrows, VpnKey, Webhook,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -84,6 +84,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Compliance Gaps", icon: <GppBad />,          path: "/control-deficiencies" },
       { label: "Remediation",     icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
+      { label: "AI Remediations", icon: <AutoFixHigh />,      path: "/remediation-jobs" },
       { label: "CTEM Programs",   icon: <Radar />,            path: "/ctem" },
     ],
   },

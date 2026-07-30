@@ -9,14 +9,16 @@ import {
 } from "@mui/material";
 import {
   BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel,
-  VisibilityOff, Visibility, AutoAwesome, Refresh, AssignmentTurnedIn,
+  VisibilityOff, Visibility, AutoAwesome, Refresh, AssignmentTurnedIn, AutoFixHigh,
 } from "@mui/icons-material";
+import Checkbox from "@mui/material/Checkbox";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { findingsApi, projectsApi, scansApi, postureApi } from "../services/api";
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
+import FixWithAIDialog from "../components/FixWithAIDialog";
 import { fromNow } from "../utils/datetime";
 
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
@@ -213,6 +215,17 @@ export default function Findings() {
   const [category, setCategory] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
   const [showSuppressed, setShowSuppressed] = React.useState(false);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [fixWithAIOpen, setFixWithAIOpen] = useState(false);
+
+  const toggleCheck = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const handleExport = async () => {
     const account = accounts[0];
@@ -565,6 +578,22 @@ export default function Findings() {
           >
             Export CSV
           </Button>
+          {checkedIds.size > 0 && (
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />}
+              onClick={() => setFixWithAIOpen(true)}
+              sx={{
+                bgcolor: "#4285F4",
+                textTransform: "none",
+                fontWeight: 600,
+                "&:hover": { bgcolor: "#3367D6" },
+              }}
+            >
+              Fix with AI ({checkedIds.size})
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -747,6 +776,18 @@ export default function Findings() {
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                  <TableCell padding="checkbox" sx={{ width: 36 }}>
+                    <Checkbox
+                      size="small"
+                      indeterminate={checkedIds.size > 0 && checkedIds.size < sortedFindings.length}
+                      checked={sortedFindings.length > 0 && checkedIds.size === sortedFindings.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setCheckedIds(new Set(sortedFindings.map(f => f.id)));
+                        else setCheckedIds(new Set());
+                      }}
+                      sx={{ color: "rgba(255,255,255,0.3)", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }}
+                    />
+                  </TableCell>
                   <TableCell><TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
                     sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>SEVERITY</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "title"} direction={sortDir} onClick={() => setSort("title")}
@@ -770,8 +811,16 @@ export default function Findings() {
                   return (
                     <TableRow key={f.id}
                       sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                        "& td": { borderColor: "divider", py: 1 } }}
+                        "& td": { borderColor: "divider", py: 1 },
+                        bgcolor: checkedIds.has(f.id) ? "rgba(66,133,244,0.06)" : undefined }}
                       onClick={() => setSelected(f)}>
+                      <TableCell padding="checkbox" onClick={(e) => toggleCheck(f.id, e)}>
+                        <Checkbox
+                          size="small"
+                          checked={checkedIds.has(f.id)}
+                          sx={{ color: "rgba(255,255,255,0.3)", "&.Mui-checked": { color: "#4285F4" } }}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Chip label={sev} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
@@ -1242,6 +1291,16 @@ export default function Findings() {
         message={snack}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       />
+
+      {fixWithAIOpen && clientId && (
+        <FixWithAIDialog
+          open={fixWithAIOpen}
+          onClose={() => { setFixWithAIOpen(false); setCheckedIds(new Set()); }}
+          findings={findings.filter(f => checkedIds.has(f.id))}
+          clientId={clientId}
+          scanId={scanId || undefined}
+        />
+      )}
     </Box>
   );
 }

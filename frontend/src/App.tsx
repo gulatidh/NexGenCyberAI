@@ -63,6 +63,7 @@ import PostureTrends from "./pages/PostureTrends";
 import ComplianceHeatmap from "./pages/ComplianceHeatmap";
 import ClientComparison from "./pages/ClientComparison";
 import EvidencePackage from "./pages/EvidencePackage";
+import RemediationJobs from "./pages/RemediationJobs";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -259,6 +260,7 @@ function ProtectedApp() {
           <Route path="/posture-trends" element={<PostureTrends />} />
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
           <Route path="/client-comparison" element={<ClientComparison />} />
+          <Route path="/remediation-jobs" element={<RemediationJobs />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>
