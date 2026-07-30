@@ -34,7 +34,7 @@ class QualysConnector(BaseConnector):
                     f"{api_url}/api/2.0/fo/scan/",
                     auth=(username, password),
                     headers=_HEADERS,
-                    data={"action": "list", "state": "Running,Paused,Cancelled,Finished"},
+                    data={"action": "list"},
                 )
 
                 if resp.status_code == 401:
