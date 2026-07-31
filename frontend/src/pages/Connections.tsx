@@ -240,9 +240,10 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "org_id", label: "Organisation ID", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", help: "Snyk Settings → Organisation → General" },
   ],
   rapid7: [
-    { key: "host", label: "InsightVM Host URL", placeholder: "https://insightvm.company.com", help: "Your InsightVM console URL" },
-    { key: "username", label: "Username" },
-    { key: "password", label: "Password", secret: true },
+    { key: "host", label: "InsightVM Host", placeholder: "insight.rapid7.com", help: "Cloud: insight.rapid7.com · On-prem: https://your-server.com" },
+    { key: "api_key", label: "API Key", secret: true, placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", help: "Insight Platform → API Keys (recommended — no MFA required)" },
+    { key: "username", label: "Username (on-prem only)", placeholder: "optional if using API key" },
+    { key: "password", label: "Password (on-prem only)", secret: true, placeholder: "optional if using API key" },
   ],
   qualys: [
     { key: "api_url", label: "Qualys API URL", placeholder: "https://qualysapi.qualys.com", help: "Your Qualys platform API URL (varies by pod)" },
@@ -277,7 +278,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   tenable:        "Connects to Tenable.io's REST API to launch network/host vulnerability scans. Scans the target IPs/CIDRs you configure and ingests all found vulnerabilities with CVSS scores.",
   burp_enterprise:"Connects to your Burp Suite Enterprise server to launch DAST scans against web applications. Uses Burp's industry-standard crawler and active attack engine.",
   snyk:           "Connects to your Snyk organisation and ingests issues from all projects — open-source vulnerabilities, license issues, and Snyk Code findings.",
-  rapid7:         "Connects to your Rapid7 InsightVM console to launch a site scan and ingest discovered vulnerabilities with severity, CVSS scores, and remediation guidance.",
+  rapid7:         "Connects to Rapid7 InsightVM Cloud (insight.rapid7.com) or on-prem. Use an API Key for cloud — no MFA prompt. Cloud mode pulls asset findings automatically; on-prem mode requires a site_id and launches a scan.",
   qualys:         "Connects to your Qualys VMDR subscription to launch authenticated scans against the specified IP/CIDR ranges and ingest QID-based vulnerabilities.",
   invicti:        "Connects to Invicti's cloud or on-prem API to launch proof-based DAST scans. Low false-positive rate due to evidence-based vulnerability confirmation.",
   acunetix:       "Connects to your Acunetix Enterprise instance to create a scan target and launch a full vulnerability scan. Ingests web application vulnerabilities, misconfigurations, and OWASP Top 10 issues.",
