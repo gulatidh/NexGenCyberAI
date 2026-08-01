@@ -219,6 +219,26 @@ const GROUPS: Group[] = [
           "Credentials are encrypted at rest using the platform's Fernet key. Rotate your API keys in the external tool and re-save the connector if the key is compromised.",
         ],
       },
+      {
+        id: "jira-connector",
+        title: "Add a Jira connector (ticket integration)",
+        summary: "Connect to Jira Cloud to create tracked tickets directly from Findings and Remediation Tracker items. Jira is a ticket integration — not a security scanner — so you set it up once in Connections and then use it from the Findings or Remediation Tracker pages.",
+        steps: [
+          { text: "Navigate to Connections from the left nav. Scroll to the Platform Connectors section. Click 'Add Connector' → pick Jira." },
+          { text: "Fill in four fields:", detail: "Jira URL: your full Atlassian subdomain, e.g. https://yourorg.atlassian.net — include https:// prefix. Email: the Atlassian account email associated with the API token. API Token: generate from id.atlassian.com → My account → Security → Create and manage API tokens. Default Project Key: optional pre-fill (e.g. KAN, SEC) — the ticket creation dialog uses this as the default but you can override it per ticket." },
+          { text: "Click Save. The connector is now available for ticket creation from the Findings and Remediation Tracker pages." },
+          { text: "Issue type: Monitara creates tickets with issue type 'Task' by default. This works with both classic and team-managed (next-gen) Jira projects. If your project doesn't support Task, ticket creation returns a 400 error — check your project's issue types in Jira Project Settings." },
+        ],
+        tips: [
+          "Team-managed (next-gen) Jira projects typically support: Task, Incident, Epic, Service Request. Classic projects also have Bug, Story, and others. Monitara uses Task as the default because it exists in all project types.",
+          "Your Default Project Key pre-fills the project key field in the ticket dialog. If you work across multiple Jira projects, you can override the key per ticket — it's an editable field.",
+          "API tokens are scoped to your Atlassian account. The token needs 'Browse Projects' and 'Create Issues' permissions on the target project.",
+        ],
+        warnings: [
+          "If ticket creation fails with a 400 error: the most common cause is a mismatch between issue type and project type. Team-managed projects reject Bug and Story types. Check your Jira project type (Project Settings → Project type) to confirm available issue types.",
+          "Do not use your Atlassian password as the API token. Jira Cloud requires a dedicated API token — generate one at id.atlassian.com → Security.",
+        ],
+      },
     ],
   },
   {
@@ -792,6 +812,28 @@ const GROUPS: Group[] = [
           "RAG answers are only as accurate as your uploaded documents. If a policy is out of date, the answer reflects the outdated policy.",
         ],
       },
+      {
+        id: "asset-compliance",
+        title: "Asset Compliance Posture (per-asset framework gap view)",
+        summary: "The Compliance tab on any Asset Detail page shows which framework controls that specific asset is failing, with an overall compliance score. It gives you an asset-centric compliance view — answering 'is this server PCI DSS compliant?' — rather than navigating the global Control Deficiencies table.",
+        steps: [
+          { text: "Navigate to Asset Inventory from the left nav. Click any asset to open the Asset Detail page." },
+          { text: "Click the Compliance tab (the last tab in the Asset Detail tab row)." },
+          { text: "Select a framework from the dropdown: NIST CSF 2.0, ISO 27001, PCI DSS, CIS v8, or GDPR." },
+          { text: "The compliance overview shows four metrics:", detail: "Compliance Score % — (total_controls − failing) / total × 100. Failing Controls — controls with at least one open finding mapped to them. Total Framework Controls — total control count in the selected framework. Open Findings — count of open findings associated with this asset." },
+          { text: "The failing controls table lists each breached control: control ID chip (e.g. PR.DS-1 for NIST CSF, REQ-6 for PCI DSS), domain, control title, worst finding severity, and finding count mapped to that control." },
+          { text: "Changing the framework dropdown immediately reloads the compliance data for the new framework — no page reload needed." },
+        ],
+        tips: [
+          "Use Asset Compliance Posture for targeted questions: 'Is this database server PCI DSS compliant?' or 'Which ISO 27001 controls is this web app failing?'.",
+          "Findings are mapped to controls via three fields: Finding.control_id + Finding.framework (direct mapping) and Finding.control_mappings JSON (secondary cross-framework mappings). The Compliance tab checks all three.",
+          "Run the Compliance Monitor agent first (AI Buddies) to populate control_mappings on findings. Without agent enrichment, only findings with explicit control_id values are counted.",
+        ],
+        warnings: [
+          "Compliance Score measures the absence of found failures, not positive proof of compliance. Unscanned assets may have findings that haven't been discovered yet.",
+          "A control not appearing in the failing controls table doesn't mean it's satisfied — it may mean no scan has produced a finding mapped to that control. Treat a high compliance score as 'no known failures found', not as a compliance certification.",
+        ],
+      },
     ],
   },
   {
@@ -807,10 +849,10 @@ const GROUPS: Group[] = [
         summary: "Monitara CTEM is a 5-phase AI-assisted workflow — Scope → Discover → Prioritise → Validate → Mobilise. Each phase auto-populates from your existing platform data (findings, assets, scans) and is fully editable by analysts.",
         steps: [
           { text: "Select your client in the top toolbar. Navigate to Governance → CTEM Programs." },
-          { text: "Click 'New Program'. Enter a name (e.g. 'Q3 2026 Exposure Cycle') and optional description. All 5 phase panels are created immediately." },
+          { text: "Click 'New Program'. Enter a name (e.g. 'Q3 2026 Exposure Cycle') and optional description. Optionally select one or more connectors from the multi-select dropdown to scope the asset inventory — only assets discovered by those connectors appear in Phase 1 and Phase 2. If no connectors are selected, all assets from all connectors are included.", detail: "Connector scoping prevents cross-environment contamination — e.g. scope a CTEM program to only your production Azure connector, excluding dev/test assets. Assets discovered by multiple connectors are deduplicated by external_id so each physical asset appears exactly once." },
           { text: "Phase 1 — Scope: the platform automatically discovers unique assets from your existing scan findings (resource_id + resource_type). For each asset you can set: In Scope, Out of Scope, or Crown Jewel.", detail: "If no assets appear: run at least one scan first. Assets are pulled from Finding.resource_id." },
           { text: "Phase 2 — Discover: shows all open findings filtered to the assets you tagged In Scope or Crown Jewel in Phase 1. Findings are grouped by exposure category — EASM (external attack surface), CSPM (cloud posture), Identity, SAST (code), Infrastructure, Third-Party." },
-          { text: "Phase 3 — Prioritise: click 'Generate AI Top 5' to have the AI analyse scoped findings and crown-jewel assets and output the 5 highest-impact exposures with rationale. After AI generation, you can add new items, remove any item, and reorder with the up/down arrows." },
+          { text: "Phase 3 — Prioritise: click 'Generate AI Top 5' to have the AI analyse scoped findings and crown-jewel assets and output the 5 highest-impact exposures with rationale. Crown Jewel assets receive automatic weighting — exposures affecting the most crown-jewel assets are ranked first regardless of raw CVSS score. Items affecting crown jewels show a red 👑 chip displaying the count of affected critical assets.", detail: "Weighting order: crown jewel asset count (highest first) → severity (highest first) → CVSS score (highest first). This ensures business-critical exposures always surface above theoretical-but-low-business-impact vulnerabilities. After AI generation you can add, remove, and reorder items using the up/down arrows." },
           { text: "Phase 4 — Validate: pre-seeded validation methods table — Automated BAS, Manual Attack-Path Validation, and Control-Efficacy Check. Fill in Tests Run and Confirmed Exploitable counts for each method." },
           { text: "Phase 5 — Mobilise: tracks remediation ownership by team. Add owner teams with their Open / Closed On-Time / SLA Breach counts. A red alert fires automatically if any team shows SLA Breach > 0." },
           { text: "AI Brief: every phase has a 'Generate AI Brief' button. The brief is fully editable." },
@@ -819,7 +861,7 @@ const GROUPS: Group[] = [
         ],
         tips: [
           "Run CTEM Programs quarterly for broad coverage, or after significant infrastructure changes.",
-          "Crown Jewel assets in Phase 1 give the AI Prioritise agent extra weight — it ranks exposures affecting crown jewels highest regardless of CVSS score.",
+          "Crown Jewel assets in Phase 1 give the AI Prioritise agent automatic extra weight — Phase 3 ranks exposures by crown jewel impact count first, then by severity, then by CVSS. A medium-severity exposure affecting 5 crown jewel assets ranks above a critical affecting none.",
           "AI Briefs are drafts. The analyst always has final editorial control — revise the tone, add business context, or remove jargon before including in a client report.",
         ],
         warnings: [
@@ -912,6 +954,27 @@ const GROUPS: Group[] = [
         warnings: [
           "Never commit API keys to source control, even in private repositories. Use CI/CD secret management (GitHub Actions Secrets, Azure Key Vault, HashiCorp Vault) to inject them as environment variables at runtime.",
           "If a key is compromised, revoke it immediately from Settings → API Keys. There is no 'suspend' — only revoke.",
+        ],
+      },
+      {
+        id: "ticket-creation",
+        title: "Create tracked tickets from Findings or Remediation Tracker",
+        summary: "Push any finding or remediation action to Jira or ServiceNow as a tracked ticket — directly from within Monitara. The ticket captures finding details (severity, CVE, description, remediation steps) and a deep link back to the source. No copy-paste required.",
+        steps: [
+          { text: "Prerequisite: save a Jira or ServiceNow connector in Connections. For Jira you need the URL, email, API token, and optionally a default project key." },
+          { text: "From the Findings page: find the finding you want to track. Click the ticket icon or ⋮ menu → 'Create Ticket'. A dialog opens.", detail: "The dialog shows: connector selector, project key field (pre-filled from the connector's Default Project Key), priority selector, and a preview of the ticket title and description that will be sent." },
+          { text: "From Remediation Tracker: find the remediation action row. Click 'Create Ticket'. Same dialog — same connector, project key, and priority fields." },
+          { text: "For Jira: enter the Project Key — this is required. The key is typically 2–5 uppercase letters from your Jira project URL (e.g. KAN, SEC, OPS). The Create button stays disabled until a project key is provided.", detail: "Even if the connector has a Default Project Key set, confirm it is correct for the target project. Using the wrong project key returns a 400 error." },
+          { text: "Click Create. Monitara calls the connector's API (Jira or ServiceNow). On success, the ticket key (e.g. KAN-42) is returned and displayed. The ticket is live in your issue tracker immediately." },
+        ],
+        tips: [
+          "The ticket description includes: severity, CVE ID, CVSS score, resource identifier, full finding description, and AI-generated remediation steps. Engineering teams get everything they need without needing Monitara access.",
+          "ServiceNow tickets land in the configured table (default: incident). The short_description is the finding title; work_notes contain the full finding context.",
+          "Ticket creation is a one-way push. If you update the finding in Monitara, the Jira ticket is not automatically updated — use the ticket's assignee and comments for tracking follow-up.",
+        ],
+        warnings: [
+          "If you see a 400 error: the project key is wrong, the issue type is not supported by your project, or the priority value is invalid. Open your Jira project settings → Issue Types to verify what types are available.",
+          "Ticket creation does not automatically update the finding status in Monitara. After the finding is resolved, manually update the finding status to 'remediated' or 'accepted'.",
         ],
       },
     ],

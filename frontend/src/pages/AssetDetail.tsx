@@ -8,7 +8,7 @@ import { ArrowBack, PlayArrow, Refresh } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, assetsApi, connectorsApi, attackPathApi } from "../services/api";
-import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup, AssetCompliance, AssetComplianceControl } from "../types";
+import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup, AssetCompliance } from "../types";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, Legend,
@@ -677,7 +677,6 @@ const KNOWN_FRAMEWORKS = [
   { value: "gdpr",      label: "GDPR" },
 ];
 
-const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
 const SEV_COLOR_MAP: Record<string, string> = { critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4" };
 
 function AssetComplianceTab({ clientId, assetId }: { clientId: string; assetId: string }) {
