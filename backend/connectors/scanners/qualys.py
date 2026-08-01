@@ -152,7 +152,7 @@ class QualysConnector(BaseConnector):
                     os_name = (host.findtext("OS") or "").strip()
                     if ip:
                         resources.append({
-                            "id": ip,
+                            "id": dns or ip,   # use dns or ip so external_id matches finding resource_id
                             "name": dns or ip,
                             "type": "host",
                             "asset_class": "host",

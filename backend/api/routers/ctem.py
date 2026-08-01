@@ -89,30 +89,44 @@ def _discover_assets(db: Session, client_id: str, connector_ids: List[str] = Non
                 seen_external[a.external_id] = True
                 unique_assets.append(a)
 
-        # Count open findings per external_id
+        # Count open findings per external_id.
+        # Build a lookup that covers both external_id and name (handles IP vs DNS mismatch
+        # for host-based scanners like Qualys where old assets may have IP as external_id
+        # but findings carry the DNS name as resource_id, or vice versa).
         external_ids = list(seen_external.keys())
-        finding_counts: Dict[str, int] = {}
-        if external_ids:
+        # Also collect asset names so we can match findings stored under the DNS name
+        external_id_to_name: Dict[str, str] = {a.external_id: (a.name or a.external_id) for a in unique_assets}
+        all_lookup_ids = list({v for pair in external_id_to_name.items() for v in pair})
+        raw_counts: Dict[str, int] = {}
+        if all_lookup_ids:
             rows = (
                 db.query(Finding.resource_id, func.count(Finding.id).label("cnt"))
                 .join(Scan)
                 .filter(
                     Scan.client_id == client_id,
-                    Finding.resource_id.in_(external_ids),
+                    Finding.resource_id.in_(all_lookup_ids),
                 )
                 .group_by(Finding.resource_id)
                 .all()
             )
-            finding_counts = {r.resource_id: r.cnt for r in rows}
+            raw_counts = {r.resource_id: r.cnt for r in rows}
 
         assets = []
         for a in unique_assets:
+            # Try external_id first; fall back to name for IP↔DNS mismatches (Qualys etc.)
+            cnt = raw_counts.get(a.external_id, 0)
+            canonical_rid = a.external_id
+            if cnt == 0 and a.name and a.name != a.external_id:
+                name_cnt = raw_counts.get(a.name, 0)
+                if name_cnt > 0:
+                    cnt = name_cnt
+                    canonical_rid = a.name  # findings are stored under the DNS name
             assets.append({
-                "resource_id": a.external_id,
+                "resource_id": canonical_rid,
                 "resource_type": a.asset_class or a.asset_type or "unknown",
                 "display_name": a.name or a.external_id,
                 "exposure_category": _exposure_category(a.asset_class or a.asset_type),
-                "finding_count": finding_counts.get(a.external_id, 0),
+                "finding_count": cnt,
                 "scope_status": "untagged",
                 "notes": "",
             })

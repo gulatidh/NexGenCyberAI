@@ -461,6 +461,38 @@ async def run_qualys_scan(scan_id: str, db_url: str, creds: dict, config: dict) 
         for f in findings_data:
             db.add(Finding(scan_id=scan_id, **f))
 
+        # Upsert Asset records from findings so CTEM connector scoping works.
+        # Enterprise scanners bypass sync_connector_assets, so we derive the
+        # asset inventory directly from what the scanner discovered.
+        if scan.connector_id:
+            from api.models.models import Asset, AssetStatus
+            _now = datetime.now(timezone.utc)
+            _seen: set = set()
+            for f in findings_data:
+                rid = f.get("resource_id")
+                if not rid or rid in _seen:
+                    continue
+                _seen.add(rid)
+                existing_asset = (
+                    db.query(Asset)
+                    .filter(Asset.connector_id == scan.connector_id, Asset.external_id == rid)
+                    .first()
+                )
+                if existing_asset is None:
+                    db.add(Asset(
+                        client_id=scan.client_id,
+                        connector_id=scan.connector_id,
+                        external_id=rid,
+                        name=rid,
+                        asset_type="host",
+                        asset_class="host",
+                        status=AssetStatus.ACTIVE,
+                        last_synced_at=_now,
+                    ))
+                else:
+                    existing_asset.status = AssetStatus.ACTIVE
+                    existing_asset.last_synced_at = _now
+
         scan.status = ScanStatus.COMPLETED
         scan.completed_at = datetime.now(timezone.utc)
         scan.summary = {
