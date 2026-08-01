@@ -100,6 +100,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Intelligence",
     items: [
       { label: "Attack Paths",       icon: <AccountTree />, path: "/attack-paths" },
+      { label: "CVE Blast Radius",   icon: <BugReport />,   path: "/cve-pivot" },
       { label: "Ask Your Data",      icon: <Psychology />,  path: "/nl-query" },
       { label: "Security Docs",      icon: <Description />, path: "/security-docs" },
       { label: "Compliance Heatmap", icon: <GridView />,    path: "/compliance-heatmap" },

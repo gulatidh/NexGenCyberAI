@@ -607,6 +607,13 @@ export const nlQueryApi = {
     apiClient.post(`/clients/${clientId}/query/nl`, { question }).then((r) => r.data),
 };
 
+export const cveApi = {
+  list: (clientId: string, q?: string) =>
+    apiClient.get(`/clients/${clientId}/cve/${q ? `?q=${encodeURIComponent(q)}` : ""}`).then((r) => r.data),
+  get: (clientId: string, cveId: string) =>
+    apiClient.get(`/clients/${clientId}/cve/${encodeURIComponent(cveId)}`).then((r) => r.data),
+};
+
 export const mttrApi = {
   // MTTR is computed client-side from posture history snapshots; no dedicated endpoint needed
 };

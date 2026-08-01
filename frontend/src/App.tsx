@@ -58,6 +58,7 @@ import TicketSyncPage from "./pages/TicketSync";
 import CTEMPage from "./pages/CTEMPage";
 import SecurityDocs from "./pages/SecurityDocs";
 import AttackPaths from "./pages/AttackPaths";
+import CVEPivot from "./pages/CVEPivot";
 import NLQuery from "./pages/NLQuery";
 import PostureTrends from "./pages/PostureTrends";
 import ComplianceHeatmap from "./pages/ComplianceHeatmap";
@@ -256,6 +257,7 @@ function ProtectedApp() {
           <Route path="/webhooks" element={<Navigate to="/settings" replace />} />
           <Route path="/api-keys" element={<Navigate to="/settings" replace />} />
           <Route path="/attack-paths" element={<AttackPaths />} />
+          <Route path="/cve-pivot" element={<CVEPivot />} />
           <Route path="/nl-query" element={<NLQuery />} />
           <Route path="/posture-trends" element={<PostureTrends />} />
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
