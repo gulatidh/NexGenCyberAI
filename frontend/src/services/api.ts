@@ -664,7 +664,7 @@ export const webhooksApi = {
 
 export const ctemApi = {
   list: (clientId: string) => api.get(`/clients/${clientId}/ctem/`).then(r => r.data),
-  create: (clientId: string, data: { name: string; description?: string }) =>
+  create: (clientId: string, data: { name: string; description?: string; connector_ids?: string[] }) =>
     api.post(`/clients/${clientId}/ctem/`, data).then(r => r.data),
   get: (clientId: string, programId: string) =>
     api.get(`/clients/${clientId}/ctem/${programId}`).then(r => r.data),

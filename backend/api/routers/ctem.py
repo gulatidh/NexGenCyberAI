@@ -60,9 +60,65 @@ def _exposure_category(resource_type: Optional[str]) -> str:
     return resource_type.replace("_", " ").title()
 
 
-def _discover_assets(db: Session, client_id: str) -> List[Dict]:
-    """Query findings for the client and return a list of asset dicts for scope pre-seeding."""
-    # Primary: findings with a non-empty resource_id
+def _discover_assets(db: Session, client_id: str, connector_ids: List[str] = None) -> List[Dict]:
+    """Return unique assets for scope pre-seeding.
+
+    When connector_ids is provided, query the Asset table filtered to those connectors
+    and deduplicate by external_id (same resource discovered by multiple connectors → one row).
+    Otherwise fall back to finding resource_ids (legacy behaviour for programs with no connector scope).
+    """
+    from api.models.models import Asset
+
+    if connector_ids:
+        # Asset-centric path: deduplicate by external_id across selected connectors
+        asset_rows = (
+            db.query(Asset)
+            .filter(
+                Asset.client_id == client_id,
+                Asset.connector_id.in_(connector_ids),
+            )
+            .order_by(Asset.name)
+            .limit(500)
+            .all()
+        )
+        # Deduplicate by external_id — same asset from multiple connectors → keep first seen
+        seen_external: Dict[str, bool] = {}
+        unique_assets: List[Asset] = []
+        for a in asset_rows:
+            if a.external_id not in seen_external:
+                seen_external[a.external_id] = True
+                unique_assets.append(a)
+
+        # Count open findings per external_id
+        external_ids = list(seen_external.keys())
+        finding_counts: Dict[str, int] = {}
+        if external_ids:
+            rows = (
+                db.query(Finding.resource_id, func.count(Finding.id).label("cnt"))
+                .join(Scan)
+                .filter(
+                    Scan.client_id == client_id,
+                    Finding.resource_id.in_(external_ids),
+                )
+                .group_by(Finding.resource_id)
+                .all()
+            )
+            finding_counts = {r.resource_id: r.cnt for r in rows}
+
+        assets = []
+        for a in unique_assets:
+            assets.append({
+                "resource_id": a.external_id,
+                "resource_type": a.asset_class or a.asset_type or "unknown",
+                "display_name": a.name or a.external_id,
+                "exposure_category": _exposure_category(a.asset_class or a.asset_type),
+                "finding_count": finding_counts.get(a.external_id, 0),
+                "scope_status": "untagged",
+                "notes": "",
+            })
+        return assets
+
+    # Legacy path: derive unique resources from findings
     rows = (
         db.query(Finding.resource_id, Finding.resource_type, func.count(Finding.id).label("cnt"))
         .join(Scan)
@@ -76,7 +132,6 @@ def _discover_assets(db: Session, client_id: str) -> List[Dict]:
         .limit(200)
         .all()
     )
-    # Fallback: group by resource_type when resource_ids are absent
     if not rows:
         rows = (
             db.query(Finding.resource_type, Finding.resource_type, func.count(Finding.id).label("cnt"))
@@ -110,11 +165,11 @@ def _ensure_phases(db: Session, program: CTEMProgram):
             db.add(CTEMPhaseNote(program_id=program.id, phase=phase))
     db.commit()
     db.refresh(program)
-    # Auto-seed scope assets from existing findings so the analyst sees something immediately
+    # Auto-seed scope assets so the analyst sees something immediately
     if needs_asset_seed:
         scope_pn = next((p for p in program.phases if p.phase == "scope"), None)
         if scope_pn:
-            assets = _discover_assets(db, program.client_id)
+            assets = _discover_assets(db, program.client_id, program.connector_ids or None)
             scope_pn.phase_data_json = {"assets": assets}
             db.commit()
 
@@ -176,6 +231,7 @@ async def create_program(
         name=payload.name,
         description=payload.description,
         created_by=user.get("email") or user.get("preferred_username") or "",
+        connector_ids_json=json.dumps(payload.connector_ids) if payload.connector_ids else None,
     )
     db.add(program)
     db.commit()
@@ -305,10 +361,17 @@ async def get_scope_assets(
     If the scope phase has no saved assets yet, auto-discover and persist them now."""
     pn = _get_phase_note(db, client_id, program_id, "scope")
 
+    program = (
+        db.query(CTEMProgram)
+        .filter(CTEMProgram.id == program_id, CTEMProgram.client_id == client_id)
+        .first()
+    )
+    scoped_connector_ids: List[str] = program.connector_ids if program else []
+
     # If the phase has never been seeded, discover and persist immediately
     saved_assets: List[Dict] = (pn.phase_data_json or {}).get("assets", [])
     if not saved_assets:
-        discovered = _discover_assets(db, client_id)
+        discovered = _discover_assets(db, client_id, scoped_connector_ids or None)
         if discovered:
             pn.phase_data_json = {"assets": discovered}
             db.commit()
@@ -319,7 +382,7 @@ async def get_scope_assets(
         f"{a.get('resource_id','')}__{a.get('resource_type','')}": a
         for a in saved_assets
     }
-    fresh = _discover_assets(db, client_id)
+    fresh = _discover_assets(db, client_id, scoped_connector_ids or None)
     seen_keys: set = set()
     assets = []
     for item in fresh:
@@ -340,6 +403,7 @@ async def get_scope_assets(
     return {
         "assets": assets,
         "connectors": [{"id": c.id, "name": c.name, "type": c.connector_type, "status": c.status} for c in connectors],
+        "scoped_connector_ids": scoped_connector_ids,
     }
 
 

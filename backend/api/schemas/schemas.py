@@ -561,6 +561,7 @@ class CTEMPhaseNoteResponse(BaseModel):
 class CTEMProgramCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    connector_ids: List[str] = []
 
 class CTEMProgramResponse(BaseModel):
     id: str
@@ -572,6 +573,7 @@ class CTEMProgramResponse(BaseModel):
     created_by: Optional[str]
     created_at: Optional[datetime]
     phases: List[CTEMPhaseNoteResponse] = []
+    connector_ids: List[str] = []
     model_config = {"from_attributes": True}
 
 # ── Security Documents ─────────────────────────────────────────────────────────

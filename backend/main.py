@@ -657,6 +657,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("risks.asset_id ALTER failed: %s", exc)
 
+        # ctem_programs.connector_ids_json — scope this CTEM program to specific connectors
+        try:
+            ctem_cols = {c["name"] for c in inspector.get_columns("ctem_programs")}
+        except Exception:
+            ctem_cols = set()
+        if ctem_cols and "connector_ids_json" not in ctem_cols:
+            ddl = ("ALTER TABLE ctem_programs ADD connector_ids_json NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE ctem_programs ADD COLUMN connector_ids_json TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added ctem_programs.connector_ids_json column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("ctem_programs.connector_ids_json ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

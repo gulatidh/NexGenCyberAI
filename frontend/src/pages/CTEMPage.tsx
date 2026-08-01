@@ -9,6 +9,7 @@ import {
   Accordion, AccordionSummary, AccordionDetails, Paper,
   Table, TableHead, TableRow, TableCell, TableBody,
   Select, MenuItem, FormControl, InputLabel, LinearProgress,
+  Checkbox, ListItemText, OutlinedInput,
 } from "@mui/material";
 import {
   Add, Delete, CheckCircle, RadioButtonUnchecked, AccountTree,
@@ -16,7 +17,7 @@ import {
   FileDownload, Edit, Save,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ctemApi } from "../services/api";
+import { ctemApi, connectorsApi } from "../services/api";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -66,6 +67,7 @@ interface CTEMProgram {
   current_phase?: string;
   phases?: PhaseNote[];
   created_at?: string;
+  connector_ids?: string[];
 }
 
 interface ScopeAsset {
@@ -1016,6 +1018,13 @@ function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; cl
                 sx={{ bgcolor: program.status === "completed" ? "rgba(52,168,83,0.15)" : "rgba(66,133,244,0.15)", color: program.status === "completed" ? "#34A853" : "#4285F4", fontSize: 10, height: 18 }}
               />
               <Chip label={`Active: ${PHASES[currentPhaseIdx]?.label ?? currentPhase}`} size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+              {program.connector_ids && program.connector_ids.length > 0 && (
+                <Chip
+                  label={`${program.connector_ids.length} connector${program.connector_ids.length > 1 ? "s" : ""} scoped`}
+                  size="small"
+                  sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#B8860B", fontSize: 10, height: 18 }}
+                />
+              )}
               {program.created_at && <Typography variant="caption" sx={{ color: "text.secondary" }}>{fmt(program.created_at)}</Typography>}
             </Box>
           </Box>
@@ -1081,6 +1090,7 @@ export default function CTEMPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newConnectorIds, setNewConnectorIds] = useState<string[]>([]);
 
   const { data: programs = [], isLoading } = useQuery<CTEMProgram[]>({
     queryKey: ["ctem", clientId],
@@ -1088,11 +1098,21 @@ export default function CTEMPage() {
     enabled: !!clientId,
   });
 
+  const { data: connectors = [] } = useQuery<{ id: string; name: string; connector_type: string }[]>({
+    queryKey: ["connectors", clientId],
+    queryFn: () => connectorsApi.list(clientId),
+    enabled: !!clientId && createOpen,
+  });
+
   const createMut = useMutation({
-    mutationFn: () => ctemApi.create(clientId, { name: newName.trim(), description: newDesc.trim() || undefined }),
+    mutationFn: () => ctemApi.create(clientId, {
+      name: newName.trim(),
+      description: newDesc.trim() || undefined,
+      connector_ids: newConnectorIds,
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ctem", clientId] });
-      setCreateOpen(false); setNewName(""); setNewDesc("");
+      setCreateOpen(false); setNewName(""); setNewDesc(""); setNewConnectorIds([]);
       toast.success("CTEM program created");
     },
     onError: () => toast.error("Create failed"),
@@ -1153,6 +1173,35 @@ export default function CTEMPage() {
               <TextField label="Description (optional)" fullWidth size="small" multiline minRows={2}
                 value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
                 placeholder="Brief objective or scope statement" />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Scope by Connector(s)</InputLabel>
+                <Select
+                  multiple
+                  value={newConnectorIds}
+                  onChange={(e) => setNewConnectorIds(e.target.value as string[])}
+                  input={<OutlinedInput label="Scope by Connector(s)" />}
+                  renderValue={(selected) => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(selected as string[]).map((id) => {
+                        const c = connectors.find(x => x.id === id);
+                        return <Chip key={id} label={c?.name || id} size="small" />;
+                      })}
+                    </Box>
+                  )}
+                >
+                  {connectors.map((c) => (
+                    <MenuItem key={c.id} value={c.id}>
+                      <Checkbox checked={newConnectorIds.includes(c.id)} />
+                      <ListItemText primary={c.name} secondary={c.connector_type} />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                Leave empty to include all connectors. Selecting connectors deduplicates assets automatically.
+              </Typography>
             </Grid>
           </Grid>
         </DialogContent>

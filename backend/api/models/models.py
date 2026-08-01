@@ -1321,8 +1321,19 @@ class CTEMProgram(Base):
     created_by = Column(String(200))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # JSON-encoded list of connector IDs that scope this program's asset inventory.
+    # Empty / NULL = all connectors (legacy behaviour).
+    connector_ids_json = Column(Text, nullable=True)
 
     phases = relationship("CTEMPhaseNote", back_populates="program", cascade="all, delete-orphan", order_by="CTEMPhaseNote.phase")
+
+    @property
+    def connector_ids(self) -> list:
+        import json as _json
+        try:
+            return _json.loads(self.connector_ids_json or "[]")
+        except Exception:
+            return []
 
 
 class CTEMPhaseNote(Base):
