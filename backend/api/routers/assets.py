@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
 from api.models.models import (
-    Asset, AssetStatus, Connector, Finding, Risk, Scan, ScanStatus, ScanType,
+    Asset, AssetStatus, Connector, Finding, Risk, Scan, ScanStatus, ScanType, FrameworkControl,
 )
 from api.schemas.schemas import (
     AssetResponse, AssetDetailResponse, AssetSyncResponse, ScanResponse,
@@ -434,6 +434,121 @@ async def get_asset_duplicates(
         "total_duplicate_groups": len(duplicate_groups),
         "total_redundant_findings": total_duplicates,
         "groups": duplicate_groups,
+    }
+
+
+@router.get("/{asset_id}/compliance")
+async def get_asset_compliance(
+    client_id: str,
+    asset_id: str,
+    framework: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return per-control compliance posture for this asset in a given framework.
+
+    For each framework control, reports whether any open finding on this asset
+    maps to that control (failing) or not (not evidenced). Surgical audit view —
+    you can ask 'which NIST CSF controls does this database fail?'
+    """
+    asset = db.query(Asset).filter(Asset.id == asset_id, Asset.client_id == client_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    findings = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.status == "open",
+            Finding.resource_id == asset.external_id,
+        )
+        .all()
+    )
+
+    # Build control → findings mapping from all relevant fields
+    ctrl_findings: Dict[str, List[Dict]] = {}  # "framework::control_id" -> [finding dicts]
+
+    def _sev(f) -> str:
+        v = f.severity
+        return v.value if hasattr(v, "value") else str(v or "info")
+
+    def _finding_stub(f) -> Dict:
+        return {"id": f.id, "title": f.title, "severity": _sev(f), "cvss": f.cvss_score, "cve": f.cve_id}
+
+    for f in findings:
+        controls = []
+        if f.control_id and f.framework:
+            frm = f.framework.value if hasattr(f.framework, "value") else str(f.framework or "")
+            controls.append((frm, f.control_id))
+        if f.control_mappings:
+            try:
+                mappings = f.control_mappings if isinstance(f.control_mappings, list) else []
+                for m in mappings:
+                    if isinstance(m, dict) and m.get("control_id"):
+                        controls.append((m.get("framework", ""), m["control_id"]))
+            except Exception:
+                pass
+        for frm, cid in controls:
+            key = f"{frm}::{cid}"
+            ctrl_findings.setdefault(key, []).append(_finding_stub(f))
+
+    # Filter to requested framework
+    if framework:
+        ctrl_findings = {k: v for k, v in ctrl_findings.items() if k.startswith(f"{framework}::")}
+
+    # Load framework control metadata
+    ctrl_meta: Dict[str, Dict] = {}
+    if framework:
+        try:
+            from api.models.models import FrameworkType
+            fw_enum = FrameworkType(framework)
+            fc_rows = db.query(FrameworkControl).filter(FrameworkControl.framework == fw_enum).all()
+            for fc in fc_rows:
+                ctrl_meta[f"{framework}::{fc.control_id}"] = {
+                    "control_id": fc.control_id,
+                    "title": fc.title,
+                    "domain": fc.domain or "",
+                    "weight": fc.weight or 1,
+                }
+        except (ValueError, Exception):
+            pass  # custom framework or unknown — use finding-derived metadata
+
+    # Build per-control result rows
+    failing_controls = []
+    for key, flist in ctrl_findings.items():
+        frm, cid = key.split("::", 1)
+        meta = ctrl_meta.get(key, {})
+        failing_controls.append({
+            "control_id": cid,
+            "framework": frm,
+            "title": meta.get("title", cid),
+            "domain": meta.get("domain", ""),
+            "weight": meta.get("weight", 1),
+            "finding_count": len(flist),
+            "max_severity": max(flist, key=lambda x: {"critical":4,"high":3,"medium":2,"low":1,"info":0}.get(x["severity"],0))["severity"],
+            "findings": flist[:5],
+        })
+
+    failing_controls.sort(key=lambda x: -x["finding_count"])
+
+    total_fw_controls = len(ctrl_meta) if ctrl_meta else None
+    failing_count = len(failing_controls)
+    score = None
+    if total_fw_controls:
+        score = max(0, round((total_fw_controls - failing_count) / total_fw_controls * 100))
+
+    return {
+        "asset_id": asset_id,
+        "asset_name": asset.name,
+        "asset_class": asset.asset_class,
+        "framework": framework,
+        "total_framework_controls": total_fw_controls,
+        "failing_controls_count": failing_count,
+        "compliance_score": score,
+        "open_findings_total": len(findings),
+        "findings_with_control_mapping": sum(len(v) for v in ctrl_findings.values()),
+        "failing_controls": failing_controls,
     }
 
 

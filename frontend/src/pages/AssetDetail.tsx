@@ -2,13 +2,13 @@ import React, { useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress, Button, IconButton,
   Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
-  Grid, Alert, Tooltip,
+  Grid, Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, LinearProgress,
 } from "@mui/material";
 import { ArrowBack, PlayArrow, Refresh } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, assetsApi, connectorsApi, attackPathApi } from "../services/api";
-import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup } from "../types";
+import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup, AssetCompliance, AssetComplianceControl } from "../types";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, Legend,
@@ -227,6 +227,7 @@ export default function AssetDetailPage() {
         <Tab label="Timeline" />
         <Tab label="Attack Path" />
         <Tab label="Duplicates" />
+        <Tab label="Compliance" />
       </Tabs>
 
       {tab === 0 && (
@@ -387,6 +388,7 @@ export default function AssetDetailPage() {
       {tab === 4 && <AssetTimeline clientId={clientId} assetId={assetId} />}
       {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
       {tab === 6 && <AssetDuplicates clientId={clientId} assetId={assetId} />}
+      {tab === 7 && <AssetComplianceTab clientId={clientId} assetId={assetId} />}
     </Box>
   );
 }
@@ -659,6 +661,146 @@ function AssetDuplicates({ clientId, assetId }: { clientId: string; assetId: str
           </Table>
         </TableContainer>
       </Card>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab 7: Compliance Posture
+// ─────────────────────────────────────────────────────────────────────────────
+
+const KNOWN_FRAMEWORKS = [
+  { value: "nist_csf",  label: "NIST CSF 2.0" },
+  { value: "iso_27001", label: "ISO 27001:2022" },
+  { value: "pci_dss",   label: "PCI DSS v4.0" },
+  { value: "cis_v8",    label: "CIS Controls v8" },
+  { value: "gdpr",      label: "GDPR" },
+];
+
+const SEV_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
+const SEV_COLOR_MAP: Record<string, string> = { critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4" };
+
+function AssetComplianceTab({ clientId, assetId }: { clientId: string; assetId: string }) {
+  const [framework, setFramework] = useState("nist_csf");
+
+  const { data, isLoading, isError } = useQuery<AssetCompliance>({
+    queryKey: ["asset-compliance", clientId, assetId, framework],
+    queryFn: () => assetsApi.compliance(clientId, assetId, framework),
+    enabled: !!clientId && !!assetId,
+  });
+
+  const score = data?.compliance_score;
+  const scoreColor = score == null ? "rgba(255,255,255,0.3)"
+    : score >= 80 ? "#34A853" : score >= 60 ? "#FBBC04" : "#EA4335";
+
+  return (
+    <Box>
+      {/* Framework selector */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
+          <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
+            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+            {KNOWN_FRAMEWORKS.map(f => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+        {isLoading && <CircularProgress size={18} />}
+      </Box>
+
+      {isError && <Alert severity="error">Failed to load compliance data.</Alert>}
+
+      {data && (
+        <>
+          {/* Summary cards */}
+          <Grid container spacing={2} sx={{ mb: 2.5 }}>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Card variant="outlined" sx={{ p: 1.5, textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: scoreColor }}>
+                  {score != null ? `${score}%` : "—"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Compliance Score</Typography>
+                {score != null && (
+                  <LinearProgress variant="determinate" value={score}
+                    sx={{ mt: 0.5, height: 4, borderRadius: 2, bgcolor: "rgba(255,255,255,0.08)",
+                      "& .MuiLinearProgress-bar": { bgcolor: scoreColor } }} />
+                )}
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Card variant="outlined" sx={{ p: 1.5, textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#EA4335" }}>
+                  {data.failing_controls_count}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Controls Failing</Typography>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Card variant="outlined" sx={{ p: 1.5, textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "text.primary" }}>
+                  {data.total_framework_controls ?? "—"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Total Controls</Typography>
+              </Card>
+            </Grid>
+            <Grid size={{ xs: 6, sm: 3 }}>
+              <Card variant="outlined" sx={{ p: 1.5, textAlign: "center" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#4285F4" }}>
+                  {data.open_findings_total}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Open Findings</Typography>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {data.findings_with_control_mapping === 0 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              No findings on this asset have framework control mappings yet. Run a scanner with control mapping support (e.g. AI Code Review, Compliance Monitor agent) to populate this view.
+            </Alert>
+          )}
+
+          {data.failing_controls.length > 0 && (
+            <Card variant="outlined">
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                      <TableCell>CONTROL</TableCell>
+                      <TableCell>DOMAIN</TableCell>
+                      <TableCell>TITLE</TableCell>
+                      <TableCell>WORST SEVERITY</TableCell>
+                      <TableCell align="right">FINDINGS</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {data.failing_controls.map((ctrl) => (
+                      <TableRow key={ctrl.control_id} sx={{ "& td": { borderColor: "divider", py: 0.75 } }}>
+                        <TableCell>
+                          <Chip label={ctrl.control_id} size="small" variant="outlined"
+                            sx={{ fontSize: 10, height: 20, borderColor: "divider", color: "text.secondary" }} />
+                        </TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{ctrl.domain || "—"}</TableCell>
+                        <TableCell sx={{ color: "text.primary", fontSize: 12, maxWidth: 320 }}>
+                          <Tooltip title={ctrl.findings.map(f => f.title).join(" · ")} placement="top">
+                            <span>{ctrl.title}</span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={ctrl.max_severity} size="small"
+                            sx={{ fontSize: 10, height: 18, bgcolor: `${SEV_COLOR_MAP[ctrl.max_severity]}22`,
+                              color: SEV_COLOR_MAP[ctrl.max_severity] }} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: "#EA4335", fontWeight: 700, fontSize: 13 }}>
+                          {ctrl.finding_count}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+          )}
+        </>
+      )}
     </Box>
   );
 }

@@ -417,6 +417,8 @@ export const assetsApi = {
     apiClient.get(`/clients/${clientId}/assets/${assetId}/timeline`).then((r) => r.data),
   deduplicate: (clientId: string, assetId: string) =>
     apiClient.get(`/clients/${clientId}/assets/${assetId}/deduplicate`).then((r) => r.data),
+  compliance: (clientId: string, assetId: string, framework?: string) =>
+    apiClient.get(`/clients/${clientId}/assets/${assetId}/compliance`, { params: framework ? { framework } : {} }).then((r) => r.data),
 };
 
 export const missionsApi = {

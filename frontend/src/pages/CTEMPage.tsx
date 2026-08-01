@@ -88,6 +88,9 @@ interface PriorityItem {
   rationale: string;
   analyst_notes: string;
   finding_id?: string;
+  crown_jewel_count?: number;
+  affects_crown_jewels?: boolean;
+  crown_jewel_assets?: string[];
 }
 
 interface ValidationMethod {
@@ -562,15 +565,26 @@ function PrioritisePhaseContent({ clientId, programId, phaseData, onSave }: {
                   </FormControl>
                 </Grid>
                 <Grid size={{ xs: 6, md: 3 }}>
-                  <Chip
-                    label={item.source === "ai" ? "AI Suggested" : "Analyst Added"}
-                    size="small"
-                    sx={{
-                      bgcolor: item.source === "ai" ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)",
-                      color: item.source === "ai" ? "#FBBC04" : "#34A853",
-                      fontSize: 10, height: 28, alignSelf: "center",
-                    }}
-                  />
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    <Chip
+                      label={item.source === "ai" ? "AI Suggested" : "Analyst Added"}
+                      size="small"
+                      sx={{
+                        bgcolor: item.source === "ai" ? "rgba(251,188,4,0.15)" : "rgba(52,168,83,0.15)",
+                        color: item.source === "ai" ? "#FBBC04" : "#34A853",
+                        fontSize: 10, height: 22,
+                      }}
+                    />
+                    {item.affects_crown_jewels && (
+                      <Tooltip title={`Affects crown jewel asset${(item.crown_jewel_count ?? 0) > 1 ? "s" : ""}: ${(item.crown_jewel_assets ?? []).join(", ")}`}>
+                        <Chip
+                          label={`👑 ${item.crown_jewel_count ?? 1} Crown Jewel`}
+                          size="small"
+                          sx={{ bgcolor: "rgba(234,67,53,0.18)", color: "#EA4335", fontSize: 10, height: 22, fontWeight: 700 }}
+                        />
+                      </Tooltip>
+                    )}
+                  </Box>
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <TextField fullWidth size="small" label="Rationale" value={item.rationale}

@@ -496,22 +496,57 @@ async def generate_priorities(
             if a.get("scope_status") == "crown_jewel":
                 crown_jewels.append(a["resource_id"])
 
+    crown_jewel_set = set(crown_jewels)
+
     q = db.query(Finding).join(Scan).filter(Scan.client_id == client_id, Finding.status == "open")
     if scoped_resources:
         q = q.filter(Finding.resource_id.in_(scoped_resources))
-    top = q.order_by(Finding.cvss_score.desc().nullslast()).limit(30).all()
+    top = q.order_by(Finding.cvss_score.desc().nullslast()).limit(50).all()
 
-    # Build LLM prompt
-    finding_lines = "\n".join(
-        f"- [{f.severity.upper()}] {f.title} | Resource: {f.resource_id} | CVSS: {f.cvss_score or 'N/A'} | CVE: {f.cve_id or 'N/A'}"
-        for f in top[:20]
+    # Group findings by CVE (or title if no CVE) to detect how many crown jewel assets each exposure hits
+    # key: cve_id or title → {findings, crown_jewel_assets affected}
+    exposure_map: Dict[str, Dict] = {}
+    for f in top:
+        key = f.cve_id or f.title or f.id
+        if key not in exposure_map:
+            exposure_map[key] = {"findings": [], "crown_jewel_assets": set()}
+        exposure_map[key]["findings"].append(f)
+        if f.resource_id and f.resource_id in crown_jewel_set:
+            exposure_map[key]["crown_jewel_assets"].add(f.resource_id)
+
+    # Sort exposures: crown jewel exposures first, then by CVSS
+    def _exposure_sort(item):
+        findings = item["findings"]
+        cj_count = len(item["crown_jewel_assets"])
+        max_cvss = max((f.cvss_score or 0) for f in findings)
+        sev_order = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+        max_sev = max(sev_order.get(str(f.severity.value if hasattr(f.severity, "value") else f.severity or "").lower(), 0) for f in findings)
+        return (-cj_count, -max_sev, -max_cvss)
+
+    sorted_exposures = sorted(exposure_map.values(), key=_exposure_sort)
+    top_30 = sorted_exposures[:30]
+
+    # Build AI prompt with crown jewel annotations
+    finding_lines_parts = []
+    for exp in top_30[:20]:
+        f = exp["findings"][0]
+        cj_note = f" 👑 CROWN JEWEL ASSET ({len(exp['crown_jewel_assets'])} affected)" if exp["crown_jewel_assets"] else ""
+        sev = str(f.severity.value if hasattr(f.severity, "value") else f.severity or "").upper()
+        finding_lines_parts.append(
+            f"- [{sev}] {f.title} | CVE: {f.cve_id or 'N/A'} | CVSS: {f.cvss_score or 'N/A'} | Resource: {f.resource_id}{cj_note}"
+        )
+    finding_lines = "\n".join(finding_lines_parts)
+
+    crown_line = (
+        f"Crown jewel assets (highest business criticality, must be protected first): {', '.join(crown_jewels)}"
+        if crown_jewels else "No crown jewels tagged in scope."
     )
-    crown_line = f"Crown jewel assets (highest business criticality): {', '.join(crown_jewels)}" if crown_jewels else "No crown jewels tagged."
     prompt = (
         f"You are a senior cybersecurity consultant performing CTEM prioritisation.\n"
         f"{crown_line}\n\n"
-        f"Open findings for scoped assets:\n{finding_lines}\n\n"
-        "Select the top 5 exposures to remediate first. For each item output EXACTLY this JSON format:\n"
+        f"Open findings (👑 = affects a crown jewel asset):\n{finding_lines}\n\n"
+        "Select the top 5 exposures to remediate first. Crown jewel exposures must be ranked higher unless "
+        "the severity difference is dramatic. For each item output EXACTLY this JSON format:\n"
         '[{"rank":1,"title":"...","severity":"critical|high|medium|low","rationale":"...","finding_ids":["id1"]},...]'
         "\nOutput only the JSON array, no other text."
     )
@@ -525,19 +560,38 @@ async def generate_priorities(
             HumanMessage(content=prompt),
         ])
         raw = result.content if hasattr(result, "content") else str(result)
-        # Extract JSON array
         start, end = raw.find("["), raw.rfind("]")
         ai_items = json.loads(raw[start:end + 1]) if start >= 0 and end > start else []
     except Exception as exc:
         logger.warning("Priority generation failed: %s", exc)
         raise HTTPException(status_code=503, detail=f"AI provider unavailable: {exc}")
 
+    # Annotate AI items with crown jewel data by matching finding_ids or title
+    finding_by_id: Dict[str, Finding] = {f.id: f for exp in sorted_exposures for f in exp["findings"]}
+    for item in ai_items:
+        fids = item.get("finding_ids") or []
+        cj_assets: set = set()
+        for fid in fids:
+            f = finding_by_id.get(fid)
+            if f and f.resource_id in crown_jewel_set:
+                cj_assets.add(f.resource_id)
+        # Also check title match against exposures
+        if not cj_assets:
+            for exp in sorted_exposures:
+                any_f = exp["findings"][0]
+                if (any_f.title or "").lower() in (item.get("title") or "").lower() or \
+                   (item.get("title") or "").lower() in (any_f.title or "").lower():
+                    cj_assets = exp["crown_jewel_assets"]
+                    break
+        item["crown_jewel_count"] = len(cj_assets)
+        item["affects_crown_jewels"] = len(cj_assets) > 0
+        item["crown_jewel_assets"] = list(cj_assets)
+
     # Merge: keep analyst items (source='analyst'), replace AI items
     existing = prio_pn.phase_data_json or {}
     analyst_items = [i for i in existing.get("items", []) if i.get("source") == "analyst"]
     new_ai_items = [dict(source="ai", analyst_notes="", **i) for i in ai_items]
     all_items = new_ai_items + analyst_items
-    # Re-rank
     for idx, item in enumerate(all_items):
         item["rank"] = idx + 1
 

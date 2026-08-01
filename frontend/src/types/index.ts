@@ -305,6 +305,30 @@ export interface CveImpact {
   priority_note: string;
 }
 
+export interface AssetComplianceControl {
+  control_id: string;
+  framework: string;
+  title: string;
+  domain: string;
+  weight: number;
+  finding_count: number;
+  max_severity: string;
+  findings: Array<{ id: string; title: string; severity: string; cvss: number | null; cve: string | null }>;
+}
+
+export interface AssetCompliance {
+  asset_id: string;
+  asset_name: string;
+  asset_class: string;
+  framework: string | null;
+  total_framework_controls: number | null;
+  failing_controls_count: number;
+  compliance_score: number | null;
+  open_findings_total: number;
+  findings_with_control_mapping: number;
+  failing_controls: AssetComplianceControl[];
+}
+
 // ── Risk Overview ──────────────────────────────────────────────────────────
 
 export interface RiskOverviewCompliance {
