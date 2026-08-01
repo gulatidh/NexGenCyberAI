@@ -79,7 +79,7 @@ class JiraConnector(BaseConnector):
         title: str,
         description: str,
         severity: str,
-        issue_type: str = "Bug",
+        issue_type: str = "Task",
         project_key: str | None = None,
     ) -> Dict[str, Any]:
         """Create a Jira issue and return {id, key, url}."""
