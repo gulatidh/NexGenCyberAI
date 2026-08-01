@@ -169,19 +169,24 @@ async def create_ticket_from_finding(
     title = finding.title or "Security Finding"
     description = finding.description or title
 
-    if conn.connector_type == ConnectorType.SERVICENOW:
-        result = await _create_sn_ticket(creds, config, title, description, severity, payload.assignment_group)
-        ticket_id = result["sys_id"]
-        ticket_url = result["url"]
-        ticket_status = "new"
-    else:
-        result = await _create_jira_ticket(
-            creds, config, title, description, severity,
-            payload.project_key or config.get("project_key"),
-        )
-        ticket_id = result["key"]
-        ticket_url = result["url"]
-        ticket_status = "open"
+    try:
+        if conn.connector_type == ConnectorType.SERVICENOW:
+            result = await _create_sn_ticket(creds, config, title, description, severity, payload.assignment_group)
+            ticket_id = result["sys_id"]
+            ticket_url = result["url"]
+            ticket_status = "new"
+        else:
+            result = await _create_jira_ticket(
+                creds, config, title, description, severity,
+                payload.project_key or config.get("project_key"),
+            )
+            ticket_id = result["key"]
+            ticket_url = result["url"]
+            ticket_status = "open"
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Connector error: {exc}")
 
     ctype = conn.connector_type.value if hasattr(conn.connector_type, "value") else str(conn.connector_type)
     sync = TicketSync(
@@ -230,19 +235,24 @@ async def create_ticket_from_remediation(
     else:
         severity = "low"
 
-    if conn.connector_type == ConnectorType.SERVICENOW:
-        result = await _create_sn_ticket(creds, config, title, description, severity, payload.assignment_group)
-        ticket_id = result["sys_id"]
-        ticket_url = result["url"]
-        ticket_status = "new"
-    else:
-        result = await _create_jira_ticket(
-            creds, config, title, description, severity,
-            payload.project_key or config.get("project_key"),
-        )
-        ticket_id = result["key"]
-        ticket_url = result["url"]
-        ticket_status = "open"
+    try:
+        if conn.connector_type == ConnectorType.SERVICENOW:
+            result = await _create_sn_ticket(creds, config, title, description, severity, payload.assignment_group)
+            ticket_id = result["sys_id"]
+            ticket_url = result["url"]
+            ticket_status = "new"
+        else:
+            result = await _create_jira_ticket(
+                creds, config, title, description, severity,
+                payload.project_key or config.get("project_key"),
+            )
+            ticket_id = result["key"]
+            ticket_url = result["url"]
+            ticket_status = "open"
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Connector error: {exc}")
 
     ctype = conn.connector_type.value if hasattr(conn.connector_type, "value") else str(conn.connector_type)
     sync = TicketSync(

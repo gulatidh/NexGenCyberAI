@@ -154,9 +154,10 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "org",   label: "Organisation" },
   ],
   jira: [
-    { key: "url",       label: "Jira URL" },
-    { key: "email",     label: "Email" },
-    { key: "api_token", label: "API Token", secret: true },
+    { key: "url",         label: "Jira URL",            placeholder: "https://yourorg.atlassian.net" },
+    { key: "email",       label: "Email" },
+    { key: "api_token",   label: "API Token",           secret: true },
+    { key: "project_key", label: "Default Project Key", placeholder: "e.g. KAN", help: "Pre-fills the project key when creating tickets. You can override it per-ticket." },
   ],
   web: [],
   semgrep: [

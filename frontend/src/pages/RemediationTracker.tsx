@@ -179,7 +179,9 @@ function CreateTicketDialog({
                 value={projectKey}
                 onChange={(e) => setProjectKey(e.target.value)}
                 fullWidth
-                helperText="e.g. SEC, OPS"
+                required
+                error={isJira && !projectKey.trim()}
+                helperText={isJira && !projectKey.trim() ? "Required — enter your Jira project key (e.g. KAN, SAM1)" : "The short key shown before every issue number (e.g. KAN-1)"}
               />
             )}
           </>
@@ -190,7 +192,7 @@ function CreateTicketDialog({
         <Button
           variant="contained"
           onClick={handleCreate}
-          disabled={creating || !connectorId || connectors.length === 0}
+          disabled={creating || !connectorId || connectors.length === 0 || (isJira && !projectKey.trim())}
         >
           {creating ? "Creating…" : "Create Ticket"}
         </Button>
