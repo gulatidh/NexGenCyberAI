@@ -44,6 +44,7 @@ const PLATFORM_TYPES = new Set<ConnectorType>([
 // All scanner types — inbuilt (GitHub Actions) + enterprise (direct API)
 const ALL_SCANNER_TYPES = new Set<ConnectorType>([
   "web", "semgrep", "codeql", "nmap", "trivy", "owasp_dc", "gitleaks", "trufflehog",
+  "nuclei", "checkov", "sslyze",
   "ai_code_review",
   "tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix",
 ]);
@@ -55,7 +56,9 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   web: "dast",
   semgrep: "sast", codeql: "sast", sonarqube: "sast",
   nmap: "network", openvas: "network", trivy: "network",
+  nuclei: "network", sslyze: "network",
   owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
+  checkov: "sast",
   ai_code_review: "sast",
   tenable: "enterprise", burp_enterprise: "enterprise", snyk: "enterprise",
   rapid7: "enterprise", qualys: "enterprise", invicti: "enterprise", acunetix: "enterprise",
@@ -70,7 +73,9 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   web: "🌐 Web App (ZAP)",
   semgrep: "🔍 Semgrep", codeql: "🧬 CodeQL", sonarqube: "📊 SonarQube",
   nmap: "📡 NMAP", openvas: "🛰️ OpenVAS", trivy: "🏷️ Trivy",
+  nuclei: "⚡ Nuclei", sslyze: "🔒 SSLyze",
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
+  checkov: "🏗️ Checkov",
   ai_code_review: "🤖 AI Code Review",
   tenable: "🔴 Tenable.io", burp_enterprise: "🟠 Burp Enterprise", snyk: "💜 Snyk",
   rapid7: "🔵 Rapid7 InsightVM", qualys: "🟢 Qualys VMDR",
@@ -260,6 +265,22 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "host", label: "Acunetix Host URL", placeholder: "https://acunetix.company.com", help: "Your Acunetix Enterprise server (port 3443 is used automatically)" },
     { key: "api_key", label: "API Key", secret: true, placeholder: "1/xxxx...", help: "Acunetix → Profile → API Key" },
   ],
+  nuclei: [
+    { key: "target_url", label: "Target URL", placeholder: "https://app.example.com",
+      help: "Full URL of the web application or API to scan with Nuclei templates." },
+    { key: "target", label: "Target Host (fallback)", placeholder: "app.example.com",
+      help: "Hostname or IP used if target_url is not set." },
+  ],
+  checkov: [
+    { key: "repo_url", label: "Git Repo URL", placeholder: "https://github.com/org/iac-repo",
+      help: "Repository containing Terraform, CloudFormation, Kubernetes, or other IaC files." },
+    { key: "git_token", label: "Git Personal Access Token", secret: true, placeholder: "ghp_…",
+      help: "Required for private repositories. Scope: repo (read)." },
+  ],
+  sslyze: [
+    { key: "target", label: "Target Host", placeholder: "api.example.com or api.example.com:443",
+      help: "Hostname (optionally with :port) of the TLS service to audit. Default port is 443." },
+  ],
   upload: [],
 };
 
@@ -275,6 +296,9 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   owasp_dc:   "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks:   "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets are flagged critical.",
+  nuclei:         "Template-based vulnerability scanner with 9,000+ templates covering CVEs, default credentials, misconfigurations, and exposed panels. Each finding is confirmed — not hypothesised. Point at a URL or hostname.",
+  checkov:        "IaC security scanner for Terraform, CloudFormation, Kubernetes, Helm, Dockerfile, and more. Finds misconfigurations before resources are deployed. Point at a Git repo containing IaC files.",
+  sslyze:         "TLS/SSL configuration auditor — detects deprecated protocols (SSL 2/3, TLS 1.0/1.1), weak ciphers, certificate issues, and TLS vulnerabilities (Heartbleed, ROBOT). Enter a hostname or hostname:port.",
   ai_code_review: "LLM-powered code security review — no GitHub Actions required. Point at a Git repo or upload a zip archive when starting a scan. The AI triages files by risk, reviews each function for vulnerabilities, runs a self-critique pass to remove false positives, and traces cross-file taint flows.",
   tenable:        "Connects to Tenable.io's REST API to launch network/host vulnerability scans. Scans the target IPs/CIDRs you configure and ingests all found vulnerabilities with CVSS scores.",
   burp_enterprise:"Connects to your Burp Suite Enterprise server to launch DAST scans against web applications. Uses Burp's industry-standard crawler and active attack engine.",

@@ -6,7 +6,7 @@ import {
 import {
   AdminPanelSettings, AutoStories, BarChart, BugReport, ExpandMore,
   Hub, Insights, Lightbulb, MenuBook, Psychology, Radar, RocketLaunch,
-  Schedule, Search, SettingsSuggest, SmartToy, Warning,
+  Schedule, Search, Security, SettingsSuggest, SmartToy, Warning,
 } from "@mui/icons-material";
 
 interface Step {
@@ -1099,6 +1099,292 @@ const GROUPS: Group[] = [
         ],
         warnings: [
           "App Service /home/ is shared across all instances when scaled out. Slow Azure Files mount performance can make large binary uploads slower — scale up (larger SKU) rather than scale out.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "scanners",
+    title: "Scanners & Tools",
+    navLabel: "Scanners & Tools",
+    icon: <Security fontSize="small" />,
+    color: "#E91E63",
+    topics: [
+      {
+        id: "tool-zap",
+        title: "OWASP ZAP — Web Application Scanner (DAST)",
+        summary: "ZAP (Zed Attack Proxy) is an open-source Dynamic Application Security Testing tool. It probes a live web application from the outside — exactly like an attacker would — and reports vulnerabilities it can observe or trigger through HTTP interactions.",
+        steps: [
+          { text: "Purpose: detect runtime web vulnerabilities that only appear when the application is running — SQL injection, XSS, CSRF, insecure headers, authentication bypasses, directory traversal, and OWASP Top 10 issues. Static analysis (Semgrep/CodeQL) cannot find these because they require a live HTTP response." },
+          { text: "When to use:", detail: "Before any production release of a web app or API. After any change to authentication, session management, or input handling. As part of a scheduled security assessment cadence (quarterly minimum). When a new endpoint or feature is added that handles user input." },
+          { text: "How to use: Connections → Add connector → Web (ZAP). Enter the target URL (must be publicly reachable or reachable from GitHub Actions runners). Assessments → New Scan → DAST tab → select your ZAP connector → choose profile: Baseline (passive, ~5 mins) or Active (~30–60 mins).", detail: "Baseline: ZAP spiders the site passively — no attack payloads sent. Safe for production. Active: ZAP sends attack payloads (SQLi, XSS, path traversal, etc.) against discovered endpoints. Use only on non-production unless you have explicit written authorisation." },
+          { text: "What to expect from results: findings are grouped by alert type — XSS, SQL Injection, Missing Security Headers, Insecure Cookie Flags, etc. Each finding includes the vulnerable URL (resource_id), evidence (the HTTP request/response that triggered the alert), and CWE ID mapped to NIST/OWASP controls." },
+          { text: "Severity mapping: ZAP uses risk codes 0–3. Risk 3 + CWE in {79 XSS, 89 SQLi, 78 OS Injection, 94 Code Injection} → Critical. Risk 3 → High. Risk 2 → Medium. Risk 1 → Low. Risk 0 → Info." },
+        ],
+        tips: [
+          "Run Baseline first on production — it's passive and safe. Use the output to fix low-hanging fruit (missing headers, insecure cookies) before running Active on a staging environment.",
+          "For authenticated scans: save session cookies or Bearer tokens as auth_headers in the connector config. ZAP injects them via the Replacer rule so all crawled pages are scanned in an authenticated context.",
+          "ZAP produces many 'Informational' findings (e.g. server version disclosure). Filter to Medium+ in the Findings page for actionable results during triage.",
+        ],
+        warnings: [
+          "Active scan sends real attack payloads — it WILL trigger WAF alerts, fill error logs, and may corrupt data in forms. Never run Active scan against production without written authorisation and a maintenance window.",
+          "ZAP cannot scan SPAs (React/Vue/Angular) that require JavaScript execution. It crawls static HTML links. For SPA coverage, use ZAP's Ajax Spider (requires manual configuration outside this platform).",
+        ],
+      },
+      {
+        id: "tool-nmap",
+        title: "Nmap — Network Port & Service Scanner",
+        summary: "Nmap is the industry-standard network reconnaissance tool. It discovers which ports are open on a host or network range, identifies the services running on those ports, detects software versions, and runs NSE (Nmap Scripting Engine) scripts that can detect specific CVEs and misconfigurations.",
+        steps: [
+          { text: "Purpose: map your external and internal attack surface — find every service that is reachable from the network, identify services that should not be exposed, detect version-specific vulnerabilities (via NSE vuln scripts), and produce evidence of network exposure for compliance." },
+          { text: "When to use:", detail: "Before and after firewall rule changes to verify intended exposure. For new cloud environments to confirm no services are accidentally public. During periodic external attack surface assessments. When a compliance framework (PCI DSS Req 11.2, CIS Control 4.4) requires network scanning." },
+          { text: "How to use: Connections → Add connector → Network (Nmap). Enter target as IP, hostname, or CIDR (e.g. 10.0.0.0/24, api.example.com, 192.168.1.1). Assessments → New Scan → Network tab → select Nmap connector → Start.", detail: "The scan runs with: -Pn (skip host discovery — needed for cloud hosts that block ICMP), -sS SYN scan, -sV service detection, --top-ports 1000, --script='default,safe,vuln', host-timeout 5m." },
+          { text: "What to expect: one finding per open port. High-risk ports (RDP 3389, SMB 445, databases 3306/5432/27017, Redis 6379, etc.) are automatically flagged High. Well-known service ports (SSH 22, SNMP 161) are Medium. Unknown open ports are Low. NSE vulnerability scripts (e.g. smb-vuln-ms17-010 EternalBlue) produce separate High findings with the CVE ID." },
+          { text: "Severity logic by port:", detail: "Critical: none (port exposure alone is never critical — exploitation requires an additional step). High: RDP, SMB, Telnet, FTP, legacy r-services, databases exposed to the network. Medium: SSH, SNMP, LDAP, VNC. Low: any other open port. NSE vuln script hits override to High/Critical based on CVE severity." },
+        ],
+        tips: [
+          "Scan your external IP(s) first — that's your real perimeter. Then scan internal subnets from within the VPN to find east-west exposure.",
+          "For /16 or larger CIDRs, the scan may time out at 30 minutes. Break large ranges into /24 subnets and create one connector per subnet.",
+          "Combine Nmap findings with cloud connector findings — Nmap tells you what's exposed on the wire; Azure/AWS connector tells you whether the NSG/Security Group rule was intentional.",
+        ],
+        warnings: [
+          "Port scanning may be blocked or logged by cloud provider abuse detection systems. Azure, AWS, and GCP permit scanning your own resources but require you to notify them for aggressive scans against third-party infrastructure.",
+          "The SYN scan (-sS) requires root privileges. GitHub Actions runners have sudo — this works correctly in the workflow. Do not attempt to run Nmap manually without root if you want accurate results.",
+        ],
+      },
+      {
+        id: "tool-semgrep",
+        title: "Semgrep — Static Application Security Testing (SAST)",
+        summary: "Semgrep is a fast, lightweight static analysis tool that finds security bugs in source code by pattern-matching against a library of rules. It supports 30+ languages and can detect injection flaws, insecure API usage, hardcoded secrets, and OWASP Top 10 patterns without executing the code.",
+        steps: [
+          { text: "Purpose: find security bugs in source code before they reach production. Semgrep excels at finding patterns like: SQL queries built from user input, use of dangerous functions (eval, exec, pickle.loads), hardcoded credentials, insecure random number generators, missing input validation, and framework-specific vulnerabilities (Flask debug mode, Django CSRF disabled, etc.)." },
+          { text: "When to use:", detail: "On every code repository that contains application logic. Especially valuable for: new repositories before their first scan, after adding new libraries or frameworks, when fixing a security bug (verify the fix pattern is correct), and as a gating check in CI/CD." },
+          { text: "How to use: Connections → Add connector → SAST (Semgrep). Enter the Git repository URL. For private repos, add a Git Personal Access Token. Assessments → New Scan → SAST tab → Semgrep → Start.", detail: "The workflow clones the repo and runs the Semgrep 'auto' ruleset which automatically selects the best rules for detected languages. Output is SARIF format, parsed into findings." },
+          { text: "What to expect: findings are at the file:line level — each finding includes the exact file path, line number (in the description), the matched code pattern, and a remediation explanation. Severity ranges from Critical (RCE patterns) to Info (style suggestions)." },
+          { text: "Languages supported best: Python, JavaScript/TypeScript, Go, Java, Ruby, PHP, C/C++, Rust, Kotlin, Scala. Limited support: Swift, Dart, Lua." },
+        ],
+        tips: [
+          "Semgrep 'auto' mode picks the right rules automatically. For specific coverage (e.g. only OWASP Top 10, or only secrets), the rule set can be customised in the workflow YAML.",
+          "False positive rate is low compared to older SAST tools because Semgrep matches on AST patterns not regex — it understands code structure. Still review each High/Critical finding before closing as false positive.",
+          "Run Semgrep on your most critical repositories first: authentication services, payment processing, API gateways, anything that handles PII.",
+        ],
+        warnings: [
+          "Semgrep does not execute code — it cannot detect runtime vulnerabilities like broken access control, IDOR, or business logic flaws. Use ZAP for those.",
+          "Very large monorepos (millions of lines) may hit the 60-minute workflow timeout. Use path filters in the connector config to scope to specific directories.",
+        ],
+      },
+      {
+        id: "tool-codeql",
+        title: "CodeQL — Deep Semantic Code Analysis (SAST)",
+        summary: "CodeQL is GitHub's enterprise-grade static analysis engine. Unlike pattern-matching tools, CodeQL builds a full semantic model of your code — data flows, call graphs, type information — and then runs queries against that model to find vulnerabilities that span multiple files and function calls.",
+        steps: [
+          { text: "Purpose: find complex, multi-hop vulnerabilities that Semgrep misses: data flows from user input across function boundaries to a sink (SQL query, shell command, file write), second-order injection, deserialization vulnerabilities, and path traversal through indirect function calls. CodeQL is significantly more thorough than Semgrep but slower." },
+          { text: "When to use:", detail: "For high-value repositories where deep coverage justifies longer scan time. Pre-release security gate for major versions. When a pentest or bug bounty finds an injection vulnerability — CodeQL can find similar patterns across the whole codebase. For Java, C#, C/C++, Go, Python, Ruby, Swift, Kotlin (best language coverage of any SAST tool)." },
+          { text: "How to use — Source mode: Connections → Add connector → SAST (CodeQL). Enter Git repo URL. Assessments → New Scan → SAST tab → CodeQL → select Source mode → Start. The workflow clones and builds the code.", detail: "How to use — Binary mode (no source): Assessments → New Scan → SAST tab → CodeQL → select Upload Binary → attach JAR/WAR/EAR/DLL/EXE (max 500 MB). CodeQL analyses bytecode with --build-mode=none. Useful for vendor binaries or compiled artifacts." },
+          { text: "What to expect: findings include the full data flow path — entry point → intermediate steps → sink. Each finding shows which variable carried tainted data and where it was used unsafely. This level of detail makes findings very actionable. A typical scan of 50k–200k LOC takes 10–25 minutes." },
+          { text: "Query suite used: CodeQL Standard Security (150+ queries) covering OWASP Top 10, CWE Top 25, SQL injection, XSS, path traversal, SSRF, code injection, deserialization, and more." },
+        ],
+        tips: [
+          "CodeQL is slower than Semgrep but produces fewer false positives and finds deeper bugs. Use Semgrep for fast feedback in PRs; use CodeQL for scheduled deep scans.",
+          "Binary analysis works best on Java/Kotlin bytecode. C# IL works but with less query coverage. Stripped native binaries (.so/.dylib without debug symbols) yield almost nothing.",
+          "CodeQL requires the code to compile for source mode. If your repo has build dependencies not available in the GitHub runner, the scan will fail. The binary upload path sidesteps this.",
+        ],
+        warnings: [
+          "CodeQL source scan requires the repository to be compilable. Missing build tools, private package registries, or complex build systems can cause the workflow to fail before analysis begins.",
+          "The 500 MB binary upload limit is hard. For large JARs, extract only the application JARs (excluding third-party dependencies) before uploading.",
+        ],
+      },
+      {
+        id: "tool-gitleaks",
+        title: "Gitleaks — Git History Secret Scanning",
+        summary: "Gitleaks scans your entire Git repository history — every commit, every branch — for secrets that were ever committed: API keys, passwords, connection strings, private keys, OAuth tokens, AWS/Azure/GCP credentials, and more. It finds secrets even if they were deleted in a later commit.",
+        steps: [
+          { text: "Purpose: detect secrets that were committed to source control. This is one of the most common causes of credential compromise — a developer commits a .env file or API key 'temporarily' and it becomes permanently embedded in git history even after deletion. Gitleaks finds these historical exposures." },
+          { text: "When to use:", detail: "On every repository immediately — this should be one of the first scans you run. Before making a private repository public. After a developer incident where credentials may have been committed. As a continuous check: schedule it monthly to catch new secrets committed since the last scan." },
+          { text: "How to use: Connections → Add connector → Secrets (Gitleaks). Enter the Git repository URL and a Personal Access Token for private repos. Assessments → New Scan → Secrets tab → Gitleaks → Start.", detail: "The workflow clones the full history (not --depth 1) so all commits are scanned. Gitleaks uses its built-in ruleset plus a generic high-entropy string detector." },
+          { text: "What to expect: each finding is one secret match — the rule that matched (e.g. 'aws-access-token', 'generic-api-key'), the file path, the commit hash, the author, the date, and a redacted preview of the secret. Severity is High for all findings (any committed secret is a High finding — rotate immediately)." },
+          { text: "What happens after a finding: the secret must be rotated (invalidated) in the originating system immediately. Then remove it from git history using `git filter-repo` or BFG Repo-Cleaner. Simply deleting it in a new commit is NOT sufficient — the secret remains in every prior commit." },
+        ],
+        tips: [
+          "Treat every Gitleaks High finding as a confirmed breach of that credential until you verify the credential has been rotated. There is no 'it was only in git for a few minutes' — bots scrape GitHub commits in real time.",
+          "After rotating a credential, update the finding status to 'remediated' and add a comment with the rotation date and ticket reference.",
+          "Use Gitleaks + TruffleHog together — they use different rule sets and different detection algorithms. Running both catches more secrets.",
+        ],
+        warnings: [
+          "Gitleaks findings are always High. Do not accept or suppress them without first verifying the credential has been rotated and is no longer valid.",
+          "For very large repositories with deep history (10,000+ commits), the scan may take 20–30 minutes. The 60-minute workflow timeout should still be sufficient.",
+        ],
+      },
+      {
+        id: "tool-trufflehog",
+        title: "TruffleHog — Deep Secret & Credential Scanning",
+        summary: "TruffleHog goes further than Gitleaks by using a verification step — it attempts to validate discovered secrets against their originating services (AWS STS, GitHub API, Stripe, Slack, etc.) to confirm whether the secret is still active. It also uses entropy analysis and 700+ detectors to find secrets Gitleaks might miss.",
+        steps: [
+          { text: "Purpose: find and verify active secrets in git history. TruffleHog's verification feature distinguishes between rotated (dead) credentials and still-active ones — letting you prioritise which findings need immediate action vs. historical cleanup." },
+          { text: "When to use:", detail: "Run TruffleHog alongside Gitleaks on every repository — they complement each other. TruffleHog is especially valuable when you have a large finding backlog and need to know which secrets are still live. Also use it on public repositories where secrets may have been exposed publicly." },
+          { text: "How to use: Connections → Add connector → Secrets (TruffleHog). Enter the Git repository URL and PAT for private repos. Assessments → New Scan → Secrets tab → TruffleHog → Start. Output includes a Verified flag per finding." },
+          { text: "What to expect: findings are similar to Gitleaks but with a Verified field. Verified=true means TruffleHog successfully authenticated with that credential — it is confirmed live and must be rotated immediately. Verified=false means it detected the pattern but couldn't confirm liveness (the credential may still be valid, or the service may not support verification)." },
+          { text: "Detectors: 700+ built-in detectors covering AWS, GitHub, GitLab, Stripe, Twilio, SendGrid, Slack, Discord, Shopify, Jira, Azure, GCP, and hundreds more service-specific formats." },
+        ],
+        tips: [
+          "Prioritise Verified=true findings above everything else — these are confirmed live credentials. Rotate them before closing the browser window.",
+          "Verified=false findings still need investigation — TruffleHog may not have verification support for that service type, or the service may have rate-limited the check.",
+          "Run both Gitleaks and TruffleHog. Gitleaks has faster rule matching and better generic patterns; TruffleHog has broader service-specific detectors and live verification.",
+        ],
+        warnings: [
+          "TruffleHog's verification feature makes real API calls to third-party services. This is intentional — it's how it confirms liveness. These calls are read-only authentication attempts.",
+          "Do not add TruffleHog findings to a public report without redacting the secret value. Even a partial key is sensitive.",
+        ],
+      },
+      {
+        id: "tool-trivy",
+        title: "Trivy — Container & Dependency Vulnerability Scanner",
+        summary: "Trivy scans container images, filesystems, and Git repositories for known CVEs in OS packages (Alpine, Debian, Ubuntu, RHEL) and language-specific dependencies (pip, npm, Maven, Go modules, Cargo, NuGet). It also detects IaC misconfigurations and exposed secrets.",
+        steps: [
+          { text: "Purpose: find CVEs in your container base images and application dependencies. A container image built from `ubuntu:20.04` may contain hundreds of vulnerable OS packages. A Node.js application may have transitive npm dependencies with known CVEs. Trivy finds both." },
+          { text: "When to use:", detail: "On every container image before it is pushed to a registry or deployed. After updating a base image or major dependency. On a scheduled basis (weekly) because new CVEs are published daily against packages that were previously clean. As a gate in CI/CD: fail builds with Critical CVEs." },
+          { text: "How to use: Connections → Add connector → Container (Trivy). Enter a container image reference (e.g. nginx:latest, myrepo/myapp:1.2.3, ghcr.io/org/app:sha-abc123) or a Git repo URL for filesystem scanning. Assessments → New Scan → select Trivy connector → Start." },
+          { text: "What to expect: findings include the CVE ID, affected package, installed version, fixed version, CVSS score, and severity. Trivy outputs are NVD-sourced so CVSS scores are accurate. A typical production image has 5–50 findings; an old unpatched image may have 200+." },
+          { text: "Severity: Trivy maps NVD CVSS v3 base score to Critical (9.0+), High (7.0–8.9), Medium (4.0–6.9), Low (<4.0), Unknown (no CVSS available). These map directly to Monitara severities." },
+        ],
+        tips: [
+          "Always scan the exact image tag you deploy — `nginx:latest` changes over time. Pin to a specific SHA for reproducible results.",
+          "Filter by 'fixed version available' — vulnerabilities without a fix cannot be patched and require compensating controls instead. Focus remediation effort on CVEs with a known fix first.",
+          "For distroless images (minimal OS): Trivy still scans language package manifests inside the image (requirements.txt, package-lock.json, pom.xml). You won't see OS CVEs but will see dependency CVEs.",
+        ],
+        warnings: [
+          "A 'clean' Trivy scan means no known CVEs in the NVD database at scan time — not that the image is vulnerability-free. Zero-day CVEs are not in any database by definition.",
+          "Large images (>2 GB) can hit the GitHub Actions runner's disk limit. Use the filesystem scan mode on the repo instead of pulling the full image if this occurs.",
+        ],
+      },
+      {
+        id: "tool-owasp-dc",
+        title: "OWASP Dependency-Check — Library CVE Scanner (SCA)",
+        summary: "OWASP Dependency-Check is a Software Composition Analysis (SCA) tool that identifies project dependencies and checks whether any contain known CVEs. It supports Java (JAR/WAR/EAR), .NET, JavaScript (npm), Python (requirements.txt), Ruby, PHP, and more.",
+        steps: [
+          { text: "Purpose: detect vulnerable third-party libraries used by your application. Your code may be perfectly written but if you depend on log4j 2.14 (Log4Shell CVE-2021-44228) or OpenSSL 3.0.1 (CVE-2022-0778), you are vulnerable. OWASP DC finds these supply chain risks." },
+          { text: "When to use:", detail: "On every application repository that has a dependency manifest (pom.xml, package.json, requirements.txt, Gemfile, composer.json, build.gradle). Run after every dependency update. Run weekly as a scheduled check because new CVEs are published against existing versions daily." },
+          { text: "How to use: Connections → Add connector → Dependency (OWASP DC). Enter the Git repository URL. Assessments → New Scan → Dependency tab → OWASP DC → Start. The workflow clones the repo and runs dependency-check against all detected manifests.", detail: "OWASP DC downloads the NVD data feed on first run (cached in the workflow). Subsequent runs use the cached feed and run much faster." },
+          { text: "What to expect: findings include the vulnerable library name, version, CVE ID, CVSS score, description, and evidence of how DC identified the dependency (filename + manifest location). One finding per CVE per library — a single old library may produce 5–10 findings." },
+          { text: "Difference vs Trivy: OWASP DC is purpose-built for application dependencies and has deeper Java/Maven/Gradle support. Trivy excels at container OS packages. Use both for complete coverage." },
+        ],
+        tips: [
+          "The most important field is 'fixed version' — upgrade to that version to remediate. If there is no fix, evaluate whether the vulnerable feature is used by your code (many CVEs are in components you may not call).",
+          "OWASP DC can produce false positives — it sometimes matches a library by filename heuristic rather than confirmed content. Always verify the library version in your manifest before treating as confirmed.",
+          "For Java: ensure the pom.xml or build.gradle is present in the repo root. DC resolves transitive dependencies by reading the manifest — it does not require a `mvn install` to work.",
+        ],
+        warnings: [
+          "OWASP DC requires an NVD API key for reliable data feed downloads (rate limiting was introduced in 2024). Without it, the first run may fail or take very long. Configure the NVD_API_KEY as a GitHub Actions secret if feed download failures occur.",
+          "Do not filter out Medium CVEs without review — many supply chain attacks exploit Medium-severity vulnerabilities that are widely ignored.",
+        ],
+      },
+      {
+        id: "tool-nuclei",
+        title: "Nuclei — Template-Based Vulnerability Scanner",
+        summary: "Nuclei is a fast, community-driven vulnerability scanner from ProjectDiscovery that runs thousands of templates covering CVEs, misconfigurations, exposed admin panels, default credentials, and more. Every Nuclei template is a PoC — a finding means the vulnerability was actually confirmed, not just hypothesised.",
+        steps: [
+          { text: "Purpose: scan web applications, APIs, and network hosts for specific, known vulnerabilities using proof-of-concept templates. Unlike ZAP which probes for vulnerability classes generically, Nuclei checks for specific CVEs (e.g. CVE-2021-44228 Log4Shell, CVE-2022-26134 Confluence RCE) and misconfigs by name. When Nuclei fires, the finding is confirmed." },
+          { text: "When to use:", detail: "After new critical CVEs are published — Nuclei templates for major CVEs are typically available within 24–48 hours of disclosure. For exposed services where you want to confirm whether a specific vulnerability applies. For discovery of exposed admin panels, default credentials, and debug endpoints. As a complement to ZAP for web targets." },
+          { text: "How to use: Connections → Add connector → Network (Nuclei). Enter the target URL or hostname. Assessments → New Scan → Network tab → Nuclei → Start.", detail: "Template sets run: network, http, ssl, default-login, misconfiguration, and cves. Templates are updated on every run (nuclei -update-templates). Timeout per request: 10 seconds. 25 concurrent threads." },
+          { text: "What to expect: findings map directly to specific CVE IDs or misconfig types. Each finding includes the template name, what matched (the matched-at URL or host), severity from the template author, and extracted results. A low-finding-count result is often better than ZAP — Nuclei prioritises precision over coverage." },
+          { text: "Template count at time of writing: 9,000+ templates. New templates added daily by the ProjectDiscovery community. Most impactful template sets: cves (confirmed CVE exploits), default-login (common default credentials), exposed-panels (admin interfaces), misconfiguration (CORS, SSRF, header issues)." },
+        ],
+        tips: [
+          "Nuclei findings have very low false-positive rates — if a template fires, the vulnerability is confirmed. Treat every Nuclei High/Critical as requiring immediate action.",
+          "The default-login template set checks for default credentials (admin/admin, admin/password) on common services — databases, Kubernetes dashboards, Jenkins, Grafana, etc. Always run this on new environments.",
+          "Use Nuclei + ZAP together: ZAP finds broad vulnerability classes through active fuzzing; Nuclei confirms specific named CVEs. They complement each other perfectly.",
+        ],
+        warnings: [
+          "Nuclei sends real attack payloads to confirm vulnerabilities. Do not run against production systems you don't own without written authorisation. The confirmed-exploit nature means some templates will trigger WAF alerts and IDS signatures.",
+          "The CVE template set includes templates for critical vulnerabilities (Log4Shell, ProxyLogon, EternalBlue over web). These are genuine exploitation attempts — run only against your own targets in controlled environments.",
+          "Template updates happen on every run. Occasionally a new community template may produce false positives. Pin to a specific Nuclei version in the workflow if scan-over-scan consistency is critical.",
+        ],
+      },
+      {
+        id: "tool-checkov",
+        title: "Checkov — Infrastructure-as-Code Security Scanner",
+        summary: "Checkov scans Infrastructure-as-Code files — Terraform, CloudFormation, Kubernetes manifests, Helm charts, Dockerfiles, Bicep, ARM templates, and more — for security misconfigurations before resources are provisioned. It catches cloud misconfigs at the PR stage, not after deployment.",
+        steps: [
+          { text: "Purpose: prevent cloud misconfigurations from ever being deployed. Checkov finds issues like: S3 buckets without encryption or public-access blocking, security groups with 0.0.0.0/0 ingress on sensitive ports, EC2 instances without IMDSv2 enforced, RDS without deletion protection, Kubernetes pods running as root, Dockerfiles using root user, missing network policies, unencrypted EBS volumes." },
+          { text: "When to use:", detail: "On every IaC repository. Run Checkov before any Terraform apply or CloudFormation deploy. Especially important for: new environments being built from scratch, repositories where multiple developers push IaC changes, legacy IaC that has never been security-reviewed, and before cloud compliance audits (PCI DSS, ISO 27001, CIS Benchmarks)." },
+          { text: "How to use: Connections → Add connector → SAST (Checkov). Enter the Git repository URL containing IaC files. For private repos, add a Personal Access Token. Assessments → New Scan → SAST tab → Checkov → Start.", detail: "Checkov auto-detects file types and runs the relevant checks. It scans the entire repo directory including subdirectories. Checks are mapped to CIS, NIST, SOC 2, PCI DSS, and ISO 27001 controls." },
+          { text: "What to expect: findings are keyed by Check ID (e.g. CKV_AWS_18 — S3 access logging enabled, CKV_K8S_30 — containers not running as root). Each finding shows the resource name, file path, and a link to the Bridgecrew guideline explaining why it matters and how to fix it.", detail: "Typical finding volume: a mature Terraform codebase may have 20–100 Checkov findings. A greenfield IaC repo being security-reviewed for the first time may have 200–500." },
+          { text: "IaC types supported: Terraform (HCL), AWS CloudFormation, Azure ARM/Bicep, Google Cloud Deployment Manager, Kubernetes YAML, Helm, Dockerfile, GitHub Actions workflows, Ansible, Serverless Framework, Kustomize." },
+        ],
+        tips: [
+          "Start with the CRITICAL and HIGH findings — these represent misconfigs that directly enable data exposure or privilege escalation (public S3 buckets, world-open security groups, unencrypted databases).",
+          "Many Checkov findings can be suppressed inline with a comment (# checkov:skip=CKV_AWS_18:reason) when the control genuinely doesn't apply. Document the business reason — auditors will ask.",
+          "Checkov findings map to compliance controls — use the Control Deficiencies view after running the Compliance Monitor agent to see which Checkov findings are failing specific ISO 27001 or CIS Benchmark controls.",
+        ],
+        warnings: [
+          "Checkov checks infrastructure configuration, not runtime behaviour. A Checkov-clean Terraform codebase may still be misconfigured at runtime if manual changes were made in the console after deployment.",
+          "Checkov does not execute Terraform plan — it reads the HCL source. Dynamic values (variables, data sources, locals) that resolve at plan time may cause some checks to produce false positives or miss issues.",
+        ],
+      },
+      {
+        id: "tool-sslyze",
+        title: "SSLyze — TLS/SSL Configuration Auditor",
+        summary: "SSLyze is a Python-based TLS configuration analysis tool that connects to a live HTTPS/TLS endpoint and reports its full configuration: accepted protocol versions, cipher suites, certificate validity, and vulnerability to attacks like Heartbleed, ROBOT, and POODLE. It produces a compliance-ready TLS posture report.",
+        steps: [
+          { text: "Purpose: audit the TLS configuration of any HTTPS service — web servers, APIs, mail servers (STARTTLS), databases with TLS — and detect: deprecated protocol versions (SSL 2.0, SSL 3.0, TLS 1.0, TLS 1.1), weak cipher suites (RC4, 3DES, EXPORT-grade, NULL ciphers), certificate issues (expired, self-signed, hostname mismatch, weak key size), and specific TLS vulnerabilities (Heartbleed CVE-2014-0160, ROBOT, CRIME/TLS compression, missing Fallback SCSV)." },
+          { text: "When to use:", detail: "Before any compliance audit that checks TLS (PCI DSS Req 4.2, NIST SP 800-52 Rev 2, ISO 27001 A.10.1). After certificate renewal to confirm the new cert is correctly deployed. When users or security testers report TLS errors. After changing web server or load balancer TLS configuration. Quarterly as part of a certificate expiry monitoring programme." },
+          { text: "How to use: Connections → Add connector → Network (SSLyze). Enter the target as hostname or hostname:port (default port is 443 if not specified, e.g. api.example.com or mail.example.com:465). Assessments → New Scan → Network tab → SSLyze → Start." },
+          { text: "What to expect: findings cover up to 8 issue categories.", detail: "Critical: Heartbleed (server leaks memory), ROBOT (RSA decryption oracle). High: SSL 2.0/3.0 accepted (broken protocols), expired certificate, certificate hostname mismatch. Medium: TLS 1.0/1.1 accepted (deprecated), weak ciphers (RC4/3DES/EXPORT/NULL), TLS compression enabled (CRIME attack). Low: TLS 1.3 not offered (informational — TLS 1.2 only)." },
+          { text: "A clean scan with no findings means: TLS 1.2 + 1.3 only, strong cipher suites, valid cert, no known TLS vulnerabilities. This is the target state for any public-facing service." },
+        ],
+        tips: [
+          "Run SSLyze on all externally facing services: web apps, APIs, mail servers (ports 25/465/587), FTPS (990), LDAPS (636). TLS misconfigs are pervasive — most organisations find multiple issues on first scan.",
+          "PCI DSS requires TLS 1.2 minimum — any finding of SSL/TLS 1.0/1.1 accepted is a direct PCI compliance failure. Fix by disabling the protocol in your web server config (nginx: ssl_protocols TLSv1.2 TLSv1.3).",
+          "Certificate expiry findings include the exact number of days remaining. Use this to prioritise renewals — set up monitoring alerts at 30 and 7 days before expiry.",
+        ],
+        warnings: [
+          "SSLyze performs a real TLS handshake with the target — it is not passive. Ensure the target is reachable from GitHub Actions runners (public internet or configured VPN). Internal-only services cannot be scanned.",
+          "Some legacy systems (old Java keystores, ancient load balancers) reject SSLyze's TLS handshake and the scan fails. In those cases, use OpenSSL or nmap --script ssl-enum-ciphers for compatibility.",
+          "Heartbleed and ROBOT checks involve sending specific malformed TLS records to the server. These are safe — they detect the vulnerability without exploiting it — but may appear in server logs as anomalous TLS connections.",
+        ],
+      },
+      {
+        id: "tool-ai-code-review",
+        title: "AI Code Review — LLM-Powered Security Analysis",
+        summary: "AI Code Review uses a 4-phase LLM pipeline to review source code for security vulnerabilities with the depth of a manual code review. Unlike rule-based SAST, it understands context — business logic flaws, missing authorisation checks, and subtle vulnerabilities that no pattern can detect.",
+        steps: [
+          { text: "Purpose: simulate a senior security engineer manually reviewing your code. It catches what Semgrep and CodeQL miss: missing ownership checks (IDOR), business logic bypasses, trust boundary violations, insecure design patterns, and context-dependent vulnerabilities that require understanding what the code is supposed to do." },
+          { text: "When to use:", detail: "For the most security-sensitive repositories: authentication services, payment flows, authorisation middleware, admin APIs. For code that was never security-reviewed before. When a pentest finds a logical vulnerability and you want to find similar patterns. When you need to brief a client on code-level security findings." },
+          { text: "How to use — Git repo: Connections → Add connector → SAST (AI Code Review). Enter Git repo URL. Assessments → New Scan → SAST tab → AI Code Review → Start. The platform clones, chunks, and analyses.", detail: "How to use — Archive upload: Assessments → New Scan → SAST tab → AI Code Review → Upload ZIP/tar.gz → select archive → Start. Maximum 500 MB. Useful for codebases without a public Git remote." },
+          { text: "Pipeline phases:", detail: "Phase 1 — Triage: risk-scores every file by language, naming, imports, and structural heuristics. Only the top-risk files proceed to deep analysis. Phase 2 — Per-function review: analyses each function in isolation for vulnerabilities. Phase 3 — Self-critique: re-reads its own findings and removes false positives. Phase 4 — Cross-file taint tracing: traces data flows across file boundaries to find multi-hop vulnerabilities." },
+          { text: "What to expect: findings are at the function level (resource_id = file path, description includes the function name and line context). Findings include: the vulnerability class, why it's a problem, a code-level explanation, and a concrete remediation suggestion. A medium-sized codebase (10k–50k LOC) typically produces 10–40 findings." },
+        ],
+        tips: [
+          "AI Code Review is not a replacement for Semgrep/CodeQL — it complements them. Run all three: Semgrep for speed, CodeQL for depth, AI Code Review for context and business logic.",
+          "Output quality scales with LLM quality. Use GPT-4o, claude-opus-4, or gemini-1.5-pro for best results. Smaller models produce more false positives and miss subtle issues.",
+          "The triage phase skips test files, documentation, and generated code by default. If your test infrastructure handles secrets or sensitive operations, include it explicitly.",
+        ],
+        warnings: [
+          "AI Code Review sends your source code to the configured LLM provider's API. Ensure your LLM provider agreement permits this for your codebase's sensitivity level. Use Azure OpenAI for regulated data — it stays within your Azure tenant.",
+          "LLM-based analysis can produce false positives — treat Critical/High findings as 'requires human verification' rather than 'confirmed vulnerability'. The self-critique phase reduces but doesn't eliminate false positives.",
+        ],
+      },
+      {
+        id: "tool-enterprise",
+        title: "Enterprise Scanners — Tenable, Burp Suite, Snyk, Rapid7, Qualys, Invicti, Acunetix",
+        summary: "Enterprise scanners connect Monitara to your existing commercial security tools via their REST APIs. They run directly (not via GitHub Actions) and can access internal networks, authenticated targets, and full vulnerability management platforms. Results are normalised and appear in Monitara alongside findings from all other scanners.",
+        steps: [
+          { text: "Tenable.io — Vulnerability Management:", detail: "Purpose: enterprise-grade VM platform with 100,000+ plugins covering network, web, and cloud. When to use: you already have Tenable deployed and want findings in Monitara for correlation with SAST/DAST results. Credentials: access_key + secret_key. What to expect: Tenable pulls all active vulnerability findings from your configured assets. CVSS scores and KEV status are already enriched." },
+          { text: "Burp Suite Enterprise — Authenticated DAST:", detail: "Purpose: the commercial version of Burp Suite's web scanner — deeper than ZAP for complex authenticated web apps. When to use: for critical web applications requiring authenticated scanning with complex session management. Credentials: host URL + API key. What to expect: web vulnerabilities with full request/response evidence, similar to ZAP but with greater depth on business-logic issues." },
+          { text: "Snyk — Developer-First SCA + SAST:", detail: "Purpose: dependency vulnerability scanning across all org projects (npm, pip, Maven, Go, Nuget, Ruby). When to use: if developers use Snyk in their IDEs and you want central visibility in Monitara. Credentials: api_token + org_id. What to expect: one scan pulls all projects in the org (capped at 50). Findings include fix PRs and patch availability." },
+          { text: "Rapid7 InsightVM — Network Vulnerability Management:", detail: "Purpose: network-based VM similar to Tenable. When to use: if InsightVM is your existing VM platform. Credentials: host URL + username + password + site_id. What to expect: findings from the specified scan site. CVSS v2 and v3 both ingested; v3 preferred." },
+          { text: "Qualys VMDR — Cloud-Based Vulnerability Management:", detail: "Purpose: SaaS VM platform. When to use: if Qualys is your existing VM tool. Two modes: (1) Import existing detections (no target needed — pulls all active findings from your Qualys account), (2) Launch new scan (requires targets configured). Credentials: api_url + username + password. Also pulls Qualys TotalCloud CSPM findings if that module is enabled." },
+          { text: "Invicti (Netsparker) / Acunetix — Proof-Based DAST:", detail: "Purpose: proof-based web app scanners that only report vulnerabilities with PoC evidence (no false positives by design). When to use: for web applications where ZAP/Burp produce too many unverified findings. Credentials: base_url + api_token (Invicti: Basic auth; Acunetix: API key header). Both require the scanner instance to be reachable from Monitara backend." },
+          { text: "All enterprise scanners: Assessments → New Scan → Enterprise Scanners tab → pick tool → pick connector → Start. Scans run asynchronously — Monitara polls the external tool every 30 seconds (2-hour timeout). Severity is normalised to critical/high/medium/low/info regardless of source tool's native scale." },
+        ],
+        tips: [
+          "Enterprise scanners don't require GitHub Actions or the MONITARA_API_URL secret — they run as FastAPI BackgroundTasks calling the external tool's API directly.",
+          "Qualys import mode (no target) is the fastest way to get existing VM data into Monitara — it pulls all active detections in one API call with no scan scheduling needed.",
+          "Use enterprise scanner findings as the 'ground truth' vulnerability baseline and run Monitara's AI agents (Risk Manager, Threat Intel, Remediation) on top of them for enriched analysis.",
+        ],
+        warnings: [
+          "Enterprise scans launch real scans in external tools — Tenable, Qualys, and Rapid7 scans consume quota/credits in those platforms. Coordinate with your existing VM team before triggering scans.",
+          "Acunetix uses self-signed TLS by default on on-prem installations — the connector disables certificate verification (verify=False) for the API connection. Ensure network access to the Acunetix server is restricted.",
         ],
       },
     ],

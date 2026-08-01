@@ -22,8 +22,11 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   semgrep: "🔍 Semgrep", codeql: "🧬 CodeQL", sonarqube: "📊 SonarQube",
   // Network
   nmap: "📡 NMAP", openvas: "🛰️ OpenVAS", trivy: "🏷️ Trivy",
+  nuclei: "⚡ Nuclei", sslyze: "🔒 SSLyze",
   // Dependency & Secret
   owasp_dc: "📦 OWASP Dep-Check", gitleaks: "💧 Gitleaks", trufflehog: "🐷 TruffleHog",
+  // IaC
+  checkov: "🏗️ Checkov",
   // AI-powered local code review
   ai_code_review: "🤖 AI Code Review",
   // Enterprise professional scanners
@@ -225,6 +228,27 @@ const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
     { key: "host", label: "Acunetix Host URL", placeholder: "https://acunetix.company.com", help: "Your Acunetix Enterprise server (port 3443 is used automatically)" },
     { key: "api_key", label: "API Key", secret: true, placeholder: "1/xxxx...", help: "Acunetix → Profile → API Key" },
   ],
+  nuclei: [
+    { key: "target_url", label: "Target URL",
+      placeholder: "https://app.example.com",
+      help: "Full URL of the web app or API. Used by HTTP/SSL templates." },
+    { key: "target", label: "Target Host (fallback)",
+      placeholder: "app.example.com",
+      help: "Hostname or IP used when target_url is not set." },
+  ],
+  checkov: [
+    { key: "repo_url", label: "Git Repo URL",
+      placeholder: "https://github.com/org/iac-repo",
+      help: "Repository containing Terraform, CloudFormation, Kubernetes, or other IaC files." },
+    { key: "git_token", label: "Git Personal Access Token", secret: true,
+      placeholder: "ghp_…",
+      help: "Required for private repos. Scope: repo (read)." },
+  ],
+  sslyze: [
+    { key: "target", label: "Target Host",
+      placeholder: "api.example.com or api.example.com:443",
+      help: "Hostname (optionally with :port) of the TLS service to audit. Default port 443." },
+  ],
   upload: [],
 };
 
@@ -239,6 +263,9 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   owasp_dc: "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks: "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
   trufflehog: "Walks the full git history with high-fidelity verification. Verified secrets (where TruffleHog can ping the issuer) are flagged critical.",
+  nuclei:         "Template-based vulnerability scanner with 9,000+ templates. Each finding is confirmed — Nuclei only reports when the PoC matches. Point at a URL or hostname.",
+  checkov:        "IaC security scanner for Terraform, CloudFormation, Kubernetes, Helm, and Dockerfile. Finds misconfigurations before resources are deployed. Point at a Git repo.",
+  sslyze:         "TLS/SSL auditor — detects deprecated protocols (SSL 2/3, TLS 1.0/1.1), weak ciphers, certificate issues, Heartbleed, and ROBOT. Enter a hostname or hostname:port.",
   ai_code_review: "LLM-powered code security review. Point at a Git repo or upload a zip archive. The AI triages files, chunks them by function, runs multi-pass vulnerability analysis (review → self-critique → cross-file taint tracing), and writes findings directly — no GitHub Actions required.",
   tenable:        "Connects to Tenable.io's REST API to launch network/host vulnerability scans. Scans the target IPs/CIDRs you configure and ingests all found vulnerabilities with CVSS scores.",
   burp_enterprise:"Connects to your Burp Suite Enterprise server to launch DAST scans against web applications. Uses Burp's industry-standard crawler and active attack engine.",
@@ -258,7 +285,9 @@ const CONNECTOR_CATEGORY: Record<ConnectorType, string> = {
   web: "dast",
   semgrep: "sast", codeql: "sast", sonarqube: "sast",
   nmap: "network", openvas: "network", trivy: "network",
+  nuclei: "network", sslyze: "network",
   owasp_dc: "dependency", gitleaks: "dependency", trufflehog: "dependency",
+  checkov: "sast",
   ai_code_review: "sast",
   tenable: "enterprise", burp_enterprise: "enterprise", snyk: "enterprise",
   rapid7: "enterprise", qualys: "enterprise", invicti: "enterprise", acunetix: "enterprise",
