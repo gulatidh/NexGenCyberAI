@@ -26,6 +26,9 @@ from connectors.scanners.owasp_dc import OwaspDependencyCheckConnector
 from connectors.scanners.gitleaks import GitleaksConnector
 from connectors.scanners.trufflehog import TruffleHogConnector
 from connectors.scanners.ai_code_review import AICodeReviewConnector
+from connectors.scanners.nuclei import NucleiConnector
+from connectors.scanners.checkov import CheckovConnector
+from connectors.scanners.sslyze import SSLyzeConnector
 from connectors.scanners.qualys import QualysConnector
 from connectors.scanners.tenable import TenableConnector
 from connectors.scanners.burp_enterprise import BurpEnterpriseConnector
@@ -69,6 +72,10 @@ _REGISTRY = {
     ConnectorType.RAPID7: Rapid7Connector,
     ConnectorType.INVICTI: InvictiConnector,
     ConnectorType.ACUNETIX: AcunetixConnector,
+    # Open-source workflow-dispatched scanners
+    ConnectorType.NUCLEI: NucleiConnector,
+    ConnectorType.CHECKOV: CheckovConnector,
+    ConnectorType.SSLYZE: SSLyzeConnector,
 }
 
 

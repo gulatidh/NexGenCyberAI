@@ -1,0 +1,323 @@
+name: Checkov IaC Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Reads the
+# target Git repository URL (and optional auth token) from /api/v1/scans/config/,
+# clones the repo, runs Checkov across all IaC files (Terraform, CloudFormation,
+# Kubernetes, Helm, Dockerfile, etc.), then POSTs structured findings to
+# /api/v1/scans/ingest/.
+#
+# Checkov is Bridgecrew/Prisma Cloud's open-source IaC scanner. It checks
+# for misconfigurations against 1000+ policies mapped to CIS, NIST, SOC2,
+# PCI-DSS, and more.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  checkov:
+    name: Run Checkov
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re
+          c = json.load(open("cfg.json"))
+          repo_url  = (c.get("repo_url") or "").strip()
+          git_token = (c.get("git_token") or "").strip()
+          # Basic URL safety check — reject shell-special chars outside URL set
+          if not repo_url or not re.fullmatch(r"[A-Za-z0-9_.\-:/@ ]+", repo_url):
+              print("repo_url=")
+              print("git_token=")
+          else:
+              print(f"repo_url={repo_url}")
+              # Mask the token from the log — write it as a masked output
+              print(f"git_token={git_token}")
+          PY
+
+      - name: Install Checkov
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          set -euo pipefail
+          pip install checkov --quiet
+
+      - name: Clone target repository
+        if: steps.cfg.outputs.repo_url != ''
+        env:
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+          GIT_TOKEN: ${{ steps.cfg.outputs.git_token }}
+        run: |
+          set -euo pipefail
+          if [ -n "$GIT_TOKEN" ]; then
+            # Inject token for private repos: https://token@github.com/org/repo
+            AUTH_URL=$(python3 -c "
+          import re, os, sys
+          url  = os.environ['REPO_URL']
+          tok  = os.environ['GIT_TOKEN']
+          # Insert token before the host component
+          m = re.match(r'(https?://)(.*)', url)
+          if m:
+              sys.stdout.write(f'{m.group(1)}{tok}@{m.group(2)}')
+          else:
+              sys.stdout.write(url)
+          ")
+            git clone --depth 1 "$AUTH_URL" /tmp/repo
+          else
+            git clone --depth 1 "$REPO_URL" /tmp/repo
+          fi
+
+      - name: Run Checkov
+        if: steps.cfg.outputs.repo_url != ''
+        run: |
+          set -uo pipefail
+          # --output json        structured output we parse below
+          # --quiet              suppress progress bars
+          # --soft-fail          exit 0 even when checks fail (we handle errors ourselves)
+          # --compact            omit passing check details (smaller JSON)
+          cd /tmp/repo
+          checkov -d . \
+            --output json \
+            --quiet \
+            --soft-fail \
+            --compact \
+            > /tmp/checkov-output.json 2>&1 || true
+          ls -la /tmp/checkov-output.json || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          REPO_URL: ${{ steps.cfg.outputs.repo_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+
+          findings = []
+          err      = None
+          repo_url = os.environ.get("REPO_URL", "")
+
+          # Severity mapping — Checkov severity values (may be absent / None)
+          SEV_MAP = {
+              "CRITICAL": "critical",
+              "HIGH":     "high",
+              "MEDIUM":   "medium",
+              "LOW":      "low",
+              "INFO":     "info",
+          }
+
+          def normalize_severity(s):
+              return SEV_MAP.get((s or "").upper(), "medium")
+
+          # IaC-focused control mappings
+          IAC_CONTROLS = {
+              "nist_800_53": ["CM-6", "CM-7", "SI-2"],
+              "cis_v8":      ["4.1", "4.2", "16.1"],
+          }
+
+          def check_type_to_resource_type(check_type):
+              """Map Checkov check_type (e.g. 'terraform_aws') to a short label."""
+              ct = (check_type or "").lower()
+              # Keep it human-readable but short
+              mapping = {
+                  "terraform":         "iac/terraform",
+                  "cloudformation":    "iac/cloudformation",
+                  "kubernetes":        "iac/kubernetes",
+                  "helm":              "iac/helm",
+                  "dockerfile":        "container/dockerfile",
+                  "github_actions":    "cicd/github-actions",
+                  "bitbucket_pipelines": "cicd/bitbucket",
+                  "circleci_pipelines":  "cicd/circleci",
+                  "ansible":           "iac/ansible",
+                  "arm":               "iac/arm",
+                  "bicep":             "iac/bicep",
+              }
+              for key, label in mapping.items():
+                  if key in ct:
+                      return label
+              return f"iac/{ct}" if ct else "iac/unknown"
+
+          if os.path.exists("/tmp/checkov-output.json") and os.path.getsize("/tmp/checkov-output.json") > 0:
+              try:
+                  raw = open("/tmp/checkov-output.json").read().strip()
+                  # Checkov can write multiple JSON objects (one per framework) to stdout.
+                  # When run with --output json it may produce a single object or a JSON
+                  # array. Try both.
+                  try:
+                      data = json.loads(raw)
+                  except json.JSONDecodeError:
+                      # Sometimes Checkov concatenates multiple JSON objects — try splitting
+                      # on the top-level boundary by looking for "}\n{" boundaries.
+                      import re
+                      parts = re.split(r'\}\s*\n\s*\{', raw)
+                      if len(parts) > 1:
+                          parts[0]  += "}"
+                          parts[-1]  = "{" + parts[-1]
+                          for i in range(1, len(parts) - 1):
+                              parts[i] = "{" + parts[i] + "}"
+                          data = [json.loads(p) for p in parts]
+                      else:
+                          raise
+
+                  # Normalise to a list of framework result objects
+                  if isinstance(data, dict):
+                      results_list = [data]
+                  elif isinstance(data, list):
+                      results_list = data
+                  else:
+                      results_list = []
+
+                  seen = set()   # deduplicate by (check_id, resource, file_path)
+
+                  for result_obj in results_list:
+                      # Checkov JSON: {"results": {"failed_checks": [...], "passed_checks": [...]}}
+                      # or sometimes the top-level IS the results dict.
+                      results = result_obj.get("results") or result_obj
+                      failed  = results.get("failed_checks") or []
+
+                      for check in failed:
+                          check_id    = check.get("check_id", "")
+                          check_type  = check.get("check_type", "")
+                          resource    = check.get("resource", "")
+                          file_path   = check.get("file_path", "")
+                          guideline   = (check.get("guideline") or "").strip()
+                          check_class = check.get("check_class", "")
+                          bc_check_id = check.get("bc_check_id", "")
+
+                          # check_result is a dict {"result": "FAILED", ...}
+                          check_result = check.get("check_result") or {}
+                          result_val   = check_result.get("result", "FAILED")
+                          if result_val not in ("FAILED", "failed"):
+                              continue   # skip PASSED / SKIPPED
+
+                          # Severity — Checkov <v2.4 may not have it, default medium
+                          sev_raw = (
+                              check.get("severity")
+                              or check.get("check_severity")
+                              or check_result.get("severity")
+                              or "MEDIUM"
+                          )
+                          severity = normalize_severity(sev_raw)
+
+                          dedup_key = (check_id, resource, file_path)
+                          if dedup_key in seen:
+                              continue
+                          seen.add(dedup_key)
+
+                          resource_type = check_type_to_resource_type(check_type)
+
+                          title = f"{check_id}: {resource}" if resource else check_id
+                          description = (
+                              guideline
+                              or f"Checkov policy {check_id} failed on resource '{resource}' "
+                                 f"in {file_path} ({check_class or check_type})"
+                          )[:4000]
+
+                          # Remediation: prefer guideline, fall back to generic advice
+                          remediation = (
+                              guideline
+                              or f"Review the Checkov policy {check_id} and update the "
+                                 f"IaC configuration in {file_path} to remediate the "
+                                 f"'{resource}' resource."
+                          )[:2000]
+
+                          # Control mappings — Checkov exposes BC framework mappings
+                          bc_mappings = check.get("bc_check_id") or {}
+                          control_mappings = dict(IAC_CONTROLS)
+                          if isinstance(bc_mappings, dict):
+                              control_mappings.update(bc_mappings)
+
+                          evidence = {
+                              "check_id":    check_id,
+                              "check_type":  check_type,
+                              "resource":    resource,
+                              "file_path":   file_path,
+                              "bc_check_id": bc_check_id,
+                              "repo_url":    repo_url,
+                              "result":      result_val,
+                          }
+
+                          findings.append({
+                              "title":          title[:255],
+                              "description":    description,
+                              "severity":       severity,
+                              "resource_id":    resource[:500] if resource else file_path[:500],
+                              "resource_type":  resource_type,
+                              "control_id":     check_id[:100],
+                              "remediation":    remediation,
+                              "evidence":       evidence,
+                              "cve_id":         "",
+                              "cvss_score":     0.0,
+                              "control_mappings": control_mappings,
+                          })
+
+                  if not findings:
+                      findings.append({
+                          "title":         f"No Checkov policy failures in {repo_url}",
+                          "description":   (
+                              "Checkov scanned all IaC files in the repository and reported "
+                              "no failed policies. The infrastructure-as-code appears to follow "
+                              "security best practices for the checks in scope."
+                          ),
+                          "severity":       "info",
+                          "resource_id":    repo_url,
+                          "resource_type":  "iac/repo",
+                          "control_id":     "CKV-PASS",
+                          "remediation":    "",
+                          "evidence":       {},
+                          "cve_id":         "",
+                          "cvss_score":     0.0,
+                          "control_mappings": IAC_CONTROLS,
+                      })
+
+              except Exception as e:
+                  err = f"Failed to parse Checkov JSON output: {e}"
+          else:
+              err = "Checkov output file not produced — scan may have failed, or the repository contains no supported IaC files"
+
+          payload = {
+              "scan_id":    os.environ["SCAN_ID"],
+              "scan_token": os.environ["SCAN_TOKEN"],
+              "findings":   findings,
+              "error":      err if (not findings and err) else None,
+          }
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

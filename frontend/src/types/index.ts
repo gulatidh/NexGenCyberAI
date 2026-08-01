@@ -13,6 +13,8 @@ export type ConnectorType =
   | "ai_code_review"
   // Enterprise professional scanners
   | "tenable" | "burp_enterprise" | "snyk" | "rapid7" | "qualys" | "invicti" | "acunetix"
+  // Open-source workflow-dispatched scanners
+  | "nuclei" | "checkov" | "sslyze"
   // Import / offline upload
   | "upload";
 export type ConnectorStatus = "active" | "inactive" | "error" | "pending";

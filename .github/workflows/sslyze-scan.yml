@@ -1,0 +1,546 @@
+name: SSLyze TLS/SSL Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Reads the
+# target hostname (or hostname:port) from /api/v1/scans/config/, runs SSLyze
+# to enumerate TLS/SSL configuration and certificate issues, then POSTs
+# structured findings to /api/v1/scans/ingest/.
+#
+# SSLyze is the industry-standard Python TLS analysis library. It checks:
+#   - Accepted cipher suites across all protocol versions (SSL2–TLS1.3)
+#   - Deprecated protocol acceptance (SSL2, SSL3, TLS1.0, TLS1.1)
+#   - Certificate validity, expiry, hostname match, and chain trust
+#   - HEARTBLEED, ROBOT, CRIME/BREACH, TLS compression, FALLBACK_SCSV
+#   - Weak ciphers: RC4, 3DES, EXPORT, NULL
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sslyze:
+    name: Run SSLyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re
+          c = json.load(open("cfg.json"))
+          target = (c.get("target") or "").strip()
+          # hostname or hostname:port — letters, digits, dot, dash, colon
+          if not target or not re.fullmatch(r"[A-Za-z0-9_.\-:]+", target):
+              print("target=")
+          else:
+              print(f"target={target}")
+          PY
+
+      - name: Install SSLyze
+        if: steps.cfg.outputs.target != ''
+        run: |
+          set -euo pipefail
+          pip install sslyze --quiet
+
+      - name: Run SSLyze
+        if: steps.cfg.outputs.target != ''
+        env:
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -uo pipefail
+          # --json_out  write structured JSON results to file
+          # We pass the target as-is; SSLyze accepts host or host:port
+          python -m sslyze --json_out=results.json "$TARGET" || true
+          ls -la results.json || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, datetime, urllib.request, urllib.error
+
+          findings = []
+          err      = None
+          target   = os.environ.get("TARGET", "")
+
+          # Control mappings for TLS/SSL issues
+          TLS_CONTROLS = {
+              "nist_800_53": ["SC-8", "SC-23", "IA-5"],
+              "cis_v8":      ["3.10", "12.8", "16.5"],
+          }
+
+          # Weak cipher string fragments we flag
+          WEAK_CIPHER_PATTERNS = [
+              ("RC4",    "RC4 stream cipher is cryptographically broken — disable in TLS configuration"),
+              ("3DES",   "3DES (TDEA) is deprecated per NIST SP 800-131A — disable in TLS configuration"),
+              ("DES",    "DES cipher is cryptographically broken — disable in TLS configuration"),
+              ("EXPORT", "EXPORT-grade ciphers are intentionally weak — disable immediately"),
+              ("NULL",   "NULL cipher provides no encryption — disable immediately"),
+              ("anon",   "Anonymous (DH/ECDH) cipher provides no authentication — disable"),
+              ("IDEA",   "IDEA cipher is deprecated — disable in TLS configuration"),
+              ("SEED",   "SEED cipher is deprecated — disable in TLS configuration"),
+          ]
+
+          def host_port(tgt):
+              parts = tgt.split(":")
+              host  = parts[0]
+              port  = int(parts[1]) if len(parts) > 1 else 443
+              return host, port
+
+          hostname, port = host_port(target)
+          resource_id    = f"{hostname}:{port}"
+
+          if os.path.exists("results.json") and os.path.getsize("results.json") > 0:
+              try:
+                  data = json.load(open("results.json"))
+
+                  # SSLyze JSON schema: {"server_scan_results": [...], ...}
+                  scan_results = data.get("server_scan_results") or []
+
+                  for scan in scan_results:
+                      # Error at connection level — record as a finding
+                      conn_error = scan.get("connectivity_error_trace")
+                      if conn_error:
+                          findings.append({
+                              "title":         f"SSLyze could not connect to {resource_id}",
+                              "description":   f"Connection error: {conn_error}"[:4000],
+                              "severity":      "info",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "SC-8",
+                              "remediation":   "Verify the target is reachable and listening on the specified port.",
+                              "evidence":      {"error": conn_error},
+                              "cve_id":        "",
+                              "cvss_score":    0.0,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+                          continue
+
+                      scan_result = scan.get("scan_result") or {}
+
+                      # ── 1. HEARTBLEED ────────────────────────────────────────────
+                      hb = scan_result.get("heartbleed") or {}
+                      hb_res = hb.get("result") or {}
+                      if hb_res.get("is_vulnerable_to_heartbleed"):
+                          findings.append({
+                              "title":         f"Heartbleed (CVE-2014-0160) vulnerability on {resource_id}",
+                              "description":   (
+                                  "The server is vulnerable to the Heartbleed OpenSSL bug (CVE-2014-0160), "
+                                  "which allows an unauthenticated attacker to read up to 64KB of server "
+                                  "memory per request, potentially exposing private keys, session tokens, "
+                                  "and credentials."
+                              ),
+                              "severity":      "critical",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "CVE-2014-0160",
+                              "remediation":   (
+                                  "Immediately upgrade OpenSSL to 1.0.1g or later. Revoke and reissue "
+                                  "all TLS certificates. Invalidate all session tokens and force "
+                                  "password resets for all users."
+                              ),
+                              "evidence":      {"check": "heartbleed", "vulnerable": True},
+                              "cve_id":        "CVE-2014-0160",
+                              "cvss_score":    7.5,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+
+                      # ── 2. ROBOT ─────────────────────────────────────────────────
+                      robot = scan_result.get("robot") or {}
+                      robot_res = robot.get("result") or {}
+                      robot_enum = robot_res.get("robot_result", "")
+                      if robot_enum and "NOT_VULNERABLE" not in str(robot_enum).upper():
+                          findings.append({
+                              "title":         f"ROBOT attack vulnerability on {resource_id}",
+                              "description":   (
+                                  f"The server appears vulnerable to the ROBOT (Return Of Bleichenbacher's "
+                                  f"Oracle Threat) attack. Result: {robot_enum}. This allows an attacker to "
+                                  f"perform RSA decryption and signing operations using the server's private key."
+                              ),
+                              "severity":      "critical",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "ROBOT-CVE-2017-13099",
+                              "remediation":   (
+                                  "Disable RSA key exchange cipher suites and switch to ECDHE or DHE. "
+                                  "Update TLS library. Patch per vendor advisory."
+                              ),
+                              "evidence":      {"check": "robot", "result": robot_enum},
+                              "cve_id":        "CVE-2017-13099",
+                              "cvss_score":    7.5,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+
+                      # ── 3. TLS compression (CRIME) ────────────────────────────────
+                      tls_comp = scan_result.get("tls_compression") or {}
+                      comp_res = tls_comp.get("result") or {}
+                      if comp_res.get("supports_compression"):
+                          findings.append({
+                              "title":         f"TLS compression enabled (CRIME/BREACH risk) on {resource_id}",
+                              "description":   (
+                                  "The server supports TLS-level compression, making it potentially "
+                                  "susceptible to the CRIME and BREACH attacks, which can allow an "
+                                  "attacker observing HTTPS traffic to recover session cookies."
+                              ),
+                              "severity":      "medium",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "CRIME-CVE-2012-4929",
+                              "remediation":   (
+                                  "Disable TLS compression at the server level (e.g. SSLCompression off "
+                                  "in Apache/Nginx). Also disable HTTP compression for pages that include "
+                                  "secret values in response bodies."
+                              ),
+                              "evidence":      {"check": "tls_compression", "supports_compression": True},
+                              "cve_id":        "CVE-2012-4929",
+                              "cvss_score":    5.0,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+
+                      # ── 4. TLS Fallback SCSV ──────────────────────────────────────
+                      fb = scan_result.get("tls_fallback_scsv") or {}
+                      fb_res = fb.get("result") or {}
+                      if fb_res.get("supports_fallback_scsv") is False:
+                          findings.append({
+                              "title":         f"TLS Fallback SCSV not supported on {resource_id}",
+                              "description":   (
+                                  "The server does not support the TLS_FALLBACK_SCSV extension "
+                                  "(RFC 7507), leaving clients vulnerable to protocol downgrade attacks "
+                                  "such as POODLE."
+                              ),
+                              "severity":      "medium",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "SC-8-FALLBACK",
+                              "remediation":   (
+                                  "Enable TLS_FALLBACK_SCSV in your TLS server configuration. "
+                                  "For OpenSSL-based servers this is automatic in OpenSSL >= 1.0.1j."
+                              ),
+                              "evidence":      {"check": "tls_fallback_scsv", "supported": False},
+                              "cve_id":        "",
+                              "cvss_score":    0.0,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+
+                      # ── 5. Deprecated protocols ───────────────────────────────────
+                      deprecated_protos = {
+                          "ssl_2_0_cipher_suites": {
+                              "label": "SSL 2.0", "severity": "critical",
+                              "cvss": 9.8, "cve": "",
+                              "remediation": "Disable SSL 2.0 entirely — it is fundamentally broken and has no known mitigations.",
+                          },
+                          "ssl_3_0_cipher_suites": {
+                              "label": "SSL 3.0", "severity": "high",
+                              "cvss": 7.5, "cve": "CVE-2014-3566",
+                              "remediation": "Disable SSL 3.0 to prevent POODLE attacks (CVE-2014-3566). Minimum TLS 1.2 is recommended.",
+                          },
+                          "tls_1_0_cipher_suites": {
+                              "label": "TLS 1.0", "severity": "high",
+                              "cvss": 7.4, "cve": "CVE-2011-3389",
+                              "remediation": "Disable TLS 1.0 (deprecated per RFC 8996). Configure TLS 1.2 as minimum; prefer TLS 1.3.",
+                          },
+                          "tls_1_1_cipher_suites": {
+                              "label": "TLS 1.1", "severity": "medium",
+                              "cvss": 5.9, "cve": "",
+                              "remediation": "Disable TLS 1.1 (deprecated per RFC 8996). Configure TLS 1.2 as minimum; prefer TLS 1.3.",
+                          },
+                      }
+
+                      for proto_key, proto_meta in deprecated_protos.items():
+                          proto_data = scan_result.get(proto_key) or {}
+                          proto_res  = proto_data.get("result") or {}
+                          suites = proto_res.get("accepted_cipher_suites") or []
+                          if suites:   # server accepted at least one cipher on this proto
+                              suite_names = [s.get("cipher_suite", {}).get("name", "") for s in suites[:10]]
+                              findings.append({
+                                  "title":         f"{proto_meta['label']} accepted on {resource_id}",
+                                  "description":   (
+                                      f"The server accepts connections using the deprecated "
+                                      f"{proto_meta['label']} protocol. Accepted cipher suites: "
+                                      f"{', '.join(suite_names[:5])}{'...' if len(suite_names) > 5 else ''}."
+                                  ),
+                                  "severity":      proto_meta["severity"],
+                                  "resource_id":   resource_id,
+                                  "resource_type": "network/tls",
+                                  "control_id":    f"DEPRECATED-{proto_meta['label'].replace(' ', '')}",
+                                  "remediation":   proto_meta["remediation"],
+                                  "evidence": {
+                                      "protocol":        proto_meta["label"],
+                                      "accepted_suites": suite_names,
+                                      "suite_count":     len(suites),
+                                  },
+                                  "cve_id":        proto_meta["cve"],
+                                  "cvss_score":    proto_meta["cvss"],
+                                  "control_mappings": TLS_CONTROLS,
+                              })
+
+                      # ── 6. Weak cipher suites (across accepted protocols) ──────────
+                      checked_protos = [
+                          "tls_1_2_cipher_suites", "tls_1_3_cipher_suites",
+                          "tls_1_0_cipher_suites", "tls_1_1_cipher_suites",
+                          "ssl_3_0_cipher_suites",
+                      ]
+                      weak_found: dict = {}   # pattern → list of (proto, suite_name)
+
+                      for proto_key in checked_protos:
+                          proto_data = scan_result.get(proto_key) or {}
+                          proto_res  = proto_data.get("result") or {}
+                          suites     = proto_res.get("accepted_cipher_suites") or []
+                          proto_label = proto_key.replace("_cipher_suites", "").replace("_", ".").upper()
+
+                          for suite_entry in suites:
+                              suite_name = suite_entry.get("cipher_suite", {}).get("name", "")
+                              for pattern, _ in WEAK_CIPHER_PATTERNS:
+                                  if pattern.upper() in suite_name.upper():
+                                      weak_found.setdefault(pattern, []).append(
+                                          f"{proto_label}/{suite_name}"
+                                      )
+
+                      for pattern, remediation in WEAK_CIPHER_PATTERNS:
+                          if pattern in weak_found:
+                              occurrences = weak_found[pattern]
+                              sev = "high" if pattern in ("RC4", "EXPORT", "NULL", "anon") else "medium"
+                              findings.append({
+                                  "title":         f"Weak cipher ({pattern}) accepted on {resource_id}",
+                                  "description":   (
+                                      f"The server accepts cipher suites containing the weak algorithm "
+                                      f"'{pattern}'. Instances: {', '.join(occurrences[:8])}."
+                                  ),
+                                  "severity":      sev,
+                                  "resource_id":   resource_id,
+                                  "resource_type": "network/tls",
+                                  "control_id":    f"WEAK-CIPHER-{pattern}",
+                                  "remediation":   remediation,
+                                  "evidence":      {"pattern": pattern, "instances": occurrences[:20]},
+                                  "cve_id":        "",
+                                  "cvss_score":    0.0,
+                                  "control_mappings": TLS_CONTROLS,
+                              })
+
+                      # ── 7. Certificate checks ─────────────────────────────────────
+                      cert_info = scan_result.get("certificate_info") or {}
+                      cert_res  = cert_info.get("result") or {}
+                      cert_deployments = cert_res.get("certificate_deployments") or []
+
+                      for deploy in cert_deployments:
+                          leaf_cert = None
+                          chain = deploy.get("received_certificate_chain") or []
+                          if chain:
+                              leaf_cert = chain[0]   # the server's own certificate
+
+                          # Hostname validation
+                          hostname_ok = deploy.get("leaf_certificate_subject_matches_hostname")
+                          if hostname_ok is False:
+                              findings.append({
+                                  "title":         f"Certificate hostname mismatch on {resource_id}",
+                                  "description":   (
+                                      f"The server's TLS certificate subject/SAN does not match the "
+                                      f"requested hostname '{hostname}'. Clients will see a browser warning."
+                                  ),
+                                  "severity":      "high",
+                                  "resource_id":   resource_id,
+                                  "resource_type": "network/tls",
+                                  "control_id":    "CERT-HOSTNAME-MISMATCH",
+                                  "remediation":   (
+                                      "Obtain and install a certificate that includes the correct "
+                                      f"hostname '{hostname}' in the CN or SAN field."
+                                  ),
+                                  "evidence":      {"hostname": hostname, "matches": False},
+                                  "cve_id":        "",
+                                  "cvss_score":    0.0,
+                                  "control_mappings": TLS_CONTROLS,
+                              })
+
+                          # Path validation failures (untrusted CA, expired, etc.)
+                          path_results = deploy.get("path_validation_results") or []
+                          for path_res_entry in path_results:
+                              verified = path_res_entry.get("verified_certificate_chain")
+                              trust_store = (path_res_entry.get("trust_store") or {}).get("name", "unknown")
+                              if verified is None:
+                                  # Path validation failed
+                                  openssl_err = path_res_entry.get("openssl_error_string", "unknown error")
+                                  sev = "critical" if "expired" in (openssl_err or "").lower() else "high"
+                                  findings.append({
+                                      "title":         f"Certificate path validation failed ({trust_store}) on {resource_id}",
+                                      "description":   (
+                                          f"The certificate chain could not be validated against the "
+                                          f"'{trust_store}' trust store. Error: {openssl_err}."
+                                      ),
+                                      "severity":      sev,
+                                      "resource_id":   resource_id,
+                                      "resource_type": "network/tls",
+                                      "control_id":    "CERT-INVALID-CHAIN",
+                                      "remediation":   (
+                                          "Ensure the server certificate is issued by a trusted CA. "
+                                          "Install any intermediate certificates and verify the chain "
+                                          "is complete. Replace self-signed certificates in production."
+                                      ),
+                                      "evidence": {
+                                          "trust_store":    trust_store,
+                                          "openssl_error":  openssl_err,
+                                      },
+                                      "cve_id":        "",
+                                      "cvss_score":    0.0,
+                                      "control_mappings": TLS_CONTROLS,
+                                  })
+
+                          # Expiry check (SSLyze provides the parsed cert object)
+                          if leaf_cert:
+                              try:
+                                  not_after_str = leaf_cert.get("not_valid_after")
+                                  if not_after_str:
+                                      # Handle both ISO format and "Mar 15 12:00:00 2026 GMT"
+                                      try:
+                                          not_after = datetime.datetime.fromisoformat(not_after_str.replace("Z", "+00:00"))
+                                      except ValueError:
+                                          not_after = datetime.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
+                                          not_after = not_after.replace(tzinfo=datetime.timezone.utc)
+
+                                      now = datetime.datetime.now(datetime.timezone.utc)
+                                      days_remaining = (not_after - now).days
+
+                                      if days_remaining < 0:
+                                          findings.append({
+                                              "title":         f"TLS certificate has expired on {resource_id}",
+                                              "description":   (
+                                                  f"The server's TLS certificate expired on "
+                                                  f"{not_after.strftime('%Y-%m-%d')} "
+                                                  f"({abs(days_remaining)} days ago). "
+                                                  f"All connections will display untrusted certificate warnings."
+                                              ),
+                                              "severity":      "critical",
+                                              "resource_id":   resource_id,
+                                              "resource_type": "network/tls",
+                                              "control_id":    "CERT-EXPIRED",
+                                              "remediation":   "Renew and deploy the TLS certificate immediately.",
+                                              "evidence": {
+                                                  "not_valid_after":  not_after_str,
+                                                  "days_remaining":   days_remaining,
+                                              },
+                                              "cve_id":        "",
+                                              "cvss_score":    0.0,
+                                              "control_mappings": TLS_CONTROLS,
+                                          })
+                                      elif days_remaining < 30:
+                                          findings.append({
+                                              "title":         f"TLS certificate expiring soon ({days_remaining} days) on {resource_id}",
+                                              "description":   (
+                                                  f"The server's TLS certificate will expire on "
+                                                  f"{not_after.strftime('%Y-%m-%d')} "
+                                                  f"(in {days_remaining} days)."
+                                              ),
+                                              "severity":      "high" if days_remaining < 14 else "medium",
+                                              "resource_id":   resource_id,
+                                              "resource_type": "network/tls",
+                                              "control_id":    "CERT-EXPIRY-SOON",
+                                              "remediation":   "Renew the TLS certificate before it expires to avoid service disruption.",
+                                              "evidence": {
+                                                  "not_valid_after": not_after_str,
+                                                  "days_remaining":  days_remaining,
+                                              },
+                                              "cve_id":        "",
+                                              "cvss_score":    0.0,
+                                              "control_mappings": TLS_CONTROLS,
+                                          })
+                              except Exception as date_err:
+                                  print(f"  cert expiry parse error: {date_err}")
+
+                  # ── 8. TLS 1.3 not supported (low — informational best practice) ──
+                  for scan in scan_results:
+                      scan_result = scan.get("scan_result") or {}
+                      tls13 = scan_result.get("tls_1_3_cipher_suites") or {}
+                      tls13_res = tls13.get("result") or {}
+                      tls13_suites = tls13_res.get("accepted_cipher_suites") or []
+                      if not tls13_suites:
+                          findings.append({
+                              "title":         f"TLS 1.3 not supported on {resource_id}",
+                              "description":   (
+                                  "The server does not accept TLS 1.3 connections. TLS 1.3 provides "
+                                  "improved security and performance over TLS 1.2 through elimination "
+                                  "of weak cipher suites, 0-RTT support, and a faster handshake."
+                              ),
+                              "severity":      "low",
+                              "resource_id":   resource_id,
+                              "resource_type": "network/tls",
+                              "control_id":    "TLS13-NOT-SUPPORTED",
+                              "remediation":   (
+                                  "Enable TLS 1.3 in your server configuration. This requires "
+                                  "OpenSSL 1.1.1+ or equivalent. Keep TLS 1.2 as fallback."
+                              ),
+                              "evidence":      {"check": "tls_1_3", "supported": False},
+                              "cve_id":        "",
+                              "cvss_score":    0.0,
+                              "control_mappings": TLS_CONTROLS,
+                          })
+
+                  if not findings:
+                      findings.append({
+                          "title":         f"TLS configuration is secure on {resource_id}",
+                          "description":   (
+                              "SSLyze completed a full TLS/SSL assessment and found no significant "
+                              "issues. The server supports only modern protocols and cipher suites, "
+                              "holds a valid certificate, and is not vulnerable to known TLS attacks."
+                          ),
+                          "severity":      "info",
+                          "resource_id":   resource_id,
+                          "resource_type": "network/tls",
+                          "control_id":    "SC-8",
+                          "remediation":   "",
+                          "evidence":      {},
+                          "cve_id":        "",
+                          "cvss_score":    0.0,
+                          "control_mappings": TLS_CONTROLS,
+                      })
+
+              except Exception as e:
+                  err = f"Failed to parse SSLyze JSON output: {e}"
+          else:
+              err = "SSLyze results file not produced — scan may have failed or target was rejected"
+
+          payload = {
+              "scan_id":    os.environ["SCAN_ID"],
+              "scan_token": os.environ["SCAN_TOKEN"],
+              "findings":   findings,
+              "error":      err if (not findings and err) else None,
+          }
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY

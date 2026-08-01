@@ -59,6 +59,10 @@ class ConnectorType(str, enum.Enum):
     QUALYS = "qualys"
     INVICTI = "invicti"
     ACUNETIX = "acunetix"
+    # Open-source workflow-dispatched scanners
+    NUCLEI = "nuclei"
+    CHECKOV = "checkov"
+    SSLYZE = "sslyze"
     # Offline scan result import (SARIF, Nessus, Burp, OpenVAS, Qualys, CSV, PDF, …)
     UPLOAD = "upload"
 
@@ -98,6 +102,10 @@ CONNECTOR_CATEGORY: dict["ConnectorType", "ScannerCategory"] = {
     ConnectorType.QUALYS: ScannerCategory.ENTERPRISE,
     ConnectorType.INVICTI: ScannerCategory.ENTERPRISE,
     ConnectorType.ACUNETIX: ScannerCategory.ENTERPRISE,
+    # Open-source workflow-dispatched scanners
+    ConnectorType.NUCLEI: ScannerCategory.DAST,
+    ConnectorType.CHECKOV: ScannerCategory.SAST,
+    ConnectorType.SSLYZE: ScannerCategory.NETWORK,
     ConnectorType.UPLOAD: "import",
 }
 

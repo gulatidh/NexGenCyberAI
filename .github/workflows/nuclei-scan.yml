@@ -1,0 +1,267 @@
+name: Nuclei Scan
+
+# Triggered by the NexGenCyberAI backend (workflow_dispatch). Reads the
+# target URL / hostname from /api/v1/scans/config/, runs Nuclei with a
+# broad template set (network, http, ssl, default-login, misconfiguration,
+# CVEs), then POSTs structured findings to /api/v1/scans/ingest/.
+#
+# Nuclei is a fast, community-driven vulnerability scanner with thousands
+# of templates maintained by ProjectDiscovery. It produces JSONL output
+# (one JSON object per match) that we parse and normalise below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scan_id:
+        description: "Scan UUID created by the API"
+        required: true
+      scan_token:
+        description: "Per-scan HMAC token (do not log)"
+        required: true
+      api_base:
+        description: "Public API base URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  nuclei:
+    name: Run Nuclei
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch scan config from API
+        id: cfg
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${API_BASE}/api/v1/scans/config/?scan_id=${SCAN_ID}&scan_token=${SCAN_TOKEN}" \
+            -o cfg.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re
+          c = json.load(open("cfg.json"))
+          # Accept target_url (preferred) or target (fallback)
+          target = (c.get("target_url") or c.get("target") or "").strip()
+          # Validate: URL or hostname/IP. Reject shell-special characters.
+          if not target or not re.fullmatch(r"[A-Za-z0-9_.\-:/? =&%@+]+", target):
+              print("target=")
+          else:
+              print(f"target={target}")
+          PY
+
+      - name: Install Nuclei
+        if: steps.cfg.outputs.target != ''
+        run: |
+          set -euo pipefail
+          curl -sL \
+            https://github.com/projectdiscovery/nuclei/releases/latest/download/nuclei_3.3.5_linux_amd64.zip \
+            -o nuclei.zip
+          unzip -q nuclei.zip
+          chmod +x nuclei
+          sudo mv nuclei /usr/local/bin/
+
+      - name: Update Nuclei templates
+        if: steps.cfg.outputs.target != ''
+        run: nuclei -update-templates -silent || true
+
+      - name: Run Nuclei
+        if: steps.cfg.outputs.target != ''
+        env:
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -uo pipefail
+          # Template categories: network discovery, HTTP probes, SSL/TLS checks,
+          # default credentials, common misconfigurations, and CVE templates.
+          # -j     JSONL output (one JSON object per finding line)
+          # -c 25  concurrency: 25 parallel template executions
+          # -timeout 10  per-request timeout in seconds
+          # -silent suppress banner / progress output
+          nuclei \
+            -u "$TARGET" \
+            -t network,http,ssl,default-login,misconfiguration,cves \
+            -j \
+            -o results.jsonl \
+            -timeout 10 \
+            -c 25 \
+            -silent \
+            || true
+          ls -la results.jsonl || true
+
+      - name: Post findings to API
+        if: always()
+        env:
+          API_BASE: ${{ inputs.api_base }}
+          SCAN_ID: ${{ inputs.scan_id }}
+          SCAN_TOKEN: ${{ inputs.scan_token }}
+          TARGET: ${{ steps.cfg.outputs.target }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.request, urllib.error
+
+          findings = []
+          err = None
+          target = os.environ.get("TARGET", "")
+
+          # Severity mapping — Nuclei uses these exact strings
+          SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4, "unknown": 4}
+
+          def normalize_severity(s):
+              s = (s or "info").lower().strip()
+              return s if s in SEV_ORDER else "info"
+
+          # CWE/control mappings for web/network findings
+          WEB_CONTROLS  = {"nist_csf": ["ID.RA-1", "PR.IP-12"], "cis_v8": ["7.1", "7.5"]}
+          NET_CONTROLS  = {"nist_800_53": ["SC-7", "SI-2"],     "cis_v8": ["4.1", "7.4"]}
+          SSL_CONTROLS  = {"nist_800_53": ["SC-8", "SC-23"],    "cis_v8": ["3.10", "12.8"]}
+
+          def pick_controls(template_id, info_tags):
+              tags = " ".join((info_tags or [])).lower()
+              tid  = (template_id or "").lower()
+              if "ssl" in tid or "tls" in tid or "cert" in tid or "ssl" in tags:
+                  return SSL_CONTROLS
+              if any(x in tags for x in ("network", "port", "service")):
+                  return NET_CONTROLS
+              return WEB_CONTROLS
+
+          def infer_resource_type(template_id, info_tags):
+              tags = " ".join((info_tags or [])).lower()
+              tid  = (template_id or "").lower()
+              if "http" in tid or "web" in tags or "http" in tags:
+                  return "web/endpoint"
+              if "ssl" in tid or "tls" in tid or "ssl" in tags:
+                  return "network/tls"
+              return "network/host"
+
+          if os.path.exists("results.jsonl") and os.path.getsize("results.jsonl") > 0:
+              try:
+                  for lineno, line in enumerate(open("results.jsonl"), 1):
+                      line = line.strip()
+                      if not line:
+                          continue
+                      try:
+                          obj = json.loads(line)
+                      except json.JSONDecodeError as je:
+                          print(f"  skip line {lineno}: {je}")
+                          continue
+
+                      template_id   = obj.get("template-id", "")
+                      info          = obj.get("info") or {}
+                      name          = info.get("name") or template_id
+                      severity      = normalize_severity(info.get("severity", "info"))
+                      description   = (info.get("description") or info.get("name") or "")[:4000]
+                      matched_at    = obj.get("matched-at") or obj.get("host") or target
+                      ip            = obj.get("ip", "")
+                      host          = obj.get("host", "")
+                      curl_cmd      = obj.get("curl-command", "")
+                      extracted     = obj.get("extracted-results") or []
+                      tags          = info.get("tags") or []
+                      reference     = info.get("reference") or []
+                      remediation   = (info.get("remediation") or
+                                       "Review the Nuclei template advisory and apply the recommended patch or configuration change.")[:2000]
+                      classification = info.get("classification") or {}
+
+                      # CVE extraction — template-id often IS the CVE
+                      cve_id = ""
+                      cve_match = re.match(r"(CVE-\d{4}-\d{4,7})", template_id, re.I)
+                      if cve_match:
+                          cve_id = cve_match.group(1).upper()
+                      else:
+                          # Try classification block
+                          cve_list = classification.get("cve-id") or []
+                          if isinstance(cve_list, list) and cve_list:
+                              cve_id = cve_list[0]
+                          elif isinstance(cve_list, str) and cve_list.startswith("CVE-"):
+                              cve_id = cve_list
+
+                      # CVSS score
+                      cvss = 0.0
+                      try:
+                          cvss = float(classification.get("cvss-score") or 0)
+                      except (TypeError, ValueError):
+                          cvss = 0.0
+
+                      # Control ID: use CVE if available, else template-id
+                      control_id = cve_id if cve_id else template_id
+
+                      resource_type = infer_resource_type(template_id, tags)
+                      controls      = pick_controls(template_id, tags)
+
+                      evidence = {
+                          "template_id": template_id,
+                          "matched_at": matched_at,
+                          "ip": ip,
+                          "host": host,
+                          "tags": tags,
+                          "extracted": extracted[:10] if extracted else [],
+                          "reference": reference[:5] if isinstance(reference, list) else [reference][:5],
+                          "curl_command": curl_cmd[:500] if curl_cmd else "",
+                      }
+
+                      title = f"{name} [{template_id}] on {matched_at}"
+
+                      findings.append({
+                          "title": title[:255],
+                          "description": description,
+                          "severity": severity,
+                          "resource_id": matched_at[:500],
+                          "resource_type": resource_type,
+                          "control_id": control_id[:100],
+                          "remediation": remediation,
+                          "evidence": evidence,
+                          "cve_id": cve_id,
+                          "cvss_score": cvss,
+                          "control_mappings": controls,
+                      })
+
+                  if not findings:
+                      findings.append({
+                          "title": f"No Nuclei findings for {target}",
+                          "description": (
+                              "Nuclei completed its scan with the network, http, ssl, "
+                              "default-login, misconfiguration, and cves template sets "
+                              "and reported no matches. This is the desired outcome for "
+                              "a well-hardened target."
+                          ),
+                          "severity": "info",
+                          "resource_id": target,
+                          "resource_type": "network/host",
+                          "control_id": "NIST SI-2",
+                          "remediation": "",
+                          "evidence": {},
+                          "cve_id": "",
+                          "cvss_score": 0.0,
+                          "control_mappings": WEB_CONTROLS,
+                      })
+
+              except Exception as e:
+                  err = f"Failed to parse Nuclei JSONL output: {e}"
+          else:
+              err = "Nuclei results file not produced — scan may have failed or target was rejected"
+
+          payload = {
+              "scan_id": os.environ["SCAN_ID"],
+              "scan_token": os.environ["SCAN_TOKEN"],
+              "findings": findings,
+              "error": err if (not findings and err) else None,
+          }
+          req = urllib.request.Request(
+              f"{os.environ['API_BASE']}/api/v1/scans/ingest/",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  print("ingest status:", r.status, r.read().decode("utf-8")[:200])
+          except urllib.error.HTTPError as e:
+              print("ingest failed:", e.code, e.read().decode("utf-8")[:400])
+              raise
+          PY
