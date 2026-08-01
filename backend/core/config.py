@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "NexGenCyberAI"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    ENABLE_SWAGGER: bool = False  # set True in dev via env var; off by default in prod
     SECRET_KEY: str = "change-me-in-production"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://nexgencyberai.azurewebsites.net"]
 
