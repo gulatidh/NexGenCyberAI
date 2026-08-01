@@ -104,6 +104,9 @@ def _discover_assets(db: Session, client_id: str, connector_ids: List[str] = Non
                 .join(Scan)
                 .filter(
                     Scan.client_id == client_id,
+                    Scan.is_live == True,
+                    Finding.duplicate_of_id.is_(None),
+                    Finding.status == "open",
                     Finding.resource_id.in_(all_lookup_ids),
                 )
                 .group_by(Finding.resource_id)
@@ -132,12 +135,15 @@ def _discover_assets(db: Session, client_id: str, connector_ids: List[str] = Non
             })
         return assets
 
-    # Legacy path: derive unique resources from findings
+    # Legacy path: derive unique resources from findings (live scans, canonical findings only)
     rows = (
         db.query(Finding.resource_id, Finding.resource_type, func.count(Finding.id).label("cnt"))
         .join(Scan)
         .filter(
             Scan.client_id == client_id,
+            Scan.is_live == True,
+            Finding.duplicate_of_id.is_(None),
+            Finding.status == "open",
             Finding.resource_id.isnot(None),
             Finding.resource_id != "",
         )
@@ -150,7 +156,14 @@ def _discover_assets(db: Session, client_id: str, connector_ids: List[str] = Non
         rows = (
             db.query(Finding.resource_type, Finding.resource_type, func.count(Finding.id).label("cnt"))
             .join(Scan)
-            .filter(Scan.client_id == client_id, Finding.resource_type.isnot(None), Finding.resource_type != "")
+            .filter(
+                Scan.client_id == client_id,
+                Scan.is_live == True,
+                Finding.duplicate_of_id.is_(None),
+                Finding.status == "open",
+                Finding.resource_type.isnot(None),
+                Finding.resource_type != "",
+            )
             .group_by(Finding.resource_type)
             .order_by(func.count(Finding.id).desc())
             .limit(50)
@@ -440,7 +453,15 @@ async def get_discover_findings(
             if a.get("scope_status") in ("in_scope", "crown_jewel") and a.get("resource_id")
         ]
 
-    q = db.query(Finding).join(Scan).filter(Scan.client_id == client_id)
+    q = (
+        db.query(Finding).join(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.is_live == True,
+            Finding.duplicate_of_id.is_(None),
+            Finding.status == "open",
+        )
+    )
     if scoped_resources:
         q = q.filter(Finding.resource_id.in_(scoped_resources))
 
@@ -457,10 +478,9 @@ async def get_discover_findings(
         if sev in cat_map[cat]:
             cat_map[cat][sev] += 1
 
-    # Recent 10 open findings for the table
+    # Recent 20 open findings for the table (already filtered to open above)
     recent = (
-        q.filter(Finding.status == "open")
-        .order_by(Finding.created_at.desc())
+        q.order_by(Finding.created_at.desc())
         .limit(20)
         .all()
     )
@@ -512,7 +532,15 @@ async def generate_priorities(
 
     crown_jewel_set = set(crown_jewels)
 
-    q = db.query(Finding).join(Scan).filter(Scan.client_id == client_id, Finding.status == "open")
+    q = (
+        db.query(Finding).join(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.is_live == True,
+            Finding.duplicate_of_id.is_(None),
+            Finding.status == "open",
+        )
+    )
     if scoped_resources:
         q = q.filter(Finding.resource_id.in_(scoped_resources))
     top = q.order_by(Finding.cvss_score.desc().nullslast()).limit(50).all()
@@ -671,7 +699,15 @@ def _fetch_phase_data(client_id: str, phase: str, pn: CTEMPhaseNote, db: Session
 
     elif phase == "discover":
         scoped = [a["resource_id"] for a in (pd.get("assets") or []) if a.get("scope_status") in ("in_scope", "crown_jewel")]
-        q = db.query(Finding).join(Scan).filter(Scan.client_id == client_id)
+        q = (
+            db.query(Finding).join(Scan)
+            .filter(
+                Scan.client_id == client_id,
+                Scan.is_live == True,
+                Finding.duplicate_of_id.is_(None),
+                Finding.status == "open",
+            )
+        )
         if scoped:
             q = q.filter(Finding.resource_id.in_(scoped))
         total = q.count()
@@ -699,7 +735,14 @@ def _fetch_phase_data(client_id: str, phase: str, pn: CTEMPhaseNote, db: Session
             sla_data[sev] = (
                 db.query(func.count(Finding.id))
                 .join(Scan)
-                .filter(Scan.client_id == client_id, Finding.severity == sev, Finding.status == "open", Finding.created_at < now - timedelta(hours=hours))
+                .filter(
+                    Scan.client_id == client_id,
+                    Scan.is_live == True,
+                    Finding.duplicate_of_id.is_(None),
+                    Finding.severity == sev,
+                    Finding.status == "open",
+                    Finding.created_at < now - timedelta(hours=hours),
+                )
                 .scalar() or 0
             )
         return {"owner_teams": owners, "sla_breaches": sla_data, "tracked_sla_breaches": total_breach, "blockers": pd.get("blockers", [])}
