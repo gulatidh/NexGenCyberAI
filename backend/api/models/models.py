@@ -342,10 +342,13 @@ class Finding(Base):
     acceptance_justification = Column(Text, nullable=True)
     accepted_by = Column(String(200), nullable=True)
     acceptance_expires_at = Column(DateTime(timezone=True), nullable=True)
+    # Ontology FK — links finding to the asset it was discovered on
+    asset_id = Column(String(36), ForeignKey("assets.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     scan = relationship("Scan", back_populates="findings")
+    asset = relationship("Asset", foreign_keys=[asset_id])
 
 
 class Risk(Base):
@@ -371,6 +374,8 @@ class Risk(Base):
     # already-converted threats and avoid duplicates on bulk convert.
     source_threat_model_id = Column(String(36), ForeignKey("threat_models.id"), nullable=True, index=True)
     source_threat_id = Column(String(64), nullable=True)
+    # Ontology FK — links risk to the asset it is associated with
+    asset_id = Column(String(36), ForeignKey("assets.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

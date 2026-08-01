@@ -49,8 +49,16 @@ def _risks_for_findings(db: Session, client_id: str, finding_ids: List[str]) -> 
 
 
 def _serialize_asset_row(
-    db: Session, client_id: str, asset: Asset, finding_counts: Dict[str, int], risk_counts: Dict[str, int]
+    db: Session,
+    client_id: str,
+    asset: Asset,
+    finding_counts: Dict[str, int],
+    risk_counts: Dict[str, int],
+    severity_breakdown: Dict[str, Dict[str, int]] = None,
+    cve_counts: Dict[str, int] = None,
+    last_scan_dates: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
+    rid = asset.external_id
     return {
         "id": asset.id,
         "client_id": asset.client_id,
@@ -69,8 +77,11 @@ def _serialize_asset_row(
         "status": asset.status,
         "first_seen_at": asset.first_seen_at,
         "last_synced_at": asset.last_synced_at,
-        "open_findings_count": finding_counts.get(asset.external_id, 0),
+        "open_findings_count": finding_counts.get(rid, 0),
         "risks_count": risk_counts.get(asset.id, 0),
+        "severity_breakdown": (severity_breakdown or {}).get(rid, {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}),
+        "cve_count": (cve_counts or {}).get(rid, 0),
+        "last_scan_date": (last_scan_dates or {}).get(rid),
     }
 
 
@@ -148,7 +159,48 @@ async def list_assets(
                 seen_assets.add(asset_id)
                 risk_counts[asset_id] = risk_counts.get(asset_id, 0) + 1
 
-    return [_serialize_asset_row(db, client_id, a, finding_counts, risk_counts) for a in assets]
+    # Severity breakdown per resource_id (open findings only)
+    sev_rows = (
+        db.query(Finding.resource_id, Finding.severity, func.count(Finding.id))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id, Finding.status == "open")
+        .group_by(Finding.resource_id, Finding.severity)
+        .all()
+    )
+    severity_breakdown: Dict[str, Dict[str, int]] = {}
+    for rid, sev, cnt in sev_rows:
+        if rid:
+            if rid not in severity_breakdown:
+                severity_breakdown[rid] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+            sev_key = str(sev.value if hasattr(sev, "value") else sev).lower()
+            if sev_key in severity_breakdown[rid]:
+                severity_breakdown[rid][sev_key] = cnt
+
+    # Unique CVE count per resource_id
+    cve_rows = (
+        db.query(Finding.resource_id, func.count(distinct(Finding.cve_id)))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.cve_id.isnot(None),
+            Finding.cve_id != "",
+        )
+        .group_by(Finding.resource_id)
+        .all()
+    )
+    cve_counts = {rid: cnt for rid, cnt in cve_rows if rid}
+
+    # Most recent finding date per resource_id (last scan activity)
+    last_seen_rows = (
+        db.query(Finding.resource_id, func.max(Finding.created_at))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id)
+        .group_by(Finding.resource_id)
+        .all()
+    )
+    last_scan_dates = {rid: dt for rid, dt in last_seen_rows if rid}
+
+    return [_serialize_asset_row(db, client_id, a, finding_counts, risk_counts, severity_breakdown, cve_counts, last_scan_dates) for a in assets]
 
 
 @router.get("/facets")
@@ -208,6 +260,13 @@ async def get_asset_detail(
         "first_seen_at": asset.first_seen_at,
         "last_synced_at": asset.last_synced_at,
         "open_findings_count": open_count,
+        "severity_breakdown": {
+            sev: sum(1 for f in findings if f.status == "open" and (f.severity.value if hasattr(f.severity, "value") else f.severity) == sev)
+            for sev in ("critical", "high", "medium", "low", "info")
+        },
+        "cves": sorted({f.cve_id for f in findings if f.cve_id}),
+        "cve_count": len({f.cve_id for f in findings if f.cve_id}),
+        "last_scan_date": max((f.created_at for f in findings if f.created_at), default=None),
         "risks_count": len(risks),
         "provider_metadata": asset.provider_metadata or {},
         "findings": findings,

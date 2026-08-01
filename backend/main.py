@@ -630,6 +630,29 @@ def _ensure_added_columns() -> None:
                 except Exception as exc:
                     logger.warning("custom_framework_controls.%s ALTER failed: %s", col_name, exc)
 
+        # findings.asset_id + risks.asset_id — persistent FK for ontology correlation
+        if finding_cols and "asset_id" not in finding_cols:
+            ddl = ("ALTER TABLE findings ADD asset_id NVARCHAR(36) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE findings ADD COLUMN asset_id VARCHAR(36)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added findings.asset_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("findings.asset_id ALTER failed: %s", exc)
+
+        if risk_cols and "asset_id" not in risk_cols:
+            ddl = ("ALTER TABLE risks ADD asset_id NVARCHAR(36) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE risks ADD COLUMN asset_id VARCHAR(36)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added risks.asset_id column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("risks.asset_id ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
@@ -1356,8 +1379,72 @@ def _fail_stale_scans() -> None:
         logger.warning("Stuck-scan reconcile failed: %s", exc)
 
 
+def _backfill_finding_asset_ids() -> None:
+    """Populate findings.asset_id and risks.asset_id by matching resource_id → Asset.external_id.
+
+    Runs idempotently on startup — only updates rows where asset_id IS NULL and a matching
+    Asset exists for the same client. Safe to run multiple times.
+    """
+    from sqlalchemy.orm import Session
+    from api.models.models import Finding, Risk, Asset, Scan
+
+    try:
+        with Session(engine) as db:
+            # Build a lookup: (client_id, external_id) → asset.id
+            asset_map: dict[tuple, str] = {
+                (a.client_id, a.external_id): a.id
+                for a in db.query(Asset).all()
+            }
+            if not asset_map:
+                return
+
+            # Backfill findings
+            unlinked_findings = (
+                db.query(Finding)
+                .join(Scan, Finding.scan_id == Scan.id)
+                .filter(Finding.asset_id.is_(None), Finding.resource_id.isnot(None))
+                .all()
+            )
+            f_updated = 0
+            for f in unlinked_findings:
+                scan = db.get(Scan, f.scan_id)
+                if not scan:
+                    continue
+                aid = asset_map.get((scan.client_id, f.resource_id))
+                if aid:
+                    f.asset_id = aid
+                    f_updated += 1
+
+            # Backfill risks (match via finding_ids → finding.resource_id → asset)
+            unlinked_risks = (
+                db.query(Risk)
+                .filter(Risk.asset_id.is_(None))
+                .all()
+            )
+            # Build finding → asset lookup
+            finding_asset: dict[str, str] = {}
+            for f in db.query(Finding).filter(Finding.asset_id.isnot(None)).all():
+                finding_asset[f.id] = f.asset_id
+
+            r_updated = 0
+            for r in unlinked_risks:
+                for fid in (r.finding_ids or []):
+                    aid = finding_asset.get(fid)
+                    if aid:
+                        r.asset_id = aid
+                        r_updated += 1
+                        break  # use the first matched finding's asset
+
+            db.commit()
+            if f_updated or r_updated:
+                logger.info("Backfilled asset_id: %d findings, %d risks", f_updated, r_updated)
+    except Exception as exc:
+        logger.warning("_backfill_finding_asset_ids failed: %s", exc)
+
+
 _ensure_added_columns()
 _ensure_projects_schema()
+_backfill_finding_asset_ids()
 _normalize_enum_case()
 _provision_entraid_connector()
 _provision_azure_connector()
