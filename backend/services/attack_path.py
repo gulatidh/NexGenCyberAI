@@ -26,7 +26,7 @@ def _classify_finding(f) -> str:
     return "vulnerability"
 
 
-def get_attack_paths(db: Session, client_id: str, scan_id: str = None, project_id: str = None) -> Dict[str, Any]:
+def get_attack_paths(db: Session, client_id: str, scan_id: str = None, project_id: str = None, asset_id: str = None) -> Dict[str, Any]:
     """Return nodes and edges representing the attack path graph for a client."""
     from api.models.models import Finding, Scan, Asset
 
@@ -39,6 +39,12 @@ def get_attack_paths(db: Session, client_id: str, scan_id: str = None, project_i
         q = q.filter(Finding.scan_id == scan_id)
     elif project_id:
         q = q.filter(Scan.project_id == project_id)
+
+    if asset_id:
+        from api.models.models import Asset as _Asset
+        _asset = db.query(_Asset).filter(_Asset.id == asset_id).first()
+        if _asset:
+            q = q.filter(Finding.resource_id == _asset.external_id)
 
     findings = q.order_by(Finding.cvss_score.desc()).limit(100).all()
 

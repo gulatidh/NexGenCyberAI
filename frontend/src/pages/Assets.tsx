@@ -418,6 +418,8 @@ export default function Assets() {
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>LAST SCAN</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "last_synced_at"} direction={sortDir} onClick={() => setSort("last_synced_at")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>SYNCED</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "risk_score"} direction={sortDir} onClick={() => setSort("risk_score")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>RISK SCORE</TableSortLabel></TableCell>
                   <TableCell align="right">ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
@@ -499,6 +501,25 @@ export default function Assets() {
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                         {fromNow(a.last_synced_at)}
+                      </TableCell>
+                      <TableCell>
+                        {a.risk_score != null ? (
+                          <Chip
+                            label={a.risk_score}
+                            size="small"
+                            sx={{
+                              fontWeight: 700, fontSize: 11,
+                              bgcolor: a.risk_score > 70 ? "rgba(244,67,54,0.15)"
+                                     : a.risk_score > 40 ? "rgba(255,152,0,0.15)"
+                                     : a.risk_score > 20 ? "rgba(255,235,59,0.12)"
+                                     : "rgba(76,175,80,0.12)",
+                              color: a.risk_score > 70 ? "#f44336"
+                                   : a.risk_score > 40 ? "#ff9800"
+                                   : a.risk_score > 20 ? "#ffeb3b"
+                                   : "#4caf50",
+                            }}
+                          />
+                        ) : <Typography sx={{ color: "text.disabled", fontSize: 12 }}>—</Typography>}
                       </TableCell>
                       <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="Run on-demand scan against this asset">

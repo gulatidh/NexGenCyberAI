@@ -4,11 +4,12 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Collapse, IconButton, Alert, Tooltip, Divider,
   FormControl, InputLabel, Select, MenuItem,
+  Dialog, DialogTitle, DialogContent,
 } from "@mui/material";
-import { BugReport, ExpandMore, ExpandLess, Shield } from "@mui/icons-material";
+import { BugReport, ExpandMore, ExpandLess, Shield, Calculate } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { clientsApi, cveApi } from "../services/api";
-import { Client } from "../types";
+import { Client, CveImpact } from "../types";
 import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
@@ -110,6 +111,7 @@ export default function CVEPivot() {
   const [clientId, setClientId] = useState("");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [impactCve, setImpactCve] = useState<string | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
 
@@ -117,6 +119,12 @@ export default function CVEPivot() {
     queryKey: ["cve-list", clientId, search],
     queryFn: () => cveApi.list(clientId, search || undefined),
     enabled: !!clientId,
+  });
+
+  const { data: impactData, isLoading: impactLoading } = useQuery<CveImpact>({
+    queryKey: ["cve-impact", clientId, impactCve],
+    queryFn: () => cveApi.impact(clientId, impactCve!),
+    enabled: !!impactCve && !!clientId,
   });
 
   const toggle = (cveId: string) => setExpanded((prev) => (prev === cveId ? null : cveId));
@@ -181,7 +189,10 @@ export default function CVEPivot() {
                     <TableCell align="right">CVSS</TableCell>
                     <TableCell align="right">ASSETS AFFECTED</TableCell>
                     <TableCell align="right">FINDINGS</TableCell>
+                    <TableCell align="right">DAYS OPEN</TableCell>
+                    <TableCell>PERSISTING</TableCell>
                     <TableCell>LAST SEEN</TableCell>
+                    <TableCell sx={{ width: 40 }}>IMPACT</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -227,12 +238,35 @@ export default function CVEPivot() {
                           <TableCell align="right" sx={{ color: "text.secondary" }}>
                             {cve.finding_count}
                           </TableCell>
+                          <TableCell align="right" sx={{
+                            fontSize: 12, fontWeight: 600,
+                            color: cve.days_open > 90 ? "#f44336" : cve.days_open > 30 ? "#ff9800" : "#4caf50",
+                          }}>
+                            {cve.days_open != null ? cve.days_open : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {cve.is_persisting ? (
+                              <Chip label="Persisting" size="small"
+                                sx={{ bgcolor: "rgba(255,152,0,0.15)", color: "#ff9800", fontSize: 10, height: 18 }} />
+                            ) : <Typography sx={{ color: "text.disabled", fontSize: 12 }}>—</Typography>}
+                          </TableCell>
                           <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                             {fromNow(cve.last_seen)}
                           </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Tooltip title="View remediation impact">
+                              <IconButton
+                                size="small"
+                                sx={{ color: "#4285F4", p: 0.25 }}
+                                onClick={() => setImpactCve(cve.cve_id)}
+                              >
+                                <Calculate fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
                         </TableRow>
                         <TableRow sx={{ "& td": { py: 0, borderColor: "divider" } }}>
-                          <TableCell colSpan={7} sx={{ p: 0 }}>
+                          <TableCell colSpan={10} sx={{ p: 0 }}>
                             <Collapse in={isOpen} timeout="auto" unmountOnExit>
                               <Box sx={{ p: 2 }}>
                                 <CVEDetailRow clientId={clientId} cveId={cve.cve_id} onClose={() => setExpanded(null)} />
@@ -249,6 +283,107 @@ export default function CVEPivot() {
           </Card>
         </>
       )}
+
+      {/* Impact Dialog */}
+      <Dialog
+        open={!!impactCve}
+        onClose={() => setImpactCve(null)}
+        maxWidth="md"
+        fullWidth
+        sx={{ "& .MuiDialog-paper": { bgcolor: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ color: "text.primary", fontWeight: 700, borderBottom: "1px solid rgba(255,255,255,0.08)", pb: 1.5 }}>
+          Remediation Impact — {impactCve}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          {impactLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+              <CircularProgress sx={{ color: "#4285F4" }} />
+            </Box>
+          ) : !impactData ? (
+            <Typography sx={{ color: "text.secondary" }}>No impact data available.</Typography>
+          ) : (
+            <Box>
+              {/* Priority note */}
+              {impactData.priority_note && (
+                <Chip
+                  label={impactData.priority_note}
+                  sx={{
+                    mb: 2,
+                    bgcolor: impactData.max_cvss >= 9 ? "rgba(244,67,54,0.15)" : "rgba(255,152,0,0.15)",
+                    color: impactData.max_cvss >= 9 ? "#f44336" : "#ff9800",
+                    fontSize: 12, height: 28, fontWeight: 600,
+                  }}
+                />
+              )}
+
+              {/* Summary stats */}
+              <Box sx={{ display: "flex", gap: 3, mb: 2, flexWrap: "wrap" }}>
+                <Box>
+                  <Typography variant="h5" sx={{ color: "#4caf50", fontWeight: 700 }}>{impactData.total_open_findings}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>findings patched</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h5" sx={{ color: "#4285F4", fontWeight: 700 }}>{impactData.affected_assets}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>assets affected</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h5" sx={{ color: "#ff9800", fontWeight: 700 }}>{impactData.total_risk_points_freed}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>risk points freed</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h5" sx={{ color: impactData.max_cvss >= 9 ? "#f44336" : impactData.max_cvss >= 7 ? "#ff9800" : "white", fontWeight: 700 }}>
+                    {impactData.max_cvss.toFixed(1)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>max CVSS</Typography>
+                </Box>
+              </Box>
+
+              {/* Per-asset table */}
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1, fontWeight: 600 }}>
+                PER-ASSET BREAKDOWN
+              </Typography>
+              <TableContainer sx={{ maxHeight: 320 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                      <TableCell>ASSET NAME</TableCell>
+                      <TableCell align="right">FINDINGS</TableCell>
+                      <TableCell align="right">RISK POINTS</TableCell>
+                      <TableCell align="right">CVSS</TableCell>
+                      <TableCell>SEVERITIES</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(impactData.per_asset || []).map((pa) => (
+                      <TableRow key={pa.resource_id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                        <TableCell sx={{ color: "text.primary", maxWidth: 240 }}>
+                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {pa.asset_name || pa.resource_id}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={{ color: "text.primary", fontWeight: 600 }}>{pa.finding_count}</TableCell>
+                        <TableCell align="right" sx={{ color: "#ff9800", fontWeight: 600 }}>{pa.risk_points_freed}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: 12, color: pa.max_cvss >= 9 ? "#f44336" : pa.max_cvss >= 7 ? "#ff9800" : "white" }}>
+                          {pa.max_cvss > 0 ? pa.max_cvss.toFixed(1) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                            {Array.from(new Set(pa.severities || [])).map((s: string) => (
+                              <Chip key={s} label={s} size="small"
+                                sx={{ bgcolor: `${SEV_COLOR[s] || "#888"}20`, color: SEV_COLOR[s] || "#888", fontSize: 10, height: 16 }} />
+                            ))}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

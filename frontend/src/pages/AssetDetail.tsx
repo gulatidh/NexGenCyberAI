@@ -7,8 +7,12 @@ import {
 import { ArrowBack, PlayArrow, Refresh } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, assetsApi, connectorsApi } from "../services/api";
-import { Client, Connector, AssetDetail, Finding, Risk } from "../types";
+import { clientsApi, assetsApi, connectorsApi, attackPathApi } from "../services/api";
+import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup } from "../types";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  ResponsiveContainer, Legend,
+} from "recharts";
 import { fmt, fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
@@ -220,6 +224,9 @@ export default function AssetDetailPage() {
         <Tab label={`Risks (${risks.length})`} />
         <Tab label={`CVEs (${asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length})`} />
         <Tab label="Raw Metadata" />
+        <Tab label="Timeline" />
+        <Tab label="Attack Path" />
+        <Tab label="Duplicates" />
       </Tabs>
 
       {tab === 0 && (
@@ -376,6 +383,282 @@ export default function AssetDetailPage() {
           </Box>
         </Card>
       )}
+
+      {tab === 4 && <AssetTimeline clientId={clientId} assetId={assetId} />}
+      {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
+      {tab === 6 && <AssetDuplicates clientId={clientId} assetId={assetId} />}
+    </Box>
+  );
+}
+
+// ── Timeline sub-component ─────────────────────────────────────────────────────
+
+const PHASE_COLOR: Record<string, string> = {
+  initial_access: "#f44336",
+  credential_access: "#ff9800",
+  privilege_escalation: "#ffeb3b",
+  lateral_movement: "#4285F4",
+  data_access: "#ce93d8",
+  execution: "#ff7043",
+  persistence: "#26c6da",
+  exfiltration: "#ef5350",
+};
+
+function AssetTimeline({ clientId, assetId }: { clientId: string; assetId: string }) {
+  const { data, isLoading, isError } = useQuery<{ timeline: AssetTimelinePoint[] }>({
+    queryKey: ["asset-timeline", clientId, assetId],
+    queryFn: () => assetsApi.timeline(clientId, assetId),
+    enabled: !!clientId && !!assetId,
+  });
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress sx={{ color: "#4285F4" }} />
+      </Box>
+    );
+  }
+  if (isError || !data?.timeline?.length) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Typography sx={{ color: "text.secondary" }}>No timeline data available for this asset yet.</Typography>
+      </Card>
+    );
+  }
+
+  const timeline = data.timeline;
+  const firstScore = timeline[0]?.risk_score;
+  const lastScore = timeline[timeline.length - 1]?.risk_score;
+  const scoreTrend = lastScore - firstScore;
+  const trendColor = scoreTrend > 0 ? "#f44336" : scoreTrend < 0 ? "#4caf50" : "text.secondary";
+
+  const chartData = timeline.map((pt) => ({
+    ...pt,
+    date: pt.date ? new Date(pt.date).toLocaleDateString() : pt.scan_id.slice(0, 8),
+  }));
+
+  return (
+    <Box>
+      {/* Risk score trend summary */}
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Risk Score Trend</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>
+            {firstScore} → {lastScore}
+          </Typography>
+          <Chip
+            label={scoreTrend > 0 ? `+${scoreTrend} worsened` : scoreTrend < 0 ? `${scoreTrend} improved` : "stable"}
+            size="small"
+            sx={{ bgcolor: `${trendColor}22`, color: trendColor, fontSize: 11 }}
+          />
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            across {timeline.length} scan{timeline.length !== 1 ? "s" : ""}
+          </Typography>
+        </Box>
+      </Card>
+
+      {/* Area chart */}
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>Findings Over Time</Typography>
+        <ResponsiveContainer width="100%" height={280}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="critGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f44336" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#f44336" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="highGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ff9800" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#ff9800" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="medGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ffeb3b" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="#ffeb3b" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} />
+            <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }} />
+            <RTooltip
+              contentStyle={{ background: "#1a1f2e", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8 }}
+              labelStyle={{ color: "rgba(255,255,255,0.7)", fontSize: 12 }}
+              itemStyle={{ fontSize: 12 }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }} />
+            <Area type="monotone" dataKey="critical" stroke="#f44336" fill="url(#critGrad)" strokeWidth={2} name="Critical" />
+            <Area type="monotone" dataKey="high" stroke="#ff9800" fill="url(#highGrad)" strokeWidth={2} name="High" />
+            <Area type="monotone" dataKey="medium" stroke="#ffeb3b" fill="url(#medGrad)" strokeWidth={2} name="Medium" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Card>
+    </Box>
+  );
+}
+
+// ── Attack Path sub-component ──────────────────────────────────────────────────
+
+function AssetAttackPath({ clientId, assetId }: { clientId: string; assetId: string }) {
+  const { data, isLoading, isError } = useQuery<any>({
+    queryKey: ["asset-attack-path", clientId, assetId],
+    queryFn: () => attackPathApi.getForAsset(clientId, assetId),
+    enabled: !!clientId && !!assetId,
+  });
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress sx={{ color: "#4285F4" }} />
+      </Box>
+    );
+  }
+
+  const nodes: any[] = data?.nodes || [];
+  const filteredNodes = nodes.filter((n) => n.asset_id === assetId || n.resource_id === assetId || nodes.length > 0);
+
+  if (isError || filteredNodes.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Typography sx={{ color: "text.secondary" }}>No attack path data available for this asset.</Typography>
+      </Card>
+    );
+  }
+
+  return (
+    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+              <TableCell>PHASE</TableCell>
+              <TableCell>SEVERITY</TableCell>
+              <TableCell>TITLE</TableCell>
+              <TableCell align="right">CVSS</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredNodes.map((node: any, idx: number) => {
+              const phase = node.phase || node.attack_phase || "unknown";
+              const sev = node.severity || "info";
+              const phaseColor = PHASE_COLOR[phase] || "rgba(255,255,255,0.4)";
+              return (
+                <TableRow key={node.id || idx} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                  <TableCell>
+                    <Chip
+                      label={phase.replace(/_/g, " ")}
+                      size="small"
+                      sx={{ bgcolor: `${phaseColor}20`, color: phaseColor, fontSize: 10, height: 18, textTransform: "capitalize" }}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={sev}
+                      size="small"
+                      sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
+                    <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {node.title || node.label || "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontSize: 12, color: node.cvss_score != null ? (node.cvss_score >= 9 ? "#f44336" : node.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
+                    {node.cvss_score != null ? node.cvss_score.toFixed(1) : "—"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Card>
+  );
+}
+
+// ── Duplicates sub-component ───────────────────────────────────────────────────
+
+function AssetDuplicates({ clientId, assetId }: { clientId: string; assetId: string }) {
+  const { data, isLoading, isError } = useQuery<{ groups: CveDuplicateGroup[]; total_duplicates: number }>({
+    queryKey: ["asset-deduplicate", clientId, assetId],
+    queryFn: () => assetsApi.deduplicate(clientId, assetId),
+    enabled: !!clientId && !!assetId,
+  });
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+        <CircularProgress sx={{ color: "#4285F4" }} />
+      </Box>
+    );
+  }
+
+  const groups: CveDuplicateGroup[] = data?.groups || [];
+  const totalDuplicates = data?.total_duplicates ?? groups.reduce((sum, g) => sum + g.duplicate_count, 0);
+
+  if (isError || groups.length === 0) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Typography sx={{ color: "text.secondary" }}>No duplicate findings detected for this asset.</Typography>
+      </Card>
+    );
+  }
+
+  return (
+    <Box>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Deduplication Summary</Typography>
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ color: "#ff9800", fontWeight: 700 }}>{groups.length}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>duplicate groups</Typography>
+          </Box>
+          <Box>
+            <Typography variant="h5" sx={{ color: "#f44336", fontWeight: 700 }}>{totalDuplicates}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>redundant findings</Typography>
+          </Box>
+        </Box>
+      </Card>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                <TableCell>CVE ID</TableCell>
+                <TableCell>SEVERITY</TableCell>
+                <TableCell align="right">CVSS</TableCell>
+                <TableCell align="right">DUPLICATES</TableCell>
+                <TableCell align="right">SCANNERS</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {groups.map((g) => {
+                const sev = g.severity || "info";
+                return (
+                  <TableRow key={g.cve_id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
+                        {g.cve_id}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={sev} size="small"
+                        sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontSize: 12, color: g.cvss_score != null ? (g.cvss_score >= 9 ? "#f44336" : g.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
+                      {g.cvss_score != null ? g.cvss_score.toFixed(1) : "—"}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: "#ff9800", fontWeight: 600, fontSize: 13 }}>
+                      {g.duplicate_count}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: "text.secondary", fontSize: 12 }}>
+                      {g.scanners?.length ?? 0}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
     </Box>
   );
 }

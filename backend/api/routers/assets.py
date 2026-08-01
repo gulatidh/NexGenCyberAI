@@ -20,6 +20,15 @@ router = APIRouter(prefix="/clients/{client_id}/assets", tags=["assets"])
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def _risk_score(sev: dict) -> int:
+    return min(100,
+        sev.get("critical", 0) * 10 +
+        sev.get("high", 0) * 5 +
+        sev.get("medium", 0) * 2 +
+        sev.get("low", 0) * 1
+    )
+
+
 def _findings_for_asset(db: Session, client_id: str, asset: Asset) -> List[Finding]:
     """Return all findings whose resource_id equals the asset's external_id (across all scans for the client)."""
     return (
@@ -82,6 +91,7 @@ def _serialize_asset_row(
         "severity_breakdown": (severity_breakdown or {}).get(rid, {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}),
         "cve_count": (cve_counts or {}).get(rid, 0),
         "last_scan_date": (last_scan_dates or {}).get(rid),
+        "risk_score": _risk_score((severity_breakdown or {}).get(rid, {})),
     }
 
 
@@ -226,6 +236,54 @@ async def get_facets(
     }
 
 
+@router.get("/heatmap")
+async def get_asset_heatmap(
+    client_id: str,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Top assets by composite risk score for dashboard heat map."""
+    assets = db.query(Asset).filter(Asset.client_id == client_id, Asset.status == "active").all()
+    if not assets:
+        return []
+
+    sev_rows = (
+        db.query(Finding.resource_id, Finding.severity, func.count(Finding.id))
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(Scan.client_id == client_id, Finding.status == "open")
+        .group_by(Finding.resource_id, Finding.severity)
+        .all()
+    )
+    sev_map: dict = {}
+    for rid, sev, cnt in sev_rows:
+        if rid:
+            if rid not in sev_map:
+                sev_map[rid] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+            sk = str(sev.value if hasattr(sev, "value") else sev).lower()
+            if sk in sev_map[rid]:
+                sev_map[rid][sk] = cnt
+
+    result = []
+    for a in assets:
+        bd = sev_map.get(a.external_id, {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0})
+        rs = _risk_score(bd)
+        if rs == 0:
+            continue
+        result.append({
+            "asset_id": a.id,
+            "name": a.name,
+            "external_id": a.external_id,
+            "asset_class": a.asset_class,
+            "region": a.region,
+            "risk_score": rs,
+            "severity_breakdown": bd,
+        })
+
+    result.sort(key=lambda x: -x["risk_score"])
+    return result[:limit]
+
+
 @router.get("/{asset_id}", response_model=AssetDetailResponse)
 async def get_asset_detail(
     client_id: str,
@@ -264,6 +322,10 @@ async def get_asset_detail(
             sev: sum(1 for f in findings if f.status == "open" and (f.severity.value if hasattr(f.severity, "value") else f.severity) == sev)
             for sev in ("critical", "high", "medium", "low", "info")
         },
+        "risk_score": _risk_score({
+            sev: sum(1 for f in findings if f.status == "open" and (f.severity.value if hasattr(f.severity, "value") else f.severity) == sev)
+            for sev in ("critical", "high", "medium", "low", "info")
+        }),
         "cves": sorted({f.cve_id for f in findings if f.cve_id}),
         "cve_count": len({f.cve_id for f in findings if f.cve_id}),
         "last_scan_date": max((f.created_at for f in findings if f.created_at), default=None),
@@ -271,6 +333,107 @@ async def get_asset_detail(
         "provider_metadata": asset.provider_metadata or {},
         "findings": findings,
         "risks": risks,
+    }
+
+
+@router.get("/{asset_id}/timeline")
+async def get_asset_timeline(
+    client_id: str,
+    asset_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Per-scan severity snapshot for a single asset — powers the posture timeline chart."""
+    asset = db.query(Asset).filter(Asset.id == asset_id, Asset.client_id == client_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    rows = (
+        db.query(Scan.id, Scan.created_at, Finding.severity, func.count(Finding.id))
+        .join(Finding, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.resource_id == asset.external_id,
+        )
+        .group_by(Scan.id, Scan.created_at, Finding.severity)
+        .order_by(Scan.created_at)
+        .all()
+    )
+
+    # Pivot to {scan_id: {date, critical, high, medium, low, info, total}}
+    scans: dict = {}
+    for scan_id, scan_date, sev, cnt in rows:
+        if scan_id not in scans:
+            scans[scan_id] = {"scan_id": scan_id, "date": scan_date, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        sk = str(sev.value if hasattr(sev, "value") else sev).lower()
+        if sk in scans[scan_id]:
+            scans[scan_id][sk] = cnt
+
+    timeline = list(scans.values())
+    for t in timeline:
+        t["total"] = t["critical"] + t["high"] + t["medium"] + t["low"] + t["info"]
+        t["risk_score"] = _risk_score(t)
+
+    return {"asset_id": asset_id, "asset_name": asset.name, "timeline": timeline}
+
+
+@router.get("/{asset_id}/deduplicate")
+async def get_asset_duplicates(
+    client_id: str,
+    asset_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Find findings with the same CVE on the same asset across multiple scans — cross-scanner deduplication."""
+    asset = db.query(Asset).filter(Asset.id == asset_id, Asset.client_id == client_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    findings = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.resource_id == asset.external_id,
+            Finding.cve_id.isnot(None),
+            Finding.cve_id != "",
+        )
+        .order_by(Finding.cve_id, Finding.created_at.desc())
+        .all()
+    )
+
+    # Group by cve_id — first (newest) is canonical, rest are duplicates
+    cve_groups: dict = {}
+    for f in findings:
+        cve_groups.setdefault(f.cve_id, []).append(f)
+
+    duplicate_groups = []
+    total_duplicates = 0
+    for cve_id, group in cve_groups.items():
+        if len(group) < 2:
+            continue
+        canonical = group[0]
+        dupes = group[1:]
+        total_duplicates += len(dupes)
+        duplicate_groups.append({
+            "cve_id": cve_id,
+            "canonical_finding_id": canonical.id,
+            "canonical_scan_id": canonical.scan_id,
+            "canonical_title": canonical.title,
+            "severity": str(canonical.severity.value if hasattr(canonical.severity, "value") else canonical.severity),
+            "cvss_score": canonical.cvss_score,
+            "duplicate_count": len(dupes),
+            "duplicate_finding_ids": [d.id for d in dupes],
+            "scanners": list({f.scan_id for f in group}),
+        })
+
+    duplicate_groups.sort(key=lambda x: -x["duplicate_count"])
+    return {
+        "asset_id": asset_id,
+        "asset_name": asset.name,
+        "total_duplicate_groups": len(duplicate_groups),
+        "total_redundant_findings": total_duplicates,
+        "groups": duplicate_groups,
     }
 
 

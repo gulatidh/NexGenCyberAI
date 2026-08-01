@@ -411,6 +411,12 @@ export const assetsApi = {
     apiClient.post(`/clients/${clientId}/assets/${assetId}/scan/`).then((r) => r.data),
   approve: (clientId: string, assetIds: string[]) =>
     apiClient.post(`/clients/${clientId}/assets/approve/`, { asset_ids: assetIds }).then((r) => r.data),
+  heatmap: (clientId: string, limit = 20) =>
+    apiClient.get(`/clients/${clientId}/assets/heatmap?limit=${limit}`).then((r) => r.data),
+  timeline: (clientId: string, assetId: string) =>
+    apiClient.get(`/clients/${clientId}/assets/${assetId}/timeline`).then((r) => r.data),
+  deduplicate: (clientId: string, assetId: string) =>
+    apiClient.get(`/clients/${clientId}/assets/${assetId}/deduplicate`).then((r) => r.data),
 };
 
 export const missionsApi = {
@@ -600,6 +606,8 @@ export const attackPathApi = {
     const qs = params.toString();
     return apiClient.get(`/clients/${clientId}/attack-paths/${qs ? `?${qs}` : ""}`).then((r) => r.data);
   },
+  getForAsset: (clientId: string, assetId: string) =>
+    apiClient.get(`/clients/${clientId}/attack-paths/?asset_id=${assetId}`).then((r) => r.data),
 };
 
 export const nlQueryApi = {
@@ -612,6 +620,8 @@ export const cveApi = {
     apiClient.get(`/clients/${clientId}/cve/${q ? `?q=${encodeURIComponent(q)}` : ""}`).then((r) => r.data),
   get: (clientId: string, cveId: string) =>
     apiClient.get(`/clients/${clientId}/cve/${encodeURIComponent(cveId)}`).then((r) => r.data),
+  impact: (clientId: string, cveId: string) =>
+    apiClient.get(`/clients/${clientId}/cve/${encodeURIComponent(cveId)}/impact`).then((r) => r.data),
 };
 
 export const mttrApi = {

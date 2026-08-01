@@ -260,6 +260,7 @@ export interface Asset {
   severity_breakdown?: { critical: number; high: number; medium: number; low: number; info: number };
   cve_count?: number;
   last_scan_date?: string;
+  risk_score?: number;
 }
 
 export interface AssetDetail extends Asset {
@@ -269,6 +270,39 @@ export interface AssetDetail extends Asset {
   cves?: string[];
   cve_count?: number;
   last_scan_date?: string;
+  risk_score?: number;
+}
+
+export interface AssetTimelinePoint {
+  scan_id: string;
+  date: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  total: number;
+  risk_score: number;
+}
+
+export interface CveDuplicateGroup {
+  cve_id: string;
+  canonical_finding_id: string;
+  severity: string;
+  cvss_score?: number;
+  duplicate_count: number;
+  scanners: string[];
+}
+
+export interface CveImpact {
+  cve_id: string;
+  total_open_findings: number;
+  affected_assets: number;
+  total_risk_points_freed: number;
+  max_cvss: number;
+  severity_breakdown: { critical: number; high: number; medium: number; low: number; info: number };
+  per_asset: Array<{ resource_id: string; asset_name: string; finding_count: number; risk_points_freed: number; max_cvss: number; severities: string[] }>;
+  priority_note: string;
 }
 
 // ── Risk Overview ──────────────────────────────────────────────────────────

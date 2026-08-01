@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Optional
+from datetime import datetime, timezone
 
 from api.models.models import Finding, Scan, Asset, ThreatEntry
 from db.database import get_db
@@ -52,22 +53,27 @@ async def list_cves(
                 "severities": set(),
                 "first_seen": None,
                 "last_seen": None,
+                "scan_ids": set(),
             }
         e = cve_map[cid]
         e["max_cvss"] = max(e["max_cvss"], float(f.cvss_score or 0))
         e["resources"].add(f.resource_id or f.id)
         e["finding_count"] += 1
         e["severities"].add(_sev(f))
+        e["scan_ids"].add(f.scan_id)
         if f.created_at:
             if e["first_seen"] is None or f.created_at < e["first_seen"]:
                 e["first_seen"] = f.created_at
             if e["last_seen"] is None or f.created_at > e["last_seen"]:
                 e["last_seen"] = f.created_at
 
+    now = datetime.now(timezone.utc)
     result = []
     for e in cve_map.values():
         sevs = e["severities"]
         max_sev = min(sevs, key=lambda s: _SEV_ORDER.get(s, 99)) if sevs else "info"
+        first = e["first_seen"]
+        days_open = (now - first.replace(tzinfo=timezone.utc if first.tzinfo is None else first.tzinfo)).days if first else None
         result.append({
             "cve_id": e["cve_id"],
             "max_cvss": round(e["max_cvss"], 1),
@@ -76,6 +82,9 @@ async def list_cves(
             "max_severity": max_sev,
             "first_seen": e["first_seen"],
             "last_seen": e["last_seen"],
+            "days_open": days_open,
+            "scan_count": len(e["scan_ids"]),
+            "is_persisting": len(e["scan_ids"]) > 1,
         })
 
     result.sort(key=lambda x: (-x["max_cvss"], -x["affected_assets"]))
@@ -169,4 +178,79 @@ async def get_cve_detail(
             }
             for rid in resource_ids
         ],
+    }
+
+
+@router.get("/{cve_id}/impact")
+async def get_cve_remediation_impact(
+    client_id: str,
+    cve_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Remediation impact: how much risk is eliminated if this CVE is patched across all assets."""
+    findings = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.cve_id == cve_id,
+            Finding.status == "open",
+        )
+        .all()
+    )
+
+    if not findings:
+        raise HTTPException(status_code=404, detail=f"No open findings for {cve_id}")
+
+    # Per-asset impact
+    asset_map: dict = {}
+    for f in findings:
+        rid = f.resource_id or f.id
+        sev = str(f.severity.value if hasattr(f.severity, "value") else f.severity).lower()
+        if rid not in asset_map:
+            asset_map[rid] = {"resource_id": rid, "severities": [], "cvss_scores": []}
+        asset_map[rid]["severities"].append(sev)
+        if f.cvss_score:
+            asset_map[rid]["cvss_scores"].append(float(f.cvss_score))
+
+    # Compute risk_score delta per asset
+    SEV_W = {"critical": 10, "high": 5, "medium": 2, "low": 1, "info": 0}
+    total_risk_points = sum(SEV_W.get(str(f.severity.value if hasattr(f.severity, "value") else f.severity).lower(), 0) for f in findings)
+    max_cvss = max((float(f.cvss_score or 0) for f in findings), default=0.0)
+
+    sev_counts: dict = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+    for f in findings:
+        sk = str(f.severity.value if hasattr(f.severity, "value") else f.severity).lower()
+        if sk in sev_counts:
+            sev_counts[sk] += 1
+
+    per_asset = []
+    for rid, data in asset_map.items():
+        asset_obj = db.query(Asset).filter(Asset.client_id == client_id, Asset.external_id == rid).first()
+        per_asset.append({
+            "resource_id": rid,
+            "asset_name": asset_obj.name if asset_obj else rid,
+            "asset_class": asset_obj.asset_class if asset_obj else None,
+            "finding_count": len(data["severities"]),
+            "risk_points_freed": sum(SEV_W.get(s, 0) for s in data["severities"]),
+            "severities": data["severities"],
+            "max_cvss": round(max(data["cvss_scores"], default=0.0), 1),
+        })
+
+    per_asset.sort(key=lambda x: -x["risk_points_freed"])
+
+    return {
+        "cve_id": cve_id,
+        "total_open_findings": len(findings),
+        "affected_assets": len(asset_map),
+        "total_risk_points_freed": total_risk_points,
+        "max_cvss": round(max_cvss, 1),
+        "severity_breakdown": sev_counts,
+        "per_asset": per_asset,
+        "priority_note": (
+            "Critical — patch immediately" if sev_counts.get("critical", 0) > 0
+            else "High — patch within 7 days" if sev_counts.get("high", 0) > 0
+            else "Medium priority"
+        ),
     }
