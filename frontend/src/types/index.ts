@@ -257,12 +257,18 @@ export interface Asset {
   reappeared_at?: string;
   open_findings_count: number;
   risks_count: number;
+  severity_breakdown?: { critical: number; high: number; medium: number; low: number; info: number };
+  cve_count?: number;
+  last_scan_date?: string;
 }
 
 export interface AssetDetail extends Asset {
   provider_metadata?: Record<string, any>;
   findings: Finding[];
   risks: Risk[];
+  cves?: string[];
+  cve_count?: number;
+  last_scan_date?: string;
 }
 
 // ── Risk Overview ──────────────────────────────────────────────────────────

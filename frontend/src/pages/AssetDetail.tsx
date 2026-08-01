@@ -160,12 +160,19 @@ export default function AssetDetailPage() {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>Open Findings</Typography>
-            <Typography variant="h4" sx={{ color: openFindings > 0 ? "#f44336" : "text.secondary", fontWeight: 700 }}>
-              {openFindings}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              of {findings.length} total
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>Severity Breakdown</Typography>
+            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+              {(["critical", "high", "medium", "low", "info"] as const).map((s) => {
+                const count = asset.severity_breakdown?.[s] ?? findings.filter((f) => f.status === "open" && ((f.severity as any)?.value ?? f.severity) === s).length;
+                return count > 0 ? (
+                  <Chip key={s} label={`${count} ${s}`} size="small"
+                    sx={{ bgcolor: `${SEV_COLOR[s]}22`, color: SEV_COLOR[s], fontSize: 10, height: 20 }} />
+                ) : null;
+              })}
+              {openFindings === 0 && <Typography variant="body2" sx={{ color: "text.secondary" }}>No open findings</Typography>}
+            </Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+              {openFindings} open of {findings.length} total
             </Typography>
           </Card>
         </Grid>
@@ -179,17 +186,13 @@ export default function AssetDetailPage() {
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>Tags</Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
-              {Object.keys(asset.tags || {}).length === 0 ? (
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>None</Typography>
-              ) : (
-                Object.entries(asset.tags || {}).map(([k, v]) => (
-                  <Chip key={k} label={`${k}: ${v}`} size="small"
-                    sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.secondary", fontSize: 10, height: 18 }} />
-                ))
-              )}
-            </Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Unique CVEs</Typography>
+            <Typography variant="h4" sx={{ color: (asset.cve_count ?? 0) > 0 ? "#4285F4" : "text.secondary", fontWeight: 700 }}>
+              {asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {asset.last_scan_date ? `Last scan ${fromNow(asset.last_scan_date)}` : "No scans yet"}
+            </Typography>
           </Card>
         </Grid>
       </Grid>
@@ -215,6 +218,7 @@ export default function AssetDetailPage() {
           "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
         <Tab label={`Findings (${findings.length})`} />
         <Tab label={`Risks (${risks.length})`} />
+        <Tab label={`CVEs (${asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length})`} />
         <Tab label="Raw Metadata" />
       </Tabs>
 
@@ -312,7 +316,60 @@ export default function AssetDetailPage() {
         )
       )}
 
-      {tab === 2 && (
+      {tab === 2 && (() => {
+        const cveIds = asset.cves ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id!))).sort();
+        return cveIds.length === 0 ? (
+          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Typography sx={{ color: "text.secondary" }}>No CVEs found for findings on this asset.</Typography>
+          </Card>
+        ) : (
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                    <TableCell>CVE ID</TableCell>
+                    <TableCell>TITLE</TableCell>
+                    <TableCell>SEVERITY</TableCell>
+                    <TableCell align="right">CVSS</TableCell>
+                    <TableCell>STATUS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {cveIds.map((cveId) => {
+                    const f = findings.find((fi) => fi.cve_id === cveId);
+                    const sev = f ? ((f.severity as any)?.value ?? f.severity) : "info";
+                    return (
+                      <TableRow key={cveId} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
+                            {cveId}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
+                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {f?.title || "—"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={sev} size="small"
+                            sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}22`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontSize: 12, color: f?.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
+                          {f?.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
+                        </TableCell>
+                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f?.status || "open"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        );
+      })()}
+
+      {tab === 3 && (
         <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
           <Box component="pre" sx={{ color: "text.secondary", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
             {JSON.stringify(asset.provider_metadata || {}, null, 2)}

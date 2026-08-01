@@ -22,6 +22,10 @@ const CLASS_COLOR: Record<string, string> = {
   other: "#9e9e9e",
 };
 
+const SEV_COLOR: Record<string, string> = {
+  critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
+};
+
 const STATUS_COLOR: Record<string, string> = {
   active: "#00e676",
   stale: "#ff9800",
@@ -402,12 +406,16 @@ export default function Assets() {
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>SUBSCRIPTION / ACCOUNT</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "resource_group"} direction={sortDir} onClick={() => setSort("resource_group")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>RESOURCE GROUP / REGION</TableSortLabel></TableCell>
-                  <TableCell align="right"><TableSortLabel active={sortKey === "open_findings_count"} direction={sortDir} onClick={() => setSort("open_findings_count")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>OPEN FINDINGS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "open_findings_count"} direction={sortDir} onClick={() => setSort("open_findings_count")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SEVERITY</TableSortLabel></TableCell>
+                  <TableCell align="right"><TableSortLabel active={sortKey === "cve_count"} direction={sortDir} onClick={() => setSort("cve_count")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVEs</TableSortLabel></TableCell>
                   <TableCell align="right"><TableSortLabel active={sortKey === "risks_count"} direction={sortDir} onClick={() => setSort("risks_count")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>RISKS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "last_scan_date"} direction={sortDir} onClick={() => setSort("last_scan_date")}
+                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>LAST SCAN</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "last_synced_at"} direction={sortDir} onClick={() => setSort("last_synced_at")}
                     sx={{ color: "rgba(255,255,255,0.5) !important" }}>SYNCED</TableSortLabel></TableCell>
                   <TableCell align="right">ACTIONS</TableCell>
@@ -416,7 +424,6 @@ export default function Assets() {
               <TableBody>
                 {sortedAssets.map((a) => {
                   const klass = a.asset_class || "other";
-                  const findingColor = a.open_findings_count > 0 ? "#f44336" : "rgba(255,255,255,0.3)";
                   const riskColor = a.risks_count > 0 ? "#ff9800" : "rgba(255,255,255,0.3)";
                   const isSelected = selectedIds.includes(a.id);
                   return (
@@ -457,15 +464,38 @@ export default function Assets() {
                       <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
                         {groupColumn(a)}
                       </TableCell>
-                      <TableCell align="right" sx={{ color: findingColor, fontWeight: 600 }}>
-                        {a.open_findings_count}
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                          {(["critical", "high", "medium", "low"] as const).map((s) => {
+                            const count = a.severity_breakdown?.[s] ?? 0;
+                            if (count === 0) return null;
+                            return (
+                              <Tooltip key={s} title={`${count} ${s}`}>
+                                <Chip
+                                  label={count}
+                                  size="small"
+                                  sx={{ bgcolor: `${SEV_COLOR[s]}22`, color: SEV_COLOR[s], fontSize: 10, height: 18, minWidth: 28, cursor: "pointer" }}
+                                />
+                              </Tooltip>
+                            );
+                          })}
+                          {a.open_findings_count === 0 && (
+                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.2)" }}>—</Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ color: (a.cve_count ?? 0) > 0 ? "#4285F4" : "rgba(255,255,255,0.2)", fontWeight: 600, fontSize: 13 }}>
+                        {(a.cve_count ?? 0) > 0 ? a.cve_count : "—"}
                       </TableCell>
                       <TableCell align="right" sx={{ color: riskColor, fontWeight: 600 }}>
-                        {a.risks_count}
+                        {a.risks_count || "—"}
                       </TableCell>
                       <TableCell>
                         <Chip label={a.status} size="small"
                           sx={{ bgcolor: `${STATUS_COLOR[a.status] || "#888"}20`, color: STATUS_COLOR[a.status] || "#888", fontSize: 10, height: 18 }} />
+                      </TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
+                        {a.last_scan_date ? fromNow(a.last_scan_date) : "—"}
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
                         {fromNow(a.last_synced_at)}
