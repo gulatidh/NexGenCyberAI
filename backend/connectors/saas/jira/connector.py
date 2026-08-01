@@ -36,7 +36,10 @@ class JiraConnector(BaseConnector):
 
     @property
     def _base_url(self) -> str:
-        return self.credentials["base_url"].rstrip("/")
+        url = self.credentials.get("url") or self.credentials.get("base_url", "")
+        if not url:
+            raise ValueError("Jira URL is not configured — set 'url' in the connector credentials")
+        return url.rstrip("/")
 
     def _auth(self):
         return (self.credentials["email"], self.credentials["api_token"])
