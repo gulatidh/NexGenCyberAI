@@ -209,6 +209,7 @@ function ProtectedApp() {
           <Route path="connections" element={<Connections />} />
           <Route path="ticket-sync" element={<TicketSyncPage />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="help" element={<Help />} />
         </Route>
 
         {/* ── v1 AppLayout routes (classic view — still accessible) ─────── */}

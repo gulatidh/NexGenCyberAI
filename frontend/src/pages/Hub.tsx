@@ -163,7 +163,7 @@ const QUICK_ACCESS = [
   { label: "Assets",         icon: <Storage sx={{ fontSize: 16 }} />,        route: "/platform/assets" },
   { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
   { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
-  { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/help" },
+  { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/platform/help" },
 ];
 
 // ── Client picker ────────────────────────────────────────────────────────────

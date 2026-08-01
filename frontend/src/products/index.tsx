@@ -9,6 +9,7 @@ import {
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
+  Devices, HelpOutlined,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -129,11 +130,13 @@ export const PLATFORM: ProductDef = {
   bgColor: "#ECEFF1",
   basePath: "/platform",
   nav: [
-    { label: "Clients",     icon: <People />,        path: "/clients" },
-    { label: "Assets",      icon: <Storage />,        path: "/assets" },
-    { label: "Connections", icon: <Cable />,          path: "/connections" },
-    { label: "Ticket Sync", icon: <SyncAlt />,        path: "/ticket-sync" },
-    { label: "Settings",    icon: <SettingsIcon />,   path: "/settings" },
+    { label: "Clients",              icon: <People />,        path: "/clients" },
+    { label: "Assets",               icon: <Storage />,        path: "/assets" },
+    { label: "Technology Inventory", icon: <Devices />,        path: "/assets/technologies" },
+    { label: "Connections",          icon: <Cable />,          path: "/connections" },
+    { label: "Ticket Sync",          icon: <SyncAlt />,        path: "/ticket-sync" },
+    { label: "Settings",             icon: <SettingsIcon />,   path: "/settings" },
+    { label: "Help",                 icon: <HelpOutlined />,    path: "/help" },
   ],
 };
 

@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem, Alert, Button, CircularProgress } from "@mui/material";
 import { Refresh } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { fmt } from "../utils/datetime";
 
-import { clientsApi, projectsApi, technologiesApi } from "../services/api";
-import { Client, Project, TechnologyInventory, TechnologyRow } from "../types";
+import { projectsApi, technologiesApi } from "../services/api";
+import { Project, TechnologyInventory, TechnologyRow } from "../types";
+import { useActiveClient } from "../contexts/ClientContext";
 
 import SearchAndFilters, { FilterState } from "../components/technologies/SearchAndFilters";
 import BreakdownByCategory from "../components/technologies/BreakdownByCategory";
@@ -20,22 +21,16 @@ const EMPTY_FILTERS: FilterState = {
 };
 
 export default function Technologies() {
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<TechnologyRow | null>(null);
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId],
     queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
-
-  // Auto-pick first client
-  useEffect(() => {
-    if (!clientId && clients.length > 0) setClientId(clients[0].id);
-  }, [clients, clientId]);
 
   const { data: inventory, isLoading, isFetching, refetch, isError, error } = useQuery<TechnologyInventory>({
     queryKey: ["technology-inventory", clientId, projectId, filters.category, filters.type, filters.status, filters.search],
@@ -71,13 +66,6 @@ export default function Technologies() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
@@ -114,9 +102,9 @@ export default function Technologies() {
         </Alert>
       )}
 
-      {!clientId && clients.length === 0 && !isLoading && (
+      {!clientId && !isLoading && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No clients yet. Create one in the Clients page first.
+          Select a client from the top toolbar to view technology inventory.
         </Alert>
       )}
 
