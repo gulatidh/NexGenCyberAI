@@ -252,6 +252,17 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.progress_message ALTER failed: %s", exc)
 
+        if "source_format" not in scan_cols:
+            ddl = ("ALTER TABLE scans ADD source_format NVARCHAR(50) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE scans ADD COLUMN source_format VARCHAR(50)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added scans.source_format column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("scans.source_format ALTER failed: %s", exc)
+
         # Add scheduled_mission_runs.report — structured LLM report per run.
         try:
             run_cols = {c["name"] for c in inspector.get_columns("scheduled_mission_runs")}
@@ -1506,10 +1517,17 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
-# CORS — allow the SPA and Azure App Service hostnames
+# CORS — allow the SPA and Azure App Service hostnames.
+# allow_origin_regex covers *.azurewebsites.net so the backend works even when
+# the ALLOWED_ORIGINS env var was set before monitara-ai was added as a hostname.
+_cors_origins = list(settings.ALLOWED_ORIGINS)
+for _o in ("https://monitara-ai.azurewebsites.net", "https://nexgencyberai.azurewebsites.net"):
+    if _o not in _cors_origins:
+        _cors_origins.append(_o)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https?://[^/]*\.azurewebsites\.net",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

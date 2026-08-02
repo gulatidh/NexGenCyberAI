@@ -742,9 +742,10 @@ export default function Scans() {
   });
 
   // Cross-client tile feed (default view). Refetches every 5s while any tile is still running.
-  const { data: tilesData, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
+  const { data: tilesData, isLoading: tilesLoading, isError: tilesError, error: tilesErr, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
     queryKey: ["assessments-tiles"],
     queryFn: () => assessmentsApi.listAll(),
+    retry: 1,
     refetchInterval: (q) => {
       const scans = (q.state.data as any)?.scans || [];
       if (!scans.some((s: any) => s.status === "running")) return false;
@@ -947,9 +948,10 @@ export default function Scans() {
 
       {/* Temporary diagnostic — shows raw API response count */}
       <Box sx={{ mb: 1, p: 1, bgcolor: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.3)", borderRadius: 1, fontSize: 12, color: "text.secondary" }}>
-        API returned <strong>{tilesData?.scans?.length ?? "…"}</strong> scans total &nbsp;|&nbsp;
+        API: {tilesLoading ? "⏳ loading" : tilesError ? `❌ error: ${(tilesErr as any)?.response?.data?.detail || (tilesErr as any)?.message || "CORS/network"}` : `✅ ${tilesData?.scans?.length ?? 0} scans`} &nbsp;|&nbsp;
         After filter: <strong>{tiles.length}</strong> &nbsp;|&nbsp;
-        Client filter: <strong>{selectedClientId || "none (all)"}</strong>
+        Client: <strong>{selectedClientId || "all"}</strong>
+        &nbsp;<button onClick={() => refetchTiles()} style={{fontSize:11,cursor:"pointer"}}>↺ retry</button>
       </Box>
 
       {/* ── Top-level scanner / import groups ──────────────────────────── */}

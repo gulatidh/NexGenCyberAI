@@ -11,9 +11,12 @@ unchanged. This module exposes the tile-view + detail-view shape:
   POST /scans/{scan_id}/generate-verdict → kick off the verdict generator
 """
 from __future__ import annotations
+import logging
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -118,19 +121,13 @@ async def list_all_scans(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    """Cross-client tile feed. Filters to clients the user has access to.
-
-    Returns each scan with:
-      - category (DAST/SAST/Network/Dependency/Cloud/Other)
-      - client_name
-      - duration_seconds
-      - tile_name = f"{category} · {client_name}"
-      - agents_ran (count + types)
-      - findings_count
-      - has_verdict
-    """
-    q = db.query(Scan).order_by(Scan.created_at.desc()).limit(500)
-    scans = q.all()
+    """Cross-client tile feed. Filters to clients the user has access to."""
+    try:
+        q = db.query(Scan).order_by(Scan.created_at.desc()).limit(500)
+        scans = q.all()
+    except Exception as exc:
+        logger.exception("list_all_scans DB query failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"DB error loading scans: {exc}")
     allowed = _accessible_ids(db, user)
     if allowed is not None:
         scans = [s for s in scans if s.client_id in allowed]
