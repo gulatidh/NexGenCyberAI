@@ -250,8 +250,8 @@ function ProtectedApp() {
           <Route path="/missions" element={<Missions />} />
           <Route path="/knowledge" element={<KnowledgeBase />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/vapt-reports" element={<VAPTReports />} />
-          <Route path="/vapt-reports/:reportId" element={<VAPTReportDetail />} />
+          <Route path="/vapt-reports" element={<Navigate to="/vapt/reports" replace />} />
+          <Route path="/vapt-reports/:reportId" element={<Navigate to="/vapt/reports" replace />} />
           <Route path="/ticket-sync" element={<TicketSyncPage />} />
           <Route path="/ctem" element={<CTEMPage />} />
           <Route path="/security-docs" element={<SecurityDocs />} />

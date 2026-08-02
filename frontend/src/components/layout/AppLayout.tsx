@@ -67,7 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Scans",        icon: <BugReport />, path: "/scans" },
       { label: "Findings",     icon: <Security />,  path: "/findings" },
-      { label: "VAPT Reports", icon: <GppGood />,   path: "/vapt-reports" },
+      { label: "VAPT Reports", icon: <GppGood />,   path: "/vapt/reports" },
     ],
   },
   {
