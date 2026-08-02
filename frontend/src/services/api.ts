@@ -190,10 +190,15 @@ export const risksApi = {
 export const agentsApi = {
   run: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/agents/run/`, data).then((r) => r.data),
   listRuns: (clientId: string) => apiClient.get(`/clients/${clientId}/agents/runs/`).then((r) => r.data),
+  listHiddenRuns: (clientId: string) => apiClient.get(`/clients/${clientId}/agents/runs/hidden/`).then((r) => r.data),
   getRun: (clientId: string, runId: string) =>
     apiClient.get(`/clients/${clientId}/agents/runs/${runId}`).then((r) => r.data),
   deleteRun: (clientId: string, runId: string) =>
     apiClient.delete(`/clients/${clientId}/agents/runs/${runId}`).then((r) => r.data),
+  restoreRun: (clientId: string, runId: string) =>
+    apiClient.post(`/clients/${clientId}/agents/runs/${runId}/restore`).then((r) => r.data),
+  permanentDeleteRun: (clientId: string, runId: string) =>
+    apiClient.delete(`/clients/${clientId}/agents/runs/${runId}/permanent`).then((r) => r.data),
 };
 
 export const aiApi = {

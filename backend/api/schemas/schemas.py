@@ -260,6 +260,7 @@ class AgentRunResponse(BaseModel):
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     error_message: Optional[str]
+    hidden_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 

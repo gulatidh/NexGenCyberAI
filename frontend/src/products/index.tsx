@@ -9,7 +9,7 @@ import {
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
-  Devices, HelpOutlined, AutoFixHigh, AltRoute, FolderZip,
+  Devices, HelpOutlined, AutoFixHigh, AltRoute, FolderZip, Delete,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -109,6 +109,7 @@ export const AI_ADVISOR: ProductDef = {
   nav: [
     { label: "AI Buddies", icon: <SmartToy />, path: "/agents" },
     { label: "Workflows", icon: <Hub />, path: "/workflows" },
+    { label: "Run Trash", icon: <Delete />, path: "/run-trash" },
   ],
 };
 

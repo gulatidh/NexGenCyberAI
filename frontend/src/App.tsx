@@ -66,6 +66,7 @@ import ComplianceHeatmap from "./pages/ComplianceHeatmap";
 import ClientComparison from "./pages/ClientComparison";
 import EvidencePackage from "./pages/EvidencePackage";
 import RemediationJobs from "./pages/RemediationJobs";
+import AgentRunTrash from "./pages/AgentRunTrash";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -196,6 +197,7 @@ function ProtectedApp() {
           <Route index element={<Navigate to="agents" replace />} />
           <Route path="agents" element={<Agents />} />
           <Route path="workflows" element={<Missions />} />
+          <Route path="run-trash" element={<AgentRunTrash />} />
         </Route>
 
         <Route path="/intelligence" element={<ProductLayout product={INTELLIGENCE} />}>

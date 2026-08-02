@@ -340,7 +340,25 @@ async def run_agent(
 
 @router.get("/runs/", response_model=List[AgentRunResponse])
 async def list_agent_runs(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    return db.query(AgentRun).filter(AgentRun.client_id == client_id).order_by(AgentRun.started_at.desc()).limit(20).all()
+    return (
+        db.query(AgentRun)
+        .filter(AgentRun.client_id == client_id, AgentRun.hidden_at.is_(None))
+        .order_by(AgentRun.started_at.desc())
+        .limit(200)
+        .all()
+    )
+
+
+@router.get("/runs/hidden/", response_model=List[AgentRunResponse])
+async def list_hidden_agent_runs(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Runs soft-deleted by the user — shown in the trash page."""
+    return (
+        db.query(AgentRun)
+        .filter(AgentRun.client_id == client_id, AgentRun.hidden_at.isnot(None))
+        .order_by(AgentRun.hidden_at.desc())
+        .limit(200)
+        .all()
+    )
 
 
 @router.get("/runs/{run_id}", response_model=AgentRunResponse)
@@ -353,11 +371,37 @@ async def get_agent_run(client_id: str, run_id: str, db: Session = Depends(get_d
 
 @router.delete("/runs/{run_id}")
 async def delete_agent_run(client_id: str, run_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
-    """Remove a single agent run — useful for clearing out empty / failed /
-    stuck-running runs from the Risk Register's AI Agent Risk Analysis tiles."""
+    """Soft-delete: set hidden_at. Run moves to trash; use /permanent to hard-delete."""
     run = db.query(AgentRun).filter(AgentRun.id == run_id, AgentRun.client_id == client_id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Agent run not found")
+    run.hidden_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"archived": True}
+
+
+@router.post("/runs/{run_id}/restore")
+async def restore_agent_run(client_id: str, run_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Restore a soft-deleted run back to the active list."""
+    run = db.query(AgentRun).filter(AgentRun.id == run_id, AgentRun.client_id == client_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    run.hidden_at = None
+    db.commit()
+    return {"restored": True}
+
+
+@router.delete("/runs/{run_id}/permanent")
+async def permanent_delete_agent_run(client_id: str, run_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Hard-delete. Clears FK references in register tables first."""
+    from api.models.models import ThreatEntry, ControlDeficiency, RemediationAction, ScanBlackboardEntry
+    run = db.query(AgentRun).filter(AgentRun.id == run_id, AgentRun.client_id == client_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Agent run not found")
+    for model in (ThreatEntry, ControlDeficiency, RemediationAction, ScanBlackboardEntry):
+        db.query(model).filter(model.agent_run_id == run_id).update(
+            {"agent_run_id": None}, synchronize_session=False
+        )
     db.delete(run)
     db.commit()
     return {"deleted": True}

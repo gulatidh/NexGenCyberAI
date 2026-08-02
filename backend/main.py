@@ -673,6 +673,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("ctem_programs.connector_ids_json ALTER failed: %s", exc)
 
+        # agent_runs.hidden_at — soft-delete support
+        try:
+            agent_run_cols = {c["name"] for c in inspector.get_columns("agent_runs")}
+        except Exception:
+            agent_run_cols = set()
+        if agent_run_cols and "hidden_at" not in agent_run_cols:
+            ddl = ("ALTER TABLE agent_runs ADD hidden_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE agent_runs ADD COLUMN hidden_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added agent_runs.hidden_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("agent_runs.hidden_at ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

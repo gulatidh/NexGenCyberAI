@@ -578,6 +578,7 @@ class AgentRun(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True))
     error_message = Column(Text)
+    hidden_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class ThreatLibrary(Base):
