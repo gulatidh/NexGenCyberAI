@@ -253,6 +253,7 @@ class AgentRunResponse(BaseModel):
     client_id: Optional[str]
     agent_type: AgentType
     status: str
+    scan_id: Optional[str] = None
     input_data: Optional[Dict[str, Any]]
     output_data: Optional[Dict[str, Any]]
     tokens_used: Optional[int]

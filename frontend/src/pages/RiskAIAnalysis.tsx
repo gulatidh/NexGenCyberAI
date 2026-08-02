@@ -1,42 +1,46 @@
 import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, Chip, Grid, Button, Alert,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  IconButton, Tooltip, Badge,
+  IconButton, Tooltip, Badge, Divider,
 } from "@mui/material";
-import { SmartToy, History, DeleteOutlined } from "@mui/icons-material";
+import { SmartToy, History, DeleteOutlined, BugReport, OpenInNew } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { agentsApi } from "../services/api";
+import { agentsApi, scansApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import AgentInsightCard from "../components/AgentInsightCard";
 
 const RISK_AGENT_TYPES = new Set(["risk_manager", "threat_intel", "remediation"]);
 
-const AGENT_LABELS: Record<string, { label: string; color: string; description: string }> = {
-  risk_manager: {
-    label: "Risk Manager",
-    color: "#EA4335",
-    description: "FAIR-lite risk scoring, ALE calculations, and domain-level exposure analysis.",
-  },
-  threat_intel: {
-    label: "Threat Intelligence",
-    color: "#FF7043",
-    description: "MITRE ATT&CK threat mapping, actor profiling, and technique correlation.",
-  },
-  remediation: {
-    label: "Remediation Planner",
-    color: "#34A853",
-    description: "Prioritised remediation actions, effort estimates, and remediation roadmap.",
-  },
+const SCAN_TYPE_LABELS: Record<string, string> = {
+  web: "Web (ZAP)", nmap: "Nmap", semgrep: "Semgrep", codeql: "CodeQL",
+  gitleaks: "Gitleaks", trufflehog: "TruffleHog", trivy: "Trivy",
+  owasp_dc: "OWASP DC", nuclei: "Nuclei", checkov: "Checkov", sslyze: "SSLyze",
+  ai_code_review: "AI Code Review", tenable: "Tenable", burp_enterprise: "Burp Enterprise",
+  snyk: "Snyk", rapid7: "Rapid7", qualys: "Qualys", invicti: "Invicti",
+  acunetix: "Acunetix", full: "Full", manual: "Manual",
 };
+
+function scanLabel(scan: any): string {
+  if (scan.name) return scan.name;
+  return SCAN_TYPE_LABELS[scan.scan_type] || scan.scan_type || "Scan";
+}
+
+function scanDate(scan: any): string {
+  const d = scan.completed_at || scan.started_at || scan.created_at;
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export default function RiskAIAnalysis() {
   const { clientId } = useActiveClient();
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-  const [historyOpenFor, setHistoryOpenFor] = useState<string | null>(null);
+  const [historyOpenFor, setHistoryOpenFor] = useState<{ scanId: string | null; agentType: string } | null>(null);
   const [viewVersion, setViewVersion] = useState<any | null>(null);
   const [pendingDeleteRun, setPendingDeleteRun] = useState<any | null>(null);
 
@@ -47,30 +51,45 @@ export default function RiskAIAnalysis() {
     refetchInterval: 15000,
   });
 
+  const { data: scans = [] } = useQuery<any[]>({
+    queryKey: ["scans", clientId],
+    queryFn: () => scansApi.list(clientId!),
+    enabled: !!clientId,
+  });
+
+  const scanMap = useMemo(() => {
+    const m: Record<string, any> = {};
+    for (const s of scans) m[s.id] = s;
+    return m;
+  }, [scans]);
+
   const riskRuns = useMemo(
     () => allRuns.filter((r) => RISK_AGENT_TYPES.has(r.agent_type)),
     [allRuns],
   );
 
-  const { latestByType, historyByType } = useMemo(() => {
-    const sorted = [...riskRuns].sort((a, b) => {
-      const ad = new Date(a.started_at || 0).getTime();
-      const bd = new Date(b.started_at || 0).getTime();
-      return bd - ad;
-    });
-    const latest: Record<string, any> = {};
-    const history: Record<string, any[]> = {};
-    for (const r of sorted) {
-      if (!latest[r.agent_type]) {
-        latest[r.agent_type] = r;
-      } else {
-        (history[r.agent_type] = history[r.agent_type] || []).push(r);
-      }
+  // Group runs by scan_id; within each group keep all runs for history tracking
+  const scanGroups = useMemo(() => {
+    const groups = new Map<string | null, any[]>();
+    for (const r of riskRuns) {
+      const key = r.scan_id || null;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(r);
     }
-    return { latestByType: latest, historyByType: history };
+    const entries = Array.from(groups.entries()) as [string | null, any[]][];
+    for (const [, runs] of entries) {
+      runs.sort((a: any, b: any) =>
+        new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime(),
+      );
+    }
+    return entries.sort(([keyA, runsA], [keyB, runsB]) => {
+      if (keyA === null) return 1;
+      if (keyB === null) return -1;
+      const latA = Math.max(...runsA.map((r: any) => new Date(r.started_at || 0).getTime()));
+      const latB = Math.max(...runsB.map((r: any) => new Date(r.started_at || 0).getTime()));
+      return latB - latA;
+    });
   }, [riskRuns]);
-
-  const latestRuns = useMemo(() => Object.values(latestByType), [latestByType]);
 
   const deleteRunMutation = useMutation({
     mutationFn: (runId: string) => agentsApi.deleteRun(clientId!, runId),
@@ -89,6 +108,8 @@ export default function RiskAIAnalysis() {
     );
   }
 
+  const totalScans = scanGroups.filter(([k]) => k !== null).length;
+
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* Header */}
@@ -99,70 +120,22 @@ export default function RiskAIAnalysis() {
             <Typography variant="h5" sx={{ fontWeight: 700 }}>AI Risk Analysis</Typography>
             {riskRuns.length > 0 && (
               <Chip
-                label={`${riskRuns.length} run${riskRuns.length !== 1 ? "s" : ""}`}
+                label={`${riskRuns.length} run${riskRuns.length !== 1 ? "s" : ""} · ${totalScans} scan${totalScans !== 1 ? "s" : ""}`}
                 size="small"
                 sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontWeight: 700 }}
               />
             )}
           </Box>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            AI-generated risk intelligence from Risk Manager, Threat Intel, and Remediation agents.
-            Run these agents from AI Advisor → AI Buddies to populate this page.
+            AI-generated risk intelligence grouped by the scan each agent analyzed.
+            Run agents from AI Advisor → AI Buddies after selecting a scan.
           </Typography>
         </Box>
-        {expandedRunId && (
-          <Button size="small" onClick={() => setExpandedRunId(null)}
-            sx={{ color: "text.secondary", fontSize: 12, textTransform: "none", alignSelf: "center" }}>
-            Collapse all
-          </Button>
-        )}
       </Box>
 
-      {/* Agent type summary chips */}
-      <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
-        {Object.entries(AGENT_LABELS).map(([type, meta]) => {
-          const run = latestByType[type];
-          const hasRun = !!run;
-          const status = run?.status?.toLowerCase();
-          const isRunning = status === "running" || status === "pending";
-          return (
-            <Card
-              key={type}
-              sx={{
-                px: 2, py: 1.5, minWidth: 180, flex: 1,
-                bgcolor: hasRun ? `${meta.color}0D` : "rgba(255,255,255,0.03)",
-                border: `1px solid ${hasRun ? `${meta.color}40` : "rgba(255,255,255,0.08)"}`,
-                borderRadius: 2,
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: hasRun ? meta.color : "rgba(255,255,255,0.2)" }} />
-                <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", color: hasRun ? meta.color : "text.disabled" }}>
-                  {meta.label}
-                </Typography>
-                {isRunning && (
-                  <Chip label="Running" size="small"
-                    sx={{ height: 16, fontSize: 9, bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", ml: "auto" }} />
-                )}
-                {hasRun && !isRunning && (
-                  <Chip label={`v${1 + (historyByType[type]?.length || 0)}`} size="small"
-                    sx={{ height: 16, fontSize: 9, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", ml: "auto" }} />
-                )}
-              </Box>
-              <Typography variant="caption" sx={{ color: "text.secondary", lineHeight: 1.3 }}>
-                {hasRun
-                  ? `Last run ${run.started_at ? fromNow(run.started_at) : "unknown"}`
-                  : meta.description}
-              </Typography>
-            </Card>
-          );
-        })}
-      </Box>
-
-      {/* Agent run tiles */}
       {isLoading ? (
         <Typography sx={{ color: "text.secondary" }}>Loading agent runs…</Typography>
-      ) : latestRuns.length === 0 ? (
+      ) : scanGroups.length === 0 ? (
         <Card sx={{
           bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)",
           borderRadius: 2, p: 4, textAlign: "center",
@@ -170,49 +143,112 @@ export default function RiskAIAnalysis() {
           <SmartToy sx={{ fontSize: 40, color: "text.disabled", mb: 1.5 }} />
           <Typography variant="h6" sx={{ color: "text.secondary", mb: 0.5 }}>No risk analysis yet</Typography>
           <Typography variant="body2" sx={{ color: "text.disabled" }}>
-            Go to AI Advisor → AI Buddies and run the Risk Manager, Threat Intel, or Remediation agent to populate this page.
+            Go to AI Advisor → AI Buddies, select a scan, then run Risk Manager, Threat Intel, or Remediation agents.
           </Typography>
         </Card>
       ) : (
-        <Grid container spacing={1.5}>
-          {latestRuns.map((run: any) => {
-            const isExpanded = expandedRunId === run.id;
-            const versionCount = 1 + (historyByType[run.agent_type]?.length || 0);
+        <Box>
+          {scanGroups.map(([scanId, runs]) => {
+            const scan = scanId ? scanMap[scanId] : null;
+            // Deduplicate: per agent_type, show latest + track older as history
+            const latestByType: Record<string, any> = {};
+            const historyByType: Record<string, any[]> = {};
+            for (const r of runs) {
+              if (!latestByType[r.agent_type]) {
+                latestByType[r.agent_type] = r;
+              } else {
+                (historyByType[r.agent_type] = historyByType[r.agent_type] || []).push(r);
+              }
+            }
+            const latestRuns = Object.values(latestByType);
+
             return (
-              <Grid key={run.id} size={{ xs: 12, md: isExpanded ? 12 : 6 }}>
-                <Box sx={{ position: "relative" }}>
-                  <AgentInsightCard
-                    run={run}
-                    expanded={isExpanded}
-                    onToggle={() => setExpandedRunId(isExpanded ? null : run.id)}
-                    onDelete={() => setPendingDeleteRun(run)}
-                  />
-                  {versionCount > 1 && (
-                    <Tooltip title={`${versionCount - 1} previous version${versionCount - 1 === 1 ? "" : "s"}`}>
-                      <IconButton
+              <Box key={scanId ?? "__no_scan__"} sx={{ mb: 4 }}>
+                {/* Scan group header */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                  <BugReport sx={{ color: scanId ? "#4285F4" : "text.disabled", fontSize: 18 }} />
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.95rem" }}>
+                    {scan ? scanLabel(scan) : "No scan context"}
+                  </Typography>
+                  {scan && (
+                    <>
+                      <Chip
+                        label={SCAN_TYPE_LABELS[scan.scan_type] || scan.scan_type}
                         size="small"
-                        onClick={(e) => { e.stopPropagation(); setHistoryOpenFor(run.agent_type); }}
-                        sx={{
-                          position: "absolute", top: 10, right: 76,
-                          color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)",
-                          "&:hover": { bgcolor: "rgba(251,188,4,0.20)" },
-                        }}
-                      >
-                        <Badge
-                          badgeContent={versionCount - 1}
-                          color="warning"
-                          sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}
+                        sx={{ height: 20, fontSize: 10, bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4" }}
+                      />
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {scanDate(scan)}
+                      </Typography>
+                      <Tooltip title="View scan detail">
+                        <IconButton
+                          size="small"
+                          onClick={() => navigate(`/vulnerability/scans/${scanId}`)}
+                          sx={{ color: "text.secondary", "&:hover": { color: "#4285F4" } }}
                         >
-                          <History sx={{ fontSize: 18 }} />
-                        </Badge>
-                      </IconButton>
-                    </Tooltip>
+                          <OpenInNew sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </>
                   )}
+                  {!scan && scanId && (
+                    <Typography variant="caption" sx={{ color: "text.disabled", fontStyle: "italic" }}>
+                      scan no longer available
+                    </Typography>
+                  )}
+                  <Box sx={{ flex: 1 }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {latestRuns.length} agent{latestRuns.length !== 1 ? "s" : ""}
+                  </Typography>
                 </Box>
-              </Grid>
+                <Divider sx={{ borderColor: "divider", mb: 2 }} />
+
+                <Grid container spacing={1.5}>
+                  {latestRuns.map((run: any) => {
+                    const isExpanded = expandedRunId === run.id;
+                    const versionCount = 1 + (historyByType[run.agent_type]?.length || 0);
+                    return (
+                      <Grid key={run.id} size={{ xs: 12, md: isExpanded ? 12 : 6 }}>
+                        <Box sx={{ position: "relative" }}>
+                          <AgentInsightCard
+                            run={run}
+                            expanded={isExpanded}
+                            onToggle={() => setExpandedRunId(isExpanded ? null : run.id)}
+                            onDelete={() => setPendingDeleteRun(run)}
+                          />
+                          {versionCount > 1 && (
+                            <Tooltip title={`${versionCount - 1} previous version${versionCount - 1 === 1 ? "" : "s"}`}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setHistoryOpenFor({ scanId, agentType: run.agent_type });
+                                }}
+                                sx={{
+                                  position: "absolute", top: 10, right: 76,
+                                  color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)",
+                                  "&:hover": { bgcolor: "rgba(251,188,4,0.20)" },
+                                }}
+                              >
+                                <Badge
+                                  badgeContent={versionCount - 1}
+                                  color="warning"
+                                  sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}
+                                >
+                                  <History sx={{ fontSize: 18 }} />
+                                </Badge>
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
             );
           })}
-        </Grid>
+        </Box>
       )}
 
       {/* Version history dialog */}
@@ -222,24 +258,26 @@ export default function RiskAIAnalysis() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <History sx={{ color: "#FBBC04" }} />
             <Typography component="span" sx={{ fontWeight: 700, textTransform: "capitalize" }}>
-              {(historyOpenFor || "").replace(/_/g, " ")} — Version history
+              {(historyOpenFor?.agentType || "").replace(/_/g, " ")} — Version history
             </Typography>
           </Box>
         </DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
           {historyOpenFor && (() => {
-            const current = latestByType[historyOpenFor];
-            const older = historyByType[historyOpenFor] || [];
-            const allVersions = current ? [current, ...older] : older;
+            const targetScanId = historyOpenFor.scanId;
+            const targetType = historyOpenFor.agentType;
+            const groupRuns = scanGroups.find(([k]) => k === targetScanId)?.[1] || [];
+            const sorted = [...groupRuns]
+              .filter((r: any) => r.agent_type === targetType)
+              .sort((a: any, b: any) => new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime());
             return (
               <Box>
                 <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-                  {allVersions.length} total version{allVersions.length === 1 ? "" : "s"}.
-                  v{allVersions.length} is the latest.
+                  {sorted.length} total version{sorted.length === 1 ? "" : "s"}. v{sorted.length} is the latest.
                 </Typography>
-                {allVersions.map((r: any, idx: number) => {
+                {sorted.map((r: any, idx: number) => {
                   const isCurrent = idx === 0;
-                  const versionNum = allVersions.length - idx;
+                  const versionNum = sorted.length - idx;
                   const status = (r.status || "").toLowerCase();
                   const statusColor = status === "completed" || status === "success" ? "#34A853"
                     : status === "failed" || status === "error" ? "#EA4335" : "#FBBC04";
@@ -322,7 +360,7 @@ export default function RiskAIAnalysis() {
         <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Delete risk analysis?</DialogTitle>
         <DialogContent sx={{ mt: 1.5 }}>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            This removes the agent run and its output. The risks created from this run stay — only the AI narrative is deleted.
+            This removes the agent run and its output. Risks created from this run stay — only the AI narrative is deleted.
           </Typography>
           {pendingDeleteRun && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
