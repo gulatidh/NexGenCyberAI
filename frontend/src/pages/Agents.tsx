@@ -13,7 +13,7 @@ import {
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
   CloudUpload, OpenInNew, ArrowBack, ArrowForward, DragIndicator,
-  AddCircle, DoNotDisturb,
+  AddCircle, DoNotDisturb, Close,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi, assetsApi, connectorsApi } from "../services/api";
@@ -524,7 +524,11 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   running: "#FBBC04",
 };
 
-function RecentRunRow({ run }: { run: AgentRun }) {
+function RecentRunRow({ run, onDismiss, onDelete }: {
+  run: AgentRun;
+  onDismiss: () => void;
+  onDelete: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const hasOutput = run.status === "completed" && run.output_data;
   return (
@@ -541,13 +545,27 @@ function RecentRunRow({ run }: { run: AgentRun }) {
             {new Date(run.started_at).toLocaleString()}
           </Typography>
         )}
-        {hasOutput && (
-          <Box sx={{ ml: "auto" }}>
-            <IconButton size="small" onClick={() => setExpanded((e) => !e)} sx={{ color: "text.secondary" }}>
-              {expanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+        <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.25 }}>
+          {hasOutput && (
+            <Tooltip title={expanded ? "Collapse" : "Expand output"}>
+              <IconButton size="small" onClick={() => setExpanded((e) => !e)} sx={{ color: "text.secondary" }}>
+                {expanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Hide from list">
+            <IconButton size="small" onClick={onDismiss}
+              sx={{ color: "text.secondary", "&:hover": { color: "text.primary" } }}>
+              <Close sx={{ fontSize: 15 }} />
             </IconButton>
-          </Box>
-        )}
+          </Tooltip>
+          <Tooltip title="Delete run">
+            <IconButton size="small" onClick={onDelete}
+              sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
+              <Delete sx={{ fontSize: 15 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
       {hasOutput && (
         <Collapse in={expanded} timeout="auto" unmountOnExit>
@@ -1052,6 +1070,7 @@ export default function Agents() {
   const [briefingOutput, setBriefingOutput] = useState<{ output: string; provider: string; model?: string; tokens_used: number; duration_ms: number } | null>(null);
   const [briefingError, setBriefingError] = useState<string>("");
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+  const [dismissedRunIds, setDismissedRunIds] = useState<Set<string>>(new Set());
 
   const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
   const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
@@ -1149,6 +1168,16 @@ export default function Agents() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => agentCatalogApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-catalog"] }); toast.success("Agent deleted"); },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
+  });
+
+  const deleteRunMutation = useMutation({
+    mutationFn: (runId: string) => agentsApi.deleteRun(selectedClientId!, runId),
+    onSuccess: (_data, runId) => {
+      setDismissedRunIds((prev) => new Set(prev).add(runId));
+      qc.invalidateQueries({ queryKey: ["agent-runs-list", selectedClientId] });
+      toast.success("Run deleted");
+    },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
   });
 
@@ -1295,16 +1324,25 @@ export default function Agents() {
       )}
 
       {/* Recent Runs */}
-      {selectedClientId && (recentRunsData?.length ?? 0) > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, mb: 1 }}>
-            Recent Runs
-          </Typography>
-          {(recentRunsData || []).map((run) => (
-            <RecentRunRow key={run.id} run={run} />
-          ))}
-        </Box>
-      )}
+      {selectedClientId && (recentRunsData?.length ?? 0) > 0 && (() => {
+        const visible = (recentRunsData || []).filter((r) => !dismissedRunIds.has(r.id));
+        if (!visible.length) return null;
+        return (
+          <Box sx={{ mt: 3 }}>
+            <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: 1.5, mb: 1 }}>
+              Recent Runs
+            </Typography>
+            {visible.map((run) => (
+              <RecentRunRow
+                key={run.id}
+                run={run}
+                onDismiss={() => setDismissedRunIds((prev) => new Set(prev).add(run.id))}
+                onDelete={() => deleteRunMutation.mutate(run.id)}
+              />
+            ))}
+          </Box>
+        );
+      })()}
 
       <ConfigureDialog
         open={!!configuring}
