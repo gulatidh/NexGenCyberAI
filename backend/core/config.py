@@ -14,7 +14,11 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENABLE_SWAGGER: bool = False  # set True in dev via env var; off by default in prod
     SECRET_KEY: str = "change-me-in-production"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "https://nexgencyberai.azurewebsites.net"]
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "https://nexgencyberai.azurewebsites.net",
+        "https://monitara-ai.azurewebsites.net",
+    ]
 
     # Azure Entra ID (OIDC / OAuth2)
     AZURE_TENANT_ID: str = ""

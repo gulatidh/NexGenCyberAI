@@ -745,7 +745,14 @@ export default function Scans() {
   const { data: tilesData, refetch: refetchTiles } = useQuery<{ scans: any[] }>({
     queryKey: ["assessments-tiles"],
     queryFn: () => assessmentsApi.listAll(),
-    refetchInterval: (q) => ((q.state.data as any)?.scans || []).some((s: any) => s.status === "running") ? 5000 : false,
+    refetchInterval: (q) => {
+      const scans = (q.state.data as any)?.scans || [];
+      if (!scans.some((s: any) => s.status === "running")) return false;
+      // Slow down to 30s when cached data is stale (last success > 15s ago)
+      // to avoid hammering the endpoint when requests are repeatedly failing.
+      const ageMs = Date.now() - (q.state.dataUpdatedAt || 0);
+      return ageMs < 15_000 ? 5000 : 30_000;
+    },
   });
 
   // Group scans by version root (parent_scan_id ?? id).

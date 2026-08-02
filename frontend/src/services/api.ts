@@ -68,9 +68,15 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Suppress aborted/cancelled requests — no HTTP response means the request
+    // was cancelled by React Query's AbortController or by an MSAL redirect.
+    // These are client-side noise, not real server errors.
+    if (axios.isCancel(error) || error.code === "ERR_CANCELED" || !error.response) {
+      return Promise.reject(error);
+    }
     const method = (error.config?.method || "").toUpperCase();
     const url = error.config?.url || "";
-    const status = error.response?.status ?? "?";
+    const status = error.response.status;
     const detail = error.response?.data?.detail || error.message || "Unknown error";
     addNotification({ type: "error", message: `${method} ${url} — ${status}`, detail });
     return Promise.reject(error);
