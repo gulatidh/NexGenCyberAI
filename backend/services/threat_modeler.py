@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── Fixed schema fields (normaliser enforces these) ─────────────────────────
 
 
-_COMPONENT_FIELDS = ("id", "name", "type", "trust_zone", "criticality", "notes")
+_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "trust_zone", "criticality", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
                      "port", "direction", "trust_boundary_crossing", "exposure",
                      "authentication_required")
@@ -319,12 +319,15 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
   "components": [
     {{ "id": "<short-slug>", "name": "<asset name>",
       "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
+      "dfd_type": "<external_entity|process|data_store>",
       "trust_zone": "<public|dmz|private|data-tier|management>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
   ],
+  NOTE — dfd_type: external_entity = user-facing actors (browsers, human users, CDN, external APIs); process = anything that transforms data (web apps, APIs, microservices, VMs, containers, identity providers); data_store = anything that stores data at rest (databases, blob storage, secret stores, file repos, caches).
   "data_flows": [
     {{ "from": "<component id>", "to": "<component id>",
+      "label": "<SourceName to DestinationName>",
       "protocol": "<https|sql|ssh|smb|grpc|amqp|dns|other>",
       "port": "<port number e.g. 443, 5432, 8080>",
       "data": "<credentials|pii|financial|telemetry|config|other>",
@@ -795,6 +798,11 @@ def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict
             "id": f"c{i+1}",
             "name": name,
             "type": _component_type(hay),
+            "dfd_type": (
+                "data_store" if _component_type(hay) in ("database", "storage", "secret-store", "repo")
+                else "external_entity" if _component_type(hay) == "endpoint"
+                else "process"
+            ),
             "trust_zone": _infer_zone(hay),
             "criticality": _str(a.get("criticality")) or "medium",
             "notes": "",
@@ -874,6 +882,7 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
         data_flows.append({
             "from": _str(_df.get("from")),
             "to": _str(_df.get("to")),
+            "label": _str(_df.get("label")),
             "protocol": _str(_df.get("protocol")),
             "port": _str(_df.get("port")),
             "data": _str(_df.get("data")),

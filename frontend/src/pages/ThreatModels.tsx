@@ -78,6 +78,7 @@ export default function ThreatModels() {
   const [methodology, setMethodology] = useState<string>("stride");
   const [cloudProvider, setCloudProvider] = useState<string>("generic");
   const [scanIds, setScanIds] = useState<string[]>([]);
+  const [dataFlowDesc, setDataFlowDesc] = useState("");
   const [notes, setNotes] = useState("");
   const [autoRemodel, setAutoRemodel] = useState(false);
 
@@ -113,7 +114,10 @@ export default function ThreatModels() {
       scan_ids: scanIds.length ? scanIds : undefined,
       methodology,
       cloud_provider: cloudProvider,
-      analyst_notes: notes.trim() || undefined,
+      analyst_notes: [
+        dataFlowDesc.trim() ? `DATA FLOWS: ${dataFlowDesc.trim()}` : "",
+        notes.trim(),
+      ].filter(Boolean).join("\n\n") || undefined,
       auto_remodel: autoRemodel,
     }),
     onSuccess: (created: ThreatModelSummary) => {
@@ -121,6 +125,7 @@ export default function ThreatModels() {
       setOpenCreate(false);
       setTmName("");
       setScanIds([]);
+      setDataFlowDesc("");
       setNotes("");
       setCloudProvider("generic");
       setAutoRemodel(false);
@@ -432,12 +437,24 @@ export default function ThreatModels() {
 
             <Box>
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
+                DESCRIBE DATA FLOWS (optional but recommended)
+              </Typography>
+              <TextField fullWidth multiline minRows={2} size="small" value={dataFlowDesc}
+                onChange={(e) => setDataFlowDesc(e.target.value)}
+                placeholder='Describe how data moves between components — e.g. "Browser → Web App over HTTPS → REST API with JWT → PostgreSQL DB. No direct browser-to-DB access. API calls Azure Key Vault for secrets."'
+                sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                Helps the AI produce accurate DFD edges and labels. Plain English is fine.
+              </Typography>
+            </Box>
+
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
                 ANALYST NOTES (optional)
               </Typography>
               <TextField fullWidth multiline minRows={2} size="small" value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Guidance for the AI — e.g. 'the payments API is internet-facing', 'ignore the legacy batch job', 'focus on data exfiltration paths'."
-                
                 sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
             </Box>
 
