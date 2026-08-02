@@ -841,6 +841,27 @@ const GROUPS: Group[] = [
     color: "#9C27B0",
     topics: [
       {
+        id: "cve-enrichment",
+        title: "Automatic CVE & CVSS enrichment",
+        summary: "After every scan completes, Monitara automatically enriches each finding with accurate CVE IDs and CVSS v3.1 scores using the LLM's own security knowledge — no external API calls, no token congestion. Multiple CVEs per finding are supported.",
+        steps: [
+          { text: "Enrichment triggers automatically. You do not need to do anything — it runs as a background task the moment a scan finishes." },
+          { text: "How it works:", detail: "The LLM receives only the minimal finding metadata (title + any existing CVE hint) in compact batches of 5. It uses its own training knowledge (NVD, MITRE, vendor advisories ingested at training time) to return: primary CVE ID, all related CVE IDs, CVSS v3.1 base score, and CVSS v3.1 vector string." },
+          { text: "Knowledge base fallback: if the LLM signals low confidence for a specific CVE (e.g. a very recent vulnerability not in its training window), it triggers a single targeted query against the client's Knowledge Base (Intelligence → Knowledge) — asking just 'CVSS score and vector for CVE-XXXX'. This means uploading NVD data exports or vendor advisories to the Knowledge Base improves enrichment accuracy for recent CVEs.", detail: "The fallback only fires when: (1) LLM confidence = low AND (2) a CVE ID exists. It is not called for every finding — only the uncertain ones." },
+          { text: "View results: open any scan's Findings. The CVE column now shows the primary CVE with a '+N' count if there are related CVEs. Click a finding to open the detail panel — all CVE chips appear at the top, followed by the colour-coded CVSS score chip and the full CVSS v3.1 vector string in monospace." },
+          { text: "Enrichment source is tracked: 'llm' (high/medium confidence from LLM), 'kb' (LLM was uncertain, KB provided the data), 'llm_low' (LLM was uncertain and KB had nothing)." },
+        ],
+        tips: [
+          "Upload NVD JSON data exports or vendor security advisories (MSRC, RedHat, etc.) to Intelligence → Knowledge to improve enrichment for very recent CVEs that postdate the LLM's training cutoff.",
+          "CVSS vector strings are shown in monospace below the score chip — use these when reporting to audit teams or importing into a SIEM that requires vector notation.",
+          "Enrichment is idempotent — re-running a scan or importing new findings triggers another enrichment pass that will fill any gaps.",
+        ],
+        warnings: [
+          "Enrichment runs in the background after scan completion — give it 30–60 seconds after a scan finishes before expecting the CVE chips to appear. Refresh the Findings page if they are not yet visible.",
+          "For CVEs published after the LLM's knowledge cutoff, scores may be absent or marked 'llm_low'. Uploading current NVD data to the Knowledge Base is the fix.",
+        ],
+      },
+      {
         id: "attack-paths",
         title: "Attack Path Visualisation",
         summary: "The Attack Paths page renders your open findings as a layered SVG graph, grouping them by MITRE ATT&CK phase to show how individual vulnerabilities chain into realistic multi-stage attack paths from Initial Access to Exfiltration.",
