@@ -383,8 +383,8 @@ export const frameworksApi = {
   catalogAll: () => apiClient.get("/frameworks/all/").then((r) => r.data),
   controls: (framework: string) => apiClient.get(`/frameworks/${framework}/controls/`).then((r) => r.data),
   summary: (clientId: string) => apiClient.get(`/clients/${clientId}/frameworks/`).then((r) => r.data),
-  forClient: (clientId: string, framework: string) =>
-    apiClient.get(`/clients/${clientId}/frameworks/${framework}/`).then((r) => r.data),
+  forClient: (clientId: string, framework: string, scanId?: string) =>
+    apiClient.get(`/clients/${clientId}/frameworks/${framework}/`, { params: scanId ? { scan_id: scanId } : {} }).then((r) => r.data),
   controlDetail: (clientId: string, framework: string, controlId: string) =>
     apiClient.get(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}`).then((r) => r.data),
   override: (clientId: string, framework: string, controlId: string, body: any) =>

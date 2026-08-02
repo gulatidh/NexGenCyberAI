@@ -4,7 +4,8 @@ import io
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List, Dict, Any
@@ -21,7 +22,7 @@ from api.schemas.schemas import (
 from db.database import get_db
 from core.security import get_current_user
 from services.compliance import (
-    compute_summary, recompute_client_framework,
+    _normalize, compute_summary, derive_status_for_control, recompute_client_framework,
 )
 
 router = APIRouter(tags=["frameworks"])
@@ -154,11 +155,14 @@ async def client_framework_summary(
 async def client_framework_detail(
     client_id: str,
     framework: str,
+    scan_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
     """Full controls-with-status payload for the Frameworks page.
     Accepts both standard FrameworkType values and custom framework slugs.
+    When scan_id is provided, statuses are derived live from that scan's findings
+    rather than from the persisted ClientControlStatus rows.
     """
     from api.models.models import CustomFramework as CustomFW
 
@@ -186,6 +190,63 @@ async def client_framework_detail(
             .order_by(FrameworkControl.control_id.asc())
             .all()
         ) if ctrl_ids else []
+    else:
+        controls = (
+            db.query(FrameworkControl)
+            .filter(FrameworkControl.framework == fw_value)
+            .order_by(FrameworkControl.control_id.asc())
+            .all()
+        )
+
+    # Build statuses: either scan-scoped (live derivation) or client-wide (persisted rows).
+    if scan_id:
+        # Verify scan belongs to this client.
+        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+        if not scan:
+            raise HTTPException(status_code=404, detail="Scan not found")
+
+        finding_rows = (
+            db.query(Finding.control_id, Finding.id, Finding.status, Finding.framework, Finding.control_mappings)
+            .filter(Finding.scan_id == scan_id)
+            .all()
+        )
+        open_by_ctrl: Dict[str, List[str]] = {}
+        hist_by_ctrl: Dict[str, List[str]] = {}
+        for ctrl_id, finding_id, fstatus, finding_framework, mappings in finding_rows:
+            is_open = (fstatus or "open") == "open"
+            keys: set = set()
+            finding_fw_value = finding_framework.value if hasattr(finding_framework, "value") else (finding_framework or "")
+            if finding_fw_value == fw_value and ctrl_id:
+                keys.add(_normalize(ctrl_id))
+            if mappings and isinstance(mappings, dict):
+                for cid in mappings.get(fw_value, []) or []:
+                    if cid:
+                        keys.add(_normalize(cid))
+            for key in keys:
+                if key:
+                    hist_by_ctrl.setdefault(key, []).append(finding_id)
+                    if is_open:
+                        open_by_ctrl.setdefault(key, []).append(finding_id)
+
+        class _DS:
+            """Lightweight proxy that looks like ClientControlStatus to the code below."""
+            def __init__(self, ctrl_key: str) -> None:
+                opens = open_by_ctrl.get(ctrl_key, [])
+                hists = hist_by_ctrl.get(ctrl_key, [])
+                self.status = derive_status_for_control(opens, hists)
+                self.derived_finding_ids = hists
+                self.derived = True
+                self.evidence = None
+                self.last_evaluated_at = None
+                self.overridden_by = None
+                self.overridden_at = None
+
+        statuses = {
+            c.id: _DS(_normalize(c.control_id))
+            for c in controls
+            if _normalize(c.control_id) in open_by_ctrl or _normalize(c.control_id) in hist_by_ctrl
+        }
+    elif custom_fw:
         statuses = {
             s.framework_control_id: s
             for s in db.query(ClientControlStatus)
@@ -196,12 +257,6 @@ async def client_framework_detail(
             .all()
         } if controls else {}
     else:
-        controls = (
-            db.query(FrameworkControl)
-            .filter(FrameworkControl.framework == fw_value)
-            .order_by(FrameworkControl.control_id.asc())
-            .all()
-        )
         statuses = {
             s.framework_control_id: s
             for s in db.query(ClientControlStatus)
@@ -279,9 +334,9 @@ async def client_framework_detail(
             "findings": rich_findings,
         })
 
-    # Custom frameworks: derive summary from items list since compute_summary
-    # queries by FrameworkControl.framework which doesn't match the custom slug.
-    if custom_fw:
+    # Custom frameworks and scan-scoped views: derive summary from items list
+    # (compute_summary queries by FrameworkControl.framework which doesn't cover either case).
+    if custom_fw or scan_id:
         cts: Dict[str, Any] = {"compliant": 0, "non_compliant": 0, "partial": 0, "not_applicable": 0, "total": 0, "last_evaluated_at": None}
         last_ev = None
         for item in items:
@@ -303,6 +358,8 @@ async def client_framework_detail(
 
     return {
         "framework": fw_value,
+        "scan_id": scan_id,
+        "scan_name": scan.name if scan_id and scan else None,
         "summary": {
             "total": summary_data["total"],
             "compliant": summary_data["compliant"],

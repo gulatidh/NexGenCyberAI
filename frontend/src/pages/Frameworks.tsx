@@ -12,6 +12,7 @@ import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { connectorsApi, frameworksApi, projectsApi, scansApi } from "../services/api";
+import { Scan } from "../types";
 import {
   Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
   FrameworkDetail, Project,
@@ -82,6 +83,7 @@ export default function Frameworks() {
   const assetsBase = location.pathname.startsWith("/compliance") ? "/platform/assets" : "/assets";
   const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
+  const [scanId, setScanId] = useState("");
   const [framework, setFramework] = useState("");
   const [family, setFamily] = useState<FrameworkFamily>("CIS");
   const [statusFilter, setStatusFilter] = useState<ControlStatus | "">("");
@@ -99,8 +101,9 @@ export default function Frameworks() {
   // Row-multiselect state — control_ids the user has ticked
   const [selectedControlIds, setSelectedControlIds] = useState<Set<string>>(new Set());
 
-  // Reset selection when client or framework changes
-  React.useEffect(() => { setSelectedControlIds(new Set()); }, [clientId, framework]);
+  // Reset scan + selection when client or project changes
+  React.useEffect(() => { setScanId(""); setSelectedControlIds(new Set()); }, [clientId, projectId]);
+  React.useEffect(() => { setSelectedControlIds(new Set()); }, [framework]);
 
   const toggleControl = (controlId: string) => {
     setSelectedControlIds((prev) => {
@@ -126,13 +129,19 @@ export default function Frameworks() {
     queryFn: () => projectsApi.list(clientId),
     enabled: !!clientId,
   });
+  const { data: allScans = [] } = useQuery<Scan[]>({
+    queryKey: ["scans", clientId, projectId],
+    queryFn: () => scansApi.list(clientId, projectId || undefined),
+    enabled: !!clientId,
+  });
+  const completedScans = allScans.filter((s) => s.status === "completed");
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
     queryKey: ["framework-catalog-all"],
     queryFn: frameworksApi.catalogAll,
   });
   const { data: detail, isLoading } = useQuery<FrameworkDetail>({
-    queryKey: ["framework-detail", clientId, framework],
-    queryFn: () => frameworksApi.forClient(clientId, framework),
+    queryKey: ["framework-detail", clientId, framework, scanId],
+    queryFn: () => frameworksApi.forClient(clientId, framework, scanId || undefined),
     enabled: !!clientId && !!framework,
   });
 
@@ -141,6 +150,7 @@ export default function Frameworks() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
       qc.invalidateQueries({ queryKey: ["framework-catalog-all"] });
+      qc.invalidateQueries({ queryKey: ["scans", clientId] });
     },
   });
 
@@ -298,6 +308,18 @@ export default function Frameworks() {
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
             </Select>
           </FormControl>
+          <FormControl size="small" sx={{ minWidth: 220 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "text.secondary" }}>Scan</InputLabel>
+            <Select value={scanId} onChange={(e) => setScanId(e.target.value)} label="Scan"
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value=""><em>All scans (combined)</em></MenuItem>
+              {completedScans.map((s) => (
+                <MenuItem key={s.id} value={s.id}>
+                  {s.name || `${s.scan_type} — ${s.completed_at ? new Date(s.completed_at).toLocaleDateString() : s.id.slice(0, 8)}`}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <FormControl size="small" sx={{ minWidth: 240 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
             <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
@@ -433,11 +455,20 @@ export default function Frameworks() {
                 </Typography>
               </Box>
             </Box>
-            {summary.last_evaluated_at && (
-              <Typography variant="caption" sx={{ color: "text.secondary", ml: "auto" }}>
-                Last evaluated {fromNow(summary.last_evaluated_at)}
-              </Typography>
-            )}
+            <Box sx={{ ml: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+              {scanId && (
+                <Chip
+                  label={`Scoped: ${completedScans.find(s => s.id === scanId)?.name || "scan"}`}
+                  size="small"
+                  sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontWeight: 700, fontSize: 11 }}
+                />
+              )}
+              {summary.last_evaluated_at && (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Last evaluated {fromNow(summary.last_evaluated_at)}
+                </Typography>
+              )}
+            </Box>
           </Card>
 
           {/* Filters */}
