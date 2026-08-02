@@ -18,7 +18,7 @@ import {
   Dialog, DialogTitle, DialogContent, TextField, Select, FormControl, InputLabel,
 } from "@mui/material";
 import {
-  ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, Schema,
+  ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
@@ -28,7 +28,6 @@ import { threatModelsApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdDiagram from "../components/DfdDiagram";
-import DrawioDiagram from "../components/DrawioDiagram";
 import DfdReactFlow from "../components/DfdReactFlow";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
@@ -233,8 +232,8 @@ export default function ThreatModelDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("diagram");
-  // Diagram-renderer toggle: 'interactive' (React Flow DFD) | 'mermaid' | 'drawio'
-  const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid" | "drawio">("interactive");
+  // Diagram-renderer toggle: 'interactive' (React Flow DFD) | 'mermaid'
+  const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid">("interactive");
   // Phase 9B — diagram VIEW (overlay lens for the Mermaid renderer).
   const [diagramView, setDiagramView] = useState<"architecture" | "threat_heat" | "detection_coverage">("architecture");
   // When the browser triggers print (button or Ctrl+P), expand every tab
@@ -262,15 +261,6 @@ export default function ThreatModelDetail() {
     },
   });
 
-  // Lazy-load draw.io XML only when the user picks that diagram mode — the
-  // server-side render is cheap but we don't want to ship it for every
-  // page load.
-  const drawioQuery = useQuery<{ xml: string; filename: string }>({
-    queryKey: ["threat-model-drawio", modelId],
-    queryFn: () => threatModelsApi.drawioXml(clientId, modelId!),
-    enabled: !!modelId && !!clientId && diagramMode === "drawio" && data?.status === "completed",
-    staleTime: 60_000,
-  });
 
   // Phase 9B — styled Mermaid for the selected view lens. The architecture
   // view falls back to the canonical dfd_mermaid; threat_heat and
@@ -621,26 +611,25 @@ export default function ThreatModelDetail() {
         <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-              <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
+              <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "action.hover", borderRadius: 1.5 }}>
                 {(
                   [
                     { key: "interactive", label: "Interactive", icon: <AccountTree sx={{ fontSize: 16 }} /> },
                     { key: "mermaid",     label: "Mermaid",     icon: <Hub sx={{ fontSize: 16 }} /> },
-                    { key: "drawio",      label: "draw.io",     icon: <Schema sx={{ fontSize: 16 }} />, disabled: data.status !== "completed" },
-                  ] as Array<{ key: "interactive"|"mermaid"|"drawio"; label: string; icon: React.ReactNode; disabled?: boolean }>
+                  ] as Array<{ key: "interactive"|"mermaid"; label: string; icon: React.ReactNode }>
                 ).map((opt) => (
                   <Button
                     key={opt.key}
                     size="small"
                     startIcon={opt.icon}
-                    disabled={opt.disabled}
                     onClick={() => setDiagramMode(opt.key)}
                     sx={{
                       minWidth: 110,
-                      color: diagramMode === opt.key ? "white" : "rgba(255,255,255,0.55)",
-                      bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.18)" : "transparent",
+                      color: diagramMode === opt.key ? "#4285F4" : "text.secondary",
+                      bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.12)" : "transparent",
+                      border: diagramMode === opt.key ? "1px solid rgba(66,133,244,0.4)" : "1px solid transparent",
                       textTransform: "none", fontSize: 12, fontWeight: 600,
-                      "&:hover": { bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
+                      "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
                     }}
                   >{opt.label}</Button>
                 ))}
@@ -663,11 +652,11 @@ export default function ThreatModelDetail() {
                           size="small"
                           onClick={() => setDiagramView(opt.v)}
                           sx={{
-                            minWidth: 102, color: active ? "white" : "text.secondary",
-                            bgcolor: active ? `${opt.color}33` : "transparent",
+                            minWidth: 102, color: active ? opt.color : "text.secondary",
+                            bgcolor: active ? `${opt.color}18` : "transparent",
                             border: active ? `1px solid ${opt.color}` : "1px solid transparent",
                             textTransform: "none", fontSize: 11.5, fontWeight: 600,
-                            "&:hover": { bgcolor: active ? `${opt.color}44` : "rgba(255,255,255,0.06)" },
+                            "&:hover": { bgcolor: `${opt.color}10` },
                           }}
                         >{opt.label}</Button>
                       );
@@ -695,7 +684,7 @@ export default function ThreatModelDetail() {
                 threats={data.threats}
                 trustBoundaries={data.trust_boundaries ?? []}
               />
-            ) : (diagramMode === "mermaid" || printing) ? (
+            ) : (
               <DfdDiagram
                 source={
                   diagramView !== "architecture" && styledDfdQuery.data?.mermaid
@@ -703,17 +692,6 @@ export default function ThreatModelDetail() {
                     : (data.dfd_mermaid || "")
                 }
               />
-            ) : drawioQuery.isLoading ? (
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", py: 6, gap: 1.5, color: "text.secondary" }}>
-                <CircularProgress size={20} sx={{ color: "#4285F4" }} />
-                <Typography variant="body2">Rendering draw.io diagram…</Typography>
-              </Box>
-            ) : drawioQuery.data ? (
-              <DrawioDiagram xml={drawioQuery.data.xml} cloudProvider={data.cloud_provider ?? "generic"} />
-            ) : (
-              <Typography variant="body2" sx={{ color: "text.secondary", py: 4, textAlign: "center" }}>
-                draw.io view unavailable.
-              </Typography>
             )}
             {data.data_flows.length > 0 && (
               <>

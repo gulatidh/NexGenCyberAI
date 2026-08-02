@@ -334,10 +334,10 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
   - trust_zone must use SECURITY DOMAIN names — NOT generic network names:
       Internet = untrusted external zone (attackers, internet users, external APIs)
       DMZ = semi-trusted perimeter (load balancers, WAF, CDN, reverse proxies)
-      Corporate Network = internally-owned trusted systems
-      Vendor Cloud = third-party cloud services (AWS, Azure services, SaaS)
-      Database Tier = data stores requiring restricted access
-      Management Zone = privileged admin systems (SIEM, bastion, key vault, monitoring)
+      Corporate Network = customer-owned internal systems (VMs, APIs, App Services, AKS, Azure-managed infra)
+      Vendor Cloud = genuinely third-party SaaS/partners NOT owned by the customer (Okta, Datadog, Splunk Cloud, external payment APIs)
+      Database Tier = data stores requiring restricted access (SQL, Cosmos DB, blob storage, Redis)
+      Management Zone = privileged admin systems ONLY (SIEM, Sentinel, Key Vault, Bastion, monitoring, IAM)
   "data_flows": [
     {{ "from": "<component id>", "to": "<component id>",
       "label": "<SourceName to DestinationName>",
@@ -972,13 +972,13 @@ def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, 
         for nid, c in comps:
             name = _mm_label(c.get("name") or c.get("id") or "?")
             ctype = _mm_label(c.get("type") or "")
-            icon = _svc_icon(f"{c.get('name','')} {c.get('type','')}")
-            label = (f"{icon} {name}<br/><small>{ctype}</small>" if ctype
-                     else f"{icon} {name}")
+            # No emoji prefix — Mermaid renders multi-byte emoji as "??" in
+            # some browsers/renderers; name + type label is sufficient.
+            label = (f"{name}<br/><small>{ctype}</small>" if ctype else name)
             lines.append(f'    {nid}["{label}"]')
         lines.append("  end")
 
-    _DIR_ICON = {"ingress": "⬇", "egress": "⬆", "bidirectional": "⇅", "internal": ""}
+    _DIR_ICON = {"ingress": ">>", "egress": "<<", "bidirectional": "<>", "internal": ""}
     for f in data_flows or []:
         frm, to = _str(f.get("from")), _str(f.get("to"))
         if not frm or not to:
@@ -990,10 +990,10 @@ def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, 
         proto = _str(f.get("protocol"))
         proto_port = f"{proto}:{port}" if proto and port else proto or port or ""
         icon = _DIR_ICON.get(direction, "")
-        prefix = "🔴 " if f.get("trust_boundary_crossing") else ""
+        prefix = "[X] " if f.get("trust_boundary_crossing") else ""
         bits = [x for x in (proto_port, _str(f.get("data"))) if x]
         if f.get("encrypted") is True and "encrypted" not in " ".join(bits):
-            bits.append("🔒")
+            bits.append("enc")
         lbl_inner = ", ".join(bits)
         lbl_parts = [x for x in (prefix, icon, lbl_inner) if x]
         lbl = _mm_label(" ".join(lbl_parts))
