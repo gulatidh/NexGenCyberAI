@@ -121,6 +121,7 @@ export const INTELLIGENCE: ProductDef = {
   bgColor: "#FBE9E7",
   basePath: "/intelligence",
   nav: [
+    { label: "AI Assisted Scan", icon: <SmartToy />, path: "/ai-assisted-scan" },
     { label: "Ask Your Data", icon: <Search />, path: "/nl-query" },
     { label: "Security Docs", icon: <Description />, path: "/security-docs" },
     { label: "Reports", icon: <Assessment />, path: "/reports" },

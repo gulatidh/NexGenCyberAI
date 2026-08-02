@@ -202,7 +202,8 @@ function ProtectedApp() {
         </Route>
 
         <Route path="/intelligence" element={<ProductLayout product={INTELLIGENCE} />}>
-          <Route index element={<Navigate to="nl-query" replace />} />
+          <Route index element={<Navigate to="ai-assisted-scan" replace />} />
+          <Route path="ai-assisted-scan" element={<AIAssistedScan />} />
           <Route path="nl-query" element={<NLQuery />} />
           <Route path="security-docs" element={<SecurityDocs />} />
           <Route path="reports" element={<Reports />} />

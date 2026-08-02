@@ -153,9 +153,6 @@ def _build_env_profile(db: Session, client_id: str) -> str:
     # Configured connectors (with IDs so LLM can reference them)
     connectors = db.query(Connector).filter(
         Connector.client_id == client_id,
-        Connector.is_active == True,
-    ).all() if hasattr(Connector, "is_active") else db.query(Connector).filter(
-        Connector.client_id == client_id,
     ).all()
 
     if connectors:
@@ -303,7 +300,12 @@ async def ai_scan_chat(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    env_profile = _build_env_profile(db, client_id)
+    try:
+        env_profile = _build_env_profile(db, client_id)
+    except Exception as exc:
+        logger.warning("ai_scan_chat: env profile build failed: %s", exc)
+        env_profile = "No environment data available yet."
+
     system = _SYSTEM_PROMPT.format(env_profile=env_profile)
 
     history = [{"role": m.role, "content": m.content} for m in payload.history]
