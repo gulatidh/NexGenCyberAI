@@ -80,7 +80,6 @@ const H = 72;  // node height
 // ── Custom component node ─────────────────────────────────────────────────────
 
 function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) {
-  const theme = useTheme();
   const cfg = TYPE_CFG[data.compType as string] ?? FALLBACK_CFG;
   const shape = cfg.shape as "process" | "store" | "external";
   const threatCount = (data.threatCount as number) ?? 0;
@@ -314,7 +313,6 @@ function buildGraph(
   zoneSet.forEach((zone) => {
     const nid = `boundary-${zi++}`;
     zoneIds.set(zone, nid);
-    const { text } = zoneColor(zone);
     nodes.push({
       id: nid,
       type: "boundary",
