@@ -1,11 +1,20 @@
 /**
  * Interactive DFD renderer — Microsoft TMT / OWASP Threat Dragon style.
  *
- * Shapes:
- *   External Entity  → plain rectangle (actor / user / internet-facing system)
- *   Process          → true circle (computation / service)
- *   Data Store       → Yourdon parallel-line notation (data at rest)
- *   Trust Boundary   → dashed red rectangle overlay, resizable
+ * Layout: two-pass dagre.
+ *   Pass 1 — lay out nodes WITHIN each trust zone independently.
+ *   Pass 2 — lay out trust-zone boxes relative to each other based on
+ *             cross-zone data flows.
+ *
+ * Containment: component nodes have parentId + extent:"parent" so they
+ * cannot be dragged outside their trust-zone box.  Users can resize the
+ * zone box with NodeResizer to give more room.
+ *
+ * Shapes (standard DFD):
+ *   External Entity  → plain rectangle
+ *   Process          → circle (border-radius 50%)
+ *   Data Store       → Yourdon parallel-line (top + bottom border only)
+ *   Trust Boundary   → dashed red parent box, resizable, label tab at top
  *   Data Flow edge   → green pill label on bezier arrow
  */
 import React, { useEffect, useMemo } from "react";
@@ -23,24 +32,33 @@ import * as dagreLib from "@dagrejs/dagre";
 
 // ── DFD shape classifier ──────────────────────────────────────────────────────
 
-function dfdType(compType: string): "external_entity" | "process" | "data_store" {
+type DfdShape = "external_entity" | "process" | "data_store";
+
+function toDfdShape(compType: string, explicitDfdType?: string): DfdShape {
+  const e = (explicitDfdType || "").toLowerCase();
+  if (e === "external_entity") return "external_entity";
+  if (e === "data_store")      return "data_store";
+  if (e === "process")         return "process";
   const t = (compType || "").toLowerCase();
-  if (t === "user" || t === "endpoint") return "external_entity";
+  if (t === "user")                                           return "external_entity";
+  if (t === "endpoint")                                       return "external_entity";
   if (t === "database" || t === "storage" || t === "secret-store" || t === "repo") return "data_store";
   return "process";
 }
 
 // ── Node dimensions ───────────────────────────────────────────────────────────
 
-const DIM = {
-  external_entity: { w: 120, h: 64 },
-  process:         { w: 90,  h: 90  },
-  data_store:      { w: 140, h: 50  },
+const DIM: Record<DfdShape, { w: number; h: number }> = {
+  external_entity: { w: 120, h: 60 },
+  process:         { w: 88,  h: 88 },
+  data_store:      { w: 136, h: 48 },
 };
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853",
 };
+
+
 
 // ── Threat badge ──────────────────────────────────────────────────────────────
 
@@ -48,16 +66,15 @@ function ThreatBadge({ count, maxSev }: { count: number; maxSev: string | null }
   if (!count || !maxSev) return null;
   const bg = SEV_COLOR[maxSev] ?? "#78909C";
   return (
-    <Tooltip title={`${count} threat${count > 1 ? "s" : ""} — max severity: ${maxSev}`}>
+    <Tooltip title={`${count} threat${count > 1 ? "s" : ""} — max: ${maxSev}`}>
       <Box sx={{
         position: "absolute", top: -9, right: -9,
         width: 22, height: 22, borderRadius: "50%",
         bgcolor: bg, border: "2px solid white",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: `0 1px 4px ${bg}88`,
-        zIndex: 10,
+        boxShadow: `0 1px 4px ${bg}88`, zIndex: 10,
       }}>
-        <Warning sx={{ fontSize: 11, color: "#fff" }} />
+        <Warning sx={{ fontSize: 10, color: "#fff" }} />
         <Typography sx={{ fontSize: 8, color: "#fff", fontWeight: 700, lineHeight: 1, ml: 0.1 }}>
           {count > 9 ? "9+" : count}
         </Typography>
@@ -68,13 +85,13 @@ function ThreatBadge({ count, maxSev }: { count: number; maxSev: string | null }
 
 // ── Component node ────────────────────────────────────────────────────────────
 
-function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) {
+function ComponentNode({ data }: { data: Record<string, any> }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const borderColor = isDark ? "#9E9E9E" : "#444444";
   const textColor = isDark ? "#E0E0E0" : "#212121";
 
-  const shape = (data.dfdShape as "external_entity" | "process" | "data_store") ?? "process";
+  const shape = (data.dfdShape as DfdShape) ?? "process";
   const threatCount = (data.threatCount as number) ?? 0;
   const maxSev = data.maxSeverity as string | null;
   const label = data.label as string ?? "";
@@ -88,25 +105,26 @@ function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) 
     </>
   );
 
+  const labelEl = (
+    <Typography sx={{
+      fontSize: 10.5, fontWeight: 600, color: textColor, textAlign: "center",
+      lineHeight: 1.3, overflow: "hidden", display: "-webkit-box",
+      WebkitLineClamp: 3, WebkitBoxOrient: "vertical", wordBreak: "break-word",
+    }}>
+      {label}
+    </Typography>
+  );
+
   if (shape === "external_entity") {
     return (
       <Box sx={{ position: "relative", width: DIM.external_entity.w }}>
         {handles}
         <Box sx={{
           width: DIM.external_entity.w, height: DIM.external_entity.h,
-          border: `2px solid ${borderColor}`,
-          bgcolor: "transparent",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          p: 1,
+          border: `2px solid ${borderColor}`, bgcolor: "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center", p: 1,
         }}>
-          <Typography sx={{
-            fontSize: 11, fontWeight: 600, color: textColor,
-            textAlign: "center", lineHeight: 1.3,
-            overflow: "hidden", display: "-webkit-box",
-            WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
-          }}>
-            {label}
-          </Typography>
+          {labelEl}
         </Box>
         <ThreatBadge count={threatCount} maxSev={maxSev} />
       </Box>
@@ -119,20 +137,11 @@ function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) 
         {handles}
         <Box sx={{
           width: DIM.process.w, height: DIM.process.h,
-          borderRadius: "50%",
-          border: `2px solid ${borderColor}`,
+          borderRadius: "50%", border: `2px solid ${borderColor}`,
           bgcolor: "transparent",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          p: 1,
+          display: "flex", alignItems: "center", justifyContent: "center", p: 1.5,
         }}>
-          <Typography sx={{
-            fontSize: 10.5, fontWeight: 600, color: textColor,
-            textAlign: "center", lineHeight: 1.3,
-            overflow: "hidden", display: "-webkit-box",
-            WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
-          }}>
-            {label}
-          </Typography>
+          {labelEl}
         </Box>
         <ThreatBadge count={threatCount} maxSev={maxSev} />
       </Box>
@@ -145,16 +154,12 @@ function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) 
       {handles}
       <Box sx={{
         width: DIM.data_store.w, height: DIM.data_store.h,
-        borderTop: `2px solid ${borderColor}`,
-        borderBottom: `2px solid ${borderColor}`,
-        bgcolor: "transparent",
-        display: "flex", alignItems: "center",
-        px: 1.5,
+        borderTop: `2px solid ${borderColor}`, borderBottom: `2px solid ${borderColor}`,
+        bgcolor: "transparent", display: "flex", alignItems: "center", px: 1.5,
       }}>
         <Typography sx={{
-          fontSize: 11, fontWeight: 600, color: textColor,
-          overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-          width: "100%",
+          fontSize: 10.5, fontWeight: 600, color: textColor,
+          overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", width: "100%",
         }}>
           {label}
         </Typography>
@@ -164,7 +169,7 @@ function ComponentNode({ id, data }: { id: string; data: Record<string, any> }) 
   );
 }
 
-// ── Trust-boundary node (resizable dashed overlay) ───────────────────────────
+// ── Trust-boundary parent node (resizable) ────────────────────────────────────
 
 function BoundaryNode({ selected, data }: { selected?: boolean; data: Record<string, any> }) {
   return (
@@ -172,25 +177,21 @@ function BoundaryNode({ selected, data }: { selected?: boolean; data: Record<str
       <NodeResizer
         color="#EA4335"
         isVisible={!!selected}
-        minWidth={200}
-        minHeight={120}
+        minWidth={220}
+        minHeight={140}
         lineStyle={{ borderWidth: 2 }}
         handleStyle={{ width: 10, height: 10, borderRadius: 2 }}
       />
       <Box sx={{
         width: "100%", height: "100%",
-        border: "2px dashed #EA4335",
-        borderRadius: "4px",
+        border: "2px dashed #EA4335", borderRadius: "4px",
         bgcolor: "rgba(234,67,53,0.04)",
         position: "relative",
-        pointerEvents: "none",
       }}>
         <Box sx={{
           position: "absolute", top: -13, left: 10,
-          bgcolor: "background.paper",
-          px: 0.75, py: 0,
-          border: "1px solid #EA4335",
-          borderRadius: "3px",
+          bgcolor: "background.paper", px: 0.75, py: 0,
+          border: "1px solid #EA4335", borderRadius: "3px",
         }}>
           <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#EA4335", whiteSpace: "nowrap" }}>
             {data.label as string}
@@ -223,12 +224,9 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
             sx={{
               position: "absolute",
               transform: `translate(-50%,-50%) translate(${lx}px,${ly}px)`,
-              bgcolor: "#DFF0D8",
-              border: "1px solid #5CB85C",
-              color: "#2D6A2D",
-              borderRadius: "4px",
-              px: 0.75, py: 0.25,
-              fontSize: 10, fontWeight: 600,
+              bgcolor: "#DFF0D8", border: "1px solid #5CB85C",
+              color: "#2D6A2D", borderRadius: "4px",
+              px: 0.75, py: 0.25, fontSize: 10, fontWeight: 600,
               pointerEvents: "none", whiteSpace: "nowrap",
               maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis",
               boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
@@ -245,188 +243,244 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
 const NODE_TYPES: NodeTypes = { component: ComponentNode, boundary: BoundaryNode };
 const EDGE_TYPES: EdgeTypes = { dataflow: DataFlowEdge };
 
-// ── Dagre layout (component nodes only) ───────────────────────────────────────
+// ── Two-pass dagre layout ─────────────────────────────────────────────────────
 
-function layoutComponents(nodes: Node[], edges: Edge[]): Node[] {
-  const dagre: any = (dagreLib as any).default ?? dagreLib;
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80, marginx: 60, marginy: 60 });
-
-  nodes.forEach((n) => {
-    const shape = (n.data as any).dfdShape as "external_entity" | "process" | "data_store";
-    const dim = DIM[shape] ?? DIM.process;
-    g.setNode(n.id, { width: dim.w + 24, height: dim.h + 40 });
-  });
-  edges.forEach((e) => { try { g.setEdge(e.source, e.target); } catch { /* skip invalid */ } });
-  dagre.layout(g);
-
-  return nodes.map((n) => {
-    const pos = g.node(n.id);
-    if (!pos) return n;
-    const shape = (n.data as any).dfdShape as "external_entity" | "process" | "data_store";
-    const dim = DIM[shape] ?? DIM.process;
-    return { ...n, position: { x: pos.x - dim.w / 2, y: pos.y - dim.h / 2 } };
-  });
-}
-
-// ── Build boundary nodes sized around their components' bounding boxes ────────
-
-function buildBoundaryNodes(
-  compNodes: Node[],
-  trustBoundaries: any[],
-  compType: Record<string, string>,
-): Node[] {
-  // zone → bounding box from laid-out component positions
-  const bbox: Record<string, { x1: number; y1: number; x2: number; y2: number }> = {};
-
-  compNodes.forEach((n) => {
-    const zone = (n.data as any).trustZone as string;
-    if (!zone) return;
-    const shape = (n.data as any).dfdShape as "external_entity" | "process" | "data_store";
-    const dim = DIM[shape] ?? DIM.process;
-    const { x, y } = n.position;
-    const b = bbox[zone] ?? { x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity };
-    bbox[zone] = {
-      x1: Math.min(b.x1, x),
-      y1: Math.min(b.y1, y),
-      x2: Math.max(b.x2, x + dim.w),
-      y2: Math.max(b.y2, y + dim.h),
-    };
-  });
-
-  const PAD = 40;
-  const boundaryNodes: Node[] = [];
-
-  // Zones from component data
-  const zones = new Set<string>(compNodes.map((n) => (n.data as any).trustZone as string).filter(Boolean));
-
-  // Also from explicit trust_boundaries list
-  (trustBoundaries || []).forEach((tb: any) => {
-    if (tb.name) zones.add(tb.name);
-    if (tb.from_zone) zones.add(tb.from_zone);
-    if (tb.to_zone) zones.add(tb.to_zone);
-  });
-
-  let bi = 0;
-  zones.forEach((zone) => {
-    const b = bbox[zone];
-    let x = 20, y = 20, w = 260, h = 180;
-    if (b && b.x1 !== Infinity) {
-      x = b.x1 - PAD;
-      y = b.y1 - PAD;
-      w = (b.x2 - b.x1) + PAD * 2;
-      h = (b.y2 - b.y1) + PAD * 2;
-    } else {
-      x = 30 + bi * 280; y = 20;
-    }
-    boundaryNodes.push({
-      id: `boundary-${bi++}`,
-      type: "boundary",
-      position: { x, y },
-      style: { width: Math.max(w, 200), height: Math.max(h, 150) },
-      data: { label: zone },
-      draggable: true,
-      selectable: true,
-      zIndex: -1,
-    } as Node);
-  });
-
-  return boundaryNodes;
-}
-
-// ── Converter: ThreatModel data → React Flow nodes + edges ───────────────────
-
-interface Component {
-  id: string; name: string; type: string; dfd_type?: string;
-  trust_zone: string; criticality: string;
-}
-interface DataFlow {
-  from: string; to: string; protocol: string; data: string;
-  encrypted: boolean; label?: string; notes?: string;
-}
-interface Threat { id: string; asset_id: string; severity: string; }
+const PAD_INNER = 30;   // padding inside zone around nodes
+const PAD_LABEL = 28;   // extra top padding for the zone label tab
 
 function buildGraph(
-  components: Component[],
-  dataFlows: DataFlow[],
-  threats: Threat[],
-  trustBoundaries: any[],
+  components: ComponentInput[],
+  dataFlows: DataFlowInput[],
+  threats: ThreatInput[],
+  _trustBoundaries: any[],
 ): { nodes: Node[]; edges: Edge[] } {
+
+  const dagre: any = (dagreLib as any).default ?? dagreLib;
+
+  // Threat count per component
   const SEV_ORDER = ["critical", "high", "medium", "low", "info"];
-  const threatsByComp = new Map<string, { count: number; maxSev: string }>();
+  const threatMap = new Map<string, { count: number; maxSev: string }>();
   for (const t of threats) {
-    const cur = threatsByComp.get(t.asset_id);
+    const cur = threatMap.get(t.asset_id);
     const sev = (t.severity || "info").toLowerCase();
     if (!cur) {
-      threatsByComp.set(t.asset_id, { count: 1, maxSev: sev });
+      threatMap.set(t.asset_id, { count: 1, maxSev: sev });
     } else {
       cur.count++;
       if (SEV_ORDER.indexOf(sev) < SEV_ORDER.indexOf(cur.maxSev)) cur.maxSev = sev;
     }
   }
 
-  // Component nodes (no parentId)
-  const compNodes: Node[] = components.map((c) => {
-    const td = threatsByComp.get(c.id);
-    const shape = (c.dfd_type as "external_entity" | "process" | "data_store") ?? dfdType(c.type);
-    return {
-      id: c.id,
-      type: "component",
-      position: { x: 0, y: 0 },
-      data: {
-        label: c.name,
-        dfdShape: shape,
-        compType: c.type || "other",
-        trustZone: c.trust_zone || "",
-        criticality: c.criticality || "",
-        threatCount: td?.count ?? 0,
-        maxSeverity: td?.maxSev ?? null,
-      },
-      draggable: true,
-    } as Node;
+  // Map component id → shape
+  const shapeOf: Record<string, DfdShape> = {};
+  components.forEach((c) => {
+    shapeOf[c.id] = toDfdShape(c.type, c.dfd_type);
   });
 
-  // Edges
+  // Group components by zone
+  const DEFAULT_ZONE = "private";
+  const zoneMap = new Map<string, ComponentInput[]>();
+  components.forEach((c) => {
+    const z = (c.trust_zone || DEFAULT_ZONE).toLowerCase().trim() || DEFAULT_ZONE;
+    if (!zoneMap.has(z)) zoneMap.set(z, []);
+    zoneMap.get(z)!.push({ ...c, trust_zone: z });
+  });
+
   const compIdSet = new Set(components.map((c) => c.id));
-  const edges: Edge[] = dataFlows
-    .filter((f) => compIdSet.has(f.from) && compIdSet.has(f.to))
-    .map((f, i) => {
-      const flowLabel = f.label || f.notes || `${f.from} → ${f.to}`;
-      return {
-        id: `e${i}`,
-        source: f.from,
-        target: f.to,
-        type: "dataflow",
-        data: {
-          label: flowLabel,
-          protocol: f.protocol,
-          encrypted: f.encrypted,
-        },
-        markerEnd: { type: MarkerType.ArrowClosed },
-      } as Edge;
+
+  // ── Pass 1: layout nodes WITHIN each zone ──────────────────────────────────
+  //
+  // We use a separate dagre graph per zone. Edges used in pass-1 are only
+  // intra-zone edges (source and target in same zone).
+  //
+  // Result: for each zone, we know
+  //   • relative positions of its nodes (top-left = 0,0 inside the zone)
+  //   • zone box size (width + height)
+
+  type ZoneLayout = {
+    nodes: Record<string, { rx: number; ry: number }>;
+    w: number;
+    h: number;
+  };
+
+  const zoneLayouts = new Map<string, ZoneLayout>();
+
+  zoneMap.forEach((comps, zone) => {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: "LR", nodesep: 44, ranksep: 60 });
+
+    comps.forEach((c) => {
+      const d = DIM[shapeOf[c.id]] ?? DIM.process;
+      g.setNode(c.id, { width: d.w + 20, height: d.h + 20 });
     });
 
-  // Layout component nodes with dagre
-  const laidComponents = layoutComponents(compNodes, edges);
+    // Only intra-zone edges
+    dataFlows.forEach((f) => {
+      const fz = (components.find((c) => c.id === f.from)?.trust_zone || DEFAULT_ZONE).toLowerCase().trim();
+      const tz = (components.find((c) => c.id === f.to)?.trust_zone || DEFAULT_ZONE).toLowerCase().trim();
+      if (fz === zone && tz === zone && compIdSet.has(f.from) && compIdSet.has(f.to)) {
+        try { g.setEdge(f.from, f.to); } catch { /* skip */ }
+      }
+    });
 
-  // Build boundary nodes sized around laid-out components
-  const compTypeMap: Record<string, string> = {};
-  laidComponents.forEach((n) => { compTypeMap[n.id] = (n.data as any).compType; });
-  const boundaryNodes = buildBoundaryNodes(laidComponents, trustBoundaries, compTypeMap);
+    dagre.layout(g);
 
-  // Boundaries first so they render behind components
-  return { nodes: [...boundaryNodes, ...laidComponents], edges };
+    // Compute bounding box (dagre centres nodes so top-left = x-w/2)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    comps.forEach((c) => {
+      const pos = g.node(c.id);
+      if (!pos) return;
+      const d = DIM[shapeOf[c.id]] ?? DIM.process;
+      minX = Math.min(minX, pos.x - d.w / 2);
+      minY = Math.min(minY, pos.y - d.h / 2);
+      maxX = Math.max(maxX, pos.x + d.w / 2);
+      maxY = Math.max(maxY, pos.y + d.h / 2);
+    });
+
+    if (minX === Infinity) { minX = 0; minY = 0; maxX = 160; maxY = 100; }
+
+    const rNodes: Record<string, { rx: number; ry: number }> = {};
+    comps.forEach((c) => {
+      const pos = g.node(c.id);
+      if (!pos) return;
+      const d = DIM[shapeOf[c.id]] ?? DIM.process;
+      rNodes[c.id] = {
+        rx: pos.x - d.w / 2 - minX + PAD_INNER,
+        ry: pos.y - d.h / 2 - minY + PAD_INNER + PAD_LABEL,
+      };
+    });
+
+    zoneLayouts.set(zone, {
+      nodes: rNodes,
+      w: (maxX - minX) + PAD_INNER * 2,
+      h: (maxY - minY) + PAD_INNER * 2 + PAD_LABEL,
+    });
+  });
+
+  // ── Pass 2: layout zones relative to each other ────────────────────────────
+
+  const zoneG = new dagre.graphlib.Graph();
+  zoneG.setDefaultEdgeLabel(() => ({}));
+  zoneG.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
+
+  const zones = Array.from(zoneMap.keys());
+  zones.forEach((z) => {
+    const zl = zoneLayouts.get(z)!;
+    zoneG.setNode(z, { width: zl.w, height: zl.h });
+  });
+
+  // Cross-zone edges drive zone ordering
+  const seenZoneEdge = new Set<string>();
+  dataFlows.forEach((f) => {
+    const fz = (components.find((c) => c.id === f.from)?.trust_zone || DEFAULT_ZONE).toLowerCase().trim();
+    const tz = (components.find((c) => c.id === f.to)?.trust_zone || DEFAULT_ZONE).toLowerCase().trim();
+    if (fz !== tz) {
+      const key = `${fz}→${tz}`;
+      if (!seenZoneEdge.has(key)) {
+        seenZoneEdge.add(key);
+        try { zoneG.setEdge(fz, tz); } catch { /* skip */ }
+      }
+    }
+  });
+
+  // Hint zone order via rank
+  // (dagre doesn't support explicit ranks easily via the graph option alone,
+  //  so we just let the edges drive it — cross-zone flows create natural ranking)
+  dagre.layout(zoneG);
+
+  // ── Assemble React Flow nodes ──────────────────────────────────────────────
+
+  const rfNodes: Node[] = [];
+  const boundaryIdOf: Record<string, string> = {};
+
+  zones.forEach((zone, zi) => {
+    const zl  = zoneLayouts.get(zone)!;
+    const zPos = zoneG.node(zone);
+    if (!zPos) return;
+
+    const bId = `boundary-${zi}`;
+    boundaryIdOf[zone] = bId;
+
+    // Boundary (parent) node
+    rfNodes.push({
+      id: bId,
+      type: "boundary",
+      position: { x: zPos.x - zl.w / 2, y: zPos.y - zl.h / 2 },
+      style: { width: zl.w, height: zl.h },
+      data: { label: zone },
+      zIndex: -1,
+      draggable: true,
+      selectable: true,
+    } as Node);
+
+    // Component (child) nodes — positions are RELATIVE to parent
+    (zoneMap.get(zone) || []).forEach((c) => {
+      const rl = zl.nodes[c.id];
+      if (!rl) return;
+      const td = threatMap.get(c.id);
+      rfNodes.push({
+        id: c.id,
+        type: "component",
+        parentId: bId,
+        extent: "parent" as const,
+        position: { x: rl.rx, y: rl.ry },
+        data: {
+          label: c.name,
+          dfdShape: shapeOf[c.id],
+          compType: c.type || "other",
+          trustZone: zone,
+          criticality: c.criticality || "",
+          threatCount: td?.count ?? 0,
+          maxSeverity: td?.maxSev ?? null,
+        },
+        draggable: true,
+        zIndex: 1,
+      } as Node);
+    });
+  });
+
+  // ── Edges ──────────────────────────────────────────────────────────────────
+
+  const rfEdges: Edge[] = dataFlows
+    .filter((f) => compIdSet.has(f.from) && compIdSet.has(f.to))
+    .map((f, i) => ({
+      id: `e${i}`,
+      source: f.from,
+      target: f.to,
+      type: "dataflow",
+      data: {
+        label: f.label || f.notes || `${f.protocol || "data"}`,
+        protocol: f.protocol,
+        encrypted: f.encrypted,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed },
+      zIndex: 5,
+    } as Edge));
+
+  return { nodes: rfNodes, edges: rfEdges };
 }
 
-// ── Inner graph component ─────────────────────────────────────────────────────
+// ── Interfaces ────────────────────────────────────────────────────────────────
+
+interface ComponentInput {
+  id: string; name: string; type: string; dfd_type?: string;
+  trust_zone: string; criticality: string;
+}
+interface DataFlowInput {
+  from: string; to: string; protocol: string; data: string;
+  encrypted: boolean; label?: string; notes?: string;
+}
+interface ThreatInput { id: string; asset_id: string; severity: string; }
+
+// ── Inner graph ───────────────────────────────────────────────────────────────
 
 function DfdGraphInner({
   components, dataFlows, threats, trustBoundaries,
 }: {
-  components: Component[];
-  dataFlows: DataFlow[];
-  threats: Threat[];
+  components: ComponentInput[];
+  dataFlows: DataFlowInput[];
+  threats: ThreatInput[];
   trustBoundaries: any[];
 }) {
   const theme = useTheme();
@@ -444,7 +498,7 @@ function DfdGraphInner({
   useEffect(() => { setEdges(rfEdges); }, [rfEdges, setEdges]);
 
   const canvasBg = isDark ? "#111827" : "#FFFFFF";
-  const dotColor = isDark ? "#2d3550" : "#D1D5DB";
+  const dotColor = isDark ? "#1f2937" : "#E5E7EB";
 
   if (components.length === 0) {
     return (
@@ -459,7 +513,7 @@ function DfdGraphInner({
 
   return (
     <Box sx={{
-      width: "100%", height: 580, bgcolor: canvasBg, borderRadius: 2,
+      width: "100%", height: 620, bgcolor: canvasBg, borderRadius: 2,
       border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`,
       overflow: "hidden",
     }}>
@@ -467,21 +521,15 @@ function DfdGraphInner({
         nodes={nodes} edges={edges}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
         nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
-        fitView fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.2} maxZoom={2.5}
+        fitView fitViewOptions={{ padding: 0.12 }}
+        minZoom={0.15} maxZoom={2.5}
         proOptions={{ hideAttribution: true }}
       >
         <Background color={dotColor} gap={20} size={1} />
         <Controls showInteractive={false}
           style={{ bottom: 12, right: 12, left: "auto", top: "auto" }} />
         <MiniMap
-          nodeColor={(n) => {
-            if (n.type === "boundary") return "transparent";
-            const shape = (n.data as any)?.dfdShape as string;
-            return shape === "external_entity" ? "#6B7280"
-              : shape === "data_store" ? "#6B7280"
-              : "#4285F4";
-          }}
+          nodeColor={(n) => n.type === "boundary" ? "transparent" : "#4285F4"}
           maskColor={isDark ? "rgba(10,15,30,0.6)" : "rgba(220,228,240,0.6)"}
           style={{ bottom: 12, left: 12, width: 140, height: 90 }}
           zoomable pannable
@@ -500,30 +548,25 @@ function DfdLegend() {
 
   return (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 1.5, px: 0.5, alignItems: "center" }}>
-      {/* External Entity */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 36, height: 22, border: `2px solid ${border}`, flexShrink: 0 }} />
         <Typography variant="caption" sx={{ color: "text.secondary" }}>External Entity</Typography>
       </Box>
-      {/* Process */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 26, height: 26, border: `2px solid ${border}`, borderRadius: "50%", flexShrink: 0 }} />
         <Typography variant="caption" sx={{ color: "text.secondary" }}>Process</Typography>
       </Box>
-      {/* Data Store */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Box sx={{ width: 42, height: 18, borderTop: `2px solid ${border}`, borderBottom: `2px solid ${border}`, flexShrink: 0 }} />
+        <Box sx={{ width: 40, height: 18, borderTop: `2px solid ${border}`, borderBottom: `2px solid ${border}`, flexShrink: 0 }} />
         <Typography variant="caption" sx={{ color: "text.secondary" }}>Data Store</Typography>
       </Box>
-      {/* Trust Boundary */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 36, height: 22, border: "2px dashed #EA4335", borderRadius: "3px", flexShrink: 0 }} />
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>Trust Boundary (drag to resize)</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>Trust Boundary (select to resize)</Typography>
       </Box>
-      {/* Flows */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 32, height: 2, bgcolor: "#5CB85C", flexShrink: 0 }} />
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>Encrypted</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>Encrypted flow</Typography>
       </Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Box sx={{ width: 32, height: 2, background: "repeating-linear-gradient(90deg,#D9534F 0,#D9534F 6px,transparent 6px,transparent 9px)", flexShrink: 0 }} />
@@ -533,12 +576,12 @@ function DfdLegend() {
   );
 }
 
-// ── Public component ──────────────────────────────────────────────────────────
+// ── Public export ─────────────────────────────────────────────────────────────
 
 interface Props {
-  components: Component[];
-  dataFlows: DataFlow[];
-  threats: Threat[];
+  components: ComponentInput[];
+  dataFlows: DataFlowInput[];
+  threats: ThreatInput[];
   trustBoundaries?: any[];
 }
 
@@ -556,7 +599,7 @@ export default function DfdReactFlow({ components, dataFlows, threats, trustBoun
         }}>
           <Warning sx={{ fontSize: 16, color: "#EA4335" }} />
           <Typography variant="caption" sx={{ color: "#EA4335", fontWeight: 600 }}>
-            {critCount} critical threat{critCount > 1 ? "s" : ""} — nodes with red badge
+            {critCount} critical threat{critCount > 1 ? "s" : ""} — nodes marked with red badge
           </Typography>
         </Box>
       )}
