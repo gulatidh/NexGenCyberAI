@@ -161,6 +161,14 @@ async def list_all_scans(
     for s in scans:
         client_name = client_names.get(s.client_id, "Unknown Client")
         connector_type = conn_types.get(s.connector_id or "", "")
+        # Infer scanner type from summary when no connector is linked
+        # (e.g. AI Code Review via archive upload, inline repo_url)
+        if not connector_type:
+            _sum = s.summary or {}
+            connector_type = (
+                _sum.get("scanner")
+                or ("ai_code_review" if (_sum.get("repo_url") or _sum.get("code_archive")) else "")
+            )
         category = _category_for_connector(connector_type) if connector_type else _category_for_connector("")
         status = s.status.value if hasattr(s.status, "value") else str(s.status)
         out.append({
@@ -204,6 +212,12 @@ async def scan_detail(
     client = db.query(Client).filter(Client.id == s.client_id).first()
     conn = db.query(Connector).filter(Connector.id == s.connector_id).first() if s.connector_id else None
     connector_type = _connector_type_value(conn)
+    if not connector_type:
+        _sum = s.summary or {}
+        connector_type = (
+            _sum.get("scanner")
+            or ("ai_code_review" if (_sum.get("repo_url") or _sum.get("code_archive")) else "")
+        )
     category = _category_for_connector(connector_type)
 
     findings = db.query(Finding).filter(Finding.scan_id == scan_id).all()

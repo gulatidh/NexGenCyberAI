@@ -352,6 +352,7 @@ async def run_ai_code_review(
 
         scan.summary = {
             **(scan.summary or {}),
+            "scanner": "ai_code_review",
             **sev_counts,
             "total": len(all_findings),
             "files_triaged": len(top_files),
