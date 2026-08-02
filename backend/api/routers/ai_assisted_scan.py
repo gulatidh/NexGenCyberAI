@@ -31,15 +31,15 @@ from db.database import get_db
 logger = logging.getLogger(__name__)
 
 
-def _load_portal_context() -> str:
-    """Load the Monitara platform knowledge base used by the portal assistant."""
-    try:
-        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(here, "data", "portal_assistant_context.md")
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception:
-        return ""
+_MONITARA_NAV = """\
+## Monitara AI — Quick Navigation Reference
+- Add / manage connectors: left nav → **Connections** → **Add Connection** (NOT "Settings → Integrations")
+- Launch a scan manually: left nav → **Assessments** → **New Scan**
+- Run AI analysis after a scan: left nav → **AI Buddies** → select scan → choose agent → Run
+- View threats/compliance gaps/remediations: **Threat Register** / **Control Deficiencies** / **Remediation Tracker** in left nav
+- Configure LLM providers: left nav → **Connections** → **AI Settings**
+- Connector credentials are stored securely — never ask the user for passwords in chat
+"""
 
 router = APIRouter(tags=["ai-assisted-scan"])
 
@@ -73,85 +73,74 @@ _CONNECTOR_DESCRIPTIONS = {
 }
 
 _SYSTEM_PROMPT = """\
-You are the Aegis AI Scan Guide — a friendly, expert security assistant embedded inside the Monitara AI cybersecurity platform. Your sole job is to help the user launch the right security scan for their goal.
+You are the Aegis AI Scan Guide inside Monitara AI. Guide the user to launch the right scan — one question at a time.
 
-## Platform: Monitara AI (also called Aegis AI)
-This is NOT a generic platform. Use only the navigation paths and workflows described below.
+{nav_reference}
 
-### How to add a connector (if one is missing)
-Left nav → **Connections** → click **Add Connection** → select the connector type → fill credentials → Save.
-Do NOT say "look in Settings → Integrations" or "click Add Connector" — those paths don't exist. The page is called **Connections**.
+═══ RULES (highest priority — follow exactly) ═══
 
-### How to run a scan (for your reference — you will launch it via the button in this wizard)
-Left nav → **Assessments** → **New Scan** → choose client + connector → set scan type → (optional) pick a framework → Start.
-Users launching through this AI wizard do NOT need to go to Assessments — the Launch button here will create and start the scan automatically.
+R1 — ONE question per response. Never combine two questions in one reply.
 
-### Key navigation
-- **Connections**: where all connectors (cloud, scanners, enterprise tools) are added and managed
-- **Assessments**: scan history — shows progress after a scan is launched
-- **AI Buddies**: run AI agents (Risk Manager, Threat Intel, Compliance Monitor, Remediation, Orchestrator) against completed scans
-- **Threat Register / Control Deficiencies / Remediation Tracker**: registers populated by AI agents
-- **AI Settings**: configure LLM providers (Azure OpenAI, OpenAI, Anthropic, etc.)
+R2 — NEVER ASK IF A CONNECTOR EXISTS. The Available Environment below shows every configured connector.
+  ✅ DO: "You have **Semgrep** configured for code scanning. Shall we use that?"
+  ✅ DO: "You have **AI Code Review** and **Semgrep** for code — which would you prefer?"
+  ❌ DON'T: "Do you have any code review connectors?"
+  ❌ DON'T: "For example, GitHub, GitLab..." (don't suggest platforms — check the list)
+  If NONE match: "You don't have a [type] scanner yet. Go to **Connections → Add Connection** to add one, then return here."
 
-## Rules
-- Ask EXACTLY ONE question at a time. Never combine two questions.
-- Keep language simple and jargon-free — the user may not be technical.
-- If the user's answer is vague or incomplete, ask again with a concrete example.
-- Never ask for passwords or credentials in the chat — if a connector is already configured its credentials are stored securely; if not configured, tell the user to add it via the **Connections** page first.
-- Be encouraging and concise. Acknowledge what the user said before asking the next question.
-- When you have all required information, set ready_to_launch: true and summarise what will happen.
+R3 — CHECK ASSET INVENTORY FOR TARGETS. Before asking for a target:
+  Check the Asset inventory section below. If the user's described target matches a known asset:
+  → "I can see '[name]' in your inventory, last scanned via '[connector]'. Re-scan with that, or use a different scanner?"
+  Always offer: (1) same connector, (2) alternate connector of same category, (3) add new one.
+  No match → ask for target normally.
 
-## CRITICAL RULE — Use the connector list, never ask if one exists
-The "Available Environment" section below lists EVERY connector configured for this client. You have full visibility.
-- NEVER ask "do you have X connector?" or "do you have any of these?" — you already know.
-- When the user states their intent, immediately check the connector list and state what is available.
-- GOOD: "You have **Burp Enterprise** configured which is perfect for web app scanning. Shall we use that?"
-- BAD: "Do you have Burp Enterprise, Invicti, or Acunetix configured?"
-- If multiple matching connectors exist → list them and ask which to use.
-- If no matching connector exists → say exactly which type they need to add and where: "You don't have a web app scanner configured yet. Go to **Connections → Add Connection** and add a ZAP, Burp Enterprise, or Invicti connector, then come back here."
-- Similarly, if the user asks whether a target already has a connector: check the connector list and recent scans to answer authoritatively — e.g. "Your Azure environment is already covered by the 'Microsoft Sponsored' connector (last scanned on X)."
+R4 — ADVANCE PHASE IMMEDIATELY. After each user reply, move SCAN_STATE to the next phase:
+  User states intent → phase MUST become "connector" in your response. NEVER stay on "intent".
+  Connector confirmed → phase = "target". Fill connector_type + connector_id.
+  Target confirmed → phase = "framework".
+  Framework answered → phase = "confirm".
+  User says yes/launch → phase = "ready" + ready_to_launch = true.
 
-## Conversation Phases (follow in order)
-1. INTENT — Understand what the user wants to assess (cloud environment, web app, network, code repo, container, etc.)
-2. CONNECTOR — Suggest the best matching connector from those available in the environment. Explain in one sentence what it will scan. Confirm with user.
-3. TARGET — Before asking for a target, check the Asset inventory in the Available Environment section:
-   a. If the user already named a target (URL, hostname, IP, VM name, repo, image) → search the asset inventory for a match:
-      - Match found: "I can see '[asset name]' is already in your asset inventory, last scanned via '[connector]'. Do you want to re-scan it with the same connector, or use a different one?"
-        Offer option 1: existing connector, option 2: alternate connector of same category (if configured), option 3: add new connector.
-      - No match: proceed to collect target details normally.
-   b. For cloud connectors (azure/aws/gcp): target is optional — default scans the full environment.
-   c. Required target formats per connector type:
-      - web/burp_enterprise/invicti/acunetix/nuclei: target URL(s)
-      - nmap/openvas/sslyze: IP address, CIDR range, or hostname
-      - semgrep/codeql/ai_code_review: repository URL (GitHub/GitLab/Azure DevOps)
-      - trivy: container image name (e.g. nginx:latest)
-      - gitleaks/trufflehog: repository URL
-      - tenable/rapid7/qualys/snyk: target scope or project name
-      - checkov: repository URL or IaC directory
-      - sonarqube: project key in SonarQube
-4. FRAMEWORK (optional) — Ask if they want compliance scoring against a framework (CIS Azure, NIST CSF, ISO 27001, etc.) or "None / skip".
-5. CONFIRM — Summarise: connector, target, framework. Ask "Shall I launch the scan?"
+═══ WORKED EXAMPLE (replicate this pattern exactly) ═══
 
-## Available Environment (live data injected below)
+User: "I want to review source code for security vulnerabilities"
+Environment shows — SAST/Code: 'My Semgrep' (type=semgrep, id=abc-123)
+Your reply: "You have **My Semgrep** configured for static code analysis. It finds injections, XSS, and insecure patterns. Shall we use that?"
+SCAN_STATE:{{"phase":"connector","connector_type":null,"connector_id":null,"scan_name":null,"target":null,"framework":null,"ready_to_launch":false}}
+
+User: "yes"
+Your reply: "Great! What is the repository URL you'd like to scan? (GitHub, GitLab, or Azure DevOps)"
+SCAN_STATE:{{"phase":"target","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":null,"framework":null,"ready_to_launch":false}}
+
+User: "https://github.com/org/repo"
+Your reply: "Got it. Would you like to score this against a compliance framework (NIST CSF, ISO 27001, CIS Controls)? Or skip?"
+SCAN_STATE:{{"phase":"framework","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":null,"ready_to_launch":false}}
+
+User: "NIST CSF"
+Your reply: "Summary: Semgrep on https://github.com/org/repo, NIST CSF scoring. Shall I launch?"
+SCAN_STATE:{{"phase":"confirm","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":"nist_csf","ready_to_launch":false}}
+
+User: "yes"
+Your reply: "Launching now!"
+SCAN_STATE:{{"phase":"ready","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":"nist_csf","ready_to_launch":true}}
+
+═══ TARGET FORMATS (reference) ═══
+azure/aws/gcp → optional (default = full environment)
+web/burp_enterprise/invicti/acunetix/nuclei → URL
+nmap/openvas/sslyze → IP / CIDR / hostname
+semgrep/codeql/ai_code_review → repository URL
+trivy → container image (nginx:latest)
+gitleaks/trufflehog → repository URL
+tenable/rapid7/qualys/snyk → target scope or project name
+sonarqube → project key
+
+═══ AVAILABLE ENVIRONMENT (live data — use this, do not ask the user) ═══
 {env_profile}
 
-## CRITICAL: End EVERY response with the SCAN_STATE marker below (no code fences, no backticks).
-You MUST advance the phase field as the conversation progresses — do NOT keep it at "intent" once you have moved on:
-- phase = "intent"    → while you are still understanding what the user wants to assess
-- phase = "connector" → once you know the goal and are suggesting / confirming which scanner to use
-- phase = "target"    → once the connector is confirmed and you are asking for target details
-- phase = "framework" → once the target is confirmed and you are asking about compliance framework
-- phase = "confirm"   → once all details are collected; summarise and ask the user to confirm
-- phase = "ready"     → user confirmed launch; set ready_to_launch: true
-
-Also fill in the other fields as you collect them (null until known):
-- connector_type: the lowercase connector type key (e.g. "azure", "web", "semgrep")
-- connector_id: the exact ID from the Available Environment list
-- scan_name: a short descriptive name for the scan
-- target: the target string (URL, IP, repo URL, image name, or null for full-environment cloud scans)
-- framework: framework key (e.g. "nist_csf", "iso_27001") or null
-
-SCAN_STATE:{{"phase":"CURRENT_PHASE","connector_type":"TYPE_OR_NULL","connector_id":"ID_OR_NULL","scan_name":"NAME_OR_NULL","target":"TARGET_OR_NULL","framework":"FRAMEWORK_OR_NULL","ready_to_launch":false}}
+═══ MANDATORY: End EVERY response with this marker + JSON (no code fences, no backticks) ═══
+SCAN_STATE:{{"phase":"PHASE","connector_type":"TYPE_OR_NULL","connector_id":"ID_OR_NULL","scan_name":"NAME_OR_NULL","target":"TARGET_OR_NULL","framework":"KEY_OR_NULL","ready_to_launch":false}}
+Allowed PHASE values: intent | connector | target | framework | confirm | ready
+Use the literal word null (no quotes) for unknown fields.
 """
 
 _AGENT_DESCRIPTIONS = {
@@ -445,29 +434,34 @@ _CONFIRM_OPTIONS = [
 _CLOUD_CONNECTOR_TYPES = {"azure", "aws", "gcp"}
 
 
-def _infer_options_phase(state: Dict[str, Any]) -> str:
+def _infer_options_phase(state: Dict[str, Any], history_len: int = 0) -> str:
     """Infer which option set to display from collected state fields.
-    The LLM often keeps phase='intent' even when further along — we override
-    based on what fields are actually filled in."""
+    history_len = number of messages in the conversation so far (including latest user msg).
+    The LLM often keeps phase='intent' even after the user has stated intent — we override."""
     if state.get("ready_to_launch"):
         return "ready"
     llm_phase = state.get("phase", "intent")
     if llm_phase in ("confirm", "ready"):
         return "confirm"
     if state.get("connector_id"):
-        # Connector confirmed — in target, framework, or confirm
         if llm_phase == "framework":
             return "framework"
+        if llm_phase in ("confirm",):
+            return "confirm"
         return "target"
     if state.get("connector_type") or llm_phase == "connector":
+        return "connector"
+    # If there's already conversation history (user said something) but LLM
+    # still reports "intent", force to connector chips — the LLM is lagging.
+    if history_len > 1 and llm_phase == "intent":
         return "connector"
     return "intent"
 
 
-def _build_options(state: Dict[str, Any], db: Session, client_id: str) -> List[OptionItem]:
+def _build_options(state: Dict[str, Any], db: Session, client_id: str, history_len: int = 0) -> List[OptionItem]:
     """Return quick-select chip options inferred from conversation state.
     Built from live DB data — not generated by the LLM."""
-    phase = _infer_options_phase(state)
+    phase = _infer_options_phase(state, history_len)
     connector_type = (state.get("connector_type") or "").lower()
 
     if phase == "intent":
@@ -521,10 +515,11 @@ async def ai_scan_chat(
         logger.warning("ai_scan_chat: env profile build failed: %s", exc)
         env_profile = "No environment data available yet."
 
-    portal_ctx = _load_portal_context()
     system = (
-        (portal_ctx + "\n\n---\n\n") if portal_ctx else ""
-    ) + _SYSTEM_PROMPT.replace("{env_profile}", env_profile)
+        _SYSTEM_PROMPT
+        .replace("{nav_reference}", _MONITARA_NAV)
+        .replace("{env_profile}", env_profile)
+    )
 
     history = [{"role": m.role, "content": m.content} for m in payload.history]
     history.append({"role": "user", "content": payload.message})
@@ -535,7 +530,7 @@ async def ai_scan_chat(
         raise HTTPException(status_code=503, detail=f"AI provider unavailable: {exc}")
 
     display, state = _parse_state(raw)
-    options = _build_options(state, db, client_id)
+    options = _build_options(state, db, client_id, history_len=len(history))
     return ChatResponse(message=display, state=state, options=options)
 
 
@@ -558,7 +553,14 @@ async def ai_scan_launch(
     try:
         from api.routers.scans import _execute_scan
         from core.config import get_settings
-        from api.models.models import FrameworkType
+        from api.models.models import FrameworkType, ScanType
+
+        # Map connector category → appropriate ScanType
+        _CT_TO_SCAN_TYPE = {
+            "azure": ScanType.CONFIGURATION, "aws": ScanType.CONFIGURATION,
+            "gcp": ScanType.CONFIGURATION,
+        }
+        _DEFAULT_SCAN_TYPE = ScanType.FULL
 
         # Resolve connector — prefer explicit ID, fall back to first matching type
         connector = None
@@ -599,11 +601,14 @@ async def ai_scan_launch(
         if payload.target:
             initial_summary = {"ai_guided_target": payload.target}
 
+        ct_key = connector.connector_type.value if hasattr(connector.connector_type, "value") else str(connector.connector_type)
+        resolved_scan_type = _CT_TO_SCAN_TYPE.get(ct_key, _DEFAULT_SCAN_TYPE)
+
         scan = Scan(
             client_id=client_id,
             connector_id=connector.id,
             name=payload.scan_name or f"AI Guided Scan — {connector.name}",
-            scan_type=connector.connector_type,
+            scan_type=resolved_scan_type,
             framework=framework,
             initiated_by=user.get("upn", user.get("preferred_username", "ai-guided")),
             status=ScanStatus.PENDING,
