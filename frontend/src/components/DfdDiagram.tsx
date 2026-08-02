@@ -68,13 +68,14 @@ function colorizeZones(src: string, isDark: boolean): string {
 const EMOJI_RE = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{1F300}-\u{1FAFF}]️?/gu;
 
 function stripEmoji(src: string): string {
-  return src.replace(EMOJI_RE, "").replace(/\s{2,}/g, " ");
+  return src.replace(EMOJI_RE, "").replace(/[ \t]{2,}/g, " ");
 }
 
 // ── Per-render %%{init}%% frontmatter ──────────────────────────────────────
+// Uses JSON.stringify for the entire object so quotes are consistent — Mermaid 11
+// requires valid JSON inside %%{init}%%. Mixed single/double quotes break parsing.
 function buildFrontmatter(isDark: boolean): string {
-  const theme = isDark ? "dark" : "default";
-  const vars = isDark
+  const themeVariables = isDark
     ? {
         primaryColor: "#1E2433",
         primaryTextColor: "#E0E0E0",
@@ -101,7 +102,12 @@ function buildFrontmatter(isDark: boolean): string {
         edgeLabelBackground: "#FFFFFF",
         fontFamily: "Inter, system-ui, sans-serif",
       };
-  return `%%{init:{'theme':'${theme}','themeVariables':${JSON.stringify(vars)},'flowchart':{'curve':'basis','htmlLabels':true,'padding':14}}}%%\n`;
+  const initConfig = {
+    theme: isDark ? "dark" : "default",
+    themeVariables,
+    flowchart: { curve: "basis", htmlLabels: true, padding: 14 },
+  };
+  return `%%{init: ${JSON.stringify(initConfig)}}%%\n`;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
