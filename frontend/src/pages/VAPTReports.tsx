@@ -105,7 +105,9 @@ export default function VAPTReports() {
     enabled: !!clientId && createOpen,
   });
 
-  const completedScans = (scans as any[]).filter((s: any) => s.status === "completed");
+  const completedScans = (scans as any[]).filter(
+    (s: any) => s.status === "completed" && s.is_live !== false
+  );
 
   const createFromScanMutation = useMutation({
     mutationFn: (data: any) => vaptApi.createFromScan(clientId!, data),
@@ -241,7 +243,7 @@ export default function VAPTReports() {
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: "rgba(26,35,126,0.2)" }}>
-                {["Title", "Version", "Classification", "Status", "Report Date", "Findings", "Actions"].map((h) => (
+                {["Report / Scan", "Version", "Status", "Date", "Findings", "Actions"].map((h) => (
                   <TableCell key={h} sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.78rem", py: 1.5 }}>
                     {h}
                   </TableCell>
@@ -252,6 +254,8 @@ export default function VAPTReports() {
               {(reports as any[]).map((report: any) => {
                 const fc = report.finding_counts || {};
                 const hasCritical = (fc.critical || 0) > 0;
+                const scanLabel = [report.connector_name, report.scan_name]
+                  .filter(Boolean).join(" · ") || (report.scan_type ? report.scan_type.toUpperCase() : null);
                 return (
                   <TableRow
                     key={report.id}
@@ -262,22 +266,29 @@ export default function VAPTReports() {
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         {hasCritical && <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#C62828", flexShrink: 0 }} />}
-                        <Typography sx={{ fontWeight: 600, fontSize: "0.88rem" }}>{report.title}</Typography>
+                        <Box>
+                          <Typography sx={{ fontWeight: 600, fontSize: "0.88rem" }}>{report.title}</Typography>
+                          {scanLabel && (
+                            <Typography variant="caption" color="text.disabled" sx={{ display: "block" }}>
+                              {scanLabel}
+                            </Typography>
+                          )}
+                          {report.parent_report_id && (
+                            <Typography variant="caption" sx={{ color: "#90CAF9", display: "block" }}>Retest version</Typography>
+                          )}
+                        </Box>
                       </Box>
-                      {report.parent_report_id && (
-                        <Typography variant="caption" color="text.disabled">Retest version</Typography>
-                      )}
                     </TableCell>
                     <TableCell>
-                      <Chip label={`v${report.version}`} size="small"
-                        sx={{ bgcolor: "rgba(21,101,192,0.15)", color: "#90CAF9", fontWeight: 700 }} />
-                    </TableCell>
-                    <TableCell>
-                      <Chip label={report.classification} size="small" variant="outlined"
-                        sx={{ borderColor: "rgba(255,255,255,0.2)", fontSize: "0.72rem" }} />
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                        <Chip label={`v${report.version}`} size="small"
+                          sx={{ bgcolor: "rgba(21,101,192,0.15)", color: "#90CAF9", fontWeight: 700, alignSelf: "flex-start" }} />
+                        <Chip label={report.classification} size="small" variant="outlined"
+                          sx={{ borderColor: "rgba(255,255,255,0.2)", fontSize: "0.72rem", alignSelf: "flex-start" }} />
+                      </Box>
                     </TableCell>
                     <TableCell><StatusChip status={report.status} /></TableCell>
-                    <TableCell sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+                    <TableCell sx={{ fontSize: "0.82rem", color: "text.secondary", whiteSpace: "nowrap" }}>
                       {report.report_date
                         ? new Date(report.report_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                         : "—"}
@@ -375,6 +386,7 @@ export default function VAPTReports() {
                 {completedScans.map((s: any) => {
                   const ct = s.connector?.connector_type || s.scan_type || "";
                   const label = SCAN_TYPE_LABEL[ct] || ct || "Scan";
+                  const connectorName = s.connector?.name;
                   return (
                     <MenuItem key={s.id} value={s.id}>
                       <Box>
@@ -382,7 +394,8 @@ export default function VAPTReports() {
                           {s.name || `${label} — ${new Date(s.created_at).toLocaleDateString()}`}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {label} · {new Date(s.created_at).toLocaleDateString("en-GB")} ·{" "}
+                          {[connectorName, label].filter(Boolean).join(" · ")} ·{" "}
+                          {new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ·{" "}
                           {s.summary?.total || 0} findings
                         </Typography>
                       </Box>

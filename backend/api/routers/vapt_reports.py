@@ -28,7 +28,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from api.models.models import Client, Finding, Scan, VAPTFinding, VAPTReport
+from api.models.models import Client, Connector, Finding, Scan, VAPTFinding, VAPTReport
 from core.security import get_current_user
 from db.database import get_db
 
@@ -212,9 +212,30 @@ async def list_vapt_reports(
 
     result = []
     for r in reports:
+        # Resolve linked scan — skip reports whose scan is archived (is_live=False)
+        scan_name = None
+        scan_type = None
+        connector_name = None
+        if r.scan_id:
+            scan = db.query(Scan).filter(Scan.id == r.scan_id).first()
+            if scan:
+                if getattr(scan, "is_live", True) is False:
+                    continue  # hide reports from archived scan versions
+                scan_name = scan.name
+                scan_type = (
+                    scan.connector.connector_type.value
+                    if scan.connector and hasattr(scan.connector.connector_type, "value")
+                    else (scan.scan_type.value if scan.scan_type and hasattr(scan.scan_type, "value") else None)
+                )
+                if scan.connector:
+                    connector_name = scan.connector.name
+
         d = _report_to_dict(r)
         d["finding_counts"] = _sev_counts(r.findings)
         d["total_findings"] = len(r.findings)
+        d["scan_name"] = scan_name
+        d["scan_type"] = scan_type
+        d["connector_name"] = connector_name
         result.append(d)
     return result
 
@@ -455,7 +476,15 @@ async def create_report_from_scan(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    findings: List[Finding] = db.query(Finding).filter(Finding.scan_id == scan.id).all()
+    findings: List[Finding] = (
+        db.query(Finding)
+        .filter(
+            Finding.scan_id == scan.id,
+            Finding.duplicate_of_id.is_(None),
+            Finding.status != "false_positive",
+        )
+        .all()
+    )
 
     # Derive scan type label
     connector_type = ""
