@@ -12,10 +12,10 @@ from core.security import get_current_user
 router = APIRouter(prefix="/clients/{client_id}/query", tags=["nl-query"])
 
 _SCHEMA_HINT = """
-Available tables and key columns (SQLite):
-- findings: id, title, severity (critical/high/medium/low/info), status (open/remediated/accepted/false_positive), resource_id, resource_type, cve_id, cvss_score, control_id, framework, description, remediation, created_at, assignee_email
+Available tables and key columns (SQL Server / Azure SQL):
+- findings: id, title, severity (critical/high/medium/low/info), status (open/remediated/accepted/false_positive), resource_id, resource_type, cve_id, cvss_score, control_id, framework, description, remediation, created_at, assignee_email, duplicate_of_id
 - risks: id, title, description, risk_level (critical/high/medium/low), likelihood, impact, risk_score, category, status, assignee_email, created_at
-- scans: id, scan_type, status (pending/running/completed/failed), created_at, client_id
+- scans: id, scan_type, status (pending/running/completed/failed), created_at, client_id, is_live
 - agent_runs: id, agent_type, status, started_at, completed_at, client_id
 - threat_entries: id, technique_id, technique_name, tactic, confidence, severity, title, created_at
 - control_deficiencies: id, control_id, framework, severity, title, gap_description, remediation, created_at
@@ -24,8 +24,59 @@ Available tables and key columns (SQLite):
 Only write SELECT queries. Do NOT use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER.
 Join findings to scans on findings.scan_id = scans.id and filter scans.client_id = '{client_id}'.
 For other tables filter directly on client_id = '{client_id}'.
-Return at most 100 rows. Use LIMIT 100.
+Return at most 100 rows. Use TOP 100 in the SELECT clause (SQL Server syntax — NOT LIMIT).
 """
+
+
+def _inject_top(sql: str, n: str) -> str:
+    """Inject SELECT TOP n into the outer-most SELECT of a query (CTE-aware)."""
+    # For WITH queries find the SELECT after all CTE parentheses close
+    if re.match(r'\s*WITH\b', sql, re.I):
+        depth = 0
+        i = 0
+        while i < len(sql):
+            if sql[i] == '(':
+                depth += 1
+            elif sql[i] == ')':
+                depth -= 1
+            elif depth == 0:
+                m = re.match(r'\bSELECT\b', sql[i:], re.I)
+                if m:
+                    return sql[:i] + f'SELECT TOP {n} ' + sql[i + len('SELECT'):].lstrip()
+            i += 1
+        return sql  # fallback — couldn't locate outer SELECT
+    # Simple query: inject TOP after the first SELECT
+    return re.sub(r'\bSELECT\b(?!\s+TOP\b)', f'SELECT TOP {n}', sql, count=1, flags=re.I)
+
+
+def _rewrite_to_tsql(sql: str) -> str:
+    """Convert common SQLite/MySQL patterns to T-SQL (Azure SQL Server)."""
+    # LIMIT N  →  TOP N  (move into SELECT clause)
+    limit_match = re.search(r'\bLIMIT\s+(\d+)\b', sql, re.I)
+    if limit_match:
+        n = limit_match.group(1)
+        # Remove the LIMIT clause
+        sql = re.sub(r'\bLIMIT\s+\d+\b', '', sql, flags=re.I).strip().rstrip(';')
+        # Inject TOP into the outer SELECT (CTE-safe)
+        if not re.search(r'\bSELECT\s+TOP\b', sql, re.I):
+            sql = _inject_top(sql, n)
+
+    # LIMIT N OFFSET M  →  already handled above (OFFSET kept if present for FETCH syntax)
+    # OFFSET M ROWS FETCH NEXT N ROWS ONLY is valid T-SQL — leave as-is if present
+
+    # Boolean literals: TRUE/FALSE → 1/0
+    sql = re.sub(r'\bTRUE\b', '1', sql, flags=re.I)
+    sql = re.sub(r'\bFALSE\b', '0', sql, flags=re.I)
+
+    # ISNULL(a, b) is valid T-SQL; IFNULL(a,b) / COALESCE both work too — no change needed
+    # DATE('now') / NOW() → GETDATE()
+    sql = re.sub(r"\bDATE\s*\(\s*'now'\s*\)", 'GETDATE()', sql, flags=re.I)
+    sql = re.sub(r'\bNOW\s*\(\s*\)', 'GETDATE()', sql, flags=re.I)
+
+    # Ensure query ends without a trailing semicolon (pymssql handles it fine either way)
+    sql = sql.strip().rstrip(';')
+
+    return sql
 
 
 class NLQueryRequest(BaseModel):
@@ -52,15 +103,18 @@ async def natural_language_query(
     from langchain_core.messages import HumanMessage, SystemMessage
 
     schema = _SCHEMA_HINT.replace("{client_id}", client_id)
-    system_prompt = f"""You are a SQLite query generator for a security platform. Given a natural language question, output ONLY a valid SQLite SELECT query — no explanation, no markdown, no code fences. Just the raw SQL.
+    system_prompt = f"""You are a T-SQL query generator for a security platform running on Azure SQL Server. Given a natural language question, output ONLY a valid T-SQL SELECT query — no explanation, no markdown, no code fences. Just the raw SQL.
 
 {schema}
 
 Rules:
 - Always add WHERE clause filtering by client_id = '{client_id}' (or via scans.client_id for findings)
-- Use LIMIT 100 always
+- Use TOP 100 in the SELECT clause — NEVER use LIMIT (this is SQL Server, not SQLite/MySQL)
 - Only SELECT — never mutate data
-- Use proper SQLite syntax"""
+- Use proper T-SQL / SQL Server syntax
+- String concatenation uses + not ||
+- Use GETDATE() not NOW() or DATE('now')
+- Boolean values are 1/0 not TRUE/FALSE"""
 
     llm = get_llm()
     resp = await llm.ainvoke([
@@ -73,6 +127,9 @@ Rules:
     raw_sql = re.sub(r"^```sql\s*", "", raw_sql, flags=re.I)
     raw_sql = re.sub(r"^```\s*", "", raw_sql)
     raw_sql = re.sub(r"\s*```$", "", raw_sql).strip()
+
+    # Rewrite SQLite/MySQL patterns to T-SQL as a safety net
+    raw_sql = _rewrite_to_tsql(raw_sql)
 
     # Safety check — only allow SELECT
     first_word = raw_sql.split()[0].upper() if raw_sql.split() else ""
