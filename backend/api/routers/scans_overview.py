@@ -44,12 +44,16 @@ def _user_email(user: dict) -> str:
 def _accessible_ids(db: Session, user: dict) -> Optional[set]:
     """Return the set of client IDs the user can see, or None if the user
     is a global admin (None means: no filter, see everything)."""
-    # Same-tenant Azure AD users are admins — give full access without
-    # requiring a UserAccess DB row (mirrors trial.py:is_admin logic).
-    from core.trial import is_admin as _jwt_admin
-    if _jwt_admin(user):
-        return None
+    from core.config import get_settings as _gs
     email = _user_email(user)
+    # INITIAL_ADMIN_EMAILS users bypass all grant checks (mirrors get_current_user logic)
+    initial_admins = {
+        e.strip().lower()
+        for e in (_gs().INITIAL_ADMIN_EMAILS or "").split(",")
+        if e.strip()
+    }
+    if email and email in initial_admins:
+        return None
     if not email:
         return set()
     try:
