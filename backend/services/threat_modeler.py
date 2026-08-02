@@ -1549,6 +1549,109 @@ def _extract_sigma_rules(threats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return rules
 
 
+async def suggest_detection_rules_llm(
+    threats: List[Dict[str, Any]],
+    components: Optional[List[Dict[str, Any]]] = None,
+    client_name: str = "Unknown",
+) -> List[Dict[str, Any]]:
+    """Call the LLM to generate proper Sigma detection rule stubs for each threat.
+    Falls back to template-based _extract_sigma_rules() if LLM is unavailable."""
+    try:
+        from core.ai_providers import get_llm
+        from langchain_core.messages import HumanMessage, SystemMessage
+        llm = get_llm(temperature=0.1, max_tokens=8000)
+    except Exception as exc:
+        logger.warning("Sigma rule LLM unavailable, using template fallback: %s", exc)
+        return _extract_sigma_rules(threats)
+
+    platforms = list({c.get("platform", "Corporate") for c in (components or [])})
+
+    threat_lines: List[str] = []
+    for t in threats[:30]:
+        techniques = ", ".join(t.get("attack_techniques") or [])
+        narrative = (t.get("attack_narrative") or "")[:200].replace("\n", " ")
+        threat_lines.append(
+            f"- id:{t.get('id','?')} [{(t.get('severity','medium')).upper()}] {t.get('title','')} "
+            f"(asset:{t.get('asset_id','')}, MITRE:{techniques or '—'}, narrative:{narrative})"
+        )
+
+    system_prompt = (
+        "You are a senior SOC engineer and Sigma rule author for a MSSP.\n"
+        "Generate detection rules as STRICT JSON array — no prose, no markdown fences.\n\n"
+        "For each threat produce exactly ONE rule object. Schema:\n"
+        '[\n'
+        '  {\n'
+        '    "threat_id": "<threat id from input>",\n'
+        '    "threat_title": "<short title>",\n'
+        '    "rule_id": "<kebab-case-slug>",\n'
+        '    "platform": "<windows|azure|linux|aws|gcp|generic>",\n'
+        '    "severity": "<critical|high|medium|low>",\n'
+        '    "status": "advisory",\n'
+        '    "description": "<1-2 sentence rationale for this detection>",\n'
+        '    "sigma_yaml": "<complete valid Sigma YAML string>"\n'
+        '  }\n'
+        ']\n\n'
+        "sigma_yaml MUST include: title, id (uuid-style), status: experimental, description, "
+        "author: Aegis AI, date (today), logsource (product+service/category), "
+        "detection (selection + condition with REAL field names), falsepositives, level, tags.\n\n"
+        "Log source guidance:\n"
+        "  Azure resources → product: azure  service: activitylogs or diagnostics\n"
+        "  Azure Entra ID → product: azure  service: auditlogs or signinlogs\n"
+        "  Azure Sentinel → product: azure  service: microsoftdefenderadvancedthreatprotection\n"
+        "  Windows Security → product: windows  service: security  (use EventID, SubjectUserName, etc.)\n"
+        "  Sysmon → product: windows  service: sysmon  (EventID 1=process, 3=network, 11=file)\n"
+        "  Linux → product: linux  service: syslog or auditd\n"
+        "  AWS → product: aws  service: cloudtrail\n"
+        "  Web → category: webserver\n\n"
+        "Real field names for Azure Activity: operationName, resourceType, resultType, callerIpAddress, "
+        "identity_claims_name (dot-notation varies by SIEM — emit both).\n"
+        "Real field names for Windows Security: EventID, SubjectUserName, TargetUserName, LogonType, "
+        "IpAddress, ProcessName, CommandLine.\n\n"
+        "STRICT JSON array only — no commentary."
+    )
+
+    user_prompt = (
+        f"Client: {client_name}\n"
+        f"Platforms in scope: {', '.join(platforms) if platforms else 'Azure, Corporate'}\n\n"
+        f"Threats to detect ({min(len(threats), 30)} of {len(threats)}):\n"
+        + "\n".join(threat_lines)
+        + "\n\nGenerate one Sigma rule stub per threat. STRICT JSON array only."
+    )
+
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        resp = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ])
+        raw = str(resp.content if hasattr(resp, "content") else resp).strip()
+        # Strip any accidental markdown fences
+        raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw, flags=re.MULTILINE)
+        raw = re.sub(r"\s*```$", "", raw, flags=re.MULTILINE)
+        parsed = json.loads(raw)
+        if not isinstance(parsed, list):
+            raise ValueError("LLM returned non-list")
+        result: List[Dict[str, Any]] = []
+        for r in parsed:
+            if not isinstance(r, dict):
+                continue
+            result.append({
+                "threat_id": _str(r.get("threat_id")),
+                "threat_title": _str(r.get("threat_title"))[:200],
+                "rule_id": _str(r.get("rule_id"))[:100],
+                "platform": _str(r.get("platform", "generic")),
+                "severity": _str(r.get("severity", "medium")).lower(),
+                "status": "advisory",
+                "description": _str(r.get("description"))[:500],
+                "sigma_yaml": _str(r.get("sigma_yaml")),
+            })
+        logger.info("Sigma rule LLM generated %d rules for %d threats", len(result), len(threats))
+        return result if result else _extract_sigma_rules(threats)
+    except Exception as exc:
+        logger.warning("Sigma LLM generation/parse failed, using template fallback: %s", exc)
+        return _extract_sigma_rules(threats)
+
+
 # ── LLM call ─────────────────────────────────────────────────────────────────
 
 

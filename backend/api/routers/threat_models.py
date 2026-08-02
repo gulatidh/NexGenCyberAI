@@ -1295,3 +1295,41 @@ async def validate_sigma_rule(
     flag_modified(tm, "sigma_rules_json")
     db.commit()
     return rules[rule_index]
+
+
+@router.post("/{model_id}/suggest-detections")
+async def suggest_detections(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(require_editor_anywhere),
+):
+    """LLM-generate Sigma detection rule stubs for all threats in this model.
+    Replaces any existing sigma_rules_json with fresh AI-authored stubs."""
+    from sqlalchemy.orm.attributes import flag_modified
+    from services.threat_modeler import suggest_detection_rules_llm
+
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id,
+        ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+
+    threats = tm.threats_json or []
+    if not threats:
+        raise HTTPException(status_code=400, detail="No threats in this model — generate the threat model first")
+
+    client = db.query(Client).filter(Client.id == client_id).first()
+    client_name = client.name if client else "Unknown"
+
+    rules = await suggest_detection_rules_llm(
+        threats=threats,
+        components=tm.components_json or [],
+        client_name=client_name,
+    )
+
+    tm.sigma_rules_json = rules
+    flag_modified(tm, "sigma_rules_json")
+    db.commit()
+    return {"rules": rules, "count": len(rules)}

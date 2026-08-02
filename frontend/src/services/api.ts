@@ -310,6 +310,8 @@ export const threatModelsApi = {
   startModeling: (clientId: string, modelId: string, body: any = {}) =>
     apiClient.post(`/clients/${clientId}/threat-models/${modelId}/start-modeling`, body).then((r) => r.data),
   // Phase 9 — Sigma rule endpoints
+  suggestDetections: (clientId: string, modelId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/suggest-detections`).then((r) => r.data),
   validateSigmaRule: (clientId: string, modelId: string, index: number) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/sigma-rules/${index}/validate`).then((r) => r.data),
   downloadSigmaRules: async (clientId: string, modelId: string) => {

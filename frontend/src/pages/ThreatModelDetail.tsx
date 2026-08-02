@@ -1889,6 +1889,15 @@ function DetectionRulesView({
     });
   };
 
+  const suggestMutation = useMutation({
+    mutationFn: () => threatModelsApi.suggestDetections(clientId, modelId),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+      toast.success(`Generated ${res.count ?? 0} detection rule stubs`);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Detection rule generation failed"),
+  });
+
   const validateMutation = useMutation({
     mutationFn: (index: number) =>
       threatModelsApi.validateSigmaRule(clientId, modelId, index),
@@ -1908,9 +1917,21 @@ function DetectionRulesView({
     return (
       <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 4, textAlign: "center" }}>
         <Verified sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          No detection rules yet — re-generate this model to produce Sigma rule stubs.
+        <Typography variant="body2" sx={{ color: "text.secondary", mb: 2.5 }}>
+          No detection rules yet. Let AI suggest Sigma rule stubs based on the threats in this model.
         </Typography>
+        <Button
+          variant="contained"
+          size="small"
+          disabled={suggestMutation.isPending}
+          startIcon={suggestMutation.isPending
+            ? <CircularProgress size={14} sx={{ color: "inherit" }} />
+            : <AutoFixHigh sx={{ fontSize: 16 }} />}
+          onClick={() => suggestMutation.mutate()}
+          sx={{ textTransform: "none", bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
+        >
+          {suggestMutation.isPending ? "Generating…" : "Suggest Detection Rules with AI"}
+        </Button>
       </Card>
     );
   }
@@ -1932,6 +1953,24 @@ function DetectionRulesView({
           <Chip label={`${advisory} advisory`}
             sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700, height: 20, fontSize: 11 }} />
           <Box sx={{ flex: 1 }} />
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={suggestMutation.isPending}
+            startIcon={suggestMutation.isPending
+              ? <CircularProgress size={13} sx={{ color: "inherit" }} />
+              : <AutoFixHigh sx={{ fontSize: 15 }} />}
+            onClick={() => suggestMutation.mutate()}
+            sx={{
+              color: "text.secondary",
+              borderColor: "divider",
+              textTransform: "none",
+              fontWeight: 600,
+              "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
+            }}
+          >
+            {suggestMutation.isPending ? "Generating…" : "Re-generate with AI"}
+          </Button>
           <Button
             size="small"
             variant="outlined"
@@ -2010,6 +2049,15 @@ function DetectionRulesView({
                     {isExpanded ? <ExpandLess sx={{ fontSize: 18 }} /> : <ExpandMore sx={{ fontSize: 18 }} />}
                   </IconButton>
                 </Box>
+
+                {/* Description (from LLM-generated rules) */}
+                {rule.description && (
+                  <Box sx={{ px: 1.5, pb: 0.75 }}>
+                    <Typography sx={{ fontSize: 11.5, color: "text.secondary", lineHeight: 1.5 }}>
+                      {rule.description}
+                    </Typography>
+                  </Box>
+                )}
 
                 {/* Collapsible YAML */}
                 <Collapse in={isExpanded} unmountOnExit>

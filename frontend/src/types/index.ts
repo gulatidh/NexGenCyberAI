@@ -655,6 +655,7 @@ export interface SigmaRule {
   rule_id: string;
   severity: string;
   status: string;
+  description?: string;
   sigma_yaml: string;
 }
 
