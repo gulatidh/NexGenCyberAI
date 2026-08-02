@@ -597,12 +597,21 @@ async def ai_scan_launch(
             except ValueError:
                 pass
 
-        initial_summary: Optional[Dict] = None
-        if payload.target:
-            initial_summary = {"ai_guided_target": payload.target}
-
         ct_key = connector.connector_type.value if hasattr(connector.connector_type, "value") else str(connector.connector_type)
         resolved_scan_type = _CT_TO_SCAN_TYPE.get(ct_key, _DEFAULT_SCAN_TYPE)
+
+        # Build initial_summary with the right key for each scanner type.
+        # Code-review scanners read "repo_url"; web scanners read "target_url".
+        _CODE_REVIEW_TYPES = {"ai_code_review", "semgrep", "codeql", "gitleaks", "trufflehog"}
+        _WEB_SCAN_TYPES    = {"web", "burp_enterprise", "invicti", "acunetix", "nuclei", "nmap", "openvas", "sslyze"}
+        initial_summary: Optional[Dict] = None
+        if payload.target:
+            if ct_key in _CODE_REVIEW_TYPES:
+                initial_summary = {"repo_url": payload.target, "ai_guided_target": payload.target}
+            elif ct_key in _WEB_SCAN_TYPES:
+                initial_summary = {"target_url": payload.target, "ai_guided_target": payload.target}
+            else:
+                initial_summary = {"ai_guided_target": payload.target}
 
         scan = Scan(
             client_id=client_id,

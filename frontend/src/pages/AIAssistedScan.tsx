@@ -5,12 +5,13 @@ import {
   Paper, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  CheckCircle, HourglassEmpty, Psychology,
+  Cable, CheckCircle, HourglassEmpty, Psychology,
   RadioButtonUnchecked, RocketLaunch, Send, SmartToy,
 } from "@mui/icons-material";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
-import { apiClient } from "../services/api";
+import { apiClient, connectorsApi } from "../services/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -101,11 +102,18 @@ interface ConfigPanelProps {
   scanId: string | null;
   nextSteps: { recommendations: AgentRec[]; summary: string } | null;
   nextStepsLoading: boolean;
+  clientId: string;
   onLaunch: () => void;
   onNavigate: (path: string) => void;
 }
 
-function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsLoading, onLaunch, onNavigate }: ConfigPanelProps) {
+function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsLoading, clientId, onLaunch, onNavigate }: ConfigPanelProps) {
+  const { data: connectors } = useQuery({
+    queryKey: ["connectors-list", clientId],
+    queryFn: () => connectorsApi.list(clientId),
+    enabled: !!clientId,
+    staleTime: 30_000,
+  });
   const currentPhase = phaseIndex(state.phase);
 
   const fields = [
@@ -146,6 +154,38 @@ function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsL
               );
             })}
           </List>
+        </CardContent>
+      </Card>
+
+      {/* Connector context — shows which connectors are available for this client */}
+      <Card variant="outlined" sx={{ bgcolor: "background.paper" }}>
+        <CardContent sx={{ pb: "12px !important" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
+            <Cable sx={{ fontSize: 14, color: "text.secondary" }} />
+            <Typography variant="caption" sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "text.secondary" }}>
+              Available Connectors
+            </Typography>
+          </Box>
+          {connectors && connectors.length > 0 ? (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              {connectors.map((c: any) => (
+                <Chip key={c.id} label={c.name} size="small"
+                  sx={{ fontSize: 10, height: 20,
+                    bgcolor: c.status === "active" ? "rgba(52,168,83,0.12)" : "rgba(255,152,0,0.12)",
+                    color: c.status === "active" ? "#34A853" : "#FF9800" }} />
+              ))}
+            </Box>
+          ) : connectors ? (
+            <Alert severity="warning" sx={{ py: 0.5, fontSize: 11 }}>
+              No connectors found for this client.{" "}
+              <Box component="span" sx={{ cursor: "pointer", textDecoration: "underline" }}
+                onClick={() => onNavigate("/platform/connections")}>
+                Add one →
+              </Box>
+            </Alert>
+          ) : (
+            <Typography variant="caption" color="text.secondary">Loading…</Typography>
+          )}
         </CardContent>
       </Card>
 
@@ -562,6 +602,7 @@ export default function AIAssistedScan() {
               scanId={scanId}
               nextSteps={nextSteps}
               nextStepsLoading={nextStepsLoading}
+              clientId={clientId}
               onLaunch={handleLaunch}
               onNavigate={navigate}
             />

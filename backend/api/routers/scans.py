@@ -150,7 +150,8 @@ async def _execute_scan(
                     from services.code_review import run_ai_code_review
                     creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
                     cfg = connector_db.config or {}
-                    repo_url = (scan.summary or {}).get("repo_url") or creds.get("repo_url") or cfg.get("repo_url") or ""
+                    _smry = scan.summary or {}
+                    repo_url = _smry.get("repo_url") or _smry.get("ai_guided_target") or creds.get("repo_url") or cfg.get("repo_url") or ""
                     git_username = creds.get("git_username") or cfg.get("git_username") or ""
                     git_token = creds.get("git_token") or cfg.get("git_token") or ""
                     archive_path = (scan.summary or {}).get("code_archive") or ""
