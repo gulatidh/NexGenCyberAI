@@ -185,7 +185,7 @@ function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsL
             </Box>
             <Button size="small" variant="outlined" fullWidth
               sx={{ borderColor: "rgba(52,168,83,0.4)", color: "#34A853", mb: 1 }}
-              onClick={() => onNavigate(`/scans/${scanId}`)}>
+              onClick={() => onNavigate(`/vulnerability/scans/${scanId}`)}>
               View Scan Progress
             </Button>
           </CardContent>
@@ -225,7 +225,7 @@ function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsL
               ))}
             </List>
             <Button size="small" variant="outlined" fullWidth sx={{ mt: 1 }}
-              onClick={() => onNavigate("/agents")}>
+              onClick={() => onNavigate("/ai-advisor/agents")}>
               Open AI Agents →
             </Button>
           </CardContent>

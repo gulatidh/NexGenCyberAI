@@ -15,6 +15,7 @@ Design:
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -28,6 +29,17 @@ from core.security import get_current_user
 from db.database import get_db
 
 logger = logging.getLogger(__name__)
+
+
+def _load_portal_context() -> str:
+    """Load the Monitara platform knowledge base used by the portal assistant."""
+    try:
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(here, "data", "portal_assistant_context.md")
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
 
 router = APIRouter(tags=["ai-assisted-scan"])
 
@@ -61,21 +73,39 @@ _CONNECTOR_DESCRIPTIONS = {
 }
 
 _SYSTEM_PROMPT = """\
-You are the Aegis AI Scan Guide — a friendly, expert security assistant inside the Monitara security platform. Your job is to help the user launch the right security scan for their goal.
+You are the Aegis AI Scan Guide — a friendly, expert security assistant embedded inside the Monitara AI cybersecurity platform. Your sole job is to help the user launch the right security scan for their goal.
+
+## Platform: Monitara AI (also called Aegis AI)
+This is NOT a generic platform. Use only the navigation paths and workflows described below.
+
+### How to add a connector (if one is missing)
+Left nav → **Connections** → click **Add Connection** → select the connector type → fill credentials → Save.
+Do NOT say "look in Settings → Integrations" or "click Add Connector" — those paths don't exist. The page is called **Connections**.
+
+### How to run a scan (for your reference — you will launch it via the button in this wizard)
+Left nav → **Assessments** → **New Scan** → choose client + connector → set scan type → (optional) pick a framework → Start.
+Users launching through this AI wizard do NOT need to go to Assessments — the Launch button here will create and start the scan automatically.
+
+### Key navigation
+- **Connections**: where all connectors (cloud, scanners, enterprise tools) are added and managed
+- **Assessments**: scan history — shows progress after a scan is launched
+- **AI Buddies**: run AI agents (Risk Manager, Threat Intel, Compliance Monitor, Remediation, Orchestrator) against completed scans
+- **Threat Register / Control Deficiencies / Remediation Tracker**: registers populated by AI agents
+- **AI Settings**: configure LLM providers (Azure OpenAI, OpenAI, Anthropic, etc.)
 
 ## Rules
 - Ask EXACTLY ONE question at a time. Never combine two questions.
 - Keep language simple and jargon-free — the user may not be technical.
 - If the user's answer is vague or incomplete, ask again with a concrete example.
-- Never ask for passwords or credentials in the chat — if a connector is already configured its credentials are stored securely; if not configured, tell the user to add it via the Connections page first.
+- Never ask for passwords or credentials in the chat — if a connector is already configured its credentials are stored securely; if not configured, tell the user to add it via the **Connections** page first.
 - Be encouraging and concise. Acknowledge what the user said before asking the next question.
 - When you have all required information, set ready_to_launch: true and summarise what will happen.
 
 ## Conversation Phases (follow in order)
 1. INTENT — Understand what the user wants to assess (cloud environment, web app, network, code repo, container, etc.)
-2. CONNECTOR — Suggest the best matching connector from those available. Explain in one sentence what it will scan. Confirm with user.
+2. CONNECTOR — Suggest the best matching connector from those available in the environment. Explain in one sentence what it will scan. Confirm with user.
 3. TARGET — Collect the specific target details required for that connector type:
-   - azure/aws/gcp: subscription/account ID or region scope
+   - azure/aws/gcp: subscription/account ID or region scope (optional for configured cloud connectors — default scans full environment)
    - web/burp_enterprise/invicti/acunetix/nuclei: target URL(s)
    - nmap/openvas/sslyze: IP address, CIDR range, or hostname
    - semgrep/codeql/ai_code_review: repository URL (GitHub/GitLab/Azure DevOps)
@@ -84,9 +114,8 @@ You are the Aegis AI Scan Guide — a friendly, expert security assistant inside
    - tenable/rapid7/qualys/snyk: target scope or project name
    - checkov: repository URL or IaC directory
    - sonarqube: project key in SonarQube
-   For already-configured cloud connectors, target is optional (default: full environment).
 4. FRAMEWORK (optional) — Ask if they want compliance scoring against a framework (CIS Azure, NIST CSF, ISO 27001, etc.) or "None / skip".
-5. CONFIRM — Summarise: connector, target, framework. Ask "Ready to launch?"
+5. CONFIRM — Summarise: connector, target, framework. Ask "Shall I launch the scan?"
 
 ## Available Environment (live data injected below)
 {env_profile}
@@ -256,25 +285,44 @@ async def _call_llm(system: str, messages: List[Dict]) -> str:
 # ── Options builder (server-side, not LLM) ────────────────────────────────────
 
 _FRAMEWORK_OPTIONS = [
-    ("NIST CSF 2.0",         "nist_csf"),
-    ("CIS Controls v8",      "cis_v8"),
-    ("CIS Azure",            "cis_azure"),
-    ("CIS AWS",              "cis_aws"),
-    ("ISO/IEC 27001",        "iso_27001"),
-    ("PCI DSS v4",           "pci_dss"),
-    ("GDPR",                 "gdpr"),
-    ("Skip / No framework",  "none"),
+    ("NIST CSF 2.0",        "nist_csf"),
+    ("CIS Controls v8",     "cis_v8"),
+    ("CIS Azure",           "cis_azure"),
+    ("CIS AWS",             "cis_aws"),
+    ("ISO/IEC 27001",       "iso_27001"),
+    ("PCI DSS v4",          "pci_dss"),
+    ("GDPR",                "gdpr"),
+    ("Skip / No framework", "none"),
 ]
 
 _OTHER_OPTION = OptionItem(label="Other / Not listed", value="__other__", sub="Type your own answer below")
 
+_INTENT_OPTIONS = [
+    OptionItem(label="Azure / Cloud posture",    value="I want to scan my Azure cloud environment for misconfigurations and security risks",         sub="Cloud security"),
+    OptionItem(label="Web application",           value="I want to scan a web application for OWASP vulnerabilities",                               sub="DAST / web"),
+    OptionItem(label="Source code review",        value="I want to review source code for security vulnerabilities",                                sub="SAST / code"),
+    OptionItem(label="Network / IP range",        value="I want to scan my network or IP address range for open ports and vulnerabilities",          sub="Network"),
+    OptionItem(label="Container / Docker image",  value="I want to scan a container image for known CVEs",                                          sub="Container"),
+    OptionItem(label="Find leaked secrets",       value="I want to scan a code repository for leaked secrets, API keys, and credentials",           sub="Secrets detection"),
+]
+
+_CONFIRM_OPTIONS = [
+    OptionItem(label="Yes, launch the scan!",    value="Yes, everything looks correct. Please launch the scan."),
+    OptionItem(label="Change the connector",     value="I'd like to use a different connector or scanner."),
+    OptionItem(label="Change the target",        value="I'd like to change the target."),
+    OptionItem(label="Change the framework",     value="I'd like to use a different compliance framework."),
+]
+
+
 def _build_options(phase: str, db: Session, client_id: str) -> List[OptionItem]:
     """Return quick-select chip options for the current phase.
     Always appends an 'Other' escape hatch so users can type freely.
-    These are built from live DB data — not generated by the LLM."""
+    Built from live DB data — not generated by the LLM."""
+    if phase == "intent":
+        return _INTENT_OPTIONS + [_OTHER_OPTION]
     if phase == "connector":
         connectors = db.query(Connector).filter(
-            Connector.client_id == client_id
+            Connector.client_id == client_id,
         ).all()
         items = [
             OptionItem(
@@ -288,7 +336,9 @@ def _build_options(phase: str, db: Session, client_id: str) -> List[OptionItem]:
     if phase == "framework":
         items = [OptionItem(label=label, value=label) for label, _ in _FRAMEWORK_OPTIONS]
         return items + [_OTHER_OPTION]
-    return []
+    if phase in ("confirm", "ready"):
+        return _CONFIRM_OPTIONS
+    return [_OTHER_OPTION]
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -306,7 +356,10 @@ async def ai_scan_chat(
         logger.warning("ai_scan_chat: env profile build failed: %s", exc)
         env_profile = "No environment data available yet."
 
-    system = _SYSTEM_PROMPT.replace("{env_profile}", env_profile)
+    portal_ctx = _load_portal_context()
+    system = (
+        (portal_ctx + "\n\n---\n\n") if portal_ctx else ""
+    ) + _SYSTEM_PROMPT.replace("{env_profile}", env_profile)
 
     history = [{"role": m.role, "content": m.content} for m in payload.history]
     history.append({"role": "user", "content": payload.message})
