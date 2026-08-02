@@ -26,10 +26,22 @@ export default function EvidencePackage() {
     setDownloading(true);
     setError(null);
     try {
-      const token = (apiClient.defaults.headers.common?.["Authorization"] as string) || "";
+      const { msalInstance } = await import("../auth/AuthProvider");
+      const { loginRequest } = await import("../auth/msalConfig");
+      await msalInstance.initialize();
+      const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+      let token = "";
+      if (account) {
+        try {
+          const resp = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
+          token = resp.accessToken;
+        } catch {
+          // proceed; backend will 401 with a clear message
+        }
+      }
       const base = apiClient.defaults.baseURL || "";
       const url = `${base}/clients/${clientId}/evidence/package?framework=${framework}`;
-      const res = await fetch(url, { headers: { Authorization: token } });
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const blob = await res.blob();
       const a = document.createElement("a");
