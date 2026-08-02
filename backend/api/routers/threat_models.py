@@ -405,6 +405,21 @@ async def get_threat_model(
             _dirty = True
         except Exception:
             pass
+    # Rebuild dfd_mermaid when the stored value contains emoji (pre-fix data).
+    # Emoji renders as '??' in Mermaid SVG; _build_mermaid() now emits clean ASCII.
+    if tm.status == "completed" and tm.components_json:
+        _mm = tm.dfd_mermaid or ""
+        import re as _re
+        _has_emoji = bool(_re.search(r"[\U0001F000-\U0001FFFF\U00002600-\U000027FF]", _mm))
+        if _has_emoji or not _mm:
+            try:
+                from services.threat_modeler import _build_mermaid
+                from sqlalchemy.orm.attributes import flag_modified
+                tm.dfd_mermaid = _build_mermaid(tm.components_json, tm.data_flows_json or [])
+                flag_modified(tm, "dfd_mermaid")
+                _dirty = True
+            except Exception:
+                pass
     if _dirty:
         try:
             db.commit()

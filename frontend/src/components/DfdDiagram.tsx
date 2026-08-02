@@ -1,34 +1,48 @@
 /**
- * Mermaid DFD renderer for threat-model diagrams.
+ * Mermaid DFD renderer — theme-aware, emoji-safe.
  *
- * The threat-modeler service emits a `dfd_mermaid` string in `flowchart TD`
- * syntax. This component renders it to inline SVG. Mermaid is loaded once
- * lazily; subsequent renders just re-invoke `mermaid.render()`.
+ * Uses Mermaid %%{init}%% frontmatter for per-render theme config so we
+ * don't depend on the cached singleton's initialization (Mermaid stores a
+ * single global config; overriding it via initialize() between renders races
+ * with concurrent renders).  The frontmatter approach is clean and per-call.
  *
- * Empty / invalid diagrams fall back to a small placeholder so the page
- * doesn't crash if the LLM returned a bad mermaid block.
+ * Old stored diagrams may contain emoji (🗄️ ⚙️ 🔒 etc.) that Mermaid renders
+ * as "??".  We strip them client-side before parsing.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { Box, CircularProgress, Typography, useTheme } from "@mui/material";
 import { ImageNotSupported } from "@mui/icons-material";
 
-let _mermaidInstance: any = null;
-let _initPromise: Promise<any> | null = null;
+let _mermaid: any = null;
+let _loadPromise: Promise<any> | null = null;
 
-// Colour each trust-zone subgraph by what the zone *is* (matched on its id +
-// label), so Internet/DMZ/Private read at a glance instead of all rendering
-// the same colour. Fills use 8-digit hex (no rgba — mermaid splits style
-// props on commas). Applied at render time, so it colours existing diagrams
-// too without a re-model.
-const ZONE_RULES: { test: RegExp; fill: string; stroke: string }[] = [
-  { test: /(public|internet|external|untrust|wan)/, fill: "#EA433528", stroke: "#EA4335" }, // red
-  { test: /(dmz|perimeter|edge|public-facing|public facing)/, fill: "#F9AB0028", stroke: "#F9AB00" }, // amber
-  { test: /(private|internal|trusted|corp|lan|intranet)/, fill: "#34A85328", stroke: "#34A853" }, // green
-  { test: /(data|database|storage|tier|backend)/, fill: "#9C27B028", stroke: "#9C27B0" }, // purple
-  { test: /(manage|mgmt|admin|control plane)/, fill: "#4285F428", stroke: "#4285F4" }, // blue
+async function getMermaid(): Promise<any> {
+  if (_mermaid) return _mermaid;
+  if (!_loadPromise) {
+    _loadPromise = (async () => {
+      const m = (await import("mermaid")).default;
+      // Minimal base init — actual theme goes in each diagram's %%{init}%%
+      m.initialize({ startOnLoad: false, securityLevel: "loose" });
+      _mermaid = m;
+      return m;
+    })();
+  }
+  return _loadPromise;
+}
+
+// ── Zone colour rules ──────────────────────────────────────────────────────
+// Applied via Mermaid `style` statements appended to the source so they work
+// with any theme. Fills use 8-digit hex (no rgba — Mermaid splits on commas).
+const ZONE_RULES: { test: RegExp; fill: string; stroke: string; textColor: string }[] = [
+  { test: /(public|internet|external|untrust|wan)/,                   fill: "#EA433520", stroke: "#EA4335", textColor: "#EA4335" },
+  { test: /(dmz|perimeter|edge|public.facing)/,                       fill: "#F9AB0018", stroke: "#F9AB00", textColor: "#E37400" },
+  { test: /(corporate|private|internal|trusted|corp|lan|intranet)/,   fill: "#1A73E818", stroke: "#1A73E8", textColor: "#1A73E8" },
+  { test: /(vendor|saas|third.party)/,                                fill: "#FF704318", stroke: "#FF7043", textColor: "#FF7043" },
+  { test: /(data|database|storage|tier|backend)/,                     fill: "#9C27B018", stroke: "#9C27B0", textColor: "#9C27B0" },
+  { test: /(manage|mgmt|admin|control|management|sentinel|siem)/,     fill: "#00897B18", stroke: "#00897B", textColor: "#00897B" },
 ];
 
-function colorizeZones(src: string): string {
+function colorizeZones(src: string, isDark: boolean): string {
   if (!src) return src;
   const re = /subgraph\s+([A-Za-z0-9_-]+)\s*(?:\[\s*"?([^"\]]*)"?\s*\])?/g;
   const styles: string[] = [];
@@ -40,45 +54,57 @@ function colorizeZones(src: string): string {
     seen.add(id);
     const hay = `${id} ${m[2] || ""}`.toLowerCase();
     const rule = ZONE_RULES.find((r) => r.test.test(hay));
-    if (rule) styles.push(`style ${id} fill:${rule.fill},stroke:${rule.stroke},stroke-width:1.5px,color:#ffffff`);
+    if (rule) {
+      const textCol = isDark ? "#ffffff" : rule.textColor;
+      styles.push(`style ${id} fill:${rule.fill},stroke:${rule.stroke},stroke-width:2px,color:${textCol}`);
+    }
   }
   return styles.length ? `${src}\n${styles.join("\n")}` : src;
 }
 
-async function loadMermaid(): Promise<any> {
-  if (_mermaidInstance) return _mermaidInstance;
-  if (!_initPromise) {
-    _initPromise = (async () => {
-      const m = (await import("mermaid")).default;
-      m.initialize({
-        startOnLoad: false,
-        theme: "dark",
-        themeVariables: {
-          // Map onto our Google-vibrant palette so the diagram doesn't
-          // clash with the rest of the UI.
-          primaryColor: "#1E1E1E",
-          primaryTextColor: "#FFFFFF",
-          primaryBorderColor: "#4285F4",
-          lineColor: "rgba(255,255,255,0.55)",
-          tertiaryColor: "#161b22",
-          backgroundColor: "background.paper",
-          mainBkg: "#1E1E1E",
-          clusterBkg: "rgba(66,133,244,0.06)",
-          clusterBorder: "rgba(66,133,244,0.5)",
-        },
-        flowchart: {
-          curve: "basis",
-          htmlLabels: true,
-          padding: 12,
-        },
-        securityLevel: "loose",
-      });
-      _mermaidInstance = m;
-      return m;
-    })();
-  }
-  return _initPromise;
+// ── Emoji stripper ─────────────────────────────────────────────────────────
+// Removes any emoji / pictograph / dingbat codepoints that Mermaid's SVG
+// renderer cannot handle and shows as "??".
+const EMOJI_RE = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{1F300}-\u{1FAFF}]️?/gu;
+
+function stripEmoji(src: string): string {
+  return src.replace(EMOJI_RE, "").replace(/\s{2,}/g, " ");
 }
+
+// ── Per-render %%{init}%% frontmatter ──────────────────────────────────────
+function buildFrontmatter(isDark: boolean): string {
+  const theme = isDark ? "dark" : "default";
+  const vars = isDark
+    ? {
+        primaryColor: "#1E2433",
+        primaryTextColor: "#E0E0E0",
+        primaryBorderColor: "#4285F4",
+        lineColor: "#9E9E9E",
+        secondaryColor: "#263145",
+        tertiaryColor: "#161b22",
+        mainBkg: "#1E2433",
+        clusterBkg: "transparent",
+        clusterBorder: "#444",
+        edgeLabelBackground: "#1E2433",
+        fontFamily: "Inter, system-ui, sans-serif",
+      }
+    : {
+        primaryColor: "#F5F7FA",
+        primaryTextColor: "#212121",
+        primaryBorderColor: "#4285F4",
+        lineColor: "#555555",
+        secondaryColor: "#EEF2F8",
+        tertiaryColor: "#F0F4FB",
+        mainBkg: "#F5F7FA",
+        clusterBkg: "transparent",
+        clusterBorder: "#BDBDBD",
+        edgeLabelBackground: "#FFFFFF",
+        fontFamily: "Inter, system-ui, sans-serif",
+      };
+  return `%%{init:{'theme':'${theme}','themeVariables':${JSON.stringify(vars)},'flowchart':{'curve':'basis','htmlLabels':true,'padding':14}}}%%\n`;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
   source: string;
@@ -86,6 +112,8 @@ interface Props {
 }
 
 export default function DfdDiagram({ source, className }: Props) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
   const ref = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,39 +121,39 @@ export default function DfdDiagram({ source, className }: Props) {
   useEffect(() => {
     let cancelled = false;
     async function render() {
-      if (!source || !source.trim()) {
-        if (!cancelled) {
-          setError("No diagram available — generator did not emit a DFD.");
-          setLoading(false);
-        }
+      if (!source?.trim()) {
+        if (!cancelled) { setError("No diagram available."); setLoading(false); }
         return;
       }
       try {
         setLoading(true);
         setError(null);
-        const mermaid = await loadMermaid();
+        const mermaid = await getMermaid();
+        const clean = stripEmoji(source);
+        const fm = buildFrontmatter(isDark);
+        const full = fm + colorizeZones(clean, isDark);
         const id = `dfd-${Math.random().toString(36).slice(2)}`;
-        const { svg } = await mermaid.render(id, colorizeZones(source));
+        const { svg } = await mermaid.render(id, full);
         if (!cancelled && ref.current) {
           ref.current.innerHTML = svg;
           setLoading(false);
         }
       } catch (exc: any) {
         if (!cancelled) {
-          setError(exc?.message || "Failed to render the diagram.");
+          setError(exc?.message || "Failed to render diagram.");
           setLoading(false);
         }
       }
     }
     render();
     return () => { cancelled = true; };
-  }, [source]);
+  }, [source, isDark]);
 
   if (error) {
     return (
       <Box className={className} sx={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 1,
-        p: 4, border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2,
+        p: 4, border: "1px dashed", borderColor: "divider", borderRadius: 2,
         color: "text.secondary",
       }}>
         <ImageNotSupported sx={{ fontSize: 24 }} />
@@ -141,11 +169,12 @@ export default function DfdDiagram({ source, className }: Props) {
         position: "relative", overflow: "auto",
         bgcolor: "background.paper",
         borderRadius: 2,
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid",
+        borderColor: "divider",
         p: 2, minHeight: 200,
         "& svg": { maxWidth: "100%", height: "auto", display: "block", mx: "auto" },
-        "& .nodeLabel, & .edgeLabel": { color: "white !important" },
         "& .cluster rect": { rx: 8, ry: 8 },
+        "& .edgeLabel": { fontSize: "11px !important" },
       }}
     >
       {loading && (
