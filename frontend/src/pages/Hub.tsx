@@ -11,7 +11,7 @@ import {
   Radar, Assessment, GppBad, PlaylistAddCheck,
   SmartToy, Search, Cable, Settings,
   Tune, Restore, Storage, Menu as MenuIcon,
-  Help as HelpOutline,
+  Help as HelpOutline, Dashboard,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -309,6 +309,27 @@ function SidebarContent({
       <ClientPicker />
       <Divider sx={{ mb: 1 }} />
 
+      {/* Dashboard — pinned above product catalogue */}
+      <List dense disablePadding sx={{ px: 1, mb: 0.5 }}>
+        <ListItemButton
+          onClick={action(() => navigate("/dashboard"))}
+          sx={{
+            borderRadius: 1.5, gap: 1,
+            bgcolor: "rgba(21,101,192,0.07)",
+            border: "1px solid rgba(21,101,192,0.2)",
+            "&:hover": { bgcolor: "rgba(21,101,192,0.12)" },
+          }}
+        >
+          <Box sx={{ color: "#1565C0", display: "flex" }}><Dashboard sx={{ fontSize: 18 }} /></Box>
+          <ListItemText
+            primary="Dashboard"
+            slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700, color: "#1565C0" } } }}
+          />
+        </ListItemButton>
+      </List>
+
+      <Divider sx={{ mb: 1 }} />
+
       {/* Category nav */}
       <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
         Products
@@ -354,18 +375,6 @@ function SidebarContent({
             <ListItemText primary={item.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
           </ListItemButton>
         ))}
-      </List>
-
-      {/* Classic View */}
-      <Divider sx={{ mt: 1 }} />
-      <List dense disablePadding sx={{ px: 1, pb: 0.5 }}>
-        <ListItemButton
-          onClick={action(() => navigate("/dashboard"))}
-          sx={{ borderRadius: 1.5, gap: 1, opacity: 0.65, "&:hover": { opacity: 1 } }}
-        >
-          <Box sx={{ color: "text.secondary" }}><Restore sx={{ fontSize: 16 }} /></Box>
-          <ListItemText primary="Classic View" slotProps={{ primary: { sx: { fontSize: 12, color: "text.secondary" } } }} />
-        </ListItemButton>
       </List>
 
       {/* User footer */}

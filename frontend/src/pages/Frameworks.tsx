@@ -16,6 +16,7 @@ import {
   Connector, ControlStatus, ControlStatusEntry, FrameworkCatalogEntry,
   FrameworkDetail, Project,
 } from "../types";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { fromNow } from "../utils/datetime";
 
 const STATUS_COLOR: Record<ControlStatus, string> = {
@@ -37,10 +38,11 @@ const STATUS_ORDER: ControlStatus[] = ["compliant", "non_compliant", "partial", 
 
 // Framework families — derived from framework key/name so the list scales as we add benchmarks.
 // New families fall under "Other" automatically.
-const FAMILY_ORDER = ["CIS", "NIST", "OWASP", "Standards", "Other"] as const;
+const FAMILY_ORDER = ["CIS", "NIST", "OWASP", "Standards", "Other", "Custom"] as const;
 type FrameworkFamily = typeof FAMILY_ORDER[number];
 
-function getFrameworkFamily(key: string, name?: string): FrameworkFamily {
+function getFrameworkFamily(key: string, name?: string, isCustom?: boolean): FrameworkFamily {
+  if (isCustom) return "Custom";
   const k = key.toLowerCase();
   const n = (name || "").toLowerCase();
   if (k.startsWith("cis_") || k === "cis_v8" || n.startsWith("cis ")) return "CIS";
@@ -125,8 +127,8 @@ export default function Frameworks() {
     enabled: !!clientId,
   });
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
-    queryKey: ["framework-catalog"],
-    queryFn: frameworksApi.catalog,
+    queryKey: ["framework-catalog-all"],
+    queryFn: frameworksApi.catalogAll,
   });
   const { data: detail, isLoading } = useQuery<FrameworkDetail>({
     queryKey: ["framework-detail", clientId, framework],
@@ -136,7 +138,10 @@ export default function Frameworks() {
 
   const recomputeMutation = useMutation({
     mutationFn: () => frameworksApi.recompute(clientId, framework),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+      qc.invalidateQueries({ queryKey: ["framework-catalog-all"] });
+    },
   });
 
   const overrideMutation = useMutation({
@@ -220,7 +225,7 @@ export default function Frameworks() {
   const familyCounts = useMemo(() => {
     const counts = new Map<FrameworkFamily, number>();
     for (const entry of catalog) {
-      const fam = getFrameworkFamily(entry.framework, entry.name);
+      const fam = getFrameworkFamily(entry.framework, entry.name, entry.is_custom);
       counts.set(fam, (counts.get(fam) || 0) + 1);
     }
     return counts;
@@ -232,7 +237,7 @@ export default function Frameworks() {
   );
 
   const filteredCatalog = useMemo(
-    () => catalog.filter((f) => getFrameworkFamily(f.framework, f.name) === family),
+    () => catalog.filter((f) => getFrameworkFamily(f.framework, f.name, f.is_custom) === family),
     [catalog, family],
   );
 
@@ -299,7 +304,11 @@ export default function Frameworks() {
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {filteredCatalog.map((f) => (
                 <MenuItem key={f.framework} value={f.framework}>
-                  {f.name} ({f.total_controls})
+                  {f.name}
+                  {f.is_custom
+                    ? <Chip label="Custom" size="small" sx={{ ml: 1, height: 16, fontSize: 9, bgcolor: "rgba(124,77,255,0.15)", color: "#9C27B0" }} />
+                    : <Typography component="span" sx={{ color: "text.secondary", fontSize: 12, ml: 0.5 }}>({f.total_controls ?? f.control_count ?? 0})</Typography>
+                  }
                 </MenuItem>
               ))}
               {filteredCatalog.length === 0 && (
@@ -571,8 +580,16 @@ export default function Frameworks() {
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
-            Run a connector scan and update compliance for {framework ? framework.replace(/_/g, " ").toUpperCase() : ""}.
+            Run a connector scan and update compliance for {framework ? (filteredCatalog.find(f => f.framework === framework)?.name || framework.replace(/_/g, " ").toUpperCase()) : ""}.
           </Typography>
+          {filteredCatalog.find(f => f.framework === framework)?.is_custom && (
+            <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", bgcolor: "rgba(124,77,255,0.08)", border: "1px solid rgba(124,77,255,0.3)", borderRadius: 1, p: 1.5, mb: 2 }}>
+              <InfoOutlinedIcon sx={{ fontSize: 16, color: "#9C27B0", mt: "1px", flexShrink: 0 }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", lineHeight: 1.5 }}>
+                Custom policies use controls drawn from standard frameworks. The scan will run the selected connector and tag findings with your custom policy. For deep gap analysis, also run <strong>AI Buddies → Compliance Monitor</strong> and select this custom policy.
+              </Typography>
+            </Box>
+          )}
 
           <FormControl fullWidth size="small" sx={{ mb: 2 }}>
             <InputLabel sx={{ color: "text.secondary" }}>Connector</InputLabel>

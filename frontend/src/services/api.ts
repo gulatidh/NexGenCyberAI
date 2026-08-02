@@ -380,6 +380,7 @@ export const technologiesApi = {
 
 export const frameworksApi = {
   catalog: () => apiClient.get("/frameworks/").then((r) => r.data),
+  catalogAll: () => apiClient.get("/frameworks/all/").then((r) => r.data),
   controls: (framework: string) => apiClient.get(`/frameworks/${framework}/controls/`).then((r) => r.data),
   summary: (clientId: string) => apiClient.get(`/clients/${clientId}/frameworks/`).then((r) => r.data),
   forClient: (clientId: string, framework: string) =>

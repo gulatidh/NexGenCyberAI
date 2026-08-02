@@ -216,10 +216,12 @@ export interface FrameworkSummary {
 }
 
 export interface FrameworkCatalogEntry {
-  framework: FrameworkType;
+  framework: string;      // FrameworkType value OR custom slug
   name: string;
   version?: string;
   total_controls: number;
+  is_custom?: boolean;
+  control_count?: number; // present on /frameworks/all/ results
 }
 
 export interface FrameworkDetail {

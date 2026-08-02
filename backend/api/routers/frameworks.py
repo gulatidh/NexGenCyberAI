@@ -157,25 +157,58 @@ async def client_framework_detail(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Full controls-with-status payload for the Frameworks page."""
-    fw = _coerce_framework(framework)
+    """Full controls-with-status payload for the Frameworks page.
+    Accepts both standard FrameworkType values and custom framework slugs.
+    """
+    from api.models.models import CustomFramework as CustomFW
+
     client = db.query(Client).filter(Client.id == client_id, Client.deleted_at.is_(None)).first()
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    controls = (
-        db.query(FrameworkControl)
-        .filter(FrameworkControl.framework == fw)
-        .order_by(FrameworkControl.control_id.asc())
-        .all()
-    )
-    statuses = {
-        s.framework_control_id: s
-        for s in db.query(ClientControlStatus)
-        .join(FrameworkControl, ClientControlStatus.framework_control_id == FrameworkControl.id)
-        .filter(ClientControlStatus.client_id == client_id, FrameworkControl.framework == fw)
-        .all()
-    }
+    # Detect whether this is a standard or custom framework.
+    custom_fw = None
+    fw_enum = None
+    try:
+        fw_enum = FrameworkType(framework)
+        fw_value: str = fw_enum.value
+    except ValueError:
+        custom_fw = db.query(CustomFW).filter(CustomFW.slug == framework).first()
+        if not custom_fw:
+            raise HTTPException(status_code=404, detail=f"Framework not found: {framework}")
+        fw_value = framework
+
+    if custom_fw:
+        ctrl_ids = [link.framework_control_id for link in custom_fw.controls]
+        controls = (
+            db.query(FrameworkControl)
+            .filter(FrameworkControl.id.in_(ctrl_ids))
+            .order_by(FrameworkControl.control_id.asc())
+            .all()
+        ) if ctrl_ids else []
+        statuses = {
+            s.framework_control_id: s
+            for s in db.query(ClientControlStatus)
+            .filter(
+                ClientControlStatus.client_id == client_id,
+                ClientControlStatus.framework_control_id.in_([c.id for c in controls]),
+            )
+            .all()
+        } if controls else {}
+    else:
+        controls = (
+            db.query(FrameworkControl)
+            .filter(FrameworkControl.framework == fw_value)
+            .order_by(FrameworkControl.control_id.asc())
+            .all()
+        )
+        statuses = {
+            s.framework_control_id: s
+            for s in db.query(ClientControlStatus)
+            .join(FrameworkControl, ClientControlStatus.framework_control_id == FrameworkControl.id)
+            .filter(ClientControlStatus.client_id == client_id, FrameworkControl.framework == fw_value)
+            .all()
+        }
 
     # Pre-load all referenced findings in one query so the drawer can show
     # title + resource_id + severity instead of just truncated IDs.
@@ -246,17 +279,38 @@ async def client_framework_detail(
             "findings": rich_findings,
         })
 
-    summary = compute_summary(db, client_id, fw)
+    # Custom frameworks: derive summary from items list since compute_summary
+    # queries by FrameworkControl.framework which doesn't match the custom slug.
+    if custom_fw:
+        cts: Dict[str, Any] = {"compliant": 0, "non_compliant": 0, "partial": 0, "not_applicable": 0, "total": 0, "last_evaluated_at": None}
+        last_ev = None
+        for item in items:
+            if item["control"]["weight"] == 0:
+                continue
+            cts["total"] += 1
+            s = item["status"]
+            cts[s] = cts.get(s, 0) + 1
+            lev = item["last_evaluated_at"]
+            if lev and (last_ev is None or lev > last_ev):
+                last_ev = lev
+        cts["last_evaluated_at"] = last_ev
+        denom = cts["total"] - cts["not_applicable"]
+        cts["score"] = round((cts["compliant"] + 0.5 * cts["partial"]) / denom * 100, 1) if denom > 0 else 0.0
+        summary_data = cts
+    else:
+        sd = compute_summary(db, client_id, fw_enum)
+        summary_data = sd
+
     return {
-        "framework": fw.value,
+        "framework": fw_value,
         "summary": {
-            "total": summary["total"],
-            "compliant": summary["compliant"],
-            "non_compliant": summary["non_compliant"],
-            "partial": summary["partial"],
-            "not_applicable": summary["not_applicable"],
-            "score": summary["score"],
-            "last_evaluated_at": summary["last_evaluated_at"],
+            "total": summary_data["total"],
+            "compliant": summary_data["compliant"],
+            "non_compliant": summary_data["non_compliant"],
+            "partial": summary_data["partial"],
+            "not_applicable": summary_data["not_applicable"],
+            "score": summary_data["score"],
+            "last_evaluated_at": summary_data["last_evaluated_at"],
         },
         "controls": items,
     }
