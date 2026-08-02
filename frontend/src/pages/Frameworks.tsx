@@ -6,7 +6,7 @@ import {
   Drawer, IconButton, Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableRow, TableCell, TableBody, Divider, Tooltip,
   Dialog, DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
-  FormControlLabel, Checkbox, Tabs, Tab,
+  FormControlLabel, Checkbox, Tabs, Tab, useTheme,
 } from "@mui/material";
 import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,7 +22,7 @@ const STATUS_COLOR: Record<ControlStatus, string> = {
   compliant: "#00e676",
   non_compliant: "#f44336",
   partial: "#ff9800",
-  not_applicable: "rgba(255,255,255,0.4)",
+  not_applicable: "#9E9E9E",
 };
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -51,6 +51,8 @@ function getFrameworkFamily(key: string, name?: string): FrameworkFamily {
 }
 
 function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
+  const theme = useTheme();
+  const trackColor = theme.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)";
   const r = (size - 12) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (score / 100) * c;
@@ -58,7 +60,7 @@ function ScoreDonut({ score, size = 110 }: { score: number; size?: number }) {
   return (
     <Box sx={{ position: "relative", width: size, height: size }}>
       <svg width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={10} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={10} fill="none" />
         <circle cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={10} fill="none"
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
           transform={`rotate(-90 ${size / 2} ${size / 2})`} />
@@ -341,7 +343,7 @@ export default function Frameworks() {
       {/* Family tabs — keeps the framework dropdown short by grouping benchmarks
           (CIS, NIST, etc.) into their own tabs. New families auto-appear. */}
       {availableFamilies.length > 1 && (
-        <Box sx={{ mb: 2, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <Box sx={{ mb: 2, borderBottom: "1px solid", borderColor: "divider" }}>
           <Tabs
             value={family}
             onChange={(_, v) => setFamily(v as FrameworkFamily)}
@@ -366,7 +368,7 @@ export default function Frameworks() {
                         height: 18,
                         fontSize: 10,
                         fontWeight: 700,
-                        bgcolor: family === f ? "rgba(66,133,244,0.15)" : "rgba(255,255,255,0.08)",
+                        bgcolor: family === f ? "rgba(66,133,244,0.15)" : "action.selected",
                         color: family === f ? "#4285F4" : "text.secondary",
                       }}
                     />
@@ -399,7 +401,7 @@ export default function Frameworks() {
       ) : summary ? (
         <>
           {/* Summary banner */}
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 2,
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2, mb: 2,
             display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
             <ScoreDonut score={summary.score} />
             <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
@@ -433,7 +435,7 @@ export default function Frameworks() {
           <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
             <Chip label={`All`} size="small" clickable
               onClick={() => setStatusFilter("")}
-              sx={{ bgcolor: !statusFilter ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.05)",
+              sx={{ bgcolor: !statusFilter ? "rgba(66,133,244,0.2)" : "action.hover",
                 color: "text.primary", border: !statusFilter ? "1px solid #4285F4" : "none" }} />
             {STATUS_ORDER.map((s) => (
               <Chip key={s} label={STATUS_LABEL[s]} size="small" clickable
@@ -471,7 +473,7 @@ export default function Frameworks() {
 
           {/* Grouped accordions */}
           {Array.from(grouped.entries()).length === 0 ? (
-            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed", borderColor: "divider", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Typography sx={{ color: "text.secondary" }}>No controls match the current filters.</Typography>
             </Card>
           ) : (
@@ -482,7 +484,7 @@ export default function Frameworks() {
               const someDomainSelected = domainSelectedCount > 0 && !allDomainSelected;
               return (
                 <Accordion key={domain} defaultExpanded
-                  sx={{ bgcolor: "background.paper", color: "text.primary", border: "1px solid rgba(255,255,255,0.08)", mb: 1, "&:before": { display: "none" } }}>
+                  sx={{ bgcolor: "background.paper", color: "text.primary", border: "1px solid", borderColor: "divider", mb: 1, "&:before": { display: "none" } }}>
                   <AccordionSummary expandIcon={<ExpandMore sx={{ color: "text.secondary" }} />}>
                     <Typography sx={{ flexGrow: 1, fontWeight: 600 }}>{domain}</Typography>
                     <Typography variant="caption" sx={{ color: "text.secondary", mr: 2 }}>
@@ -512,7 +514,7 @@ export default function Frameworks() {
                           const checked = selectedControlIds.has(item.control.control_id);
                           return (
                             <TableRow key={item.control.id}
-                              sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+                              sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" },
                                 bgcolor: checked ? "rgba(66,133,244,0.06)" : "transparent",
                                 "& td": { borderColor: "divider", py: 1 } }}
                               onClick={() => { setSelected(item); setEvidenceDraft(item.evidence || ""); }}>
@@ -564,7 +566,7 @@ export default function Frameworks() {
       {/* Scan dialog */}
       <Dialog open={scanOpen} onClose={() => setScanOpen(false)} maxWidth="sm" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
-        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+        <DialogTitle sx={{ borderBottom: "1px solid", borderColor: "divider" }}>
           Scan against framework
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -588,17 +590,15 @@ export default function Frameworks() {
           </Typography>
           <RadioGroup value={scanScope} onChange={(e) => setScanScope(e.target.value as any)} sx={{ mb: 1 }}>
             <FormControlLabel value="full" control={<Radio sx={{ color: "text.secondary" }} />}
-              label={<span style={{ color: "white" }}>Full framework — every control in the catalog</span>} />
+              label="Full framework — every control in the catalog" />
             <FormControlLabel value="selected" control={<Radio sx={{ color: "text.secondary" }} />}
-              label={<span style={{ color: "white" }}>
-                Selected rows — re-scan the {selectedControlIds.size} control{selectedControlIds.size === 1 ? "" : "s"} ticked in the table
-              </span>}
+              label={`Selected rows — re-scan the ${selectedControlIds.size} control${selectedControlIds.size === 1 ? "" : "s"} ticked in the table`}
               disabled={selectedControlIds.size === 0} />
             <FormControlLabel value="failing" control={<Radio sx={{ color: "text.secondary" }} />}
-              label={<span style={{ color: "white" }}>Failing only — re-scan the {failingControlIds.length} non-compliant / partial controls</span>}
+              label={`Failing only — re-scan the ${failingControlIds.length} non-compliant / partial controls`}
               disabled={failingControlIds.length === 0} />
             <FormControlLabel value="custom" control={<Radio sx={{ color: "text.secondary" }} />}
-              label={<span style={{ color: "white" }}>Custom — specific control IDs</span>} />
+              label="Custom — specific control IDs" />
           </RadioGroup>
 
           {scanScope === "custom" && (
@@ -617,7 +617,7 @@ export default function Frameworks() {
             </Alert>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+        <DialogActions sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
           <Button onClick={() => setScanOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button onClick={submitScan}
             variant="contained"
@@ -719,7 +719,7 @@ export default function Frameworks() {
                     const sev = (typeof f.severity === "object" ? (f.severity as any).value : f.severity) || "info";
                     return (
                       <Box key={f.id} sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1, p: 1,
-                        bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1 }}>
+                        bgcolor: "action.hover", borderRadius: 1 }}>
                         <Chip label={sev} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888",
                             fontSize: 9, height: 16, flexShrink: 0, mt: "2px" }} />
