@@ -101,6 +101,16 @@ Users launching through this AI wizard do NOT need to go to Assessments — the 
 - Be encouraging and concise. Acknowledge what the user said before asking the next question.
 - When you have all required information, set ready_to_launch: true and summarise what will happen.
 
+## CRITICAL RULE — Use the connector list, never ask if one exists
+The "Available Environment" section below lists EVERY connector configured for this client. You have full visibility.
+- NEVER ask "do you have X connector?" or "do you have any of these?" — you already know.
+- When the user states their intent, immediately check the connector list and state what is available.
+- GOOD: "You have **Burp Enterprise** configured which is perfect for web app scanning. Shall we use that?"
+- BAD: "Do you have Burp Enterprise, Invicti, or Acunetix configured?"
+- If multiple matching connectors exist → list them and ask which to use.
+- If no matching connector exists → say exactly which type they need to add and where: "You don't have a web app scanner configured yet. Go to **Connections → Add Connection** and add a ZAP, Burp Enterprise, or Invicti connector, then come back here."
+- Similarly, if the user asks whether a target already has a connector: check the connector list and recent scans to answer authoritatively — e.g. "Your Azure environment is already covered by the 'Microsoft Sponsored' connector (last scanned on X)."
+
 ## Conversation Phases (follow in order)
 1. INTENT — Understand what the user wants to assess (cloud environment, web app, network, code repo, container, etc.)
 2. CONNECTOR — Suggest the best matching connector from those available in the environment. Explain in one sentence what it will scan. Confirm with user.
@@ -193,14 +203,44 @@ def _build_env_profile(db: Session, client_id: str) -> str:
         Connector.client_id == client_id,
     ).all()
 
+    # Group connectors by security use-case so LLM can instantly match user intent
+    _CATEGORY_TYPES = {
+        "Web / DAST":        {"web", "burp_enterprise", "invicti", "acunetix", "nuclei"},
+        "Cloud posture":     {"azure", "aws", "gcp"},
+        "SAST / Code":       {"semgrep", "codeql", "sonarqube", "ai_code_review"},
+        "Network":           {"nmap", "openvas", "sslyze"},
+        "Containers":        {"trivy"},
+        "Secrets detection": {"gitleaks", "trufflehog"},
+        "Dependencies":      {"owasp_dc", "snyk", "checkov"},
+        "Enterprise VM":     {"tenable", "rapid7", "qualys"},
+    }
+
     if connectors:
-        lines.append("### Configured connectors (use these IDs when suggesting):")
+        # Build category → connector list map
+        by_category: Dict[str, list] = {cat: [] for cat in _CATEGORY_TYPES}
+        by_category["Other"] = []
         for c in connectors:
             ct = c.connector_type.value if hasattr(c.connector_type, "value") else str(c.connector_type)
-            desc = _CONNECTOR_DESCRIPTIONS.get(ct, ct)
-            lines.append(f"  - name='{c.name}' | type={ct} | id={c.id} | scans: {desc}")
+            placed = False
+            for cat, types in _CATEGORY_TYPES.items():
+                if ct in types:
+                    by_category[cat].append((c.name, ct, c.id))
+                    placed = True
+                    break
+            if not placed:
+                by_category["Other"].append((c.name, ct, c.id))
+
+        lines.append("### Configured connectors grouped by use-case (ALWAYS use these when making suggestions — do NOT ask if the user has a connector, you already know):")
+        for cat, items in by_category.items():
+            if items:
+                item_strs = [f"'{name}' (type={ct}, id={cid})" for name, ct, cid in items]
+                lines.append(f"  {cat}: {', '.join(item_strs)}")
+            else:
+                lines.append(f"  {cat}: [none configured]")
+        lines.append("RULE: If the user's intent matches a category with configured connectors → immediately name those connectors and ask which to use.")
+        lines.append("RULE: If the category has [none configured] → tell the user they don't have that type of connector and direct them to Connections page to add one before proceeding.")
     else:
-        lines.append("### Configured connectors: NONE — tell the user to add connectors via the Connections page first.")
+        lines.append("### Configured connectors: NONE — tell the user they need to add connectors via the Connections page before scanning.")
 
     # Recent scans
     recent = db.query(Scan).filter(
