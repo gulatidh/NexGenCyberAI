@@ -15,10 +15,10 @@ import {
   Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
-  Dialog, DialogTitle, DialogContent, TextField, Select, FormControl, InputLabel,
+  Dialog, DialogTitle, DialogContent, TextField, Select,
 } from "@mui/material";
 import {
-  ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download,
+  ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
@@ -111,14 +111,52 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#FF7043", in_progress: "#FBBC04", accepted: "#4285F4",
   compensating_control: "#9C27B0", closed: "#34A853",
 };
+// Security-domain zone palette — matches DfdReactFlow zone colours
+const ZONES = [
+  "Internet", "DMZ", "Corporate Network", "Vendor Cloud", "Database Tier", "Management Zone",
+] as const;
+type Zone = typeof ZONES[number];
+
 const ZONE_COLOR: Record<string, string> = {
-  public: "#EA4335", dmz: "#FF7043", private: "#4285F4",
-  "data-tier": "#9C27B0", management: "#34A853",
+  // New security-domain names
+  "Internet":          "#EA4335",
+  "DMZ":               "#F9AB00",
+  "Corporate Network": "#1A73E8",
+  "Vendor Cloud":      "#FF7043",
+  "Database Tier":     "#9C27B0",
+  "Management Zone":   "#00897B",
+  // Legacy network-tier names (stored in older models)
+  "public":      "#EA4335",
+  "dmz":         "#F9AB00",
+  "private":     "#1A73E8",
+  "data-tier":   "#9C27B0",
+  "management":  "#00897B",
 };
+
+function zoneColor(z: string) { return ZONE_COLOR[z] ?? "#78909C"; }
+
+// Normalize a stored zone name to the canonical security-domain name
+function normZone(z: string): string {
+  const l = (z || "").toLowerCase().trim();
+  if (!l || l === "private" || l === "internal" || l === "corporate network") return "Corporate Network";
+  if (l === "internet" || l === "untrusted" || l === "external") return "Internet";
+  if (l === "public" || l === "dmz" || l === "perimeter") return "DMZ";
+  if (l === "data-tier" || l === "data tier" || l === "database tier") return "Database Tier";
+  if (l === "management" || l === "management zone") return "Management Zone";
+  if (l === "vendor" || l === "vendor cloud") return "Vendor Cloud";
+  return z;
+}
 
 function prettyCat(s: string): string {
   return (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+const TYPES = ["endpoint", "api", "database", "storage", "identity", "queue", "secret-store", "repo", "vm", "other"];
+const CRITS = ["critical", "high", "medium", "low"];
+
+const CRIT_COLOR: Record<string, string> = {
+  critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853",
+};
 
 function ComponentsEditor({ clientId, modelId, components, notes }: {
   clientId: string; modelId: string; components: Component[]; notes?: string | null;
@@ -126,36 +164,62 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<Component[]>(components);
+  const [rows, setRows] = useState<Component[]>(() =>
+    components.map((c) => ({ ...c, trust_zone: normZone(c.trust_zone) }))
+  );
   const [noteText, setNoteText] = useState(notes || "");
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+  // New-component form state
   const [nName, setNName] = useState("");
-  const [nType, setNType] = useState("endpoint");
-  const [nZone, setNZone] = useState("private");
+  const [nType, setNType] = useState("api");
+  const [nZone, setNZone] = useState<Zone>("Corporate Network");
   const [nCrit, setNCrit] = useState("medium");
-  React.useEffect(() => { setRows(components); setNoteText(notes || ""); }, [components, notes]);
 
-  const TYPES = ["endpoint", "api", "database", "storage", "identity", "queue", "secret-store", "repo", "vm", "other"];
-  const ZONES = ["public", "dmz", "private", "data-tier", "management"];
-  const CRITS = ["critical", "high", "medium", "low"];
+  React.useEffect(() => {
+    setRows(components.map((c) => ({ ...c, trust_zone: normZone(c.trust_zone) })));
+    setNoteText(notes || "");
+  }, [components, notes]);
+
+  const updateRow = (id: string, field: keyof Component, value: string) =>
+    setRows((prev) => prev.map((r) => r.id === id ? { ...r, [field]: value } : r));
+
+  const toggleNotes = (id: string) =>
+    setExpandedNotes((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const addRow = () => {
     if (!nName.trim()) return;
-    setRows([...rows, { id: `c${rows.length + 1}`, name: nName.trim(), type: nType, trust_zone: nZone, criticality: nCrit, notes: "" } as Component]);
+    const newId = `c${Date.now()}`;
+    setRows((prev) => [...prev, {
+      id: newId, name: nName.trim(), type: nType,
+      trust_zone: nZone, criticality: nCrit, notes: "",
+    } as Component]);
     setNName("");
   };
 
   const remodel = useMutation({
     mutationFn: () => threatModelsApi.remodel(clientId, modelId, {
-      components: rows.map((r) => ({ id: r.id, name: r.name, type: r.type, trust_zone: r.trust_zone, criticality: r.criticality, notes: r.notes || "" })),
+      components: rows.map((r) => ({
+        id: r.id, name: r.name, type: r.type,
+        trust_zone: r.trust_zone, criticality: r.criticality, notes: r.notes || "",
+      })),
       analyst_notes: noteText.trim() || undefined,
     }),
     onSuccess: (created: any) => {
       toast.success("Re-modelling with your component set…");
       qc.invalidateQueries({ queryKey: ["threat-models"] });
-      if (created?.id) navigate(`/threat-models/${created.id}`);
+      if (created?.id) navigate(`/threat-models/${created.id}?client=${clientId}`);
     },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Re-model failed"),
   });
+
+  const selectSx = {
+    fontSize: 11, height: 26,
+    "& .MuiSelect-select": { py: "3px !important", px: "8px !important" },
+  };
 
   if (!open) {
     return (
@@ -167,55 +231,159 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
       </Box>
     );
   }
+
   return (
     <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(66,133,244,0.3)", borderRadius: 2, mb: 2 }}>
       <CardContent>
-        <Typography sx={{ color: "text.primary", fontWeight: 700, mb: 0.5 }}>Curate components & re-model</Typography>
+        <Typography sx={{ color: "text.primary", fontWeight: 700, mb: 0.25 }}>Edit components</Typography>
         <Typography variant="caption" sx={{ color: "text.secondary", mb: 1.5, display: "block" }}>
-          Remove components that aren't relevant and add missing ones, then re-model. Your set is pinned (the AI keeps it verbatim and regenerates threats). Creates a new version — history is kept.
+          Set the correct trust zone and criticality for each component, add missing ones, remove irrelevant ones, then re-model.
+          Your set is pinned — the AI keeps it verbatim and regenerates threats. Creates a new version (history preserved).
         </Typography>
 
-        <Box sx={{ maxHeight: 260, overflow: "auto", mb: 1.5 }}>
+        {/* Column headers */}
+        <Box sx={{ display: "flex", gap: 1, px: 0.5, mb: 0.5 }}>
+          <Typography variant="caption" sx={{ color: "text.disabled", flex: 1, fontSize: 10 }}>COMPONENT</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 110, fontSize: 10 }}>TYPE</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 158, fontSize: 10 }}>TRUST ZONE</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 100, fontSize: 10 }}>CRITICALITY</Typography>
+          <Box sx={{ width: 56 }} />
+        </Box>
+
+        <Box sx={{ maxHeight: 340, overflow: "auto", mb: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
           {rows.map((r) => (
-            <Box key={r.id} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5, borderBottom: "1px solid rgba(127,127,127,0.12)" }}>
-              <Typography sx={{ fontFamily: "monospace", color: "text.secondary", width: 40, fontSize: 12 }}>{r.id}</Typography>
-              <Typography sx={{ color: "text.primary", flex: 1, fontSize: 13 }}>{r.name}</Typography>
-              <Chip label={r.type} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(127,127,127,0.12)", color: "text.secondary" }} />
-              <Chip label={r.trust_zone} size="small" sx={{ height: 18, fontSize: 10, bgcolor: `${ZONE_COLOR[r.trust_zone] || "#888"}20`, color: ZONE_COLOR[r.trust_zone] || "#888" }} />
-              <IconButton size="small" onClick={() => setRows(rows.filter((x) => x.id !== r.id))}
-                sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
-                <DeleteOutlined sx={{ fontSize: 16 }} />
-              </IconButton>
+            <Box key={r.id}>
+              <Box sx={{
+                display: "flex", alignItems: "center", gap: 1, px: 1, py: 0.75,
+                borderBottom: "1px solid", borderColor: "divider",
+                "&:last-child": { borderBottom: "none" },
+                "&:hover": { bgcolor: "action.hover" },
+              }}>
+                {/* Name */}
+                <Tooltip title={r.name} placement="top-start">
+                  <Typography sx={{
+                    flex: 1, fontSize: 12, color: "text.primary", fontWeight: 500,
+                    overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
+                    minWidth: 0,
+                  }}>
+                    {r.name}
+                  </Typography>
+                </Tooltip>
+
+                {/* Type */}
+                <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 110 }}
+                  onChange={(e) => updateRow(r.id, "type", e.target.value)}>
+                  {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
+                </Select>
+
+                {/* Trust Zone */}
+                <Select size="small" value={normZone(r.trust_zone)} sx={{ ...selectSx, width: 158 }}
+                  onChange={(e) => updateRow(r.id, "trust_zone", e.target.value)}
+                  renderValue={(v) => (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: zoneColor(v), flexShrink: 0 }} />
+                      <Typography sx={{ fontSize: 11, color: zoneColor(v), fontWeight: 600, lineHeight: 1 }}>{v}</Typography>
+                    </Box>
+                  )}>
+                  {ZONES.map((z) => (
+                    <MenuItem key={z} value={z} sx={{ fontSize: 11 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: zoneColor(z), flexShrink: 0 }} />
+                        {z}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+
+                {/* Criticality */}
+                <Select size="small" value={r.criticality || "medium"} sx={{ ...selectSx, width: 100 }}
+                  onChange={(e) => updateRow(r.id, "criticality", e.target.value)}
+                  renderValue={(v) => (
+                    <Typography sx={{ fontSize: 11, color: CRIT_COLOR[v] ?? "text.secondary", fontWeight: 600 }}>{v}</Typography>
+                  )}>
+                  {CRITS.map((c) => (
+                    <MenuItem key={c} value={c} sx={{ fontSize: 11, color: CRIT_COLOR[c] }}>{c}</MenuItem>
+                  ))}
+                </Select>
+
+                {/* Notes toggle */}
+                <Tooltip title={expandedNotes.has(r.id) ? "Hide notes" : "Edit notes"}>
+                  <IconButton size="small" onClick={() => toggleNotes(r.id)}
+                    sx={{ color: r.notes ? "#4285F4" : "text.disabled", flexShrink: 0 }}>
+                    <NoteAlt sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+
+                {/* Delete */}
+                <IconButton size="small" onClick={() => setRows((prev) => prev.filter((x) => x.id !== r.id))}
+                  sx={{ color: "text.secondary", flexShrink: 0, "&:hover": { color: "#EA4335" } }}>
+                  <DeleteOutlined sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Box>
+
+              {/* Inline notes field */}
+              {expandedNotes.has(r.id) && (
+                <Box sx={{ px: 1, pb: 1, bgcolor: "action.hover" }}>
+                  <TextField
+                    fullWidth size="small" multiline minRows={1} maxRows={3}
+                    placeholder="Notes / context for this component…"
+                    value={r.notes || ""}
+                    onChange={(e) => updateRow(r.id, "notes", e.target.value)}
+                    sx={{ "& .MuiInputBase-root": { fontSize: 12 } }}
+                  />
+                </Box>
+              )}
             </Box>
           ))}
-          {rows.length === 0 && <Typography variant="caption" sx={{ color: "text.secondary" }}>No components — add some below.</Typography>}
+          {rows.length === 0 && (
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", p: 2, textAlign: "center" }}>
+              No components — add one below.
+            </Typography>
+          )}
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 1.5 }}>
-          <TextField size="small" placeholder="New component name" value={nName} onChange={(e) => setNName(e.target.value)} sx={{ minWidth: 200 }} />
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Type</InputLabel>
-            <Select label="Type" value={nType} onChange={(e) => setNType(e.target.value)}>{TYPES.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}</Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Zone</InputLabel>
-            <Select label="Zone" value={nZone} onChange={(e) => setNZone(e.target.value)}>{ZONES.map((z) => <MenuItem key={z} value={z}>{z}</MenuItem>)}</Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Criticality</InputLabel>
-            <Select label="Criticality" value={nCrit} onChange={(e) => setNCrit(e.target.value)}>{CRITS.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}</Select>
-          </FormControl>
-          <Button size="small" startIcon={<Add />} onClick={addRow} sx={{ textTransform: "none" }}>Add</Button>
+        {/* Add new component */}
+        <Box sx={{
+          display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center",
+          mb: 1.5, p: 1, bgcolor: "action.hover", borderRadius: 1,
+        }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5 }}>Add:</Typography>
+          <TextField size="small" placeholder="Component name" value={nName}
+            onChange={(e) => setNName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addRow()}
+            sx={{ minWidth: 180, flex: 1, "& .MuiInputBase-root": { fontSize: 12, height: 30 } }} />
+          <Select size="small" value={nType} onChange={(e) => setNType(e.target.value)} sx={{ ...selectSx, width: 110 }}>
+            {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
+          </Select>
+          <Select size="small" value={nZone} onChange={(e) => setNZone(e.target.value as Zone)} sx={{ ...selectSx, width: 158 }}>
+            {ZONES.map((z) => (
+              <MenuItem key={z} value={z} sx={{ fontSize: 11 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: zoneColor(z) }} />
+                  {z}
+                </Box>
+              </MenuItem>
+            ))}
+          </Select>
+          <Select size="small" value={nCrit} onChange={(e) => setNCrit(e.target.value)} sx={{ ...selectSx, width: 100 }}>
+            {CRITS.map((c) => <MenuItem key={c} value={c} sx={{ fontSize: 11 }}>{c}</MenuItem>)}
+          </Select>
+          <Button size="small" startIcon={<Add sx={{ fontSize: 14 }} />} onClick={addRow}
+            disabled={!nName.trim()}
+            sx={{ textTransform: "none", height: 28, fontSize: 12, flexShrink: 0 }}>
+            Add
+          </Button>
         </Box>
 
-        <TextField fullWidth multiline minRows={2} size="small" label="Analyst notes / guidance"
+        <TextField fullWidth multiline minRows={2} size="small" label="Analyst notes / guidance for the AI"
           value={noteText} onChange={(e) => setNoteText(e.target.value)} sx={{ mb: 1.5 }} />
 
         <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-          <Button size="small" onClick={() => setOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button size="small" onClick={() => setOpen(false)} sx={{ color: "text.secondary", textTransform: "none" }}>Cancel</Button>
           <Button size="small" variant="contained" disabled={remodel.isPending || rows.length === 0}
             startIcon={remodel.isPending ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : <Replay sx={{ fontSize: 16 }} />}
-            onClick={() => remodel.mutate()}>
+            onClick={() => remodel.mutate()}
+            sx={{ textTransform: "none" }}>
             {remodel.isPending ? "Re-modelling…" : "Re-model with these"}
           </Button>
         </Box>
@@ -748,7 +916,7 @@ export default function ThreatModelDetail() {
               </TableHead>
               <TableBody>
                 {data.components.map((c) => {
-                  const zc = ZONE_COLOR[c.trust_zone] || "rgba(255,255,255,0.4)";
+                  const zc = zoneColor(normZone(c.trust_zone));
                   return (
                     <TableRow key={c.id} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
                       <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{c.id}</TableCell>
