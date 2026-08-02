@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── Fixed schema fields (normaliser enforces these) ─────────────────────────
 
 
-_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "trust_zone", "criticality", "notes")
+_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "platform", "trust_zone", "criticality", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
                      "port", "direction", "trust_boundary_crossing", "exposure",
                      "authentication_required")
@@ -324,20 +324,30 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "dfd_type": "<external_entity|process|data_store>",
       "is_threat_actor": <true|false>,
       "threat_actor_type": "<external_attacker|insider_threat|nation_state|script_kiddie|vendor_risk|null>",
-      "trust_zone": "<Internet|DMZ|Corporate Network|Vendor Cloud|Database Tier|Management Zone>",
+      "platform": "<Azure|AWS|GCP|Corporate|Internet|Third-Party>",
+      "trust_zone": "<DMZ|Web Tier|Application Tier|Data Tier|Management Zone|External>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
   ],
   SCHEMA NOTES:
   - dfd_type: external_entity = users, browsers, threat actors, CDN, external APIs, 3rd-party services; process = anything that transforms/handles data (web apps, APIs, microservices, VMs, containers, auth providers); data_store = data at rest (databases, blob storage, secret stores, file repos).
-  - ALWAYS include 1-3 threat actor components (is_threat_actor:true) representing realistic adversaries for this environment — e.g. "External Attacker", "Malicious Insider", "Compromised Vendor". Place them in the "Internet" trust_zone (or "Corporate Network" for insider). Give them dfd_type:"external_entity".
-  - trust_zone must use SECURITY DOMAIN names — NOT generic network names:
-      Internet = untrusted external zone (attackers, internet users, external APIs)
-      DMZ = semi-trusted perimeter (load balancers, WAF, CDN, reverse proxies)
-      Corporate Network = customer-owned internal systems (VMs, APIs, App Services, AKS, Azure-managed infra)
-      Vendor Cloud = genuinely third-party SaaS/partners NOT owned by the customer (Okta, Datadog, Splunk Cloud, external payment APIs)
-      Database Tier = data stores requiring restricted access (SQL, Cosmos DB, blob storage, Redis)
-      Management Zone = privileged admin systems ONLY (SIEM, Sentinel, Key Vault, Bastion, monitoring, IAM)
+  - ALWAYS include 1-3 threat actor components (is_threat_actor:true) representing realistic adversaries for this environment — e.g. "External Attacker", "Malicious Insider", "Compromised Vendor". Set platform:"Internet", trust_zone:"External" for external attackers; platform:"Corporate", trust_zone:"Application Tier" for insider threats.
+  - TWO-LEVEL ARCHITECTURE — assign BOTH platform (where it lives) and trust_zone (security tier within it):
+    platform values:
+      Azure = Microsoft Azure (App Service, AKS, SQL, Key Vault, Sentinel, Cosmos, Storage, etc.)
+      AWS = Amazon Web Services (EC2, S3, Lambda, RDS, etc.)
+      GCP = Google Cloud Platform (GKE, BigQuery, Cloud Run, etc.)
+      Corporate = on-premises / customer datacenter
+      Internet = untrusted external (attackers, internet users — NOT customer Azure/AWS infra)
+      Third-Party = vendor SaaS / partner services NOT owned by the customer (Okta, Datadog, Splunk, Salesforce, external payment APIs)
+    trust_zone values (security tier WITHIN the platform):
+      DMZ = semi-trusted perimeter (load balancers, WAF, CDN, reverse proxies, internet-facing API gateways)
+      Web Tier = public-facing web layer (web servers, SPAs, static hosting)
+      Application Tier = internal application/API layer (microservices, backend APIs, app containers, App Services)
+      Data Tier = data stores requiring restricted access (SQL, Cosmos DB, blob storage, Redis, queues, Key Vault secrets)
+      Management Zone = privileged admin layer ONLY (SIEM, Key Vault itself, Bastion, monitoring, IAM, security tooling)
+      External = components outside the organization (threat actors, external users, 3rd-party integrations)
+    Examples: Azure Key Vault → platform:"Azure" trust_zone:"Management Zone" | Azure App Service → platform:"Azure" trust_zone:"Application Tier" | Azure SQL → platform:"Azure" trust_zone:"Data Tier" | On-prem AD → platform:"Corporate" trust_zone:"Management Zone" | External Attacker → platform:"Internet" trust_zone:"External"
   "data_flows": [
     {{ "from": "<component id>", "to": "<component id>",
       "label": "<SourceName to DestinationName>",
@@ -604,7 +614,7 @@ def _build_user_prompt(scope: Dict[str, Any], framework: Optional[str], methodol
         for c in preset_components[:60]:
             parts.append(
                 f"- id={c.get('id')}  name={c.get('name')}  type={c.get('type')}  "
-                f"trust_zone={c.get('trust_zone')}  criticality={c.get('criticality')}"
+                f"platform={c.get('platform', 'Corporate')}  trust_zone={c.get('trust_zone')}  criticality={c.get('criticality')}"
             )
         if preset_data_flows:
             parts.append("### Data flows")
@@ -912,6 +922,20 @@ def _infer_zone(text: str) -> str:
     return "Corporate Network"
 
 
+def _infer_platform(hay: str) -> str:
+    """Determine which platform/location the component lives on from asset signals."""
+    t = (hay or "").lower()
+    if any(k in t for k in ("microsoft.", "/providers/microsoft", "azure", ".azurewebsites.", ".windows.net")):
+        return "Azure"
+    if any(k in t for k in ("arn:aws:", "amazonaws.com", "aws::", ".aws.")):
+        return "AWS"
+    if any(k in t for k in ("googleapis.com", "google.com", ".gcp.", "gke", "gcs")):
+        return "GCP"
+    if any(k in t for k in ("saas", "third_party", "third-party", "vendor", "partner", "okta", "salesforce")):
+        return "Third-Party"
+    return "Corporate"
+
+
 def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     """Deterministically derive DFD components from the scoped asset inventory,
     so the architecture is identical for STRIDE / MITRE / any rerun of the same
@@ -943,6 +967,7 @@ def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict
             ),
             "is_threat_actor": False,
             "threat_actor_type": None,
+            "platform": _infer_platform(hay),
             "trust_zone": _infer_zone(hay),
             "criticality": _str(a.get("criticality")) or "medium",
             "notes": "",

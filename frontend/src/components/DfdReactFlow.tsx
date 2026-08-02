@@ -224,7 +224,47 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   );
 }
 
-// ── Trust-boundary parent node ────────────────────────────────────────────────
+// ── Platform (Level 1) node ───────────────────────────────────────────────────
+
+const PLATFORM_STYLE: Record<string, { border: string; bg: string }> = {
+  "Azure":       { border: "#0078D4", bg: "rgba(0,120,212,0.03)" },
+  "AWS":         { border: "#FF9900", bg: "rgba(255,153,0,0.03)" },
+  "GCP":         { border: "#4285F4", bg: "rgba(66,133,244,0.03)" },
+  "Corporate":   { border: "#34A853", bg: "rgba(52,168,83,0.03)" },
+  "Internet":    { border: "#EA4335", bg: "rgba(234,67,53,0.03)" },
+  "Third-Party": { border: "#9C27B0", bg: "rgba(156,39,176,0.03)" },
+};
+
+function PlatformNode({ selected, data }: { selected?: boolean; data: Record<string, any> }) {
+  const label = (data.label as string) ?? "";
+  const ps = PLATFORM_STYLE[label] ?? { border: "#78909C", bg: "rgba(120,144,156,0.03)" };
+  return (
+    <>
+      <NodeResizer color={ps.border} isVisible={!!selected}
+        minWidth={300} minHeight={200}
+        lineStyle={{ borderWidth: 2 }}
+        handleStyle={{ width: 10, height: 10, borderRadius: 2 }}
+      />
+      <Box sx={{
+        width: "100%", height: "100%",
+        border: `2px solid ${ps.border}`, borderRadius: "8px",
+        bgcolor: ps.bg, position: "relative",
+      }}>
+        <Box sx={{
+          position: "absolute", top: -15, left: 14,
+          bgcolor: "background.paper", px: 1,
+          border: `1.5px solid ${ps.border}`, borderRadius: "4px",
+        }}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: ps.border, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>
+            {label}
+          </Typography>
+        </Box>
+      </Box>
+    </>
+  );
+}
+
+// ── Trust-boundary (Level 2) tier node ────────────────────────────────────────
 
 function BoundaryNode({ selected, data }: { selected?: boolean; data: Record<string, any> }) {
   const { border, bg, label: labelColor } = zoneStyle(data.label as string ?? "");
@@ -233,7 +273,7 @@ function BoundaryNode({ selected, data }: { selected?: boolean; data: Record<str
       <NodeResizer
         color={border}
         isVisible={!!selected}
-        minWidth={220} minHeight={140}
+        minWidth={200} minHeight={120}
         lineStyle={{ borderWidth: 2 }}
         handleStyle={{ width: 10, height: 10, borderRadius: 2 }}
       />
@@ -300,13 +340,19 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
   );
 }
 
-const NODE_TYPES: NodeTypes = { component: ComponentNode, boundary: BoundaryNode };
+const NODE_TYPES: NodeTypes = { component: ComponentNode, boundary: BoundaryNode, platform: PlatformNode };
 const EDGE_TYPES: EdgeTypes = { dataflow: DataFlowEdge };
 
-// ── Two-pass dagre layout ─────────────────────────────────────────────────────
+// ── Three-pass dagre layout (platform → tier → component) ────────────────────
 
-const PAD_INNER = 32;
-const PAD_LABEL = 26;
+// Padding inside tier boxes
+const PAD_COMP_H   = 28;  // horizontal pad each side
+const PAD_COMP_TOP = 32;  // top pad (tier label space)
+const PAD_COMP_BOT = 20;
+// Padding inside platform boxes
+const PAD_TIER_H   = 32;
+const PAD_TIER_TOP = 44;  // top pad (platform label space)
+const PAD_TIER_BOT = 28;
 
 function buildGraph(
   components: ComponentInput[],
@@ -332,42 +378,75 @@ function buildGraph(
 
   const shapeOf: Record<string, DfdShape> = {};
   components.forEach((c) => { shapeOf[c.id] = toDfdShape(c.type, c.dfd_type); });
-
-  const DEFAULT_ZONE = "Corporate Network";
   const compIdSet = new Set(components.map((c) => c.id));
 
-  // Normalise zone name — maps legacy network-tier names to security-domain names.
-  // "public" in a cloud context means publicly reachable (DMZ), NOT the internet.
-  // Only explicit "internet" or "untrusted" maps to the Internet zone.
-  function normZone(z: string): string {
+  // ── Zone/platform normalizers ──────────────────────────────────────────────
+
+  function normPlatform(p: string): string {
+    const l = (p || "").toLowerCase().trim();
+    if (!l) return "Corporate";
+    if (/^azure/.test(l) || l === "microsoft azure") return "Azure";
+    if (/^aws/.test(l) || l.includes("amazon")) return "AWS";
+    if (/^gcp/.test(l) || l.includes("google")) return "GCP";
+    if (l === "internet" || l === "external" || l === "untrusted") return "Internet";
+    if (l === "third-party" || l === "third party" || l === "vendor cloud" || l === "vendor" || l === "saas") return "Third-Party";
+    if (l === "corporate" || l === "on-premises" || l === "on premises" || l === "corporate network") return "Corporate";
+    return p;
+  }
+
+  function normTier(z: string): string {
     const l = (z || "").toLowerCase().trim();
-    if (!l || l === "private" || l === "internal") return "Corporate Network";
-    if (l === "internet" || l === "untrusted" || l === "external") return "Internet";
-    if (l === "public" || l === "dmz" || l === "perimeter") return "DMZ";
-    if (l === "data-tier" || l === "data tier") return "Database Tier";
+    if (!l || l === "private" || l === "internal" || l === "application tier" || l === "corporate network") return "Application Tier";
+    if (l === "internet" || l === "external" || l === "untrusted") return "External";
+    if (l === "dmz" || l === "perimeter" || l === "edge" || l === "public") return "DMZ";
+    if (l === "web tier" || l === "web") return "Web Tier";
+    if (l === "data tier" || l === "data-tier" || l === "database tier" || l === "database") return "Data Tier";
     if (l === "management" || l === "management zone") return "Management Zone";
-    if (l === "vendor" || l === "vendor cloud") return "Vendor Cloud";
-    // Already a well-formed security-domain name
+    if (l === "vendor cloud" || l === "vendor") return "Application Tier";
     return z;
   }
 
-  // Group components by normalised zone
-  const zoneMap = new Map<string, ComponentInput[]>();
+  // Derive platform from explicit field; fallback to trust_zone for old data
+  function getPlatform(c: ComponentInput): string {
+    if (c.platform) return normPlatform(c.platform);
+    const z = (c.trust_zone || "").toLowerCase();
+    if (z === "internet") return "Internet";
+    if (z === "vendor cloud") return "Third-Party";
+    if (c.is_threat_actor) return "Internet";
+    return "Corporate";
+  }
+
+  function getTier(c: ComponentInput): string {
+    // Old data where trust_zone was used as platform gets mapped to a sensible default tier
+    const z = (c.trust_zone || "").toLowerCase();
+    if (z === "vendor cloud") return "Application Tier";
+    if (z === "internet" && !c.is_threat_actor) return "Application Tier";
+    return normTier(c.trust_zone || "");
+  }
+
+  // Group key = "platform::tier"
+  const groupMap = new Map<string, ComponentInput[]>();
   components.forEach((c) => {
-    const z = normZone(c.trust_zone || DEFAULT_ZONE);
-    if (!zoneMap.has(z)) zoneMap.set(z, []);
-    zoneMap.get(z)!.push({ ...c, trust_zone: z });
+    const key = `${getPlatform(c)}::${getTier(c)}`;
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(c);
   });
 
-  // ── Pass 1: layout within each zone ───────────────────────────────────────
+  // Map platform → set of group keys
+  const platformMap = new Map<string, Set<string>>();
+  groupMap.forEach((_, key) => {
+    const platform = key.split("::")[0];
+    if (!platformMap.has(platform)) platformMap.set(platform, new Set());
+    platformMap.get(platform)!.add(key);
+  });
 
-  type ZoneLayout = {
-    nodes: Record<string, { rx: number; ry: number }>;
-    w: number; h: number;
-  };
-  const zoneLayouts = new Map<string, ZoneLayout>();
+  // ── Pass 1: layout components within each (platform, tier) group ───────────
 
-  zoneMap.forEach((comps, zone) => {
+  type GroupLayout = { nodes: Record<string, { rx: number; ry: number }>; w: number; h: number };
+  const groupLayouts = new Map<string, GroupLayout>();
+
+  groupMap.forEach((comps, key) => {
+    const tier = key.split("::")[1];
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: "LR", nodesep: 44, ranksep: 60 });
@@ -375,10 +454,14 @@ function buildGraph(
       const d = DIM[shapeOf[c.id]] ?? DIM.process;
       g.setNode(c.id, { width: d.w + 20, height: d.h + 20 });
     });
+    // Add intra-group edges
     dataFlows.forEach((f) => {
-      const fz = normZone(components.find((c) => c.id === f.from)?.trust_zone || DEFAULT_ZONE);
-      const tz = normZone(components.find((c) => c.id === f.to)?.trust_zone || DEFAULT_ZONE);
-      if (fz === zone && tz === zone && compIdSet.has(f.from) && compIdSet.has(f.to)) {
+      const fc = components.find((c) => c.id === f.from);
+      const tc = components.find((c) => c.id === f.to);
+      if (!fc || !tc) return;
+      if (getPlatform(fc) === key.split("::")[0] && getTier(fc) === tier &&
+          getPlatform(tc) === key.split("::")[0] && getTier(tc) === tier &&
+          compIdSet.has(f.from) && compIdSet.has(f.to)) {
         try { g.setEdge(f.from, f.to); } catch { /* ignore */ }
       }
     });
@@ -392,7 +475,7 @@ function buildGraph(
       minX = Math.min(minX, pos.x - d.w / 2); minY = Math.min(minY, pos.y - d.h / 2);
       maxX = Math.max(maxX, pos.x + d.w / 2); maxY = Math.max(maxY, pos.y + d.h / 2);
     });
-    if (minX === Infinity) { minX = 0; minY = 0; maxX = 160; maxY = 100; }
+    if (minX === Infinity) { minX = 0; minY = 0; maxX = 140; maxY = 80; }
 
     const rNodes: Record<string, { rx: number; ry: number }> = {};
     comps.forEach((c) => {
@@ -400,79 +483,157 @@ function buildGraph(
       if (!pos) return;
       const d = DIM[shapeOf[c.id]] ?? DIM.process;
       rNodes[c.id] = {
-        rx: pos.x - d.w / 2 - minX + PAD_INNER,
-        ry: pos.y - d.h / 2 - minY + PAD_INNER + PAD_LABEL,
+        rx: pos.x - d.w / 2 - minX + PAD_COMP_H,
+        ry: pos.y - d.h / 2 - minY + PAD_COMP_TOP,
       };
     });
 
-    zoneLayouts.set(zone, {
+    groupLayouts.set(key, {
       nodes: rNodes,
-      w: (maxX - minX) + PAD_INNER * 2,
-      h: (maxY - minY) + PAD_INNER * 2 + PAD_LABEL,
+      w: (maxX - minX) + PAD_COMP_H * 2,
+      h: (maxY - minY) + PAD_COMP_TOP + PAD_COMP_BOT,
     });
   });
 
-  // ── Pass 2: layout zones relative to each other ────────────────────────────
+  // ── Pass 2: layout tier boxes within each platform ─────────────────────────
 
-  const zoneG = new dagre.graphlib.Graph();
-  zoneG.setDefaultEdgeLabel(() => ({}));
-  zoneG.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
-  const zones = Array.from(zoneMap.keys());
-  zones.forEach((z) => {
-    const zl = zoneLayouts.get(z)!;
-    zoneG.setNode(z, { width: zl.w, height: zl.h });
+  type PlatformLayout = { tiers: Record<string, { rx: number; ry: number }>; w: number; h: number };
+  const platformLayoutMap = new Map<string, PlatformLayout>();
+
+  platformMap.forEach((groupKeys, platform) => {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: "TB", nodesep: 36, ranksep: 48 });
+    groupKeys.forEach((key) => {
+      const gl = groupLayouts.get(key)!;
+      g.setNode(key, { width: gl.w, height: gl.h });
+    });
+    const seenTE = new Set<string>();
+    dataFlows.forEach((f) => {
+      const fc = components.find((c) => c.id === f.from);
+      const tc = components.find((c) => c.id === f.to);
+      if (!fc || !tc) return;
+      const fP = getPlatform(fc), tP = getPlatform(tc);
+      if (fP !== platform || tP !== platform) return;
+      const fKey = `${fP}::${getTier(fc)}`, tKey = `${tP}::${getTier(tc)}`;
+      if (fKey === tKey) return;
+      const ek = `${fKey}→${tKey}`;
+      if (!seenTE.has(ek) && groupKeys.has(fKey) && groupKeys.has(tKey)) {
+        seenTE.add(ek);
+        try { g.setEdge(fKey, tKey); } catch { /* ignore */ }
+      }
+    });
+    dagre.layout(g);
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    groupKeys.forEach((key) => {
+      const pos = g.node(key);
+      if (!pos) return;
+      const gl = groupLayouts.get(key)!;
+      minX = Math.min(minX, pos.x - gl.w / 2); minY = Math.min(minY, pos.y - gl.h / 2);
+      maxX = Math.max(maxX, pos.x + gl.w / 2); maxY = Math.max(maxY, pos.y + gl.h / 2);
+    });
+    if (minX === Infinity) { minX = 0; minY = 0; maxX = 200; maxY = 150; }
+
+    const tiers: Record<string, { rx: number; ry: number }> = {};
+    groupKeys.forEach((key) => {
+      const pos = g.node(key);
+      if (!pos) return;
+      const gl = groupLayouts.get(key)!;
+      tiers[key] = {
+        rx: pos.x - gl.w / 2 - minX + PAD_TIER_H,
+        ry: pos.y - gl.h / 2 - minY + PAD_TIER_TOP,
+      };
+    });
+
+    platformLayoutMap.set(platform, {
+      tiers,
+      w: (maxX - minX) + PAD_TIER_H * 2,
+      h: (maxY - minY) + PAD_TIER_TOP + PAD_TIER_BOT,
+    });
   });
-  const seenZE = new Set<string>();
+
+  // ── Pass 3: layout platform boxes ─────────────────────────────────────────
+
+  const platG = new dagre.graphlib.Graph();
+  platG.setDefaultEdgeLabel(() => ({}));
+  platG.setGraph({ rankdir: "LR", nodesep: 64, ranksep: 88, marginx: 48, marginy: 48 });
+  const platforms = Array.from(platformMap.keys());
+  platforms.forEach((p) => {
+    const pl = platformLayoutMap.get(p)!;
+    platG.setNode(p, { width: pl.w, height: pl.h });
+  });
+  const seenPE = new Set<string>();
   dataFlows.forEach((f) => {
-    const fz = normZone(components.find((c) => c.id === f.from)?.trust_zone || DEFAULT_ZONE);
-    const tz = normZone(components.find((c) => c.id === f.to)?.trust_zone || DEFAULT_ZONE);
-    if (fz !== tz) {
-      const key = `${fz}→${tz}`;
-      if (!seenZE.has(key)) { seenZE.add(key); try { zoneG.setEdge(fz, tz); } catch { /* ignore */ } }
-    }
+    const fc = components.find((c) => c.id === f.from);
+    const tc = components.find((c) => c.id === f.to);
+    if (!fc || !tc) return;
+    const fp = getPlatform(fc), tp = getPlatform(tc);
+    if (fp === tp) return;
+    const ek = `${fp}→${tp}`;
+    if (!seenPE.has(ek)) { seenPE.add(ek); try { platG.setEdge(fp, tp); } catch { /* ignore */ } }
   });
-  dagre.layout(zoneG);
+  dagre.layout(platG);
 
   // ── Assemble React Flow nodes ──────────────────────────────────────────────
 
   const rfNodes: Node[] = [];
 
-  zones.forEach((zone, zi) => {
-    const zl   = zoneLayouts.get(zone)!;
-    const zPos = zoneG.node(zone);
-    if (!zPos) return;
+  platforms.forEach((platform, pi) => {
+    const pl = platformLayoutMap.get(platform)!;
+    const pPos = platG.node(platform);
+    if (!pPos) return;
 
-    const bId = `boundary-${zi}`;
+    const pId = `platform-${pi}`;
     rfNodes.push({
-      id: bId, type: "boundary",
-      position: { x: zPos.x - zl.w / 2, y: zPos.y - zl.h / 2 },
-      style: { width: zl.w, height: zl.h },
-      data: { label: zone },
-      zIndex: -1, draggable: true, selectable: true,
+      id: pId, type: "platform",
+      position: { x: pPos.x - pl.w / 2, y: pPos.y - pl.h / 2 },
+      style: { width: pl.w, height: pl.h },
+      data: { label: platform },
+      zIndex: -2, draggable: true, selectable: true,
     } as Node);
 
-    (zoneMap.get(zone) || []).forEach((c) => {
-      const rl = zl.nodes[c.id];
-      if (!rl) return;
-      const td = threatMap.get(c.id);
+    Array.from(platformMap.get(platform)!).forEach((groupKey, ti) => {
+      const gl = groupLayouts.get(groupKey)!;
+      const tierPos = pl.tiers[groupKey];
+      if (!tierPos) return;
+      const tier = groupKey.split("::")[1];
+
+      const tId = `tier-${pi}-${ti}`;
       rfNodes.push({
-        id: c.id, type: "component",
-        parentId: bId,
+        id: tId, type: "boundary",
+        parentId: pId,
         extent: "parent" as const,
-        position: { x: rl.rx, y: rl.ry },
-        data: {
-          label: c.name,
-          dfdShape: shapeOf[c.id],
-          compType: c.type || "other",
-          isThreatActor: !!(c as any).is_threat_actor,
-          threatActorType: (c as any).threat_actor_type || null,
-          trustZone: zone,
-          criticality: c.criticality || "",
-          threatCount: td?.count ?? 0,
-          maxSeverity: td?.maxSev ?? null,
-        },
-        draggable: true, zIndex: 1,
+        position: { x: tierPos.rx, y: tierPos.ry },
+        style: { width: gl.w, height: gl.h },
+        data: { label: tier },
+        zIndex: -1, draggable: true, selectable: true,
       } as Node);
+
+      (groupMap.get(groupKey) || []).forEach((c) => {
+        const rl = gl.nodes[c.id];
+        if (!rl) return;
+        const td = threatMap.get(c.id);
+        rfNodes.push({
+          id: c.id, type: "component",
+          parentId: tId,
+          extent: "parent" as const,
+          position: { x: rl.rx, y: rl.ry },
+          data: {
+            label: c.name,
+            dfdShape: shapeOf[c.id],
+            compType: c.type || "other",
+            isThreatActor: !!c.is_threat_actor,
+            threatActorType: c.threat_actor_type || null,
+            platform,
+            trustZone: tier,
+            criticality: c.criticality || "",
+            threatCount: td?.count ?? 0,
+            maxSeverity: td?.maxSev ?? null,
+          },
+          draggable: true, zIndex: 1,
+        } as Node);
+      });
     });
   });
 
@@ -501,7 +662,7 @@ function buildGraph(
 
 interface ComponentInput {
   id: string; name: string; type: string; dfd_type?: string;
-  trust_zone: string; criticality: string;
+  platform?: string; trust_zone: string; criticality: string;
   is_threat_actor?: boolean; threat_actor_type?: string;
 }
 interface DataFlowInput {
@@ -588,6 +749,7 @@ function DfdGraphInner({
             style={{ bottom: 12, right: 12, left: "auto", top: "auto" }} />
           <MiniMap
             nodeColor={(n) => {
+              if (n.type === "platform") return "transparent";
               if (n.type === "boundary") return "transparent";
               return (n.data as any)?.isThreatActor ? "#EA4335" : "#4285F4";
             }}
@@ -608,19 +770,26 @@ function DfdLegend() {
   const isDark = theme.palette.mode === "dark";
   const border = isDark ? "#9E9E9E" : "#444";
 
-  const zones = [
+  const platforms = [
+    { label: "Azure",       color: "#0078D4" },
+    { label: "AWS",         color: "#FF9900" },
+    { label: "GCP",         color: "#4285F4" },
+    { label: "Corporate",   color: "#34A853" },
+    { label: "Internet",    color: "#EA4335" },
+    { label: "Third-Party", color: "#9C27B0" },
+  ];
+  const tiers = [
     { label: "Internet",        color: "#EA4335" },
     { label: "DMZ",             color: "#F9AB00" },
-    { label: "Corporate",       color: "#1A73E8" },
-    { label: "Vendor Cloud",    color: "#FF7043" },
-    { label: "Database Tier",   color: "#9C27B0" },
+    { label: "Application Tier", color: "#1A73E8" },
+    { label: "Data Tier",       color: "#9C27B0" },
     { label: "Management Zone", color: "#00897B" },
+    { label: "External",        color: "#EA4335" },
   ];
 
   return (
     <Box sx={{ mt: 1.5, px: 0.5 }}>
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1, alignItems: "center" }}>
-        {/* DFD shapes */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
           <BugReport sx={{ fontSize: 16, color: "#EA4335" }} />
           <Typography variant="caption" sx={{ color: "text.secondary" }}>Threat Actor</Typography>
@@ -637,7 +806,6 @@ function DfdLegend() {
           <Box sx={{ width: 34, height: 14, borderTop: `2px solid ${border}`, borderBottom: `2px solid ${border}`, flexShrink: 0 }} />
           <Typography variant="caption" sx={{ color: "text.secondary" }}>Data Store</Typography>
         </Box>
-        {/* Flows */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
           <Box sx={{ width: 28, height: 2, background: "repeating-linear-gradient(90deg,#EA4335 0,#EA4335 6px,transparent 6px,transparent 9px)", flexShrink: 0 }} />
           <Typography variant="caption" sx={{ color: "text.secondary" }}>Attack Vector</Typography>
@@ -647,9 +815,18 @@ function DfdLegend() {
           <Typography variant="caption" sx={{ color: "text.secondary" }}>Encrypted Flow</Typography>
         </Box>
       </Box>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 0.5 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5, fontWeight: 600 }}>Platforms:</Typography>
+        {platforms.map((p) => (
+          <Box key={p.label} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ width: 12, height: 12, border: `2px solid ${p.color}`, borderRadius: "2px", flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>{p.label}</Typography>
+          </Box>
+        ))}
+      </Box>
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-        <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5 }}>Trust Zones:</Typography>
-        {zones.map((z) => (
+        <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5, fontWeight: 600 }}>Security Tiers:</Typography>
+        {tiers.map((z) => (
           <Box key={z.label} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <Box sx={{ width: 12, height: 12, border: `2px dashed ${z.color}`, borderRadius: "2px", flexShrink: 0 }} />
             <Typography variant="caption" sx={{ color: "text.secondary" }}>{z.label}</Typography>

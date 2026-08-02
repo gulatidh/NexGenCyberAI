@@ -33,7 +33,7 @@ import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 interface Component {
   id: string; name: string; type: string;
-  trust_zone: string; criticality: string; notes?: string;
+  platform?: string; trust_zone: string; criticality: string; notes?: string;
 }
 interface DataFlow { from: string; to: string; protocol: string; data: string; encrypted: boolean; notes?: string; }
 interface EvidenceRef { kind: string; id: string; label?: string }
@@ -111,39 +111,70 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#FF7043", in_progress: "#FBBC04", accepted: "#4285F4",
   compensating_control: "#9C27B0", closed: "#34A853",
 };
-// Security-domain zone palette — matches DfdReactFlow zone colours
+// Level 1 — Platform (where it lives)
+const PLATFORMS = ["Azure", "AWS", "GCP", "Corporate", "Internet", "Third-Party"] as const;
+type Platform = typeof PLATFORMS[number];
+
+const PLATFORM_COLOR: Record<string, string> = {
+  "Azure":       "#0078D4",
+  "AWS":         "#FF9900",
+  "GCP":         "#4285F4",
+  "Corporate":   "#34A853",
+  "Internet":    "#EA4335",
+  "Third-Party": "#9C27B0",
+};
+
+function platformColor(p: string) { return PLATFORM_COLOR[p] ?? "#78909C"; }
+
+function normPlatform(p: string): string {
+  const l = (p || "").toLowerCase().trim();
+  if (!l) return "Corporate";
+  if (/^azure/.test(l)) return "Azure";
+  if (/^aws/.test(l) || l.includes("amazon")) return "AWS";
+  if (/^gcp/.test(l) || l.includes("google")) return "GCP";
+  if (l === "internet" || l === "external") return "Internet";
+  if (l === "third-party" || l === "third party" || l.includes("vendor")) return "Third-Party";
+  return "Corporate";
+}
+
+// Level 2 — Security Tier (within the platform)
 const ZONES = [
-  "Internet", "DMZ", "Corporate Network", "Vendor Cloud", "Database Tier", "Management Zone",
+  "DMZ", "Web Tier", "Application Tier", "Data Tier", "Management Zone", "External",
 ] as const;
 type Zone = typeof ZONES[number];
 
 const ZONE_COLOR: Record<string, string> = {
-  // New security-domain names
-  "Internet":          "#EA4335",
-  "DMZ":               "#F9AB00",
-  "Corporate Network": "#1A73E8",
-  "Vendor Cloud":      "#FF7043",
-  "Database Tier":     "#9C27B0",
-  "Management Zone":   "#00897B",
-  // Legacy network-tier names (stored in older models)
-  "public":      "#EA4335",
-  "dmz":         "#F9AB00",
-  "private":     "#1A73E8",
-  "data-tier":   "#9C27B0",
-  "management":  "#00897B",
+  "DMZ":              "#F9AB00",
+  "Web Tier":         "#FF7043",
+  "Application Tier": "#1A73E8",
+  "Data Tier":        "#9C27B0",
+  "Management Zone":  "#00897B",
+  "External":         "#EA4335",
+  // Legacy zone names
+  "Internet":         "#EA4335",
+  "Corporate Network":"#1A73E8",
+  "Vendor Cloud":     "#FF7043",
+  "Database Tier":    "#9C27B0",
+  "public":           "#F9AB00",
+  "private":          "#1A73E8",
+  "data-tier":        "#9C27B0",
+  "management":       "#00897B",
 };
 
 function zoneColor(z: string) { return ZONE_COLOR[z] ?? "#78909C"; }
 
-// Normalize a stored zone name to the canonical security-domain name
+// Normalize a stored trust_zone to a canonical tier name
 function normZone(z: string): string {
   const l = (z || "").toLowerCase().trim();
-  if (!l || l === "private" || l === "internal" || l === "corporate network") return "Corporate Network";
-  if (l === "internet" || l === "untrusted" || l === "external") return "Internet";
+  if (!l || l === "private" || l === "internal" || l === "corporate network") return "Application Tier";
+  if (l === "internet" || l === "untrusted") return "External";
+  if (l === "external") return "External";
   if (l === "public" || l === "dmz" || l === "perimeter") return "DMZ";
-  if (l === "data-tier" || l === "data tier" || l === "database tier") return "Database Tier";
+  if (l === "web tier" || l === "web") return "Web Tier";
+  if (l === "application tier" || l === "app tier") return "Application Tier";
+  if (l === "data-tier" || l === "data tier" || l === "database tier" || l === "database") return "Data Tier";
   if (l === "management" || l === "management zone") return "Management Zone";
-  if (l === "vendor" || l === "vendor cloud") return "Vendor Cloud";
+  if (l === "vendor" || l === "vendor cloud") return "Application Tier";
   return z;
 }
 
@@ -165,18 +196,19 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Component[]>(() =>
-    components.map((c) => ({ ...c, trust_zone: normZone(c.trust_zone) }))
+    components.map((c) => ({ ...c, platform: normPlatform(c.platform || ""), trust_zone: normZone(c.trust_zone) }))
   );
   const [noteText, setNoteText] = useState(notes || "");
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   // New-component form state
   const [nName, setNName] = useState("");
   const [nType, setNType] = useState("api");
-  const [nZone, setNZone] = useState<Zone>("Corporate Network");
+  const [nPlatform, setNPlatform] = useState<Platform>("Corporate");
+  const [nZone, setNZone] = useState<Zone>("Application Tier");
   const [nCrit, setNCrit] = useState("medium");
 
   React.useEffect(() => {
-    setRows(components.map((c) => ({ ...c, trust_zone: normZone(c.trust_zone) })));
+    setRows(components.map((c) => ({ ...c, platform: normPlatform(c.platform || ""), trust_zone: normZone(c.trust_zone) })));
     setNoteText(notes || "");
   }, [components, notes]);
 
@@ -195,7 +227,7 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
     const newId = `c${Date.now()}`;
     setRows((prev) => [...prev, {
       id: newId, name: nName.trim(), type: nType,
-      trust_zone: nZone, criticality: nCrit, notes: "",
+      platform: nPlatform, trust_zone: nZone, criticality: nCrit, notes: "",
     } as Component]);
     setNName("");
   };
@@ -204,6 +236,7 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
     mutationFn: () => threatModelsApi.remodel(clientId, modelId, {
       components: rows.map((r) => ({
         id: r.id, name: r.name, type: r.type,
+        platform: r.platform || "Corporate",
         trust_zone: r.trust_zone, criticality: r.criticality, notes: r.notes || "",
       })),
       analyst_notes: noteText.trim() || undefined,
@@ -244,10 +277,11 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
         {/* Column headers */}
         <Box sx={{ display: "flex", gap: 1, px: 0.5, mb: 0.5 }}>
           <Typography variant="caption" sx={{ color: "text.disabled", flex: 1, fontSize: 10 }}>COMPONENT</Typography>
-          <Typography variant="caption" sx={{ color: "text.disabled", width: 110, fontSize: 10 }}>TYPE</Typography>
-          <Typography variant="caption" sx={{ color: "text.disabled", width: 158, fontSize: 10 }}>TRUST ZONE</Typography>
-          <Typography variant="caption" sx={{ color: "text.disabled", width: 100, fontSize: 10 }}>CRITICALITY</Typography>
-          <Box sx={{ width: 56 }} />
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 100, fontSize: 10 }}>TYPE</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 120, fontSize: 10 }}>PLATFORM</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 138, fontSize: 10 }}>SECURITY TIER</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 90, fontSize: 10 }}>CRITICALITY</Typography>
+          <Box sx={{ width: 48 }} />
         </Box>
 
         <Box sx={{ maxHeight: 340, overflow: "auto", mb: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
@@ -271,13 +305,32 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
                 </Tooltip>
 
                 {/* Type */}
-                <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 110 }}
+                <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 100 }}
                   onChange={(e) => updateRow(r.id, "type", e.target.value)}>
                   {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
                 </Select>
 
-                {/* Trust Zone */}
-                <Select size="small" value={normZone(r.trust_zone)} sx={{ ...selectSx, width: 158 }}
+                {/* Platform */}
+                <Select size="small" value={normPlatform(r.platform || "")} sx={{ ...selectSx, width: 120 }}
+                  onChange={(e) => updateRow(r.id, "platform", e.target.value)}
+                  renderValue={(v) => (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: platformColor(v), flexShrink: 0 }} />
+                      <Typography sx={{ fontSize: 11, color: platformColor(v), fontWeight: 700, lineHeight: 1 }}>{v}</Typography>
+                    </Box>
+                  )}>
+                  {PLATFORMS.map((p) => (
+                    <MenuItem key={p} value={p} sx={{ fontSize: 11 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ width: 10, height: 10, borderRadius: "2px", bgcolor: platformColor(p), flexShrink: 0 }} />
+                        {p}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+
+                {/* Security Tier */}
+                <Select size="small" value={normZone(r.trust_zone)} sx={{ ...selectSx, width: 138 }}
                   onChange={(e) => updateRow(r.id, "trust_zone", e.target.value)}
                   renderValue={(v) => (
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -296,7 +349,7 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
                 </Select>
 
                 {/* Criticality */}
-                <Select size="small" value={r.criticality || "medium"} sx={{ ...selectSx, width: 100 }}
+                <Select size="small" value={r.criticality || "medium"} sx={{ ...selectSx, width: 90 }}
                   onChange={(e) => updateRow(r.id, "criticality", e.target.value)}
                   renderValue={(v) => (
                     <Typography sx={{ fontSize: 11, color: CRIT_COLOR[v] ?? "text.secondary", fontWeight: 600 }}>{v}</Typography>
@@ -352,10 +405,20 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
             onChange={(e) => setNName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addRow()}
             sx={{ minWidth: 180, flex: 1, "& .MuiInputBase-root": { fontSize: 12, height: 30 } }} />
-          <Select size="small" value={nType} onChange={(e) => setNType(e.target.value)} sx={{ ...selectSx, width: 110 }}>
+          <Select size="small" value={nType} onChange={(e) => setNType(e.target.value)} sx={{ ...selectSx, width: 100 }}>
             {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
           </Select>
-          <Select size="small" value={nZone} onChange={(e) => setNZone(e.target.value as Zone)} sx={{ ...selectSx, width: 158 }}>
+          <Select size="small" value={nPlatform} onChange={(e) => setNPlatform(e.target.value as Platform)} sx={{ ...selectSx, width: 120 }}>
+            {PLATFORMS.map((p) => (
+              <MenuItem key={p} value={p} sx={{ fontSize: 11 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: platformColor(p) }} />
+                  {p}
+                </Box>
+              </MenuItem>
+            ))}
+          </Select>
+          <Select size="small" value={nZone} onChange={(e) => setNZone(e.target.value as Zone)} sx={{ ...selectSx, width: 138 }}>
             {ZONES.map((z) => (
               <MenuItem key={z} value={z} sx={{ fontSize: 11 }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
