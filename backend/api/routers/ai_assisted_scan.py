@@ -114,16 +114,21 @@ The "Available Environment" section below lists EVERY connector configured for t
 ## Conversation Phases (follow in order)
 1. INTENT — Understand what the user wants to assess (cloud environment, web app, network, code repo, container, etc.)
 2. CONNECTOR — Suggest the best matching connector from those available in the environment. Explain in one sentence what it will scan. Confirm with user.
-3. TARGET — Collect the specific target details required for that connector type:
-   - azure/aws/gcp: subscription/account ID or region scope (optional for configured cloud connectors — default scans full environment)
-   - web/burp_enterprise/invicti/acunetix/nuclei: target URL(s)
-   - nmap/openvas/sslyze: IP address, CIDR range, or hostname
-   - semgrep/codeql/ai_code_review: repository URL (GitHub/GitLab/Azure DevOps)
-   - trivy: container image name (e.g. nginx:latest)
-   - gitleaks/trufflehog: repository URL
-   - tenable/rapid7/qualys/snyk: target scope or project name
-   - checkov: repository URL or IaC directory
-   - sonarqube: project key in SonarQube
+3. TARGET — Before asking for a target, check the Asset inventory in the Available Environment section:
+   a. If the user already named a target (URL, hostname, IP, VM name, repo, image) → search the asset inventory for a match:
+      - Match found: "I can see '[asset name]' is already in your asset inventory, last scanned via '[connector]'. Do you want to re-scan it with the same connector, or use a different one?"
+        Offer option 1: existing connector, option 2: alternate connector of same category (if configured), option 3: add new connector.
+      - No match: proceed to collect target details normally.
+   b. For cloud connectors (azure/aws/gcp): target is optional — default scans the full environment.
+   c. Required target formats per connector type:
+      - web/burp_enterprise/invicti/acunetix/nuclei: target URL(s)
+      - nmap/openvas/sslyze: IP address, CIDR range, or hostname
+      - semgrep/codeql/ai_code_review: repository URL (GitHub/GitLab/Azure DevOps)
+      - trivy: container image name (e.g. nginx:latest)
+      - gitleaks/trufflehog: repository URL
+      - tenable/rapid7/qualys/snyk: target scope or project name
+      - checkov: repository URL or IaC directory
+      - sonarqube: project key in SonarQube
 4. FRAMEWORK (optional) — Ask if they want compliance scoring against a framework (CIS Azure, NIST CSF, ISO 27001, etc.) or "None / skip".
 5. CONFIRM — Summarise: connector, target, framework. Ask "Shall I launch the scan?"
 
@@ -254,17 +259,84 @@ def _build_env_profile(db: Session, client_id: str) -> str:
             total = summary.get("total", "?")
             lines.append(f"  - '{s.name}' ({dt}) status={s.status.value if hasattr(s.status,'value') else s.status} findings={total}")
 
-    # Asset + finding counts
+    # Asset inventory — grouped by class, each entry shows asset name + connector source
     try:
-        from api.models.models import Asset
-        asset_count = db.query(Asset).filter(Asset.client_id == client_id).count()
-        open_findings = db.query(Finding).join(Scan, Finding.scan_id == Scan.id).filter(
-            Scan.client_id == client_id,
-            Finding.status == "open",
-        ).count()
-        lines.append(f"### Environment size: {asset_count} assets, {open_findings} open findings")
-    except Exception:
-        pass
+        from api.models.models import Asset as AssetModel
+
+        # Build connector_id → (name, type) lookup from already-queried connectors
+        conn_map = {}
+        for c in connectors:
+            ct = c.connector_type.value if hasattr(c.connector_type, "value") else str(c.connector_type)
+            conn_map[c.id] = (c.name, ct)
+
+        # Fetch assets (cap at 150 most recent to stay compact)
+        assets = (
+            db.query(AssetModel)
+            .filter(AssetModel.client_id == client_id)
+            .order_by(AssetModel.last_synced_at.desc())
+            .limit(150)
+            .all()
+        )
+
+        # Friendly class labels
+        _CLASS_LABEL = {
+            "vm":       "VMs / Compute",
+            "storage":  "Storage",
+            "network":  "Network",
+            "database": "Databases",
+            "identity": "Identity / IAM",
+            "keyvault": "Key Vaults / Secrets",
+            "other":    "Other cloud resources",
+        }
+        _WEB_CLASSES  = {"url", "web", "webapp", "application"}
+        _CODE_CLASSES = {"repo", "repository", "code", "codebase"}
+        _CONT_CLASSES = {"container", "image", "docker"}
+
+        by_class: Dict[str, list] = {}
+        for a in assets:
+            ac = (a.asset_class or "other").lower()
+            if ac in _WEB_CLASSES:
+                bucket = "Web apps / URLs"
+            elif ac in _CODE_CLASSES:
+                bucket = "Code repositories"
+            elif ac in _CONT_CLASSES:
+                bucket = "Container images"
+            else:
+                bucket = _CLASS_LABEL.get(ac, f"{ac}")
+            by_class.setdefault(bucket, []).append(a)
+
+        if assets:
+            open_findings = db.query(Finding).join(Scan, Finding.scan_id == Scan.id).filter(
+                Scan.client_id == client_id, Finding.status == "open",
+            ).count()
+            lines.append(
+                f"\n### Asset inventory ({len(assets)} assets, {open_findings} open findings"
+                " — use this to match user-described targets):"
+            )
+            for bucket, items in by_class.items():
+                shown = items[:12]
+                asset_strs = []
+                for a in shown:
+                    cname, ctype = conn_map.get(a.connector_id, ("unknown connector", "?"))
+                    synced = a.last_synced_at.strftime("%Y-%m-%d") if a.last_synced_at else "?"
+                    asset_strs.append(f"'{a.name}' [via '{cname}' ({ctype}), last seen {synced}]")
+                overflow = f" (+{len(items)-12} more)" if len(items) > 12 else ""
+                lines.append(f"  {bucket}: {', '.join(asset_strs)}{overflow}")
+
+            lines.append(
+                "\nTARGET MATCHING RULE: When the user describes a scan target (hostname, URL, IP, "
+                "repo name, image, VM name), scan the asset list above:"
+                "\n  • If a matching asset is found → tell the user it already exists: "
+                "\"I can see '[name]' is already in your asset inventory, last scanned via '[connector]'. "
+                "Would you like to re-scan it with the same connector, or configure an alternate scanner?\""
+                "\n  • Always offer: (1) existing connector that discovered it, (2) an alternate connector "
+                "of the same category if one is configured, (3) add a new connector if nothing suitable exists."
+                "\n  • If no matching asset is found → proceed normally with target collection."
+            )
+        else:
+            lines.append("\n### Asset inventory: empty (no assets discovered yet — run a scan first to populate)")
+    except Exception as _ae:
+        logger.debug("asset map build failed: %s", _ae)
 
     return "\n".join(lines) if lines else "No environment data available yet."
 
