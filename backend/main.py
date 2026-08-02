@@ -628,6 +628,20 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.is_live ALTER failed: %s", exc)
 
+        # Fix scans with invalid scan_type values (e.g. connector type accidentally stored as scan_type).
+        # This is a one-time data correction that is idempotent: UPDATE changes 0 rows when all values are valid.
+        try:
+            from api.models.models import ScanType as _ST
+            _valid_scan_types = ",".join(f"'{v.value}'" for v in _ST)
+            with engine.begin() as conn:
+                result = conn.execute(text(
+                    f"UPDATE scans SET scan_type = 'vulnerability' WHERE scan_type NOT IN ({_valid_scan_types})"
+                ))
+                if result.rowcount > 0:
+                    logger.warning("Fixed %d scan(s) with invalid scan_type value(s)", result.rowcount)
+        except Exception as exc:
+            logger.warning("scan_type data correction failed: %s", exc)
+
         # custom_framework_controls — reference_id, sort_order, domain (added for MAS TRM policy mapping)
         try:
             cfc_cols = {c["name"] for c in inspector.get_columns("custom_framework_controls")}
