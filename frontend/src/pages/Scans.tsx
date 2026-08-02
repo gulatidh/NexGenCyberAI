@@ -72,6 +72,8 @@ const SCANNERS: ScannerDef[] = [
     description: "Open-source static analysis with curated rule packs. Runs in GitHub Actions via semgrep/semgrep image." },
   { id: "codeql", name: "GitHub CodeQL", connectorType: "codeql", category: "sast", status: "live",
     description: "GitHub's semantic code analysis. Auto-detects language; runs the security-and-quality query suite in GitHub Actions." },
+  { id: "checkov", name: "Checkov", connectorType: "checkov", category: "sast", status: "live",
+    description: "IaC security scanner for Terraform, CloudFormation, Kubernetes, Helm, and Dockerfile. Finds misconfigurations before resources are deployed. Runs in GitHub Actions." },
   { id: "ai_code_review", name: "AI Code Review", connectorType: "ai_code_review", category: "sast", status: "live",
     description: "LLM-powered vulnerability discovery — triage, per-function analysis, self-critique, and cross-file taint tracing. Runs fully in-process; no GitHub Actions required." },
   { id: "sonarqube", name: "SonarQube", connectorType: "sonarqube", category: "sast", status: "soon",
@@ -79,6 +81,10 @@ const SCANNERS: ScannerDef[] = [
   // Network
   { id: "nmap", name: "NMAP", connectorType: "nmap", category: "network", status: "live",
     description: "Service / port discovery on hosts or CIDR ranges with NSE safe + vuln scripts. Runs in GitHub Actions." },
+  { id: "nuclei", name: "Nuclei", connectorType: "nuclei", category: "network", status: "live",
+    description: "Template-based vulnerability scanner with 9,000+ PoC templates covering CVEs, default credentials, misconfigurations, and exposed panels. Every finding is confirmed. Runs in GitHub Actions." },
+  { id: "sslyze", name: "SSLyze", connectorType: "sslyze", category: "network", status: "live",
+    description: "TLS/SSL configuration auditor — detects deprecated protocols (SSL 2/3, TLS 1.0/1.1), weak ciphers, expired certs, Heartbleed, and ROBOT. Runs in GitHub Actions." },
   { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "soon",
     description: "Open-source network vulnerability scanner. Workflow coming soon." },
   { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
@@ -111,7 +117,8 @@ const CATEGORY_ORDER: ScanCategory[] = ["cloud", "dast", "sast", "network", "dep
 
 // Scanner groups for the top-level accordion sections
 const PLATFORM_SCANNER_TYPES = new Set([
-  "web", "nmap", "openvas", "trivy", "semgrep", "codeql", "sonarqube",
+  "web", "nmap", "nuclei", "sslyze", "openvas", "trivy",
+  "semgrep", "codeql", "checkov", "sonarqube",
   "owasp_dc", "gitleaks", "trufflehog", "ai_code_review",
 ]);
 const ENTERPRISE_SCANNER_TYPES = new Set([
