@@ -631,16 +631,63 @@ async def delete_scan(
     scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
-    # Clean up polymorphic comments that reference findings from this scan
-    # (no DB FK — must be purged explicitly before the finding rows vanish)
-    from api.models.models import Comment, Finding as F
-    finding_ids = [f.id for f in db.query(F.id).filter(F.scan_id == scan_id).all()]
+
+    from api.models.models import (
+        Comment, Finding as F, AgentRun, FrameworkAssessment, ScanBlackboardEntry,
+        ThreatEntry, ControlDeficiency, RemediationAction, RemediationJob,
+    )
+
+    # Collect IDs needed for cascades
+    finding_ids = [r.id for r in db.query(F.id).filter(F.scan_id == scan_id).all()]
+    agent_run_ids = [r.id for r in db.query(AgentRun.id).filter(AgentRun.scan_id == scan_id).all()]
+
+    # Polymorphic comments on findings (string entity_id — no real FK)
     if finding_ids:
         db.query(Comment).filter(
             Comment.entity_type == "finding",
             Comment.entity_id.in_(finding_ids),
         ).delete(synchronize_session=False)
-    db.delete(scan)  # ORM cascade removes findings + agent runs
+
+    # NULL out agent_run_id FKs before deleting agent_runs
+    if agent_run_ids:
+        for model in (ThreatEntry, ControlDeficiency, RemediationAction):
+            db.query(model).filter(
+                model.agent_run_id.in_(agent_run_ids)
+            ).update({"agent_run_id": None}, synchronize_session=False)
+        db.query(ScanBlackboardEntry).filter(
+            ScanBlackboardEntry.agent_run_id.in_(agent_run_ids)
+        ).update({"agent_run_id": None}, synchronize_session=False)
+
+    # Delete scan_blackboard (scan_id is NOT NULL — must delete before scan)
+    db.query(ScanBlackboardEntry).filter(
+        ScanBlackboardEntry.scan_id == scan_id
+    ).delete(synchronize_session=False)
+
+    # Delete agent_runs for this scan
+    db.query(AgentRun).filter(AgentRun.scan_id == scan_id).delete(synchronize_session=False)
+
+    # NULL out scan_id on register/assessment tables (keep the records)
+    db.query(FrameworkAssessment).filter(
+        FrameworkAssessment.scan_id == scan_id
+    ).update({"scan_id": None}, synchronize_session=False)
+    for model in (ThreatEntry, ControlDeficiency, RemediationAction):
+        db.query(model).filter(model.scan_id == scan_id).update(
+            {"scan_id": None}, synchronize_session=False
+        )
+    db.query(RemediationJob).filter(RemediationJob.scan_id == scan_id).update(
+        {"scan_id": None}, synchronize_session=False
+    )
+    db.query(RemediationJob).filter(RemediationJob.verification_scan_id == scan_id).update(
+        {"verification_scan_id": None}, synchronize_session=False
+    )
+
+    # Unlink child scans from this parent (self-referential FK)
+    db.query(Scan).filter(Scan.parent_scan_id == scan_id).update(
+        {"parent_scan_id": None}, synchronize_session=False
+    )
+
+    # Delete scan — ORM cascade handles findings via relationship
+    db.delete(scan)
     db.commit()
 
 
