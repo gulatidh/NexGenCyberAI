@@ -306,7 +306,7 @@ async def ai_scan_chat(
         logger.warning("ai_scan_chat: env profile build failed: %s", exc)
         env_profile = "No environment data available yet."
 
-    system = _SYSTEM_PROMPT.format(env_profile=env_profile)
+    system = _SYSTEM_PROMPT.replace("{env_profile}", env_profile)
 
     history = [{"role": m.role, "content": m.content} for m in payload.history]
     history.append({"role": "user", "content": payload.message})
