@@ -539,6 +539,9 @@ def _ensure_added_columns() -> None:
             ("acceptance_justification","NVARCHAR(MAX) NULL",  "TEXT"),
             ("accepted_by",            "NVARCHAR(200) NULL",  "VARCHAR(200)"),
             ("acceptance_expires_at",  "DATETIME2 NULL",      "TIMESTAMP"),
+            ("cve_ids",                "NVARCHAR(MAX) NULL",  "TEXT"),
+            ("cvss_vector",            "NVARCHAR(100) NULL",  "VARCHAR(100)"),
+            ("enrichment_source",      "NVARCHAR(20) NULL",   "VARCHAR(20)"),
         ]
         for col, mssql_type, sqlite_type in _finding_additions:
             if finding_cols and col not in finding_cols:

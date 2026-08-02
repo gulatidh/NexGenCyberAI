@@ -329,7 +329,10 @@ class Finding(Base):
     remediation = Column(Text)
     evidence = Column(JSON, default={})
     cve_id = Column(String(50))
+    cve_ids = Column(Text, nullable=True)          # JSON array of all CVEs e.g. '["CVE-2021-44228","CVE-2021-45046"]'
     cvss_score = Column(Float)
+    cvss_vector = Column(String(100), nullable=True)   # CVSS v3.1 vector string e.g. "AV:N/AC:L/PR:N/..."
+    enrichment_source = Column(String(20), nullable=True)  # "llm" | "kb" | "scanner" | "llm_low"
     control_mappings = Column(JSON, default={})  # {framework_value: [control_ids]} — fans this finding out across frameworks
     assignee_email = Column(String(200), nullable=True)
     due_date = Column(String(32), nullable=True)          # ISO date string e.g. "2026-09-30"

@@ -848,10 +848,21 @@ export default function Findings() {
                           })()}
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>
-                        {f.cve_id || "—"}
+                      <TableCell sx={{ fontSize: 12 }}>
+                        {(() => {
+                          let ids: string[] = [];
+                          try { if (f.cve_ids) ids = JSON.parse(f.cve_ids); } catch {}
+                          if (ids.length === 0 && f.cve_id) ids = [f.cve_id];
+                          if (ids.length === 0) return <span style={{ color: "rgba(128,128,128,0.5)" }}>—</span>;
+                          return (
+                            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                              <span style={{ color: "#4285F4" }}>{ids[0]}</span>
+                              {ids.length > 1 && <span style={{ color: "rgba(128,128,128,0.7)", fontSize: 11 }}>+{ids.length - 1}</span>}
+                            </Box>
+                          );
+                        })()}
                       </TableCell>
-                      <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)", fontSize: 12 }}>
+                      <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "inherit") : "rgba(128,128,128,0.5)", fontSize: 12, fontWeight: f.cvss_score != null ? 600 : 400 }}>
                         {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary", fontSize: 12, maxWidth: 160 }}>
@@ -1051,11 +1062,45 @@ export default function Findings() {
                 {selected.description && (
                   <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>{selected.description}</Typography>
                 )}
-                <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2 }}>
-                  {selected.cve_id && <Chip label={selected.cve_id} size="small" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4" }} />}
-                  {selected.cvss_score != null && <Chip label={`CVSS ${selected.cvss_score.toFixed(1)}`} size="small" sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary" }} />}
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+                  {/* CVE chips — show all CVEs from enrichment, fall back to single cve_id */}
+                  {(() => {
+                    const ids: string[] = [];
+                    try {
+                      if (selected.cve_ids) ids.push(...JSON.parse(selected.cve_ids));
+                    } catch {}
+                    if (ids.length === 0 && selected.cve_id) ids.push(selected.cve_id);
+                    return ids.map((cve) => (
+                      <Chip key={cve} label={cve} size="small"
+                        sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontWeight: 600, fontSize: 11 }} />
+                    ));
+                  })()}
+                  {/* CVSS score chip — colour-coded by severity */}
+                  {selected.cvss_score != null && (
+                    <Chip
+                      label={`CVSS ${selected.cvss_score.toFixed(1)}`}
+                      size="small"
+                      sx={{
+                        bgcolor: selected.cvss_score >= 9 ? "rgba(244,67,54,0.15)"
+                          : selected.cvss_score >= 7 ? "rgba(255,152,0,0.15)"
+                          : selected.cvss_score >= 4 ? "rgba(255,235,59,0.15)"
+                          : "rgba(255,255,255,0.08)",
+                        color: selected.cvss_score >= 9 ? "#f44336"
+                          : selected.cvss_score >= 7 ? "#ff9800"
+                          : selected.cvss_score >= 4 ? "#fdd835"
+                          : "text.secondary",
+                        fontWeight: 700,
+                      }}
+                    />
+                  )}
                   {selected.control_id && <Chip label={selected.control_id} size="small" sx={{ bgcolor: "rgba(124,77,255,0.2)", color: "#34A853" }} />}
                 </Box>
+                {/* CVSS vector string */}
+                {selected.cvss_vector && (
+                  <Typography variant="caption" sx={{ fontFamily: "monospace", color: "text.secondary", display: "block", mb: 1.5, letterSpacing: 0 }}>
+                    {selected.cvss_vector}
+                  </Typography>
+                )}
                 {selected.resource_id && (
                   <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                     {selected.resource_type === "code_file" ? "File" : selected.resource_type === "host" || selected.resource_type === "ip" ? "Host" : "Resource"}: {selected.resource_id}

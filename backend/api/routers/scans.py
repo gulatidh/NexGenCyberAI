@@ -404,7 +404,18 @@ async def _execute_scan(
                 import logging as _lg
                 _lg.getLogger(__name__).debug("raw_context collection failed (non-fatal): %s", _rc_exc)
 
-        # Phase 9 — auto re-model: if this client has threat models with
+        # Phase 9 — CVE/CVSS enrichment: LLM fills in missing CVE IDs, CVSS
+        # scores and vectors using its own training knowledge. Runs in the
+        # background — non-fatal, never blocks scan completion.
+        try:
+            from services.cve_enrichment import enrich_scan_findings
+            import asyncio as _aio
+            _aio.ensure_future(enrich_scan_findings(scan_id, db, scan.client_id))
+        except Exception as _enr_exc:
+            import logging as _lg
+            _lg.getLogger(__name__).debug("CVE enrichment trigger failed (non-fatal): %s", _enr_exc)
+
+        # Phase 10 — auto re-model: if this client has threat models with
         # auto_remodel=True, queue a re-generation now that scan data is fresh.
         try:
             from api.models.models import ThreatModel as _TM

@@ -111,7 +111,10 @@ export interface Finding {
   status: string;
   remediation?: string;
   cve_id?: string;
+  cve_ids?: string;           // JSON array string e.g. '["CVE-2021-44228"]'
   cvss_score?: number;
+  cvss_vector?: string;       // CVSS v3.1 vector e.g. "AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+  enrichment_source?: string; // "llm" | "kb" | "scanner" | "llm_low"
   created_at?: string;
   seen_count?: number;
   first_seen_at?: string;
