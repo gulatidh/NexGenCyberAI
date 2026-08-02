@@ -182,6 +182,7 @@ function ProtectedApp() {
           <Route index element={<Navigate to="ctem" replace />} />
           <Route path="ctem" element={<CTEMPage />} />
           <Route path="remediation" element={<RemediationTracker />} />
+          <Route path="remediation-jobs" element={<RemediationJobs />} />
         </Route>
 
         <Route path="/ai-advisor" element={<ProductLayout product={AI_ADVISOR} />}>
@@ -219,7 +220,7 @@ function ProtectedApp() {
           <Route path="/risk-overview" element={<RiskOverviewPage />} />
           <Route path="/threat-register" element={<ThreatRegister />} />
           <Route path="/control-deficiencies" element={<ControlDeficiencies />} />
-          <Route path="/remediation-tracker" element={<RemediationTracker />} />
+          <Route path="/remediation-tracker" element={<Navigate to="/governance/remediation" replace />} />
           <Route path="/custom-frameworks" element={<CustomFrameworks />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:clientId" element={<ClientDetail />} />
@@ -263,7 +264,7 @@ function ProtectedApp() {
           <Route path="/posture-trends" element={<PostureTrends />} />
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
           <Route path="/client-comparison" element={<ClientComparison />} />
-          <Route path="/remediation-jobs" element={<RemediationJobs />} />
+          <Route path="/remediation-jobs" element={<Navigate to="/governance/remediation-jobs" replace />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>

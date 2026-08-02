@@ -83,9 +83,9 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Compliance",
     items: [
       { label: "Compliance Gaps", icon: <GppBad />,          path: "/control-deficiencies" },
-      { label: "Remediation",     icon: <PlaylistAddCheck />, path: "/remediation-tracker" },
-      { label: "AI Remediations", icon: <AutoFixHigh />,      path: "/remediation-jobs" },
-      { label: "CTEM Programs",   icon: <Radar />,            path: "/ctem" },
+      { label: "Remediation",     icon: <PlaylistAddCheck />, path: "/governance/remediation" },
+      { label: "AI Remediations", icon: <AutoFixHigh />,      path: "/governance/remediation-jobs" },
+      { label: "CTEM Programs",   icon: <Radar />,            path: "/governance/ctem" },
     ],
   },
   {

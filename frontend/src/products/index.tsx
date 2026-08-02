@@ -9,7 +9,7 @@ import {
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
-  Devices, HelpOutlined,
+  Devices, HelpOutlined, AutoFixHigh,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -91,6 +91,7 @@ export const GOVERNANCE: ProductDef = {
   nav: [
     { label: "CTEM Programs", icon: <AccountTree />, path: "/ctem" },
     { label: "Remediation Tracker", icon: <PlaylistAddCheck />, path: "/remediation" },
+    { label: "AI Remediations", icon: <AutoFixHigh />, path: "/remediation-jobs" },
   ],
 };
 
