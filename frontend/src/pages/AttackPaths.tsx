@@ -1,11 +1,24 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
 import { useQuery } from "@tanstack/react-query";
 import {
   Box, Typography, Chip, CircularProgress, Alert, Card, CardContent,
   FormControl, InputLabel, Select, MenuItem,
 } from "@mui/material";
-import { AccountTree } from "@mui/icons-material";
+import {
+  AccountTree, VpnKey, Security, SyncAlt,
+  Storage, Loop, BugReport, GppBad, Dns, Public, Warning,
+} from "@mui/icons-material";
+import {
+  ReactFlow, Background, Controls, MiniMap,
+  useNodesState, useEdgesState,
+  MarkerType, Handle, Position,
+  BaseEdge, EdgeLabelRenderer, getBezierPath,
+  ReactFlowProvider,
+  type Node, type Edge, type NodeTypes, type EdgeTypes,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import * as dagreLib from "@dagrejs/dagre";
 import { attackPathApi, scansApi, projectsApi } from "../services/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -39,296 +52,325 @@ interface AttackPathData {
   stats: { total_findings: number; critical: number; phases_present: string[] };
 }
 
-// ── Card dimensions ───────────────────────────────────────────────────────────
-
-const CARD_W = 150;
-const CARD_HEADER_H = 48;
-const CARD_SUB_H = 24;
-const CARD_H = CARD_HEADER_H + CARD_SUB_H;
-const COL_W = 200;
-const ROW_GAP = 24;
-const PAD_X = 48;
-const PAD_Y = 72; // room for column header labels
-
-// ── Column assignment — maps node type → column index ────────────────────────
-
-const COLUMN_MAP: Record<string, number> = {
-  attacker: 0,
-  initial_access: 1,
-  vulnerability: 1,
-  credential_access: 2,
-  privilege_escalation: 2,
-  lateral_movement: 2,
-  data_access: 3,
-  persistence: 3,
-  impact: 3,
-  resource: 4,
-};
-
-const COL_HEADERS: Record<number, string> = {
-  0: "Scope",
-  1: "Initial Access",
-  2: "Lateral Movement",
-  3: "Impact / Exfil",
-  4: "Affected Assets",
-};
-
-// ── Colors by node type ───────────────────────────────────────────────────────
-
-const TYPE_COLOR: Record<string, string> = {
-  attacker: "#4285F4",
-  initial_access: "#EA4335",
-  vulnerability: "#E53935",
-  credential_access: "#AD1457",
-  privilege_escalation: "#6A1B9A",
-  lateral_movement: "#E64A19",
-  data_access: "#EF6C00",
-  persistence: "#4E342E",
-  impact: "#B71C1C",
-  resource: "#00838F",
-};
+// ── Visual config ─────────────────────────────────────────────────────────────
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#EA4335",
-  high: "#FF7043",
-  medium: "#FBBC04",
-  low: "#34A853",
+  high:     "#FF7043",
+  medium:   "#FBBC04",
+  low:      "#34A853",
+  info:     "#78909C",
 };
 
-function nodeColor(node: AttackNode): string {
-  if (node.type === "resource") return "#00838F";
-  if (node.severity && SEV_COLOR[node.severity.toLowerCase()]) {
-    return SEV_COLOR[node.severity.toLowerCase()];
-  }
-  return TYPE_COLOR[node.type] || "#607D8B";
+const TYPE_CFG: Record<string, { color: string; icon: React.ReactNode }> = {
+  attacker:             { color: "#2E7D32", icon: <Public     sx={{ fontSize: 26, color: "#fff" }} /> },
+  initial_access:       { color: "#C62828", icon: <Warning    sx={{ fontSize: 26, color: "#fff" }} /> },
+  vulnerability:        { color: "#B71C1C", icon: <BugReport  sx={{ fontSize: 26, color: "#fff" }} /> },
+  credential_access:    { color: "#AD1457", icon: <VpnKey     sx={{ fontSize: 26, color: "#fff" }} /> },
+  privilege_escalation: { color: "#6A1B9A", icon: <Security   sx={{ fontSize: 26, color: "#fff" }} /> },
+  lateral_movement:     { color: "#E64A19", icon: <SyncAlt    sx={{ fontSize: 26, color: "#fff" }} /> },
+  data_access:          { color: "#00695C", icon: <Storage    sx={{ fontSize: 26, color: "#fff" }} /> },
+  persistence:          { color: "#4E342E", icon: <Loop       sx={{ fontSize: 26, color: "#fff" }} /> },
+  impact:               { color: "#B71C1C", icon: <GppBad     sx={{ fontSize: 26, color: "#fff" }} /> },
+  resource:             { color: "#0277BD", icon: <Dns        sx={{ fontSize: 26, color: "#fff" }} /> },
+};
+
+const FALLBACK_CFG = { color: "#607D8B", icon: <BugReport sx={{ fontSize: 26, color: "#fff" }} /> };
+
+const NODE_D = 88; // circle diameter
+
+// ── Dagre layout (LR) ─────────────────────────────────────────────────────────
+
+function layoutGraph(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+  // @dagrejs/dagre exports as a module with graphlib inside
+  const dagre: any = (dagreLib as any).default ?? dagreLib;
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "LR", nodesep: 90, ranksep: 170, marginx: 60, marginy: 60 });
+
+  nodes.forEach((n) => g.setNode(n.id, { width: NODE_D + 40, height: NODE_D + 56 }));
+  edges.forEach((e) => g.setEdge(e.source, e.target));
+  dagre.layout(g);
+
+  return {
+    nodes: nodes.map((n) => {
+      const { x, y } = g.node(n.id);
+      return { ...n, position: { x: x - (NODE_D + 40) / 2, y: y - (NODE_D + 56) / 2 } };
+    }),
+    edges,
+  };
 }
 
-// ── Text wrapping helper ──────────────────────────────────────────────────────
+// ── Custom circular node ──────────────────────────────────────────────────────
 
-function wrapText(text: string, maxChars: number): string[] {
-  if (text.length <= maxChars) return [text];
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    if ((cur + " " + w).trim().length > maxChars) {
-      if (cur) lines.push(cur.trim());
-      cur = w;
-    } else {
-      cur = (cur + " " + w).trim();
-    }
-  }
-  if (cur) lines.push(cur.trim());
-  return lines.slice(0, 3); // max 3 lines
-}
-
-// ── Sub-label for card ────────────────────────────────────────────────────────
-
-function subLabel(node: AttackNode): string {
-  if (node.type === "attacker") return "Entry Point";
-  if (node.type === "resource") return node.resource ? node.resource.slice(0, 22) : "Asset";
-  if (node.cvss != null && node.cvss > 0) return `CVSS ${node.cvss.toFixed(1)}`;
-  if (node.severity) return node.severity.toUpperCase();
-  return node.type.replace(/_/g, " ");
-}
-
-// ── Attack card (SVG) ─────────────────────────────────────────────────────────
-
-function AttackCard({
-  x, y, node, isCritPath,
-}: {
-  x: number; y: number; node: AttackNode; isCritPath: boolean;
-}) {
-  const color = nodeColor(node);
-  const cx = x + CARD_W / 2;
-  const lines = wrapText(node.label, 17);
-  const lineH = CARD_HEADER_H / (lines.length + 1);
-  const sub = subLabel(node);
+function CircleNode({ id, data }: { id: string; data: Record<string, any> }) {
+  const cfg = TYPE_CFG[data.attackType as string] ?? FALLBACK_CFG;
+  const sev  = data.severity as string | null;
+  const sevColor = sev ? (SEV_COLOR[sev] ?? cfg.color) : cfg.color;
+  const isCrit   = data.isCritPath as boolean;
+  const collapsed = data.collapsed as boolean;
+  const childCount = (data.childCount as number) ?? 0;
+  const hasChildren = childCount > 0;
+  const onToggle = data.onToggle as ((id: string) => void) | null;
 
   return (
-    <g>
-      {/* Card shadow / outline */}
-      <rect
-        x={x} y={y} width={CARD_W} height={CARD_H}
-        rx={8} fill="#141414"
-        stroke={isCritPath ? "#fff" : "rgba(255,255,255,0.12)"}
-        strokeWidth={isCritPath ? 2 : 1}
-      />
-      {/* Colored header block */}
-      <rect x={x} y={y} width={CARD_W} height={CARD_HEADER_H} rx={8} fill={color} opacity={0.92} />
-      {/* Square off bottom corners of header */}
-      <rect x={x} y={y + CARD_HEADER_H - 8} width={CARD_W} height={8} fill={color} opacity={0.92} />
-      {/* Header text lines */}
-      {lines.map((line, i) => (
-        <text
-          key={i}
-          x={cx}
-          y={y + lineH * (i + 1)}
-          textAnchor="middle"
-          fill="#fff"
-          fontSize={10}
-          fontWeight="700"
-          fontFamily="sans-serif"
-        >
-          {line}
-        </text>
-      ))}
-      {/* Divider */}
-      <line x1={x + 10} y1={y + CARD_HEADER_H} x2={x + CARD_W - 10} y2={y + CARD_HEADER_H}
-        stroke="rgba(255,255,255,0.15)" strokeWidth={1} />
+    <Box
+      onClick={hasChildren && onToggle ? () => onToggle(id) : undefined}
+      sx={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        cursor: hasChildren && onToggle ? "pointer" : "default",
+        userSelect: "none",
+        width: NODE_D + 40,
+      }}
+    >
+      <Handle type="target" position={Position.Left}  style={{ opacity: 0 }} />
+
+      {/* Circle */}
+      <Box sx={{ position: "relative" }}>
+        {/* Critical glow ring */}
+        {isCrit && (
+          <Box sx={{
+            position: "absolute", inset: -7, borderRadius: "50%",
+            border: "3px solid #EA4335",
+            boxShadow: "0 0 18px #EA4335aa",
+            pointerEvents: "none",
+          }} />
+        )}
+        <Box sx={{
+          width: NODE_D, height: NODE_D, borderRadius: "50%",
+          border: `4px solid ${sevColor}`,
+          background: `radial-gradient(circle at 35% 35%, ${cfg.color}dd, ${cfg.color})`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 6px 20px ${cfg.color}44`,
+          position: "relative",
+          transition: "transform 0.15s",
+          "&:hover": hasChildren ? { transform: "scale(1.06)" } : {},
+        }}>
+          {cfg.icon}
+
+          {/* Severity badge */}
+          {sev && data.attackType !== "attacker" && data.attackType !== "resource" && (
+            <Box sx={{
+              position: "absolute", bottom: 3, right: 3,
+              width: 20, height: 20, borderRadius: "50%",
+              bgcolor: sevColor, border: "2px solid #fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Typography sx={{ fontSize: 8, color: "#fff", fontWeight: 700, lineHeight: 1 }}>
+                {(sev[0] ?? "").toUpperCase()}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Collapsed count bubble */}
+        {collapsed && childCount > 0 && (
+          <Box sx={{
+            position: "absolute", top: -6, right: -6,
+            width: 22, height: 22, borderRadius: "50%",
+            bgcolor: "#FF6F00", border: "2px solid #fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 9, color: "#fff", fontWeight: 700,
+          }}>
+            {childCount}
+          </Box>
+        )}
+      </Box>
+
+      {/* Label */}
+      <Typography sx={{
+        mt: 0.75, fontSize: 10.5, fontWeight: 700, textAlign: "center",
+        color: "#1a1a2e", lineHeight: 1.3, maxWidth: NODE_D + 36,
+        overflow: "hidden",
+        display: "-webkit-box",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
+      }}>
+        {data.label as string}
+      </Typography>
+
       {/* Sub-label */}
-      <text
-        x={cx} y={y + CARD_HEADER_H + CARD_SUB_H / 2 + 4}
-        textAnchor="middle"
-        fill="rgba(255,255,255,0.55)"
-        fontSize={9}
-        fontFamily="sans-serif"
-      >
-        {sub.length > 22 ? sub.slice(0, 21) + "…" : sub}
-      </text>
-    </g>
+      <Typography sx={{ fontSize: 9, color: "#777", textAlign: "center", maxWidth: NODE_D + 24 }}>
+        {data.sublabel as string}
+      </Typography>
+
+      {/* Collapse hint */}
+      {hasChildren && (
+        <Typography sx={{ fontSize: 8.5, color: collapsed ? "#FF8F00" : "#9E9E9E", mt: 0.25 }}>
+          {collapsed ? "Click to expand" : "Click to collapse"}
+        </Typography>
+      )}
+
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+    </Box>
   );
 }
 
-// ── Bezier edge ───────────────────────────────────────────────────────────────
+// ── Labeled edge ──────────────────────────────────────────────────────────────
 
-function EdgePath({
-  x1, y1, x2, y2, isCrit,
-}: {
-  x1: number; y1: number; x2: number; y2: number; isCrit: boolean;
-}) {
-  const mx = (x1 + x2) / 2;
+function LabeledEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
+  const [path, lx, ly] = getBezierPath({ sourceX, sourceY, targetX, targetY });
+  const isCrit  = data?.isCrit as boolean;
+  const stroke  = isCrit ? "#EA4335" : "#F59E0B";
+  const txtColor = isCrit ? "#EA4335" : "#92400E";
+
   return (
-    <path
-      d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-      fill="none"
-      stroke={isCrit ? "#f44336" : "rgba(255,255,255,0.18)"}
-      strokeWidth={isCrit ? 2 : 1}
-      markerEnd={isCrit ? "url(#arr-crit)" : "url(#arr)"}
-    />
+    <>
+      <BaseEdge id={id} path={path} style={{ stroke, strokeWidth: isCrit ? 2.5 : 1.5 }} />
+      {data?.label && (
+        <EdgeLabelRenderer>
+          <Box
+            className="nodrag nopan"
+            sx={{
+              position: "absolute",
+              transform: `translate(-50%,-50%) translate(${lx}px,${ly}px)`,
+              fontSize: 9, fontWeight: 600, color: txtColor,
+              bgcolor: "rgba(255,255,255,0.93)",
+              px: 0.6, py: 0.15, borderRadius: 0.5,
+              border: `1px solid ${stroke}44`,
+              pointerEvents: "none", whiteSpace: "nowrap",
+            }}
+          >
+            {data.label}
+          </Box>
+        </EdgeLabelRenderer>
+      )}
+    </>
   );
 }
 
-// ── Main graph ────────────────────────────────────────────────────────────────
+const NODE_TYPES: NodeTypes = { circle: CircleNode };
+const EDGE_TYPES: EdgeTypes = { labeled: LabeledEdge };
 
-function AttackGraph({ data }: { data: AttackPathData }) {
-  const { nodes, edges, paths } = data;
+// ── Inner graph (must be inside ReactFlowProvider) ────────────────────────────
 
+function AttackGraphInner({ data }: { data: AttackPathData }) {
+  const { nodes: rawNodes, edges: rawEdges, paths } = data;
   const critSet = useMemo(() => new Set<string>(paths[0]?.nodes ?? []), [paths]);
 
-  // Assign column to each node
-  const colOf = (n: AttackNode) => COLUMN_MAP[n.type] ?? 2;
-
-  // Group nodes by column
-  const byCol = useMemo(() => {
-    const map = new Map<number, AttackNode[]>();
-    for (const n of nodes) {
-      const c = colOf(n);
-      if (!map.has(c)) map.set(c, []);
-      map.get(c)!.push(n);
-    }
-    return map;
-  }, [nodes]);
-
-  // Compute positions — centre column vertically within the canvas
-  const positions = useMemo(() => {
-    const pos = new Map<string, { x: number; y: number }>();
-    byCol.forEach((colNodes, ci) => {
-      const startY = PAD_Y;
-      colNodes.forEach((n, ri) => {
-        pos.set(n.id, {
-          x: PAD_X + ci * COL_W,
-          y: startY + ri * (CARD_H + ROW_GAP),
-        });
-      });
+  // Direct children map
+  const childrenOf = useMemo(() => {
+    const m = new Map<string, string[]>();
+    rawEdges.forEach((e) => {
+      if (!m.has(e.source)) m.set(e.source, []);
+      m.get(e.source)!.push(e.target);
     });
-    return pos;
-  }, [byCol]);
+    return m;
+  }, [rawEdges]);
 
-  const usedCols = byCol.size || 1;
-  const maxNodesInCol = Math.max(...Array.from(byCol.values()).map((c) => c.length), 1);
-  const svgW = PAD_X * 2 + (usedCols - 1) * COL_W + CARD_W;
-  const svgH = PAD_Y + maxNodesInCol * (CARD_H + ROW_GAP) + 24;
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Hidden ids = all nodes reachable exclusively through a collapsed node
+  const hiddenIds = useMemo(() => {
+    const hidden = new Set<string>();
+    const queue = Array.from(collapsed);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const c of childrenOf.get(cur) ?? []) {
+        if (!hidden.has(c)) { hidden.add(c); queue.push(c); }
+      }
+    }
+    return hidden;
+  }, [collapsed, childrenOf]);
+
+  // Build React Flow nodes
+  const rfNodes: Node[] = useMemo(() =>
+    rawNodes
+      .filter((n) => !hiddenIds.has(n.id))
+      .map((n) => ({
+        id: n.id,
+        type: "circle",
+        position: { x: 0, y: 0 },
+        data: {
+          label: n.label,
+          attackType: n.type,
+          severity: n.severity?.toLowerCase() ?? null,
+          isCritPath: critSet.has(n.id),
+          collapsed: collapsed.has(n.id),
+          childCount: (childrenOf.get(n.id) ?? []).length,
+          onToggle: childrenOf.has(n.id) ? toggleCollapse : null,
+          sublabel:
+            n.type === "attacker" ? "Entry Point"
+            : n.type === "resource" ? (n.resource ? n.resource.slice(0, 20) : "Asset")
+            : n.cvss ? `CVSS ${(n.cvss as number).toFixed(1)}`
+            : (n.severity ?? n.type).replace(/_/g, " "),
+        },
+        draggable: true,
+      })),
+  [rawNodes, hiddenIds, critSet, collapsed, childrenOf, toggleCollapse]);
+
+  // Build React Flow edges
+  const rfEdges: Edge[] = useMemo(() =>
+    rawEdges
+      .filter((e) => !hiddenIds.has(e.source) && !hiddenIds.has(e.target))
+      .map((e, i) => ({
+        id: `e-${i}`,
+        source: e.source,
+        target: e.target,
+        type: "labeled",
+        data: { label: e.label, isCrit: critSet.has(e.source) && critSet.has(e.target) },
+        markerEnd: { type: MarkerType.ArrowClosed, color: critSet.has(e.source) && critSet.has(e.target) ? "#EA4335" : "#F59E0B" },
+      })),
+  [rawEdges, hiddenIds, critSet]);
+
+  // Apply dagre
+  const { nodes: laidNodes, edges: laidEdges } = useMemo(
+    () => layoutGraph(rfNodes, rfEdges),
+    [rfNodes, rfEdges],
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(laidNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(laidEdges);
+
+  useEffect(() => { setNodes(laidNodes); }, [laidNodes, setNodes]);
+  useEffect(() => { setEdges(laidEdges); }, [laidEdges, setEdges]);
 
   return (
-    <svg
-      width={svgW}
-      height={svgH}
-      style={{ display: "block", minWidth: svgW }}
-      aria-label="Attack path graph"
-    >
-      <defs>
-        <marker id="arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
-          <polygon points="0 0, 7 2.5, 0 5" fill="rgba(255,255,255,0.3)" />
-        </marker>
-        <marker id="arr-crit" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
-          <polygon points="0 0, 7 2.5, 0 5" fill="#f44336" />
-        </marker>
-      </defs>
-
-      {/* Column header labels */}
-      {Array.from(byCol.keys()).map((ci) => (
-        COL_HEADERS[ci] && (
-          <text
-            key={ci}
-            x={PAD_X + ci * COL_W + CARD_W / 2}
-            y={PAD_Y - 18}
-            textAnchor="middle"
-            fill="rgba(255,255,255,0.35)"
-            fontSize={10}
-            fontStyle="italic"
-            fontFamily="sans-serif"
-          >
-            {COL_HEADERS[ci]}
-          </text>
-        )
-      ))}
-
-      {/* Edges (drawn first, behind cards) */}
-      {edges.map((e, i) => {
-        const src = positions.get(e.source);
-        const tgt = positions.get(e.target);
-        if (!src || !tgt) return null;
-        const isCrit = critSet.has(e.source) && critSet.has(e.target);
-        return (
-          <EdgePath
-            key={i}
-            x1={src.x + CARD_W}
-            y1={src.y + CARD_H / 2}
-            x2={tgt.x}
-            y2={tgt.y + CARD_H / 2}
-            isCrit={isCrit}
-          />
-        );
-      })}
-
-      {/* Cards */}
-      {nodes.map((n) => {
-        const pos = positions.get(n.id);
-        if (!pos) return null;
-        return (
-          <AttackCard
-            key={n.id}
-            x={pos.x}
-            y={pos.y}
-            node={n}
-            isCritPath={critSet.has(n.id)}
-          />
-        );
-      })}
-    </svg>
+    <Box sx={{ width: "100%", height: 600, bgcolor: "#FAFAFA", borderRadius: 2, border: "1px solid #e0e0e0", overflow: "hidden" }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
+        fitView
+        fitViewOptions={{ padding: 0.12 }}
+        minZoom={0.2}
+        maxZoom={2.5}
+        proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{ animated: false }}
+      >
+        <Background color="#e8ecf0" gap={28} size={1} />
+        <Controls showInteractive={false} style={{ bottom: 12, right: 12, left: "auto", top: "auto" }} />
+        <MiniMap
+          nodeColor={(n) => (TYPE_CFG[(n.data as any)?.attackType ?? ""] ?? FALLBACK_CFG).color}
+          maskColor="rgba(240,244,248,0.6)"
+          style={{ bottom: 12, left: 12, width: 140, height: 90 }}
+          zoomable pannable
+        />
+      </ReactFlow>
+    </Box>
   );
 }
 
 // ── Legend ────────────────────────────────────────────────────────────────────
 
-const LEGEND = [
-  { color: "#4285F4", label: "Scope / Attacker" },
-  { color: "#EA4335", label: "Initial Access" },
+const LEGEND_ITEMS = [
+  { color: "#2E7D32", label: "Entry Point" },
+  { color: "#C62828", label: "Initial Access" },
   { color: "#AD1457", label: "Credential / Privilege" },
   { color: "#E64A19", label: "Lateral Movement" },
-  { color: "#EF6C00", label: "Data Access / Persistence" },
-  { color: "#00838F", label: "Affected Asset" },
+  { color: "#00695C", label: "Data Access" },
+  { color: "#0277BD", label: "Affected Asset" },
 ];
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -357,33 +399,26 @@ export default function AttackPaths() {
     enabled: !!clientId,
   });
 
-  const isEmpty = !isLoading && !isError && data && data.nodes.length === 0;
-  const hasData = !!data && data.nodes.length > 0;
-
-  const selectSx = {
-    fontSize: 13,
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.3)" },
-    "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#4285F4" },
-  };
+  const isEmpty  = !isLoading && !isError && data && data.nodes.length === 0;
+  const hasData  = !!data && data.nodes.length > 0;
 
   return (
     <Box>
-      {/* Page header */}
+      {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>Attack Paths</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Visualise how an attacker can chain findings into a full compromise path
+            Visualise how an attacker can chain findings into a full compromise. Click nodes to expand/collapse branches.
           </Typography>
         </Box>
 
         {clientId && (
-          <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+          <Box sx={{ display: "flex", gap: 1.5 }}>
             <FormControl size="small" sx={{ minWidth: 190 }}>
               <InputLabel sx={{ fontSize: 13 }}>Scan</InputLabel>
               <Select value={scanId} label="Scan"
-                onChange={(e) => { setScanId(e.target.value); setProjectId(""); }} sx={selectSx}>
+                onChange={(e) => { setScanId(e.target.value); setProjectId(""); }}>
                 <MenuItem value=""><em>All Scans</em></MenuItem>
                 {scans.map((s: any) => (
                   <MenuItem key={s.id} value={s.id} sx={{ fontSize: 13 }}>
@@ -398,7 +433,7 @@ export default function AttackPaths() {
             <FormControl size="small" sx={{ minWidth: 160 }}>
               <InputLabel sx={{ fontSize: 13 }}>Project</InputLabel>
               <Select value={projectId} label="Project"
-                onChange={(e) => { setProjectId(e.target.value); setScanId(""); }} sx={selectSx}>
+                onChange={(e) => { setProjectId(e.target.value); setScanId(""); }}>
                 <MenuItem value=""><em>All Projects</em></MenuItem>
                 {projects.map((p: any) => (
                   <MenuItem key={p.id} value={p.id} sx={{ fontSize: 13 }}>{p.name}</MenuItem>
@@ -413,14 +448,13 @@ export default function AttackPaths() {
 
       {clientId && isLoading && (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-          <CircularProgress sx={{ color: "#4285F4" }} />
+          <CircularProgress />
         </Box>
       )}
 
       {clientId && isError && (
         <Alert severity="error">
-          Failed to load attack paths:{" "}
-          {(error as any)?.response?.data?.detail || (error as Error).message || "Unknown error"}
+          {(error as any)?.response?.data?.detail || (error as Error).message || "Failed to load attack paths"}
         </Alert>
       )}
 
@@ -436,81 +470,80 @@ export default function AttackPaths() {
       {clientId && hasData && (
         <>
           {/* Stats bar */}
-          <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-            <Card variant="outlined" sx={{ minWidth: 120 }}>
+          <Box sx={{ display: "flex", gap: 2, mb: 2.5, flexWrap: "wrap" }}>
+            <Card variant="outlined" sx={{ minWidth: 110 }}>
               <CardContent sx={{ py: 1.5, px: 2, "&:last-child": { pb: 1.5 } }}>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: "#4285F4" }}>
-                  {data.stats.total_findings}
+                <Typography variant="h5" sx={{ fontWeight: 700, color: "#1565C0" }}>
+                  {data!.stats.total_findings}
                 </Typography>
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>Total Findings</Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>Findings</Typography>
               </CardContent>
             </Card>
-            <Card variant="outlined" sx={{ minWidth: 120 }}>
+            <Card variant="outlined" sx={{ minWidth: 110 }}>
               <CardContent sx={{ py: 1.5, px: 2, "&:last-child": { pb: 1.5 } }}>
                 <Typography variant="h5" sx={{ fontWeight: 700, color: "#EA4335" }}>
-                  {data.stats.critical}
+                  {data!.stats.critical}
                 </Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>Critical</Typography>
               </CardContent>
             </Card>
-            <Card variant="outlined" sx={{ minWidth: 220 }}>
+            <Card variant="outlined" sx={{ flexGrow: 1 }}>
               <CardContent sx={{ py: 1.5, px: 2, "&:last-child": { pb: 1.5 } }}>
                 <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
-                  Phases Present
+                  Attack Phases
                 </Typography>
                 <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                  {data.stats.phases_present.length === 0 ? (
-                    <Typography variant="caption" sx={{ color: "text.secondary" }}>—</Typography>
-                  ) : (
-                    data.stats.phases_present.map((ph) => (
-                      <Chip key={ph} label={ph.replace(/_/g, " ")} size="small"
-                        sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#82b1ff", fontSize: 10, height: 18, textTransform: "capitalize" }} />
-                    ))
-                  )}
+                  {data!.stats.phases_present.map((ph) => (
+                    <Chip key={ph} label={ph.replace(/_/g, " ")} size="small"
+                      sx={{ fontSize: 10, height: 20, textTransform: "capitalize",
+                            bgcolor: "rgba(21,101,192,0.1)", color: "#1565C0" }} />
+                  ))}
                 </Box>
               </CardContent>
             </Card>
           </Box>
 
-          {/* Graph — scrollable both axes */}
-          <Card variant="outlined" sx={{ mb: 3, bgcolor: "#0a0a0a", overflow: "hidden" }}>
-            <Box sx={{ overflowX: "auto", overflowY: "auto", maxHeight: 560, p: 1 }}>
-              <AttackGraph data={data} />
-            </Box>
-          </Card>
+          {/* Graph */}
+          <ReactFlowProvider>
+            <AttackGraphInner data={data!} />
+          </ReactFlowProvider>
 
           {/* Legend */}
-          <Card variant="outlined" sx={{ mb: 3 }}>
-            <CardContent>
+          <Card variant="outlined" sx={{ mt: 2 }}>
+            <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 1 }}>
                 LEGEND
               </Typography>
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-                {LEGEND.map((item) => (
+              <Box sx={{ display: "flex", gap: 2.5, flexWrap: "wrap", alignItems: "center" }}>
+                {LEGEND_ITEMS.map((item) => (
                   <Box key={item.label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                    <Box sx={{ width: 28, height: 14, borderRadius: 1, bgcolor: item.color, flexShrink: 0 }} />
+                    <Box sx={{ width: 16, height: 16, borderRadius: "50%", bgcolor: item.color, flexShrink: 0 }} />
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>{item.label}</Typography>
                   </Box>
                 ))}
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                  <Box sx={{ width: 28, height: 2, bgcolor: "#f44336", flexShrink: 0 }} />
+                  <Box sx={{ width: 22, height: 3, bgcolor: "#EA4335", borderRadius: 1, flexShrink: 0 }} />
                   <Typography variant="caption" sx={{ color: "text.secondary" }}>Critical path</Typography>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 22, height: 3, bgcolor: "#F59E0B", borderRadius: 1, flexShrink: 0 }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>Attack chain</Typography>
                 </Box>
               </Box>
             </CardContent>
           </Card>
 
-          {/* Critical path chain */}
-          {data.paths.length > 0 && (
-            <Card variant="outlined">
+          {/* Critical path breadcrumb */}
+          {data!.paths.length > 0 && (
+            <Card variant="outlined" sx={{ mt: 2 }}>
               <CardContent>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: "#f44336" }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: "#EA4335" }}>
                   Critical Attack Path
                 </Typography>
-                {data.paths.map((path, pi) => {
-                  const nodeMap = new Map(data.nodes.map((n) => [n.id, n]));
+                {data!.paths.map((path, pi) => {
+                  const nodeMap = new Map(data!.nodes.map((n) => [n.id, n]));
                   return (
-                    <Box key={pi} sx={{ mb: pi < data.paths.length - 1 ? 2 : 0 }}>
+                    <Box key={pi} sx={{ mb: pi < data!.paths.length - 1 ? 2 : 0 }}>
                       <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.75 }}>
                         {path.label}
                       </Typography>
@@ -518,13 +551,14 @@ export default function AttackPaths() {
                         {path.nodes.map((nid, ni) => {
                           const n = nodeMap.get(nid);
                           const sev = n?.severity?.toLowerCase();
-                          const color = (sev && SEV_COLOR[sev]) ? SEV_COLOR[sev] : "#4285F4";
+                          const col = (sev && SEV_COLOR[sev]) ? SEV_COLOR[sev] : "#1565C0";
                           return (
                             <React.Fragment key={nid}>
                               <Chip label={n?.label ?? nid} size="small"
-                                sx={{ bgcolor: `${color}20`, color, fontSize: 11, height: 20, border: `1px solid ${color}50` }} />
+                                sx={{ bgcolor: `${col}18`, color: col, fontSize: 11, height: 22,
+                                      border: `1px solid ${col}50`, fontWeight: 600 }} />
                               {ni < path.nodes.length - 1 && (
-                                <Typography variant="caption" sx={{ color: "text.secondary" }}>→</Typography>
+                                <Typography variant="caption" sx={{ color: "#F59E0B", fontWeight: 700 }}>→</Typography>
                               )}
                             </React.Fragment>
                           );

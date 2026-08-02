@@ -5,6 +5,7 @@
   "dependencies": {
     "@azure/msal-browser": "^5.9.0",
     "@azure/msal-react": "^5.3.2",
+    "@dagrejs/dagre": "^3.0.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^9.0.0",
@@ -20,6 +21,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@xyflow/react": "^12.11.2",
     "axios": "^1.16.0",
     "dayjs": "^1.11.20",
     "mermaid": "^11.15.0",
