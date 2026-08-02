@@ -628,19 +628,26 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("scans.is_live ALTER failed: %s", exc)
 
-        # Fix scans with invalid scan_type values (e.g. connector type accidentally stored as scan_type).
-        # This is a one-time data correction that is idempotent: UPDATE changes 0 rows when all values are valid.
+        # Fix scans with invalid enum values — idempotent (0 rows changed when data is clean).
         try:
-            from api.models.models import ScanType as _ST
-            _valid_scan_types = ",".join(f"'{v.value}'" for v in _ST)
+            from api.models.models import ScanType as _ST, FrameworkType as _FT
+            _valid_st = ",".join(f"'{v.value}'" for v in _ST)
             with engine.begin() as conn:
-                result = conn.execute(text(
-                    f"UPDATE scans SET scan_type = 'vulnerability' WHERE scan_type NOT IN ({_valid_scan_types})"
+                r = conn.execute(text(
+                    f"UPDATE scans SET scan_type = 'vulnerability' WHERE scan_type NOT IN ({_valid_st})"
                 ))
-                if result.rowcount > 0:
-                    logger.warning("Fixed %d scan(s) with invalid scan_type value(s)", result.rowcount)
+                if r.rowcount > 0:
+                    logger.warning("Fixed %d scan(s) with invalid scan_type value(s)", r.rowcount)
+            # Null out invalid framework values (framework is nullable so NULL is safe)
+            _valid_ft = ",".join(f"'{v.value}'" for v in _FT)
+            with engine.begin() as conn:
+                r = conn.execute(text(
+                    f"UPDATE scans SET framework = NULL WHERE framework IS NOT NULL AND framework NOT IN ({_valid_ft})"
+                ))
+                if r.rowcount > 0:
+                    logger.warning("Nulled %d scan(s) with invalid framework value(s)", r.rowcount)
         except Exception as exc:
-            logger.warning("scan_type data correction failed: %s", exc)
+            logger.warning("scan enum data correction failed: %s", exc)
 
         # custom_framework_controls — reference_id, sort_order, domain (added for MAS TRM policy mapping)
         try:
