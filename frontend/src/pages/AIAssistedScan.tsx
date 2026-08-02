@@ -55,11 +55,20 @@ async function chatApi(clientId: string, message: string, history: Message[]) {
 async function launchApi(clientId: string, state: ScanState) {
   const r = await apiClient.post(`/clients/${clientId}/ai-assisted-scan/launch`, {
     connector_id: state.connector_id,
+    connector_type: state.connector_type, // fallback if connector_id is null
     scan_name: state.scan_name || "AI Guided Scan",
     target: state.target,
     framework: state.framework,
   });
   return r.data as { scan_id: string; scan_name: string };
+}
+
+function extractErrorDetail(e: any): string {
+  const detail = e?.response?.data?.detail;
+  if (!detail) return "Failed to launch scan.";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((d: any) => d?.msg || JSON.stringify(d)).join(", ");
+  return JSON.stringify(detail);
 }
 
 async function nextStepsApi(clientId: string, scanId: string) {
@@ -301,7 +310,7 @@ export default function AIAssistedScan() {
       setState(res.state);
       setOptions(res.options ?? []);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "AI unavailable — check AI provider settings.");
+      setError(extractErrorDetail(e) || "AI unavailable — check AI provider settings.");
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -331,7 +340,7 @@ export default function AIAssistedScan() {
         setState(res.state);
         setOptions(res.options ?? []);
       })
-      .catch(e => setError(e?.response?.data?.detail || "AI unavailable."))
+      .catch(e => setError(extractErrorDetail(e) || "AI unavailable."))
       .finally(() => { setLoading(false); setTimeout(() => inputRef.current?.focus(), 100); });
   };
 
@@ -358,7 +367,7 @@ export default function AIAssistedScan() {
         }
       }, 3000);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Failed to launch scan.");
+      setError(extractErrorDetail(e) || "Failed to launch scan.");
     } finally {
       setLaunching(false);
     }

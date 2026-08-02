@@ -120,8 +120,23 @@ Users launching through this AI wizard do NOT need to go to Assessments — the 
 ## Available Environment (live data injected below)
 {env_profile}
 
-## CRITICAL: End EVERY response with this exact marker and JSON (no code fences):
-SCAN_STATE:{{"phase":"intent|connector|target|framework|confirm|ready","connector_type":"{connector_type_or_null}","connector_id":"{connector_id_or_null}","scan_name":"{descriptive_name_or_null}","target":"{target_or_null}","framework":"{framework_value_or_null}","ready_to_launch":false}}
+## CRITICAL: End EVERY response with the SCAN_STATE marker below (no code fences, no backticks).
+You MUST advance the phase field as the conversation progresses — do NOT keep it at "intent" once you have moved on:
+- phase = "intent"    → while you are still understanding what the user wants to assess
+- phase = "connector" → once you know the goal and are suggesting / confirming which scanner to use
+- phase = "target"    → once the connector is confirmed and you are asking for target details
+- phase = "framework" → once the target is confirmed and you are asking about compliance framework
+- phase = "confirm"   → once all details are collected; summarise and ask the user to confirm
+- phase = "ready"     → user confirmed launch; set ready_to_launch: true
+
+Also fill in the other fields as you collect them (null until known):
+- connector_type: the lowercase connector type key (e.g. "azure", "web", "semgrep")
+- connector_id: the exact ID from the Available Environment list
+- scan_name: a short descriptive name for the scan
+- target: the target string (URL, IP, repo URL, image name, or null for full-environment cloud scans)
+- framework: framework key (e.g. "nist_csf", "iso_27001") or null
+
+SCAN_STATE:{{"phase":"CURRENT_PHASE","connector_type":"TYPE_OR_NULL","connector_id":"ID_OR_NULL","scan_name":"NAME_OR_NULL","target":"TARGET_OR_NULL","framework":"FRAMEWORK_OR_NULL","ready_to_launch":false}}
 """
 
 _AGENT_DESCRIPTIONS = {
@@ -152,12 +167,6 @@ class ChatResponse(BaseModel):
     message: str
     state: Dict[str, Any]
     options: List[OptionItem] = []   # quick-select chips shown below the AI message
-
-class LaunchRequest(BaseModel):
-    connector_id: str
-    scan_name: str
-    target: Optional[str] = None
-    framework: Optional[str] = None
 
 class LaunchResponse(BaseModel):
     scan_id: str
@@ -256,11 +265,15 @@ def _parse_state(raw: str) -> tuple[str, Dict[str, Any]]:
     for k, v in _DEFAULT_STATE.items():
         if k not in state:
             state[k] = v
-    # null strings → None
+    # null strings → None (covers old and new placeholder values)
+    _NULL_VALUES = {
+        "null", "None", "", "TYPE_OR_NULL", "ID_OR_NULL", "NAME_OR_NULL",
+        "TARGET_OR_NULL", "FRAMEWORK_OR_NULL", "CURRENT_PHASE",
+        "{connector_type_or_null}", "{connector_id_or_null}",
+        "{descriptive_name_or_null}", "{target_or_null}", "{framework_value_or_null}",
+    }
     for k in ("connector_type", "connector_id", "scan_name", "target", "framework"):
-        if state.get(k) in ("null", "None", "", "{connector_type_or_null}",
-                             "{connector_id_or_null}", "{descriptive_name_or_null}",
-                             "{target_or_null}", "{framework_value_or_null}"):
+        if state.get(k) in _NULL_VALUES:
             state[k] = None
 
     return display, state
@@ -292,8 +305,11 @@ _FRAMEWORK_OPTIONS = [
     ("ISO/IEC 27001",       "iso_27001"),
     ("PCI DSS v4",          "pci_dss"),
     ("GDPR",                "gdpr"),
-    ("Skip / No framework", "none"),
+    ("Skip / No framework", ""),
 ]
+
+# Map label → enum key so chip values are always the correct DB key
+_FRAMEWORK_LABEL_TO_KEY = {label: key for label, key in _FRAMEWORK_OPTIONS}
 
 _OTHER_OPTION = OptionItem(label="Other / Not listed", value="__other__", sub="Type your own answer below")
 
@@ -314,12 +330,37 @@ _CONFIRM_OPTIONS = [
 ]
 
 
-def _build_options(phase: str, db: Session, client_id: str) -> List[OptionItem]:
-    """Return quick-select chip options for the current phase.
-    Always appends an 'Other' escape hatch so users can type freely.
+_CLOUD_CONNECTOR_TYPES = {"azure", "aws", "gcp"}
+
+
+def _infer_options_phase(state: Dict[str, Any]) -> str:
+    """Infer which option set to display from collected state fields.
+    The LLM often keeps phase='intent' even when further along — we override
+    based on what fields are actually filled in."""
+    if state.get("ready_to_launch"):
+        return "ready"
+    llm_phase = state.get("phase", "intent")
+    if llm_phase in ("confirm", "ready"):
+        return "confirm"
+    if state.get("connector_id"):
+        # Connector confirmed — in target, framework, or confirm
+        if llm_phase == "framework":
+            return "framework"
+        return "target"
+    if state.get("connector_type") or llm_phase == "connector":
+        return "connector"
+    return "intent"
+
+
+def _build_options(state: Dict[str, Any], db: Session, client_id: str) -> List[OptionItem]:
+    """Return quick-select chip options inferred from conversation state.
     Built from live DB data — not generated by the LLM."""
+    phase = _infer_options_phase(state)
+    connector_type = (state.get("connector_type") or "").lower()
+
     if phase == "intent":
         return _INTENT_OPTIONS + [_OTHER_OPTION]
+
     if phase == "connector":
         connectors = db.query(Connector).filter(
             Connector.client_id == client_id,
@@ -333,11 +374,23 @@ def _build_options(phase: str, db: Session, client_id: str) -> List[OptionItem]:
             for c in connectors
         ]
         return items + [_OTHER_OPTION]
+
+    if phase == "target":
+        if connector_type in _CLOUD_CONNECTOR_TYPES:
+            return [
+                OptionItem(label="Full environment (default)", value="Scan my full environment — no specific scope needed"),
+                OptionItem(label="Specific subscription / account", value="I want to specify a subscription or account ID"),
+                _OTHER_OPTION,
+            ]
+        return [_OTHER_OPTION]
+
     if phase == "framework":
-        items = [OptionItem(label=label, value=label) for label, _ in _FRAMEWORK_OPTIONS]
+        items = [OptionItem(label=label, value=key or label) for label, key in _FRAMEWORK_OPTIONS]
         return items + [_OTHER_OPTION]
+
     if phase in ("confirm", "ready"):
         return _CONFIRM_OPTIONS
+
     return [_OTHER_OPTION]
 
 
@@ -370,8 +423,16 @@ async def ai_scan_chat(
         raise HTTPException(status_code=503, detail=f"AI provider unavailable: {exc}")
 
     display, state = _parse_state(raw)
-    options = _build_options(state.get("phase", "intent"), db, client_id)
+    options = _build_options(state, db, client_id)
     return ChatResponse(message=display, state=state, options=options)
+
+
+class LaunchRequest(BaseModel):
+    connector_id: Optional[str] = None
+    connector_type: Optional[str] = None  # fallback if connector_id is null
+    scan_name: str = "AI Guided Scan"
+    target: Optional[str] = None
+    framework: Optional[str] = None
 
 
 @router.post("/clients/{client_id}/ai-assisted-scan/launch", response_model=LaunchResponse)
@@ -382,47 +443,75 @@ async def ai_scan_launch(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    from api.routers.scans import _execute_scan
-    from core.config import get_settings
-    from api.models.models import FrameworkType
+    try:
+        from api.routers.scans import _execute_scan
+        from core.config import get_settings
+        from api.models.models import FrameworkType
 
-    connector = db.query(Connector).filter(
-        Connector.id == payload.connector_id,
-        Connector.client_id == client_id,
-    ).first()
-    if not connector:
-        raise HTTPException(status_code=404, detail="Connector not found")
+        # Resolve connector — prefer explicit ID, fall back to first matching type
+        connector = None
+        if payload.connector_id:
+            connector = db.query(Connector).filter(
+                Connector.id == payload.connector_id,
+                Connector.client_id == client_id,
+            ).first()
+        if not connector and payload.connector_type:
+            # Find first connector of that type for this client
+            from api.models.models import ConnectorType
+            try:
+                ct = ConnectorType(payload.connector_type.lower())
+                connector = db.query(Connector).filter(
+                    Connector.client_id == client_id,
+                    Connector.connector_type == ct,
+                ).first()
+            except (ValueError, Exception):
+                connector = None
+        if not connector:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Connector not found — no connector_id provided and no connector of type '{payload.connector_type}' configured for this client. Add a connector via the Connections page first.",
+            )
 
-    framework = None
-    if payload.framework:
-        try:
-            framework = FrameworkType(payload.framework)
-        except ValueError:
-            pass
+        # Resolve framework key — handle label strings ("CIS Azure" → "cis_azure")
+        framework_key = payload.framework or ""
+        if framework_key in _FRAMEWORK_LABEL_TO_KEY:
+            framework_key = _FRAMEWORK_LABEL_TO_KEY[framework_key]
+        framework = None
+        if framework_key:
+            try:
+                framework = FrameworkType(framework_key)
+            except ValueError:
+                pass
 
-    initial_summary: Optional[Dict] = None
-    if payload.target:
-        initial_summary = {"ai_guided_target": payload.target}
+        initial_summary: Optional[Dict] = None
+        if payload.target:
+            initial_summary = {"ai_guided_target": payload.target}
 
-    scan = Scan(
-        client_id=client_id,
-        connector_id=payload.connector_id,
-        name=payload.scan_name or f"AI Guided Scan — {connector.name}",
-        scan_type=connector.connector_type,
-        framework=framework,
-        initiated_by=user.get("upn", user.get("preferred_username", "ai-guided")),
-        status=ScanStatus.PENDING,
-        summary=initial_summary,
-    )
-    db.add(scan)
-    db.commit()
-    db.refresh(scan)
+        scan = Scan(
+            client_id=client_id,
+            connector_id=connector.id,
+            name=payload.scan_name or f"AI Guided Scan — {connector.name}",
+            scan_type=connector.connector_type,
+            framework=framework,
+            initiated_by=user.get("upn", user.get("preferred_username", "ai-guided")),
+            status=ScanStatus.PENDING,
+            summary=initial_summary,
+        )
+        db.add(scan)
+        db.commit()
+        db.refresh(scan)
 
-    background_tasks.add_task(
-        _execute_scan, scan.id, get_settings().DATABASE_URL, None, None,
-    )
+        background_tasks.add_task(
+            _execute_scan, scan.id, get_settings().DATABASE_URL, None, None,
+        )
 
-    return LaunchResponse(scan_id=scan.id, scan_name=scan.name)
+        return LaunchResponse(scan_id=scan.id, scan_name=scan.name)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("ai_scan_launch failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Failed to launch scan: {exc}")
 
 
 @router.get("/clients/{client_id}/ai-assisted-scan/{scan_id}/next-steps", response_model=NextStepsResponse)
