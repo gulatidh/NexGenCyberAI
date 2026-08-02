@@ -35,8 +35,9 @@ export const RISK_MANAGER: ProductDef = {
   bgColor: "#E3F2FD",
   basePath: "/risk",
   nav: [
-    { label: "Risk Overview", icon: <Assessment />, path: "/overview" },
-    { label: "Risk Register", icon: <Security />, path: "/register" },
+    { label: "Risk Overview",    icon: <Assessment />, path: "/overview" },
+    { label: "Risk Register",    icon: <Security />,   path: "/register" },
+    { label: "AI Risk Analysis", icon: <SmartToy />,   path: "/ai-analysis" },
   ],
 };
 

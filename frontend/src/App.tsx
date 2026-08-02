@@ -28,6 +28,7 @@ import EmailSettings from "./pages/EmailSettings";
 import AccessLogs from "./pages/AccessLogs";
 import Findings from "./pages/Findings";
 import Risks from "./pages/Risks";
+import RiskAIAnalysis from "./pages/RiskAIAnalysis";
 import Assets from "./pages/Assets";
 import StaleAssets from "./pages/StaleAssets";
 import AssetDetail from "./pages/AssetDetail";
@@ -153,6 +154,7 @@ function ProtectedApp() {
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<RiskOverviewPage />} />
           <Route path="register" element={<Risks />} />
+          <Route path="ai-analysis" element={<RiskAIAnalysis />} />
         </Route>
 
         <Route path="/vulnerability" element={<ProductLayout product={VULN_MGMT} />}>

@@ -5,14 +5,12 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   FormControl, InputLabel, Select, MenuItem, Button, Alert, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
-  IconButton, Tooltip, Badge,
 } from "@mui/material";
-import { Warning, SmartToy, History, DeleteOutlined } from "@mui/icons-material";
+import { Warning } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { risksApi, projectsApi, agentsApi } from "../services/api";
+import { risksApi, projectsApi } from "../services/api";
 import { Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
-import AgentInsightCard from "../components/AgentInsightCard";
 
 const LEVEL_COLOR: Record<string, string> = {
   critical: "#EA4335", high: "#FF7043", medium: "#FBBC04", low: "#34A853",
@@ -21,8 +19,6 @@ const STATUS_COLOR: Record<string, string> = {
   open: "#FF7043", mitigated: "#34A853", accepted: "#4285F4", closed: "rgba(255,255,255,0.3)",
 };
 
-// Agent types whose outputs are risk-relevant — the panel filters to these.
-const RISK_AGENT_TYPES = new Set(["risk_manager", "threat_intel", "remediation"]);
 
 // ── Small chart components (SVG, no extra deps) ─────────────────────────────
 
@@ -89,9 +85,6 @@ export default function Risks() {
   const [levelFilters, setLevelFilters] = useState<Set<string>>(new Set());
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
-  // Only ONE agent insight tile is expanded at a time. null = all collapsed.
-  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-
   const toggle = (s: Set<string>, setter: (s: Set<string>) => void, v: string) => {
     const next = new Set(s);
     if (next.has(v)) next.delete(v); else next.add(v);
@@ -107,53 +100,9 @@ export default function Risks() {
     enabled: !!clientId,
   });
 
-  // AI Agent runs — filter client-side to risk-related types only
-  const { data: allRuns = [] } = useQuery<any[]>({
-    queryKey: ["agent-runs", clientId],
-    queryFn: () => agentsApi.listRuns(clientId),
-    enabled: !!clientId,
-  });
-  const riskRuns = useMemo(() => allRuns.filter((r) => RISK_AGENT_TYPES.has(r.agent_type)), [allRuns]);
-
-  // Group runs by agent_type. Each new run for an agent supersedes the
-  // previous, but the older runs stay accessible as a version history.
-  // `latestByType` is what we render as the live tile; `historyByType`
-  // is the list of older versions (newest-first) for the History dialog.
-  const { latestByType, historyByType } = useMemo(() => {
-    const sorted = [...riskRuns].sort((a, b) => {
-      const ad = new Date(a.started_at || 0).getTime();
-      const bd = new Date(b.started_at || 0).getTime();
-      return bd - ad;
-    });
-    const latest: Record<string, any> = {};
-    const history: Record<string, any[]> = {};
-    for (const r of sorted) {
-      if (!latest[r.agent_type]) {
-        latest[r.agent_type] = r;
-      } else {
-        (history[r.agent_type] = history[r.agent_type] || []).push(r);
-      }
-    }
-    return { latestByType: latest, historyByType: history };
-  }, [riskRuns]);
-
-  const latestRuns = useMemo(() => Object.values(latestByType), [latestByType]);
-  const [historyOpenFor, setHistoryOpenFor] = useState<string | null>(null);
-  const [viewVersion, setViewVersion] = useState<any | null>(null);
-
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => risksApi.update(clientId, id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["risks"] }); setSelected(null); },
-  });
-
-  const [pendingDeleteRun, setPendingDeleteRun] = useState<any | null>(null);
-  const deleteRunMutation = useMutation({
-    mutationFn: (runId: string) => agentsApi.deleteRun(clientId, runId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["agent-runs", clientId] });
-      if (expandedRunId === pendingDeleteRun?.id) setExpandedRunId(null);
-      setPendingDeleteRun(null);
-    },
   });
 
   const lvOf = (r: Risk) => (typeof r.risk_level === "object" ? (r.risk_level as any).value ?? r.risk_level : r.risk_level) as string;
@@ -415,78 +364,6 @@ export default function Risks() {
             </TableContainer>
           </Card>
 
-          {/* AI Agent Risk Analysis — one tile per run, only one expanded at a time */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, mt: 1 }}>
-            <SmartToy sx={{ color: "#4285F4", fontSize: 18 }} />
-            <Typography variant="subtitle1" sx={{ color: "text.primary", fontWeight: 700 }}>
-              AI Agent Risk Analysis
-            </Typography>
-            <Chip label={riskRuns.length} size="small"
-              sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
-            <Box sx={{ flex: 1 }} />
-            {expandedRunId && (
-              <Button size="small" onClick={() => setExpandedRunId(null)}
-                sx={{ color: "text.secondary", fontSize: 11, textTransform: "none" }}>
-                Collapse all
-              </Button>
-            )}
-          </Box>
-          <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mb: 1.5 }}>
-            Risk-focused agents only (Risk Manager, Threat Intel, Remediation). Click any tile to read the full analysis.
-          </Typography>
-          {latestRuns.length === 0 ? (
-            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 2, p: 3, textAlign: "center" }}>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                No risk-related agent runs yet. Run Risk Manager / Threat Intel / Remediation from the Agents page.
-              </Typography>
-            </Card>
-          ) : (
-            <Grid container spacing={1.5}>
-              {latestRuns.map((run: any) => {
-                const isExpanded = expandedRunId === run.id;
-                const versionCount = 1 + (historyByType[run.agent_type]?.length || 0);
-                return (
-                  <Grid key={run.id} size={{ xs: 12, md: isExpanded ? 12 : 6 }}>
-                    <Box sx={{ position: "relative" }}>
-                      <AgentInsightCard
-                        run={run}
-                        expanded={isExpanded}
-                        onToggle={() => setExpandedRunId(isExpanded ? null : run.id)}
-                        onDelete={() => setPendingDeleteRun(run)}
-                      />
-                      {versionCount > 1 && (
-                        <Tooltip title={`${versionCount - 1} previous version${versionCount - 1 === 1 ? "" : "s"}`}>
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setHistoryOpenFor(run.agent_type); }}
-                            sx={{
-                              position: "absolute", top: 10, right: 76,
-                              color: "#FBBC04",
-                              bgcolor: "rgba(251,188,4,0.10)",
-                              "&:hover": { bgcolor: "rgba(251,188,4,0.20)" },
-                            }}
-                          >
-                            <Badge
-                              badgeContent={versionCount - 1}
-                              color="warning"
-                              sx={{
-                                "& .MuiBadge-badge": {
-                                  fontSize: 9, height: 14, minWidth: 14,
-                                  bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700,
-                                },
-                              }}
-                            >
-                              <History sx={{ fontSize: 18 }} />
-                            </Badge>
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          )}
         </>
       )}
 
@@ -539,171 +416,6 @@ export default function Risks() {
         })()}
       </Dialog>
 
-      {/* Version history — older runs for a given agent type */}
-      <Dialog open={!!historyOpenFor} onClose={() => setHistoryOpenFor(null)} maxWidth="sm" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
-        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <History sx={{ color: "#FBBC04" }} />
-            <Typography component="span" sx={{ fontWeight: 700, textTransform: "capitalize" }}>
-              {(historyOpenFor || "").replace(/_/g, " ")} — Version history
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 1.5 }}>
-          {historyOpenFor && (() => {
-            const current = latestByType[historyOpenFor];
-            const older = historyByType[historyOpenFor] || [];
-            const allVersions = current ? [current, ...older] : older;
-            return (
-              <Box>
-                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-                  {allVersions.length} total version{allVersions.length === 1 ? "" : "s"}. v{allVersions.length} is the latest and currently shown on the tile; older versions are below.
-                </Typography>
-                {allVersions.map((r: any, idx: number) => {
-                  const isCurrent = idx === 0;
-                  const versionNum = allVersions.length - idx;
-                  const status = (r.status || "").toLowerCase();
-                  const statusColor =
-                    status === "completed" || status === "success" ? "#34A853"
-                      : status === "failed" || status === "error" ? "#EA4335"
-                        : "#FBBC04";
-                  return (
-                    <Box
-                      key={r.id}
-                      sx={{
-                        display: "flex", alignItems: "center", gap: 1.5,
-                        p: 1.25, mb: 0.75, borderRadius: 1,
-                        bgcolor: isCurrent ? "rgba(66,133,244,0.08)" : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${isCurrent ? "rgba(66,133,244,0.3)" : "rgba(255,255,255,0.06)"}`,
-                      }}
-                    >
-                      <Chip
-                        label={`v${versionNum}${isCurrent ? " · LIVE" : ""}`}
-                        size="small"
-                        sx={{
-                          height: 22, fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
-                          bgcolor: isCurrent ? "rgba(66,133,244,0.2)" : "rgba(255,255,255,0.06)",
-                          color: isCurrent ? "#4285F4" : "text.secondary",
-                          minWidth: 76,
-                        }} />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" sx={{ color: "text.primary", fontSize: 13, fontWeight: 500 }}>
-                          {r.started_at ? new Date(r.started_at).toLocaleString() : "—"}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                          {r.started_at ? fromNow(r.started_at) : ""}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={r.status || "unknown"}
-                        size="small"
-                        sx={{
-                          height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                          bgcolor: `${statusColor}20`, color: statusColor,
-                        }} />
-                      <Tooltip title="View this version">
-                        <IconButton
-                          size="small"
-                          onClick={() => { setViewVersion(r); }}
-                          sx={{
-                            color: "text.secondary",
-                            "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-                          }}
-                        >
-                          <SmartToy sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
-                      {!isCurrent && (
-                        <Tooltip title="Delete this version">
-                          <IconButton
-                            size="small"
-                            onClick={() => setPendingDeleteRun(r)}
-                            sx={{
-                              color: "text.secondary",
-                              "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-                            }}
-                          >
-                            <DeleteOutlined sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            );
-          })()}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setHistoryOpenFor(null)} sx={{ color: "text.secondary" }}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* View a single historical version's full output */}
-      <Dialog open={!!viewVersion} onClose={() => setViewVersion(null)} maxWidth="md" fullWidth
-        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
-        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <SmartToy sx={{ color: "#4285F4" }} />
-            <Typography component="span" sx={{ fontWeight: 700, textTransform: "capitalize" }}>
-              {viewVersion ? (viewVersion.agent_type || "").replace(/_/g, " ") : ""}
-            </Typography>
-            {viewVersion?.started_at && (
-              <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 1 }}>
-                {new Date(viewVersion.started_at).toLocaleString()}
-              </Typography>
-            )}
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 1.5 }}>
-          {viewVersion && (
-            <AgentInsightCard
-              run={viewVersion}
-              expanded={true}
-              onToggle={() => {}}
-            />
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setViewVersion(null)} sx={{ color: "text.secondary" }}>Close</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Confirm delete of an AI agent risk analysis run */}
-      <Dialog open={!!pendingDeleteRun} onClose={() => setPendingDeleteRun(null)}
-        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
-        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          Delete risk analysis?
-        </DialogTitle>
-        <DialogContent sx={{ mt: 1.5 }}>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            This removes the agent run and its output from the Risk Register feed. The risks that were created from this run (in the table above) stay — only the agent narrative is deleted.
-          </Typography>
-          {pendingDeleteRun && (
-            <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, textTransform: "capitalize" }}>
-                {(pendingDeleteRun.agent_type || "").replace(/_/g, " ")}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                Status: {pendingDeleteRun.status}
-                {pendingDeleteRun.started_at ? ` · started ${fromNow(pendingDeleteRun.started_at)}` : ""}
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setPendingDeleteRun(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
-          <Button
-            variant="contained"
-            disabled={deleteRunMutation.isPending}
-            onClick={() => pendingDeleteRun && deleteRunMutation.mutate(pendingDeleteRun.id)}
-            sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
