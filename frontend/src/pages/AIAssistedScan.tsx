@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Divider, LinearProgress, List, ListItem, ListItemIcon, ListItemText,
-  Paper, TextField, Tooltip, Typography, useTheme,
+  List, ListItem, ListItemIcon, ListItemText,
+  Paper, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  AutoFixHigh, CheckCircle, HourglassEmpty, Psychology,
+  CheckCircle, HourglassEmpty, Psychology,
   RadioButtonUnchecked, RocketLaunch, Send, SmartToy,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -97,7 +97,6 @@ interface ConfigPanelProps {
 }
 
 function ConfigPanel({ state, launching, launched, scanId, nextSteps, nextStepsLoading, onLaunch, onNavigate }: ConfigPanelProps) {
-  const theme = useTheme();
   const currentPhase = phaseIndex(state.phase);
 
   const fields = [
@@ -259,10 +258,12 @@ export default function AIAssistedScan() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const greeted = useRef(false);
 
-  // Kick off with a greeting on first load
+  // Kick off with a greeting once per client
   useEffect(() => {
-    if (!clientId || messages.length > 0) return;
+    if (!clientId || greeted.current) return;
+    greeted.current = true;
     setLoading(true);
     chatApi(clientId, "Hello, I want to run a security assessment.", [])
       .then(res => {
@@ -308,8 +309,14 @@ export default function AIAssistedScan() {
   };
 
   const handleOptionClick = (value: string) => {
-    setInput(value);
-    // auto-send immediately
+    // "Other" chip — just focus the text input so user can type freely
+    if (value === "__other__") {
+      setOptions([]);
+      setInput("");
+      setTimeout(() => inputRef.current?.focus(), 50);
+      return;
+    }
+    // All other chips — auto-send immediately
     const text = value.trim();
     if (!text || loading || !clientId) return;
     const newMessages: Message[] = [...messages, { role: "user", content: text }];
@@ -441,25 +448,36 @@ export default function AIAssistedScan() {
             {/* Quick-select option chips — shown after last AI message when backend provides options */}
             {!loading && options.length > 0 && !launched && (
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, pl: "40px" }}>
-                {options.map(opt => (
-                  <Tooltip key={opt.value} title={opt.sub || ""} placement="top">
-                    <Chip
-                      label={opt.label}
-                      onClick={() => handleOptionClick(opt.value)}
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        cursor: "pointer",
-                        borderColor: "primary.main",
-                        color: "primary.main",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        "&:hover": { bgcolor: "primary.main", color: "#fff" },
-                        transition: "all 0.15s",
-                      }}
-                    />
-                  </Tooltip>
-                ))}
+                {options.map(opt => {
+                  const isOther = opt.value === "__other__";
+                  return (
+                    <Tooltip key={opt.value} title={opt.sub || ""} placement="top">
+                      <Chip
+                        label={opt.label}
+                        onClick={() => handleOptionClick(opt.value)}
+                        variant="outlined"
+                        size="small"
+                        sx={isOther ? {
+                          cursor: "pointer",
+                          borderColor: "text.disabled",
+                          borderStyle: "dashed",
+                          color: "text.secondary",
+                          fontSize: 12,
+                          "&:hover": { borderColor: "text.primary", color: "text.primary" },
+                          transition: "all 0.15s",
+                        } : {
+                          cursor: "pointer",
+                          borderColor: "primary.main",
+                          color: "primary.main",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          "&:hover": { bgcolor: "primary.main", color: "#fff" },
+                          transition: "all 0.15s",
+                        }}
+                      />
+                    </Tooltip>
+                  );
+                })}
               </Box>
             )}
 
