@@ -722,6 +722,115 @@ const GROUPS: Group[] = [
           "Selecting a custom framework affects only the Compliance Monitor and Framework Analyst agents. Risk Manager, Threat Intel, and Remediation agents are framework-independent.",
         ],
       },
+      {
+        id: "custom-policy-scan",
+        title: "Scan against a custom policy (Custom tab)",
+        summary: "The Frameworks page has a 'Custom' family tab alongside CIS, NIST, and Standards. Select any custom policy you have built and use the same Scan wizard to run a connector scan scoped to those controls.",
+        steps: [
+          { text: "Open Frameworks from the left nav. At the top of the page a row of family tabs appears: CIS, NIST, OWASP, Standards, Other, Custom. Click 'Custom'." },
+          { text: "The Framework dropdown now shows only your custom policies, each with a purple 'Custom' chip and their control count." },
+          { text: "Select your custom policy from the dropdown." },
+          { text: "Click 'Scan' in the toolbar. The Scan wizard opens — pick a connector and scope (full policy / failing controls only / selected rows / custom IDs)." },
+          { text: "Start the scan. The scan runs the connector and tags findings with your custom policy slug. The Frameworks page refreshes automatically when it completes.", detail: "Custom policy controls are drawn from standard frameworks, so the connector's output is mapped to those source controls. For a full gap analysis with AI reasoning, also run AI Buddies → Compliance Monitor with your custom policy selected." },
+          { text: "The framework detail view (accordions, status chips, score donut) works identically for custom policies — it shows compliance status for each control in your policy based on all findings from this client." },
+        ],
+        tips: [
+          "The purple info note in the Scan wizard is a reminder: for deep gap analysis with explanations, combine a connector scan with the Compliance Monitor agent.",
+          "Use the Scan dropdown (see next topic) to scope the view to a specific scan after running it — this shows only the controls affected by that scan.",
+        ],
+        warnings: [
+          "If the Custom tab is missing: you have no custom frameworks built yet. Go to Custom Standards and create one first.",
+        ],
+      },
+      {
+        id: "framework-scan-scope",
+        title: "View compliance posture for a specific scan",
+        summary: "The Frameworks page has a Scan dropdown (between Project and Framework) that scopes the entire compliance view — score, status chips, finding links — to a single completed scan. Use this to produce a per-engagement compliance report.",
+        steps: [
+          { text: "Open Frameworks. Select your client and a framework." },
+          { text: "The Scan dropdown (labelled 'Scan') sits between the Project and Framework dropdowns. It lists all completed scans for the client, filtered by the selected project." },
+          { text: "Choose a scan from the list. The framework detail reloads and now shows statuses derived live from that scan's findings only — not the aggregate across all scans.", detail: "Live derivation logic: for each framework control, the platform looks for findings from the selected scan that map to that control (via control_id match or control_mappings cross-reference). Non-compliant = open findings exist; Partial = some open, some remediated; Compliant = only historical findings (all remediated); N/A = no findings from this scan touch this control." },
+          { text: "A blue 'Scoped: [scan name]' chip appears in the summary banner to confirm the view is filtered." },
+          { text: "The score donut and control counts all reflect only the selected scan — this is the compliance posture at that point in time." },
+          { text: "To return to the combined view: clear the Scan dropdown (select 'All scans (combined)')." },
+        ],
+        tips: [
+          "Use scan-scoped views when generating compliance evidence for a specific audit cycle — select the scan that was run during the audit window.",
+          "Pair with the Evidence Package export (Compliance Monitor → evidence/) to produce an auditor-ready ZIP with findings CSV and control deficiencies JSON scoped to that scan.",
+        ],
+        warnings: [
+          "Scan-scoped status is derived in real time from that scan's findings and is NOT the same as the persisted ClientControlStatus (which is computed across all scans and updated by the Recompute button). The donut score may differ between the two views.",
+        ],
+      },
+    ],
+  },
+  {
+    id: "threat-models",
+    title: "Threat Models",
+    navLabel: "Threat Models",
+    icon: <Hub fontSize="small" />,
+    color: "#1565C0",
+    topics: [
+      {
+        id: "threat-model-intro",
+        title: "What a Threat Model is",
+        summary: "A Threat Model is an AI-generated structured assessment of how an attacker could compromise your system. It produces a Data Flow Diagram (DFD), a threat list with STRIDE categories and CVSS-style scores, a MITRE ATT&CK control mapping, and — for each threat — a Sigma detection rule stub.",
+        steps: [
+          { text: "Navigate to Threat & Risk → Threat Models from the left nav." },
+          { text: "Click 'New Threat Model'. Give it a name and an optional description." },
+          { text: "Add components: in the Components tab, click '+ Component'. Each component represents a system element — web app, database, API gateway, identity provider, cloud service, etc.", detail: "Fields: Name, Type (web_app / database / api / identity / cloud_service / network / user / external_system), Platform (Azure / AWS / GCP / Corporate / Internet / Third-Party), Security Tier (DMZ / Web Tier / Application Tier / Data Tier / Management Zone / External), Criticality (critical/high/medium/low), Notes." },
+          { text: "Click 'Generate Threats'. The AI analyses your component list, infers trust boundaries, and produces a prioritised threat list with STRIDE category, severity, CVSS score, affected component, and mitigations." },
+          { text: "Review threats in the Threats tab. Each threat card shows the threat title, STRIDE category, severity chip, affected component, and a description. Click a card to see the full detail with mitigations and MITRE mapping." },
+        ],
+        tips: [
+          "The more detail you put in component Notes (e.g. 'Stores PII, internet-facing, no WAF'), the more targeted the generated threats will be.",
+          "Re-generate threats at any time — the AI keeps your pinned components and regenerates the threat list. Each regeneration creates a new version; the history is preserved.",
+        ],
+        warnings: [
+          "AI-generated threats are a starting point. Review each threat for accuracy before presenting to stakeholders — the AI may flag risks that your architecture already mitigates.",
+        ],
+      },
+      {
+        id: "dfd-trust-zones",
+        title: "DFD — Two-level trust zone hierarchy",
+        summary: "The Data Flow Diagram renders components nested in two levels: Platform (outer solid-border box — where the component lives) and Security Tier (inner dashed-border box — the trust tier within that platform). This mirrors a real network segmentation model.",
+        steps: [
+          { text: "Open a Threat Model → DFD tab. Click 'React Flow' mode for the interactive graph (or 'Mermaid' for the text diagram)." },
+          { text: "Platform values and their border colours:", detail: "Azure (#0078D4 blue), AWS (#FF9900 orange), GCP (#4285F4 blue), Corporate (#34A853 green), Internet (#EA4335 red), Third-Party (#9C27B0 purple)." },
+          { text: "Security Tier values (inner dashed boxes):", detail: "DMZ — public-facing layer / Web Tier — presentation layer / Application Tier — business logic (default for most corporate components) / Data Tier — databases and storage / Management Zone — admin, SIEM, CA servers / External — untrusted or Internet-side actors." },
+          { text: "When you add or edit a component, set both Platform and Security Tier using the dropdowns in the component table. Platform controls which outer box the component appears in; Security Tier controls the inner grouping." },
+          { text: "Backward compatibility: old components with a flat 'trust_zone' field (e.g. 'Corporate Network', 'Vendor Cloud') are automatically migrated to the two-level model on load." },
+        ],
+        tips: [
+          "A Key Vault or HSM should be: Platform=Azure, Tier=Management Zone. A public API endpoint: Platform=Azure (or Corporate), Tier=DMZ. An attacker persona: Platform=Internet, Tier=External.",
+          "The DFD legend (bottom-left of the React Flow canvas) shows the colour coding for both platforms and security tiers.",
+        ],
+        warnings: [
+          "The Mermaid diagram view uses subgraph blocks — very long tier names or special characters in component names may occasionally cause a parse error. Switch to React Flow view for interactive exploration.",
+        ],
+      },
+      {
+        id: "detection-rules",
+        title: "AI Detection Rules — Sigma stubs",
+        summary: "The Detection Rules tab on any Threat Model lets you generate Sigma rule stubs for every threat with one click. Each rule includes real log sources, detection conditions, MITRE ATT&CK tags, false-positive guidance, and severity.",
+        steps: [
+          { text: "Open a Threat Model that has threats generated. Click the 'Detection Rules' tab." },
+          { text: "If no rules exist: a prompt appears with a 'Suggest Detection Rules with AI' button. Click it." },
+          { text: "The AI generates one Sigma rule stub per threat. Each rule includes:", detail: "logsource (category + product matched to the platform — e.g. Azure activitylogs/signinlogs, Windows Security/Sysmon, AWS CloudTrail), detection selection with realistic field names (UriPath, HttpMethod, ClientIpAddress, EventID, etc.), condition, falsepositive list, level, and ATT&CK tags." },
+          { text: "Rules display as collapsible cards: platform chip, severity, title, rule ID, ADVISORY/Validated status badge, description, and an expand arrow to see the full YAML." },
+          { text: "Click 'Validate' on a rule card to mark it as reviewed. The badge changes from ADVISORY to Validated." },
+          { text: "Click 'Download YAML' (top-right of the Detection Rules section) to export all rules as a single Sigma YAML file suitable for importing into your SIEM." },
+          { text: "To regenerate rules (e.g. after adding more threats): click 'Re-generate with AI' button in the rules header. This replaces the current rule set." },
+        ],
+        tips: [
+          "Sigma rules are stubs — the log source and field structure are correct for the platform, but the specific values (e.g. exact UriPath) should be tuned to your environment before deploying to a SIEM.",
+          "Export the YAML and import into Microsoft Sentinel (via the Analytics rule template importer), Splunk (as a search or alert), or Elastic SIEM (as a detection rule) — all support Sigma format via converters.",
+        ],
+        warnings: [
+          "Not all generated rules will have perfect detection conditions — review each rule in the context of your actual log schema before enabling in production.",
+          "Detection rules require a working AI provider configured in AI Settings. If generation fails with '503', configure at least one provider (Azure OpenAI, Anthropic, OpenAI, etc.) first.",
+        ],
+      },
     ],
   },
   {
