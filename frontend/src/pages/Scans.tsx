@@ -945,6 +945,13 @@ export default function Scans() {
         </Box>
       </Box>
 
+      {/* Temporary diagnostic — shows raw API response count */}
+      <Box sx={{ mb: 1, p: 1, bgcolor: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.3)", borderRadius: 1, fontSize: 12, color: "text.secondary" }}>
+        API returned <strong>{tilesData?.scans?.length ?? "…"}</strong> scans total &nbsp;|&nbsp;
+        After filter: <strong>{tiles.length}</strong> &nbsp;|&nbsp;
+        Client filter: <strong>{selectedClientId || "none (all)"}</strong>
+      </Box>
+
       {/* ── Top-level scanner / import groups ──────────────────────────── */}
       <Box sx={{ mb: 3 }}>
         {/* Group 1: Inbuilt Scanners */}
