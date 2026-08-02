@@ -44,10 +44,18 @@ def _user_email(user: dict) -> str:
 def _accessible_ids(db: Session, user: dict) -> Optional[set]:
     """Return the set of client IDs the user can see, or None if the user
     is a global admin (None means: no filter, see everything)."""
+    # Same-tenant Azure AD users are admins — give full access without
+    # requiring a UserAccess DB row (mirrors trial.py:is_admin logic).
+    from core.trial import is_admin as _jwt_admin
+    if _jwt_admin(user):
+        return None
     email = _user_email(user)
     if not email:
         return set()
-    grants = get_user_grants(db, email)
+    try:
+        grants = get_user_grants(db, email)
+    except Exception:
+        return set()
     # Global admin grant → full access
     for g in grants:
         scope = g.scope_type.value if hasattr(g.scope_type, "value") else str(g.scope_type)
