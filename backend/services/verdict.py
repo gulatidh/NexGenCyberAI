@@ -204,11 +204,41 @@ def compute_rps(finding: Finding) -> Dict[str, Any]:
 
 # ── Heuristic / scaffolded verdict ───────────────────────────────────────────
 
+_TOOL_LABELS: dict = {
+    "web": "OWASP ZAP",
+    "semgrep": "Semgrep",
+    "codeql": "GitHub CodeQL",
+    "sonarqube": "SonarQube",
+    "nmap": "Nmap",
+    "openvas": "OpenVAS",
+    "trivy": "Trivy",
+    "owasp_dc": "OWASP Dep-Check",
+    "gitleaks": "Gitleaks",
+    "trufflehog": "TruffleHog",
+    "ai_code_review": "AI Code Review",
+    "nuclei": "Nuclei",
+    "checkov": "Checkov",
+    "sslyze": "SSLyze",
+    "tenable": "Tenable.io",
+    "burp_enterprise": "Burp Suite Enterprise",
+    "snyk": "Snyk",
+    "rapid7": "Rapid7 InsightVM",
+    "qualys": "Qualys VMDR",
+    "invicti": "Invicti",
+    "acunetix": "Acunetix Enterprise",
+}
+
+
+def _tool_label_for_connector(ct: str) -> str:
+    return _TOOL_LABELS.get(ct, ct.replace("_", " ").title() if ct else "Unknown Scanner")
+
+
 def _category_for_connector(ct: str) -> str:
-    if ct in {"semgrep", "codeql", "sonarqube"}: return "SAST"
-    if ct in {"nmap", "openvas", "trivy"}: return "Network"
+    if ct in {"semgrep", "codeql", "sonarqube", "ai_code_review", "checkov"}: return "SAST"
+    if ct in {"nmap", "openvas", "trivy", "nuclei", "sslyze"}: return "Network"
     if ct in {"owasp_dc", "gitleaks", "trufflehog"}: return "Dependency"
     if ct == "web": return "DAST"
+    if ct in {"tenable", "burp_enterprise", "snyk", "rapid7", "qualys", "invicti", "acunetix"}: return "Enterprise"
     if ct in {"azure", "aws", "gcp", "entraid", "containers", "onprem", "servicenow", "okta", "github", "jira"}: return "Cloud"
     return "Other"
 

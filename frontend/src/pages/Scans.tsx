@@ -640,12 +640,16 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
           <Typography variant="caption" sx={{ color: catColor, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{cat}</Typography>
         </Box>
         <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 15, lineHeight: 1.25, mb: 0.5 }}>{tile.tile_name}</Typography>
-        <Typography variant="caption" sx={{ color: status === "running" ? "#FBBC04" : "text.secondary", display: "block", mb: 1.25, fontWeight: status === "running" ? 600 : 400 }}>
+        <Typography variant="caption" sx={{ color: status === "running" ? "#FBBC04" : "text.secondary", display: "block", mb: 0.5, fontWeight: status === "running" ? 600 : 400 }}>
+          {tile.client_name && <span style={{ fontWeight: 600 }}>{tile.client_name}</span>}
+          {tile.client_name && " · "}
           {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
         </Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 32 }}>
-          {tile.name || `${tile.scan_type} scan`}
-          {tile.findings_count > 0 ? ` · ${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}` : ""}
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 28 }}>
+          {tile.name ? tile.name : ""}
+          {tile.findings_count > 0
+            ? `${tile.name ? " · " : ""}${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}`
+            : (tile.name ? "" : "No findings yet")}
           {tile.framework ? ` · ${tile.framework}` : ""}
         </Typography>
         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>

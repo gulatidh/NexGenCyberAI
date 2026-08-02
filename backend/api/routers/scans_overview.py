@@ -26,7 +26,8 @@ from core.security import get_current_user
 from core.authz import get_user_grants, is_admin_anywhere
 from api.models.models import UserAccess, AccessRole, AccessScope
 from services.verdict import (
-    _category_for_connector, compute_rps, generate_verdict, generate_verdict_bg,
+    _category_for_connector, _tool_label_for_connector,
+    compute_rps, generate_verdict, generate_verdict_bg,
 )
 
 router = APIRouter(tags=["scans-overview"])
@@ -168,7 +169,7 @@ async def list_all_scans(
             "client_name": client_name,
             "connector_type": connector_type,
             "category": category,
-            "tile_name": f"{category} · {client_name}",
+            "tile_name": _tool_label_for_connector(connector_type),
             "name": s.name,
             "scan_type": s.scan_type.value if hasattr(s.scan_type, "value") else str(s.scan_type),
             "framework": (s.framework.value if hasattr(s.framework, "value") else (s.framework or None)) if s.framework else None,
@@ -251,7 +252,7 @@ async def scan_detail(
         "client_id": s.client_id,
         "client_name": client.name if client else "Unknown Client",
         "category": category,
-        "tile_name": f"{category} · {client.name if client else 'Unknown'}",
+        "tile_name": _tool_label_for_connector(connector_type),
         "name": s.name,
         "scan_type": s.scan_type.value if hasattr(s.scan_type, "value") else str(s.scan_type),
         "framework": (s.framework.value if hasattr(s.framework, "value") else s.framework) if s.framework else None,
