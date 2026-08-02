@@ -2061,7 +2061,7 @@ function DetectionRulesView({
 
                 {/* Collapsible YAML */}
                 <Collapse in={isExpanded} unmountOnExit>
-                  <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.06)", bgcolor: "rgba(0,0,0,0.3)", p: 0 }}>
+                  <Box sx={{ borderTop: "1px solid rgba(255,255,255,0.10)", bgcolor: "#0d1117", p: 0 }}>
                     <Box
                       component="pre"
                       sx={{
@@ -2069,13 +2069,13 @@ function DetectionRulesView({
                         p: 2,
                         fontSize: 11.5,
                         fontFamily: "'Fira Code', 'Cascadia Code', 'Consolas', monospace",
-                        color: "#B0BEC5",
+                        color: "#e6edf3",
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-word",
                         overflowX: "auto",
                         maxHeight: 400,
                         overflowY: "auto",
-                        lineHeight: 1.5,
+                        lineHeight: 1.6,
                       }}
                     >
                       {rule.sigma_yaml}
