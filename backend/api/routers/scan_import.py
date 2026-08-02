@@ -238,7 +238,7 @@ def import_history(
         results.append({
             "id": s.id,
             "scan_name": s.name,
-            "target": s.target,
+            "target": ctx.get("target") or (s.summary or {}).get("ai_guided_target") or "",
             "finding_count": finding_count,
             "detected_format": ctx.get("source_format", "unknown"),
             "tool_hint": ctx.get("tool_hint", ""),
