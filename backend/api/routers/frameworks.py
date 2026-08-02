@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 from api.models.models import (
     Asset, AssetStatus, Client, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
+    CustomFramework,
 )
 from api.schemas.schemas import (
     ControlStatusResponse, ControlStatusUpdate, FrameworkCatalogEntry,
@@ -92,6 +93,48 @@ async def list_frameworks(db: Session = Depends(get_db), _=Depends(get_current_u
     except Exception as exc:
         logger.exception("list_frameworks failed")
         raise HTTPException(status_code=500, detail=f"list_frameworks failed: {type(exc).__name__}: {exc}")
+
+
+@router.get("/frameworks/all/")
+async def list_frameworks_all(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Merged catalog: standard frameworks + user-created custom frameworks.
+    Returns [{value, label, is_custom, control_count}] used by Frameworks page
+    and AI Agents framework selector.
+    """
+    try:
+        # Standard frameworks
+        rows = db.query(FrameworkControl.framework, FrameworkControl.id).all()
+        by_fw: Dict[str, int] = {}
+        for fw, _id in rows:
+            v = fw.value if hasattr(fw, "value") else str(fw)
+            by_fw[v] = by_fw.get(v, 0) + 1
+        valid_values = {m.value for m in FrameworkType}
+        out = []
+        for fw_value, display_name in _FRAMEWORK_NAMES.items():
+            if fw_value not in valid_values:
+                continue
+            out.append({
+                "value": fw_value,
+                "label": display_name,
+                "is_custom": False,
+                "control_count": by_fw.get(fw_value, 0),
+            })
+        out.sort(key=lambda e: e["label"].lower())
+
+        # Custom frameworks
+        customs = db.query(CustomFramework).order_by(CustomFramework.name).all()
+        for cf in customs:
+            out.append({
+                "value": cf.slug,
+                "label": cf.name,
+                "is_custom": True,
+                "control_count": len(cf.controls) if cf.controls else 0,
+            })
+
+        return out
+    except Exception as exc:
+        logger.exception("list_frameworks_all failed")
+        raise HTTPException(status_code=500, detail=f"list_frameworks_all failed: {exc}")
 
 
 @router.get("/frameworks/{framework}/controls/", response_model=List[FrameworkControlResponse])

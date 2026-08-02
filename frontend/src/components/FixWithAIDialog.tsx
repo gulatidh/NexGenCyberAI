@@ -168,11 +168,11 @@ function PlanCard({ plan, finding, verificationResult, defaultExpanded = true }:
   const artifactMeta = ARTIFACT_META[plan.artifact_type];
   const downtimeMeta = DOWNTIME_META[plan.estimated_downtime];
 
-  const title = finding ? finding.title : `Finding ${plan.finding_id}`;
-  const severity = finding?.severity ?? "info";
+  const title = finding?.title ?? plan.finding_title ?? `Finding #${plan.finding_id.slice(-6)}`;
+  const severity = finding?.severity ?? plan.finding_severity ?? "info";
 
   return (
-    <Accordion defaultExpanded={defaultExpanded} sx={{ bgcolor: "rgba(255,255,255,0.03)", mb: 1 }}>
+    <Accordion defaultExpanded={defaultExpanded} sx={{ bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", mb: 1 }}>
       <AccordionSummary expandIcon={<ExpandMore />}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", flex: 1, mr: 1 }}>
           <Chip
@@ -278,9 +278,9 @@ function PlanCard({ plan, finding, verificationResult, defaultExpanded = true }:
               sx={{
                 mb: 1,
                 p: 1,
-                bgcolor: "rgba(255,255,255,0.03)",
+                bgcolor: "rgba(255,255,255,0.07)",
                 borderRadius: 1,
-                border: "1px solid rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.12)",
                 fontSize: 13,
                 lineHeight: 1.6,
                 "& code": {
@@ -588,7 +588,7 @@ export default function FixWithAIDialog({
         </Table>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} color="inherit">
+        <Button onClick={onClose} variant="outlined" sx={{ borderColor: "rgba(255,255,255,0.25)", color: "text.primary" }}>
           Cancel
         </Button>
         <Button
@@ -711,9 +711,9 @@ export default function FixWithAIDialog({
               gap: 2,
               alignItems: "flex-start",
               p: 2,
-              bgcolor: "rgba(255,255,255,0.03)",
+              bgcolor: "rgba(255,255,255,0.07)",
               borderRadius: 1,
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.15)",
               mb: 3,
             }}
           >
@@ -803,7 +803,7 @@ export default function FixWithAIDialog({
             Download Plan
           </Button>
           <Box sx={{ flex: 1 }} />
-          <Button onClick={onClose} color="inherit" size="small">
+          <Button onClick={onClose} variant="outlined" size="small" sx={{ borderColor: "rgba(255,255,255,0.25)", color: "text.primary" }}>
             Close
           </Button>
           {scanId ? (

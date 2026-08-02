@@ -692,6 +692,8 @@ export type RemediationJobStatus =
 
 export interface FindingRemediationPlan {
   finding_id: string;
+  finding_title?: string;    // stored on the job so UI works without the Finding object
+  finding_severity?: string;
   confidence_score: number;
   automatable: 'yes' | 'partial' | 'no';
   estimated_downtime: 'none' | 'minimal' | 'maintenance_window';

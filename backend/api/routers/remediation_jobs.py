@@ -80,7 +80,21 @@ async def _run_planner(job_id: str):
 
         plan = await generate_remediation_plan(findings)
 
-        job.plans = plan.get("findings", [])
+        # Attach finding title/severity to each plan item so the UI can display
+        # the title even when the Finding objects are not passed to the dialog.
+        finding_meta = {str(f.id): (f.title, f.severity.value if hasattr(f.severity, "value") else str(f.severity)) for f in findings}
+        enriched_plans = []
+        for p in plan.get("findings", []):
+            fid = p.get("finding_id", "")
+            title, sev = finding_meta.get(fid, (None, None))
+            enriched = {**p}
+            if title:
+                enriched["finding_title"] = title
+            if sev:
+                enriched["finding_severity"] = sev
+            enriched_plans.append(enriched)
+
+        job.plans = enriched_plans
         job.overall_summary = plan.get("overall_summary")
         job.overall_confidence = plan.get("overall_confidence")
         job.overall_risk_level = plan.get("overall_risk_level")
