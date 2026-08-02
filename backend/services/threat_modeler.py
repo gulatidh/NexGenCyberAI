@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── Fixed schema fields (normaliser enforces these) ─────────────────────────
 
 
-_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "trust_zone", "criticality", "notes")
+_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "trust_zone", "criticality", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
                      "port", "direction", "trust_boundary_crossing", "exposure",
                      "authentication_required")
@@ -318,16 +318,28 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
   "executive_summary": "<2-4 sentence CISO-level overview>",
   "components": [
     {{ "id": "<short-slug>", "name": "<asset name>",
-      "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
+      "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|threat_actor|other>",
       "dfd_type": "<external_entity|process|data_store>",
-      "trust_zone": "<public|dmz|private|data-tier|management>",
+      "is_threat_actor": <true|false>,
+      "threat_actor_type": "<external_attacker|insider_threat|nation_state|script_kiddie|vendor_risk|null>",
+      "trust_zone": "<Internet|DMZ|Corporate Network|Vendor Cloud|Database Tier|Management Zone>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
   ],
-  NOTE — dfd_type: external_entity = user-facing actors (browsers, human users, CDN, external APIs); process = anything that transforms data (web apps, APIs, microservices, VMs, containers, identity providers); data_store = anything that stores data at rest (databases, blob storage, secret stores, file repos, caches).
+  SCHEMA NOTES:
+  - dfd_type: external_entity = users, browsers, threat actors, CDN, external APIs, 3rd-party services; process = anything that transforms/handles data (web apps, APIs, microservices, VMs, containers, auth providers); data_store = data at rest (databases, blob storage, secret stores, file repos).
+  - ALWAYS include 1-3 threat actor components (is_threat_actor:true) representing realistic adversaries for this environment — e.g. "External Attacker", "Malicious Insider", "Compromised Vendor". Place them in the "Internet" trust_zone (or "Corporate Network" for insider). Give them dfd_type:"external_entity".
+  - trust_zone must use SECURITY DOMAIN names — NOT generic network names:
+      Internet = untrusted external zone (attackers, internet users, external APIs)
+      DMZ = semi-trusted perimeter (load balancers, WAF, CDN, reverse proxies)
+      Corporate Network = internally-owned trusted systems
+      Vendor Cloud = third-party cloud services (AWS, Azure services, SaaS)
+      Database Tier = data stores requiring restricted access
+      Management Zone = privileged admin systems (SIEM, bastion, key vault, monitoring)
   "data_flows": [
     {{ "from": "<component id>", "to": "<component id>",
       "label": "<SourceName to DestinationName>",
+      "is_attack_vector": <true|false>,
       "protocol": "<https|sql|ssh|smb|grpc|amqp|dns|other>",
       "port": "<port number e.g. 443, 5432, 8080>",
       "data": "<credentials|pii|financial|telemetry|config|other>",
@@ -339,10 +351,13 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "notes": "<one-line>" }}
   ],
   "trust_boundaries": [
-    {{ "id": "tb1", "name": "Internet → DMZ",
-      "from_zone": "public", "to_zone": "dmz",
+    {{ "id": "tb1", "name": "<e.g. Corporate Boundary|Vendor Boundary|Internet Boundary|Database Server Boundary>",
+      "from_zone": "<Internet|DMZ|Corporate Network|Vendor Cloud|Database Tier|Management Zone>",
+      "to_zone": "<Internet|DMZ|Corporate Network|Vendor Cloud|Database Tier|Management Zone>",
+      "boundary_type": "<corporate|vendor|internet|server|dmz|cloud>",
       "description": "<one-line>", "crossed_by_flow_ids": ["f1","f2"] }}
   ],
+  NOTE — produce named trust boundaries like "Corporate Boundary" (wraps Corporate Network zone), "Vendor Boundary" (wraps Vendor Cloud zone), "Database Server Boundary" (wraps Database Tier). These boundaries must have meaningful SECURITY context — not just "public→private".
   "entry_points": [
     {{ "id": "ep1", "kind": "http|websocket|api|cli|email|file_upload|webhook|other",
       "name": "/api/v1/login", "component_id": "<id>",
@@ -422,6 +437,8 @@ CRITICAL rules (these are gates, not preferences):
 2. COMPLETENESS — components, data_flows, trust_boundaries, AND entry_points are ALL required. Do not
    omit trust_boundaries or entry_points. An entry point is anywhere data crosses INTO the system from
    an external actor (HTTP endpoints, file uploads, webhooks, message queues consumed from outside).
+
+2b. THREAT ACTORS — include 1-3 threat actor components (is_threat_actor:true, dfd_type:external_entity) that represent realistic adversaries. For each threat actor, produce at least one data_flow (is_attack_vector:true) from that actor to the component they would initially target. Attack vector flows show HOW the adversary enters the system on the DFD. Label them e.g. "Attacker → Login Endpoint" or "Malicious Insider → Key Vault". Trust boundaries MUST reflect security ownership — use "Corporate Boundary", "Vendor Boundary", "Database Server Boundary" etc., NOT network zone names.
 
 3. TIERED STRIDE COVERAGE — produce coverage_decisions covering:
    - Critical + High criticality components: ALL 6 STRIDE categories (or your methodology's full set)
@@ -767,19 +784,22 @@ def _component_type(text: str) -> str:
 
 
 def _infer_zone(text: str) -> str:
-    """Heuristic trust zone for an asset — deterministic so the same asset
-    lands in the same zone across every methodology / rerun."""
+    """Heuristic security-domain trust zone — uses ownership/trust vocabulary
+    instead of network zones so the DFD reads as a threat model."""
     t = (text or "").lower()
-    if any(k in t for k in ("public", "internet", "cdn", "frontend", "web", "waf",
-                            "gateway", "load balancer", "ingress", "edge", "dmz", "front door")):
-        return "public"
+    if any(k in t for k in ("cdn", "waf", "edge", "front door", "load balancer",
+                            "ingress", "dmz", "perimeter", "reverse proxy")):
+        return "DMZ"
     if any(k in t for k in ("database", "db", "sql", "storage", "bucket", "blob",
-                            "data", "warehouse", "lake")):
-        return "data-tier"
-    if any(k in t for k in ("identity", "iam", "auth", "entra", "secret", "vault",
-                            "kms", "admin", "manage", "mgmt", "bastion")):
-        return "management"
-    return "private"
+                            "data", "warehouse", "lake", "cosmos", "dynamo", "rds")):
+        return "Database Tier"
+    if any(k in t for k in ("secret", "vault", "kms", "keyvault", "bastion",
+                            "admin", "manage", "mgmt", "siem", "sentinel", "monitor")):
+        return "Management Zone"
+    if any(k in t for k in ("aws", "azure", "gcp", "saas", "vendor", "third.party",
+                            "external.api", "partner", "s3", "lambda", "function")):
+        return "Vendor Cloud"
+    return "Corporate Network"
 
 
 def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
@@ -803,6 +823,8 @@ def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict
                 else "external_entity" if _component_type(hay) == "endpoint"
                 else "process"
             ),
+            "is_threat_actor": False,
+            "threat_actor_type": None,
             "trust_zone": _infer_zone(hay),
             "criticality": _str(a.get("criticality")) or "medium",
             "notes": "",
@@ -883,6 +905,7 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
             "from": _str(_df.get("from")),
             "to": _str(_df.get("to")),
             "label": _str(_df.get("label")),
+            "is_attack_vector": bool(_df.get("is_attack_vector", False)),
             "protocol": _str(_df.get("protocol")),
             "port": _str(_df.get("port")),
             "data": _str(_df.get("data")),
