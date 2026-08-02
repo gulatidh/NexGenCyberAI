@@ -29,6 +29,7 @@ import { fromNow } from "../utils/datetime";
 import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdDiagram from "../components/DfdDiagram";
 import DrawioDiagram from "../components/DrawioDiagram";
+import DfdReactFlow from "../components/DfdReactFlow";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 interface Component {
@@ -80,7 +81,7 @@ interface GenerationProgress {
 }
 interface ThreatModelDetailData {
   id: string; client_id: string; name?: string | null;
-  scope_type: string; framework?: string | null; methodology: string;
+  scope_type: string; framework?: string | null; methodology: string; cloud_provider?: string | null;
   status: string; executive_summary?: string | null;
   component_count: number; threat_count: number; mitigation_count: number;
   components: Component[]; data_flows: DataFlow[]; threats: Threat[];
@@ -232,8 +233,8 @@ export default function ThreatModelDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("diagram");
-  // Diagram-renderer toggle: 'mermaid' (built-in, fast) | 'drawio' (rich, editable)
-  const [diagramMode, setDiagramMode] = useState<"mermaid" | "drawio">("mermaid");
+  // Diagram-renderer toggle: 'interactive' (React Flow DFD) | 'mermaid' | 'drawio'
+  const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid" | "drawio">("interactive");
   // Phase 9B — diagram VIEW (overlay lens for the Mermaid renderer).
   const [diagramView, setDiagramView] = useState<"architecture" | "threat_heat" | "detection_coverage">("architecture");
   // When the browser triggers print (button or Ctrl+P), expand every tab
@@ -621,29 +622,28 @@ export default function ThreatModelDetail() {
           <CardContent>
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
               <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
-                <Button
-                  size="small"
-                  startIcon={<Hub sx={{ fontSize: 16 }} />}
-                  onClick={() => setDiagramMode("mermaid")}
-                  sx={{
-                    minWidth: 120, color: diagramMode === "mermaid" ? "white" : "rgba(255,255,255,0.55)",
-                    bgcolor: diagramMode === "mermaid" ? "rgba(66,133,244,0.18)" : "transparent",
-                    textTransform: "none", fontSize: 12, fontWeight: 600,
-                    "&:hover": { bgcolor: diagramMode === "mermaid" ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
-                  }}
-                >Mermaid</Button>
-                <Button
-                  size="small"
-                  startIcon={<Schema sx={{ fontSize: 16 }} />}
-                  onClick={() => setDiagramMode("drawio")}
-                  disabled={data.status !== "completed"}
-                  sx={{
-                    minWidth: 120, color: diagramMode === "drawio" ? "white" : "rgba(255,255,255,0.55)",
-                    bgcolor: diagramMode === "drawio" ? "rgba(66,133,244,0.18)" : "transparent",
-                    textTransform: "none", fontSize: 12, fontWeight: 600,
-                    "&:hover": { bgcolor: diagramMode === "drawio" ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
-                  }}
-                >draw.io</Button>
+                {(
+                  [
+                    { key: "interactive", label: "Interactive", icon: <AccountTree sx={{ fontSize: 16 }} /> },
+                    { key: "mermaid",     label: "Mermaid",     icon: <Hub sx={{ fontSize: 16 }} /> },
+                    { key: "drawio",      label: "draw.io",     icon: <Schema sx={{ fontSize: 16 }} />, disabled: data.status !== "completed" },
+                  ] as Array<{ key: "interactive"|"mermaid"|"drawio"; label: string; icon: React.ReactNode; disabled?: boolean }>
+                ).map((opt) => (
+                  <Button
+                    key={opt.key}
+                    size="small"
+                    startIcon={opt.icon}
+                    disabled={opt.disabled}
+                    onClick={() => setDiagramMode(opt.key)}
+                    sx={{
+                      minWidth: 110,
+                      color: diagramMode === opt.key ? "white" : "rgba(255,255,255,0.55)",
+                      bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.18)" : "transparent",
+                      textTransform: "none", fontSize: 12, fontWeight: 600,
+                      "&:hover": { bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.25)" : "rgba(255,255,255,0.06)" },
+                    }}
+                  >{opt.label}</Button>
+                ))}
               </Box>
               <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
                 {/* Phase 9B — view-lens toggle, only meaningful in Mermaid mode */}
@@ -688,7 +688,14 @@ export default function ThreatModelDetail() {
                 >Download .drawio</Button>
               </Box>
             </Box>
-            {(diagramMode === "mermaid" || printing) ? (
+            {diagramMode === "interactive" && !printing ? (
+              <DfdReactFlow
+                components={data.components}
+                dataFlows={data.data_flows}
+                threats={data.threats}
+                trustBoundaries={data.trust_boundaries ?? []}
+              />
+            ) : (diagramMode === "mermaid" || printing) ? (
               <DfdDiagram
                 source={
                   diagramView !== "architecture" && styledDfdQuery.data?.mermaid
@@ -702,7 +709,7 @@ export default function ThreatModelDetail() {
                 <Typography variant="body2">Rendering draw.io diagram…</Typography>
               </Box>
             ) : drawioQuery.data ? (
-              <DrawioDiagram xml={drawioQuery.data.xml} />
+              <DrawioDiagram xml={drawioQuery.data.xml} cloudProvider={data.cloud_provider ?? "generic"} />
             ) : (
               <Typography variant="body2" sx={{ color: "text.secondary", py: 4, textAlign: "center" }}>
                 draw.io view unavailable.

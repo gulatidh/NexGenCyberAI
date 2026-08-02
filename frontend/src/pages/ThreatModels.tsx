@@ -76,6 +76,7 @@ export default function ThreatModels() {
   // ── Create-dialog form state
   const [tmName, setTmName] = useState("");
   const [methodology, setMethodology] = useState<string>("stride");
+  const [cloudProvider, setCloudProvider] = useState<string>("generic");
   const [scanIds, setScanIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [autoRemodel, setAutoRemodel] = useState(false);
@@ -111,6 +112,7 @@ export default function ThreatModels() {
       scope_type: scanIds.length ? "scans" : "client",
       scan_ids: scanIds.length ? scanIds : undefined,
       methodology,
+      cloud_provider: cloudProvider,
       analyst_notes: notes.trim() || undefined,
       auto_remodel: autoRemodel,
     }),
@@ -120,6 +122,7 @@ export default function ThreatModels() {
       setTmName("");
       setScanIds([]);
       setNotes("");
+      setCloudProvider("generic");
       setAutoRemodel(false);
       toast.success("Threat model generation started");
       // Auto-open detail so the user sees the generating state.
@@ -350,6 +353,45 @@ export default function ThreatModels() {
                   Loading methodologies…
                 </Typography>
               )}
+            </Box>
+
+            <Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
+                TARGET ENVIRONMENT
+              </Typography>
+              <Grid container spacing={1}>
+                {[
+                  { id: "aws",     label: "AWS",        desc: "Amazon Web Services — EC2, S3, RDS, Lambda…" },
+                  { id: "azure",   label: "Azure",       desc: "Microsoft Azure — App Service, Cosmos DB, Key Vault…" },
+                  { id: "gcp",     label: "GCP",         desc: "Google Cloud — GKE, Cloud SQL, GCS…" },
+                  { id: "on_prem", label: "On-Premises", desc: "Data centre / bare-metal / private infrastructure" },
+                  { id: "generic", label: "Generic / Multi-cloud", desc: "Mixed or provider-agnostic architecture" },
+                ].map((env) => {
+                  const picked = cloudProvider === env.id;
+                  return (
+                    <Grid key={env.id} size={{ xs: 12, sm: 6 }}>
+                      <Card
+                        onClick={() => setCloudProvider(env.id)}
+                        sx={{
+                          p: 1.5, cursor: "pointer",
+                          bgcolor: picked ? "rgba(66,133,244,0.08)" : "transparent",
+                          border: `1px solid ${picked ? "#4285F4" : "rgba(255,255,255,0.1)"}`,
+                          borderRadius: 1.5, height: "100%",
+                          "&:hover": { borderColor: "#4285F4" },
+                        }}
+                      >
+                        <Typography sx={{ color: "text.primary", fontWeight: 700, fontSize: 13, mb: 0.25 }}>{env.label}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", lineHeight: 1.4 }}>
+                          {env.desc}
+                        </Typography>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                Selects provider-specific icons in the draw.io diagram (AWS, Azure, GCP resource shapes).
+              </Typography>
             </Box>
 
             <Box>

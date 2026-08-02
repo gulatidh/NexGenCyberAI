@@ -180,13 +180,40 @@ def _safe(s: Any) -> str:
     return escape(str(s or "")).replace('"', "&quot;")
 
 
-def _style_for(component_type: Optional[str], notes: Optional[str] = None) -> str:
+_PROVIDER_PREFIXES: Dict[str, str] = {
+    "aws": "aws_",
+    "azure": "azure_",
+    "gcp": "gcp_",
+}
+
+_PROVIDER_GENERIC_FALLBACKS: Dict[str, Dict[str, str]] = {
+    "aws": {
+        "database": "aws_rds", "storage": "aws_s3", "queue": "aws_sqs",
+        "api": "aws_apigateway", "identity": "aws_iam", "secret-store": "aws_secretsmanager",
+        "vm": "aws_ec2",
+    },
+    "azure": {
+        "database": "azure_sql", "storage": "azure_storage", "queue": "azure_servicebus",
+        "api": "azure_apim", "identity": "entra_id", "secret-store": "azure_keyvault",
+        "vm": "azure_vm",
+    },
+    "gcp": {
+        "database": "gcp_sql", "storage": "gcp_storage",
+    },
+}
+
+
+def _style_for(
+    component_type: Optional[str],
+    notes: Optional[str] = None,
+    cloud_provider: Optional[str] = None,
+) -> str:
     """Pick the right mxGraph style for a component.
 
     Tries (in order):
       1. Direct match on a provider-specific key (`aws_s3`, `azure_keyvault`, ...)
       2. Substring hint match against `_TYPE_HINTS`
-      3. Substring against notes (sometimes the provider hint lives there)
+      3. Provider-aware generic fallback (e.g. 'database' + 'aws' → aws_rds)
       4. Generic fallback
     """
     if not component_type:
@@ -199,6 +226,11 @@ def _style_for(component_type: Optional[str], notes: Optional[str] = None) -> st
     for needle, target in _TYPE_HINTS:
         if needle in full and target in _TYPE_STYLE:
             return _TYPE_STYLE[target]
+    # Provider-aware generic fallback
+    if cloud_provider and cloud_provider in _PROVIDER_GENERIC_FALLBACKS:
+        pf = _PROVIDER_GENERIC_FALLBACKS[cloud_provider]
+        if haystack in pf and pf[haystack] in _TYPE_STYLE:
+            return _TYPE_STYLE[pf[haystack]]
     return _DEFAULT_STYLE
 
 
@@ -230,6 +262,7 @@ def render_drawio_xml(
     components: List[Dict[str, Any]],
     data_flows: List[Dict[str, Any]],
     executive_summary: Optional[str] = None,
+    cloud_provider: Optional[str] = None,
 ) -> str:
     """Render the threat-model components + flows into an mxGraph XML string.
 
@@ -287,7 +320,7 @@ def render_drawio_xml(
             if crit in ("critical", "high"):
                 badge = f"\n[{crit.upper()}]"
             label = f"{name}{badge}"
-            style = _style_for(comp.get("type"), comp.get("notes"))
+            style = _style_for(comp.get("type"), comp.get("notes"), cloud_provider)
             cells.append(
                 f'<mxCell id="{_safe(cid)}" value="{_safe(label)}" '
                 f'style="{style}" vertex="1" parent="{zone_id}">'

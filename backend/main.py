@@ -335,6 +335,7 @@ def _ensure_added_columns() -> None:
             ("adversary_profiles_json", "TEXT"),
             ("sigma_rules_json", "TEXT"),
             ("auto_remodel", "INTEGER DEFAULT 0"),
+            ("cloud_provider", "VARCHAR(32) DEFAULT 'generic'"),
         ]:
             if _col not in tm_cols:
                 _ddl = (f"ALTER TABLE threat_models ADD {_col} NVARCHAR(MAX) NULL"

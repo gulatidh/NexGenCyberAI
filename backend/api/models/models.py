@@ -652,6 +652,7 @@ class ThreatModel(Base):
     # methodologies later doesn't require a DB migration. Currently
     # supported: stride | pasta | linddun | mitre_attack | kill_chain.
     methodology = Column(String(32), default="stride")
+    cloud_provider = Column(String(32), default="generic")  # aws | azure | gcp | on_prem | generic
     status = Column(String(32), default="pending")  # pending | generating | completed | failed
     error_message = Column(Text)
     # Live generation progress for the UI step checklist. Shape:

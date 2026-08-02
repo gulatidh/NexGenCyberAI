@@ -109,6 +109,7 @@ class ThreatModelCreate(BaseModel):
     framework: Optional[FrameworkType] = None
     methodology: Optional[str] = None  # stride | pasta | linddun | mitre_attack | kill_chain
     analyst_notes: Optional[str] = None  # free-text guidance for the model
+    cloud_provider: Optional[str] = None  # aws | azure | gcp | on_prem | generic
     components: Optional[List[Dict[str, Any]]] = None  # optional curated component set (pinned)
     auto_remodel: bool = False  # Phase 9 — auto re-generate on new scan completion
 
@@ -123,6 +124,7 @@ class ThreatModelSummary(BaseModel):
     scope_scan_ids: Optional[List[str]] = None
     framework: Optional[str] = None
     methodology: str = "stride"
+    cloud_provider: Optional[str] = "generic"
     status: str
     component_count: int
     threat_count: int
@@ -182,6 +184,7 @@ def _summary_from(tm: ThreatModel) -> Dict[str, Any]:
         "scope_scan_ids": tm.scope_scan_ids or None,
         "framework": tm.framework.value if hasattr(tm.framework, "value") else tm.framework,
         "methodology": tm.methodology or "stride",
+        "cloud_provider": tm.cloud_provider or "generic",
         "status": tm.status or "pending",
         "component_count": len(tm.components_json or []),
         "threat_count": len(tm.threats_json or []),
@@ -329,6 +332,7 @@ async def create_threat_model(
         analyst_notes=(payload.analyst_notes or "").strip() or None,
         components_json=curated,
         components_pinned=bool(curated),
+        cloud_provider=(payload.cloud_provider or "generic").lower().strip(),
         auto_remodel=bool(payload.auto_remodel),
         status="pending",
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
@@ -637,6 +641,7 @@ async def get_threat_model_drawio(
         components=tm.components_json or [],
         data_flows=tm.data_flows_json or [],
         executive_summary=tm.executive_summary,
+        cloud_provider=tm.cloud_provider or "generic",
     )
     safe_name = "".join(c if c.isalnum() or c in "-_" else "-" for c in title)[:80] or "threat-model"
     filename = f"{safe_name}.drawio"

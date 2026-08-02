@@ -13,17 +13,32 @@ import React, { useEffect, useRef, useState } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { Warning } from "@mui/icons-material";
 
-const EMBED_URL =
-  "https://embed.diagrams.net/?embed=1&proto=json&spin=0&ui=dark" +
-  "&libraries=0&saveAndExit=0&noSaveBtn=1&noExitBtn=1&toolbar=zoom%20pages";
+const EMBED_BASE =
+  "https://embed.diagrams.net/?embed=1&proto=json&spin=0" +
+  "&saveAndExit=0&noSaveBtn=1&noExitBtn=1&toolbar=zoom%20pages";
+
+const PROVIDER_LIBS: Record<string, string> = {
+  aws:     "aws4;general",
+  azure:   "azure2;general",
+  gcp:     "gcp2;general",
+  on_prem: "cisco;network;general",
+  generic: "general",
+};
+
+function embedUrl(cloudProvider?: string): string {
+  const libs = PROVIDER_LIBS[cloudProvider || "generic"] ?? "general";
+  return `${EMBED_BASE}&ui=dark&libraries=1&libs=${encodeURIComponent(libs)}`;
+}
 
 interface Props {
   xml: string;
   className?: string;
   height?: number | string;
+  cloudProvider?: string;
 }
 
-export default function DrawioDiagram({ xml, className, height = 620 }: Props) {
+export default function DrawioDiagram({ xml, className, height = 620, cloudProvider }: Props) {
+  const EMBED_URL = embedUrl(cloudProvider);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
