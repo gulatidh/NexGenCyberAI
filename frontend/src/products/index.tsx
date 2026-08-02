@@ -9,7 +9,7 @@ import {
   Security, FindInPage, Policy, LibraryAdd, Description,
   Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
-  Devices, HelpOutlined, AutoFixHigh,
+  Devices, HelpOutlined, AutoFixHigh, AltRoute, FolderZip,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -55,14 +55,17 @@ export const VULN_MGMT: ProductDef = {
 };
 
 export const PEN_TEST: ProductDef = {
-  name: "Pen Testing",
+  name: "Pen Testing & Red Team",
   abbrev: "PT",
   icon: <Shield />,
   color: "#00695C",
   bgColor: "#E0F2F1",
   basePath: "/vapt",
   nav: [
-    { label: "VAPT Reports", icon: <Description />, path: "/reports" },
+    { label: "Pentest Scans",    icon: <BugReport />,    path: "/scans" },
+    { label: "VAPT Reports",     icon: <Description />,  path: "/reports" },
+    { label: "Attack Paths",     icon: <AltRoute />,     path: "/attack-paths" },
+    { label: "Evidence Package", icon: <FolderZip />,    path: "/evidence" },
   ],
 };
 

@@ -165,9 +165,14 @@ function ProtectedApp() {
         </Route>
 
         <Route path="/vapt" element={<ProductLayout product={PEN_TEST} />}>
-          <Route index element={<Navigate to="reports" replace />} />
+          <Route index element={<Navigate to="scans" replace />} />
+          <Route path="scans" element={<Scans />} />
+          <Route path="scans/:scanId" element={<ScanDetail />} />
+          <Route path="scans/:scanId/diff" element={<ScanDiff />} />
           <Route path="reports" element={<VAPTReports />} />
           <Route path="reports/:reportId" element={<VAPTReportDetail />} />
+          <Route path="attack-paths" element={<AttackPaths />} />
+          <Route path="evidence" element={<EvidencePackage />} />
         </Route>
 
         <Route path="/compliance" element={<ProductLayout product={COMPLIANCE_MONITOR} />}>
