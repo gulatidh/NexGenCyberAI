@@ -61,6 +61,7 @@ import SecurityDocs from "./pages/SecurityDocs";
 import AttackPaths from "./pages/AttackPaths";
 import CVEPivot from "./pages/CVEPivot";
 import NLQuery from "./pages/NLQuery";
+import AIAssistedScan from "./pages/AIAssistedScan";
 import PostureTrends from "./pages/PostureTrends";
 import ComplianceHeatmap from "./pages/ComplianceHeatmap";
 import ClientComparison from "./pages/ClientComparison";
@@ -270,6 +271,7 @@ function ProtectedApp() {
           <Route path="/attack-paths" element={<AttackPaths />} />
           <Route path="/cve-pivot" element={<CVEPivot />} />
           <Route path="/nl-query" element={<NLQuery />} />
+          <Route path="/ai-assisted-scan" element={<AIAssistedScan />} />
           <Route path="/posture-trends" element={<PostureTrends />} />
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
           <Route path="/client-comparison" element={<ClientComparison />} />

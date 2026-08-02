@@ -841,6 +841,29 @@ const GROUPS: Group[] = [
     color: "#9C27B0",
     topics: [
       {
+        id: "ai-assisted-scan",
+        title: "AI Assisted Scan — guided assessment wizard",
+        summary: "AI Assisted Scan is a conversational wizard that takes you from plain-English intent to a running scan without needing to know which connector to use or how to configure it. The AI keeps asking questions until it has everything it needs, then lets you launch with one click.",
+        steps: [
+          { text: "Navigate to Intelligence → AI Assisted Scan in the left sidebar." },
+          { text: "Select your client in the top toolbar. The AI immediately greets you and asks what you want to assess." },
+          { text: "Type your goal in plain English — for example: 'I want to check my Azure environment for misconfigurations' or 'Scan my web application for vulnerabilities'. The AI uses your configured connectors to suggest the best match.", detail: "The AI is told about every connector you have set up (name, type, what it scans) at runtime — it never guesses. If you have no connectors configured it will tell you to add one in Connections first." },
+          { text: "Answer the AI's follow-up questions one at a time: connector confirmation, target details (URL, subscription ID, IP range, etc.), optional compliance framework. The AI rephrases and asks again if your answer is unclear." },
+          { text: "When all required information is collected, the right-hand panel shows a green 'Launch Scan' button and a summary of the scan configuration. Review it and click Launch." },
+          { text: "After launch: the right panel shows a 'View Scan Progress' link. Once the scan completes, the AI recommends which AI Agents to run next (Threat Intel, Risk Manager, Compliance Monitor, Remediation) with a one-sentence reason for each." },
+          { text: "Click 'Open AI Agents →' to go straight to the Agents page and run the recommended agents against the completed scan." },
+        ],
+        tips: [
+          "You can use quick-start suggestion chips on the empty state to kickstart the conversation without typing.",
+          "The scan launched by AI Assisted Scan is a normal scan — it appears in your Scans list, has a ScanDetail page, and is subject to all the same CVE enrichment and compliance recompute steps.",
+          "If you want to scan against a compliance framework, mention it in the conversation (e.g. 'and check against CIS Azure') or the AI will ask about it in the Framework phase.",
+        ],
+        warnings: [
+          "The AI does not handle credentials — if a connector requires credentials that aren't already stored in Connections, it will tell you to add the connector first.",
+          "AI Assisted Scan requires at least one AI provider configured in AI Settings. If the chat shows a 503 error, go to Connections → AI Settings and add a provider.",
+        ],
+      },
+      {
         id: "cve-enrichment",
         title: "Automatic CVE & CVSS enrichment",
         summary: "After every scan completes, Monitara automatically enriches each finding with accurate CVE IDs and CVSS v3.1 scores using the LLM's own security knowledge — no external API calls, no token congestion. Multiple CVEs per finding are supported.",

@@ -99,6 +99,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Intelligence",
     items: [
+      { label: "AI Assisted Scan",   icon: <SmartToy />,    path: "/ai-assisted-scan" },
       { label: "Attack Paths",       icon: <AccountTree />, path: "/attack-paths" },
       { label: "CVE Blast Radius",   icon: <BugReport />,   path: "/cve-pivot" },
       { label: "Ask Your Data",      icon: <Psychology />,  path: "/nl-query" },
