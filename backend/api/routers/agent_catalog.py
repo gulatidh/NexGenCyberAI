@@ -123,13 +123,23 @@ class AgentResponse(AgentBase):
 
 @router.get("/")
 async def list_agents(
+    include_hidden: bool = False,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return agents grouped by group_key, sorted by builtin-first then name."""
-    rows = db.query(AIAgent).order_by(AIAgent.group_key, AIAgent.is_builtin.desc(), AIAgent.name).all()
+    """Return agents grouped by group_key, sorted by builtin-first then name.
+
+    By default, built-in agents that have been hidden (is_enabled=False) are
+    excluded from the response.  Pass ?include_hidden=true to include them so
+    admins can restore or permanently re-enable them.
+    """
+    q = db.query(AIAgent).order_by(AIAgent.group_key, AIAgent.is_builtin.desc(), AIAgent.name)
+    rows = q.all()
     grouped: Dict[str, Dict[str, Any]] = {}
     for a in rows:
+        # Skip disabled built-ins unless the caller explicitly wants them
+        if a.is_builtin and not a.is_enabled and not include_hidden:
+            continue
         if a.group_key not in grouped:
             grouped[a.group_key] = {"key": a.group_key, "label": a.group_label, "agents": []}
         grouped[a.group_key]["agents"].append(AgentResponse.model_validate(a).model_dump(mode="json"))
@@ -191,16 +201,34 @@ async def update_agent(
 async def delete_agent(
     agent_id: str,
     db: Session = Depends(get_db),
-    _: dict = Depends(_require_admin),
+    _: dict = Depends(get_current_user),
 ):
     a = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Agent not found")
     if a.is_builtin:
-        raise HTTPException(status_code=409, detail="Built-in agents cannot be deleted. Disable them via the `is_enabled` toggle instead.")
+        # Built-ins are re-seeded on restart — hide instead of hard-delete
+        a.is_enabled = False
+        db.commit()
+        return {"hidden": True}
     db.delete(a)
     db.commit()
     return {"deleted": True}
+
+
+@router.post("/{agent_id}/restore")
+async def restore_agent(
+    agent_id: str,
+    db: Session = Depends(get_db),
+    _: dict = Depends(get_current_user),
+):
+    """Re-enable a hidden built-in agent."""
+    a = db.query(AIAgent).filter(AIAgent.id == agent_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    a.is_enabled = True
+    db.commit()
+    return {"restored": True}
 
 
 class AgentRunRequest(BaseModel):

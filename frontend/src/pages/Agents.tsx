@@ -1078,9 +1078,24 @@ export default function Agents() {
     queryFn: () => customFrameworksApi.listAll(),
   });
 
+  const [showHidden, setShowHidden] = useState(false);
+
   const { data: catalogData, isLoading } = useQuery<{ groups: AgentGroup[] }>({
-    queryKey: ["agent-catalog"], queryFn: agentCatalogApi.list,
+    queryKey: ["agent-catalog", showHidden],
+    queryFn: () => agentCatalogApi.list(showHidden),
   });
+
+  const { data: hiddenData } = useQuery<{ groups: AgentGroup[] }>({
+    queryKey: ["agent-catalog-hidden"],
+    queryFn: () => agentCatalogApi.list(true),
+    select: (d) => ({
+      groups: d.groups.map((g) => ({
+        ...g,
+        agents: g.agents.filter((a: any) => a.is_builtin && !a.is_enabled),
+      })).filter((g) => g.agents.length > 0),
+    }),
+  });
+  const hiddenCount = hiddenData?.groups.reduce((s, g) => s + g.agents.length, 0) ?? 0;
 
   const allGroups = useMemo(() => catalogData?.groups || [], [catalogData]);
   const groups = allGroups;
@@ -1158,8 +1173,22 @@ export default function Agents() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => agentCatalogApi.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agent-catalog"] }); toast.success("Agent deleted"); },
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["agent-catalog"] });
+      qc.invalidateQueries({ queryKey: ["agent-catalog-hidden"] });
+      toast.success(res?.hidden ? "Agent hidden — restore it from 'Show hidden'" : "Agent deleted");
+    },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (id: string) => agentCatalogApi.restore(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent-catalog"] });
+      qc.invalidateQueries({ queryKey: ["agent-catalog-hidden"] });
+      toast.success("Agent restored");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Restore failed"),
   });
 
   const archiveRunMutation = useMutation({
@@ -1182,7 +1211,17 @@ export default function Agents() {
               : "Loading…"}
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+          {hiddenCount > 0 && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setShowHidden((v) => !v)}
+              sx={{ fontSize: 12, borderColor: "rgba(255,255,255,0.2)", color: "text.secondary" }}
+            >
+              {showHidden ? "Hide hidden agents" : `Show hidden (${hiddenCount})`}
+            </Button>
+          )}
           {isAdmin && (
             <Button variant="contained" startIcon={<Add />} onClick={() => setNewOpen(true)}>
               New Agent
@@ -1267,17 +1306,18 @@ export default function Agents() {
                               {isAdmin ? <Edit sx={{ fontSize: 16 }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
                             </IconButton>
                           </Tooltip>
-                          {!agent.is_builtin && (
-                            <Tooltip title="Delete agent">
-                              <IconButton size="small"
-                                onClick={() => {
-                                  if (window.confirm(`Delete agent "${agent.name}"? This cannot be undone.`)) deleteMutation.mutate(agent.id);
-                                }}
-                                sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
-                                <Delete sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
+                          <Tooltip title={agent.is_builtin ? "Hide agent" : "Delete agent"}>
+                            <IconButton size="small"
+                              onClick={() => {
+                                const msg = agent.is_builtin
+                                  ? `Hide "${agent.name}"? You can restore it later.`
+                                  : `Delete "${agent.name}"? This cannot be undone.`;
+                                if (window.confirm(msg)) deleteMutation.mutate(agent.id);
+                              }}
+                              sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
+                              <Delete sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
                         </Box>
                       </CardContent>
                     </Card>
@@ -1287,6 +1327,43 @@ export default function Agents() {
             </Box>
           );
         })
+      )}
+
+      {/* Hidden built-in agents section */}
+      {showHidden && hiddenData && hiddenData.groups.length > 0 && (
+        <Box sx={{ mt: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+            <Box sx={{ width: 4, height: 18, bgcolor: "#9E9E9E", borderRadius: 1 }} />
+            <Typography sx={{ color: "text.secondary", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: 1.5 }}>
+              Hidden Agents
+            </Typography>
+            <Chip label={hiddenCount} size="small"
+              sx={{ height: 20, bgcolor: "rgba(158,158,158,0.15)", color: "text.secondary", fontSize: 11, fontWeight: 700 }} />
+            <Box sx={{ flex: 1, height: 1, bgcolor: "rgba(255,255,255,0.08)" }} />
+          </Box>
+          <Grid container spacing={2}>
+            {hiddenData.groups.flatMap((g) => g.agents).map((agent: any) => (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.id}>
+                <Card variant="outlined" sx={{ opacity: 0.55, borderStyle: "dashed" }}>
+                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{agent.name}</Typography>
+                      <Chip label="Hidden" size="small" sx={{ height: 18, fontSize: 9, bgcolor: "rgba(158,158,158,0.15)", color: "text.secondary" }} />
+                    </Box>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+                      {agent.description}
+                    </Typography>
+                    <Button size="small" variant="outlined"
+                      onClick={() => restoreMutation.mutate(agent.id)}
+                      sx={{ fontSize: 11, borderColor: "rgba(255,255,255,0.2)", color: "text.secondary" }}>
+                      Restore
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
 
       {/* Polling status banner */}

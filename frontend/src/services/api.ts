@@ -462,12 +462,14 @@ export const assessmentsApi = {
 };
 
 export const agentCatalogApi = {
-  list: () => apiClient.get(`/agents/catalog/`).then((r) => r.data),
+  list: (includeHidden = false) =>
+    apiClient.get(`/agents/catalog/`, { params: includeHidden ? { include_hidden: true } : {} }).then((r) => r.data),
   get: (agentId: string) => apiClient.get(`/agents/catalog/${agentId}`).then((r) => r.data),
   create: (data: any) => apiClient.post(`/agents/catalog/`, data).then((r) => r.data),
   update: (agentId: string, data: any) =>
     apiClient.patch(`/agents/catalog/${agentId}`, data).then((r) => r.data),
   delete: (agentId: string) => apiClient.delete(`/agents/catalog/${agentId}`).then((r) => r.data),
+  restore: (agentId: string) => apiClient.post(`/agents/catalog/${agentId}/restore`).then((r) => r.data),
   run: (agentId: string, prompt?: string, clientId?: string, scanId?: string, assetIds?: string[]) =>
     apiClient.post(`/agents/catalog/${agentId}/run`, {
       prompt,
