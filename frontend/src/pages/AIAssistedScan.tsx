@@ -14,6 +14,12 @@ import { apiClient } from "../services/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+interface OptionItem {
+  label: string;
+  value: string;
+  sub?: string;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -43,7 +49,7 @@ async function chatApi(clientId: string, message: string, history: Message[]) {
     message,
     history,
   });
-  return r.data as { message: string; state: ScanState };
+  return r.data as { message: string; state: ScanState; options: OptionItem[] };
 }
 
 async function launchApi(clientId: string, state: ScanState) {
@@ -237,6 +243,7 @@ export default function AIAssistedScan() {
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [options, setOptions] = useState<OptionItem[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [state, setState] = useState<ScanState>({
@@ -261,6 +268,7 @@ export default function AIAssistedScan() {
       .then(res => {
         setMessages([{ role: "assistant", content: res.message }]);
         setState(res.state);
+        setOptions(res.options ?? []);
       })
       .catch(() => {
         setMessages([{
@@ -290,12 +298,34 @@ export default function AIAssistedScan() {
       const res = await chatApi(clientId, text, messages);
       setMessages([...newMessages, { role: "assistant", content: res.message }]);
       setState(res.state);
+      setOptions(res.options ?? []);
     } catch (e: any) {
       setError(e?.response?.data?.detail || "AI unavailable — check AI provider settings.");
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
+  };
+
+  const handleOptionClick = (value: string) => {
+    setInput(value);
+    // auto-send immediately
+    const text = value.trim();
+    if (!text || loading || !clientId) return;
+    const newMessages: Message[] = [...messages, { role: "user", content: text }];
+    setMessages(newMessages);
+    setInput("");
+    setOptions([]);
+    setLoading(true);
+    setError(null);
+    chatApi(clientId, text, messages)
+      .then(res => {
+        setMessages([...newMessages, { role: "assistant", content: res.message }]);
+        setState(res.state);
+        setOptions(res.options ?? []);
+      })
+      .catch(e => setError(e?.response?.data?.detail || "AI unavailable."))
+      .finally(() => { setLoading(false); setTimeout(() => inputRef.current?.focus(), 100); });
   };
 
   const handleLaunch = async () => {
@@ -407,6 +437,31 @@ export default function AIAssistedScan() {
                 </Paper>
               </Box>
             ))}
+
+            {/* Quick-select option chips — shown after last AI message when backend provides options */}
+            {!loading && options.length > 0 && !launched && (
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, pl: "40px" }}>
+                {options.map(opt => (
+                  <Tooltip key={opt.value} title={opt.sub || ""} placement="top">
+                    <Chip
+                      label={opt.label}
+                      onClick={() => handleOptionClick(opt.value)}
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        cursor: "pointer",
+                        borderColor: "primary.main",
+                        color: "primary.main",
+                        fontWeight: 600,
+                        fontSize: 12,
+                        "&:hover": { bgcolor: "primary.main", color: "#fff" },
+                        transition: "all 0.15s",
+                      }}
+                    />
+                  </Tooltip>
+                ))}
+              </Box>
+            )}
 
             {loading && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
