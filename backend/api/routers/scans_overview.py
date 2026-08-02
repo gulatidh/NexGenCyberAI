@@ -59,7 +59,11 @@ def _accessible_ids(db: Session, user: dict) -> Optional[set]:
     try:
         grants = get_user_grants(db, email)
     except Exception:
-        return set()
+        return None  # Fail open on DB error — don't silently hide all scans
+    # No grants at all: user passed get_current_user (authenticated) but grants
+    # haven't been bootstrapped yet (race condition or migration gap). Fail open.
+    if not grants:
+        return None
     # Global admin grant → full access
     for g in grants:
         scope = g.scope_type.value if hasattr(g.scope_type, "value") else str(g.scope_type)
