@@ -336,15 +336,18 @@ function buildGraph(
   const DEFAULT_ZONE = "Corporate Network";
   const compIdSet = new Set(components.map((c) => c.id));
 
-  // Normalise zone name (legacy "public"/"private"/"data-tier" → new names)
+  // Normalise zone name — maps legacy network-tier names to security-domain names.
+  // "public" in a cloud context means publicly reachable (DMZ), NOT the internet.
+  // Only explicit "internet" or "untrusted" maps to the Internet zone.
   function normZone(z: string): string {
     const l = (z || "").toLowerCase().trim();
     if (!l || l === "private" || l === "internal") return "Corporate Network";
-    if (l === "public" || l === "internet") return "Internet";
-    if (l === "data-tier") return "Database Tier";
-    if (l === "management") return "Management Zone";
-    if (l === "dmz") return "DMZ";
-    // Already a good name
+    if (l === "internet" || l === "untrusted" || l === "external") return "Internet";
+    if (l === "public" || l === "dmz" || l === "perimeter") return "DMZ";
+    if (l === "data-tier" || l === "data tier") return "Database Tier";
+    if (l === "management" || l === "management zone") return "Management Zone";
+    if (l === "vendor" || l === "vendor cloud") return "Vendor Cloud";
+    // Already a well-formed security-domain name
     return z;
   }
 

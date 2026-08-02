@@ -193,8 +193,10 @@ def _collect_scope(
             "id": a.id,
             "name": a.name or a.external_id or a.id,
             "type": a.asset_type or "unknown",
+            "asset_class": getattr(a, "asset_class", None) or "",
             "external_id": a.external_id,
             "provider": provider,
+            "region": getattr(a, "region", None) or "",
             "criticality": getattr(a, "criticality", None) or "medium",
         })
 
@@ -784,21 +786,129 @@ def _component_type(text: str) -> str:
 
 
 def _infer_zone(text: str) -> str:
-    """Heuristic security-domain trust zone — uses ownership/trust vocabulary
-    instead of network zones so the DFD reads as a threat model."""
+    """Security-domain trust zone from asset name/type/external_id signals.
+
+    Uses security-ownership vocabulary (Corporate Network, DMZ, etc.) not
+    network-tier names.  Azure resource IDs encode the resource provider
+    (e.g. Microsoft.Sql/servers) which is far more reliable than keyword
+    matching on a display name, so those paths are checked first.
+    """
     t = (text or "").lower()
-    if any(k in t for k in ("cdn", "waf", "edge", "front door", "load balancer",
-                            "ingress", "dmz", "perimeter", "reverse proxy")):
+
+    # ── Azure resource-provider paths (external_id format) ────────────────
+    # Microsoft.Network/applicationGateways → DMZ
+    if any(k in t for k in (
+        "microsoft.network/applicationgateways",
+        "microsoft.network/frontdoors",
+        "microsoft.network/trafficmanagerprofiles",
+        "microsoft.cdn",
+        "microsoft.network/loadbalancers",
+    )):
         return "DMZ"
-    if any(k in t for k in ("database", "db", "sql", "storage", "bucket", "blob",
-                            "data", "warehouse", "lake", "cosmos", "dynamo", "rds")):
+    # Azure data services → Database Tier
+    if any(k in t for k in (
+        "microsoft.sql/",
+        "microsoft.dbformysql",
+        "microsoft.dbforpostgresql",
+        "microsoft.dbformariadb",
+        "microsoft.documentdb",
+        "microsoft.storage/storageaccounts",
+        "microsoft.synapse",
+        "microsoft.datalakestore",
+        "microsoft.databricks",
+        "microsoft.cache/redis",
+    )):
         return "Database Tier"
-    if any(k in t for k in ("secret", "vault", "kms", "keyvault", "bastion",
-                            "admin", "manage", "mgmt", "siem", "sentinel", "monitor")):
+    # Azure security / management → Management Zone
+    if any(k in t for k in (
+        "microsoft.keyvault",
+        "microsoft.security",
+        "microsoft.operationalinsights",
+        "microsoft.insights",
+        "microsoft.sentinel",
+        "microsoft.automation",
+        "microsoft.managedidentity",
+        "microsoft.network/bastionhosts",
+        "microsoft.network/privatednszones",
+    )):
         return "Management Zone"
-    if any(k in t for k in ("aws", "azure", "gcp", "saas", "vendor", "third.party",
-                            "external.api", "partner", "s3", "lambda", "function")):
+    # Azure web / compute / container → app stays inside Corporate Network
+    if any(k in t for k in (
+        "microsoft.web/",
+        "microsoft.compute/",
+        "microsoft.containerservice/",
+        "microsoft.containerregistry/",
+        "microsoft.app/",
+        "microsoft.servicefabric",
+        "microsoft.logic/",
+        "microsoft.apimanagement",
+        "microsoft.servicebus",
+        "microsoft.eventhub",
+        "microsoft.signalrservice",
+    )):
+        return "Corporate Network"
+    # Any other Microsoft/Azure resource → customer-owned, Corporate Network
+    if "microsoft." in t or "/providers/microsoft" in t:
+        return "Corporate Network"
+
+    # ── AWS resource ARN / type patterns ──────────────────────────────────
+    if any(k in t for k in (
+        "cloudfront", "apigateway", "aws::elasticloadbalancing",
+        "wafv2", "aws::route53",
+    )):
+        return "DMZ"
+    if any(k in t for k in (
+        "aws::rds", "aws::dynamodb", "aws::s3", "aws::redshift",
+        "aws::elasticache", "aws::glue", "aws::athena",
+        ":s3:::", ":rds:",
+    )):
+        return "Database Tier"
+    if any(k in t for k in (
+        "aws::secretsmanager", "aws::kms", "aws::iam",
+        "aws::cloudwatch", "aws::guardduty", "aws::securityhub",
+        "aws::ssm",
+    )):
+        return "Management Zone"
+    # Generic AWS compute → Corporate Network (customer's own infra)
+    if any(k in t for k in (
+        "aws::ec2", "aws::ecs", "aws::eks", "aws::lambda",
+        "aws::elasticbeanstalk", "arn:aws:",
+    )):
+        return "Corporate Network"
+
+    # ── GCP resource paths ────────────────────────────────────────────────
+    if "cloudsql" in t or "bigquery" in t or "firestore" in t or "spanner" in t:
+        return "Database Tier"
+    if "secretmanager" in t or "cloudkms" in t or "logging.googleapis" in t:
+        return "Management Zone"
+    if any(k in t for k in ("compute.googleapis", "container.googleapis",
+                             "appengine.googleapis", "run.googleapis")):
+        return "Corporate Network"
+
+    # ── Generic display-name keywords (fallback) ──────────────────────────
+    if any(k in t for k in (
+        "cdn", "waf", "edge", "front door", "load balancer", "load_balancer",
+        "ingress", "dmz", "perimeter", "reverse proxy", "api gateway",
+    )):
+        return "DMZ"
+    if any(k in t for k in (
+        "database", " db ", "_db_", "sql", "storage", "bucket", "blob",
+        "warehouse", "lake", "cosmos", "dynamo", "rds", "cache", "redis",
+    )):
+        return "Database Tier"
+    if any(k in t for k in (
+        "secret", "vault", "kms", "keyvault", "key vault",
+        "bastion", "admin", "mgmt", "siem", "sentinel",
+        " monitor", "_monitor", "logging",
+    )):
+        return "Management Zone"
+    # Third-party SaaS / external APIs → Vendor Cloud
+    if any(k in t for k in (
+        "saas", "third.party", "third_party", "external.api", "external_api",
+        "partner", "vendor",
+    )):
         return "Vendor Cloud"
+
     return "Corporate Network"
 
 
@@ -810,7 +920,15 @@ def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict
     comps: List[Dict[str, Any]] = []
     for i, a in enumerate(list(assets or [])[:60]):
         name = _str(a.get("name")) or _str(a.get("id")) or f"component {i+1}"
-        hay = f"{a.get('name', '')} {a.get('type', '')} {a.get('provider', '')}"
+        # Build hay from every signal available — external_id is the most
+        # reliable for cloud assets (e.g. Microsoft.Sql/servers/... for Azure)
+        hay = " ".join(filter(None, [
+            a.get("name", ""),
+            a.get("type", ""),
+            a.get("asset_class", ""),
+            a.get("provider", ""),
+            (a.get("external_id") or "").lower(),
+        ]))
         comps.append({
             # Short, stable IDs (c1, c2, …) the LLM can echo reliably when
             # keying threats/flows/coverage back to a component — asset UUIDs
@@ -1741,10 +1859,18 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
             tm.components_json = pinned
             tm.data_flows_json = orig_data_flows or []
         elif pinned_components:
-            # Analyst-curated or asset-derived: fixed component set; keep only
-            # LLM-proposed flows that connect two known components.
-            known = {c["id"] for c in pinned_components}
-            tm.components_json = pinned_components
+            # Asset-derived or analyst-curated component set.
+            # Append LLM-generated threat actors — they are always synthetic
+            # (never in the asset inventory) so they must come from the LLM.
+            # All real-asset components keep their deterministic IDs.
+            pinned_ids = {c["id"] for c in pinned_components}
+            threat_actors = [
+                c for c in (model.get("components") or [])
+                if c.get("is_threat_actor") and _str(c.get("id")) not in pinned_ids
+            ]
+            merged = pinned_components + threat_actors
+            known = {c["id"] for c in merged}
+            tm.components_json = merged
             tm.data_flows_json = [
                 f for f in (model.get("data_flows") or [])
                 if _str(f.get("from")) in known and _str(f.get("to")) in known
