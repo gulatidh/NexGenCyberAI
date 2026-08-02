@@ -1267,11 +1267,11 @@ export default function Agents() {
                               {isAdmin ? <Edit sx={{ fontSize: 16 }} /> : <AutoFixHigh sx={{ fontSize: 16 }} />}
                             </IconButton>
                           </Tooltip>
-                          {isAdmin && !agent.is_builtin && (
-                            <Tooltip title="Delete">
+                          {!agent.is_builtin && (
+                            <Tooltip title="Delete agent">
                               <IconButton size="small"
                                 onClick={() => {
-                                  if (window.confirm(`Delete agent "${agent.name}"?`)) deleteMutation.mutate(agent.id);
+                                  if (window.confirm(`Delete agent "${agent.name}"? This cannot be undone.`)) deleteMutation.mutate(agent.id);
                                 }}
                                 sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
                                 <Delete sx={{ fontSize: 16 }} />
