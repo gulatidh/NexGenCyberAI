@@ -1,8 +1,8 @@
 ##############################################################################
-# Monitara v2 — Deploy to monitara-ai App Service
+# Monitara v2 — Deploy to monitara-sea App Service (Southeast Asia)
 #
-# Triggers on push to v2-redesign branch.
-# Shares the same backend as v1 (nexgencyberai-dev-okxksu-api).
+# Triggers on workflow_dispatch.
+# Backend: nexgencyberai-sea-api (SEA)
 # No backend deploy — frontend only.
 #
 # Required GitHub Secrets (same as main deploy.yml):
@@ -24,8 +24,8 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  AZ_RESOURCE_GROUP: "nexgencyberai-dev-rg"
-  AZ_FRONTEND_APP: "monitara-ai"
+  AZ_RESOURCE_GROUP: "nexgencyberai-sea-rg"
+  AZ_FRONTEND_APP: "monitara-sea"
 
 jobs:
 
@@ -57,8 +57,8 @@ jobs:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
-          REACT_APP_REDIRECT_URI: "https://monitara-ai.azurewebsites.net"
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-sea-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: "https://monitara-sea.azurewebsites.net"
           GENERATE_SOURCEMAP: "false"
 
       - name: Upload build artifact
@@ -68,9 +68,9 @@ jobs:
           path: frontend/build/
           retention-days: 1
 
-  # ── 2. Deploy to monitara-ai ───────────────────────────────────────────────
+  # ── 2. Deploy to monitara-sea ──────────────────────────────────────────────
   deploy:
-    name: Deploy — monitara-ai
+    name: Deploy — monitara-sea
     needs: frontend-build
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -117,7 +117,7 @@ jobs:
               --src-path frontend.zip \
               --type zip \
               --async true \
-              --timeout 300 && { echo "Deployed successfully to https://monitara-ai.azurewebsites.net"; exit 0; }
+              --timeout 300 && { echo "Deployed successfully to https://monitara-sea.azurewebsites.net"; exit 0; }
             echo "Attempt $attempt failed — waiting 30s before retry"
             sleep 30
           done
