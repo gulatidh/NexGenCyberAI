@@ -330,6 +330,7 @@ class Finding(Base):
     evidence = Column(JSON, default={})
     cve_id = Column(String(50))
     cve_ids = Column(Text, nullable=True)          # JSON array of all CVEs e.g. '["CVE-2021-44228","CVE-2021-45046"]'
+    cwe_id = Column(String(50), nullable=True)     # CWE-xxx weakness identifier e.g. "CWE-89"
     cvss_score = Column(Float)
     cvss_vector = Column(String(100), nullable=True)   # CVSS v3.1 vector string e.g. "AV:N/AC:L/PR:N/..."
     enrichment_source = Column(String(20), nullable=True)  # "llm" | "kb" | "scanner" | "llm_low"

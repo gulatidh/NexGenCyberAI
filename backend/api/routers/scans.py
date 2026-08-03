@@ -765,6 +765,35 @@ async def rescan(
     return new
 
 
+@router.post("/{scan_id}/enrich")
+async def trigger_enrichment(
+    client_id: str,
+    scan_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Re-run CVE/CWE/CVSS enrichment for an existing scan on demand.
+    Returns immediately; enrichment runs in the background.
+    Safe to call multiple times — each run overwrites previous enrichment values."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    def _run():
+        import asyncio
+        from services.cve_enrichment import enrich_scan_findings
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(enrich_scan_findings(scan_id, client_id=client_id))
+        finally:
+            loop.close()
+
+    background_tasks.add_task(_run)
+    return {"status": "enrichment_queued", "scan_id": scan_id, "message": "CVE/CWE/CVSS enrichment started. Refresh findings in ~30 seconds."}
+
+
 @router.get("/{scan_id}/versions", response_model=List[ScanResponse])
 async def list_scan_versions(
     client_id: str,

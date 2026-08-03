@@ -75,7 +75,7 @@ const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
 const STATUS_COLOR: Record<string, string> = {
-  open: "#ff9800", remediated: "#00e676", accepted: "#FF9800", false_positive: "rgba(255,255,255,0.4)",
+  open: "#ff9800", remediated: "#00e676", accepted: "#FF9800", false_positive: "#9e9e9e",
 };
 
 function CatIcon({ name, sx }: { name: string; sx?: any }) {
@@ -368,6 +368,11 @@ export default function Findings() {
     },
   });
 
+  const enrichMutation = useMutation({
+    mutationFn: (sid: string) => scansApi.triggerEnrich(clientId, sid),
+    onSuccess: () => setSnack("Enrichment queued — refresh findings in ~30 seconds"),
+  });
+
   // Suppress dialog state
   const [suppressTarget, setSuppressTarget] = React.useState<Finding | null>(null);
   const [suppressReason, setSuppressReason] = React.useState("");
@@ -578,6 +583,23 @@ export default function Findings() {
           >
             Export CSV
           </Button>
+          {scanId && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<Refresh sx={{ fontSize: 16 }} />}
+              disabled={enrichMutation.isPending}
+              onClick={() => enrichMutation.mutate(scanId)}
+              sx={{
+                color: "text.secondary",
+                borderColor: "divider",
+                textTransform: "none",
+                "&:hover": { borderColor: "#FBBC04", color: "#FBBC04", bgcolor: "rgba(251,188,4,0.05)" },
+              }}
+            >
+              {enrichMutation.isPending ? "Enriching…" : "Re-evaluate CVE/CVSS/CWE"}
+            </Button>
+          )}
           {checkedIds.size > 0 && (
             <Button
               size="small"
@@ -785,22 +807,24 @@ export default function Findings() {
                         if (e.target.checked) setCheckedIds(new Set(sortedFindings.map(f => f.id)));
                         else setCheckedIds(new Set());
                       }}
-                      sx={{ color: "rgba(255,255,255,0.3)", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }}
+                      sx={{ color: "action.disabled", "&.Mui-checked": { color: "#4285F4" }, "&.MuiCheckbox-indeterminate": { color: "#4285F4" } }}
                     />
                   </TableCell>
                   <TableCell><TableSortLabel active={sortKey === "severity"} direction={sortDir} onClick={() => setSort("severity")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>SEVERITY</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>SEVERITY</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "title"} direction={sortDir} onClick={() => setSort("title")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>TITLE</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>TITLE</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "cve_id"} direction={sortDir} onClick={() => setSort("cve_id")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVE</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>CVE</TableSortLabel></TableCell>
+                  <TableCell><TableSortLabel active={sortKey === "cwe_id"} direction={sortDir} onClick={() => setSort("cwe_id")}
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>CWE</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "cvss_score"} direction={sortDir} onClick={() => setSort("cvss_score")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVSS</TableSortLabel></TableCell>
-                  <TableCell>RESOURCE</TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>CVSS</TableSortLabel></TableCell>
+                  <TableCell sx={{ color: "text.secondary" }}>RESOURCE</TableCell>
                   <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>STATUS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "first_seen_at"} direction={sortDir} onClick={() => setSort("first_seen_at")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>FOUND</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>FOUND</TableSortLabel></TableCell>
                   <TableCell align="right" sx={{ width: 44 }} />
                   <TableCell align="right" sx={{ width: 220, whiteSpace: "nowrap" }} />
                 </TableRow>
@@ -861,6 +885,11 @@ export default function Findings() {
                             </Box>
                           );
                         })()}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12 }}>
+                        {f.cwe_id
+                          ? <span style={{ color: "#F5A623", fontWeight: 600 }}>{f.cwe_id}</span>
+                          : <span style={{ color: "rgba(128,128,128,0.5)" }}>—</span>}
                       </TableCell>
                       <TableCell sx={{ color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "inherit") : "rgba(128,128,128,0.5)", fontSize: 12, fontWeight: f.cvss_score != null ? 600 : 400 }}>
                         {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}

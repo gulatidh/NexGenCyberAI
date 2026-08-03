@@ -1,12 +1,15 @@
 """
-CVE enrichment pipeline.
+CVE/CWE enrichment pipeline.
 
 Design: the LLM is the primary source — it already knows CVE details from training.
 We send only the minimal finding metadata (title + existing CVE hint), ask the LLM
-for structured CVSS/CVE data, then optionally do a single targeted RAG query against
-the client's knowledge base if the LLM returned low confidence.
+for structured CVSS/CVE/CWE data, then optionally do a single targeted RAG query
+against the client's knowledge base if the LLM returned low confidence.
 
-No DB dumps, no external API calls, no token congestion.
+Always creates its own DB session so it is safe to call via asyncio.ensure_future()
+or BackgroundTasks after the caller's session may have already been closed.
+
+No external API calls, no token congestion.
 Processes findings in small batches (5 at a time) to keep prompts compact.
 """
 
@@ -18,15 +21,16 @@ logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 5
 
-_ENRICH_PROMPT = """You are a vulnerability intelligence expert with deep knowledge of CVEs, CVSS scores, and security vulnerabilities.
+_ENRICH_PROMPT = """You are a vulnerability intelligence expert with deep knowledge of CVEs, CWEs, CVSS scores, and security weaknesses.
 
-For each finding below, use your training knowledge to return structured data. Be precise — if you know the CVE, return the exact CVSS v3.1 base score and vector from NVD. If a finding has no CVE or you are not confident, use null.
+For each finding below, use your training knowledge to return structured data. Be precise — if you know the CVE, return the exact CVSS v3.1 base score and vector from NVD. If a finding has no known CVE, return the most relevant CWE weakness class (e.g. CWE-89 for SQL injection). If uncertain, use null.
 
 Respond ONLY with a valid JSON array (no markdown, no explanation), one object per finding in input order.
 Schema per object:
 {{
   "cve_id": "CVE-YYYY-NNNNN or null",
   "cve_ids": ["CVE-...", ...],
+  "cwe_id": "CWE-NNN or null",
   "cvss_score": 9.8,
   "cvss_vector": "AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H or null",
   "confidence": "high|medium|low",
@@ -41,6 +45,8 @@ def _build_finding_line(idx: int, finding) -> str:
     parts = [f"{idx + 1}. Title: {finding.title}"]
     if finding.cve_id:
         parts.append(f"CVE hint: {finding.cve_id}")
+    if getattr(finding, "cwe_id", None):
+        parts.append(f"CWE hint: {finding.cwe_id}")
     if finding.resource_type:
         parts.append(f"Resource type: {finding.resource_type}")
     return " | ".join(parts)
@@ -110,70 +116,86 @@ async def _kb_fallback(cve_id: str, db, client_id: str) -> Optional[dict]:
         return None
 
 
-async def enrich_scan_findings(scan_id: str, db, client_id: str) -> None:
+async def enrich_scan_findings(scan_id: str, db=None, client_id: str = "") -> None:
     """
-    Post-scan enrichment entry point.
-    Fetches all findings for the scan, processes in batches, writes back
-    cve_id / cve_ids / cvss_score / cvss_vector / enrichment_source.
-    Designed to be called as a BackgroundTask — all failures are non-fatal.
+    Post-scan CVE/CWE enrichment entry point.
+
+    Always opens its own DB session so it is safe to call via
+    asyncio.ensure_future() or BackgroundTasks after the calling
+    function's session has already been closed.
+
+    Fetches all findings for the scan, processes in batches, writes back:
+    cve_id / cve_ids / cwe_id / cvss_score / cvss_vector / enrichment_source.
+    All failures are non-fatal.
     """
+    from db.database import SessionLocal
     from api.models.models import Finding
 
-    findings = (
-        db.query(Finding)
-        .filter(Finding.scan_id == scan_id)
-        .filter(Finding.title.isnot(None))
-        .all()
-    )
-    if not findings:
-        return
+    # Always use a fresh session — the caller's session may be closed by the
+    # time asyncio schedules this coroutine.
+    _db = SessionLocal()
+    try:
+        findings = (
+            _db.query(Finding)
+            .filter(Finding.scan_id == scan_id)
+            .filter(Finding.title.isnot(None))
+            .all()
+        )
+        if not findings:
+            logger.info("CVE enrichment: no findings for scan %s", scan_id)
+            return
 
-    logger.info("CVE enrichment: %d findings for scan %s", len(findings), scan_id)
+        logger.info("CVE enrichment: %d findings for scan %s", len(findings), scan_id)
 
-    for batch_start in range(0, len(findings), _BATCH_SIZE):
-        batch = findings[batch_start: batch_start + _BATCH_SIZE]
-        results = await _enrich_batch(batch, db, client_id)
+        for batch_start in range(0, len(findings), _BATCH_SIZE):
+            batch = findings[batch_start: batch_start + _BATCH_SIZE]
+            results = await _enrich_batch(batch, _db, client_id)
 
-        for finding, result in zip(batch, results):
-            if not result:
-                continue
-            try:
-                cve_id = result.get("cve_id") or finding.cve_id
-                cve_ids = result.get("cve_ids") or ([cve_id] if cve_id else [])
-                cvss_score = result.get("cvss_score")
-                cvss_vector = result.get("cvss_vector")
-                confidence = result.get("confidence", "low")
+            for finding, result in zip(batch, results):
+                if not result:
+                    continue
+                try:
+                    cve_id = result.get("cve_id") or finding.cve_id
+                    cve_ids = result.get("cve_ids") or ([cve_id] if cve_id else [])
+                    cwe_id = result.get("cwe_id") or getattr(finding, "cwe_id", None)
+                    cvss_score = result.get("cvss_score")
+                    cvss_vector = result.get("cvss_vector")
+                    confidence = result.get("confidence", "low")
 
-                # If LLM was not confident and we have a CVE, try KB
-                if confidence == "low" and cve_id:
-                    kb = await _kb_fallback(cve_id, db, client_id)
-                    if kb:
-                        cvss_score = kb.get("cvss_score") or cvss_score
-                        cvss_vector = kb.get("cvss_vector") or cvss_vector
-                        source = "kb"
+                    # If LLM was not confident and we have a CVE, try KB
+                    if confidence == "low" and cve_id:
+                        kb = await _kb_fallback(cve_id, _db, client_id)
+                        if kb:
+                            cvss_score = kb.get("cvss_score") or cvss_score
+                            cvss_vector = kb.get("cvss_vector") or cvss_vector
+                            source = "kb"
+                        else:
+                            source = "llm_low"
                     else:
-                        source = "llm_low"
-                else:
-                    source = "llm"
+                        source = "llm"
 
-                # Only write back if we actually got something useful
-                if cve_id:
-                    finding.cve_id = cve_id
-                if cve_ids:
-                    finding.cve_ids = json.dumps(cve_ids)
-                if cvss_score is not None:
-                    finding.cvss_score = float(cvss_score)
-                if cvss_vector:
-                    finding.cvss_vector = cvss_vector
-                finding.enrichment_source = source
+                    # Write back everything we got
+                    if cve_id:
+                        finding.cve_id = cve_id
+                    if cve_ids:
+                        finding.cve_ids = json.dumps(cve_ids)
+                    if cwe_id:
+                        finding.cwe_id = cwe_id
+                    if cvss_score is not None:
+                        finding.cvss_score = float(cvss_score)
+                    if cvss_vector:
+                        finding.cvss_vector = cvss_vector
+                    finding.enrichment_source = source
 
+                except Exception as exc:
+                    logger.debug("Enrichment write failed for finding %s: %s", finding.id, exc)
+
+            try:
+                _db.commit()
             except Exception as exc:
-                logger.debug("Enrichment write failed for finding %s: %s", finding.id, exc)
+                logger.warning("CVE enrichment commit failed (batch %d): %s", batch_start, exc)
+                _db.rollback()
 
-        try:
-            db.commit()
-        except Exception as exc:
-            logger.warning("CVE enrichment commit failed (batch %d): %s", batch_start, exc)
-            db.rollback()
-
-    logger.info("CVE enrichment complete for scan %s", scan_id)
+        logger.info("CVE enrichment complete for scan %s", scan_id)
+    finally:
+        _db.close()
