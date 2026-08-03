@@ -117,7 +117,7 @@ def _build_azure_openai(model: str = None, **kwargs) -> BaseChatModel:
     )
 
 
-def _build_anthropic(model: str = "claude-sonnet-4-6", **kwargs) -> BaseChatModel:
+def _build_anthropic(model: str = "claude-fable-5", **kwargs) -> BaseChatModel:
     from langchain_anthropic import ChatAnthropic
     return ChatAnthropic(
         model=model,
@@ -302,7 +302,7 @@ def list_providers() -> list[dict]:
             "gpt-4o", "gpt-4.1", "gpt-4.1-mini", "gpt-4-turbo", "gpt-35-turbo",
             azure_deploy,  # always include the configured deployment
         }),
-        AIProvider.ANTHROPIC: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+        AIProvider.ANTHROPIC: ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
         AIProvider.GOOGLE_GEMINI: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash"],
         AIProvider.AWS_BEDROCK: [
             "anthropic.claude-3-5-sonnet-20241022-v2:0",
