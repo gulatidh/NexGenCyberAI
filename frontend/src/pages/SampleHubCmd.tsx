@@ -5,7 +5,7 @@ import {
   Dialog, DialogContent, TextField, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, InputAdornment, Tooltip, Fab,
 } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import { Grid } from "@mui/material";
 import {
   Cable, Hub, BugReport, Insights, Radar, GppGood, SmartToy,
   Settings, ArrowForward, People, Security, Policy, Dashboard,
@@ -378,7 +378,7 @@ export default function SampleHubCmd() {
           const isHovered = hovered === phase.id;
 
           return (
-            <Grid key={phase.id} size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid key={phase.id} item xs={12} sm={6} md={3}>
               <Card
                 onMouseEnter={() => setHovered(phase.id)}
                 onMouseLeave={() => setHovered(null)}
