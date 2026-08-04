@@ -69,7 +69,7 @@ export default function SampleHub() {
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1440, mx: "auto" }}>
       {/* Header */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 0.5 }}>
-        <Typography variant="h4" fontWeight={700} letterSpacing="-0.5px">
+        <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: "-0.5px" }}>
           Security Operations Hub
         </Typography>
         <Chip label="Sample — Option 1" size="small" color="primary" variant="outlined" />
@@ -130,10 +130,10 @@ export default function SampleHub() {
                   </Box>
 
                   {/* Label + tagline */}
-                  <Typography variant="h6" fontWeight={700} lineHeight={1.2} sx={{ mb: 0.4 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, mb: 0.4 }}>
                     {phase.label}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" lineHeight={1.4} sx={{ mb: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.4, mb: 1.5 }}>
                     {phase.tagline}
                   </Typography>
 
