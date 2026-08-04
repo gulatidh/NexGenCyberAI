@@ -11,6 +11,8 @@ Design:
   BackgroundTask — reuses existing scan infrastructure, touches nothing else.
 - Post-scan next-steps endpoint reads only finding summary (counts + top titles),
   not full finding dump, to stay lightweight.
+- Frontend handles all wizard UI and option selection; backend only provides
+  AI guidance text and state parsing.
 """
 
 import json
@@ -73,72 +75,25 @@ _CONNECTOR_DESCRIPTIONS = {
 }
 
 _SYSTEM_PROMPT = """\
-You are the Aegis AI Scan Guide inside Monitara AI. Guide the user to launch the right scan — one question at a time.
+You are the Aegis AI Scan Guide inside Monitara AI. The user is configuring a security scan through a structured wizard UI — your role is to provide helpful guidance text that appears in a blue strip at the top of the wizard. You do NOT drive navigation — the UI handles that. Respond with concise, encouraging guidance (1-3 sentences) based on what the user has selected or asked.
 
 {nav_reference}
 
-═══ RULES (highest priority — follow exactly) ═══
+═══ RULES ═══
 
-R1 — ONE question per response. Never combine two questions in one reply.
+R1 — Keep responses SHORT and helpful. The UI already shows the wizard options — just acknowledge the selection and hint at what's next.
 
-R2 — NEVER ASK IF A CONNECTOR EXISTS. The Available Environment below shows every configured connector.
-  ✅ DO: "You have **Semgrep** configured for code scanning. Shall we use that?"
-  ✅ DO: "You have **AI Code Review** and **Semgrep** for code — which would you prefer?"
-  ❌ DON'T: "Do you have any code review connectors?"
-  ❌ DON'T: "For example, GitHub, GitLab..." (don't suggest platforms — check the list)
-  If NONE match: "You don't have a [type] scanner yet. Go to **Connections → Add Connection** to add one, then return here."
+R2 — NEVER ask the user to name a connector or choose options — the UI provides those. Only comment on what they've chosen or asked.
 
-R3 — CHECK ASSET INVENTORY FOR TARGETS. Before asking for a target:
-  Check the Asset inventory section below. If the user's described target matches a known asset:
-  → "I can see '[name]' in your inventory, last scanned via '[connector]'. Re-scan with that, or use a different scanner?"
-  Always offer: (1) same connector, (2) alternate connector of same category, (3) add new one.
-  No match → ask for target normally.
+R3 — If the user sends free text with a question, answer it helpfully based on the environment profile below.
 
-R4 — ADVANCE PHASE IMMEDIATELY. After each user reply, move SCAN_STATE to the next phase:
-  User states intent → phase MUST become "connector" in your response. NEVER stay on "intent".
-  Connector confirmed → phase = "target". Fill connector_type + connector_id.
-  Target confirmed → phase = "framework".
-  Framework answered → phase = "confirm".
-  User says yes/launch → phase = "ready" + ready_to_launch = true.
+R4 — NEVER ASK IF A CONNECTOR EXISTS. The Available Environment below shows every configured connector.
 
-═══ WORKED EXAMPLE (replicate this pattern exactly) ═══
-
-User: "I want to review source code for security vulnerabilities"
-Environment shows — SAST/Code: 'My Semgrep' (type=semgrep, id=abc-123)
-Your reply: "You have **My Semgrep** configured for static code analysis. It finds injections, XSS, and insecure patterns. Shall we use that?"
-SCAN_STATE:{{"phase":"connector","connector_type":null,"connector_id":null,"scan_name":null,"target":null,"framework":null,"ready_to_launch":false}}
-
-User: "yes"
-Your reply: "Great! What is the repository URL you'd like to scan? (GitHub, GitLab, or Azure DevOps)"
-SCAN_STATE:{{"phase":"target","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":null,"framework":null,"ready_to_launch":false}}
-
-User: "https://github.com/org/repo"
-Your reply: "Got it. Would you like to score this against a compliance framework (NIST CSF, ISO 27001, CIS Controls)? Or skip?"
-SCAN_STATE:{{"phase":"framework","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":null,"ready_to_launch":false}}
-
-User: "NIST CSF"
-Your reply: "Summary: Semgrep on https://github.com/org/repo, NIST CSF scoring. Shall I launch?"
-SCAN_STATE:{{"phase":"confirm","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":"nist_csf","ready_to_launch":false}}
-
-User: "yes"
-Your reply: "Launching now!"
-SCAN_STATE:{{"phase":"ready","connector_type":"semgrep","connector_id":"abc-123","scan_name":"Source Code Review","target":"https://github.com/org/repo","framework":"nist_csf","ready_to_launch":true}}
-
-═══ TARGET FORMATS (reference) ═══
-azure/aws/gcp → optional (default = full environment)
-web/burp_enterprise/invicti/acunetix/nuclei → URL
-nmap/openvas/sslyze → IP / CIDR / hostname
-semgrep/codeql/ai_code_review → repository URL
-trivy → container image (nginx:latest)
-gitleaks/trufflehog → repository URL
-tenable/rapid7/qualys/snyk → target scope or project name
-sonarqube → project key
-
-═══ AVAILABLE ENVIRONMENT (live data — use this, do not ask the user) ═══
+═══ AVAILABLE ENVIRONMENT (live data) ═══
 {env_profile}
 
 ═══ MANDATORY: End EVERY response with this marker + JSON (no code fences, no backticks) ═══
-SCAN_STATE:{{"phase":"PHASE","connector_type":"TYPE_OR_NULL","connector_id":"ID_OR_NULL","scan_name":"NAME_OR_NULL","target":"TARGET_OR_NULL","framework":"KEY_OR_NULL","ready_to_launch":false}}
+SCAN_STATE:{{"phase":"PHASE","category":"CATEGORY_OR_NULL","connector_type":"TYPE_OR_NULL","connector_id":"ID_OR_NULL","scan_name":"NAME_OR_NULL","target":"TARGET_OR_NULL","framework":"KEY_OR_NULL","ready_to_launch":false}}
 Allowed PHASE values: intent | connector | target | framework | confirm | ready
 Use the literal word null (no quotes) for unknown fields.
 """
@@ -163,14 +118,14 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage] = []
 
 class OptionItem(BaseModel):
-    label: str          # display text on the chip
-    value: str          # sent back as the user's answer when clicked
-    sub: Optional[str] = None  # optional subtitle (e.g. connector type)
+    label: str
+    value: str
+    sub: Optional[str] = None
 
 class ChatResponse(BaseModel):
     message: str
     state: Dict[str, Any]
-    options: List[OptionItem] = []   # quick-select chips shown below the AI message
+    options: List[OptionItem] = []
 
 class LaunchResponse(BaseModel):
     scan_id: str
@@ -224,15 +179,13 @@ def _build_env_profile(db: Session, client_id: str) -> str:
             if not placed:
                 by_category["Other"].append((c.name, ct, c.id))
 
-        lines.append("### Configured connectors grouped by use-case (ALWAYS use these when making suggestions — do NOT ask if the user has a connector, you already know):")
+        lines.append("### Configured connectors grouped by use-case:")
         for cat, items in by_category.items():
             if items:
                 item_strs = [f"'{name}' (type={ct}, id={cid})" for name, ct, cid in items]
                 lines.append(f"  {cat}: {', '.join(item_strs)}")
             else:
                 lines.append(f"  {cat}: [none configured]")
-        lines.append("RULE: If the user's intent matches a category with configured connectors → immediately name those connectors and ask which to use.")
-        lines.append("RULE: If the category has [none configured] → tell the user they don't have that type of connector and direct them to Connections page to add one before proceeding.")
     else:
         lines.append("### Configured connectors: NONE — tell the user they need to add connectors via the Connections page before scanning.")
 
@@ -299,8 +252,7 @@ def _build_env_profile(db: Session, client_id: str) -> str:
                 Scan.client_id == client_id, Finding.status == "open",
             ).count()
             lines.append(
-                f"\n### Asset inventory ({len(assets)} assets, {open_findings} open findings"
-                " — use this to match user-described targets):"
+                f"\n### Asset inventory ({len(assets)} assets, {open_findings} open findings):"
             )
             for bucket, items in by_class.items():
                 shown = items[:12]
@@ -311,17 +263,6 @@ def _build_env_profile(db: Session, client_id: str) -> str:
                     asset_strs.append(f"'{a.name}' [via '{cname}' ({ctype}), last seen {synced}]")
                 overflow = f" (+{len(items)-12} more)" if len(items) > 12 else ""
                 lines.append(f"  {bucket}: {', '.join(asset_strs)}{overflow}")
-
-            lines.append(
-                "\nTARGET MATCHING RULE: When the user describes a scan target (hostname, URL, IP, "
-                "repo name, image, VM name), scan the asset list above:"
-                "\n  • If a matching asset is found → tell the user it already exists: "
-                "\"I can see '[name]' is already in your asset inventory, last scanned via '[connector]'. "
-                "Would you like to re-scan it with the same connector, or configure an alternate scanner?\""
-                "\n  • Always offer: (1) existing connector that discovered it, (2) an alternate connector "
-                "of the same category if one is configured, (3) add a new connector if nothing suitable exists."
-                "\n  • If no matching asset is found → proceed normally with target collection."
-            )
         else:
             lines.append("\n### Asset inventory: empty (no assets discovered yet — run a scan first to populate)")
     except Exception as _ae:
@@ -334,6 +275,7 @@ def _build_env_profile(db: Session, client_id: str) -> str:
 
 _DEFAULT_STATE: Dict[str, Any] = {
     "phase": "intent",
+    "category": None,
     "connector_type": None,
     "connector_id": None,
     "scan_name": None,
@@ -369,11 +311,11 @@ def _parse_state(raw: str) -> tuple[str, Dict[str, Any]]:
     # null strings → None (covers old and new placeholder values)
     _NULL_VALUES = {
         "null", "None", "", "TYPE_OR_NULL", "ID_OR_NULL", "NAME_OR_NULL",
-        "TARGET_OR_NULL", "FRAMEWORK_OR_NULL", "CURRENT_PHASE",
+        "TARGET_OR_NULL", "FRAMEWORK_OR_NULL", "CURRENT_PHASE", "CATEGORY_OR_NULL",
         "{connector_type_or_null}", "{connector_id_or_null}",
         "{descriptive_name_or_null}", "{target_or_null}", "{framework_value_or_null}",
     }
-    for k in ("connector_type", "connector_id", "scan_name", "target", "framework"):
+    for k in ("category", "connector_type", "connector_id", "scan_name", "target", "framework"):
         if state.get(k) in _NULL_VALUES:
             state[k] = None
 
@@ -396,108 +338,11 @@ async def _call_llm(system: str, messages: List[Dict]) -> str:
     return response.content
 
 
-# ── Options builder (server-side, not LLM) ────────────────────────────────────
-
-_FRAMEWORK_OPTIONS = [
-    ("NIST CSF 2.0",        "nist_csf"),
-    ("CIS Controls v8",     "cis_v8"),
-    ("CIS Azure",           "cis_azure"),
-    ("CIS AWS",             "cis_aws"),
-    ("ISO/IEC 27001",       "iso_27001"),
-    ("PCI DSS v4",          "pci_dss"),
-    ("GDPR",                "gdpr"),
-    ("Skip / No framework", ""),
-]
-
-# Map label → enum key so chip values are always the correct DB key
-_FRAMEWORK_LABEL_TO_KEY = {label: key for label, key in _FRAMEWORK_OPTIONS}
-
-_OTHER_OPTION = OptionItem(label="Other / Not listed", value="__other__", sub="Type your own answer below")
-
-_INTENT_OPTIONS = [
-    OptionItem(label="Azure / Cloud posture",    value="I want to scan my Azure cloud environment for misconfigurations and security risks",         sub="Cloud security"),
-    OptionItem(label="Web application",           value="I want to scan a web application for OWASP vulnerabilities",                               sub="DAST / web"),
-    OptionItem(label="Source code review",        value="I want to review source code for security vulnerabilities",                                sub="SAST / code"),
-    OptionItem(label="Network / IP range",        value="I want to scan my network or IP address range for open ports and vulnerabilities",          sub="Network"),
-    OptionItem(label="Container / Docker image",  value="I want to scan a container image for known CVEs",                                          sub="Container"),
-    OptionItem(label="Find leaked secrets",       value="I want to scan a code repository for leaked secrets, API keys, and credentials",           sub="Secrets detection"),
-]
-
-_CONFIRM_OPTIONS = [
-    OptionItem(label="Yes, launch the scan!",    value="Yes, everything looks correct. Please launch the scan."),
-    OptionItem(label="Change the connector",     value="I'd like to use a different connector or scanner."),
-    OptionItem(label="Change the target",        value="I'd like to change the target."),
-    OptionItem(label="Change the framework",     value="I'd like to use a different compliance framework."),
-]
-
-
-_CLOUD_CONNECTOR_TYPES = {"azure", "aws", "gcp"}
-
-
-def _infer_options_phase(state: Dict[str, Any], history_len: int = 0) -> str:
-    """Infer which option set to display from collected state fields.
-    history_len = number of messages in the conversation so far (including latest user msg).
-    The LLM often keeps phase='intent' even after the user has stated intent — we override."""
-    if state.get("ready_to_launch"):
-        return "ready"
-    llm_phase = state.get("phase", "intent")
-    if llm_phase in ("confirm", "ready"):
-        return "confirm"
-    if state.get("connector_id"):
-        if llm_phase == "framework":
-            return "framework"
-        if llm_phase in ("confirm",):
-            return "confirm"
-        return "target"
-    if state.get("connector_type") or llm_phase == "connector":
-        return "connector"
-    # If there's already conversation history (user said something) but LLM
-    # still reports "intent", force to connector chips — the LLM is lagging.
-    if history_len > 1 and llm_phase == "intent":
-        return "connector"
-    return "intent"
-
+# ── Options builder — frontend handles all selections, always return empty ─────
 
 def _build_options(state: Dict[str, Any], db: Session, client_id: str, history_len: int = 0) -> List[OptionItem]:
-    """Return quick-select chip options inferred from conversation state.
-    Built from live DB data — not generated by the LLM."""
-    phase = _infer_options_phase(state, history_len)
-    connector_type = (state.get("connector_type") or "").lower()
-
-    if phase == "intent":
-        return _INTENT_OPTIONS + [_OTHER_OPTION]
-
-    if phase == "connector":
-        connectors = db.query(Connector).filter(
-            Connector.client_id == client_id,
-        ).all()
-        items = [
-            OptionItem(
-                label=c.name,
-                value=f"Use {c.name}",
-                sub=c.connector_type.value if hasattr(c.connector_type, "value") else str(c.connector_type),
-            )
-            for c in connectors
-        ]
-        return items + [_OTHER_OPTION]
-
-    if phase == "target":
-        if connector_type in _CLOUD_CONNECTOR_TYPES:
-            return [
-                OptionItem(label="Full environment (default)", value="Scan my full environment — no specific scope needed"),
-                OptionItem(label="Specific subscription / account", value="I want to specify a subscription or account ID"),
-                _OTHER_OPTION,
-            ]
-        return [_OTHER_OPTION]
-
-    if phase == "framework":
-        items = [OptionItem(label=label, value=key or label) for label, key in _FRAMEWORK_OPTIONS]
-        return items + [_OTHER_OPTION]
-
-    if phase in ("confirm", "ready"):
-        return _CONFIRM_OPTIONS
-
-    return [_OTHER_OPTION]
+    """Frontend handles all wizard selections. Always return empty list."""
+    return []
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -540,6 +385,19 @@ class LaunchRequest(BaseModel):
     scan_name: str = "AI Guided Scan"
     target: Optional[str] = None
     framework: Optional[str] = None
+
+
+# Framework label → key mapping for launch endpoint
+_FRAMEWORK_LABEL_TO_KEY = {
+    "NIST CSF 2.0":      "nist_csf",
+    "CIS Controls v8":   "cis_v8",
+    "CIS Azure":         "cis_azure",
+    "CIS AWS":           "cis_aws",
+    "ISO/IEC 27001":     "iso_27001",
+    "PCI DSS v4":        "pci_dss",
+    "GDPR":              "gdpr",
+    "Skip / No framework": "",
+}
 
 
 @router.post("/clients/{client_id}/ai-assisted-scan/launch", response_model=LaunchResponse)
