@@ -13,7 +13,7 @@
 #   REACT_APP_API_URL
 ##############################################################################
 
-name: Owlet — Deploy
+name: Owlet Deploy
 
 on:
   workflow_dispatch:
