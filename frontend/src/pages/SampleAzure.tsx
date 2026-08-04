@@ -6,8 +6,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, IconButton, InputBase, Chip, Avatar,
-  Tooltip, alpha, Badge, Card, Dialog, DialogContent,
+  Box, Typography, IconButton, Chip, Avatar,
+  Tooltip, alpha, Badge, Dialog, DialogContent,
   List, ListItemButton, ListItemIcon, ListItemText,
   InputAdornment, TextField, Divider,
 } from "@mui/material";
@@ -17,9 +17,9 @@ import {
   Radar, GppGood, SmartToy, Policy, Storage,
   AutoStories, Psychology, Description, Assessment, GppBad,
   PlaylistAddCheck, TrendingUp, Engineering, GridView,
-  Star, Add, PlayArrow, CheckCircle, People,
-  LibraryAdd, AccountTree, Warning, Schedule,
-  ChevronRight, AccountCircle,
+  Add, PlayArrow, People,
+  LibraryAdd, AccountTree, Schedule,
+  ChevronRight,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 
