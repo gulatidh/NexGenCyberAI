@@ -84,7 +84,7 @@ export default function SampleHub() {
           const { Icon } = phase;
           const isHovered = hovered === phase.id;
           return (
-            <Grid key={phase.id} item xs={12} sm={6} md={3}>
+            <Grid key={phase.id} size={{ xs: 12, sm: 6, md: 3 }}>
               <Card
                 onMouseEnter={() => setHovered(phase.id)}
                 onMouseLeave={() => setHovered(null)}
