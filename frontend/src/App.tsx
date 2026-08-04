@@ -11,6 +11,10 @@ import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./auth/AuthProvider";
 import { loginRequest } from "./auth/msalConfig";
 import AppLayout from "./components/layout/AppLayout";
+import OwletLayout from "./components/layout/OwletLayout";
+
+const IS_OWLET = process.env.REACT_APP_THEME === "owlet";
+const Shell = IS_OWLET ? OwletLayout : AppLayout;
 import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
 import {
@@ -231,7 +235,7 @@ function ProtectedApp() {
         </Route>
 
         {/* ── v1 AppLayout routes (classic view — still accessible) ─────── */}
-        <Route element={<AppLayout />}>
+        <Route element={<Shell />}>
           <Route index element={<Navigate to="/hub" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/risk-overview" element={<RiskOverviewPage />} />

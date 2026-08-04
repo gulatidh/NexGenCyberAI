@@ -1,0 +1,95 @@
+##############################################################################
+# Owlet — Deploy to owlet-sea App Service (Southeast Asia)
+#
+# Azure Portal-style UI, same backend (nexgencyberai-sea-api), same DB.
+# Key difference from deploy-v2.yml: REACT_APP_THEME=owlet activates
+# OwletLayout instead of AppLayout at build time.
+#
+# Required GitHub Secrets (shared with main deploy):
+#   AZURE_CREDENTIALS
+#   REACT_APP_AZURE_CLIENT_ID
+#   REACT_APP_AZURE_TENANT_ID
+#   REACT_APP_BACKEND_CLIENT_ID
+#   REACT_APP_API_URL
+##############################################################################
+
+name: Owlet — Deploy
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-owlet-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  AZ_RESOURCE_GROUP: "nexgencyberai-sea-rg"
+  AZ_FRONTEND_APP:   "owlet-sea"
+
+jobs:
+  build-and-deploy:
+    name: Build + Deploy Owlet
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit || echo "Type check done"
+
+      - name: Build (Owlet theme)
+        run: npm run build
+        env:
+          REACT_APP_THEME:            owlet
+          REACT_APP_AZURE_CLIENT_ID:  ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
+          REACT_APP_AZURE_TENANT_ID:  ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
+          REACT_APP_BACKEND_CLIENT_ID:${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
+          REACT_APP_API_URL:          ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-sea-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI:     "https://owlet-sea.azurewebsites.net"
+          GENERATE_SOURCEMAP:         "false"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set startup command
+        run: |
+          az webapp config set \
+            --name "$AZ_FRONTEND_APP" \
+            --resource-group "$AZ_RESOURCE_GROUP" \
+            --startup-file "npx --yes serve -s . -l 8080" \
+            --output none
+        working-directory: .
+
+      - name: Package and deploy
+        run: |
+          set -euo pipefail
+          cd build && zip -qr ../../owlet.zip . && cd ../..
+          echo "Owlet zip: $(du -sh owlet.zip | cut -f1)"
+          for attempt in $(seq 1 5); do
+            echo "Attempt $attempt — deploying to $AZ_FRONTEND_APP..."
+            az webapp deploy \
+              --name "$AZ_FRONTEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --src-path owlet.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Deployed to https://owlet-sea.azurewebsites.net"; exit 0; }
+            sleep 30
+          done
+          exit 1
+        working-directory: frontend
