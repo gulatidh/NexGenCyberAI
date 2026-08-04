@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Card, CardContent, Chip, Stack, alpha,
+  Box, Typography, Card, CardContent, Chip, Grid, alpha,
   Dialog, DialogContent, TextField, List, ListItemButton,
-  ListItemIcon, ListItemText, Divider, InputAdornment, Tooltip, Fab,
+  ListItemIcon, ListItemText, InputAdornment, Fab, Tooltip,
 } from "@mui/material";
-import { Grid } from "@mui/material";
 import {
   Cable, Hub, BugReport, Insights, Radar, GppGood, SmartToy,
   Settings, ArrowForward, People, Security, Policy, Dashboard,
@@ -57,7 +56,7 @@ const PHASES = [
   {
     num: 7, id: "automate", label: "Automate", color: "#5C6BC0", Icon: SmartToy,
     tagline: "AI-powered tools & knowledge",
-    items: ["AI Buddies (6 agents)", "Automated Workflows", "Knowledge Base", "Security Docs (RAG)", "Ask Your Data (NL→SQL)"],
+    items: ["AI Buddies (6 agents)", "Automated Workflows", "Knowledge Base", "Security Docs (RAG)", "Ask Your Data"],
     metric: "4 workflows active", path: "/agents",
   },
   {
@@ -79,43 +78,35 @@ interface CmdItem {
 }
 
 const CMD_ITEMS: CmdItem[] = [
-  // Recent (mock)
-  { label: "Dashboard", path: "/dashboard", section: "Recent", Icon: Dashboard },
-  { label: "Findings — 12 Critical", path: "/findings", section: "Recent", Icon: Security },
-  { label: "Threat Models", path: "/threat-models", section: "Recent", Icon: Hub },
-  // Setup
-  { label: "Connections", sub: "Scanners, AI, Jira", path: "/connections", section: "Setup", Icon: Cable },
-  { label: "Clients", path: "/clients", section: "Setup", Icon: People },
-  // Design
-  { label: "Threat Models", sub: "DFD + STRIDE + Sigma", path: "/threat-models", section: "Design", Icon: Hub },
-  { label: "Frameworks", sub: "NIST CSF, CIS v8, ISO 27001…", path: "/frameworks", section: "Design", Icon: Policy },
-  { label: "Custom Policy", path: "/custom-frameworks", section: "Design", Icon: LibraryAdd },
-  // Discover
-  { label: "AI Assisted Scan", sub: "Guided scan wizard", path: "/ai-assisted-scan", section: "Discover", Icon: SmartToy },
-  { label: "Scans", path: "/scans", section: "Discover", Icon: BugReport },
-  { label: "Assets", path: "/assets", section: "Discover", Icon: Storage },
-  { label: "Findings", path: "/findings", section: "Discover", Icon: Security },
-  // Analyse
-  { label: "Risk Overview", sub: "FAIR ALE model", path: "/risk-overview", section: "Analyse", Icon: Insights },
-  { label: "Risk Register", path: "/risks", section: "Analyse", Icon: Assessment },
-  { label: "Attack Paths", sub: "MITRE kill-chain graph", path: "/attack-paths", section: "Analyse", Icon: AccountTree },
-  { label: "CVE Blast Radius", path: "/cve-pivot", section: "Analyse", Icon: BugReport },
-  // Respond
-  { label: "Threat Intelligence", sub: "ATT&CK-mapped entries", path: "/threat-register", section: "Respond", Icon: Radar },
-  { label: "Control Deficiencies", path: "/control-deficiencies", section: "Respond", Icon: GppBad },
-  { label: "Remediation", path: "/governance/remediation", section: "Respond", Icon: PlaylistAddCheck },
-  { label: "CTEM Programs", sub: "5-phase exposure management", path: "/governance/ctem", section: "Respond", Icon: Engineering },
-  // Report
-  { label: "VAPT Reports", sub: "PDF / DOCX export", path: "/vapt/reports", section: "Report", Icon: GppGood },
-  { label: "Posture Trends", path: "/posture-trends", section: "Report", Icon: TrendingUp },
-  // Automate
-  { label: "AI Buddies", sub: "Orchestrator, Threat Intel, Compliance…", path: "/agents", section: "Automate", Icon: SmartToy },
-  { label: "Knowledge Base", path: "/knowledge", section: "Automate", Icon: AutoStories },
-  { label: "Security Docs", sub: "Upload policies, RAG Q&A", path: "/security-docs", section: "Automate", Icon: Description },
-  { label: "Ask Your Data", sub: "Natural language → SQL", path: "/nl-query", section: "Automate", Icon: Psychology },
+  { label: "Dashboard",                path: "/dashboard",            section: "Recent",   Icon: Dashboard },
+  { label: "Findings — 12 Critical",   path: "/findings",             section: "Recent",   Icon: Security },
+  { label: "Threat Models",            path: "/threat-models",        section: "Recent",   Icon: Hub },
+  { label: "Connections",              path: "/connections",          section: "Setup",    Icon: Cable,        sub: "Scanners, AI, Jira" },
+  { label: "Clients",                  path: "/clients",              section: "Setup",    Icon: People },
+  { label: "Threat Models",            path: "/threat-models",        section: "Design",   Icon: Hub,          sub: "DFD + STRIDE + Sigma" },
+  { label: "Frameworks",               path: "/frameworks",           section: "Design",   Icon: Policy,       sub: "NIST CSF, CIS v8, ISO 27001…" },
+  { label: "Custom Policy",            path: "/custom-frameworks",    section: "Design",   Icon: LibraryAdd },
+  { label: "AI Assisted Scan",         path: "/ai-assisted-scan",     section: "Discover", Icon: SmartToy,     sub: "Guided scan wizard" },
+  { label: "Scans",                    path: "/scans",                section: "Discover", Icon: BugReport },
+  { label: "Assets",                   path: "/assets",               section: "Discover", Icon: Storage },
+  { label: "Findings",                 path: "/findings",             section: "Discover", Icon: Security },
+  { label: "Risk Overview",            path: "/risk-overview",        section: "Analyse",  Icon: Insights,     sub: "FAIR ALE model" },
+  { label: "Risk Register",            path: "/risks",                section: "Analyse",  Icon: Assessment },
+  { label: "Attack Paths",             path: "/attack-paths",         section: "Analyse",  Icon: AccountTree,  sub: "MITRE kill-chain graph" },
+  { label: "CVE Blast Radius",         path: "/cve-pivot",            section: "Analyse",  Icon: BugReport },
+  { label: "Threat Intelligence",      path: "/threat-register",      section: "Respond",  Icon: Radar,        sub: "ATT&CK-mapped entries" },
+  { label: "Control Deficiencies",     path: "/control-deficiencies", section: "Respond",  Icon: GppBad },
+  { label: "Remediation",              path: "/governance/remediation",section: "Respond", Icon: PlaylistAddCheck },
+  { label: "CTEM Programs",            path: "/governance/ctem",      section: "Respond",  Icon: Engineering,  sub: "5-phase exposure management" },
+  { label: "VAPT Reports",             path: "/vapt/reports",         section: "Report",   Icon: GppGood,      sub: "PDF / DOCX export" },
+  { label: "Posture Trends",           path: "/posture-trends",       section: "Report",   Icon: TrendingUp },
+  { label: "AI Buddies",               path: "/agents",               section: "Automate", Icon: SmartToy,     sub: "Orchestrator, Threat Intel, Compliance…" },
+  { label: "Knowledge Base",           path: "/knowledge",            section: "Automate", Icon: AutoStories },
+  { label: "Security Docs",            path: "/security-docs",        section: "Automate", Icon: Description,  sub: "Upload policies, RAG Q&A" },
+  { label: "Ask Your Data",            path: "/nl-query",             section: "Automate", Icon: Psychology,   sub: "Natural language → SQL" },
 ];
 
-// ── Command palette component ────────────────────────────────────────────────
+// ── Command palette ──────────────────────────────────────────────────────────
 
 function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const theme = useTheme();
@@ -131,30 +122,26 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
   const filtered = useMemo(() => {
     if (!query.trim()) return CMD_ITEMS;
     const q = query.toLowerCase();
-    return CMD_ITEMS.filter(
-      (c) => c.label.toLowerCase().includes(q) || (c.sub ?? "").toLowerCase().includes(q) || c.section.toLowerCase().includes(q)
+    return CMD_ITEMS.filter((c) =>
+      c.label.toLowerCase().includes(q) || (c.sub ?? "").toLowerCase().includes(q) || c.section.toLowerCase().includes(q)
     );
   }, [query]);
 
-  // Group by section
   const grouped = useMemo(() => {
     const map = new Map<string, CmdItem[]>();
-    const sections = query.trim() ? [] : ["Recent"];
     filtered.forEach((item) => {
-      if (!map.has(item.section)) { map.set(item.section, []); }
+      if (!map.has(item.section)) map.set(item.section, []);
       map.get(item.section)!.push(item);
     });
     return map;
-  }, [filtered, query]);
-
-  const flat = useMemo(() => filtered, [filtered]);
+  }, [filtered]);
 
   const go = (item: CmdItem) => { onClose(); navigate(item.path); };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, flat.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, filtered.length - 1)); }
     if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
-    if (e.key === "Enter" && flat[activeIdx]) go(flat[activeIdx]);
+    if (e.key === "Enter" && filtered[activeIdx]) go(filtered[activeIdx]);
     if (e.key === "Escape") onClose();
   };
 
@@ -168,18 +155,15 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
-          overflow: "hidden",
+          borderRadius: 3, overflow: "hidden",
           boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
           border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-          mt: "8vh",
-          verticalAlign: "top",
+          mt: "8vh", verticalAlign: "top",
         },
       }}
       slotProps={{ backdrop: { sx: { backdropFilter: "blur(4px)", bgcolor: alpha("#000", 0.45) } } }}
     >
       <DialogContent sx={{ p: 0 }}>
-        {/* Search input */}
         <TextField
           inputRef={inputRef}
           fullWidth
@@ -207,10 +191,9 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
           }}
         />
 
-        {/* Results */}
         <Box sx={{ maxHeight: 420, overflow: "auto" }}>
           {grouped.size === 0 ? (
-            <Typography color="text.disabled" textAlign="center" py={4} variant="body2">
+            <Typography color="text.disabled" sx={{ textAlign: "center", py: 4 }} variant="body2">
               No results for "{query}"
             </Typography>
           ) : (
@@ -220,8 +203,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
                   variant="caption"
                   sx={{
                     display: "block", px: 2, py: 0.75,
-                    color: "text.disabled", fontWeight: 700,
-                    letterSpacing: "0.08em", fontSize: "0.68rem",
+                    color: "text.disabled", fontWeight: 700, letterSpacing: "0.08em", fontSize: "0.68rem",
                     bgcolor: alpha(theme.palette.background.default, 0.5),
                     borderBottom: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
                   }}
@@ -244,10 +226,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
                         onMouseEnter={() => setActiveIdx(idx)}
                         sx={{
                           px: 2, py: 0.9,
-                          "&.Mui-selected": {
-                            bgcolor: alpha(accent, 0.1),
-                            "& .cmd-label": { color: "text.primary" },
-                          },
+                          "&.Mui-selected": { bgcolor: alpha(accent, 0.1) },
                           borderLeft: isActive ? `3px solid ${accent}` : "3px solid transparent",
                           transition: "all 0.1s",
                         }}
@@ -257,7 +236,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Typography className="cmd-label" variant="body2" fontWeight={isActive ? 600 : 400} color="text.secondary">
+                            <Typography variant="body2" fontWeight={isActive ? 600 : 400} color="text.secondary">
                               {item.label}
                             </Typography>
                           }
@@ -279,22 +258,12 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
         </Box>
 
         {/* Footer */}
-        <Box
-          sx={{
-            px: 2, py: 1,
-            borderTop: `1px solid ${theme.palette.divider}`,
-            display: "flex", gap: 2, alignItems: "center",
-          }}
-        >
-          {[["↑↓", "navigate"], ["↵", "open"], ["esc", "close"]].map(([key, action]) => (
-            <Stack key={key} direction="row" spacing={0.5} alignItems="center">
-              <Chip
-                label={key}
-                size="small"
-                sx={{ fontFamily: "monospace", fontSize: "0.65rem", height: 18, bgcolor: alpha(theme.palette.divider, 0.5) }}
-              />
+        <Box sx={{ px: 2, py: 1, borderTop: `1px solid ${theme.palette.divider}`, display: "flex", gap: 2, alignItems: "center" }}>
+          {([["↑↓", "navigate"], ["↵", "open"], ["esc", "close"]] as const).map(([key, action]) => (
+            <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Chip label={key} size="small" sx={{ fontFamily: "monospace", fontSize: "0.65rem", height: 18, bgcolor: alpha(theme.palette.divider, 0.5) }} />
               <Typography variant="caption" color="text.disabled">{action}</Typography>
-            </Stack>
+            </Box>
           ))}
         </Box>
       </DialogContent>
@@ -310,13 +279,9 @@ export default function SampleHubCmd() {
   const [hovered, setHovered] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPaletteOpen((v) => !v); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -325,15 +290,15 @@ export default function SampleHubCmd() {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1440, mx: "auto", position: "relative" }}>
       {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={0.5}>
-        <Stack direction="row" alignItems="center" spacing={2}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Typography variant="h4" fontWeight={700} letterSpacing="-0.5px">
             Security Operations Hub
           </Typography>
           <Chip label="Sample — Option 1+2" size="small" color="secondary" variant="outlined" />
-        </Stack>
+        </Box>
 
-        {/* Cmd+K trigger button */}
+        {/* ⌘K search trigger */}
         <Tooltip title="Press ⌘K anywhere">
           <Box
             onClick={() => setPaletteOpen(true)}
@@ -344,39 +309,25 @@ export default function SampleHubCmd() {
               cursor: "pointer",
               bgcolor: alpha(theme.palette.background.paper, 0.6),
               transition: "all 0.15s",
-              "&:hover": {
-                bgcolor: theme.palette.action.hover,
-                borderColor: theme.palette.primary.main,
-              },
+              "&:hover": { bgcolor: theme.palette.action.hover, borderColor: theme.palette.primary.main },
             }}
           >
             <Search sx={{ fontSize: 16, color: "text.disabled" }} />
-            <Typography variant="body2" color="text.disabled">
-              Search anything…
-            </Typography>
-            <Chip
-              label="⌘K"
-              size="small"
-              sx={{
-                fontFamily: "monospace", fontSize: "0.65rem", height: 20,
-                bgcolor: alpha(theme.palette.divider, 0.5),
-                ml: 1,
-              }}
-            />
+            <Typography variant="body2" color="text.disabled">Search anything…</Typography>
+            <Chip label="⌘K" size="small" sx={{ fontFamily: "monospace", fontSize: "0.65rem", height: 20, bgcolor: alpha(theme.palette.divider, 0.5), ml: 1 }} />
           </Box>
         </Tooltip>
-      </Stack>
+      </Box>
 
-      <Typography color="text.secondary" mb={4} variant="body2">
+      <Typography color="text.secondary" variant="body2" sx={{ mb: 4 }}>
         8-phase workflow &nbsp;·&nbsp; Click any phase card or press ⌘K to jump anywhere instantly
       </Typography>
 
-      {/* Phase grid — identical to SampleHub */}
+      {/* Phase grid */}
       <Grid container spacing={2.5}>
         {PHASES.map((phase) => {
           const { Icon } = phase;
           const isHovered = hovered === phase.id;
-
           return (
             <Grid key={phase.id} item xs={12} sm={6} md={3}>
               <Card
@@ -384,85 +335,52 @@ export default function SampleHubCmd() {
                 onMouseLeave={() => setHovered(null)}
                 onClick={() => navigate(phase.path)}
                 sx={{
-                  height: "100%",
-                  cursor: "pointer",
+                  height: "100%", cursor: "pointer",
                   transition: "all 0.18s ease",
                   borderTop: `3px solid ${phase.color}`,
                   boxShadow: isHovered
                     ? `0 8px 32px ${alpha(phase.color, 0.28)}, 0 2px 8px rgba(0,0,0,0.2)`
                     : theme.shadows[2],
                   transform: isHovered ? "translateY(-4px)" : "none",
-                  position: "relative",
-                  overflow: "hidden",
+                  position: "relative", overflow: "hidden",
                   "&::before": {
-                    content: '""',
-                    position: "absolute", inset: 0,
-                    background: isHovered
-                      ? `linear-gradient(135deg, ${alpha(phase.color, 0.07)} 0%, transparent 55%)`
-                      : "none",
-                    pointerEvents: "none",
-                    transition: "all 0.18s ease",
+                    content: '""', position: "absolute", inset: 0,
+                    background: isHovered ? `linear-gradient(135deg, ${alpha(phase.color, 0.07)} 0%, transparent 55%)` : "none",
+                    pointerEvents: "none", transition: "all 0.18s ease",
                   },
                 }}
               >
                 <CardContent sx={{ pb: "16px !important", height: "100%", display: "flex", flexDirection: "column" }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.5}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <Box
-                        sx={{
-                          width: 34, height: 34, borderRadius: "9px",
-                          bgcolor: alpha(phase.color, 0.14),
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ width: 34, height: 34, borderRadius: "9px", bgcolor: alpha(phase.color, 0.14), display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <Icon sx={{ fontSize: 18, color: phase.color }} />
                       </Box>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: alpha(phase.color, 0.8), fontWeight: 700, letterSpacing: "0.08em" }}
-                      >
+                      <Typography variant="caption" sx={{ color: alpha(phase.color, 0.8), fontWeight: 700, letterSpacing: "0.08em" }}>
                         PHASE {phase.num}
                       </Typography>
-                    </Stack>
-                    <ArrowForward
-                      sx={{ fontSize: 15, color: phase.color, opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }}
-                    />
-                  </Stack>
+                    </Box>
+                    <ArrowForward sx={{ fontSize: 15, color: phase.color, opacity: isHovered ? 1 : 0, transition: "opacity 0.15s" }} />
+                  </Box>
 
-                  <Typography variant="h6" fontWeight={700} lineHeight={1.2} mb={0.4}>
+                  <Typography variant="h6" fontWeight={700} lineHeight={1.2} sx={{ mb: 0.4 }}>
                     {phase.label}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1.5} lineHeight={1.4}>
+                  <Typography variant="caption" color="text.secondary" display="block" lineHeight={1.4} sx={{ mb: 1.5 }}>
                     {phase.tagline}
                   </Typography>
 
-                  <Stack spacing={0.5} mb={2} flex={1}>
+                  <Box sx={{ flex: 1, mb: 2 }}>
                     {phase.items.map((item) => (
-                      <Typography
-                        key={item}
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ display: "flex", alignItems: "center", gap: 1, fontSize: "0.775rem" }}
-                      >
-                        <Box
-                          component="span"
-                          sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: phase.color, flexShrink: 0, opacity: 0.7 }}
-                        />
-                        {item}
-                      </Typography>
+                      <Box key={item} sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: phase.color, flexShrink: 0, opacity: 0.7 }} />
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.775rem" }}>{item}</Typography>
+                      </Box>
                     ))}
-                  </Stack>
+                  </Box>
 
                   {phase.metric && (
-                    <Chip
-                      label={phase.metric}
-                      size="small"
-                      sx={{
-                        bgcolor: alpha(phase.color, 0.12), color: phase.color,
-                        fontWeight: 600, fontSize: "0.7rem", height: 22,
-                        alignSelf: "flex-start",
-                      }}
-                    />
+                    <Chip label={phase.metric} size="small" sx={{ bgcolor: alpha(phase.color, 0.12), color: phase.color, fontWeight: 600, fontSize: "0.7rem", height: 22, alignSelf: "flex-start" }} />
                   )}
                 </CardContent>
               </Card>
@@ -471,46 +389,28 @@ export default function SampleHubCmd() {
         })}
       </Grid>
 
-      {/* Phase flow dots */}
-      <Stack direction="row" alignItems="center" justifyContent="center" mt={4} spacing={0.5}>
+      {/* Phase dot strip */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", mt: 4, gap: 0.5 }}>
         {PHASES.map((phase, idx) => (
           <React.Fragment key={phase.id}>
-            <Box
-              onClick={() => navigate(phase.path)}
-              title={`Phase ${phase.num}: ${phase.label}`}
-              sx={{
-                width: 10, height: 10, borderRadius: "50%",
-                bgcolor: phase.color, cursor: "pointer",
-                transition: "transform 0.15s",
-                "&:hover": { transform: "scale(1.5)" },
-              }}
+            <Box onClick={() => navigate(phase.path)} title={`Phase ${phase.num}: ${phase.label}`}
+              sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: phase.color, cursor: "pointer", transition: "transform 0.15s", "&:hover": { transform: "scale(1.5)" } }}
             />
             {idx < PHASES.length - 1 && <Box sx={{ width: 28, height: 1, bgcolor: "divider" }} />}
           </React.Fragment>
         ))}
-      </Stack>
-      <Typography variant="caption" color="text.disabled" textAlign="center" display="block" mt={1}>
+      </Box>
+      <Typography variant="caption" color="text.disabled" sx={{ textAlign: "center", display: "block", mt: 1 }}>
         Phase 1 → 8 &nbsp;·&nbsp; Click any card, dot, or press <strong>⌘K</strong> to search
       </Typography>
 
-      {/* Floating ⌘K FAB (visible on mobile) */}
-      <Fab
-        size="small"
-        onClick={() => setPaletteOpen(true)}
-        sx={{
-          position: "fixed", bottom: 80, right: 24,
-          bgcolor: theme.palette.background.paper,
-          border: `1px solid ${theme.palette.divider}`,
-          color: "text.secondary",
-          boxShadow: theme.shadows[6],
-          display: { xs: "flex", md: "none" },
-          "&:hover": { bgcolor: theme.palette.action.hover },
-        }}
+      {/* Mobile FAB */}
+      <Fab size="small" onClick={() => setPaletteOpen(true)}
+        sx={{ position: "fixed", bottom: 80, right: 24, bgcolor: theme.palette.background.paper, border: `1px solid ${theme.palette.divider}`, color: "text.secondary", boxShadow: theme.shadows[6], display: { xs: "flex", md: "none" }, "&:hover": { bgcolor: theme.palette.action.hover } }}
       >
         <Keyboard sx={{ fontSize: 18 }} />
       </Fab>
 
-      {/* Command palette */}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </Box>
   );
