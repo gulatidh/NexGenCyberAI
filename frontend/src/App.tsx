@@ -12,9 +12,6 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { loginRequest } from "./auth/msalConfig";
 import AppLayout from "./components/layout/AppLayout";
 import OwletLayout from "./components/layout/OwletLayout";
-
-const IS_OWLET = process.env.REACT_APP_THEME === "owlet";
-const Shell = IS_OWLET ? OwletLayout : AppLayout;
 import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
 import {
@@ -79,6 +76,8 @@ import SampleAzure from "./pages/SampleAzure";
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
+
+const Shell = process.env.REACT_APP_THEME === "owlet" ? OwletLayout : AppLayout;
 
 function LoginPage() {
   return (

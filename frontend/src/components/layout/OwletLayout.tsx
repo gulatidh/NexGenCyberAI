@@ -426,7 +426,7 @@ function TopBar({
         <FormControl size="small" sx={{ minWidth: 130, flexShrink: 0, display: { xs: "none", md: "flex" } }}>
           <Select
             value={clientId ?? ""}
-            onChange={(e) => setClientId(e.target.value || null)}
+            onChange={(e) => setClientId(e.target.value)}
             displayEmpty
             sx={{
               color: alpha("#fff", 0.85),
