@@ -68,6 +68,8 @@ import ClientComparison from "./pages/ClientComparison";
 import EvidencePackage from "./pages/EvidencePackage";
 import RemediationJobs from "./pages/RemediationJobs";
 import AgentRunTrash from "./pages/AgentRunTrash";
+import SampleHub from "./pages/SampleHub";
+import SampleHubCmd from "./pages/SampleHubCmd";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -277,6 +279,9 @@ function ProtectedApp() {
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
           <Route path="/client-comparison" element={<ClientComparison />} />
           <Route path="/remediation-jobs" element={<Navigate to="/governance/remediation-jobs" replace />} />
+          <Route path="/sample1" element={<SampleHub />} />
+          <Route path="/sample2" element={<SampleHubCmd />} />
+          <Route path="/1+2" element={<SampleHubCmd />} />
         </Route>
       </Routes>
     </MsalAuthenticationTemplate>
