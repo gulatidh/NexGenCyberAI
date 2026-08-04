@@ -44,9 +44,9 @@ concurrency:
 env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
-  AZ_RESOURCE_GROUP: "nexgencyberai-dev-rg"
-  AZ_BACKEND_APP:  "nexgencyberai-dev-okxksu-api"
-  AZ_FRONTEND_APP: "monitara-ai"
+  AZ_RESOURCE_GROUP: "nexgencyberai-sea-rg"
+  AZ_BACKEND_APP:  "nexgencyberai-sea-api"
+  AZ_FRONTEND_APP: "monitara-sea"
 
 jobs:
 
@@ -148,8 +148,8 @@ jobs:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-dev-okxksu-api.azurewebsites.net/api/v1' }}
-          REACT_APP_REDIRECT_URI: "https://monitara-ai.azurewebsites.net"
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-sea-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: "https://monitara-sea.azurewebsites.net"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
