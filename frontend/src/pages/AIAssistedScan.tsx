@@ -615,10 +615,11 @@ function TargetStep({ connector, clientId, target, onSelect, onBack }: {
   const ct = connector?.connector_type?.value ?? connector?.connector_type ?? "";
   const isCloud = CLOUD_CONNECTOR_TYPES.has(ct);
 
+  const connectorId = connector?.id ?? null;
   const { data: assets } = useQuery({
-    queryKey: ["assets-for-target", clientId, ct],
-    queryFn: () => assetsApi.list(clientId, { connector_type: ct }),
-    enabled: !!clientId && !!ct,
+    queryKey: ["assets-for-target", clientId, connectorId],
+    queryFn: () => assetsApi.list(clientId, { connector_id: connectorId }),
+    enabled: !!clientId && !!connectorId,
     staleTime: 60_000,
     select: (data: any[]) => data.slice(0, 20),
   });
