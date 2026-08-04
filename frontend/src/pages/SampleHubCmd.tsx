@@ -153,15 +153,17 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 3, overflow: "hidden",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
-          border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
-          mt: "8vh", verticalAlign: "top",
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 3, overflow: "hidden",
+            boxShadow: "0 24px 80px rgba(0,0,0,0.4)",
+            border: `1px solid ${alpha(theme.palette.divider, 0.3)}`,
+            mt: "8vh", verticalAlign: "top",
+          },
         },
+        backdrop: { sx: { backdropFilter: "blur(4px)", bgcolor: alpha("#000", 0.45) } },
       }}
-      slotProps={{ backdrop: { sx: { backdropFilter: "blur(4px)", bgcolor: alpha("#000", 0.45) } } }}
     >
       <DialogContent sx={{ p: 0 }}>
         <TextField
