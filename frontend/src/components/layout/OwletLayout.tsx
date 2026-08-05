@@ -6,19 +6,19 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
-  Box, Typography, IconButton, Chip, Avatar,
-  Tooltip, alpha, Badge, Dialog, DialogContent,
+  Box, Typography, IconButton, Avatar,
+  Tooltip, alpha, Dialog, DialogContent,
   List, ListItemButton, ListItemIcon, ListItemText,
   InputAdornment, TextField, Divider, Select, FormControl,
   MenuItem,
 } from "@mui/material";
 import {
-  Menu as MenuIcon, Search, Notifications, Settings,
+  Menu as MenuIcon, Search, Settings,
   Dashboard, Security, BugReport, Insights, Hub, Cable,
   Radar, GppGood, SmartToy, Policy, Storage,
   AutoStories, Psychology, Description, Assessment, GppBad,
   PlaylistAddCheck, TrendingUp, Engineering, GridView,
-  People, LibraryAdd, AccountTree, Schedule, ChevronRight,
+  People, LibraryAdd, AccountTree, Schedule,
   ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
@@ -366,7 +366,7 @@ function TopBar({
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { instance, accounts } = useMsal();
+  const { accounts } = useMsal();
   const { clientId, setClientId } = useActiveClient();
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const isDark = theme.palette.mode === "dark";
