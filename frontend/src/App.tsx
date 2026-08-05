@@ -72,6 +72,7 @@ import AgentRunTrash from "./pages/AgentRunTrash";
 import SampleHub from "./pages/SampleHub";
 import SampleHubCmd from "./pages/SampleHubCmd";
 import SampleAzure from "./pages/SampleAzure";
+import OwletHome from "./pages/OwletHome";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -235,8 +236,8 @@ function ProtectedApp() {
 
         {/* ── v1 AppLayout routes (classic view — still accessible) ─────── */}
         <Route element={<Shell />}>
-          <Route index element={<Navigate to="/hub" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route index element={<Navigate to={process.env.REACT_APP_THEME === "owlet" ? "/dashboard" : "/hub"} replace />} />
+          <Route path="/dashboard" element={process.env.REACT_APP_THEME === "owlet" ? <OwletHome /> : <Dashboard />} />
           <Route path="/risk-overview" element={<RiskOverviewPage />} />
           <Route path="/threat-register" element={<ThreatRegister />} />
           <Route path="/control-deficiencies" element={<ControlDeficiencies />} />
