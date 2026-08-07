@@ -1199,7 +1199,7 @@ export default function Scans() {
               value={selectedClientId}
               onChange={(e) => {
                 setSelectedClientId(e.target.value);
-                localStorage.setItem("monitara-active-client", e.target.value);
+                localStorage.setItem("owlet-active-client", e.target.value);
                 setSelectedProjectId("");
                 setConnectorId("");
                 setScannerId("");
@@ -1659,7 +1659,7 @@ export default function Scans() {
                   value={selectedClientId}
                   onChange={(e) => {
                     setSelectedClientId(e.target.value);
-                    localStorage.setItem("monitara-active-client", e.target.value);
+                    localStorage.setItem("owlet-active-client", e.target.value);
                     setEnterpriseSelectedConnId("");
                   }}
                   label="Client"

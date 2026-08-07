@@ -87,5 +87,5 @@ async def test_webhook(webhook_id: str, background_tasks: BackgroundTasks, db: S
     if wh.client_id:
         require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, wh.client_id, db, user)
     from services.webhook_dispatcher import dispatch_event
-    background_tasks.add_task(dispatch_event, "webhook.test", {"message": "Test event from Monitara"}, wh.client_id)
+    background_tasks.add_task(dispatch_event, "webhook.test", {"message": "Test event from Owlet"}, wh.client_id)
     return {"queued": True}

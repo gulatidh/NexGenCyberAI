@@ -43,7 +43,7 @@ async def run_acunetix_scan(scan_id: str, db_url: str, creds: dict, config: dict
             target_resp = await client.post(
                 f"{base}/targets",
                 headers=headers,
-                json={"address": target_url, "description": f"Monitara-{scan_id[:8]}", "type": "default"},
+                json={"address": target_url, "description": f"Owlet-{scan_id[:8]}", "type": "default"},
             )
             target_resp.raise_for_status()
             target_id = target_resp.json().get("target_id")

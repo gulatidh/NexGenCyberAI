@@ -1,5 +1,5 @@
 /**
- * Product definitions for Monitara v2.
+ * Product definitions for Owlet v2.
  * Each product maps to a route prefix and a set of sub-nav items.
  */
 import React from "react";

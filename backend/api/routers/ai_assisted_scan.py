@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 _MONITARA_NAV = """\
-## Monitara AI — Quick Navigation Reference
+## Owlet AI — Quick Navigation Reference
 - Add / manage connectors: left nav → **Connections** → **Add Connection** (NOT "Settings → Integrations")
 - Launch a scan manually: left nav → **Assessments** → **New Scan**
 - Run AI analysis after a scan: left nav → **AI Buddies** → select scan → choose agent → Run
@@ -75,7 +75,7 @@ _CONNECTOR_DESCRIPTIONS = {
 }
 
 _SYSTEM_PROMPT = """\
-You are the Aegis AI Scan Guide inside Monitara AI. The user is configuring a security scan through a structured wizard UI — your role is to provide helpful guidance text that appears in a blue strip at the top of the wizard. You do NOT drive navigation — the UI handles that. Respond with concise, encouraging guidance (1-3 sentences) based on what the user has selected or asked.
+You are the Owlet AI Scan Guide inside Owlet AI. The user is configuring a security scan through a structured wizard UI — your role is to provide helpful guidance text that appears in a blue strip at the top of the wizard. You do NOT drive navigation — the UI handles that. Respond with concise, encouraging guidance (1-3 sentences) based on what the user has selected or asked.
 
 {nav_reference}
 

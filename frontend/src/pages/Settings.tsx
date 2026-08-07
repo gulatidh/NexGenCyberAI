@@ -69,7 +69,7 @@ function GeneralTab({ me }: { me?: MyAccess }) {
               <Typography variant="subtitle2" sx={{ color: "text.secondary", mb: 2, fontWeight: 700, textTransform: "uppercase", fontSize: 11, letterSpacing: 1 }}>Platform</Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 {[
-                  ["Application", "Monitara AI — NexGenCyberAI"],
+                  ["Application", "Owlet AI — NexGenCyberAI"],
                   ["Version", "1.0"],
                   ["Stack", "FastAPI + React + MUI v6"],
                   ["Auth", "Microsoft Entra ID (MSAL)"],
@@ -259,7 +259,7 @@ function SsoTab({ isAdmin }: { isAdmin: boolean }) {
         subtitle="Azure Entra ID (Azure AD) tenant connection"
       />
       <Alert severity="info" sx={{ mb: 2.5 }}>
-        These settings control which Azure AD tenant Monitara authenticates against. Changes take effect after the application is restarted or redeployed.
+        These settings control which Azure AD tenant Owlet authenticates against. Changes take effect after the application is restarted or redeployed.
       </Alert>
 
       <Card variant="outlined" sx={{ mb: 2 }}>
@@ -283,7 +283,7 @@ function SsoTab({ isAdmin }: { isAdmin: boolean }) {
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField fullWidth size="small" label="Client ID (App Registration)" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 value={form.client_id || ""} disabled={!isAdmin}
-                helperText="Application (client) ID of the Monitara app registration"
+                helperText="Application (client) ID of the Owlet app registration"
                 onChange={(e) => set("client_id", e.target.value)} />
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>

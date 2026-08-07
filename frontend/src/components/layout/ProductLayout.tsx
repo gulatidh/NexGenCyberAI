@@ -1,8 +1,8 @@
 /**
- * ProductLayout — the inside-product shell for Monitara v2.
+ * ProductLayout — the inside-product shell for Owlet v2.
  *
  * Structure:
- *   TopBar (56px):  waffle → home | "Monitara" | product name | client selector | user
+ *   TopBar (56px):  waffle → home | "Owlet" | product name | client selector | user
  *   Left sidebar (220px): product icon + name + sub-nav
  *   Main content: background.default, overflow auto, p 3
  *
@@ -138,7 +138,7 @@ export default function ProductLayout({ product }: Props) {
             sx={{ display: "flex", alignItems: "center", gap: 0.25, cursor: "pointer", mr: 0.5 }}
           >
             <Typography sx={{ fontWeight: 800, fontSize: 14, color: "primary.main", userSelect: "none" }}>
-              Monitara
+              Owlet
             </Typography>
           </Box>
         </Tooltip>

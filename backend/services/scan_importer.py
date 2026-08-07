@@ -1,5 +1,5 @@
 """
-Scan result importer — parse offline scan files from any tool into Aegis findings.
+Scan result importer — parse offline scan files from any tool into Owlet findings.
 
 Supports structured parsers for known formats, LLM fallback for unknown/PDF,
 CVE enrichment from NVD, and delta diff against existing findings.

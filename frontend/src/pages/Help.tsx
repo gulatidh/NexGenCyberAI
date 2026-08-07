@@ -40,8 +40,8 @@ const GROUPS: Group[] = [
     topics: [
       {
         id: "sign-in",
-        title: "Sign in to Monitara AI",
-        summary: "Monitara AI uses Microsoft Entra ID (Azure AD) for authentication — your work Microsoft account is your only credential. No separate passwords are created or stored anywhere on the platform. Only Microsoft work or school accounts are accepted — personal Outlook.com, Hotmail.com, and Live.com accounts are blocked.",
+        title: "Sign in to Owlet AI",
+        summary: "Owlet AI uses Microsoft Entra ID (Azure AD) for authentication — your work Microsoft account is your only credential. No separate passwords are created or stored anywhere on the platform. Only Microsoft work or school accounts are accepted — personal Outlook.com, Hotmail.com, and Live.com accounts are blocked.",
         steps: [
           { text: "Open the platform URL. The landing page is public. Click 'Sign in' or navigate to any protected route — you'll be redirected to Microsoft Entra ID automatically." },
           { text: "Authenticate with your work Microsoft account. Complete MFA if your organisation requires it." },
@@ -60,7 +60,7 @@ const GROUPS: Group[] = [
       {
         id: "first-client",
         title: "Create your first client",
-        summary: "Clients are the top-level multi-tenant containers in Monitara AI. Every piece of security data — connectors, scans, findings, risks, threat entries, remediation actions — lives under a client and is invisible across client boundaries.",
+        summary: "Clients are the top-level multi-tenant containers in Owlet AI. Every piece of security data — connectors, scans, findings, risks, threat entries, remediation actions — lives under a client and is invisible across client boundaries.",
         steps: [
           { text: "Why create a client first? You cannot run a scan, add a connector, or view findings without one. Everything in the platform is scoped to a client." },
           { text: "Open the Clients tab from the left navigation." },
@@ -105,7 +105,7 @@ const GROUPS: Group[] = [
       {
         id: "platform-overview",
         title: "Advanced features overview",
-        summary: "Monitara has 7 advanced features beyond the core scan → findings → agents flow: Attack Path Visualisation, Natural Language Query, Posture Trends, CTEM workflow, Security Document RAG, Webhooks, and API Keys.",
+        summary: "Owlet has 7 advanced features beyond the core scan → findings → agents flow: Attack Path Visualisation, Natural Language Query, Posture Trends, CTEM workflow, Security Document RAG, Webhooks, and API Keys.",
         steps: [
           { text: "Attack Path Visualisation (Intelligence → Attack Paths): SVG graph that maps your open findings onto MITRE ATT&CK phases — Initial Access through Exfiltration. See which findings chain together into a realistic attack path.", detail: "No configuration needed — the graph is generated automatically from your current findings. Select a client and navigate to /attack-paths." },
           { text: "Natural Language Query (Intelligence → Ask Your Data): type a plain-English question about your security data — 'How many critical findings are unresolved?', 'Which scanner found the most highs?' — and the platform generates SQL, runs it safely, and returns a result table plus a plain-English summary.", detail: "Only SELECT queries are allowed. The safety validator blocks DROP, DELETE, INSERT, UPDATE, and other write keywords before execution." },
@@ -113,7 +113,7 @@ const GROUPS: Group[] = [
           { text: "CTEM Programs (Governance → CTEM): structured 5-phase Continuous Threat Exposure Management workflow — Scope, Discover, Prioritise, Validate, Mobilise. Create a program per engagement or quarter. Advance phases with notes recording decisions made." },
           { text: "Security Document RAG (Intelligence → Security Docs): upload your security policies, procedures, or third-party assessment reports (PDF, DOCX, TXT). Then ask natural-language questions — 'Does our password policy cover MFA?' — and get answers grounded in your uploaded documents.", detail: "Documents are chunked at 800 chars with 100-char overlap. Retrieval uses keyword ranking followed by an LLM synthesis pass. Works entirely client-scoped — no cross-client document leakage." },
           { text: "Webhooks (Settings → Webhooks): configure Slack, Teams, or any HTTPS endpoint to receive real-time alerts. Supported events: 'finding.critical', 'scan.completed', 'agent.completed'. Payloads are HMAC-SHA256 signed." },
-          { text: "API Keys (Settings → API Keys): generate machine-to-machine API keys (monitara_ prefix, 32-byte hex) for CI/CD pipelines, SIEM integrations, or scripts. The full key is shown only once at creation — store it immediately." },
+          { text: "API Keys (Settings → API Keys): generate machine-to-machine API keys (owlet_ prefix, 32-byte hex) for CI/CD pipelines, SIEM integrations, or scripts. The full key is shown only once at creation — store it immediately." },
         ],
         tips: [
           "Start with Posture Trends — capture a snapshot today and one per week going forward. After a month you'll have a concrete trending dataset to show stakeholders.",
@@ -139,7 +139,7 @@ const GROUPS: Group[] = [
         title: "Add a cloud connector (Azure / AWS / GCP / Entra ID)",
         summary: "Cloud connectors query your cloud provider's read-only APIs to detect misconfigurations, exposed resources, and identity risks — no agent installation, no network probing, no changes to your infrastructure.",
         steps: [
-          { text: "What cloud connectors do: they call cloud provider control-plane APIs (Azure Resource Graph, AWS Config, GCP Security Command Center, Entra ID Microsoft Graph) and translate the results into findings using Monitara's rule library.", detail: "This is fundamentally different from workflow scanners like Nmap or ZAP that actively probe targets. Cloud connectors read configuration state — they never touch your data plane." },
+          { text: "What cloud connectors do: they call cloud provider control-plane APIs (Azure Resource Graph, AWS Config, GCP Security Command Center, Entra ID Microsoft Graph) and translate the results into findings using Owlet's rule library.", detail: "This is fundamentally different from workflow scanners like Nmap or ZAP that actively probe targets. Cloud connectors read configuration state — they never touch your data plane." },
           { text: "Open the Client whose environment you want to connect. Switch to the Connectors tab on the Client Detail page." },
           { text: "Click 'Add connector'. Pick the cloud type: Azure Security, AWS Security, GCP Security, Entra ID, Container Security, On-Premises, etc." },
           { text: "Paste credentials. Azure: Tenant ID + Client ID + Client Secret + Subscription ID of a service principal. AWS: Access Key ID + Secret Access Key. GCP: service account JSON. Entra ID: same as Azure but scoped to Graph API.", detail: "Credentials are encrypted with the platform's Fernet key before being stored. They're decrypted at scan time only and never returned to the UI after saving." },
@@ -166,7 +166,7 @@ const GROUPS: Group[] = [
           { text: "Fill in the target field — format depends on scanner:", detail: "SAST/Secrets: Git repo URL. Network: host, IP, or CIDR. Container (Trivy): Docker image ref or repo URL. Web (ZAP): target HTTP/HTTPS URL." },
           { text: "For private repos, paste a Git PAT or deploy key. It's stored encrypted and injected into the clone URL at scan time — never logged in Actions inputs." },
           { text: "Save the connector. Start a scan from Assessments → New scan → pick this connector." },
-          { text: "What happens: Monitara creates a PENDING scan, generates a per-scan HMAC token, and calls GitHub Actions workflow_dispatch. The runner clones the target, runs the tool, parses output, and POSTs findings to /api/v1/scans/ingest/ authenticated with the HMAC token." },
+          { text: "What happens: Owlet creates a PENDING scan, generates a per-scan HMAC token, and calls GitHub Actions workflow_dispatch. The runner clones the target, runs the tool, parses output, and POSTs findings to /api/v1/scans/ingest/ authenticated with the HMAC token." },
         ],
         tips: [
           "If GitHub Actions isn't triggering: (1) confirm MONITARA_API_URL is set as a GitHub Actions secret in the NexGenCyberAI repo, (2) the workflow .yml for the scanner exists in the repo, (3) the dispatch token has 'actions: write' permission.",
@@ -201,9 +201,9 @@ const GROUPS: Group[] = [
       {
         id: "enterprise-scanners",
         title: "Add an enterprise scanner (Tenable, Burp Suite, Snyk, Rapid7, Qualys, Invicti, Acunetix)",
-        summary: "Enterprise scanners connect to your existing commercial security tools via their REST APIs. Unlike workflow scanners, enterprise scanners run as direct API integrations — Monitara calls the tool's API, waits for results, and ingests findings automatically.",
+        summary: "Enterprise scanners connect to your existing commercial security tools via their REST APIs. Unlike workflow scanners, enterprise scanners run as direct API integrations — Owlet calls the tool's API, waits for results, and ingests findings automatically.",
         steps: [
-          { text: "How enterprise scanners work: Monitara authenticates to the scanner's cloud or on-prem API, creates a scan job, polls for completion (up to 2 hours), fetches results, normalises severity, and persists findings to the database — identical to any other scan from the platform's perspective." },
+          { text: "How enterprise scanners work: Owlet authenticates to the scanner's cloud or on-prem API, creates a scan job, polls for completion (up to 2 hours), fetches results, normalises severity, and persists findings to the database — identical to any other scan from the platform's perspective." },
           { text: "Supported enterprise tools:", detail: "Tenable.io — full vulnerability management via pytenable SDK. Burp Suite Enterprise — enterprise DAST via REST API. Snyk — SCA/SAST across all org projects. Rapid7 InsightVM — network vulnerability management via site scans. Qualys VMDR — cloud-based VM platform via XML API. Invicti (Netsparker) — proof-based DAST. Acunetix Enterprise — web application scanner." },
           { text: "Go to Connections → Scanners section → 'Add Scanner'. Pick your enterprise tool from the Enterprise Scanners category." },
           { text: "Fill in the credentials. Each tool requires different fields:", detail: "Tenable.io: access_key + secret_key. Burp Suite Enterprise: host URL + api_key. Snyk: api_token + org_id. Rapid7 InsightVM: host URL + username + password + site_id. Qualys VMDR: api_url + username + password + scan_title + ip_to_scan. Invicti: base_url + api_token. Acunetix: base_url + api_key + target_url." },
@@ -227,10 +227,10 @@ const GROUPS: Group[] = [
           { text: "Navigate to Connections from the left nav. Scroll to the Platform Connectors section. Click 'Add Connector' → pick Jira." },
           { text: "Fill in four fields:", detail: "Jira URL: your full Atlassian subdomain, e.g. https://yourorg.atlassian.net — include https:// prefix. Email: the Atlassian account email associated with the API token. API Token: generate from id.atlassian.com → My account → Security → Create and manage API tokens. Default Project Key: optional pre-fill (e.g. KAN, SEC) — the ticket creation dialog uses this as the default but you can override it per ticket." },
           { text: "Click Save. The connector is now available for ticket creation from the Findings and Remediation Tracker pages." },
-          { text: "Issue type: Monitara creates tickets with issue type 'Task' by default. This works with both classic and team-managed (next-gen) Jira projects. If your project doesn't support Task, ticket creation returns a 400 error — check your project's issue types in Jira Project Settings." },
+          { text: "Issue type: Owlet creates tickets with issue type 'Task' by default. This works with both classic and team-managed (next-gen) Jira projects. If your project doesn't support Task, ticket creation returns a 400 error — check your project's issue types in Jira Project Settings." },
         ],
         tips: [
-          "Team-managed (next-gen) Jira projects typically support: Task, Incident, Epic, Service Request. Classic projects also have Bug, Story, and others. Monitara uses Task as the default because it exists in all project types.",
+          "Team-managed (next-gen) Jira projects typically support: Task, Incident, Epic, Service Request. Classic projects also have Bug, Story, and others. Owlet uses Task as the default because it exists in all project types.",
           "Your Default Project Key pre-fills the project key field in the ticket dialog. If you work across multiple Jira projects, you can override the key per ticket — it's an editable field.",
           "API tokens are scoped to your Atlassian account. The token needs 'Browse Projects' and 'Create Issues' permissions on the target project.",
         ],
@@ -349,7 +349,7 @@ const GROUPS: Group[] = [
         title: "Risk Overview — the executive dashboard",
         summary: "Risk Overview translates raw scan findings into financial risk estimates using FAIR-lite ALE (Annual Loss Expectancy). It's the board-level view of your client's security posture — not individual CVEs, but aggregated business risk by domain with dollar-range estimates.",
         steps: [
-          { text: "What FAIR-lite ALE means: each risk is scored with a likelihood (probability of a loss event in a year) and impact (estimated financial loss range). ALE = likelihood × impact. Total Exposure = sum of all open risk ALEs.", detail: "Monitara derives likelihood from CVSS + EPSS + KEV data. Impact is mapped to a loss magnitude band based on the risk category and available threat intel." },
+          { text: "What FAIR-lite ALE means: each risk is scored with a likelihood (probability of a loss event in a year) and impact (estimated financial loss range). ALE = likelihood × impact. Total Exposure = sum of all open risk ALEs.", detail: "Owlet derives likelihood from CVSS + EPSS + KEV data. Impact is mapped to a loss magnitude band based on the risk category and available threat intel." },
           { text: "Select a client from the top toolbar, then open Risk Overview from the left nav." },
           { text: "Top KPI strip: Total Exposure (ALE high estimate), Net Exposure (after applied controls), Open Critical/High count, 30-Day Breach Probability.", detail: "30-Day Breach Probability is derived from EPSS scores of open critical findings — the probability that at least one critical finding is actively exploited in the next 30 days." },
           { text: "Risk by Domain bar chart: groups risks into stable categories — Identity, Cloud Security, Application Security, Network, Data Protection, Compliance. Each bar shows ALE for that domain." },
@@ -498,7 +498,7 @@ const GROUPS: Group[] = [
       {
         id: "ai-settings",
         title: "Choose your AI provider",
-        summary: "Monitara supports five AI providers with automatic failover. Configure your primary provider in AI Settings — all agents, scan verdicts, and workflow reports use it. If the primary fails at runtime, the platform automatically tries the next configured provider.",
+        summary: "Owlet supports five AI providers with automatic failover. Configure your primary provider in AI Settings — all agents, scan verdicts, and workflow reports use it. If the primary fails at runtime, the platform automatically tries the next configured provider.",
         steps: [
           { text: "Why configure an AI provider: without one, agents produce rule-based output only — no narrative, limited register quality." },
           { text: "Open Settings → AI Settings (or Connections → AI Settings from the left nav collapsible)." },
@@ -587,7 +587,7 @@ const GROUPS: Group[] = [
         title: "What is a VAPT Report",
         summary: "End-to-end penetration test report with findings, severity, and remediation. VAPT reports are structured engagement documents that capture all findings from a security test — including scope, methodology, executive summary, per-finding detail, and retest history.",
         steps: [
-          { text: "What it does: VAPT (Vulnerability Assessment and Penetration Testing) reports in Monitara are structured engagement documents that capture all findings from a security test." },
+          { text: "What it does: VAPT (Vulnerability Assessment and Penetration Testing) reports in Owlet are structured engagement documents that capture all findings from a security test." },
           { text: "Why it matters: A VAPT report is the deliverable that goes to clients, boards, and auditors. It translates raw scanner output into an accountable, versioned document with clear remediation ownership." },
           { text: "Structure: Reports are versioned (1.0, 1.1…), linked to a scan, and contain: Document Control (title, classification, prepared by, reviewed by, dates), Scope & Methodology, Findings (severity-banded, with evidence and reproduction steps), and Export & History." },
           { text: "When to use: After completing a security scan — use 'Generate from Scan' to auto-populate findings. Or create a blank report for manual engagements." },
@@ -664,7 +664,7 @@ const GROUPS: Group[] = [
       {
         id: "framework-library",
         title: "What the framework library is",
-        summary: "Monitara ships with a pre-seeded library of industry compliance frameworks — NIST CSF 2.0, ISO 27001:2022, PCI DSS 4.0, GDPR, CIS Controls v8, and more. Each framework is a structured list of controls with IDs, domains, and descriptions. Scan findings are automatically mapped to these controls when you tag a framework at scan time.",
+        summary: "Owlet ships with a pre-seeded library of industry compliance frameworks — NIST CSF 2.0, ISO 27001:2022, PCI DSS 4.0, GDPR, CIS Controls v8, and more. Each framework is a structured list of controls with IDs, domains, and descriptions. Scan findings are automatically mapped to these controls when you tag a framework at scan time.",
         steps: [
           { text: "Open Frameworks from the left nav (under the Frameworks section)." },
           { text: "Browse controls by framework, domain, or search term. Each control shows its ID (e.g. PR.DS-1 for NIST CSF, A.8.24 for ISO 27001), title, domain, and description." },
@@ -866,7 +866,7 @@ const GROUPS: Group[] = [
       {
         id: "cve-enrichment",
         title: "Automatic CVE & CVSS enrichment",
-        summary: "After every scan completes, Monitara automatically enriches each finding with accurate CVE IDs and CVSS v3.1 scores using the LLM's own security knowledge — no external API calls, no token congestion. Multiple CVEs per finding are supported.",
+        summary: "After every scan completes, Owlet automatically enriches each finding with accurate CVE IDs and CVSS v3.1 scores using the LLM's own security knowledge — no external API calls, no token congestion. Multiple CVEs per finding are supported.",
         steps: [
           { text: "Enrichment triggers automatically. You do not need to do anything — it runs as a background task the moment a scan finishes." },
           { text: "How it works:", detail: "The LLM receives only the minimal finding metadata (title + any existing CVE hint) in compact batches of 5. It uses its own training knowledge (NVD, MITRE, vendor advisories ingested at training time) to return: primary CVE ID, all related CVE IDs, CVSS v3.1 base score, and CVSS v3.1 vector string." },
@@ -907,7 +907,7 @@ const GROUPS: Group[] = [
       {
         id: "nl-query",
         title: "Ask Your Data (Natural Language Query)",
-        summary: "Type a plain-English security question and Monitara translates it into SQL, runs it safely against your live data, and returns a result table plus a plain-English summary — no SQL knowledge required.",
+        summary: "Type a plain-English security question and Owlet translates it into SQL, runs it safely against your live data, and returns a result table plus a plain-English summary — no SQL knowledge required.",
         steps: [
           { text: "Select your client in the top toolbar. Navigate to Intelligence → Ask Your Data." },
           { text: "Type your question in the text field. Examples:", detail: "'How many critical findings are still open?' / 'Which scanner found the most high-severity findings?' / 'What are the top 5 resources by finding count?' / 'Show me all findings with a CVSS score above 9.0'" },
@@ -999,7 +999,7 @@ const GROUPS: Group[] = [
       {
         id: "ctem",
         title: "CTEM Workflow (Continuous Threat Exposure Management)",
-        summary: "Monitara CTEM is a 5-phase AI-assisted workflow — Scope → Discover → Prioritise → Validate → Mobilise. Each phase auto-populates from your existing platform data (findings, assets, scans) and is fully editable by analysts.",
+        summary: "Owlet CTEM is a 5-phase AI-assisted workflow — Scope → Discover → Prioritise → Validate → Mobilise. Each phase auto-populates from your existing platform data (findings, assets, scans) and is fully editable by analysts.",
         steps: [
           { text: "Select your client in the top toolbar. Navigate to Governance → CTEM Programs." },
           { text: "Click 'New Program'. Enter a name (e.g. 'Q3 2026 Exposure Cycle') and optional description. Optionally select one or more connectors from the multi-select dropdown to scope the asset inventory — only assets discovered by those connectors appear in Phase 1 and Phase 2. If no connectors are selected, all assets from all connectors are included.", detail: "Connector scoping prevents cross-environment contamination — e.g. scope a CTEM program to only your production Azure connector, excluding dev/test assets. Assets discovered by multiple connectors are deduplicated by external_id so each physical asset appears exactly once." },
@@ -1047,7 +1047,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "Select your client in the top toolbar. Navigate to the client's settings or the Scorecard section." },
           { text: "Click 'Generate Scorecard Link'. The platform creates a ScorecardToken (random hex) and returns the public URL: /public/scorecard/{token}." },
-          { text: "Share the URL with anyone who needs visibility — customer, board member, partner. No Monitara account required to view it." },
+          { text: "Share the URL with anyone who needs visibility — customer, board member, partner. No Owlet account required to view it." },
           { text: "The scorecard shows: overall score (0–100), severity breakdown (critical/high/medium/low/info open counts), and a colour-coded risk band (green >80, yellow 60–80, red <60).", detail: "Score formula: max(0, 100 - critical*10 - high*3 - other_open). Each open critical deducts 10 points, each open high deducts 3 points, each other open finding deducts 1 point." },
           { text: "Multiple tokens can exist per client — create separate tokens for different audiences (e.g. one for the customer portal, one for the executive dashboard) and revoke each independently." },
         ],
@@ -1076,9 +1076,9 @@ const GROUPS: Group[] = [
           { text: "Navigate to Settings → Webhooks." },
           { text: "Click 'Add Webhook'. Fill in:", detail: "Name: descriptive label. URL: the HTTPS endpoint. Events: select one or more — 'finding.critical', 'scan.completed', 'agent.completed'. Secret (optional but recommended): a string used to generate the HMAC-SHA256 signature." },
           { text: "Click 'Save'. Click 'Test Delivery' on the webhook row to send a test payload immediately." },
-          { text: "How payload signing works: every delivery includes an X-Monitara-Signature header containing HMAC-SHA256(secret, payload_body_as_bytes). Verify this on your endpoint to confirm the payload is genuine.", detail: "In Python: hmac.compare_digest(computed_sig, received_sig). In Node.js: crypto.createHmac('sha256', secret).update(body).digest('hex')." },
-          { text: "For Slack: create an Incoming Webhook App in your Slack workspace (api.slack.com/apps → Incoming Webhooks → Add New Webhook to Workspace). Paste the resulting URL into Monitara." },
-          { text: "For Teams: create a workflow using 'Post to a channel when a webhook request is received' in Power Automate, or use the Teams Incoming Webhook connector. Paste the webhook URL into Monitara." },
+          { text: "How payload signing works: every delivery includes an X-Owlet-Signature header containing HMAC-SHA256(secret, payload_body_as_bytes). Verify this on your endpoint to confirm the payload is genuine.", detail: "In Python: hmac.compare_digest(computed_sig, received_sig). In Node.js: crypto.createHmac('sha256', secret).update(body).digest('hex')." },
+          { text: "For Slack: create an Incoming Webhook App in your Slack workspace (api.slack.com/apps → Incoming Webhooks → Add New Webhook to Workspace). Paste the resulting URL into Owlet." },
+          { text: "For Teams: create a workflow using 'Post to a channel when a webhook request is received' in Power Automate, or use the Teams Incoming Webhook connector. Paste the webhook URL into Owlet." },
         ],
         tips: [
           "Start with 'finding.critical' — an immediate Slack message when a critical finding is ingested is the highest-value notification.",
@@ -1086,18 +1086,18 @@ const GROUPS: Group[] = [
         ],
         warnings: [
           "Webhook deliveries are fire-and-forget with one retry on failure. If your endpoint is down during a critical finding event, the notification is not queued indefinitely.",
-          "Do not use webhook URLs as substitutes for authentication. Validate the X-Monitara-Signature on every delivery.",
+          "Do not use webhook URLs as substitutes for authentication. Validate the X-Owlet-Signature on every delivery.",
         ],
       },
       {
         id: "api-keys",
         title: "API Keys & Programmatic Access",
-        summary: "Generate long-lived API keys for CI/CD pipelines, SIEM integrations, or scripts that need to call Monitara APIs without a user login. Keys use the 'monitara_' prefix and are scoped to specific capabilities. The full key is shown only once — store it securely immediately.",
+        summary: "Generate long-lived API keys for CI/CD pipelines, SIEM integrations, or scripts that need to call Owlet APIs without a user login. Keys use the 'owlet_' prefix and are scoped to specific capabilities. The full key is shown only once — store it securely immediately.",
         steps: [
           { text: "Navigate to Settings → API Keys." },
           { text: "Click 'Create API Key'. Enter a descriptive name. Select the scopes this key requires.", detail: "Scopes control access: 'findings:read', 'scans:write', 'reports:read', 'webhooks:write'. Assign minimum necessary scopes — principle of least privilege." },
-          { text: "Click 'Generate'. The full key (format: monitara_[64 hex chars]) is displayed exactly once. Copy it immediately — this is the only time the platform shows the full key value." },
-          { text: "Use the key in API calls via the Authorization header: Authorization: Bearer monitara_[your-key-here]. The platform verifies by hashing the received key and comparing to stored hashes." },
+          { text: "Click 'Generate'. The full key (format: owlet_[64 hex chars]) is displayed exactly once. Copy it immediately — this is the only time the platform shows the full key value." },
+          { text: "Use the key in API calls via the Authorization header: Authorization: Bearer owlet_[your-key-here]. The platform verifies by hashing the received key and comparing to stored hashes." },
           { text: "To revoke: find the key in the API Keys list, click 'Revoke'. The key becomes invalid immediately." },
         ],
         tips: [
@@ -1112,22 +1112,22 @@ const GROUPS: Group[] = [
       {
         id: "ticket-creation",
         title: "Create tracked tickets from Findings or Remediation Tracker",
-        summary: "Push any finding or remediation action to Jira or ServiceNow as a tracked ticket — directly from within Monitara. The ticket captures finding details (severity, CVE, description, remediation steps) and a deep link back to the source. No copy-paste required.",
+        summary: "Push any finding or remediation action to Jira or ServiceNow as a tracked ticket — directly from within Owlet. The ticket captures finding details (severity, CVE, description, remediation steps) and a deep link back to the source. No copy-paste required.",
         steps: [
           { text: "Prerequisite: save a Jira or ServiceNow connector in Connections. For Jira you need the URL, email, API token, and optionally a default project key." },
           { text: "From the Findings page: find the finding you want to track. Click the ticket icon or ⋮ menu → 'Create Ticket'. A dialog opens.", detail: "The dialog shows: connector selector, project key field (pre-filled from the connector's Default Project Key), priority selector, and a preview of the ticket title and description that will be sent." },
           { text: "From Remediation Tracker: find the remediation action row. Click 'Create Ticket'. Same dialog — same connector, project key, and priority fields." },
           { text: "For Jira: enter the Project Key — this is required. The key is typically 2–5 uppercase letters from your Jira project URL (e.g. KAN, SEC, OPS). The Create button stays disabled until a project key is provided.", detail: "Even if the connector has a Default Project Key set, confirm it is correct for the target project. Using the wrong project key returns a 400 error." },
-          { text: "Click Create. Monitara calls the connector's API (Jira or ServiceNow). On success, the ticket key (e.g. KAN-42) is returned and displayed. The ticket is live in your issue tracker immediately." },
+          { text: "Click Create. Owlet calls the connector's API (Jira or ServiceNow). On success, the ticket key (e.g. KAN-42) is returned and displayed. The ticket is live in your issue tracker immediately." },
         ],
         tips: [
-          "The ticket description includes: severity, CVE ID, CVSS score, resource identifier, full finding description, and AI-generated remediation steps. Engineering teams get everything they need without needing Monitara access.",
+          "The ticket description includes: severity, CVE ID, CVSS score, resource identifier, full finding description, and AI-generated remediation steps. Engineering teams get everything they need without needing Owlet access.",
           "ServiceNow tickets land in the configured table (default: incident). The short_description is the finding title; work_notes contain the full finding context.",
-          "Ticket creation is a one-way push. If you update the finding in Monitara, the Jira ticket is not automatically updated — use the ticket's assignee and comments for tracking follow-up.",
+          "Ticket creation is a one-way push. If you update the finding in Owlet, the Jira ticket is not automatically updated — use the ticket's assignee and comments for tracking follow-up.",
         ],
         warnings: [
           "If you see a 400 error: the project key is wrong, the issue type is not supported by your project, or the priority value is invalid. Open your Jira project settings → Issue Types to verify what types are available.",
-          "Ticket creation does not automatically update the finding status in Monitara. After the finding is resolved, manually update the finding status to 'remediated' or 'accepted'.",
+          "Ticket creation does not automatically update the finding status in Owlet. After the finding is resolved, manually update the finding status to 'remediated' or 'accepted'.",
         ],
       },
     ],
@@ -1183,7 +1183,7 @@ const GROUPS: Group[] = [
       {
         id: "client-lifecycle",
         title: "Delete, restore, or permanently remove a client",
-        summary: "Client deletion in Monitara is a two-stage process: soft-delete (data hidden, 30-day grace period, fully restorable) then permanent delete (irreversible full database cascade). You can't accidentally permanently delete — it requires navigating to the Deleted Clients tab and explicitly confirming.",
+        summary: "Client deletion in Owlet is a two-stage process: soft-delete (data hidden, 30-day grace period, fully restorable) then permanent delete (irreversible full database cascade). You can't accidentally permanently delete — it requires navigating to the Deleted Clients tab and explicitly confirming.",
         steps: [
           { text: "Soft-delete (stage 1): open Clients, hover any client card, click the trash icon, confirm in the dialog. The client and all its data are hidden from every view immediately — but nothing is removed from the database.", detail: "Soft-deleted clients don't appear in the global client selector, dashboard KPIs, activity feeds, or any list query. They're completely invisible to non-admin users." },
           { text: "To restore: open Settings → Deleted Clients tab (admin only). Find the client. Click the restore icon. All data reinstates immediately." },
@@ -1202,7 +1202,7 @@ const GROUPS: Group[] = [
       {
         id: "grant-access",
         title: "Grant another user access",
-        summary: "Monitara uses role-based access control with three roles (Reader, Editor, Admin) at three scopes (Global, Client, Project). A user's effective access is the union of all their grants. Revocation takes effect on the next API call — no re-login required.",
+        summary: "Owlet uses role-based access control with three roles (Reader, Editor, Admin) at three scopes (Global, Client, Project). A user's effective access is the union of all their grants. Revocation takes effect on the next API call — no re-login required.",
         steps: [
           { text: "How RBAC works: every API call checks the caller's role grants against the resource being accessed. Checks are live — no caching — so revocation is immediate." },
           { text: "Role breakdown:", detail: "Reader: view-only — no create, edit, or delete. Editor: full CRUD on security data (scans, findings, risks, agents, connectors, registers). Admin: all editor permissions plus RBAC management, client delete, sync controls, and admin API endpoints." },
@@ -1398,7 +1398,7 @@ const GROUPS: Group[] = [
           { text: "When to use:", detail: "On every container image before it is pushed to a registry or deployed. After updating a base image or major dependency. On a scheduled basis (weekly) because new CVEs are published daily against packages that were previously clean. As a gate in CI/CD: fail builds with Critical CVEs." },
           { text: "How to use: Connections → Add connector → Container (Trivy). Enter a container image reference (e.g. nginx:latest, myrepo/myapp:1.2.3, ghcr.io/org/app:sha-abc123) or a Git repo URL for filesystem scanning. Assessments → New Scan → select Trivy connector → Start." },
           { text: "What to expect: findings include the CVE ID, affected package, installed version, fixed version, CVSS score, and severity. Trivy outputs are NVD-sourced so CVSS scores are accurate. A typical production image has 5–50 findings; an old unpatched image may have 200+." },
-          { text: "Severity: Trivy maps NVD CVSS v3 base score to Critical (9.0+), High (7.0–8.9), Medium (4.0–6.9), Low (<4.0), Unknown (no CVSS available). These map directly to Monitara severities." },
+          { text: "Severity: Trivy maps NVD CVSS v3 base score to Critical (9.0+), High (7.0–8.9), Medium (4.0–6.9), Low (<4.0), Unknown (no CVSS available). These map directly to Owlet severities." },
         ],
         tips: [
           "Always scan the exact image tag you deploy — `nginx:latest` changes over time. Pin to a specific SHA for reproducible results.",
@@ -1520,20 +1520,20 @@ const GROUPS: Group[] = [
       {
         id: "tool-enterprise",
         title: "Enterprise Scanners — Tenable, Burp Suite, Snyk, Rapid7, Qualys, Invicti, Acunetix",
-        summary: "Enterprise scanners connect Monitara to your existing commercial security tools via their REST APIs. They run directly (not via GitHub Actions) and can access internal networks, authenticated targets, and full vulnerability management platforms. Results are normalised and appear in Monitara alongside findings from all other scanners.",
+        summary: "Enterprise scanners connect Owlet to your existing commercial security tools via their REST APIs. They run directly (not via GitHub Actions) and can access internal networks, authenticated targets, and full vulnerability management platforms. Results are normalised and appear in Owlet alongside findings from all other scanners.",
         steps: [
-          { text: "Tenable.io — Vulnerability Management:", detail: "Purpose: enterprise-grade VM platform with 100,000+ plugins covering network, web, and cloud. When to use: you already have Tenable deployed and want findings in Monitara for correlation with SAST/DAST results. Credentials: access_key + secret_key. What to expect: Tenable pulls all active vulnerability findings from your configured assets. CVSS scores and KEV status are already enriched." },
+          { text: "Tenable.io — Vulnerability Management:", detail: "Purpose: enterprise-grade VM platform with 100,000+ plugins covering network, web, and cloud. When to use: you already have Tenable deployed and want findings in Owlet for correlation with SAST/DAST results. Credentials: access_key + secret_key. What to expect: Tenable pulls all active vulnerability findings from your configured assets. CVSS scores and KEV status are already enriched." },
           { text: "Burp Suite Enterprise — Authenticated DAST:", detail: "Purpose: the commercial version of Burp Suite's web scanner — deeper than ZAP for complex authenticated web apps. When to use: for critical web applications requiring authenticated scanning with complex session management. Credentials: host URL + API key. What to expect: web vulnerabilities with full request/response evidence, similar to ZAP but with greater depth on business-logic issues." },
-          { text: "Snyk — Developer-First SCA + SAST:", detail: "Purpose: dependency vulnerability scanning across all org projects (npm, pip, Maven, Go, Nuget, Ruby). When to use: if developers use Snyk in their IDEs and you want central visibility in Monitara. Credentials: api_token + org_id. What to expect: one scan pulls all projects in the org (capped at 50). Findings include fix PRs and patch availability." },
+          { text: "Snyk — Developer-First SCA + SAST:", detail: "Purpose: dependency vulnerability scanning across all org projects (npm, pip, Maven, Go, Nuget, Ruby). When to use: if developers use Snyk in their IDEs and you want central visibility in Owlet. Credentials: api_token + org_id. What to expect: one scan pulls all projects in the org (capped at 50). Findings include fix PRs and patch availability." },
           { text: "Rapid7 InsightVM — Network Vulnerability Management:", detail: "Purpose: network-based VM similar to Tenable. When to use: if InsightVM is your existing VM platform. Credentials: host URL + username + password + site_id. What to expect: findings from the specified scan site. CVSS v2 and v3 both ingested; v3 preferred." },
           { text: "Qualys VMDR — Cloud-Based Vulnerability Management:", detail: "Purpose: SaaS VM platform. When to use: if Qualys is your existing VM tool. Two modes: (1) Import existing detections (no target needed — pulls all active findings from your Qualys account), (2) Launch new scan (requires targets configured). Credentials: api_url + username + password. Also pulls Qualys TotalCloud CSPM findings if that module is enabled." },
-          { text: "Invicti (Netsparker) / Acunetix — Proof-Based DAST:", detail: "Purpose: proof-based web app scanners that only report vulnerabilities with PoC evidence (no false positives by design). When to use: for web applications where ZAP/Burp produce too many unverified findings. Credentials: base_url + api_token (Invicti: Basic auth; Acunetix: API key header). Both require the scanner instance to be reachable from Monitara backend." },
-          { text: "All enterprise scanners: Assessments → New Scan → Enterprise Scanners tab → pick tool → pick connector → Start. Scans run asynchronously — Monitara polls the external tool every 30 seconds (2-hour timeout). Severity is normalised to critical/high/medium/low/info regardless of source tool's native scale." },
+          { text: "Invicti (Netsparker) / Acunetix — Proof-Based DAST:", detail: "Purpose: proof-based web app scanners that only report vulnerabilities with PoC evidence (no false positives by design). When to use: for web applications where ZAP/Burp produce too many unverified findings. Credentials: base_url + api_token (Invicti: Basic auth; Acunetix: API key header). Both require the scanner instance to be reachable from Owlet backend." },
+          { text: "All enterprise scanners: Assessments → New Scan → Enterprise Scanners tab → pick tool → pick connector → Start. Scans run asynchronously — Owlet polls the external tool every 30 seconds (2-hour timeout). Severity is normalised to critical/high/medium/low/info regardless of source tool's native scale." },
         ],
         tips: [
           "Enterprise scanners don't require GitHub Actions or the MONITARA_API_URL secret — they run as FastAPI BackgroundTasks calling the external tool's API directly.",
-          "Qualys import mode (no target) is the fastest way to get existing VM data into Monitara — it pulls all active detections in one API call with no scan scheduling needed.",
-          "Use enterprise scanner findings as the 'ground truth' vulnerability baseline and run Monitara's AI agents (Risk Manager, Threat Intel, Remediation) on top of them for enriched analysis.",
+          "Qualys import mode (no target) is the fastest way to get existing VM data into Owlet — it pulls all active detections in one API call with no scan scheduling needed.",
+          "Use enterprise scanner findings as the 'ground truth' vulnerability baseline and run Owlet's AI agents (Risk Manager, Threat Intel, Remediation) on top of them for enriched analysis.",
         ],
         warnings: [
           "Enterprise scans launch real scans in external tools — Tenable, Qualys, and Rapid7 scans consume quota/credits in those platforms. Coordinate with your existing VM team before triggering scans.",

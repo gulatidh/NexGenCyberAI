@@ -84,14 +84,14 @@ function LoginPage() {
       height: "100vh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
-      <img src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Monitara AI"
+      <img src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Owlet AI"
         style={{ width: 90, height: 90, marginBottom: 16 }} />
       <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 36, margin: 0, letterSpacing: "-0.02em", fontWeight: 800 }}>
-        <span style={{ color: "#4285F4" }}>A</span>
-        <span style={{ color: "#EA4335" }}>e</span>
-        <span style={{ color: "#FBBC04" }}>g</span>
-        <span style={{ color: "#4285F4" }}>i</span>
-        <span style={{ color: "#34A853" }}>s</span>
+        <span style={{ color: "#4285F4" }}>O</span>
+        <span style={{ color: "#EA4335" }}>w</span>
+        <span style={{ color: "#FBBC04" }}>l</span>
+        <span style={{ color: "#4285F4" }}>e</span>
+        <span style={{ color: "#34A853" }}>t</span>
         <span style={{ color: "#FFFFFF" }}>{" AI"}</span>
       </h1>
       <p style={{ color: "rgba(255,255,255,0.5)", fontFamily: "Inter, sans-serif", marginBottom: 8 }}>

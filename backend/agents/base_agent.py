@@ -21,7 +21,7 @@ settings = get_settings()
 
 
 class BaseAgent(ABC):
-    """Abstract base for all Monitara AI agents.
+    """Abstract base for all Owlet AI agents.
 
     Subclasses must set:
         agent_name  – display name used in prompts and logs

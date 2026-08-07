@@ -352,7 +352,7 @@ function TopBar({ onMenuClick, onSearchClick }: { onMenuClick: () => void; onSea
           <Typography sx={{ color: "#fff", fontSize: "0.75rem", fontWeight: 800 }}>A</Typography>
         </Box>
         <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
-          Aegis
+          Owlet
         </Typography>
       </Box>
 

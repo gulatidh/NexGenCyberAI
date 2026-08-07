@@ -146,7 +146,7 @@ async def generate_evidence_package(
 
     buf.seek(0)
     fname = (
-        f"monitara-evidence-{client_name.replace(' ', '_')}"
+        f"owlet-evidence-{client_name.replace(' ', '_')}"
         f"-{datetime.now(timezone.utc).strftime('%Y%m%d')}.zip"
     )
     return StreamingResponse(

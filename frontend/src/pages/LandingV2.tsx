@@ -1,5 +1,5 @@
 /**
- * Monitara v2 — public landing page (no auth required).
+ * Owlet v2 — public landing page (no auth required).
  * Light theme: white hero, blue gradient accents, product tiles, CTA.
  */
 import { Box, Typography, Button, Card, CardContent, Chip } from "@mui/material";
@@ -76,7 +76,7 @@ function NavBar({ onSignIn }: { onSignIn: () => void }) {
           <Shield sx={{ color: "#fff", fontSize: 18 }} />
         </Box>
         <Typography sx={{ fontWeight: 800, fontSize: 18, color: "#1A2027" }}>
-          Monitara
+          Owlet
         </Typography>
       </Box>
       <Button
@@ -141,7 +141,7 @@ function Hero({ onSignIn }: { onSignIn: () => void }) {
         fontSize: { xs: 15, md: 18 }, color: "#546E7A",
         maxWidth: 600, lineHeight: 1.7, mb: 4,
       }}>
-        Monitara unifies vulnerability management, threat intelligence, compliance monitoring,
+        Owlet unifies vulnerability management, threat intelligence, compliance monitoring,
         and AI-powered analysis into a single security operations platform.
       </Typography>
 
@@ -289,10 +289,10 @@ function Footer() {
         }}>
           <Shield sx={{ color: "#fff", fontSize: 16 }} />
         </Box>
-        <Typography sx={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>Monitara</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>Owlet</Typography>
       </Box>
       <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-        © {new Date().getFullYear()} Monitara Security Platform. Powered by Anthropic Claude.
+        © {new Date().getFullYear()} Owlet Security Platform. Powered by Anthropic Claude.
       </Typography>
     </Box>
   );

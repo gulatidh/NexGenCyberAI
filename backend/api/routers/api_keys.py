@@ -29,7 +29,7 @@ async def list_api_keys(client_id: Optional[str] = None, db: Session = Depends(g
 async def create_api_key(payload: APIKeyCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     if payload.client_id:
         require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, payload.client_id, db, user)
-    full_key = "monitara_" + secrets.token_hex(32)
+    full_key = "owlet_" + secrets.token_hex(32)
     key_hash = hashlib.sha256(full_key.encode()).hexdigest()
     expires_at = None
     if payload.expires_days:

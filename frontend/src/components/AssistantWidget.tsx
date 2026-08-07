@@ -38,8 +38,8 @@ export default function AssistantWidget() {
 
   useEffect(() => {
     const handler = () => setOpen(true);
-    window.addEventListener("aegis:open-assistant", handler);
-    return () => window.removeEventListener("aegis:open-assistant", handler);
+    window.addEventListener("owlet:open-assistant", handler);
+    return () => window.removeEventListener("owlet:open-assistant", handler);
   }, []);
 
   const mutation = useMutation({
@@ -74,7 +74,7 @@ export default function AssistantWidget() {
 
   return (
     <>
-      <Tooltip title={open ? "" : "Ask Monitara Assistant"} placement="left">
+      <Tooltip title={open ? "" : "Ask Owlet Assistant"} placement="left">
         <Fab
           size="medium"
           onClick={() => setOpen((o) => !o)}
@@ -130,7 +130,7 @@ export default function AssistantWidget() {
             <SmartToy sx={{ color: "#4285F4", fontSize: 20 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "text.primary", lineHeight: 1.2 }}>
-                Monitara Assistant
+                Owlet Assistant
               </Typography>
               <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                 Ask anything about the platform
@@ -166,7 +166,7 @@ export default function AssistantWidget() {
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <AutoAwesome sx={{ color: "#4285F4", fontSize: 28, mb: 1 }} />
                 <Typography sx={{ color: "text.secondary", fontSize: 13, mb: 2 }}>
-                  Ask me anything about Monitara AI
+                  Ask me anything about Owlet AI
                 </Typography>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
                   {SUGGESTIONS.map((s) => (

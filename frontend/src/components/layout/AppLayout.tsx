@@ -209,7 +209,7 @@ export default function AppLayout() {
     mutationFn: adminApi.bootstrapAdmin,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-access"] });
-      setBootstrapSnack("You are now a global admin. Welcome to Monitara!");
+      setBootstrapSnack("You are now a global admin. Welcome to Owlet!");
     },
     onError: () => setBootstrapSnack("An admin already exists — contact them for access."),
   });
@@ -258,14 +258,14 @@ export default function AppLayout() {
             <Box
               component="img"
               src={`${process.env.PUBLIC_URL}/aegis-logo.svg`}
-              alt="Monitara AI"
+              alt="Owlet AI"
               sx={{ height: 42, width: "auto", maxWidth: 190, flexShrink: 0 }}
             />
           ) : (
             <Box
               component="img"
               src={`${process.env.PUBLIC_URL}/aegis-icon.svg`}
-              alt="Monitara AI"
+              alt="Owlet AI"
               sx={{ width: 36, height: 36, flexShrink: 0 }}
             />
           )}
@@ -485,7 +485,7 @@ export default function AppLayout() {
                 display: { xs: "none", sm: "block" },
               }}
             >
-              <Box component="span" sx={{ color: "#4285F4" }}>Monitara</Box>
+              <Box component="span" sx={{ color: "#4285F4" }}>Owlet</Box>
               <Box component="span" sx={{ color: "text.primary" }}> AI</Box>
             </Typography>
             <Chip

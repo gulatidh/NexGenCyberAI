@@ -1592,7 +1592,7 @@ async def suggest_detection_rules_llm(
         '  }\n'
         ']\n\n'
         "sigma_yaml MUST include: title, id (uuid-style), status: experimental, description, "
-        "author: Aegis AI, date (today), logsource (product+service/category), "
+        "author: Owlet AI, date (today), logsource (product+service/category), "
         "detection (selection + condition with REAL field names), falsepositives, level, tags.\n\n"
         "Log source guidance:\n"
         "  Azure resources → product: azure  service: activitylogs or diagnostics\n"

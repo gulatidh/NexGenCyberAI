@@ -43,10 +43,10 @@ async def dispatch_event(event_type: str, payload: Dict[str, Any], client_id: Op
             db.add(delivery)
             db.flush()
 
-            headers = {"Content-Type": "application/json", "X-Monitara-Event": event_type}
+            headers = {"Content-Type": "application/json", "X-Owlet-Event": event_type}
             if wh.secret:
                 sig = hmac.new(wh.secret.encode(), body.encode(), hashlib.sha256).hexdigest()
-                headers["X-Monitara-Signature"] = f"sha256={sig}"
+                headers["X-Owlet-Signature"] = f"sha256={sig}"
 
             try:
                 async with httpx.AsyncClient(timeout=10) as client:

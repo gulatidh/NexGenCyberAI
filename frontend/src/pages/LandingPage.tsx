@@ -45,7 +45,7 @@ const FEATURES = [
     color: PURPLE,
     title: "AI Threat Modeling",
     subtitle: "STRIDE · MITRE ATT&CK",
-    desc: "Describe your system and Monitara generates comprehensive threat models in minutes. Threats are mapped to STRIDE categories, MITRE ATT&CK techniques, and compliance controls — with attacker profiles and detection gap analysis.",
+    desc: "Describe your system and Owlet generates comprehensive threat models in minutes. Threats are mapped to STRIDE categories, MITRE ATT&CK techniques, and compliance controls — with attacker profiles and detection gap analysis.",
     bullets: ["STRIDE taxonomy", "ATT&CK technique mapping", "Detection gap analysis"],
   },
   {
@@ -285,8 +285,8 @@ const STEPS = [
 
 const FAQS = [
   {
-    q: "What scanners does Monitara integrate with?",
-    a: "Monitara integrates with 9 open-source and commercial scanners across four categories: SAST (Semgrep, CodeQL, SonarQube), DAST (OWASP ZAP), Network (Nmap, OpenVAS, Trivy), and Dependency / Secrets scanning (Gitleaks, TruffleHog). Scans are dispatched via GitHub Actions — no extra infrastructure required.",
+    q: "What scanners does Owlet integrate with?",
+    a: "Owlet integrates with 9 open-source and commercial scanners across four categories: SAST (Semgrep, CodeQL, SonarQube), DAST (OWASP ZAP), Network (Nmap, OpenVAS, Trivy), and Dependency / Secrets scanning (Gitleaks, TruffleHog). Scans are dispatched via GitHub Actions — no extra infrastructure required.",
   },
   {
     q: "How do AI agents automatically populate the threat register?",
@@ -294,30 +294,30 @@ const FAQS = [
   },
   {
     q: "Can I bring my own AI provider?",
-    a: "Yes. Monitara supports Azure OpenAI, OpenAI, Anthropic, Google Gemini, and AWS Bedrock. Configure one or more providers in AI Settings — Monitara automatically fails over to the next configured provider if the primary is unavailable. No vendor lock-in.",
+    a: "Yes. Owlet supports Azure OpenAI, OpenAI, Anthropic, Google Gemini, and AWS Bedrock. Configure one or more providers in AI Settings — Owlet automatically fails over to the next configured provider if the primary is unavailable. No vendor lock-in.",
   },
   {
     q: "Is my source code stored after an AI code review?",
     a: "No. Your repository is cloned or unzipped into a temporary directory, analyzed, and immediately deleted when the review completes. Only the structured findings — file paths, line numbers, vulnerability descriptions, and remediation steps — are persisted in the database.",
   },
   {
-    q: "Which compliance frameworks does Monitara support?",
+    q: "Which compliance frameworks does Owlet support?",
     a: "Out of the box: NIST CSF 2.0, CIS Controls v8, ISO 27001:2022, GDPR, and PCI DSS v4.0. You can also build custom compliance frameworks in the Custom Standards section — pick controls from any built-in framework, combine them, and AI agents will evaluate your findings against your custom standard.",
   },
   {
     q: "How does AI VAPT report generation work?",
-    a: "Select a completed scan and choose 'Generate from Scan.' Monitara pulls all findings, infers the scope and testing methodology from the connector type, then uses an LLM to write an executive summary, per-finding detailed remediation, and a conclusion. Reports export as PDF or DOCX — full engagement report or remediation-only plan.",
+    a: "Select a completed scan and choose 'Generate from Scan.' Owlet pulls all findings, infers the scope and testing methodology from the connector type, then uses an LLM to write an executive summary, per-finding detailed remediation, and a conclusion. Reports export as PDF or DOCX — full engagement report or remediation-only plan.",
   },
   {
-    q: "Can I use Monitara across multiple clients or teams?",
-    a: "Yes. Monitara supports multi-client workspaces — each client has isolated assets, scans, findings, threat entries, and risk scores. A global client selector in the top nav switches context instantly. Soft-delete lets you archive clients without losing historical data.",
+    q: "Can I use Owlet across multiple clients or teams?",
+    a: "Yes. Owlet supports multi-client workspaces — each client has isolated assets, scans, findings, threat entries, and risk scores. A global client selector in the top nav switches context instantly. Soft-delete lets you archive clients without losing historical data.",
   },
 ];
 
 const NAV_LINKS = ["Features", "Process", "Integrations", "FAQ"];
 
 const TERMINAL_LINES = [
-  { text: "$ monitara agent run --orchestrator --scan-id a4f9bc12", color: CYAN, delay: 0 },
+  { text: "$ owlet agent run --orchestrator --scan-id a4f9bc12", color: CYAN, delay: 0 },
   { text: "", color: "", delay: 400 },
   { text: "⚡ Loading 84 open findings across 3 scans…", color: "rgba(255,255,255,0.6)", delay: 800 },
   { text: "", color: "", delay: 1100 },
@@ -345,7 +345,7 @@ const USE_CASES = [
     persona: "CISO",
     headline: "Board-ready risk visibility in minutes",
     problem: "You're asked to present risk posture weekly but findings are buried in spreadsheets from five different tools.",
-    solution: "Monitara aggregates every finding into a live risk score, attack path graph, and CTEM program — one number that means something.",
+    solution: "Owlet aggregates every finding into a live risk score, attack path graph, and CTEM program — one number that means something.",
     points: ["Live risk score per client", "CTEM 5-phase program tracking", "Embeddable scorecard for board decks"],
     color: CYAN,
   },
@@ -354,7 +354,7 @@ const USE_CASES = [
     persona: "AppSec Team",
     headline: "From commit to finding in one pipeline",
     problem: "Running 9 different scanners means 9 different UIs, 9 result formats, and no unified view of what's actually exploitable.",
-    solution: "Submit a repo URL or zip — Monitara runs SAST, DAST, SCA, and secrets scanning, then an AI agent cross-traces taint paths and ranks by real exploitability.",
+    solution: "Submit a repo URL or zip — Owlet runs SAST, DAST, SCA, and secrets scanning, then an AI agent cross-traces taint paths and ranks by real exploitability.",
     points: ["9 scanners, one unified schema", "AI cross-file taint analysis", "Priority-banded remediation playbooks"],
     color: PURPLE,
   },
@@ -556,7 +556,7 @@ export default function LandingPage() {
         <Container maxWidth="lg">
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Monitara" style={{ width: 32, height: 32 }} />
+              <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Owlet" style={{ width: 32, height: 32 }} />
               <Typography sx={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>
                 <Box component="span" sx={{ color: "#4285F4" }}>Aeg</Box>
                 <Box component="span" sx={{ color: CYAN }}>is</Box>
@@ -648,7 +648,7 @@ export default function LandingPage() {
               </Typography>
 
               <Typography sx={{ fontSize: { xs: 16, md: 18 }, color: "rgba(255,255,255,0.5)", lineHeight: 1.7, mb: 5, maxWidth: 500 }}>
-                Monitara combines AI code review, VAPT, threat modeling, and autonomous security agents in one platform. AI agents auto-populate Threat, Control, and Remediation registers — so your team sees risk clearly and fixes what matters.
+                Owlet combines AI code review, VAPT, threat modeling, and autonomous security agents in one platform. AI agents auto-populate Threat, Control, and Remediation registers — so your team sees risk clearly and fixes what matters.
               </Typography>
 
               <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -657,7 +657,7 @@ export default function LandingPage() {
                   textTransform: "none", px: 4, py: 1.5, borderRadius: 2,
                   "&:hover": { background: "#00B8E0", transform: "translateY(-1px)" }, transition: "all 0.2s",
                 }}>
-                  Sign In to Monitara
+                  Sign In to Owlet
                 </Button>
                 <Button variant="outlined" size="large" href="#features" sx={{
                   color: "rgba(255,255,255,0.65)", borderColor: BORDER, fontWeight: 500,
@@ -697,7 +697,7 @@ export default function LandingPage() {
                   <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FF5F57" }} />
                   <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E" }} />
                   <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840" }} />
-                  <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)", ml: 1, fontFamily: "monospace" }}>Monitara AI — Security Dashboard</Typography>
+                  <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)", ml: 1, fontFamily: "monospace" }}>Owlet AI — Security Dashboard</Typography>
                 </Box>
 
                 <Box sx={{ p: 2.5 }}>
@@ -906,7 +906,7 @@ export default function LandingPage() {
               <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E" }} />
               <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840" }} />
               <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.22)", ml: 1, fontFamily: "monospace" }}>
-                Aegis AI — {PRODUCT_TOUR_TABS[tourTab]}
+                Owlet AI — {PRODUCT_TOUR_TABS[tourTab]}
               </Typography>
             </Box>
 
@@ -929,7 +929,7 @@ export default function LandingPage() {
               One platform. Every security role.
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.38)", fontSize: 16, maxWidth: 520, mx: "auto" }}>
-              Monitara adapts to how your team works — whether you're presenting to the board, hunting vulnerabilities, or preparing for an audit.
+              Owlet adapts to how your team works — whether you're presenting to the board, hunting vulnerabilities, or preparing for an audit.
             </Typography>
           </Box>
 
@@ -972,7 +972,7 @@ export default function LandingPage() {
                   </Box>
                   <Box sx={{ p: 2, mb: 3, borderRadius: 2, background: `${uc.color}0A`, border: `1px solid ${uc.color}25` }}>
                     <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.65 }}>
-                      <Box component="span" sx={{ color: uc.color, fontWeight: 700 }}>Monitara: </Box>
+                      <Box component="span" sx={{ color: uc.color, fontWeight: 700 }}>Owlet: </Box>
                       {uc.solution}
                     </Typography>
                   </Box>
@@ -1151,7 +1151,7 @@ export default function LandingPage() {
                   <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840" }} />
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, ml: 1.5 }}>
                     <Terminal sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }} />
-                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>monitara-cli — orchestrator</Typography>
+                    <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>owlet-cli — orchestrator</Typography>
                   </Box>
                 </Box>
                 {/* Terminal output */}
@@ -1290,7 +1290,7 @@ export default function LandingPage() {
               </Box>
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.45)", fontSize: 17, maxWidth: 620, mx: "auto", lineHeight: 1.65 }}>
-              Monitara runs entirely inside your own cloud or on-premises infrastructure — Azure, AWS, GCP, or a private data centre. No internet exposure. No data leaving your boundary. Works wherever your workloads live.
+              Owlet runs entirely inside your own cloud or on-premises infrastructure — Azure, AWS, GCP, or a private data centre. No internet exposure. No data leaving your boundary. Works wherever your workloads live.
             </Typography>
           </Box>
 
@@ -1381,7 +1381,7 @@ export default function LandingPage() {
                 {/* arrow gateway → app service */}
                 <line x1="335" y1="170" x2="375" y2="170" stroke="#34A853" strokeWidth="1.5" markerEnd="url(#arr-green)" />
 
-                {/* ── Monitara App Service ── */}
+                {/* ── Owlet App Service ── */}
                 <rect x="375" y="55" width="140" height="230" rx="10" fill="rgba(52,168,83,0.07)" stroke="rgba(52,168,83,0.45)" strokeWidth="2" />
                 <text x="445" y="78" textAnchor="middle" fill="#34A853" fontSize="11" fontWeight="700">MONITARA</text>
                 <text x="445" y="92" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">Azure App Service</text>
@@ -1506,7 +1506,7 @@ export default function LandingPage() {
             "&:hover": { background: "#00B8E0", transform: "translateY(-2px)", boxShadow: "0 0 60px rgba(0,212,255,0.4)" },
             transition: "all 0.25s",
           }}>
-            Sign In to Monitara
+            Sign In to Owlet
           </Button>
           <Typography sx={{ mt: 2.5, fontSize: 12, color: "rgba(255,255,255,0.2)" }}>
             Microsoft Entra ID · Work accounts only · No password required
@@ -1521,7 +1521,7 @@ export default function LandingPage() {
             {/* Brand column */}
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-                <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Monitara" style={{ width: 28, height: 28, opacity: 0.8 }} />
+                <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Owlet" style={{ width: 28, height: 28, opacity: 0.8 }} />
                 <Typography sx={{ fontWeight: 800, fontSize: 18, letterSpacing: "-0.02em" }}>
                   <Box component="span" sx={{ color: "#4285F4" }}>Aeg</Box>
                   <Box component="span" sx={{ color: CYAN }}>is</Box>

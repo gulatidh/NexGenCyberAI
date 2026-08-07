@@ -1003,7 +1003,7 @@ function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; cl
   const onRefresh = () => qc.invalidateQueries({ queryKey: ["ctem", clientId] });
 
   const downloadReport = (format: "pdf" | "docx") => {
-    const token = localStorage.getItem("monitara-token") || "";
+    const token = localStorage.getItem("owlet-token") || "";
     const url = ctemApi.exportUrl(clientId, program.id, format);
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob())

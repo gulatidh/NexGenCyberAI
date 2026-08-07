@@ -296,7 +296,7 @@ function SidebarContent({
           </Box>
           <Box>
             <Typography sx={{ fontWeight: 800, fontSize: 15, color: "text.primary", lineHeight: 1.1 }}>
-              Monitara
+              Owlet
             </Typography>
             <Typography sx={{ fontSize: 10.5, color: "text.secondary", lineHeight: 1 }}>
               Security Platform
@@ -366,7 +366,7 @@ function SidebarContent({
           <ListItemButton
             key={item.label}
             onClick={action(() => {
-              if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("aegis:open-assistant"));
+              if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
               else navigate(item.route);
             })}
             sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}
@@ -473,7 +473,7 @@ export default function Hub() {
                 <Shield sx={{ color: "#fff", fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontWeight: 800, fontSize: 14, color: "text.primary", flexShrink: 0 }}>
-                Monitara
+                Owlet
               </Typography>
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <ClientPicker compact />
@@ -510,7 +510,7 @@ export default function Hub() {
                     icon={item.icon as any}
                     label={item.label}
                     onClick={() => {
-                      if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("aegis:open-assistant"));
+                      if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
                       else navigate(item.route);
                     }}
                     size="small"

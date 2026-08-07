@@ -829,7 +829,7 @@ export default function Connections() {
       <TabPanel value={activeTab} index={2}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Language models powering Aegis AI agents. Configure API keys in AI Settings.
+            Language models powering Owlet AI agents. Configure API keys in AI Settings.
           </Typography>
           <Button
             variant="outlined" size="small" endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
