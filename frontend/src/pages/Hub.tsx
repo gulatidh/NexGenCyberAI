@@ -6,8 +6,7 @@ import {
   useMediaQuery, useTheme, alpha,
 } from "@mui/material";
 import {
-  Shield, BugReport, SmartToy, Radar, Assessment, GppBad,
-  PlaylistAddCheck, Psychology, Cable, Settings,
+  Shield, SmartToy, Cable, Settings,
   Storage, Menu as MenuIcon, Help as HelpOutline, Dashboard, AutoStories,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -228,6 +227,7 @@ const QUICK_NAV = [
   { label: "AI Buddies",   icon: <SmartToy sx={{ fontSize: 16 }} />,       route: "/agents" },
   { label: "Assets",       icon: <Storage sx={{ fontSize: 16 }} />,        route: "/assets" },
   { label: "Settings",     icon: <Settings sx={{ fontSize: 16 }} />,       route: "/settings" },
+  { label: "Data Model",   icon: <AutoStories sx={{ fontSize: 16 }} />,    route: "/data-model" },
   { label: "Help",         icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/help" },
 ];
 
@@ -535,8 +535,16 @@ export default function Hub() {
               <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", color: isDark ? "#5b6675" : "text.disabled", letterSpacing: "0.02em" }}>
                 SETUP → DESIGN → DISCOVER → ANALYSE → RESPOND → REPORT → AUTOMATE
               </Typography>
-              <Box sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: isDark ? "#8b96a5" : "text.secondary", border: "1px solid", borderColor: isDark ? "#232b36" : "divider", px: 1.5, py: 0.75, borderRadius: "20px" }}>
-                Owlet · NexGenAI
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Box
+                  onClick={() => navigate("/data-model")}
+                  sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "#6366f1", border: "1px solid", borderColor: "#6366f155", px: 1.5, py: 0.75, borderRadius: "20px", cursor: "pointer", "&:hover": { bgcolor: "#6366f110" } }}
+                >
+                  Data Ontology →
+                </Box>
+                <Box sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: isDark ? "#8b96a5" : "text.secondary", border: "1px solid", borderColor: isDark ? "#232b36" : "divider", px: 1.5, py: 0.75, borderRadius: "20px" }}>
+                  Owlet · NexGenAI
+                </Box>
               </Box>
             </Box>
           </Box>

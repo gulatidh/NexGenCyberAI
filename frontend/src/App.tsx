@@ -13,6 +13,7 @@ import { loginRequest } from "./auth/msalConfig";
 import AppLayout from "./components/layout/AppLayout";
 import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
+import OntologyPage from "./pages/OntologyPage";
 import {
   THREAT_INTEL, RISK_MANAGER, VULN_MGMT, PEN_TEST,
   COMPLIANCE_MONITOR, GOVERNANCE, AI_ADVISOR, INTELLIGENCE, PLATFORM,
@@ -279,6 +280,7 @@ function ProtectedApp() {
           <Route path="/api-keys" element={<Navigate to="/settings" replace />} />
           <Route path="/attack-paths" element={<AttackPaths />} />
           <Route path="/cve-pivot" element={<CVEPivot />} />
+          <Route path="/data-model" element={<OntologyPage />} />
           <Route path="/nl-query" element={<NLQuery />} />
           <Route path="/ai-assisted-scan" element={<AIAssistedScan />} />
           <Route path="/posture-trends" element={<PostureTrends />} />

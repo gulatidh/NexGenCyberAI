@@ -51,6 +51,7 @@ const NAV_ITEMS: SearchItem[] = [
   { id: "risks",          label: "Risk Register",       Icon: Assessment,       path: "/risks",                      section: "4 · Analyse",  keywords: ["risk register", "fair", "likelihood", "impact", "score"] },
   { id: "attack-paths",   label: "Attack Paths",        Icon: AccountTree,      path: "/attack-paths",               section: "4 · Analyse",  keywords: ["attack chain", "lateral movement", "kill chain", "mitre", "path", "graph"] },
   { id: "cve-pivot",      label: "CVE Blast Radius",    Icon: BugReport,        path: "/cve-pivot",                  section: "4 · Analyse",  keywords: ["cve", "blast radius", "affected", "impact", "vulnerability"] },
+  { id: "data-model",    label: "Data Ontology",       Icon: AccountTree,      path: "/data-model",                 section: "Owlet",        keywords: ["ontology", "data model", "entity", "graph", "schema", "entities", "relationships"] },
   { id: "heatmap",        label: "Compliance Heatmap",  Icon: GridView,         path: "/compliance-heatmap",         section: "4 · Analyse",  keywords: ["heatmap", "compliance", "control", "matrix", "gap"] },
   // Respond
   { id: "gaps",           label: "Control Gaps",        Icon: GppBad,           path: "/control-deficiencies",       section: "5 · Respond",  keywords: ["gap", "deficiency", "control", "missing", "compliance gap"] },
