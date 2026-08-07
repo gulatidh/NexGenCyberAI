@@ -26,6 +26,7 @@ import { MyAccess, Client } from "../../types";
 import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import { useViewMode } from "../../theme/ViewModeContext";
+import GlobalSearch from "../GlobalSearch";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -427,7 +428,7 @@ export default function AppLayout() {
                 <MenuIcon />
               </IconButton>
             </Tooltip>
-            <Box sx={{ flexGrow: 1 }} />
+            <GlobalSearch />
             {/* Global client selector */}
             {clients.length > 0 && (
               <FormControl size="small" sx={{ mr: 2, minWidth: 160 }}>
