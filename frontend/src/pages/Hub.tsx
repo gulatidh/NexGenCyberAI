@@ -1,13 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Avatar, List, ListItemButton, ListItemText,
-  Divider, FormControl, Select, MenuItem, Drawer, IconButton,
-  useMediaQuery, useTheme, alpha,
+  Box, Typography, Card, CardActionArea, Avatar,
+  List, ListItemButton, ListItemText, Divider,
+  FormControl, Select, MenuItem, InputLabel,
+  Drawer, IconButton, Chip, useMediaQuery, useTheme,
 } from "@mui/material";
 import {
-  Shield, SmartToy, Cable, Settings,
-  Storage, Menu as MenuIcon, Help as HelpOutline, Dashboard, AutoStories,
+  Shield, BugReport, Psychology,
+  Radar, Assessment, GppBad, PlaylistAddCheck,
+  SmartToy, Search, Cable, Settings,
+  Tune, Restore, Storage, Menu as MenuIcon,
+  Help as HelpOutline, Dashboard,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
@@ -16,256 +20,287 @@ import AssistantWidget from "../components/AssistantWidget";
 import { MyAccess, Client } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
 
-// ── Stage definitions ─────────────────────────────────────────────────────────
+// ── Product catalogue ────────────────────────────────────────────────────────
 
-interface StageModule {
-  tag: string;
+interface Product {
+  abbrev: string;
   name: string;
-  desc: string;
+  description: string;
   route: string;
-  chips: { label: string; route: string }[];
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
 }
 
-interface Stage {
-  num: string;
+interface Category {
   id: string;
   label: string;
   color: string;
-  title: string;
-  sub: string;
-  modules: StageModule[];
+  products: Product[];
 }
 
-const STAGES: Stage[] = [
+const CATEGORIES: Category[] = [
   {
-    num: "01", id: "setup", label: "Setup", color: "#3b82f6",
-    title: "Stand up the environment",
-    sub: "Nothing downstream works without this. Get the tenant ready — clients, connectors, and AI providers.",
-    modules: [
+    id: "threat-risk",
+    label: "Threat & Risk",
+    color: "#1565C0",
+    products: [
       {
-        tag: "ST", name: "Setup", route: "/platform",
-        desc: "Clients, assets, connectors, AI providers, and platform settings.",
-        chips: [
-          { label: "Clients",      route: "/clients" },
-          { label: "Assets",       route: "/assets" },
-          { label: "Connectors",   route: "/connections" },
-          { label: "AI providers", route: "/connections" },
-          { label: "Settings",     route: "/settings" },
-        ],
+        abbrev: "TI",
+        name: "Threat Intelligence",
+        description: "MITRE ATT&CK mapped threats and attack path analysis",
+        route: "/threat-intel",
+        icon: <Radar />,
+        color: "#1565C0",
+        bgColor: "#E3F2FD",
+      },
+      {
+        abbrev: "RM",
+        name: "Risk Manager",
+        description: "FAIR-scored risk register and ALE exposure dashboard",
+        route: "/risk",
+        icon: <Assessment />,
+        color: "#1565C0",
+        bgColor: "#E3F2FD",
       },
     ],
   },
   {
-    num: "02", id: "design", label: "Design", color: "#a855f7",
-    title: "Define the blueprint",
-    sub: "Model how data actually moves, then pick which standards it has to satisfy.",
-    modules: [
+    id: "vulnerability",
+    label: "Vulnerability",
+    color: "#00695C",
+    products: [
       {
-        tag: "TM", name: "Threat Models", route: "/threat-intel/threat-models",
-        desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",
-        chips: [
-          { label: "Data flow diagrams",    route: "/threat-intel/threat-models" },
-          { label: "STRIDE analysis",       route: "/threat-intel/threat-models" },
-          { label: "Sigma detection rules", route: "/threat-intel/threat-models" },
-        ],
+        abbrev: "VM",
+        name: "Vulnerability Management",
+        description: "Scans, findings, posture trends, and scan import",
+        route: "/vulnerability",
+        icon: <BugReport />,
+        color: "#00695C",
+        bgColor: "#E0F2F1",
       },
       {
-        tag: "FW", name: "Frameworks", route: "/compliance/frameworks",
-        desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",
-        chips: [
-          { label: "NIST CSF",       route: "/compliance/frameworks" },
-          { label: "CIS Controls",   route: "/compliance/frameworks" },
-          { label: "ISO 27001",      route: "/compliance/frameworks" },
-          { label: "PCI DSS",        route: "/compliance/frameworks" },
-          { label: "GDPR",           route: "/compliance/frameworks" },
-          { label: "Custom policy",  route: "/compliance/custom-frameworks" },
-        ],
+        abbrev: "PT",
+        name: "Pen Testing",
+        description: "VAPT reports with retest lifecycle and PDF/DOCX export",
+        route: "/vapt",
+        icon: <Shield />,
+        color: "#00695C",
+        bgColor: "#E0F2F1",
       },
     ],
   },
   {
-    num: "03", id: "discover", label: "Discover", color: "#14b8a6",
-    title: "Find what's actually exposed",
-    sub: "Scan the environment the blueprint just described — manually or through a guided AI conversation.",
-    modules: [
+    id: "compliance",
+    label: "Compliance",
+    color: "#6A1B9A",
+    products: [
       {
-        tag: "VM", name: "Vulnerability Management", route: "/vulnerability",
-        desc: "Scans, findings, posture trends, CVE enrichment, and scan import.",
-        chips: [
-          { label: "Scans",           route: "/vulnerability/scans" },
-          { label: "Findings",        route: "/vulnerability/findings" },
-          { label: "CVE enrichment",  route: "/vulnerability/findings" },
-          { label: "Posture trends",  route: "/vulnerability/posture" },
-          { label: "Scan import",     route: "/vulnerability/scans" },
-        ],
+        abbrev: "CM",
+        name: "Compliance Monitor",
+        description: "Framework control gaps, custom standards, and evidence packages",
+        route: "/compliance",
+        icon: <GppBad />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
       },
       {
-        tag: "AI", name: "AI Assisted Scan", route: "/intelligence/ai-assisted-scan",
-        desc: "Conversational guided assessment — describe your environment, launch a scan.",
-        chips: [
-          { label: "Guided wizard",    route: "/intelligence/ai-assisted-scan" },
-          { label: "Environment chat", route: "/intelligence/ai-assisted-scan" },
-          { label: "Auto-launch",      route: "/intelligence/ai-assisted-scan" },
-        ],
+        abbrev: "GR",
+        name: "Governance",
+        description: "CTEM programs, remediation tracker, and security scorecard",
+        route: "/governance",
+        icon: <PlaylistAddCheck />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
       },
     ],
   },
   {
-    num: "04", id: "analyse", label: "Analyse", color: "#f59e0b",
-    title: "Turn findings into risk",
-    sub: "Raw findings get scored, attack paths mapped, and the whole posture becomes queryable in plain language.",
-    modules: [
+    id: "ai-intelligence",
+    label: "AI & Intelligence",
+    color: "#E65100",
+    products: [
       {
-        tag: "RM", name: "Risk Manager", route: "/risk",
-        desc: "FAIR-scored risk register, ALE exposure, and attack path graph.",
-        chips: [
-          { label: "Risk register",  route: "/risk/register" },
-          { label: "FAIR / ALE",     route: "/risk/overview" },
-          { label: "Attack paths",   route: "/threat-intel/attack-paths" },
-          { label: "CVE blast radius", route: "/intelligence/nl-query" },
-        ],
+        abbrev: "AI",
+        name: "AI Security Advisor",
+        description: "AI agents, workflows, and 60+ advisory specialist catalog",
+        route: "/ai-advisor",
+        icon: <SmartToy />,
+        color: "#E65100",
+        bgColor: "#FBE9E7",
       },
       {
-        tag: "IG", name: "Smart Intelligence", route: "/intelligence",
-        desc: "Natural language queries, compliance heatmap, and asset inventory.",
-        chips: [
-          { label: "Ask your data",       route: "/intelligence/nl-query" },
-          { label: "Compliance heatmap",  route: "/intelligence/reports" },
-          { label: "Client comparison",   route: "/intelligence/reports" },
-          { label: "Asset inventory",     route: "/platform/assets" },
-        ],
+        abbrev: "IG",
+        name: "Smart Intelligence",
+        description: "Natural language queries, security doc RAG, and knowledge base",
+        route: "/intelligence",
+        icon: <Psychology />,
+        color: "#E65100",
+        bgColor: "#FBE9E7",
       },
     ],
   },
   {
-    num: "05", id: "respond", label: "Respond", color: "#ef4444",
-    title: "Act on the picture",
-    sub: "Map risk to real adversary behaviour, then push it into a tracked remediation program.",
-    modules: [
+    id: "platform",
+    label: "Setup",
+    color: "#37474F",
+    products: [
       {
-        tag: "TI", name: "Threat Intelligence", route: "/threat-intel",
-        desc: "MITRE ATT&CK threat register and attack path visualisation.",
-        chips: [
-          { label: "Threat register",   route: "/threat-intel/register" },
-          { label: "MITRE ATT&CK",      route: "/threat-intel/register" },
-          { label: "Attack paths",      route: "/threat-intel/attack-paths" },
-        ],
-      },
-      {
-        tag: "GR", name: "Governance", route: "/governance",
-        desc: "CTEM programs, control gaps, remediation tracker, and scorecard.",
-        chips: [
-          { label: "CTEM programs",     route: "/governance/ctem" },
-          { label: "Control gaps",      route: "/compliance/deficiencies" },
-          { label: "Remediation",       route: "/governance/remediation" },
-          { label: "AI remediations",   route: "/governance/remediation-jobs" },
-        ],
-      },
-    ],
-  },
-  {
-    num: "06", id: "report", label: "Report", color: "#22c55e",
-    title: "Prove it happened",
-    sub: "Close the loop with evidence the client — or the auditor — can actually keep.",
-    modules: [
-      {
-        tag: "PT", name: "Pen Testing / VAPT", route: "/vapt",
-        desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",
-        chips: [
-          { label: "VAPT reports",   route: "/vapt/reports" },
-          { label: "Retest lifecycle", route: "/vapt/reports" },
-          { label: "PDF / DOCX",     route: "/vapt/reports" },
-          { label: "Attack evidence", route: "/vapt/attack-paths" },
-        ],
-      },
-      {
-        tag: "CM", name: "Compliance Monitor", route: "/compliance",
-        desc: "Framework assessments, evidence packages, and audit-ready output.",
-        chips: [
-          { label: "Framework assessments", route: "/compliance/frameworks" },
-          { label: "Evidence packages",     route: "/compliance/evidence" },
-          { label: "Control deficiencies",  route: "/compliance/deficiencies" },
-          { label: "Posture trends",        route: "/vulnerability/posture" },
-        ],
-      },
-    ],
-  },
-  {
-    num: "07", id: "automate", label: "Automate", color: "#6366f1",
-    title: "Let AI carry the load",
-    sub: "Once the first run is done, agents run the loop — analysis, intel, remediation, knowledge — on repeat.",
-    modules: [
-      {
-        tag: "AB", name: "AI Buddies", route: "/ai-advisor",
-        desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.",
-        chips: [
-          { label: "Orchestrator",      route: "/ai-advisor/agents" },
-          { label: "Risk Manager",      route: "/ai-advisor/agents" },
-          { label: "Threat Intel",      route: "/ai-advisor/agents" },
-          { label: "Remediation",       route: "/ai-advisor/agents" },
-          { label: "Workflows",         route: "/ai-advisor/workflows" },
-        ],
-      },
-      {
-        tag: "KB", name: "Knowledge & Docs", route: "/intelligence/knowledge",
-        desc: "Knowledge base, security doc RAG, and ask-your-data queries.",
-        chips: [
-          { label: "Knowledge base",  route: "/intelligence/knowledge" },
-          { label: "Security docs",   route: "/intelligence/security-docs" },
-          { label: "Ask your data",   route: "/intelligence/nl-query" },
-          { label: "Webhooks",        route: "/platform/settings" },
-          { label: "API keys",        route: "/platform/settings" },
-        ],
+        abbrev: "ST",
+        name: "Setup",
+        description: "Clients, assets, connectors, ticket sync, and platform settings",
+        route: "/platform",
+        icon: <Tune />,
+        color: "#37474F",
+        bgColor: "#ECEFF1",
       },
     ],
   },
 ];
 
-const QUICK_NAV = [
-  { label: "Dashboard",    icon: <Dashboard sx={{ fontSize: 16 }} />,     route: "/dashboard" },
-  { label: "Connections",  icon: <Cable sx={{ fontSize: 16 }} />,          route: "/connections" },
-  { label: "AI Buddies",   icon: <SmartToy sx={{ fontSize: 16 }} />,       route: "/agents" },
-  { label: "Assets",       icon: <Storage sx={{ fontSize: 16 }} />,        route: "/assets" },
-  { label: "Settings",     icon: <Settings sx={{ fontSize: 16 }} />,       route: "/settings" },
-  { label: "Data Model",   icon: <AutoStories sx={{ fontSize: 16 }} />,    route: "/data-model" },
-  { label: "Help",         icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/help" },
+const QUICK_ACCESS = [
+  { label: "Connectors",     icon: <Cable sx={{ fontSize: 16 }} />,         route: "/platform/connections" },
+  { label: "Assets",         icon: <Storage sx={{ fontSize: 16 }} />,        route: "/platform/assets" },
+  { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
+  { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
+  { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/platform/help" },
 ];
 
-// ── Client picker ─────────────────────────────────────────────────────────────
+// ── Client picker ────────────────────────────────────────────────────────────
 
-function ClientPicker() {
+function ClientPicker({ compact = false }: { compact?: boolean }) {
   const { clientId, setClientId } = useActiveClient();
-  const { data: clients = [], isLoading } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list, staleTime: 60_000 });
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.list(),
+    staleTime: 60_000,
+  });
+
   return (
-    <FormControl fullWidth size="small" sx={{ px: 1.5, py: 1 }}>
-      <Select
-        displayEmpty value={clientId || ""}
-        onChange={(e) => setClientId(e.target.value as string)}
-        disabled={isLoading || clients.length === 0}
-        sx={{ fontSize: 12, bgcolor: "background.default", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-      >
-        <MenuItem value="" disabled><em>{isLoading ? "Loading…" : "Select client…"}</em></MenuItem>
-        {clients.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12 }}>{c.name}</MenuItem>)}
-      </Select>
-    </FormControl>
+    <Box sx={{ px: compact ? 0 : 1.5, py: compact ? 0 : 1 }}>
+      <FormControl fullWidth size="small">
+        {!compact && <InputLabel sx={{ fontSize: 12 }}>Active Client</InputLabel>}
+        <Select
+          label={compact ? undefined : "Active Client"}
+          displayEmpty={compact}
+          value={clientId || ""}
+          onChange={(e) => setClientId(e.target.value as string)}
+          disabled={isLoading || clients.length === 0}
+          sx={{
+            fontSize: 13,
+            bgcolor: "background.default",
+            "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+          }}
+        >
+          <MenuItem value="" disabled>
+            <em>{isLoading ? "Loading…" : clients.length === 0 ? "No clients" : compact ? "Select client…" : "Select client…"}</em>
+          </MenuItem>
+          {clients.map((c) => (
+            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Box>
   );
 }
 
-// ── Sidebar ───────────────────────────────────────────────────────────────────
+// ── Product card ─────────────────────────────────────────────────────────────
 
-function Sidebar({ accounts, me, navigate, onClose }: { accounts: any[]; me: MyAccess | undefined; navigate: (p: string) => void; onClose?: () => void }) {
-  const go = (p: string) => { navigate(p); onClose?.(); };
+function ProductCard({ product }: { product: Product }) {
+  const navigate = useNavigate();
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        border: "1px solid rgba(0,0,0,0.09)",
+        borderRadius: 2,
+        overflow: "hidden",
+        transition: "box-shadow .18s ease, transform .18s ease",
+        "&:hover": { boxShadow: "0 4px 20px rgba(0,0,0,0.12)", transform: "translateY(-2px)" },
+      }}
+    >
+      <CardActionArea
+        onClick={() => navigate(product.route)}
+        sx={{ display: "flex", alignItems: "center", p: 0 }}
+      >
+        <Box sx={{
+          width: 72, flexShrink: 0, alignSelf: "stretch",
+          bgcolor: product.bgColor,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: 0.5,
+          borderRight: "1px solid rgba(0,0,0,0.06)",
+        }}>
+          <Box sx={{ color: product.color, "& svg": { fontSize: 22 } }}>{product.icon}</Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: product.color, letterSpacing: 0.5 }}>
+            {product.abbrev}
+          </Typography>
+        </Box>
+        <Box sx={{ px: 2, py: 1.5, flexGrow: 1, textAlign: "left" }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, color: "text.primary", lineHeight: 1.3, mb: 0.4 }}>
+            {product.name}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.4 }}>
+            {product.description}
+          </Typography>
+        </Box>
+      </CardActionArea>
+    </Card>
+  );
+}
+
+function CategorySection({ category }: { category: Category }) {
+  return (
+    <Box id={`cat-${category.id}`} sx={{ mb: 4, scrollMarginTop: 24 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+        <Box sx={{ width: 4, height: 20, borderRadius: 2, bgcolor: category.color }} />
+        <Typography sx={{ fontWeight: 700, fontSize: 15, color: "text.primary" }}>
+          {category.label}
+        </Typography>
+      </Box>
+      <Box sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" },
+        gap: 1.5,
+      }}>
+        {category.products.map((p) => <ProductCard key={p.abbrev} product={p} />)}
+      </Box>
+    </Box>
+  );
+}
+
+// ── Sidebar content (shared between desktop sidebar + mobile drawer) ──────────
+
+function SidebarContent({
+  accounts, me, activeCategory, scrollTo, navigate, onClose,
+}: {
+  accounts: any[];
+  me: MyAccess | undefined;
+  activeCategory: string;
+  scrollTo: (id: string) => void;
+  navigate: ReturnType<typeof useNavigate>;
+  onClose?: () => void;
+}) {
+  const action = (fn: () => void) => () => { fn(); onClose?.(); };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", py: 2 }}>
       {/* Logo */}
-      <Box sx={{ px: 2, mb: 2 }}>
+      <Box sx={{ px: 2, mb: 2.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box sx={{ width: 34, height: 34, borderRadius: 1.5, background: "linear-gradient(135deg,#3b82f6,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Shield sx={{ color: "#fff", fontSize: 18 }} />
+          <Box sx={{
+            width: 36, height: 36, borderRadius: 1.5,
+            background: "linear-gradient(135deg, #1565C0, #0288D1)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Shield sx={{ color: "#fff", fontSize: 20 }} />
           </Box>
           <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 14, lineHeight: 1.1 }}>Owlet</Typography>
-            <Typography sx={{ fontSize: 10, color: "text.secondary" }}>Security Platform</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: 15, color: "text.primary", lineHeight: 1.1 }}>
+              Owlet
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: "text.secondary", lineHeight: 1 }}>
+              Security Platform
+            </Typography>
           </Box>
         </Box>
       </Box>
@@ -274,46 +309,87 @@ function Sidebar({ accounts, me, navigate, onClose }: { accounts: any[]; me: MyA
       <ClientPicker />
       <Divider sx={{ mb: 1 }} />
 
-      {/* Phase shortcuts */}
-      <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
-        Phases
-      </Typography>
-      <List dense disablePadding sx={{ px: 1, mb: 1 }}>
-        {STAGES.map((s) => (
-          <ListItemButton key={s.id} onClick={() => { document.getElementById(`stage-${s.id}`)?.scrollIntoView({ behavior: "smooth" }); onClose?.(); }}
-            sx={{ borderRadius: 1.5, mb: 0.25, gap: 1, "&:hover": { bgcolor: alpha(s.color, 0.08) } }}>
-            <Box sx={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${s.color}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Typography sx={{ fontFamily: "monospace", fontSize: "0.6rem", fontWeight: 700, color: s.color }}>{s.num}</Typography>
-            </Box>
-            <ListItemText primary={s.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
-          </ListItemButton>
-        ))}
+      {/* Dashboard — pinned above product catalogue */}
+      <List dense disablePadding sx={{ px: 1, mb: 0.5 }}>
+        <ListItemButton
+          onClick={action(() => navigate("/dashboard"))}
+          sx={{
+            borderRadius: 1.5, gap: 1,
+            bgcolor: "rgba(21,101,192,0.07)",
+            border: "1px solid rgba(21,101,192,0.2)",
+            "&:hover": { bgcolor: "rgba(21,101,192,0.12)" },
+          }}
+        >
+          <Box sx={{ color: "#1565C0", display: "flex" }}><Dashboard sx={{ fontSize: 18 }} /></Box>
+          <ListItemText
+            primary="Dashboard"
+            slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700, color: "#1565C0" } } }}
+          />
+        </ListItemButton>
       </List>
 
       <Divider sx={{ mb: 1 }} />
 
-      {/* Quick nav */}
+      {/* Category nav */}
+      <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
+        Products
+      </Typography>
+      <List dense disablePadding sx={{ px: 1 }}>
+        {CATEGORIES.map((cat) => (
+          <ListItemButton
+            key={cat.id}
+            selected={activeCategory === cat.id}
+            onClick={action(() => scrollTo(cat.id))}
+            sx={{
+              borderRadius: 1.5, mb: 0.25,
+              "&.Mui-selected": {
+                bgcolor: `${cat.color}12`,
+                borderLeft: `3px solid ${cat.color}`,
+                pl: "11px",
+                "& .MuiListItemText-primary": { color: cat.color, fontWeight: 700 },
+              },
+            }}
+          >
+            <ListItemText primary={cat.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
+          </ListItemButton>
+        ))}
+      </List>
+
+      <Divider sx={{ my: 1.5 }} />
+
+      {/* Quick Access */}
       <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
         Quick Access
       </Typography>
       <List dense disablePadding sx={{ px: 1 }}>
-        {QUICK_NAV.map((item) => (
-          <ListItemButton key={item.label} onClick={() => go(item.route)} sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}>
+        {QUICK_ACCESS.map((item) => (
+          <ListItemButton
+            key={item.label}
+            onClick={action(() => {
+              if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
+              else navigate(item.route);
+            })}
+            sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}
+          >
             <Box sx={{ color: "text.secondary" }}>{item.icon}</Box>
             <ListItemText primary={item.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
           </ListItemButton>
         ))}
       </List>
 
-      {/* User */}
+      {/* User footer */}
       <Box sx={{ mt: "auto", pt: 1.5, px: 2, borderTop: "1px solid", borderColor: "divider" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar sx={{ width: 28, height: 28, fontSize: 11, bgcolor: "#3b82f6" }}>
+          <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "#1565C0" }}>
             {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
-            <Typography noWrap sx={{ fontSize: 12, fontWeight: 600 }}>{accounts[0]?.name || "User"}</Typography>
-            {me?.is_admin && <Typography sx={{ fontSize: 10, color: "#3b82f6", fontWeight: 600 }}>Admin</Typography>}
+            <Typography noWrap sx={{ fontSize: 12, fontWeight: 600, color: "text.primary" }}>
+              {accounts[0]?.name || accounts[0]?.username || "User"}
+            </Typography>
+            {me?.is_admin && (
+              <Typography sx={{ fontSize: 10, color: "#1565C0", fontWeight: 600 }}>Admin</Typography>
+            )}
           </Box>
         </Box>
       </Box>
@@ -321,236 +397,201 @@ function Sidebar({ accounts, me, navigate, onClose }: { accounts: any[]; me: MyA
   );
 }
 
-// ── Feature chip ──────────────────────────────────────────────────────────────
-
-function FeatureChip({ label, route, stageColor }: { label: string; route: string; stageColor: string }) {
-  const navigate = useNavigate();
-  const [active, setActive] = useState(false);
-  return (
-    <Box
-      component="button"
-      onClick={() => { setActive((v) => !v); navigate(route); }}
-      sx={{
-        fontFamily: "monospace", fontSize: "0.72rem", lineHeight: 1.2,
-        color: active ? "#fff" : "text.secondary",
-        bgcolor: active ? alpha(stageColor, 0.18) : "background.default",
-        border: "1px solid", borderColor: active ? stageColor : "divider",
-        px: 1.25, py: 0.65, borderRadius: "6px",
-        cursor: "pointer", transition: "all 0.14s ease",
-        "&:hover": { borderColor: stageColor, color: "text.primary" },
-        "&::before": active ? { content: '"✓ "', color: stageColor } : {},
-      }}
-    >
-      {active ? `✓ ${label}` : label}
-    </Box>
-  );
-}
-
-// ── Module card ───────────────────────────────────────────────────────────────
-
-function ModuleCard({ mod, stageColor }: { mod: StageModule; stageColor: string }) {
-  const navigate = useNavigate();
-  return (
-    <Box sx={{
-      bgcolor: "background.paper",
-      border: "1px solid", borderColor: "divider",
-      borderRadius: "10px", p: "16px 18px",
-      transition: "border-color 0.15s, transform 0.15s",
-      "&:hover": { borderColor: stageColor, transform: "translateY(-1px)" },
-    }}>
-      {/* Tag + name */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1, cursor: "pointer" }} onClick={() => navigate(mod.route)}>
-        <Box sx={{
-          fontFamily: "monospace", fontSize: "0.66rem", fontWeight: 700,
-          color: stageColor, bgcolor: alpha(stageColor, 0.14),
-          px: 0.9, py: 0.4, borderRadius: "4px", letterSpacing: "0.05em",
-          flexShrink: 0,
-        }}>
-          {mod.tag}
-        </Box>
-        <Typography sx={{ fontWeight: 700, fontSize: "0.94rem", "&:hover": { color: stageColor } }}>
-          {mod.name}
-        </Typography>
-      </Box>
-      {/* Desc */}
-      <Typography sx={{ color: "text.secondary", fontSize: "0.81rem", lineHeight: 1.55, mb: 1.25 }}>
-        {mod.desc}
-      </Typography>
-      {/* Chips */}
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-        {mod.chips.map((c) => (
-          <FeatureChip key={c.label} label={c.label} route={c.route} stageColor={stageColor} />
-        ))}
-      </Box>
-    </Box>
-  );
-}
-
-// ── Main Hub ──────────────────────────────────────────────────────────────────
+// ── Main Hub page ─────────────────────────────────────────────────────────────
 
 export default function Hub() {
   const { accounts } = useMsal();
+  const [activeCategory, setActiveCategory] = useState("threat-risk");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const isDark = theme.palette.mode === "dark";
+
+  const { data: me } = useQuery<MyAccess>({
+    queryKey: ["my-access"], queryFn: adminApi.me, retry: 0, staleTime: 60_000,
+  });
+
+  const displayName = accounts[0]?.name?.split(" ")[0]
+    || accounts[0]?.username?.split("@")[0]
+    || "there";
+
   const navigate = useNavigate();
 
-  const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0, staleTime: 60_000 });
+  const scrollTo = (id: string) => {
+    setActiveCategory(id);
+    document.getElementById(`cat-${id}`)?.scrollIntoView({ behavior: "smooth" });
+  };
 
-  const displayName = accounts[0]?.name?.split(" ")[0] || accounts[0]?.username?.split("@")[0] || "there";
-
-  // Load Space Grotesk + IBM Plex Mono for the pipeline design
-  useEffect(() => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap";
-    document.head.appendChild(link);
-    return () => { document.head.removeChild(link); };
-  }, []);
-
-  const RAIL_GRADIENT = "linear-gradient(180deg,#3b82f6,#a855f7 25%,#14b8a6 42%,#f59e0b 58%,#ef4444 75%,#22c55e 88%,#6366f1)";
-
-  const sidebarProps = { accounts, me, navigate, onClose: () => setDrawerOpen(false) };
+  const sidebarProps = { accounts, me, activeCategory, scrollTo, navigate };
 
   return (
     <>
-      <Box sx={{ display: "flex", height: "100%", bgcolor: isDark ? "#0b0f14" : "background.default" }}>
+    <Box sx={{ display: "flex", height: "100%", bgcolor: "background.default", flexDirection: "column" }}>
 
-        {/* Mobile drawer */}
-        <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-          sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: 240, bgcolor: isDark ? "#10151d" : "background.paper" } }}>
-          <Sidebar {...sidebarProps} />
-        </Drawer>
+      {/* ── Mobile drawer ──────────────────────────────────────────────────── */}
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: 240 } }}
+      >
+        <SidebarContent {...sidebarProps} onClose={() => setDrawerOpen(false)} />
+      </Drawer>
 
-        {/* Desktop sidebar */}
+      <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
+
+        {/* ── Desktop sidebar ───────────────────────────────────────────────── */}
         <Box sx={{
           width: 220, flexShrink: 0,
-          bgcolor: isDark ? "#10151d" : "background.paper",
-          borderRight: "1px solid", borderColor: isDark ? "#232b36" : "divider",
-          display: { xs: "none", md: "flex" }, flexDirection: "column",
+          bgcolor: "background.paper",
+          borderRight: "1px solid", borderColor: "divider",
+          display: { xs: "none", md: "flex" },
+          flexDirection: "column",
         }}>
-          <Sidebar {...{ accounts, me, navigate }} />
+          <SidebarContent {...sidebarProps} />
         </Box>
 
-        {/* Main content */}
-        <Box sx={{ flexGrow: 1, overflow: "auto" }}>
+        {/* ── Main content ──────────────────────────────────────────────────── */}
+        <Box sx={{ flexGrow: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
 
           {/* Mobile top bar */}
           {isMobile && (
-            <Box sx={{ position: "sticky", top: 0, zIndex: 100, bgcolor: isDark ? "#10151d" : "background.paper", borderBottom: "1px solid", borderColor: isDark ? "#232b36" : "divider", px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1 }}>
-              <IconButton size="small" onClick={() => setDrawerOpen(true)}><MenuIcon /></IconButton>
-              <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Owlet</Typography>
+            <Box sx={{
+              position: "sticky", top: 0, zIndex: 100,
+              bgcolor: "background.paper",
+              borderBottom: "1px solid", borderColor: "divider",
+              px: 1.5, py: 1,
+              display: "flex", alignItems: "center", gap: 1,
+            }}>
+              <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ color: "text.secondary" }}>
+                <MenuIcon />
+              </IconButton>
+              <Box sx={{
+                width: 28, height: 28, borderRadius: 1,
+                background: "linear-gradient(135deg, #1565C0, #0288D1)",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <Shield sx={{ color: "#fff", fontSize: 16 }} />
+              </Box>
+              <Typography sx={{ fontWeight: 800, fontSize: 14, color: "text.primary", flexShrink: 0 }}>
+                Owlet
+              </Typography>
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                <ClientPicker compact />
+              </Box>
+              <Avatar sx={{ width: 28, height: 28, fontSize: 11, bgcolor: "#1565C0", flexShrink: 0 }}>
+                {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
+              </Avatar>
             </Box>
           )}
 
-          <Box sx={{ maxWidth: 860, mx: "auto", px: { xs: 2.5, md: 5 }, py: { xs: 4, md: 8 }, pb: 14 }}>
+          <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, flexGrow: 1 }}>
 
-            {/* ── Hero ── */}
-            <Box sx={{ pb: 7, borderBottom: "1px solid", borderColor: isDark ? "#232b36" : "divider", mb: 1 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2.75 }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: RAIL_GRADIENT, boxShadow: "0 0 10px 1px #3b82f688" }} />
-                <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.75rem", letterSpacing: "0.14em", textTransform: "uppercase", color: isDark ? "#5b6675" : "text.disabled" }}>
-                  Owlet · Security Operations Platform
-                </Typography>
-              </Box>
-
-              <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: { xs: 30, md: 44 }, letterSpacing: "-0.02em", lineHeight: 1.08, mb: 2.25 }}>
-                Hi {displayName} — one{" "}
-                <Box component="span" sx={{ background: RAIL_GRADIENT, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-                  signal path
-                </Box>
-                ,<br />from setup to evidence.
+            {/* Welcome */}
+            <Box sx={{ mb: { xs: 2.5, md: 4 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: "text.primary", mb: 0.5, fontSize: { xs: 20, md: 24 } }}>
+                Hi, {displayName}
               </Typography>
-
-              <Typography sx={{ color: isDark ? "#8b96a5" : "text.secondary", fontSize: "1rem", maxWidth: 600, mb: 3.5 }}>
-                Seven stages run in order — each one hands its output to the next. Click any chip to jump straight there.
+              <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                Select a product to get started.
               </Typography>
             </Box>
 
-            {/* ── Pipeline ── */}
-            <Box sx={{ position: "relative", mt: 7 }}>
-              {/* Vertical rail */}
+            {/* Mobile quick-access chips */}
+            {isMobile && (
               <Box sx={{
-                position: "absolute", left: 23, top: 14, bottom: 14, width: 2,
-                background: RAIL_GRADIENT, opacity: 0.55,
-              }} />
-
-              {STAGES.map((stage, si) => (
-                <Box
-                  key={stage.id}
-                  id={`stage-${stage.id}`}
+                display: "flex", gap: 1, mb: 3,
+                overflowX: "auto",
+                pb: 0.5,
+                "&::-webkit-scrollbar": { display: "none" },
+              }}>
+                {QUICK_ACCESS.map((item) => (
+                  <Chip
+                    key={item.label}
+                    icon={item.icon as any}
+                    label={item.label}
+                    onClick={() => {
+                      if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
+                      else navigate(item.route);
+                    }}
+                    size="small"
+                    sx={{
+                      flexShrink: 0,
+                      fontSize: 12, fontWeight: 600,
+                      bgcolor: "background.paper",
+                      border: "1px solid", borderColor: "divider",
+                      cursor: "pointer",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}
+                  />
+                ))}
+                <Chip
+                  icon={<Restore sx={{ fontSize: 15 }} /> as any}
+                  label="Classic View"
+                  onClick={() => navigate("/dashboard")}
+                  size="small"
                   sx={{
-                    position: "relative", pl: "64px", mb: si < STAGES.length - 1 ? 8 : 0,
-                    scrollMarginTop: 24,
-                    opacity: 0, transform: "translateY(14px)",
-                    animation: `rise 0.55s ease ${si * 0.07}s forwards`,
-                    "@keyframes rise": { to: { opacity: 1, transform: "translateY(0)" } },
+                    flexShrink: 0, fontSize: 12, opacity: 0.6,
+                    bgcolor: "background.paper",
+                    border: "1px solid", borderColor: "divider",
+                    cursor: "pointer",
                   }}
-                >
-                  {/* Stage node */}
-                  <Box sx={{
-                    position: "absolute", left: 0, top: 0,
-                    width: 48, height: 48, borderRadius: "50%",
-                    bgcolor: isDark ? "#141b25" : "background.paper",
-                    border: `2px solid ${stage.color}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: "1.05rem",
-                    color: stage.color,
-                    boxShadow: `0 0 0 5px ${isDark ? "#0b0f14" : theme.palette.background.default}, 0 0 22px -4px ${stage.color}`,
-                    zIndex: 2,
-                  }}>
-                    {stage.num}
-                  </Box>
-
-                  {/* Stage header */}
-                  <Box sx={{ pt: "5px", mb: 2.5 }}>
-                    <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.75rem", color: stage.color, letterSpacing: "0.1em", textTransform: "uppercase", mb: 0.75 }}>
-                      Stage {stage.num} · {stage.label}
-                    </Typography>
-                    <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 20, md: 26 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.75 }}>
-                      {stage.title}
-                    </Typography>
-                    <Typography sx={{ color: isDark ? "#8b96a5" : "text.secondary", fontSize: "0.91rem", maxWidth: 560 }}>
-                      {stage.sub}
-                    </Typography>
-                  </Box>
-
-                  {/* Module cards */}
-                  <Box sx={{
-                    display: "grid",
-                    gridTemplateColumns: stage.modules.length === 1 ? "1fr" : { xs: "1fr", sm: "1fr 1fr" },
-                    gap: 1.5,
-                  }}>
-                    {stage.modules.map((mod) => (
-                      <ModuleCard key={mod.tag} mod={mod} stageColor={stage.color} />
-                    ))}
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-
-            {/* ── Footer ── */}
-            <Box sx={{ mt: 10, pt: 3.5, borderTop: "1px solid", borderColor: isDark ? "#232b36" : "divider", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
-              <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", color: isDark ? "#5b6675" : "text.disabled", letterSpacing: "0.02em" }}>
-                SETUP → DESIGN → DISCOVER → ANALYSE → RESPOND → REPORT → AUTOMATE
-              </Typography>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                <Box
-                  onClick={() => navigate("/data-model")}
-                  sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "#6366f1", border: "1px solid", borderColor: "#6366f155", px: 1.5, py: 0.75, borderRadius: "20px", cursor: "pointer", "&:hover": { bgcolor: "#6366f110" } }}
-                >
-                  Data Ontology →
-                </Box>
-                <Box sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: isDark ? "#8b96a5" : "text.secondary", border: "1px solid", borderColor: isDark ? "#232b36" : "divider", px: 1.5, py: 0.75, borderRadius: "20px" }}>
-                  Owlet · NexGenAI
-                </Box>
+                />
               </Box>
+            )}
+
+            {/* Mobile category filter chips */}
+            {isMobile && (
+              <Box sx={{
+                display: "flex", gap: 1, mb: 2.5,
+                overflowX: "auto",
+                "&::-webkit-scrollbar": { display: "none" },
+              }}>
+                {CATEGORIES.map((cat) => (
+                  <Chip
+                    key={cat.id}
+                    label={cat.label}
+                    onClick={() => scrollTo(cat.id)}
+                    size="small"
+                    sx={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 600,
+                      bgcolor: activeCategory === cat.id ? `${cat.color}18` : "background.paper",
+                      color: activeCategory === cat.id ? cat.color : "text.secondary",
+                      border: "1px solid",
+                      borderColor: activeCategory === cat.id ? cat.color : "divider",
+                      cursor: "pointer",
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {/* Category sections */}
+            {CATEGORIES.map((cat) => (
+              <CategorySection key={cat.id} category={cat} />
+            ))}
+
+            {/* Bottom hint */}
+            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
+              <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>
+                <strong style={{ color: "#1565C0" }}>Setup</strong> — clients, assets, connectors, and settings are in{" "}
+                <Box component="span"
+                  onClick={() => navigate("/platform")}
+                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                  Setup
+                </Box>.{" "}
+                <Box component="span"
+                  onClick={() => navigate("/platform/clients")}
+                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+                  Clients
+                </Box>{" "}
+                manage your multi-tenant data containers.
+              </Typography>
             </Box>
           </Box>
         </Box>
       </Box>
-      <AssistantWidget />
+    </Box>
+    <AssistantWidget />
     </>
   );
 }
