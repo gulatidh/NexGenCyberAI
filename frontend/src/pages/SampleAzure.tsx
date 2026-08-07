@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import {
   Menu as MenuIcon, Search, Notifications, Settings,
-  Dashboard, Security, BugReport, Insights, Hub, Cable,
+  Dashboard, Security, BugReport, Hub, Cable,
   Radar, GppGood, SmartToy, Policy, Storage,
   AutoStories, Psychology, Description, Assessment, GppBad,
   PlaylistAddCheck, TrendingUp, Engineering, GridView,
@@ -42,35 +42,62 @@ interface SearchItem {
   color?: string;
 }
 
-// ── Nav items — every item has keywords for alias search ─────────────────────
+// ── Stage color map (matches pipeline rail) ───────────────────────────────────
+
+const STAGE_META: { num: string; label: string; color: string }[] = [
+  { num: "01", label: "Setup",    color: "#3b82f6" },
+  { num: "02", label: "Design",   color: "#a855f7" },
+  { num: "03", label: "Discover", color: "#14b8a6" },
+  { num: "04", label: "Analyse",  color: "#f59e0b" },
+  { num: "05", label: "Respond",  color: "#ef4444" },
+  { num: "06", label: "Report",   color: "#22c55e" },
+  { num: "07", label: "Automate", color: "#6366f1" },
+];
+
+// ── Nav items aligned to pipeline stages ──────────────────────────────────────
 
 const NAV_ITEMS: SearchItem[] = [
-  { id: "dashboard",    label: "Dashboard",           Icon: Dashboard,        path: "/dashboard",             pinned: true,  keywords: ["home", "overview", "summary", "main"] },
-  { id: "findings",     label: "Findings",            Icon: Security,         path: "/findings",              pinned: true,  keywords: ["vulnerabilities", "issues", "alerts", "bugs", "cve", "open"] },
-  { id: "scans",        label: "Scans",               Icon: BugReport,        path: "/scans",                 pinned: true,  keywords: ["assessment", "scan", "test", "nmap", "zap", "trivy", "semgrep"] },
-  { id: "risk",         label: "Risk Overview",       Icon: Insights,         path: "/risk-overview",         pinned: true,  keywords: ["risk", "score", "ale", "fair", "exposure", "posture"] },
-  { id: "connections",  label: "Connections",         Icon: Cable,            path: "/connections",           section: "1 · Setup",    keywords: ["connectors", "integrations", "azure", "aws", "setup", "configure", "api key", "ai settings", "providers"] },
-  { id: "clients",      label: "Clients",             Icon: People,           path: "/clients",               section: "1 · Setup",    keywords: ["customers", "tenants", "organisations", "workspace"] },
-  { id: "threat-models",label: "Threat Models",       Icon: Hub,              path: "/threat-models",         section: "2 · Design",   keywords: ["dfd", "stride", "data flow", "diagram", "model", "attack surface", "design"] },
-  { id: "frameworks",   label: "Frameworks",          Icon: Policy,           path: "/frameworks",            section: "2 · Design",   keywords: ["nist", "cis", "gdpr", "iso", "pci", "compliance", "controls", "standards"] },
-  { id: "custom-fw",    label: "Custom Policy",       Icon: LibraryAdd,       path: "/custom-frameworks",     section: "2 · Design",   keywords: ["custom framework", "policy", "standard", "controls", "build"] },
-  { id: "ai-scan",      label: "AI Assisted Scan",    Icon: SmartToy,         path: "/ai-assisted-scan",      section: "3 · Discover", keywords: ["ai scan", "guided", "wizard", "conversational", "chat scan"] },
-  { id: "assets",       label: "Assets",              Icon: Storage,          path: "/assets",                section: "3 · Discover", keywords: ["inventory", "resources", "servers", "cloud", "hosts", "infra"] },
-  { id: "risks",        label: "Risk Register",       Icon: Assessment,       path: "/risks",                 section: "4 · Analyse",  keywords: ["risk register", "risks", "fair", "score", "likelihood", "impact"] },
-  { id: "attack",       label: "Attack Paths",        Icon: AccountTree,      path: "/attack-paths",          section: "4 · Analyse",  keywords: ["attack chain", "lateral movement", "kill chain", "mitre", "path", "graph"] },
-  { id: "heatmap",      label: "Compliance Heatmap",  Icon: GridView,         path: "/compliance-heatmap",    section: "4 · Analyse",  keywords: ["heatmap", "compliance", "control", "matrix", "gap"] },
-  { id: "threat-intel", label: "Threat Intelligence", Icon: Radar,            path: "/threat-register",       section: "5 · Respond",  keywords: ["threat", "intel", "ioc", "mitre", "att&ck", "ttp", "threat register"] },
-  { id: "gaps",         label: "Control Gaps",        Icon: GppBad,           path: "/control-deficiencies",  section: "5 · Respond",  keywords: ["gaps", "deficiencies", "control", "compliance gaps", "missing"] },
-  { id: "remediation",  label: "Remediation",         Icon: PlaylistAddCheck, path: "/governance/remediation",section: "5 · Respond",  keywords: ["fix", "remediate", "action", "ticket", "patch", "tracker"] },
-  { id: "ctem",         label: "CTEM Programs",       Icon: Engineering,      path: "/governance/ctem",       section: "5 · Respond",  keywords: ["ctem", "exposure management", "scope", "validate", "mobilise"] },
-  { id: "vapt",         label: "VAPT Reports",        Icon: GppGood,          path: "/vapt/reports",          section: "6 · Report",   keywords: ["penetration test", "pen test", "report", "vapt", "engagement", "pdf"] },
-  { id: "posture",      label: "Posture Trends",      Icon: TrendingUp,       path: "/posture-trends",        section: "6 · Report",   keywords: ["posture", "trend", "history", "graph", "chart", "audit readiness"] },
-  { id: "agents",       label: "AI Buddies",          Icon: SmartToy,         path: "/agents",                section: "7 · Automate", keywords: ["agent", "buddy", "buddies", "ai", "orchestrator", "llm", "run agent", "automation", "ai agent"] },
-  { id: "workflows",    label: "Workflows",           Icon: Schedule,         path: "/missions",              section: "7 · Automate", keywords: ["mission", "workflow", "pipeline", "scheduled", "automated"] },
-  { id: "knowledge",    label: "Knowledge Base",      Icon: AutoStories,      path: "/knowledge",             section: "7 · Automate", keywords: ["kb", "knowledge", "articles", "docs", "wiki", "info"] },
-  { id: "sec-docs",     label: "Security Docs",       Icon: Description,      path: "/security-docs",         section: "7 · Automate", keywords: ["document", "upload", "policy", "rag", "question", "ask docs"] },
-  { id: "nlquery",      label: "Ask Your Data",       Icon: Psychology,       path: "/nl-query",              section: "7 · Automate", keywords: ["nl query", "natural language", "sql", "ask", "question", "query"] },
-  { id: "settings",     label: "Settings",            Icon: Settings,         path: "/settings",              section: "8 · Configure",keywords: ["config", "settings", "api keys", "webhooks", "auth", "admin"] },
+  // ── home ──────────────────────────────────────────────────────────────────
+  { id: "dashboard",    label: "Dashboard",           Icon: Dashboard,        path: "/dashboard",              pinned: true, keywords: ["home", "overview", "summary", "main"] },
+
+  // ── 01 · Setup ────────────────────────────────────────────────────────────
+  { id: "clients",      label: "Clients",             Icon: People,           path: "/clients",                section: "01 · Setup",    keywords: ["customers", "tenants", "organisations", "workspace"] },
+  { id: "assets",       label: "Assets",              Icon: Storage,          path: "/assets",                 section: "01 · Setup",    keywords: ["inventory", "resources", "servers", "cloud", "hosts"] },
+  { id: "connections",  label: "Connectors",          Icon: Cable,            path: "/connections",            section: "01 · Setup",    keywords: ["connectors", "integrations", "azure", "aws", "configure", "api", "providers"] },
+  { id: "settings",     label: "Settings",            Icon: Settings,         path: "/settings",               section: "01 · Setup",    keywords: ["config", "api keys", "webhooks", "auth", "admin"] },
+
+  // ── 02 · Design ───────────────────────────────────────────────────────────
+  { id: "threat-models",label: "Threat Models",       Icon: Hub,              path: "/threat-models",          section: "02 · Design",   keywords: ["dfd", "stride", "data flow", "diagram", "model", "attack surface"] },
+  { id: "frameworks",   label: "Frameworks",          Icon: Policy,           path: "/frameworks",             section: "02 · Design",   keywords: ["nist", "cis", "gdpr", "iso", "pci", "compliance", "controls", "standards"] },
+  { id: "custom-fw",    label: "Custom Policy",       Icon: LibraryAdd,       path: "/custom-frameworks",      section: "02 · Design",   keywords: ["custom framework", "policy", "standard", "build"] },
+
+  // ── 03 · Discover ─────────────────────────────────────────────────────────
+  { id: "scans",        label: "Scans",               Icon: BugReport,        path: "/scans",                  section: "03 · Discover", keywords: ["assessment", "scan", "test", "nmap", "zap", "trivy", "semgrep"] },
+  { id: "findings",     label: "Findings",            Icon: Security,         path: "/findings",               section: "03 · Discover", keywords: ["vulnerabilities", "issues", "alerts", "bugs", "cve", "open"] },
+  { id: "ai-scan",      label: "AI Assisted Scan",    Icon: SmartToy,         path: "/ai-assisted-scan",       section: "03 · Discover", keywords: ["ai scan", "guided", "wizard", "conversational", "chat"] },
+
+  // ── 04 · Analyse ──────────────────────────────────────────────────────────
+  { id: "risks",        label: "Risk Register",       Icon: Assessment,       path: "/risks",                  section: "04 · Analyse",  keywords: ["risk register", "risks", "fair", "score", "likelihood", "impact"] },
+  { id: "attack",       label: "Attack Paths",        Icon: AccountTree,      path: "/attack-paths",           section: "04 · Analyse",  keywords: ["attack chain", "kill chain", "mitre", "path", "graph"] },
+  { id: "nlquery",      label: "Ask Your Data",       Icon: Psychology,       path: "/nl-query",               section: "04 · Analyse",  keywords: ["nl query", "natural language", "sql", "ask", "question", "query"] },
+  { id: "data-model",   label: "Data Model",          Icon: GridView,         path: "/data-model",             section: "04 · Analyse",  keywords: ["ontology", "entity", "graph", "schema", "relationships"] },
+
+  // ── 05 · Respond ──────────────────────────────────────────────────────────
+  { id: "threat-intel", label: "Threat Intelligence", Icon: Radar,            path: "/threat-register",        section: "05 · Respond",  keywords: ["threat", "intel", "ioc", "mitre", "att&ck", "ttp"] },
+  { id: "gaps",         label: "Control Gaps",        Icon: GppBad,           path: "/control-deficiencies",   section: "05 · Respond",  keywords: ["gaps", "deficiencies", "control", "compliance", "missing"] },
+  { id: "remediation",  label: "Remediation",         Icon: PlaylistAddCheck, path: "/governance/remediation", section: "05 · Respond",  keywords: ["fix", "remediate", "action", "ticket", "patch", "tracker"] },
+  { id: "ctem",         label: "CTEM Programs",       Icon: Engineering,      path: "/governance/ctem",        section: "05 · Respond",  keywords: ["ctem", "exposure management", "scope", "validate", "mobilise"] },
+
+  // ── 06 · Report ───────────────────────────────────────────────────────────
+  { id: "vapt",         label: "VAPT Reports",        Icon: GppGood,          path: "/vapt/reports",           section: "06 · Report",   keywords: ["penetration test", "pen test", "report", "vapt", "engagement", "pdf"] },
+  { id: "posture",      label: "Posture Trends",      Icon: TrendingUp,       path: "/posture-trends",         section: "06 · Report",   keywords: ["posture", "trend", "history", "graph", "chart", "audit"] },
+  { id: "evidence",     label: "Compliance Monitor",  Icon: Description,      path: "/compliance/deficiencies",section: "06 · Report",   keywords: ["compliance monitor", "evidence", "control deficiency", "audit ready"] },
+
+  // ── 07 · Automate ─────────────────────────────────────────────────────────
+  { id: "agents",       label: "AI Buddies",          Icon: SmartToy,         path: "/agents",                 section: "07 · Automate", keywords: ["agent", "buddy", "buddies", "ai", "orchestrator", "llm", "run agent", "automation"] },
+  { id: "knowledge",    label: "Knowledge Base",      Icon: AutoStories,      path: "/knowledge",              section: "07 · Automate", keywords: ["kb", "knowledge", "articles", "docs", "wiki"] },
+  { id: "sec-docs",     label: "Security Docs",       Icon: Description,      path: "/security-docs",          section: "07 · Automate", keywords: ["document", "upload", "policy", "rag", "question", "ask docs"] },
+  { id: "workflows",    label: "Workflows",           Icon: Schedule,         path: "/missions",               section: "07 · Automate", keywords: ["mission", "workflow", "pipeline", "scheduled", "automated"] },
 ];
 
 const QUICK_ACTIONS: SearchItem[] = [
@@ -333,9 +360,17 @@ function LeftBlade({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
   const bladeBg = isDark ? "#1a1a2e" : "#1e3a5f";
   const hoverBg = alpha("#fff", 0.08);
 
+  // colour lookup by section key
+  const stageColorOf = (sec: string): string => {
+    const m = STAGE_META.find((s) => sec.startsWith(s.num));
+    return m ? m.color : alpha("#fff", 0.5);
+  };
+
   const pinned = NAV_ITEMS.filter((n) => n.pinned);
+
   const sections = useMemo(() => {
     const map = new Map<string, SearchItem[]>();
+    STAGE_META.forEach((s) => map.set(`${s.num} · ${s.label}`, []));
     NAV_ITEMS.filter((n) => !n.pinned).forEach((n) => {
       const sec = n.section ?? "Other";
       if (!map.has(sec)) map.set(sec, []);
@@ -344,8 +379,9 @@ function LeftBlade({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
     return map;
   }, []);
 
-  const item = (nav: SearchItem) => {
+  const navItem = (nav: SearchItem, iconColor?: string) => {
     const { Icon } = nav;
+    const ic = iconColor ?? alpha("#fff", 0.65);
     return (
       <Tooltip key={nav.id} title={expanded ? "" : nav.label} placement="right">
         <Box
@@ -355,15 +391,15 @@ function LeftBlade({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
             gap: expanded ? 1.5 : 0,
             px: expanded ? 1.5 : 0,
             justifyContent: expanded ? "flex-start" : "center",
-            height: 40, cursor: "pointer", borderRadius: 1,
-            mx: 0.5, mb: 0.25,
+            height: 36, cursor: "pointer", borderRadius: 1,
+            mx: 0.5, mb: 0.15,
             transition: "background 0.15s",
             "&:hover": { bgcolor: hoverBg },
           }}
         >
-          <Icon sx={{ fontSize: 18, color: alpha("#fff", 0.75), flexShrink: 0 }} />
+          <Icon sx={{ fontSize: 17, color: ic, flexShrink: 0 }} />
           {expanded && (
-            <Typography variant="body2" sx={{ color: alpha("#fff", 0.85), fontSize: "0.82rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <Typography sx={{ color: alpha("#fff", 0.82), fontSize: "0.8rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {nav.label}
             </Typography>
           )}
@@ -382,33 +418,51 @@ function LeftBlade({ expanded, onToggle }: { expanded: boolean; onToggle: () => 
       overflow: "hidden",
       display: "flex", flexDirection: "column",
       zIndex: 1100,
-      boxShadow: "2px 0 8px rgba(0,0,0,0.3)",
+      boxShadow: "2px 0 8px rgba(0,0,0,0.35)",
     }}>
+
+      {/* Home row */}
       <Box sx={{ pt: 1, pb: 0.5 }}>
-        {expanded && (
-          <Typography variant="caption" sx={{ display: "block", px: 1.5, py: 0.5, color: alpha("#fff", 0.4), fontWeight: 700, letterSpacing: "0.08em", fontSize: "0.65rem" }}>
-            FAVOURITES
-          </Typography>
-        )}
-        {pinned.map(item)}
+        {pinned.map((n) => navItem(n, alpha("#fff", 0.55)))}
       </Box>
-      <Divider sx={{ borderColor: alpha("#fff", 0.1), mx: 1 }} />
-      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", pt: 0.5, pb: 2, "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-thumb": { bgcolor: alpha("#fff", 0.15), borderRadius: 2 } }}>
-        {expanded && (
-          <Typography variant="caption" sx={{ display: "block", px: 1.5, py: 0.5, color: alpha("#fff", 0.4), fontWeight: 700, letterSpacing: "0.08em", fontSize: "0.65rem" }}>
-            ALL SERVICES
-          </Typography>
-        )}
-        {Array.from(sections.entries()).map(([section, items]) => (
-          <Box key={section}>
-            {expanded && (
-              <Typography variant="caption" sx={{ display: "block", px: 1.5, pt: 1.25, pb: 0.25, color: alpha("#fff", 0.35), fontSize: "0.68rem", whiteSpace: "nowrap" }}>
-                {section}
-              </Typography>
-            )}
-            {items.map(item)}
-          </Box>
-        ))}
+
+      <Divider sx={{ borderColor: alpha("#fff", 0.08), mx: 1, mb: 0.5 }} />
+
+      {/* Stage sections */}
+      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", pb: 2, "&::-webkit-scrollbar": { width: 3 }, "&::-webkit-scrollbar-thumb": { bgcolor: alpha("#fff", 0.12), borderRadius: 2 } }}>
+        {Array.from(sections.entries()).map(([sec, items]) => {
+          if (items.length === 0) return null;
+          const color = stageColorOf(sec);
+          const meta  = STAGE_META.find((s) => sec.startsWith(s.num));
+          return (
+            <Box key={sec} sx={{ mb: 0.5 }}>
+              {/* Stage header */}
+              {expanded ? (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, pt: 1.5, pb: 0.5 }}>
+                  {/* Colored stage node */}
+                  <Box sx={{
+                    width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                    border: `1.5px solid ${color}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 0 8px -2px ${color}`,
+                  }}>
+                    <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.55rem", fontWeight: 700, color, lineHeight: 1 }}>
+                      {meta?.num}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.65rem", fontWeight: 600, color, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                    {meta?.label}
+                  </Typography>
+                </Box>
+              ) : (
+                /* Collapsed: just a colored 2px left accent line before icons */
+                <Box sx={{ width: 2, height: 6, bgcolor: color, ml: "25px", borderRadius: 1, mb: 0.25, mt: 1 }} />
+              )}
+
+              {items.map((n) => navItem(n, color))}
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );
