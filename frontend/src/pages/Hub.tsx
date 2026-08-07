@@ -41,98 +41,89 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   {
-    id: "threat-risk",
-    label: "Threat & Risk",
-    color: "#1565C0",
+    id: "setup",
+    label: "1 · Setup",
+    color: "#42A5F5",
     products: [
       {
-        abbrev: "TI",
-        name: "Threat Intelligence",
-        description: "MITRE ATT&CK mapped threats and attack path analysis",
-        route: "/threat-intel",
-        icon: <Radar />,
-        color: "#1565C0",
-        bgColor: "#E3F2FD",
-      },
-      {
-        abbrev: "RM",
-        name: "Risk Manager",
-        description: "FAIR-scored risk register and ALE exposure dashboard",
-        route: "/risk",
-        icon: <Assessment />,
+        abbrev: "ST",
+        name: "Setup",
+        description: "Clients, assets, connectors, AI providers, and platform settings",
+        route: "/platform",
+        icon: <Tune />,
         color: "#1565C0",
         bgColor: "#E3F2FD",
       },
     ],
   },
   {
-    id: "vulnerability",
-    label: "Vulnerability",
-    color: "#00695C",
+    id: "design",
+    label: "2 · Design",
+    color: "#AB47BC",
+    products: [
+      {
+        abbrev: "TM",
+        name: "Threat Models",
+        description: "Data flow diagrams, STRIDE analysis, and Sigma detection rules",
+        route: "/threat-intel/threat-models",
+        icon: <Radar />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
+      },
+      {
+        abbrev: "FW",
+        name: "Frameworks",
+        description: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards",
+        route: "/compliance/frameworks",
+        icon: <GppBad />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
+      },
+    ],
+  },
+  {
+    id: "discover",
+    label: "3 · Discover",
+    color: "#26A69A",
     products: [
       {
         abbrev: "VM",
         name: "Vulnerability Management",
-        description: "Scans, findings, posture trends, and scan import",
+        description: "Scans, findings, posture trends, CVE enrichment, and scan import",
         route: "/vulnerability",
         icon: <BugReport />,
         color: "#00695C",
         bgColor: "#E0F2F1",
       },
       {
-        abbrev: "PT",
-        name: "Pen Testing",
-        description: "VAPT reports with retest lifecycle and PDF/DOCX export",
-        route: "/vapt",
-        icon: <Shield />,
+        abbrev: "AI",
+        name: "AI Assisted Scan",
+        description: "Conversational guided assessment — describe your environment, launch a scan",
+        route: "/intelligence/ai-assisted-scan",
+        icon: <SmartToy />,
         color: "#00695C",
         bgColor: "#E0F2F1",
       },
     ],
   },
   {
-    id: "compliance",
-    label: "Compliance",
-    color: "#6A1B9A",
+    id: "analyse",
+    label: "4 · Analyse",
+    color: "#FFA726",
     products: [
       {
-        abbrev: "CM",
-        name: "Compliance Monitor",
-        description: "Framework control gaps, custom standards, and evidence packages",
-        route: "/compliance",
-        icon: <GppBad />,
-        color: "#6A1B9A",
-        bgColor: "#F3E5F5",
-      },
-      {
-        abbrev: "GR",
-        name: "Governance",
-        description: "CTEM programs, remediation tracker, and security scorecard",
-        route: "/governance",
-        icon: <PlaylistAddCheck />,
-        color: "#6A1B9A",
-        bgColor: "#F3E5F5",
-      },
-    ],
-  },
-  {
-    id: "ai-intelligence",
-    label: "AI & Intelligence",
-    color: "#E65100",
-    products: [
-      {
-        abbrev: "AI",
-        name: "AI Security Advisor",
-        description: "AI agents, workflows, and 60+ advisory specialist catalog",
-        route: "/ai-advisor",
-        icon: <SmartToy />,
+        abbrev: "RM",
+        name: "Risk Manager",
+        description: "FAIR-scored risk register, ALE exposure, and attack path graph",
+        route: "/risk",
+        icon: <Assessment />,
         color: "#E65100",
         bgColor: "#FBE9E7",
       },
       {
         abbrev: "IG",
         name: "Smart Intelligence",
-        description: "Natural language queries, security doc RAG, and knowledge base",
+        description: "Natural language queries, compliance heatmap, and asset inventory",
         route: "/intelligence",
         icon: <Psychology />,
         color: "#E65100",
@@ -141,27 +132,88 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
-    id: "platform",
-    label: "Setup",
-    color: "#37474F",
+    id: "respond",
+    label: "5 · Respond",
+    color: "#EF5350",
     products: [
       {
-        abbrev: "ST",
-        name: "Setup",
-        description: "Clients, assets, connectors, ticket sync, and platform settings",
-        route: "/platform",
-        icon: <Tune />,
-        color: "#37474F",
-        bgColor: "#ECEFF1",
+        abbrev: "TI",
+        name: "Threat Intelligence",
+        description: "MITRE ATT&CK threat register and attack path visualisation",
+        route: "/threat-intel",
+        icon: <Radar />,
+        color: "#1565C0",
+        bgColor: "#E3F2FD",
+      },
+      {
+        abbrev: "GR",
+        name: "Governance",
+        description: "CTEM programs, control gaps, remediation tracker, and scorecard",
+        route: "/governance",
+        icon: <PlaylistAddCheck />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
+      },
+    ],
+  },
+  {
+    id: "report",
+    label: "6 · Report",
+    color: "#66BB6A",
+    products: [
+      {
+        abbrev: "PT",
+        name: "Pen Testing / VAPT",
+        description: "VAPT reports with retest lifecycle and PDF/DOCX export",
+        route: "/vapt",
+        icon: <Shield />,
+        color: "#00695C",
+        bgColor: "#E0F2F1",
+      },
+      {
+        abbrev: "CM",
+        name: "Compliance Monitor",
+        description: "Framework assessments, evidence packages, and audit readiness",
+        route: "/compliance",
+        icon: <GppBad />,
+        color: "#6A1B9A",
+        bgColor: "#F3E5F5",
+      },
+    ],
+  },
+  {
+    id: "automate",
+    label: "7 · Automate",
+    color: "#5C6BC0",
+    products: [
+      {
+        abbrev: "AB",
+        name: "AI Buddies",
+        description: "60+ AI agents — orchestrator, risk manager, threat intel, remediation",
+        route: "/ai-advisor",
+        icon: <SmartToy />,
+        color: "#E65100",
+        bgColor: "#FBE9E7",
+      },
+      {
+        abbrev: "KB",
+        name: "Knowledge & Docs",
+        description: "Knowledge base, security doc RAG, webhooks, and API keys",
+        route: "/intelligence/knowledge",
+        icon: <Psychology />,
+        color: "#E65100",
+        bgColor: "#FBE9E7",
       },
     ],
   },
 ];
 
 const QUICK_ACCESS = [
-  { label: "Connectors",     icon: <Cable sx={{ fontSize: 16 }} />,         route: "/platform/connections" },
+  { label: "Connections",    icon: <Cable sx={{ fontSize: 16 }} />,          route: "/platform/connections" },
+  { label: "Scans",          icon: <BugReport sx={{ fontSize: 16 }} />,      route: "/vulnerability/scans" },
+  { label: "AI Buddies",     icon: <SmartToy sx={{ fontSize: 16 }} />,       route: "/ai-advisor/agents" },
   { label: "Assets",         icon: <Storage sx={{ fontSize: 16 }} />,        route: "/platform/assets" },
-  { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
+  { label: "Ask Your Data",  icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
   { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
   { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/platform/help" },
 ];
@@ -332,7 +384,7 @@ function SidebarContent({
 
       {/* Category nav */}
       <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
-        Products
+        Demo Flow
       </Typography>
       <List dense disablePadding sx={{ px: 1 }}>
         {CATEGORIES.map((cat) => (
@@ -492,7 +544,7 @@ export default function Hub() {
                 Hi, {displayName}
               </Typography>
               <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-                Select a product to get started.
+                Follow the phases below to run a complete security assessment.
               </Typography>
             </Box>
 
@@ -572,19 +624,9 @@ export default function Hub() {
 
             {/* Bottom hint */}
             <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-              <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>
-                <strong style={{ color: "#1565C0" }}>Setup</strong> — clients, assets, connectors, and settings are in{" "}
-                <Box component="span"
-                  onClick={() => navigate("/platform")}
-                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
-                  Setup
-                </Box>.{" "}
-                <Box component="span"
-                  onClick={() => navigate("/platform/clients")}
-                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
-                  Clients
-                </Box>{" "}
-                manage your multi-tenant data containers.
+              <Typography sx={{ fontSize: 12.5, color: "text.secondary", lineHeight: 1.6 }}>
+                <strong style={{ color: "#42A5F5" }}>Start at Phase 1</strong> — connect your cloud and scanner integrations, add a client, then follow the phases in order.{" "}
+                Each phase builds on the last: discover vulnerabilities → analyse risk → respond → report → automate with AI.
               </Typography>
             </Box>
           </Box>
