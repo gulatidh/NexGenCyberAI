@@ -18,7 +18,7 @@ import {
   AutoStories, Psychology, Description, Assessment, GppBad,
   PlaylistAddCheck, TrendingUp, Engineering, GridView,
   Add, PlayArrow, People, LibraryAdd, AccountTree, Schedule,
-  ChevronRight, SearchOff,
+  SearchOff,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 
@@ -80,33 +80,6 @@ const QUICK_ACTIONS: SearchItem[] = [
   { id: "a-nlq",    label: "Ask Your Data",  Icon: Psychology, path: "/nl-query",     type: "action", color: "#FFA726", keywords: ["ask", "query", "nl"] },
 ];
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-const RECENT = [
-  { label: "Findings",        sub: "12 critical open",     Icon: Security,   color: "#EF5350", path: "/findings" },
-  { label: "Risk Overview",   sub: "Score: 72 / 100",      Icon: Insights,   color: "#FFA726", path: "/risk-overview" },
-  { label: "AI Buddies",      sub: "Last run: 2h ago",     Icon: SmartToy,   color: "#5C6BC0", path: "/agents" },
-  { label: "Scans",           sub: "1 running now",        Icon: BugReport,  color: "#26A69A", path: "/scans" },
-  { label: "Threat Models",   sub: "2 models, 18 threats", Icon: Hub,        color: "#AB47BC", path: "/threat-models" },
-  { label: "VAPT Reports",    sub: "3 reports",            Icon: GppGood,    color: "#66BB6A", path: "/vapt/reports" },
-];
-
-const METRICS = [
-  { label: "Posture Score",     value: "72", unit: "/ 100",  icon: TrendingUp, color: "#FFA726", path: "/posture-trends" },
-  { label: "Critical Findings", value: "12", unit: "open",   icon: Security,   color: "#EF5350", path: "/findings" },
-  { label: "Active Scans",      value: "1",  unit: "running",icon: BugReport,  color: "#26A69A", path: "/scans" },
-  { label: "Risks Scored",      value: "47", unit: "total",  icon: Insights,   color: "#42A5F5", path: "/risk-overview" },
-  { label: "Control Gaps",      value: "8",  unit: "open",   icon: GppBad,     color: "#AB47BC", path: "/control-deficiencies" },
-  { label: "VAPT Reports",      value: "3",  unit: "total",  icon: GppGood,    color: "#66BB6A", path: "/vapt/reports" },
-];
-
-const ACTIVITY = [
-  { msg: "Orchestrator agent completed successfully",  time: "2 min ago",  type: "success" },
-  { msg: "12 new findings from Azure cloud scan",      time: "18 min ago", type: "warning" },
-  { msg: "VAPT Report generated — Acme Corp Q3",      time: "1 hr ago",   type: "success" },
-  { msg: "Critical CVE CVE-2024-3094 detected",        time: "3 hr ago",   type: "error" },
-  { msg: "Threat model updated — Customer Portal DFD", time: "Yesterday",  type: "info" },
-];
 
 // ── Search scoring ────────────────────────────────────────────────────────────
 
@@ -541,7 +514,6 @@ function TopBar({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function SampleAzure() {
-  const theme = useTheme();
   const navigate = useNavigate();
   const [bladeExpanded, setBladeExpanded]   = useState(false);
   const [paletteOpen,   setPaletteOpen]     = useState(false);
@@ -561,9 +533,6 @@ export default function SampleAzure() {
 
   const contentLeft = bladeExpanded ? BLADE_EXPANDED : BLADE_COLLAPSED;
 
-  const activityColor = (type: string) =>
-    type === "success" ? "#66BB6A" : type === "warning" ? "#FFA726" : type === "error" ? "#EF5350" : theme.palette.primary.main;
-
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
       <TopBar
@@ -574,179 +543,339 @@ export default function SampleAzure() {
       />
       <LeftBlade expanded={bladeExpanded} onToggle={() => setBladeExpanded((v) => !v)} />
 
-      {/* Main content */}
+      {/* ── Pipeline main content ─────────────────────────────────────── */}
       <Box sx={{
         ml: `${contentLeft}px`,
         mt: `${TOPBAR_HEIGHT}px`,
         transition: "margin-left 0.2s ease",
-        p: { xs: 2, md: 3 },
         minHeight: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
       }}>
-        {/* Breadcrumb */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 2 }}>
-          <Chip label="Sample — Option 3" size="small" color="secondary" variant="outlined" sx={{ mr: 1 }} />
-          <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.75rem" }}>Home</Typography>
-        </Box>
-
-        {/* Greeting */}
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>Good morning, Dheeraj</Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>Here's your security operations overview</Typography>
-
-        {/* Metrics row */}
-        <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap" }}>
-          {METRICS.map((m) => {
-            const { icon: Icon } = m;
-            return (
-              <Box
-                key={m.label}
-                onClick={() => navigate(m.path)}
-                sx={{
-                  flex: "1 1 130px", minWidth: 120,
-                  bgcolor: "background.paper",
-                  border: "1px solid", borderColor: "divider",
-                  borderTop: `3px solid ${m.color}`,
-                  borderRadius: 1.5, p: 1.5, cursor: "pointer",
-                  transition: "box-shadow 0.15s, transform 0.15s",
-                  "&:hover": { boxShadow: `0 4px 20px ${alpha(m.color, 0.2)}`, transform: "translateY(-2px)" },
-                }}
-              >
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                  <Icon sx={{ fontSize: 16, color: m.color }} />
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.72rem" }}>{m.label}</Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: m.color, lineHeight: 1 }}>{m.value}</Typography>
-                  <Typography variant="caption" sx={{ color: "text.disabled" }}>{m.unit}</Typography>
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-
-        {/* Two-column layout */}
-        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-          {/* Left */}
-          <Box sx={{ flex: "2 1 500px", minWidth: 280 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.secondary", fontSize: "0.78rem", letterSpacing: "0.06em" }}>
-              RECENTLY VISITED
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 3 }}>
-              {RECENT.map((r) => {
-                const { Icon } = r;
-                return (
-                  <Box
-                    key={r.label}
-                    onClick={() => navigate(r.path)}
-                    sx={{
-                      flex: "1 1 140px", minWidth: 130,
-                      bgcolor: "background.paper",
-                      border: "1px solid", borderColor: "divider",
-                      borderRadius: 1.5, p: 1.5, cursor: "pointer",
-                      transition: "all 0.15s",
-                      "&:hover": { borderColor: r.color, boxShadow: `0 2px 12px ${alpha(r.color, 0.15)}`, transform: "translateY(-2px)" },
-                    }}
-                  >
-                    <Box sx={{ width: 36, height: 36, borderRadius: "8px", bgcolor: alpha(r.color, 0.12), display: "flex", alignItems: "center", justifyContent: "center", mb: 1 }}>
-                      <Icon sx={{ fontSize: 18, color: r.color }} />
-                    </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: "0.82rem", mb: 0.25 }}>{r.label}</Typography>
-                    <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.72rem" }}>{r.sub}</Typography>
-                  </Box>
-                );
-              })}
-            </Box>
-
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.secondary", fontSize: "0.78rem", letterSpacing: "0.06em" }}>
-              QUICK ACTIONS
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              {QUICK_ACTIONS.map((a) => {
-                const { Icon } = a;
-                return (
-                  <Box
-                    key={a.id}
-                    onClick={() => navigate(a.path)}
-                    sx={{
-                      display: "flex", alignItems: "center", gap: 1,
-                      px: 2, py: 1,
-                      bgcolor: "background.paper",
-                      border: "1px solid", borderColor: "divider",
-                      borderRadius: 1.5, cursor: "pointer",
-                      transition: "all 0.15s",
-                      "&:hover": { borderColor: a.color, bgcolor: alpha(a.color!, 0.06) },
-                    }}
-                  >
-                    <Icon sx={{ fontSize: 16, color: a.color }} />
-                    <Typography variant="body2" sx={{ fontWeight: 500, fontSize: "0.82rem" }}>{a.label}</Typography>
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
-
-          {/* Right */}
-          <Box sx={{ flex: "1 1 260px", minWidth: 240 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.secondary", fontSize: "0.78rem", letterSpacing: "0.06em" }}>
-              RECENT ACTIVITY
-            </Typography>
-            <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
-              {ACTIVITY.map((a, idx) => (
-                <Box
-                  key={idx}
-                  sx={{
-                    display: "flex", alignItems: "flex-start", gap: 1.5,
-                    px: 2, py: 1.25,
-                    borderBottom: idx < ACTIVITY.length - 1 ? "1px solid" : "none",
-                    borderColor: "divider",
-                    "&:hover": { bgcolor: "action.hover", cursor: "pointer" },
-                  }}
-                >
-                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: activityColor(a.type), mt: 0.6, flexShrink: 0 }} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontSize: "0.8rem", lineHeight: 1.3 }}>{a.msg}</Typography>
-                    <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.7rem" }}>{a.time}</Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, mt: 3, color: "text.secondary", fontSize: "0.78rem", letterSpacing: "0.06em" }}>
-              WORKFLOW PHASES
-            </Typography>
-            <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
-              {[
-                { label: "1 · Setup",     color: "#42A5F5", path: "/connections" },
-                { label: "2 · Design",    color: "#AB47BC", path: "/threat-models" },
-                { label: "3 · Discover",  color: "#26A69A", path: "/scans" },
-                { label: "4 · Analyse",   color: "#FFA726", path: "/risk-overview" },
-                { label: "5 · Respond",   color: "#EF5350", path: "/control-deficiencies" },
-                { label: "6 · Report",    color: "#66BB6A", path: "/vapt/reports" },
-                { label: "7 · Automate",  color: "#5C6BC0", path: "/agents" },
-                { label: "8 · Configure", color: "#78909C", path: "/settings" },
-              ].map((p, idx, arr) => (
-                <Box
-                  key={p.label}
-                  onClick={() => navigate(p.path)}
-                  sx={{
-                    display: "flex", alignItems: "center", gap: 1.5,
-                    px: 2, py: 1,
-                    borderBottom: idx < arr.length - 1 ? "1px solid" : "none",
-                    borderColor: "divider",
-                    cursor: "pointer",
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: p.color, flexShrink: 0 }} />
-                  <Typography variant="body2" sx={{ flex: 1, fontSize: "0.8rem" }}>{p.label}</Typography>
-                  <ChevronRight sx={{ fontSize: 14, color: "text.disabled" }} />
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        </Box>
+        <Pipeline navigate={navigate} />
       </Box>
 
       <CommandPalette open={paletteOpen} onClose={closePalette} initialQuery={searchQuery} />
+    </Box>
+  );
+}
+
+// ── Pipeline stage data ───────────────────────────────────────────────────────
+
+interface StageChip  { label: string; route: string }
+interface StageModule { tag: string; name: string; desc: string; route: string; chips: StageChip[] }
+interface Stage { num: string; id: string; color: string; title: string; sub: string; modules: StageModule[] }
+
+const STAGES: Stage[] = [
+  {
+    num: "01", id: "setup", color: "#3b82f6",
+    title: "Stand up the environment",
+    sub: "Nothing downstream works without this. Get the tenant ready — clients, connectors, and AI providers.",
+    modules: [
+      { tag: "ST", name: "Setup", route: "/platform",
+        desc: "Clients, assets, connectors, AI providers, and platform settings.",
+        chips: [
+          { label: "Clients",      route: "/clients" },
+          { label: "Assets",       route: "/assets" },
+          { label: "Connectors",   route: "/connections" },
+          { label: "AI providers", route: "/connections" },
+          { label: "Settings",     route: "/settings" },
+        ] },
+    ],
+  },
+  {
+    num: "02", id: "design", color: "#a855f7",
+    title: "Define the blueprint",
+    sub: "Model how data actually moves, then pick which standards it has to satisfy.",
+    modules: [
+      { tag: "TM", name: "Threat Models", route: "/threat-intel/threat-models",
+        desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",
+        chips: [
+          { label: "Data flow diagrams",    route: "/threat-intel/threat-models" },
+          { label: "STRIDE analysis",       route: "/threat-intel/threat-models" },
+          { label: "Sigma detection rules", route: "/threat-intel/threat-models" },
+        ] },
+      { tag: "FW", name: "Frameworks", route: "/compliance/frameworks",
+        desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",
+        chips: [
+          { label: "NIST CSF",      route: "/compliance/frameworks" },
+          { label: "CIS Controls",  route: "/compliance/frameworks" },
+          { label: "ISO 27001",     route: "/compliance/frameworks" },
+          { label: "PCI DSS",       route: "/compliance/frameworks" },
+          { label: "GDPR",          route: "/compliance/frameworks" },
+          { label: "Custom policy", route: "/compliance/custom-frameworks" },
+        ] },
+    ],
+  },
+  {
+    num: "03", id: "discover", color: "#14b8a6",
+    title: "Find what's actually exposed",
+    sub: "Scan the environment the blueprint just described — manually or through a guided AI conversation.",
+    modules: [
+      { tag: "VM", name: "Vulnerability Management", route: "/vulnerability",
+        desc: "Scans, findings, posture trends, CVE enrichment, and scan import.",
+        chips: [
+          { label: "Scans",           route: "/vulnerability/scans" },
+          { label: "Findings",        route: "/vulnerability/findings" },
+          { label: "CVE enrichment",  route: "/vulnerability/findings" },
+          { label: "Posture trends",  route: "/vulnerability/posture" },
+          { label: "Scan import",     route: "/vulnerability/scans" },
+        ] },
+      { tag: "AI", name: "AI Assisted Scan", route: "/intelligence/ai-assisted-scan",
+        desc: "Conversational guided assessment — describe your environment, launch a scan.",
+        chips: [
+          { label: "Guided wizard",    route: "/intelligence/ai-assisted-scan" },
+          { label: "Environment chat", route: "/intelligence/ai-assisted-scan" },
+          { label: "Auto-launch",      route: "/intelligence/ai-assisted-scan" },
+        ] },
+    ],
+  },
+  {
+    num: "04", id: "analyse", color: "#f59e0b",
+    title: "Turn findings into risk",
+    sub: "Raw findings get scored, attack paths mapped, and the whole posture becomes queryable in plain language.",
+    modules: [
+      { tag: "RM", name: "Risk Manager", route: "/risk",
+        desc: "FAIR-scored risk register, ALE exposure, and attack path graph.",
+        chips: [
+          { label: "Risk register",    route: "/risk/register" },
+          { label: "FAIR / ALE",       route: "/risk/overview" },
+          { label: "Attack paths",     route: "/threat-intel/attack-paths" },
+          { label: "CVE blast radius", route: "/cve-pivot" },
+        ] },
+      { tag: "IG", name: "Smart Intelligence", route: "/intelligence",
+        desc: "Natural language queries, compliance heatmap, and asset inventory.",
+        chips: [
+          { label: "Ask your data",      route: "/intelligence/nl-query" },
+          { label: "Compliance heatmap", route: "/intelligence/reports" },
+          { label: "Asset inventory",    route: "/assets" },
+          { label: "Data model",         route: "/data-model" },
+        ] },
+    ],
+  },
+  {
+    num: "05", id: "respond", color: "#ef4444",
+    title: "Act on the picture",
+    sub: "Map risk to real adversary behaviour, then push it into a tracked remediation program.",
+    modules: [
+      { tag: "TI", name: "Threat Intelligence", route: "/threat-intel",
+        desc: "MITRE ATT&CK threat register and attack path visualisation.",
+        chips: [
+          { label: "Threat register", route: "/threat-intel/register" },
+          { label: "MITRE ATT&CK",    route: "/threat-intel/register" },
+          { label: "Attack paths",    route: "/threat-intel/attack-paths" },
+        ] },
+      { tag: "GR", name: "Governance", route: "/governance",
+        desc: "CTEM programs, control gaps, remediation tracker, and scorecard.",
+        chips: [
+          { label: "CTEM programs",   route: "/governance/ctem" },
+          { label: "Control gaps",    route: "/compliance/deficiencies" },
+          { label: "Remediation",     route: "/governance/remediation" },
+        ] },
+    ],
+  },
+  {
+    num: "06", id: "report", color: "#22c55e",
+    title: "Prove it happened",
+    sub: "Close the loop with evidence the client — or the auditor — can actually keep.",
+    modules: [
+      { tag: "PT", name: "Pen Testing / VAPT", route: "/vapt",
+        desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",
+        chips: [
+          { label: "VAPT reports",     route: "/vapt/reports" },
+          { label: "Retest lifecycle", route: "/vapt/reports" },
+          { label: "PDF / DOCX",       route: "/vapt/reports" },
+        ] },
+      { tag: "CM", name: "Compliance Monitor", route: "/compliance",
+        desc: "Framework assessments, evidence packages, and audit-ready output.",
+        chips: [
+          { label: "Framework assessments", route: "/compliance/frameworks" },
+          { label: "Evidence packages",     route: "/compliance/evidence" },
+          { label: "Control deficiencies",  route: "/compliance/deficiencies" },
+        ] },
+    ],
+  },
+  {
+    num: "07", id: "automate", color: "#6366f1",
+    title: "Let AI carry the load",
+    sub: "Once the first run is done, agents run the loop — analysis, intel, remediation, knowledge — on repeat.",
+    modules: [
+      { tag: "AB", name: "AI Buddies", route: "/agents",
+        desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.",
+        chips: [
+          { label: "Orchestrator", route: "/agents" },
+          { label: "Risk Manager", route: "/agents" },
+          { label: "Threat Intel", route: "/agents" },
+          { label: "Remediation",  route: "/agents" },
+        ] },
+      { tag: "KB", name: "Knowledge & Docs", route: "/knowledge",
+        desc: "Knowledge base, security doc RAG, and ask-your-data queries.",
+        chips: [
+          { label: "Knowledge base", route: "/knowledge" },
+          { label: "Security docs",  route: "/security-docs" },
+          { label: "Ask your data",  route: "/intelligence/nl-query" },
+        ] },
+    ],
+  },
+];
+
+// ── Pipeline component ────────────────────────────────────────────────────────
+
+function FeatureChip({ label, route, color, nav }: { label: string; route: string; color: string; nav: (p: string) => void }) {
+  const [active, setActive] = useState(false);
+  return (
+    <Box
+      component="button"
+      onClick={() => { setActive((v) => !v); nav(route); }}
+      sx={{
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem",
+        color: active ? "#fff" : "text.secondary",
+        bgcolor: active ? alpha(color, 0.18) : "background.default",
+        border: "1px solid", borderColor: active ? color : "divider",
+        px: 1.25, py: 0.65, borderRadius: "6px",
+        cursor: "pointer", transition: "all 0.14s",
+        "&:hover": { borderColor: color, color: "text.primary" },
+      }}
+    >
+      {active ? `✓ ${label}` : label}
+    </Box>
+  );
+}
+
+function ModuleCard({ mod, color, nav }: { mod: StageModule; color: string; nav: (p: string) => void }) {
+  return (
+    <Box sx={{
+      bgcolor: "background.paper",
+      border: "1px solid", borderColor: "divider",
+      borderRadius: "10px", p: "16px 18px",
+      transition: "border-color 0.15s, transform 0.15s",
+      "&:hover": { borderColor: color, transform: "translateY(-1px)" },
+    }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1, cursor: "pointer" }} onClick={() => nav(mod.route)}>
+        <Box sx={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.66rem", fontWeight: 700,
+          color, bgcolor: alpha(color, 0.14),
+          px: 0.9, py: 0.4, borderRadius: "4px", letterSpacing: "0.05em", flexShrink: 0,
+        }}>
+          {mod.tag}
+        </Box>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.94rem", "&:hover": { color } }}>
+          {mod.name}
+        </Typography>
+      </Box>
+      <Typography sx={{ color: "text.secondary", fontSize: "0.81rem", lineHeight: 1.55, mb: 1.25 }}>
+        {mod.desc}
+      </Typography>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        {mod.chips.map((c) => (
+          <FeatureChip key={c.label} label={c.label} route={c.route} color={color} nav={nav} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function Pipeline({ navigate: nav }: { navigate: (p: string) => void }) {
+  const RAIL = "linear-gradient(180deg,#3b82f6,#a855f7 25%,#14b8a6 42%,#f59e0b 58%,#ef4444 75%,#22c55e 88%,#6366f1)";
+
+  // Load fonts
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap";
+    document.head.appendChild(link);
+    return () => { document.head.removeChild(link); };
+  }, []);
+
+  return (
+    <Box sx={{ maxWidth: 900, px: { xs: 2.5, md: 5 }, py: { xs: 4, md: 7 }, pb: 14 }}>
+
+      {/* Hero */}
+      <Box sx={{ pb: 6, borderBottom: "1px solid", borderColor: "divider", mb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2.5 }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: RAIL, boxShadow: "0 0 10px 1px #3b82f688" }} />
+          <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "text.disabled" }}>
+            Owlet · Security Operations Platform
+          </Typography>
+        </Box>
+        <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: { xs: 28, md: 40 }, letterSpacing: "-0.02em", lineHeight: 1.08, mb: 2 }}>
+          One{" "}
+          <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+            signal path
+          </Box>
+          ,{" "}from setup to evidence.
+        </Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 580 }}>
+          Seven stages run in order — each one hands its output to the next. Click any chip to jump straight there.
+        </Typography>
+      </Box>
+
+      {/* Pipeline */}
+      <Box sx={{ position: "relative", mt: 7 }}>
+        {/* Rail */}
+        <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.5 }} />
+
+        {STAGES.map((stage, si) => (
+          <Box
+            key={stage.id}
+            id={`stage-${stage.id}`}
+            sx={{
+              position: "relative", pl: "64px",
+              mb: si < STAGES.length - 1 ? 8 : 0,
+              opacity: 0, transform: "translateY(14px)",
+              animation: `s3rise 0.55s ease ${si * 0.07}s forwards`,
+              "@keyframes s3rise": { to: { opacity: 1, transform: "translateY(0)" } },
+            }}
+          >
+            {/* Node */}
+            <Box sx={{
+              position: "absolute", left: 0, top: 0,
+              width: 48, height: 48, borderRadius: "50%",
+              bgcolor: "background.default",
+              border: `2px solid ${stage.color}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: "1.05rem",
+              color: stage.color,
+              boxShadow: `0 0 0 5px background.default, 0 0 22px -4px ${stage.color}`,
+              zIndex: 2,
+            }}>
+              {stage.num}
+            </Box>
+
+            {/* Stage header */}
+            <Box sx={{ pt: "5px", mb: 2.5 }}>
+              <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.75rem", color: stage.color, letterSpacing: "0.1em", textTransform: "uppercase", mb: 0.75 }}>
+                Stage {stage.num} · {STAGES[si].id.charAt(0).toUpperCase() + STAGES[si].id.slice(1)}
+              </Typography>
+              <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 20, md: 24 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.75 }}>
+                {stage.title}
+              </Typography>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.9rem", maxWidth: 560 }}>
+                {stage.sub}
+              </Typography>
+            </Box>
+
+            {/* Module cards */}
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: stage.modules.length === 1 ? "1fr" : { xs: "1fr", sm: "1fr 1fr" },
+              gap: 1.5,
+            }}>
+              {stage.modules.map((mod) => (
+                <ModuleCard key={mod.tag} mod={mod} color={stage.color} nav={nav} />
+              ))}
+            </Box>
+          </Box>
+        ))}
+      </Box>
+
+      {/* Footer */}
+      <Box sx={{ mt: 10, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
+        <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "text.disabled", letterSpacing: "0.02em" }}>
+          SETUP → DESIGN → DISCOVER → ANALYSE → RESPOND → REPORT → AUTOMATE
+        </Typography>
+        <Box sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "text.secondary", border: "1px solid", borderColor: "divider", px: 1.5, py: 0.75, borderRadius: "20px" }}>
+          Owlet · NexGenAI
+        </Box>
+      </Box>
     </Box>
   );
 }
