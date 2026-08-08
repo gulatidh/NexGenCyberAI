@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Button, Chip, CircularProgress,
+  Box, Typography, Chip, CircularProgress,
   Divider, Tooltip, alpha, useTheme,
 } from "@mui/material";
 import { InfoOutlined } from "@mui/icons-material";
@@ -10,38 +10,21 @@ import AssistantWidget from "../components/AssistantWidget";
 import MegaMenuBar from "../components/layout/MegaMenuBar";
 import AppControls from "../components/layout/AppControls";
 import OwletLogo from "../components/OwletLogo";
-import { dataModelApi, clientsApi, dashboardApi } from "../services/api";
+import { dataModelApi } from "../services/api";
 import { useActiveClient } from "../contexts/ClientContext";
-import { Client } from "../types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface DashSummary {
-  total_clients?: number;
-  active_connectors?: number;
-  open_findings?: number;
-  scans_last_30d?: number;
-  findings_by_severity?: Record<string, number>;
-  risks_open?: number;
-  recent_scans?: { name?: string; scan_type?: string }[];
-}
-
-interface LiveCardDef {
-  letter: string;
+interface CardDef {
   name: string;
   desc: string;
   route: string;
-  manageRoute?: string;
-  primaryLabel: string;
-  secondaryLabel?: string;
-  countFn?: (accounts: Client[], dash: DashSummary | null) => string | null;
-  rowsFn?: (accounts: Client[], dash: DashSummary | null) => { label: string; value: string }[];
 }
 
 interface StageDef {
   num: string; id: string; label: string; color: string;
   title: string; sub: string; info: string;
-  cards: LiveCardDef[];
+  cards: CardDef[];
 }
 
 // ── Stage + card definitions ──────────────────────────────────────────────────
@@ -50,272 +33,134 @@ const STAGE_DEFS: StageDef[] = [
   {
     num: "01", id: "setup", label: "Setup", color: "#2563eb",
     title: "Stand up the environment",
-    sub: "Configure your accounts, connectors, and AI providers before any scanning begins.",
-    info: "Complete this stage first — every downstream scan and analysis depends on at least one connected account and a configured AI provider.",
+    sub: "Configure accounts, connectors, and AI providers before any scanning begins.",
+    info: "Complete this stage first — every downstream scan depends on at least one connected account and a configured AI provider.",
     cards: [
-      {
-        letter: "A", name: "Accounts", primaryLabel: "Add Account", secondaryLabel: "Manage", manageRoute: "/platform/clients",
-        desc: "Client profiles, contact details, and security posture scoping.",
-        route: "/platform/clients",
-        countFn: (accounts) => `${accounts.length} active`,
-        rowsFn: (accounts) => accounts.slice(0, 3).map(a => ({
-          label: a.name,
-          value: [a.industry, a.country].filter(Boolean).join(", ") || "—",
-        })),
-      },
-      {
-        letter: "C", name: "Connections", primaryLabel: "Add Connector", secondaryLabel: "Manage", manageRoute: "/connections",
-        desc: "Scanner integrations, enterprise tools, and AI provider credentials.",
-        route: "/connections",
-        countFn: (_, dash) => dash?.active_connectors != null ? `${dash.active_connectors} connected` : null,
-        rowsFn: (_, dash) => [
-          { label: "Scans this month", value: String(dash?.scans_last_30d ?? "—") },
-          { label: "Open findings", value: String(dash?.open_findings ?? "—") },
-        ],
-      },
-      {
-        letter: "T", name: "Threat Models", primaryLabel: "Open Designer",
-        desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",
-        route: "/threat-intel/threat-models",
-      },
-      {
-        letter: "F", name: "Frameworks", primaryLabel: "View Standards",
-        desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR, and custom standards.",
-        route: "/compliance/frameworks",
-      },
+      { name: "Accounts",         desc: "Client profiles, contact details, and security posture scoping.",          route: "/platform/clients" },
+      { name: "Asset Inventory",  desc: "Discovered assets — servers, apps, containers, and cloud resources.",       route: "/platform/assets" },
+      { name: "Connections",      desc: "Scanner integrations, enterprise tools, and SIEM connectors.",              route: "/connections" },
+      { name: "AI Settings",      desc: "AI provider credentials, model selection, and automatic failover config.",  route: "/ai-settings" },
+      { name: "Threat Models",    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",       route: "/threat-intel/threat-models" },
+      { name: "Frameworks",       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",           route: "/compliance/frameworks" },
+      { name: "Custom Standards", desc: "Build your own control framework from existing platform controls.",          route: "/compliance/custom-frameworks" },
+      { name: "Data Model",       desc: "Platform ontology — eleven entities, one interactive graph.",               route: "/data-model" },
     ],
   },
   {
     num: "02", id: "discover", label: "Discover", color: "#0f766e",
     title: "Find what's actually exposed",
-    sub: "Scan the environment — via inbuilt scanners, enterprise integrations, or an AI-guided conversation.",
-    info: "CVE enrichment and severity scoring run automatically after each scan. Import results from external scanners via the Import tab.",
+    sub: "Scan the environment via inbuilt scanners, enterprise integrations, or an AI-guided conversation.",
+    info: "CVE enrichment and severity scoring run automatically after each scan. Import results from external scanners via the Import tab in Assessments.",
     cards: [
-      {
-        letter: "V", name: "Vulnerability Management", primaryLabel: "Start Scan", secondaryLabel: "Findings", manageRoute: "/vulnerability/findings",
-        desc: "All scanners, findings, posture trends, and CVE blast radius in one place.",
-        route: "/vulnerability",
-        countFn: (_, dash) => dash?.open_findings != null ? `${dash.open_findings} open` : null,
-        rowsFn: (_, dash) => {
-          const sev = dash?.findings_by_severity ?? {};
-          return [
-            { label: "Critical", value: String(sev.critical ?? 0) },
-            { label: "High", value: String(sev.high ?? 0) },
-            { label: "Medium", value: String(sev.medium ?? 0) },
-          ];
-        },
-      },
-      {
-        letter: "CV", name: "CVE Blast Radius", primaryLabel: "Explore CVEs",
-        desc: "Which assets does a specific CVE actually affect? Map the full exposure path.",
-        route: "/cve-pivot",
-      },
-      {
-        letter: "AS", name: "AI-Assisted Scan", primaryLabel: "Start Wizard",
-        desc: "Conversational guided assessment — describe your environment, and AI configures the scan.",
-        route: "/intelligence/ai-assisted-scan",
-      },
+      { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",             route: "/vulnerability/scans" },
+      { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",          route: "/vulnerability/findings" },
+      { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/intelligence/ai-assisted-scan" },
+      { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                  route: "/cve-pivot" },
+      { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                  route: "/platform/assets/technologies" },
+      { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",               route: "/vulnerability/posture" },
     ],
   },
   {
     num: "03", id: "analyse", label: "Analyse", color: "#b45309",
-    title: "Turn findings into risk",
+    title: "Turn findings into insight",
     sub: "Score findings, apply FAIR-lite ALE modelling, and query your entire posture in plain language.",
     info: "Risk domains are automatically normalised. Attack paths are derived from finding combinations — no manual correlation needed.",
     cards: [
-      {
-        letter: "R", name: "Risk Manager", primaryLabel: "Open Register", secondaryLabel: "Attack Paths", manageRoute: "/threat-intel/attack-paths",
-        desc: "FAIR-scored risk register, financial ALE exposure, and attack path visualisation.",
-        route: "/risk",
-        countFn: (_, dash) => dash?.risks_open != null ? `${dash.risks_open} open` : null,
-        rowsFn: (_, dash) => {
-          const sev = dash?.findings_by_severity ?? {};
-          const total = (sev.critical ?? 0) + (sev.high ?? 0);
-          return [
-            { label: "Critical + High findings", value: String(total) },
-            { label: "Scans this month", value: String(dash?.scans_last_30d ?? "—") },
-          ];
-        },
-      },
-      {
-        letter: "I", name: "Smart Intelligence", primaryLabel: "Open",
-        desc: "NL queries, compliance heatmap, account comparison, and executive reports.",
-        route: "/intelligence",
-      },
+      { name: "Risk Register",      desc: "FAIR-scored risk register with domain heatmap and financial ALE.",         route: "/risk/register" },
+      { name: "Risk Overview",      desc: "Executive summary of ALE exposure, risk domains, and top risks.",          route: "/risk/overview" },
+      { name: "AI Risk Analysis",   desc: "AI-generated risk narrative with actionable recommendations.",             route: "/risk/ai-analysis" },
+      { name: "Attack Paths",       desc: "MITRE-phased attack chain graph derived from live findings.",              route: "/threat-intel/attack-paths" },
+      { name: "Compliance Heatmap", desc: "Control coverage heatmap across all active frameworks.",                   route: "/compliance-heatmap" },
+      { name: "Ask Your Data",      desc: "Natural language SQL queries over findings, risks, and assets.",           route: "/intelligence/nl-query" },
+      { name: "Account Comparison", desc: "Compare security posture side-by-side across multiple accounts.",          route: "/client-comparison" },
+      { name: "Reports",            desc: "AI-generated security posture and trend reports.",                         route: "/intelligence/reports" },
     ],
   },
   {
     num: "04", id: "respond", label: "Respond", color: "#b91c1c",
     title: "Act on the picture",
     sub: "Map risk to real adversary behaviour, then track remediation through structured CTEM programs.",
-    info: "Threat entries are automatically mapped to MITRE ATT&CK techniques by the Threat Intel agent. CTEM programs progress through 5 phases: Scope → Discover → Prioritise → Validate → Mobilise.",
+    info: "Threat entries are mapped to MITRE ATT&CK automatically. CTEM programs progress through 5 phases: Scope → Discover → Prioritise → Validate → Mobilise.",
     cards: [
-      {
-        letter: "TI", name: "Threat Intelligence", primaryLabel: "Open Register", secondaryLabel: "Attack Paths", manageRoute: "/threat-intel/attack-paths",
-        desc: "MITRE ATT&CK–mapped threat entries, IOCs, and attack path graph from your findings.",
-        route: "/threat-intel",
-      },
-      {
-        letter: "G", name: "Governance", primaryLabel: "Open Programs",
-        desc: "CTEM programs, control deficiency gaps, remediation tracker, and public scorecard.",
-        route: "/governance",
-      },
+      { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",                route: "/threat-intel/register" },
+      { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",            route: "/compliance/deficiencies" },
+      { name: "Remediation Tracker",  desc: "Priority-banded remediation actions tracked to completion.",                   route: "/governance/remediation" },
+      { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",            route: "/governance/remediation-jobs" },
+      { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                      route: "/governance/ctem" },
+      { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, or Linear.",              route: "/connections" },
+      { name: "Webhooks",             desc: "Event-driven alerts to Slack, Teams, or any HTTP endpoint.",                  route: "/webhooks" },
+      { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",                     route: "/intelligence/security-docs" },
     ],
   },
   {
     num: "05", id: "report", label: "Report", color: "#15803d",
     title: "Prove it happened",
     sub: "Close the loop with evidence the auditor — or the client — can actually use.",
-    info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs containing findings CSV, control deficiencies, remediation actions, and agent logs.",
+    info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs of findings, control deficiencies, remediation actions, and agent logs.",
     cards: [
-      {
-        letter: "P", name: "Pen Testing / VAPT", primaryLabel: "Open Reports",
-        desc: "Engagement reports with retest versioning and PDF/DOCX export.",
-        route: "/vapt",
-      },
-      {
-        letter: "CM", name: "Compliance Monitor", primaryLabel: "View Framework Status", secondaryLabel: "Evidence",
-        desc: "Framework compliance assessments, control deficiency gaps, and audit evidence packages.",
-        route: "/compliance",
-        manageRoute: "/compliance/evidence",
-      },
+      { name: "VAPT Reports",        desc: "Engagement reports with retest versioning and PDF/DOCX export.",         route: "/vapt/reports" },
+      { name: "Pentest Scans",       desc: "Pentest scan sessions with structured findings and evidence.",           route: "/vapt/scans" },
+      { name: "Evidence Package",    desc: "Audit-ready ZIP of findings, deficiencies, and agent logs.",             route: "/vapt/evidence" },
+      { name: "Compliance Monitor",  desc: "Framework compliance status scored against all active controls.",        route: "/compliance/frameworks" },
+      { name: "Control Gaps",        desc: "Deficiency register with framework and severity breakdown.",             route: "/compliance/deficiencies" },
+      { name: "Compliance Evidence", desc: "Compliance audit evidence package for framework assessments.",           route: "/compliance/evidence" },
     ],
   },
   {
     num: "06", id: "automate", label: "Automate", color: "#4338ca",
     title: "Let AI carry the load",
     sub: "Agents run the full analysis loop — risk, intel, remediation, compliance — on demand or on repeat.",
-    info: "AI Buddies output structured data directly into the Risk, Threat, Compliance, and Remediation registers. The Orchestrator runs all four in sequence from a single trigger.",
+    info: "AI Buddies output structured data directly into the Risk, Threat, Compliance, and Remediation registers. The Orchestrator runs all four in sequence from one trigger.",
     cards: [
-      {
-        letter: "AB", name: "AI Buddies", primaryLabel: "Open Agents",
-        desc: "60+ AI agents — orchestrator, risk manager, threat intel, and remediation planner.",
-        route: "/ai-advisor",
-      },
-      {
-        letter: "K", name: "Knowledge & Docs", primaryLabel: "Open",
-        desc: "Security document RAG, ask-your-data queries, and the Aegis knowledge base.",
-        route: "/intelligence/knowledge",
-      },
+      { name: "AI Buddies",     desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/ai-advisor" },
+      { name: "AI Workflows",   desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/ai-advisor/workflows" },
+      { name: "Knowledge Base", desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/intelligence/knowledge" },
+      { name: "API Keys",       desc: "M2M API keys for CI/CD pipelines and programmatic integrations.",            route: "/api-keys" },
+      { name: "Help & Docs",    desc: "Documentation, setup guides, and platform support resources.",               route: "/platform/help" },
     ],
   },
 ];
 
 // ── HubCard ───────────────────────────────────────────────────────────────────
 
-function HubCard({
-  card, color, accounts, dash, loading,
-}: {
-  card: LiveCardDef;
-  color: string;
-  accounts: Client[];
-  dash: DashSummary | null;
-  loading: boolean;
-}) {
+function HubCard({ card, color }: { card: CardDef; color: string }) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const count = card.countFn ? card.countFn(accounts, dash) : null;
-  const rows = card.rowsFn ? card.rowsFn(accounts, dash) : [];
 
   return (
-    <Box sx={{
-      bgcolor: "background.paper",
-      border: "1px solid", borderColor: "divider",
-      borderRadius: 2, p: 2.5,
-      display: "flex", flexDirection: "column", gap: 2,
-      transition: "border-color .18s, box-shadow .18s",
-      "&:hover": {
-        borderColor: color,
-        boxShadow: `0 4px 20px ${alpha(color, 0.12)}`,
-      },
-    }}>
-      {/* Top row: avatar + count badge */}
-      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <Box sx={{
-          width: 44, height: 44, borderRadius: 1.5, flexShrink: 0,
-          bgcolor: alpha(color, isDark ? 0.18 : 0.1),
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Typography sx={{
-            fontWeight: 800, fontSize: card.letter.length > 1 ? 13 : 20,
-            color, lineHeight: 1, fontFamily: "monospace", letterSpacing: -0.5,
-          }}>
-            {card.letter}
-          </Typography>
-        </Box>
-        {count !== null && (
-          <Box sx={{
-            px: 1.25, py: 0.4, borderRadius: "20px",
-            bgcolor: alpha(color, isDark ? 0.18 : 0.1),
-            color, fontSize: 11, fontWeight: 700, lineHeight: 1.6,
-          }}>
-            {loading ? <CircularProgress size={10} /> : count}
-          </Box>
-        )}
+    <Box
+      onClick={() => navigate(card.route)}
+      sx={{
+        bgcolor: "background.paper",
+        border: "1px solid", borderColor: "divider",
+        borderRadius: 2, p: 1.75, cursor: "pointer",
+        display: "flex", flexDirection: "column", gap: 0.75,
+        minHeight: 94,
+        transition: "border-color .15s, box-shadow .15s",
+        "&:hover": {
+          borderColor: color,
+          boxShadow: `0 2px 10px ${alpha(color, isDark ? 0.18 : 0.1)}`,
+        },
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+        <Typography sx={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{card.name}</Typography>
       </Box>
-
-      {/* Name + desc */}
-      <Box>
-        <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 0.5, lineHeight: 1.3 }}>{card.name}</Typography>
-        <Typography sx={{ fontSize: 12.5, color: "text.secondary", lineHeight: 1.5 }}>{card.desc}</Typography>
-      </Box>
-
-      {/* Data rows */}
-      {rows.length > 0 && (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, borderTop: "1px solid", borderColor: "divider", pt: 1.5 }}>
-          {rows.map((row, i) => (
-            <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>{row.label}</Typography>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{loading ? "…" : row.value}</Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {/* Spacer */}
-      <Box sx={{ flex: 1 }} />
-
-      {/* Actions */}
-      <Box sx={{ display: "flex", gap: 1 }}>
-        <Button
-          size="small" variant="contained"
-          onClick={() => navigate(card.route)}
-          sx={{
-            flex: 1, bgcolor: "#111827", "&:hover": { bgcolor: "#1f2937" },
-            borderRadius: 1.5, fontWeight: 600, fontSize: 12.5,
-            textTransform: "none", py: 0.9,
-          }}
-        >
-          {card.primaryLabel}
-        </Button>
-        {card.manageRoute && (
-          <Button
-            size="small" variant="outlined"
-            onClick={() => navigate(card.manageRoute!)}
-            sx={{
-              flex: 1, borderRadius: 1.5, fontWeight: 600, fontSize: 12.5,
-              textTransform: "none", py: 0.9,
-              borderColor: "divider", color: "text.primary",
-              "&:hover": { bgcolor: "action.hover", borderColor: color },
-            }}
-          >
-            {card.secondaryLabel ?? "Manage"}
-          </Button>
-        )}
-      </Box>
+      <Typography sx={{ fontSize: 11.5, color: "text.secondary", lineHeight: 1.5, flex: 1 }}>
+        {card.desc}
+      </Typography>
+      <Typography sx={{ fontSize: 11, color, fontWeight: 600, textAlign: "right" }}>
+        Manage →
+      </Typography>
     </Box>
   );
 }
 
 // ── StageSection ──────────────────────────────────────────────────────────────
 
-function StageSection({
-  stage, si, accounts, dash, loading,
-}: {
-  stage: StageDef; si: number;
-  accounts: Client[]; dash: DashSummary | null; loading: boolean;
-}) {
+function StageSection({ stage, si }: { stage: StageDef; si: number }) {
   return (
     <Box
       id={`stage-${stage.id}`}
@@ -372,14 +217,14 @@ function StageSection({
         </Box>
       </Box>
 
-      {/* Cards */}
+      {/* Cards — 4 per row on desktop */}
       <Box sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
         gap: 1.5,
       }}>
         {stage.cards.map((card) => (
-          <HubCard key={card.name} card={card} color={stage.color} accounts={accounts} dash={dash} loading={loading} />
+          <HubCard key={card.name} card={card} color={stage.color} />
         ))}
       </Box>
     </Box>
@@ -679,20 +524,6 @@ export default function Hub() {
     return () => { document.head.removeChild(link); };
   }, []);
 
-  const { data: accounts = [], isLoading: acctLoading } = useQuery<Client[]>({
-    queryKey: ["clients"],
-    queryFn: clientsApi.list,
-    staleTime: 60_000,
-  });
-
-  const { data: dash = null, isLoading: dashLoading } = useQuery<DashSummary | null>({
-    queryKey: ["dashboard-summary"],
-    queryFn: () => dashboardApi.summary().catch(() => null),
-    staleTime: 60_000,
-  });
-
-  const loading = acctLoading || dashLoading;
-
   const RAIL = "linear-gradient(180deg,#2563eb,#0f766e 25%,#b45309 50%,#b91c1c 65%,#15803d 80%,#4338ca)";
 
   return (
@@ -735,14 +566,7 @@ export default function Hub() {
             <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.35 }} />
 
             {STAGE_DEFS.map((stage, si) => (
-              <StageSection
-                key={stage.id}
-                stage={stage}
-                si={si}
-                accounts={accounts}
-                dash={dash}
-                loading={loading}
-              />
+              <StageSection key={stage.id} stage={stage} si={si} />
             ))}
           </Box>
 

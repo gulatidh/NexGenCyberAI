@@ -17,7 +17,7 @@ import {
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
   Description, AltRoute, FolderZip, VerifiedUser, AccountTree,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
-  Hub as HubIcon, Devices,
+  Hub as HubIcon, Devices, SyncAlt, VpnKey, Webhook,
 } from "@mui/icons-material";
 
 // ── Phase → route mapping for active highlight ────────────────────────────────
@@ -48,6 +48,9 @@ function getActivePhase(pathname: string): string | null {
   if (pathname.startsWith("/intelligence/knowledge"))       return "automate";
   if (pathname.startsWith("/intelligence/security-docs"))   return "automate";
   if (pathname.startsWith("/intelligence"))                 return "automate";
+  if (pathname.startsWith("/ai-settings"))                  return "setup";
+  if (pathname.startsWith("/webhooks"))                     return "automate";
+  if (pathname.startsWith("/api-keys"))                     return "automate";
   return null;
 }
 
@@ -79,10 +82,10 @@ const MENU: MenuItem[] = [
       {
         heading: "Environment",
         items: [
-          { name: "Platform Setup",    desc: "Accounts, AI providers, and platform settings.",                  route: "/platform",                     Icon: Tune        },
-          { name: "Clients",           desc: "Manage client organisations and their details.",                 route: "/platform/clients",             Icon: People      },
-          { name: "Connections",       desc: "Scanner connectors, enterprise tools, and SIEM integrations.",  route: "/platform/connections",         Icon: Cable       },
-          { name: "Help",              desc: "Documentation, guides, and support resources.",                 route: "/platform/help",                Icon: HubIcon     },
+          { name: "Accounts",       desc: "Client profiles, contact details, and security posture scoping.",  route: "/platform/clients",  Icon: People  },
+          { name: "Connections",    desc: "Scanner connectors, enterprise tools, and SIEM integrations.",     route: "/connections",        Icon: Cable   },
+          { name: "AI Settings",    desc: "AI provider credentials, model selection, and failover config.",   route: "/ai-settings",        Icon: Tune    },
+          { name: "Help",           desc: "Documentation, setup guides, and platform support resources.",     route: "/platform/help",      Icon: HubIcon },
         ],
       },
       {
@@ -157,6 +160,7 @@ const MENU: MenuItem[] = [
         items: [
           { name: "Remediation Tracker",  desc: "Priority-banded remediation actions from the AI agent.",   route: "/governance/remediation",       Icon: PlaylistAddCheck },
           { name: "AI Remediations",      desc: "AI-generated remediation plans with automated workflows.",  route: "/governance/remediation-jobs",  Icon: AutoFixHigh     },
+          { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, Linear.", route: "/connections",                Icon: SyncAlt         },
         ],
       },
     ],
@@ -200,6 +204,8 @@ const MENU: MenuItem[] = [
           { name: "Knowledge Base",  desc: "Platform knowledge base and reference documentation.",           route: "/intelligence/knowledge",       Icon: MenuBook    },
           { name: "Security Docs",   desc: "Upload security policies and ask questions via RAG.",            route: "/intelligence/security-docs",   Icon: Description },
           { name: "Ask Your Data",   desc: "SQL-backed natural language queries over all your data.",        route: "/intelligence/nl-query",        Icon: Search      },
+          { name: "Webhooks",        desc: "Event-driven alerts on critical findings and completed scans.",  route: "/webhooks",                     Icon: Webhook     },
+          { name: "API Keys",        desc: "M2M API keys for CI/CD pipelines and programmatic access.",     route: "/api-keys",                     Icon: VpnKey      },
         ],
       },
     ],
