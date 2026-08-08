@@ -209,6 +209,7 @@ export default function Findings() {
   const { instance, accounts } = useMsal();
   const [projectId, setProjectId] = useState("");
   const [scanId, setScanId] = useState("");
+  const [connectorType, setConnectorType] = useState("");
   const [sevFilter, setSevFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [section, setSection] = useState("security_posture");
@@ -514,10 +515,20 @@ export default function Findings() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
-            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setScanId(""); }} label="Project"
+            <Select value={projectId} onChange={(e) => { setProjectId(e.target.value); setScanId(""); setConnectorType(""); }} label="Project"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All projects</MenuItem>
               {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "text.secondary" }}>Scanner</InputLabel>
+            <Select value={connectorType} onChange={(e) => { setConnectorType(e.target.value); setScanId(""); }} label="Scanner"
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value="">All scanners</MenuItem>
+              {Array.from(new Set(scans.map((s) => (s as any).connector_type).filter(Boolean))).sort().map((ct) => (
+                <MenuItem key={ct as string} value={ct as string}>{ct as string}</MenuItem>
+              ))}
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 180 }} disabled={!clientId}>
@@ -525,7 +536,11 @@ export default function Findings() {
             <Select value={scanId} onChange={(e) => setScanId(e.target.value)} label="Scan"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               <MenuItem value="">All scans</MenuItem>
-              {scans.filter((s) => (s as any).is_live !== false).map((s) => (
+              {scans
+                .filter((s) => (s as any).is_live !== false)
+                .filter((s) => !connectorType || (s as any).connector_type === connectorType)
+                .filter((s) => !projectId || (s as any).project_id === projectId)
+                .map((s) => (
                 <MenuItem key={s.id} value={s.id}>
                   {(s as any).name || (s as any).scan_type || s.id.slice(0, 8)}
                   {(s as any).findings_count ? ` (${(s as any).findings_count})` : ""}

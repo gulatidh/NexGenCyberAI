@@ -29,16 +29,18 @@ export interface CustomPalette {
   paper?: string;
 }
 
+const SG = "'Space Grotesk', 'Inter', sans-serif";
+
 const COMMON: ThemeOptions = {
   typography: {
     fontFamily: '"Inter", "Roboto", "Google Sans", sans-serif',
     button: { textTransform: "none", fontWeight: 600 },
-    h1: { fontWeight: 700, letterSpacing: "-0.02em" },
-    h2: { fontWeight: 700, letterSpacing: "-0.02em" },
-    h3: { fontWeight: 700, letterSpacing: "-0.01em" },
-    h4: { fontWeight: 700, letterSpacing: "-0.01em" },
-    h5: { fontWeight: 600 },
-    h6: { fontWeight: 600 },
+    h1: { fontFamily: SG, fontWeight: 700, letterSpacing: "-0.03em" },
+    h2: { fontFamily: SG, fontWeight: 700, letterSpacing: "-0.02em" },
+    h3: { fontFamily: SG, fontWeight: 700, letterSpacing: "-0.02em" },
+    h4: { fontFamily: SG, fontWeight: 700, letterSpacing: "-0.02em" },
+    h5: { fontFamily: SG, fontWeight: 700, letterSpacing: "-0.01em" },
+    h6: { fontFamily: SG, fontWeight: 600, letterSpacing: "-0.01em" },
   },
   shape: { borderRadius: 12 },
 };

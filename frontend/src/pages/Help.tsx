@@ -275,7 +275,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "Tile header: 'Category · Account' (e.g. DAST · Acme Corp, Network · TechCorp). Category comes from the connector type." },
           { text: "Status chip (top-right of tile): pending → running → completed → failed. 'Failed' means the GitHub Actions workflow errored or findings ingestion failed — check Actions logs." },
-          { text: "Action icons (visible on hover, top-right): trash icon (deletes scan + all its findings + verdict — irreversible), replay icon (re-triggers as a new version), yellow history badge with count (opens version history dialog)." },
+          { text: "Action icons (top-right of each tile): trash icon (delete — irreversible), green move icon (reassign scan to a different project), replay icon (rescan as new version), yellow history badge (opens version history dialog)." },
           { text: "Severity chips (tile footer): Critical / High / Medium / Low / Info counts. These populate as findings are ingested — they update in near-real-time during a running scan." },
           { text: "AI verdict chip: green 'Verdict' chip when the AI verdict has been generated. Click the tile to generate one manually from the Verdict tab if it didn't auto-trigger." },
           { text: "Click anywhere on the tile body (not the icons) to open the full Assessment detail page." },

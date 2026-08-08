@@ -1,5 +1,5 @@
 """Scan management and execution endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -835,6 +835,29 @@ def set_live_version(
     # Promote this version
     scan.is_live = True
     db.add(scan)
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
+@router.patch("/{scan_id}/move", response_model=ScanResponse, dependencies=[Depends(require_editor_anywhere)])
+def move_scan_to_project(
+    client_id: str,
+    scan_id: str,
+    db: Session = Depends(get_db),
+    target_project_id: Optional[str] = Body(default=None, embed=True),
+):
+    """Move a scan (and all its versions in the chain) to a different project within the same client."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    # Move the whole version chain together
+    root_id = scan.parent_scan_id or scan.id
+    db.query(Scan).filter(
+        (Scan.id == root_id) | (Scan.parent_scan_id == root_id),
+        Scan.client_id == client_id,
+    ).update({"project_id": target_project_id or None}, synchronize_session=False)
     db.commit()
     db.refresh(scan)
     return scan

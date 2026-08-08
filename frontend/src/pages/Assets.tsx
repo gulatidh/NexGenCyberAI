@@ -8,8 +8,9 @@ import {
 import { Storage, Refresh, PlayArrow, CheckCircle } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, connectorsApi, assetsApi, projectsApi } from "../services/api";
-import { Client, Connector, Asset, Project } from "../types";
+import { connectorsApi, assetsApi, projectsApi } from "../services/api";
+import { Connector, Asset, Project } from "../types";
+import { useActiveClient } from "../contexts/ClientContext";
 import { fromNow } from "../utils/datetime";
 
 const CLASS_COLOR: Record<string, string> = {
@@ -44,7 +45,7 @@ export default function Assets() {
   const location = useLocation();
   const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
 
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [connectorId, setConnectorId] = useState("");
   const [assetClass, setAssetClass] = useState("");
@@ -56,7 +57,9 @@ export default function Assets() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("active");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  // Reset project/connectors when account changes
+  React.useEffect(() => { setProjectId(""); setSelectedIds([]); }, [clientId]);
+
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["projects", clientId],
     queryFn: () => projectsApi.list(clientId),
@@ -68,9 +71,7 @@ export default function Assets() {
     enabled: !!clientId,
   });
 
-  React.useEffect(() => {
-    setConnectorId("");
-  }, [projectId]);
+  React.useEffect(() => { setConnectorId(""); }, [projectId]);
 
   const { data: facets = {} as any } = useQuery<any>({
     queryKey: ["asset-facets", clientId],
@@ -214,13 +215,6 @@ export default function Assets() {
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setProjectId(""); setSelectedIds([]); }} label="Client"
-              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-              {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
             <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
             <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} label="Project"
@@ -363,7 +357,7 @@ export default function Assets() {
 
       {!clientId ? (
         <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
-          Select a client to view its asset inventory.
+          Select an account from the top toolbar to view its asset inventory.
         </Alert>
       ) : isLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>

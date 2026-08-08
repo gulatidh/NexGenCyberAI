@@ -13,12 +13,12 @@ import {
 } from "@mui/material";
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
-  ExpandMore, CloudUpload, Upload, Storage, Business, Link as LinkIcon,
+  ExpandMore, CloudUpload, Upload, Storage, Business, Link as LinkIcon, DriveFileMove,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient } from "../services/api";
+import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient, projectsApi } from "../services/api";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry } from "../types";
+import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
 import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
 import { CREDENTIAL_FIELDS } from "./Connections";
@@ -563,9 +563,10 @@ interface AssessmentTileCardProps {
   rescanMutation: any;
   setPendingDeleteScan: (tile: any) => void;
   setHistoryOpenForRoot: (root: string | null) => void;
+  setMoveScan: (tile: any) => void;
 }
 
-function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot }: AssessmentTileCardProps) {
+function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot, setMoveScan }: AssessmentTileCardProps) {
   const location = useLocation();
   const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
   const status = tile.status as string;
@@ -602,11 +603,17 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
             <DeleteOutlined sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
+        <Tooltip title="Move to a different project">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setMoveScan(tile); }}
+            sx={{ position: "absolute", top: 6, right: 32, color: "text.secondary", "&:hover": { color: "#34A853", bgcolor: "rgba(52,168,83,0.08)" } }}>
+            <DriveFileMove sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
         <Tooltip title={status === "running" ? "Rescan disabled while a run is in progress" : "Rescan — keeps history of this assessment"}>
           <span>
             <IconButton size="small" disabled={status === "running" || rescanMutation.isPending}
               onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
-              sx={{ position: "absolute", top: 6, right: 32, color: "text.secondary", "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" }, "&.Mui-disabled": { color: "text.secondary" } }}>
+              sx={{ position: "absolute", top: 6, right: 58, color: "text.secondary", "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" }, "&.Mui-disabled": { color: "text.secondary" } }}>
               <Replay sx={{ fontSize: 16 }} />
             </IconButton>
           </span>
@@ -614,7 +621,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
         {isLive && versionCount > 1 && (
           <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
-              sx={{ position: "absolute", top: 6, right: 58, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
+              sx={{ position: "absolute", top: 6, right: 84, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
               <Badge badgeContent={versionCount}
                 sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}>
                 <History sx={{ fontSize: 16 }} />
@@ -625,13 +632,13 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
         {tile.parent_scan_id && (
           <Tooltip title="View diff — compare with previous scan">
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`${scansBase}/${tile.id}/diff`); }}
-              sx={{ position: "absolute", top: 6, right: 84, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
+              sx={{ position: "absolute", top: 6, right: 110, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
               <CompareArrows sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
         )}
         <Chip label={status} size="small" sx={{
-          position: "absolute", top: 12, right: tile.parent_scan_id ? 110 : 84,
+          position: "absolute", top: 12, right: tile.parent_scan_id ? 136 : 110,
           bgcolor: `${statusColor}20`, color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
           textTransform: "uppercase", letterSpacing: 0.5,
         }} />
@@ -802,6 +809,25 @@ export default function Scans() {
   });
 
   const [pendingDeleteScan, setPendingDeleteScan] = useState<any | null>(null);
+  const [moveScan, setMoveScan] = useState<any | null>(null);
+  const [moveTargetProjectId, setMoveTargetProjectId] = useState<string>("");
+  const { data: projectsForMove = [] } = useQuery<Project[]>({
+    queryKey: ["projects-for-move", selectedClientId],
+    queryFn: () => projectsApi.list(selectedClientId),
+    enabled: !!selectedClientId && !!moveScan,
+  });
+  const moveScanMutation = useMutation({
+    mutationFn: ({ scan, projectId }: { scan: any; projectId: string }) =>
+      scansApi.move(scan.client_id, scan.id, projectId || null),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
+      setMoveScan(null);
+      setMoveTargetProjectId("");
+      toast.success("Scan moved to project");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to move scan"),
+  });
+
   const deleteScanMutation = useMutation({
     mutationFn: (tile: any) => scansApi.delete(tile.client_id, tile.id),
     onSuccess: () => {
@@ -1025,7 +1051,7 @@ export default function Scans() {
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
                         <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
-                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>
                     ))}
                   </Grid>
@@ -1115,7 +1141,7 @@ export default function Scans() {
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
                         <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
-                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>
                     ))}
                   </Grid>
@@ -1171,7 +1197,7 @@ export default function Scans() {
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
                         <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
-                          setHistoryOpenForRoot={setHistoryOpenForRoot} />
+                          setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>
                     ))}
                   </Grid>
@@ -2085,6 +2111,48 @@ export default function Scans() {
             sx={{ bgcolor: "#EA4335", "&:hover": { bgcolor: "#c5362b" } }}
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Move scan to project ──────────────────────────────────────────── */}
+      <Dialog open={!!moveScan} onClose={() => { setMoveScan(null); setMoveTargetProjectId(""); }}
+        slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}
+        maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>Move to project</DialogTitle>
+        <DialogContent sx={{ mt: 1.5 }}>
+          {moveScan && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600 }}>{moveScan.tile_name}</Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {moveScan.scan_type}{moveScan.findings_count ? ` · ${moveScan.findings_count} findings` : ""}
+              </Typography>
+            </Box>
+          )}
+          <FormControl fullWidth size="small">
+            <InputLabel sx={{ color: "text.secondary" }}>Target project</InputLabel>
+            <Select
+              value={moveTargetProjectId}
+              onChange={(e) => setMoveTargetProjectId(e.target.value)}
+              label="Target project"
+              sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+            >
+              <MenuItem value="">No project (unassigned)</MenuItem>
+              {projectsForMove.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setMoveScan(null); setMoveTargetProjectId(""); }} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={moveScanMutation.isPending}
+            onClick={() => moveScan && moveScanMutation.mutate({ scan: moveScan, projectId: moveTargetProjectId })}
+            sx={{ bgcolor: "#34A853", "&:hover": { bgcolor: "#2d9249" } }}
+          >
+            Move
           </Button>
         </DialogActions>
       </Dialog>

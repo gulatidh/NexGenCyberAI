@@ -167,6 +167,8 @@ export const scansApi = {
     apiClient.patch(`/clients/${clientId}/scans/${scanId}/set-live`).then((r) => r.data),
   triggerEnrich: (clientId: string, scanId: string) =>
     apiClient.post(`/clients/${clientId}/scans/${scanId}/enrich`).then((r) => r.data),
+  move: (clientId: string, scanId: string, targetProjectId: string | null) =>
+    apiClient.patch(`/clients/${clientId}/scans/${scanId}/move`, { target_project_id: targetProjectId }).then((r) => r.data),
 };
 
 export const findingsApi = {
