@@ -414,7 +414,7 @@ export default function ThreatModels() {
                   sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
                   MenuProps={{ slotProps: { paper: { sx: { maxHeight: 340, bgcolor: "background.paper" } } } }}
                 >
-                  {clientScans.length === 0 && <MenuItem disabled>No scans for this client</MenuItem>}
+                  {clientScans.length === 0 && <MenuItem disabled>No scans for this account</MenuItem>}
                   {clientScans.map((s) => {
                     const label = s.name || (s.scan_type as any) || s.id.slice(0, 8);
                     const total = s.summary?.total ?? 0;

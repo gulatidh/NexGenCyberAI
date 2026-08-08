@@ -242,7 +242,7 @@ export default function Admin() {
                   Global — applies everywhere {!isGlobalAdmin && "(global admin only)"}
                 </MenuItem>
                 <MenuItem value="client" disabled={!isGlobalAdmin && (manageable?.client_ids.length ?? 0) === 0}>
-                  Specific client
+                  Specific account
                 </MenuItem>
                 <MenuItem value="project" disabled={!isGlobalAdmin && (manageable?.project_ids.length ?? 0) === 0}>
                   Specific project

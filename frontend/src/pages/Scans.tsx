@@ -1237,7 +1237,7 @@ export default function Scans() {
                 <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
               ))}
               {clients.length === 0 && (
-                <MenuItem value="" disabled>No clients you can access — ask an admin for a grant</MenuItem>
+                <MenuItem value="" disabled>No accounts you can access — ask an admin for a grant</MenuItem>
               )}
             </Select>
           </FormControl>
@@ -1695,7 +1695,7 @@ export default function Scans() {
                     <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
                   ))}
                   {clients.length === 0 && (
-                    <MenuItem value="" disabled>No clients — ask an admin for a grant</MenuItem>
+                    <MenuItem value="" disabled>No accounts — ask an admin for a grant</MenuItem>
                   )}
                 </Select>
               </FormControl>

@@ -200,7 +200,7 @@ export default function APIKeysPage() {
                 value={form.client_id}
                 onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))}
               >
-                <MenuItem value="">All clients</MenuItem>
+                <MenuItem value="">All accounts</MenuItem>
                 {(clients as Client[]).map((c) => (
                   <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
                 ))}

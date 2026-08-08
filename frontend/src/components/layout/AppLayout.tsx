@@ -50,7 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Foundation",
     items: [
-      { label: "Clients",     icon: <People />,  path: "/clients" },
+      { label: "Accounts",    icon: <People />,  path: "/clients" },
       { label: "Connections", icon: <Cable />,   path: "/connections", children: [
         { label: "All Connections", icon: <Cable />,   path: "/connections" },
         { label: "Ticket Sync",     icon: <SyncAlt />, path: "/ticket-sync" },
@@ -496,12 +496,12 @@ export default function AppLayout() {
                     "& .MuiSelect-select": { py: 0.5, px: 1.5 },
                   }}
                   renderValue={(v) => {
-                    if (!v) return <span style={{ color: "#888", fontSize: 12 }}>Select client…</span>;
+                    if (!v) return <span style={{ color: "#888", fontSize: 12 }}>Select account…</span>;
                     const c = (clients as Client[]).find((x) => x.id === v);
                     return <span style={{ fontSize: 12 }}>{c?.name ?? v}</span>;
                   }}
                 >
-                  <MenuItem value="" sx={{ fontSize: 12, color: "text.secondary" }}>All clients</MenuItem>
+                  <MenuItem value="" sx={{ fontSize: 12, color: "text.secondary" }}>All accounts</MenuItem>
                   {(clients as Client[]).map((c) => (
                     <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12 }}>{c.name}</MenuItem>
                   ))}

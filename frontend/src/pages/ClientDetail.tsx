@@ -164,7 +164,7 @@ export default function ClientDetail() {
     return <Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}><CircularProgress sx={{ color: "#4285F4" }} /></Box>;
   }
   if (!client) {
-    return <Box sx={{ color: "text.secondary", p: 4 }}>Client not found.</Box>;
+    return <Box sx={{ color: "text.secondary", p: 4 }}>Account not found.</Box>;
   }
 
   const totalFindings = scans.reduce((acc, s) => acc + (s.summary?.total || 0), 0);
@@ -497,7 +497,7 @@ export default function ClientDetail() {
           {scans.length === 0 ? (
             <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
               <Scanner sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-              <Typography sx={{ color: "text.secondary" }}>No scans yet for this client.</Typography>
+              <Typography sx={{ color: "text.secondary" }}>No scans yet for this account.</Typography>
             </Card>
           ) : (
             <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>

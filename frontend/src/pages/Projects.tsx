@@ -157,7 +157,7 @@ export default function Projects() {
       </Box>
 
       {!clientId && clients.length === 0 && (
-        <Alert severity="info">No clients yet. Create one in the Clients page first.</Alert>
+        <Alert severity="info">No accounts yet. Create one in the Accounts page first.</Alert>
       )}
 
       <Grid container spacing={2}>

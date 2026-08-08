@@ -765,7 +765,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
             <Select value={form.scope_type} label="Scope"
               onChange={(e) => setForm((f) => ({ ...f, scope_type: e.target.value as AccessScope, client_id: "", project_id: "" }))}>
               <MenuItem value="global">Global — applies everywhere</MenuItem>
-              <MenuItem value="client">Specific client</MenuItem>
+              <MenuItem value="client">Specific account</MenuItem>
               <MenuItem value="project">Specific project</MenuItem>
             </Select>
           </FormControl>
@@ -799,7 +799,7 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-// ── Deleted Clients tab ──────────────────────────────────────────────────────
+// ── Deleted Accounts tab ──────────────────────────────────────────────────────
 function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
   const [confirmPerm, setConfirmPerm] = useState<any | null>(null);
@@ -841,7 +841,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
     onError: () => toast.error("Purge failed"),
   });
 
-  if (!isAdmin) return <Alert severity="warning">Admin access required to manage deleted clients.</Alert>;
+  if (!isAdmin) return <Alert severity="warning">Admin access required to manage deleted accounts.</Alert>;
 
   function retentionColor(daysRemaining: number): string {
     if (daysRemaining <= 3) return "#EA4335";
@@ -861,7 +861,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {deletedClients.length} client{deletedClients.length !== 1 ? "s" : ""} in trash
+          {deletedClients.length} account{deletedClients.length !== 1 ? "s" : ""} in trash
           {expiredCount > 0 && (
             <Chip label={`${expiredCount} expired`} size="small" sx={{ ml: 1, bgcolor: "#EA433522", color: "#EA4335", fontSize: 10 }} />
           )}
@@ -883,7 +883,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
       ) : deletedClients.length === 0 ? (
         <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
           <RestoreFromTrash sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
-          <Typography sx={{ color: "text.secondary" }}>No deleted clients — the trash is empty.</Typography>
+          <Typography sx={{ color: "text.secondary" }}>No deleted accounts — the trash is empty.</Typography>
         </Card>
       ) : (
         <TableContainer component={Card} variant="outlined">
@@ -973,7 +973,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
         </DialogTitle>
         <DialogContent>
           <Alert severity="error" sx={{ mb: 2 }}>
-            This action is <strong>irreversible</strong>. All scans, findings, connectors, and risk data for this client will be permanently erased.
+            This action is <strong>irreversible</strong>. All scans, findings, connectors, and risk data for this account will be permanently erased.
           </Alert>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             You are about to permanently delete <strong style={{ color: "white" }}>{confirmPerm?.name}</strong> and all its associated data.

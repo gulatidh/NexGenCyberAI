@@ -492,7 +492,7 @@ export default function Dashboard() {
                 </Typography>
                 {!clientId ? (
                   <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No account selected</Typography>
                   </Box>
                 ) : loadingFindingsTrend ? (
                   <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />
@@ -543,7 +543,7 @@ export default function Dashboard() {
                 </Typography>
                 {!clientId ? (
                   <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No account selected</Typography>
                   </Box>
                 ) : loadingRiskTrend ? (
                   <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />
@@ -586,7 +586,7 @@ export default function Dashboard() {
                 </Typography>
                 {!clientId ? (
                   <Box sx={{ height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No client selected</Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>No account selected</Typography>
                   </Box>
                 ) : loadingComplianceTrend ? (
                   <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.06)" }} />

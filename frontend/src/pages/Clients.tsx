@@ -147,7 +147,7 @@ export default function Clients() {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setCreateOpen(false);
       setCreateForm({ ...EMPTY_FORM });
-      toast.success("Client created");
+      toast.success("Account created");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error creating client"),
   });
@@ -157,7 +157,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setEditClient(null);
-      toast.success("Client updated");
+      toast.success("Account updated");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error updating client"),
   });
@@ -202,7 +202,7 @@ export default function Clients() {
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-          Add Client
+          Add Account
         </Button>
       </Box>
 
@@ -210,7 +210,7 @@ export default function Clients() {
         <Card sx={{ border: "1px dashed", borderColor: "divider", borderRadius: 2, p: 4, textAlign: "center" }}>
           <Business sx={{ fontSize: 48, color: "text.disabled", mb: 1 }} />
           <Typography sx={{ color: "text.secondary" }}>
-            No clients yet. Add your first client to get started.
+            No accounts yet. Add your first account to get started.
           </Typography>
         </Card>
       ) : (
@@ -229,7 +229,7 @@ export default function Clients() {
         onClose={() => setCreateOpen(false)}
         fullWidth maxWidth="sm"
       >
-        <DialogTitle>Add New Client</DialogTitle>
+        <DialogTitle>Add New Account</DialogTitle>
         <DialogContent>
           <ClientForm form={createForm} onChange={setCreateForm} />
         </DialogContent>
@@ -277,7 +277,7 @@ export default function Clients() {
         <DialogContent>
           <Typography sx={{ color: "text.secondary" }}>
             <strong>{pendingDelete?.name}</strong> will be moved to the trash.
-            It can be restored within 30 days from <strong>Settings → Deleted Clients</strong>.
+            It can be restored within 30 days from <strong>Settings → Deleted Accounts</strong>.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
