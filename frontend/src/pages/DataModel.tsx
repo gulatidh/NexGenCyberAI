@@ -4,12 +4,12 @@
  * Entity type tabs → search / pick a record → radial spider graph
  * showing all connected entities fanning out from the anchor node.
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Tabs, Tab, TextField, InputAdornment,
   List, ListItemButton, ListItemText, Chip, CircularProgress,
-  Paper, Divider, alpha, useTheme, IconButton, Tooltip,
+  Paper, Divider, alpha, useTheme, IconButton,
 } from "@mui/material";
 import {
   Search, Computer, BugReport, Warning, Build,
@@ -265,7 +265,6 @@ export default function DataModel() {
   const [tab, setTab] = useState(0);
   const [search, setSearch] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<{ id: string; label: string } | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [clickedNode, setClickedNode] = useState<GraphNode | null>(null);
 
   const entityType = ENTITY_TYPES[tab].key;
