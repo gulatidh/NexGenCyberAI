@@ -38,7 +38,7 @@ const NAV_ITEMS = [
   { id: "overview",    label: "Overview",    Icon: DashboardIcon, color: "#4285F4" },
   { id: "projects",    label: "Projects",    Icon: FolderOpen,    color: "#757575" },
   { id: "scans",       label: "Scans",       Icon: Scanner,       color: "#34A853" },
-  { id: "connectors",  label: "Connectors",  Icon: Cable,         color: "#FF9800" },
+  { id: "connectors",  label: "Connections", Icon: Cable,         color: "#FF9800" },
   { id: "assets",      label: "Assets",      Icon: StorageIcon,   color: "#9C27B0" },
   { id: "findings",    label: "Findings",    Icon: BugReport,     color: "#EA4335" },
   { id: "help",        label: "Help",        Icon: MenuBook,      color: "#00BCD4" },
@@ -212,7 +212,7 @@ export default function ClientDetail() {
 
   const envData = [
     { name: "Projects",   value: projects.length,   fill: "#4285F4" },
-    { name: "Connectors", value: connectors.length,  fill: "#FF9800" },
+    { name: "Connections", value: connectors.length,  fill: "#FF9800" },
     { name: "Assets",     value: assets.length,      fill: "#9C27B0" },
     { name: "Scans",      value: scans.length,       fill: "#34A853" },
   ];
@@ -268,6 +268,8 @@ export default function ClientDetail() {
                 onClick={() => {
                   if (id === "findings") {
                     navigate(findingsBase);
+                  } else if (id === "connectors") {
+                    navigate("/connections");
                   } else if (id === "help") {
                     navigate("/help");
                   } else {
@@ -466,8 +468,8 @@ export default function ClientDetail() {
                 <Card>
                   <CardContent>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Connectors</Typography>
-                      <Button size="small" onClick={() => setTab("connectors")} sx={{ color: "primary.main", fontSize: 11 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Connections</Typography>
+                      <Button size="small" onClick={() => navigate("/connections")} sx={{ color: "primary.main", fontSize: 11 }}>
                         Manage →
                       </Button>
                     </Box>
