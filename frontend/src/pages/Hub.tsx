@@ -40,6 +40,7 @@ const STAGE_DEFS: StageDef[] = [
       { name: "Asset Inventory",  desc: "Discovered assets — servers, apps, containers, and cloud resources.",       route: "/platform/assets" },
       { name: "Connections",      desc: "Scanner integrations, enterprise tools, and SIEM connectors.",              route: "/connections" },
       { name: "AI Settings",      desc: "AI provider credentials, model selection, and automatic failover config.",  route: "/ai-settings" },
+      { name: "AI Guardrails",    desc: "AI safety controls, prompt audit logs, and guardrail coverage status.",     route: "/ai-guardrails" },
       { name: "Threat Models",    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",       route: "/threat-intel/threat-models" },
       { name: "Frameworks",       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",           route: "/compliance/frameworks" },
       { name: "Custom Standards", desc: "Build your own control framework from existing platform controls.",          route: "/compliance/custom-frameworks" },
