@@ -18,7 +18,7 @@ import { loginRequest } from "../auth/msalConfig";
 import { useActiveClient } from "../contexts/ClientContext";
 import { vaptApi } from "../services/api";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
 const SEV_COLORS: Record<string, string> = {
   critical: "#C62828",

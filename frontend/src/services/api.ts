@@ -8,7 +8,7 @@ import { msalInstance } from "../auth/AuthProvider";
 import { loginRequest as loginReq } from "../auth/msalConfig";
 import { addNotification } from "./notifications";
 
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+const BASE_URL = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
 export const apiClient = axios.create({ baseURL: BASE_URL });
 

@@ -42,10 +42,11 @@
     "@types/d3-dispatch": "3.0.6"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "vite",
+    "build": "vite build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "preview": "vite preview"
   },
   "eslintConfig": {
     "extends": [
@@ -64,5 +65,9 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.1"
   }
 }

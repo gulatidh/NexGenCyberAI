@@ -21,7 +21,7 @@ import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import FixWithAIDialog from "../components/FixWithAIDialog";
 import { fromNow } from "../utils/datetime";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
 // Add suppress/playbook endpoints to findingsApi locally
 async function suppressFinding(clientId: string, findingId: string, reason: string, token: string): Promise<void> {

@@ -7,11 +7,11 @@ import { Configuration, BrowserCacheLocation, LogLevel } from "@azure/msal-brows
 
 export const msalConfig: Configuration = {
   auth: {
-    clientId: process.env.REACT_APP_AZURE_CLIENT_ID || "",
+    clientId: import.meta.env.REACT_APP_AZURE_CLIENT_ID || "",
     // "organizations" restricts login to work/school accounts — personal
     // outlook.com / hotmail.com accounts are blocked at the Microsoft login page.
-    authority: `https://login.microsoftonline.com/${process.env.REACT_APP_AZURE_TENANT_ID || "organizations"}`,
-    redirectUri: process.env.REACT_APP_REDIRECT_URI || window.location.origin,
+    authority: `https://login.microsoftonline.com/${import.meta.env.REACT_APP_AZURE_TENANT_ID || "organizations"}`,
+    redirectUri: import.meta.env.REACT_APP_REDIRECT_URI || window.location.origin,
     postLogoutRedirectUri: window.location.origin,
   },
   cache: {
@@ -21,7 +21,7 @@ export const msalConfig: Configuration = {
     loggerOptions: {
       loggerCallback: (level, message, containsPii) => {
         if (containsPii) return;
-        if (process.env.NODE_ENV === "development") console.log("[MSAL]", message);
+        if (import.meta.env.DEV) console.log("[MSAL]", message);
       },
       logLevel: LogLevel.Warning,
     },
@@ -34,7 +34,7 @@ export const loginRequest = {
     "openid",
     "profile",
     "email",
-    `api://${process.env.REACT_APP_BACKEND_CLIENT_ID}/NexGenCyberAI.Read`,
+    `api://${import.meta.env.REACT_APP_BACKEND_CLIENT_ID}/NexGenCyberAI.Read`,
   ],
 };
 
