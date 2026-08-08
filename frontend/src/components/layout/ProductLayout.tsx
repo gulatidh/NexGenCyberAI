@@ -30,8 +30,12 @@ export default function ProductLayout({ product }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const isActive = (path: string) =>
-    pathname === path || pathname.startsWith(path + "/");
+  // product.nav paths are relative to basePath (e.g. "/scans" → "/vulnerability/scans")
+  const fullPath = (rel: string) => product.basePath + rel;
+  const isActive = (rel: string) => {
+    const fp = fullPath(rel);
+    return pathname === fp || pathname.startsWith(fp + "/");
+  };
 
   return (
     <>
@@ -85,7 +89,7 @@ export default function ProductLayout({ product }: Props) {
                   return (
                     <Box
                       key={item.path}
-                      onClick={() => navigate(item.path)}
+                      onClick={() => navigate(fullPath(item.path))}
                       sx={{
                         display: "flex", alignItems: "center", gap: 1.25,
                         px: 1.5, py: 1, cursor: "pointer",
