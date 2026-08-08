@@ -140,8 +140,8 @@ export default function CVEPivot() {
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setExpanded(null); }} label="Client"
+            <InputLabel sx={{ color: "text.secondary" }}>Account</InputLabel>
+            <Select value={clientId} onChange={(e) => { setClientId(e.target.value); setExpanded(null); }} label="Account"
               sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
               {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
             </Select>

@@ -477,7 +477,7 @@ export default function Dashboard() {
           <TrendingUp sx={{ color: "#4285F4", fontSize: 22 }} />
           <Typography variant="h6" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Trends</Typography>
           {!clientId && (
-            <Chip label="Select a client to see trends" size="small"
+            <Chip label="Select an account to see trends" size="small"
               sx={{ height: 20, fontSize: 10, bgcolor: "rgba(255,255,255,0.08)", color: "text.secondary" }} />
           )}
         </Box>

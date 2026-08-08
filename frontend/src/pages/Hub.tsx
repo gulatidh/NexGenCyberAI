@@ -1,137 +1,388 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Card, CardActionArea, alpha, useTheme,
-  Chip, CircularProgress, Divider, Tooltip,
+  Box, Typography, Button, Chip, CircularProgress,
+  Divider, Tooltip, alpha, useTheme,
 } from "@mui/material";
-import {
-  Shield, BugReport, Psychology, Radar, Assessment,
-  GppBad, PlaylistAddCheck, SmartToy, AutoStories, Tune, Policy,
-  Hub as HubIcon,
-} from "@mui/icons-material";
+import { InfoOutlined } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import AssistantWidget from "../components/AssistantWidget";
 import MegaMenuBar from "../components/layout/MegaMenuBar";
 import AppControls from "../components/layout/AppControls";
 import OwletLogo from "../components/OwletLogo";
-import { dataModelApi } from "../services/api";
+import { dataModelApi, clientsApi, dashboardApi } from "../services/api";
 import { useActiveClient } from "../contexts/ClientContext";
+import { Client } from "../types";
 
-// ── Stage + product data ──────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface StageProduct {
-  abbrev: string;
+interface DashSummary {
+  total_clients?: number;
+  active_connectors?: number;
+  open_findings?: number;
+  scans_last_30d?: number;
+  findings_by_severity?: Record<string, number>;
+  risks_open?: number;
+  recent_scans?: { name?: string; scan_type?: string }[];
+}
+
+interface LiveCardDef {
+  letter: string;
   name: string;
   desc: string;
   route: string;
-  Icon: React.ElementType;
+  manageRoute?: string;
+  primaryLabel: string;
+  secondaryLabel?: string;
+  countFn?: (accounts: Client[], dash: DashSummary | null) => string | null;
+  rowsFn?: (accounts: Client[], dash: DashSummary | null) => { label: string; value: string }[];
 }
 
-interface Stage {
-  num: string;
-  id: string;
-  label: string;
-  color: string;
-  bgColor: string;
-  title: string;
-  sub: string;
-  products: StageProduct[];
+interface StageDef {
+  num: string; id: string; label: string; color: string;
+  title: string; sub: string; info: string;
+  cards: LiveCardDef[];
 }
 
-const STAGES: Stage[] = [
+// ── Stage + card definitions ──────────────────────────────────────────────────
+
+const STAGE_DEFS: StageDef[] = [
   {
-    num: "01", id: "setup", label: "Setup",
-    color: "#2563eb", bgColor: "#EFF6FF",
+    num: "01", id: "setup", label: "Setup", color: "#2563eb",
     title: "Stand up the environment",
-    sub: "Get the tenant ready — clients, connectors, and AI providers.",
-    products: [
-      { abbrev: "ST", name: "Setup",         desc: "Clients, assets, connectors, AI providers, and platform settings.",          route: "/platform",                     Icon: Tune       },
-      { abbrev: "TM", name: "Threat Models", desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",            route: "/threat-intel/threat-models",   Icon: HubIcon    },
-      { abbrev: "FW", name: "Frameworks",    desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",                route: "/compliance/frameworks",         Icon: Policy     },
+    sub: "Configure your accounts, connectors, and AI providers before any scanning begins.",
+    info: "Complete this stage first — every downstream scan and analysis depends on at least one connected account and a configured AI provider.",
+    cards: [
+      {
+        letter: "A", name: "Accounts", primaryLabel: "Add Account", secondaryLabel: "Manage", manageRoute: "/platform/clients",
+        desc: "Client profiles, contact details, and security posture scoping.",
+        route: "/platform/clients",
+        countFn: (accounts) => `${accounts.length} active`,
+        rowsFn: (accounts) => accounts.slice(0, 3).map(a => ({
+          label: a.name,
+          value: [a.industry, a.country].filter(Boolean).join(", ") || "—",
+        })),
+      },
+      {
+        letter: "C", name: "Connections", primaryLabel: "Add Connector", secondaryLabel: "Manage", manageRoute: "/connections",
+        desc: "Scanner integrations, enterprise tools, and AI provider credentials.",
+        route: "/connections",
+        countFn: (_, dash) => dash?.active_connectors != null ? `${dash.active_connectors} connected` : null,
+        rowsFn: (_, dash) => [
+          { label: "Scans this month", value: String(dash?.scans_last_30d ?? "—") },
+          { label: "Open findings", value: String(dash?.open_findings ?? "—") },
+        ],
+      },
+      {
+        letter: "T", name: "Threat Models", primaryLabel: "Open Designer",
+        desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",
+        route: "/threat-intel/threat-models",
+      },
+      {
+        letter: "F", name: "Frameworks", primaryLabel: "View Standards",
+        desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR, and custom standards.",
+        route: "/compliance/frameworks",
+      },
     ],
   },
   {
-    num: "02", id: "discover", label: "Discover",
-    color: "#0f766e", bgColor: "#F0FDFA",
+    num: "02", id: "discover", label: "Discover", color: "#0f766e",
     title: "Find what's actually exposed",
-    sub: "Scan the environment — manually or through a guided AI conversation.",
-    products: [
-      { abbrev: "VM", name: "Vulnerability Management", desc: "Scans, findings, posture trends, CVE enrichment, and scan import.",    route: "/vulnerability",                Icon: BugReport  },
-      { abbrev: "CV", name: "CVE Blast Radius",         desc: "Which assets does a CVE actually affect? Map the full exposure.",      route: "/cve-pivot",                    Icon: Shield     },
-      { abbrev: "AI", name: "AI Assisted Scan",         desc: "Conversational guided assessment — describe your environment, launch.", route: "/intelligence/ai-assisted-scan",Icon: SmartToy   },
+    sub: "Scan the environment — via inbuilt scanners, enterprise integrations, or an AI-guided conversation.",
+    info: "CVE enrichment and severity scoring run automatically after each scan. Import results from external scanners via the Import tab.",
+    cards: [
+      {
+        letter: "V", name: "Vulnerability Management", primaryLabel: "Start Scan", secondaryLabel: "Findings", manageRoute: "/vulnerability/findings",
+        desc: "All scanners, findings, posture trends, and CVE blast radius in one place.",
+        route: "/vulnerability",
+        countFn: (_, dash) => dash?.open_findings != null ? `${dash.open_findings} open` : null,
+        rowsFn: (_, dash) => {
+          const sev = dash?.findings_by_severity ?? {};
+          return [
+            { label: "Critical", value: String(sev.critical ?? 0) },
+            { label: "High", value: String(sev.high ?? 0) },
+            { label: "Medium", value: String(sev.medium ?? 0) },
+          ];
+        },
+      },
+      {
+        letter: "CV", name: "CVE Blast Radius", primaryLabel: "Explore CVEs",
+        desc: "Which assets does a specific CVE actually affect? Map the full exposure path.",
+        route: "/cve-pivot",
+      },
+      {
+        letter: "AS", name: "AI-Assisted Scan", primaryLabel: "Start Wizard",
+        desc: "Conversational guided assessment — describe your environment, and AI configures the scan.",
+        route: "/intelligence/ai-assisted-scan",
+      },
     ],
   },
   {
-    num: "03", id: "analyse", label: "Analyse",
-    color: "#b45309", bgColor: "#FFFBEB",
+    num: "03", id: "analyse", label: "Analyse", color: "#b45309",
     title: "Turn findings into risk",
-    sub: "Score findings, map attack paths, and query your entire posture in plain language.",
-    products: [
-      { abbrev: "RM", name: "Risk Manager",       desc: "FAIR-scored risk register, ALE exposure, and attack path graph.",   route: "/risk",              Icon: Assessment },
-      { abbrev: "IG", name: "Smart Intelligence", desc: "NL queries, compliance heatmap, client comparison, and reports.",  route: "/intelligence",      Icon: Psychology },
+    sub: "Score findings, apply FAIR-lite ALE modelling, and query your entire posture in plain language.",
+    info: "Risk domains are automatically normalised. Attack paths are derived from finding combinations — no manual correlation needed.",
+    cards: [
+      {
+        letter: "R", name: "Risk Manager", primaryLabel: "Open Register", secondaryLabel: "Attack Paths", manageRoute: "/threat-intel/attack-paths",
+        desc: "FAIR-scored risk register, financial ALE exposure, and attack path visualisation.",
+        route: "/risk",
+        countFn: (_, dash) => dash?.risks_open != null ? `${dash.risks_open} open` : null,
+        rowsFn: (_, dash) => {
+          const sev = dash?.findings_by_severity ?? {};
+          const total = (sev.critical ?? 0) + (sev.high ?? 0);
+          return [
+            { label: "Critical + High findings", value: String(total) },
+            { label: "Scans this month", value: String(dash?.scans_last_30d ?? "—") },
+          ];
+        },
+      },
+      {
+        letter: "I", name: "Smart Intelligence", primaryLabel: "Open",
+        desc: "NL queries, compliance heatmap, account comparison, and executive reports.",
+        route: "/intelligence",
+      },
     ],
   },
   {
-    num: "04", id: "respond", label: "Respond",
-    color: "#b91c1c", bgColor: "#FEF2F2",
+    num: "04", id: "respond", label: "Respond", color: "#b91c1c",
     title: "Act on the picture",
-    sub: "Map risk to real adversary behaviour, then track remediation programs.",
-    products: [
-      { abbrev: "TI", name: "Threat Intelligence", desc: "MITRE ATT&CK threat register and attack path visualisation.",         route: "/threat-intel",   Icon: Radar           },
-      { abbrev: "GR", name: "Governance",          desc: "CTEM programs, control gaps, remediation tracker, and scorecard.",   route: "/governance",     Icon: PlaylistAddCheck },
+    sub: "Map risk to real adversary behaviour, then track remediation through structured CTEM programs.",
+    info: "Threat entries are automatically mapped to MITRE ATT&CK techniques by the Threat Intel agent. CTEM programs progress through 5 phases: Scope → Discover → Prioritise → Validate → Mobilise.",
+    cards: [
+      {
+        letter: "TI", name: "Threat Intelligence", primaryLabel: "Open Register", secondaryLabel: "Attack Paths", manageRoute: "/threat-intel/attack-paths",
+        desc: "MITRE ATT&CK–mapped threat entries, IOCs, and attack path graph from your findings.",
+        route: "/threat-intel",
+      },
+      {
+        letter: "G", name: "Governance", primaryLabel: "Open Programs",
+        desc: "CTEM programs, control deficiency gaps, remediation tracker, and public scorecard.",
+        route: "/governance",
+      },
     ],
   },
   {
-    num: "05", id: "report", label: "Report",
-    color: "#15803d", bgColor: "#F0FDF4",
+    num: "05", id: "report", label: "Report", color: "#15803d",
     title: "Prove it happened",
-    sub: "Close the loop with evidence the client — or the auditor — can keep.",
-    products: [
-      { abbrev: "PT", name: "Pen Testing / VAPT", desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",               route: "/vapt",       Icon: Shield   },
-      { abbrev: "CM", name: "Compliance Monitor", desc: "Framework assessments, evidence packages, and audit-ready output.",    route: "/compliance", Icon: GppBad   },
+    sub: "Close the loop with evidence the auditor — or the client — can actually use.",
+    info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs containing findings CSV, control deficiencies, remediation actions, and agent logs.",
+    cards: [
+      {
+        letter: "P", name: "Pen Testing / VAPT", primaryLabel: "Open Reports",
+        desc: "Engagement reports with retest versioning and PDF/DOCX export.",
+        route: "/vapt",
+      },
+      {
+        letter: "CM", name: "Compliance Monitor", primaryLabel: "View Framework Status", secondaryLabel: "Evidence",
+        desc: "Framework compliance assessments, control deficiency gaps, and audit evidence packages.",
+        route: "/compliance",
+        manageRoute: "/compliance/evidence",
+      },
     ],
   },
   {
-    num: "06", id: "automate", label: "Automate",
-    color: "#4338ca", bgColor: "#EEF2FF",
+    num: "06", id: "automate", label: "Automate", color: "#4338ca",
     title: "Let AI carry the load",
-    sub: "Agents run the loop — analysis, intel, remediation, knowledge — on repeat.",
-    products: [
-      { abbrev: "AB", name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.", route: "/ai-advisor",            Icon: SmartToy   },
-      { abbrev: "KB", name: "Knowledge & Docs", desc: "Knowledge base, security doc RAG, and ask-your-data queries.",          route: "/intelligence/knowledge", Icon: AutoStories },
+    sub: "Agents run the full analysis loop — risk, intel, remediation, compliance — on demand or on repeat.",
+    info: "AI Buddies output structured data directly into the Risk, Threat, Compliance, and Remediation registers. The Orchestrator runs all four in sequence from a single trigger.",
+    cards: [
+      {
+        letter: "AB", name: "AI Buddies", primaryLabel: "Open Agents",
+        desc: "60+ AI agents — orchestrator, risk manager, threat intel, and remediation planner.",
+        route: "/ai-advisor",
+      },
+      {
+        letter: "K", name: "Knowledge & Docs", primaryLabel: "Open",
+        desc: "Security document RAG, ask-your-data queries, and the Aegis knowledge base.",
+        route: "/intelligence/knowledge",
+      },
     ],
   },
 ];
 
-// ── Product card ──────────────────────────────────────────────────────────────
+// ── HubCard ───────────────────────────────────────────────────────────────────
 
-function ProductCard({ p, stageColor, stageBg }: { p: StageProduct; stageColor: string; stageBg: string }) {
+function HubCard({
+  card, color, accounts, dash, loading,
+}: {
+  card: LiveCardDef;
+  color: string;
+  accounts: Client[];
+  dash: DashSummary | null;
+  loading: boolean;
+}) {
   const navigate = useNavigate();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
-  const cardBg = isDark ? alpha(stageColor, 0.08) : stageBg;
+  const count = card.countFn ? card.countFn(accounts, dash) : null;
+  const rows = card.rowsFn ? card.rowsFn(accounts, dash) : [];
 
   return (
-    <Card elevation={0} sx={{
-      border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden",
-      transition: "box-shadow .18s, transform .18s, border-color .18s",
-      "&:hover": { boxShadow: `0 4px 20px ${alpha(stageColor, 0.18)}`, transform: "translateY(-2px)", borderColor: stageColor },
+    <Box sx={{
+      bgcolor: "background.paper",
+      border: "1px solid", borderColor: "divider",
+      borderRadius: 2, p: 2.5,
+      display: "flex", flexDirection: "column", gap: 2,
+      transition: "border-color .18s, box-shadow .18s",
+      "&:hover": {
+        borderColor: color,
+        boxShadow: `0 4px 20px ${alpha(color, 0.12)}`,
+      },
     }}>
-      <CardActionArea onClick={() => navigate(p.route)} sx={{ display: "flex", alignItems: "center", p: 0 }}>
+      {/* Top row: avatar + count badge */}
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <Box sx={{
-          width: 68, flexShrink: 0, alignSelf: "stretch", bgcolor: cardBg,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0.5,
-          borderRight: "1px solid", borderColor: "divider",
+          width: 44, height: 44, borderRadius: 1.5, flexShrink: 0,
+          bgcolor: alpha(color, isDark ? 0.18 : 0.1),
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <p.Icon sx={{ fontSize: 22, color: stageColor }} />
-          <Typography sx={{ fontSize: 10, fontWeight: 800, color: stageColor, letterSpacing: 0.5 }}>{p.abbrev}</Typography>
+          <Typography sx={{
+            fontWeight: 800, fontSize: card.letter.length > 1 ? 13 : 20,
+            color, lineHeight: 1, fontFamily: "monospace", letterSpacing: -0.5,
+          }}>
+            {card.letter}
+          </Typography>
         </Box>
-        <Box sx={{ px: 2, py: 1.5, flexGrow: 1, textAlign: "left" }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, mb: 0.4 }}>{p.name}</Typography>
-          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.45 }}>{p.desc}</Typography>
+        {count !== null && (
+          <Box sx={{
+            px: 1.25, py: 0.4, borderRadius: "20px",
+            bgcolor: alpha(color, isDark ? 0.18 : 0.1),
+            color, fontSize: 11, fontWeight: 700, lineHeight: 1.6,
+          }}>
+            {loading ? <CircularProgress size={10} /> : count}
+          </Box>
+        )}
+      </Box>
+
+      {/* Name + desc */}
+      <Box>
+        <Typography sx={{ fontWeight: 700, fontSize: 16, mb: 0.5, lineHeight: 1.3 }}>{card.name}</Typography>
+        <Typography sx={{ fontSize: 12.5, color: "text.secondary", lineHeight: 1.5 }}>{card.desc}</Typography>
+      </Box>
+
+      {/* Data rows */}
+      {rows.length > 0 && (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, borderTop: "1px solid", borderColor: "divider", pt: 1.5 }}>
+          {rows.map((row, i) => (
+            <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>{row.label}</Typography>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 600 }}>{loading ? "…" : row.value}</Typography>
+            </Box>
+          ))}
         </Box>
-      </CardActionArea>
-    </Card>
+      )}
+
+      {/* Spacer */}
+      <Box sx={{ flex: 1 }} />
+
+      {/* Actions */}
+      <Box sx={{ display: "flex", gap: 1 }}>
+        <Button
+          size="small" variant="contained"
+          onClick={() => navigate(card.route)}
+          sx={{
+            flex: 1, bgcolor: "#111827", "&:hover": { bgcolor: "#1f2937" },
+            borderRadius: 1.5, fontWeight: 600, fontSize: 12.5,
+            textTransform: "none", py: 0.9,
+          }}
+        >
+          {card.primaryLabel}
+        </Button>
+        {card.manageRoute && (
+          <Button
+            size="small" variant="outlined"
+            onClick={() => navigate(card.manageRoute!)}
+            sx={{
+              flex: 1, borderRadius: 1.5, fontWeight: 600, fontSize: 12.5,
+              textTransform: "none", py: 0.9,
+              borderColor: "divider", color: "text.primary",
+              "&:hover": { bgcolor: "action.hover", borderColor: color },
+            }}
+          >
+            {card.secondaryLabel ?? "Manage"}
+          </Button>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+// ── StageSection ──────────────────────────────────────────────────────────────
+
+function StageSection({
+  stage, si, accounts, dash, loading,
+}: {
+  stage: StageDef; si: number;
+  accounts: Client[]; dash: DashSummary | null; loading: boolean;
+}) {
+  return (
+    <Box
+      id={`stage-${stage.id}`}
+      sx={{
+        position: "relative", pl: "64px",
+        mb: si < STAGE_DEFS.length - 1 ? 7 : 0,
+        scrollMarginTop: 24,
+        opacity: 0, transform: "translateY(12px)",
+        animation: `hubrise 0.5s ease ${si * 0.07}s forwards`,
+        "@keyframes hubrise": { to: { opacity: 1, transform: "translateY(0)" } },
+      }}
+    >
+      {/* Circle node */}
+      <Box sx={{
+        position: "absolute", left: 0, top: 0,
+        width: 48, height: 48, borderRadius: "50%",
+        bgcolor: "background.default",
+        border: `2px solid ${stage.color}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "monospace", fontWeight: 700, fontSize: "1rem",
+        color: stage.color,
+        boxShadow: `0 0 18px -4px ${stage.color}60`,
+        zIndex: 2,
+      }}>
+        {stage.num}
+      </Box>
+
+      {/* Stage header */}
+      <Box sx={{ pt: "4px", mb: 2.5 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+          <Box sx={{ width: 4, height: 16, borderRadius: 2, bgcolor: stage.color }} />
+          <Typography sx={{ fontSize: "0.71rem", fontWeight: 700, color: stage.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+            Stage {stage.num} · {stage.label}
+          </Typography>
+        </Box>
+        <Typography sx={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: { xs: 20, md: 26 }, fontWeight: 700, letterSpacing: "-0.02em", mb: 0.75,
+        }}>
+          {stage.title}
+        </Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: "0.88rem", maxWidth: 560, lineHeight: 1.6, mb: 2 }}>
+          {stage.sub}
+        </Typography>
+        {/* Info callout */}
+        <Box sx={{
+          display: "flex", alignItems: "flex-start", gap: 1.5,
+          bgcolor: alpha(stage.color, 0.06),
+          border: "1px solid", borderColor: alpha(stage.color, 0.2),
+          borderRadius: 1.5, px: 2, py: 1.25,
+        }}>
+          <InfoOutlined sx={{ color: stage.color, fontSize: 15, mt: "2px", flexShrink: 0 }} />
+          <Typography sx={{ fontSize: 12.5, color: "text.secondary", lineHeight: 1.55 }}>{stage.info}</Typography>
+        </Box>
+      </Box>
+
+      {/* Cards */}
+      <Box sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+        gap: 1.5,
+      }}>
+        {stage.cards.map((card) => (
+          <HubCard key={card.name} card={card} color={stage.color} accounts={accounts} dash={dash} loading={loading} />
+        ))}
+      </Box>
+    </Box>
   );
 }
 
@@ -183,17 +434,12 @@ const ONT_ROUTES: Record<string, string> = {
   Report:"vapt/reports",
 };
 
-// ── Severity / level colour helpers ───────────────────────────────────────────
-
 const SEV_COLOR: Record<string, string> = {
   critical: "#b91c1c", high: "#ea580c", medium: "#d97706",
   low: "#16a34a", info: "#0284c7",
   critical_risk: "#b91c1c", high_risk: "#ea580c", medium_risk: "#d97706", low_risk: "#16a34a",
 };
-
 function severityColor(k: string) { return SEV_COLOR[k] ?? "#6b7280"; }
-
-// ── OntologyStatPanel — right panel shown when a node is selected ─────────────
 
 interface StatData {
   total: number;
@@ -202,43 +448,27 @@ interface StatData {
   status?: Record<string, number>;
 }
 
-function OntologyStatPanel({
-  entity, stats, color, route,
-}: {
-  entity: string;
-  stats: StatData;
-  color: string;
-  route: string;
+function OntologyStatPanel({ entity, stats, color, route }: {
+  entity: string; stats: StatData; color: string; route: string;
 }) {
   const navigate = useNavigate();
-  const breakdownEntries = Object.entries(stats.breakdown)
-    .filter(([, v]) => v > 0)
-    .sort(([, a], [, b]) => b - a);
+  const breakdownEntries = Object.entries(stats.breakdown).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
   const maxVal = Math.max(...breakdownEntries.map(([, v]) => v), 1);
 
   return (
     <Box sx={{
-      width: 260, flexShrink: 0,
-      border: "1px solid", borderColor: "divider",
-      borderRadius: 2, bgcolor: "background.paper",
-      p: 2, display: "flex", flexDirection: "column", gap: 1.5,
+      width: 260, flexShrink: 0, border: "1px solid", borderColor: "divider",
+      borderRadius: 2, bgcolor: "background.paper", p: 2,
+      display: "flex", flexDirection: "column", gap: 1.5,
     }}>
-      {/* Header */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
-          <Typography sx={{ fontWeight: 700, fontSize: 14, textTransform: "capitalize" }}>
-            {entity}
-          </Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, textTransform: "capitalize" }}>{entity}</Typography>
         </Box>
-        <Typography sx={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
-          {stats.total}
-        </Typography>
+        <Typography sx={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{stats.total}</Typography>
       </Box>
-
       <Divider />
-
-      {/* Breakdown bars */}
       {breakdownEntries.length > 0 ? (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           {breakdownEntries.map(([k, v]) => (
@@ -248,12 +478,7 @@ function OntologyStatPanel({
                 <Typography sx={{ fontSize: 11, fontWeight: 600 }}>{v}</Typography>
               </Box>
               <Box sx={{ height: 5, borderRadius: 3, bgcolor: "action.hover", overflow: "hidden" }}>
-                <Box sx={{
-                  height: "100%", borderRadius: 3,
-                  bgcolor: severityColor(k),
-                  width: `${Math.round((v / maxVal) * 100)}%`,
-                  transition: "width 0.4s ease",
-                }} />
+                <Box sx={{ height: "100%", borderRadius: 3, bgcolor: severityColor(k), width: `${Math.round((v / maxVal) * 100)}%`, transition: "width 0.4s ease" }} />
               </Box>
             </Box>
           ))}
@@ -261,37 +486,26 @@ function OntologyStatPanel({
       ) : (
         <Typography sx={{ fontSize: 12, color: "text.disabled", textAlign: "center", py: 1 }}>No data</Typography>
       )}
-
-      {/* Status chips (findings only) */}
       {stats.status && Object.keys(stats.status).length > 0 && (
         <>
           <Divider />
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
             {Object.entries(stats.status).filter(([, v]) => v > 0).map(([k, v]) => (
-              <Chip key={k} label={`${k}: ${v}`} size="small"
-                sx={{ fontSize: 10, height: 20, bgcolor: "action.hover" }} />
+              <Chip key={k} label={`${k}: ${v}`} size="small" sx={{ fontSize: 10, height: 20, bgcolor: "action.hover" }} />
             ))}
           </Box>
         </>
       )}
-
       <Divider />
-
-      {/* Navigate link */}
       <Box
         onClick={() => navigate(`/${route}`)}
-        sx={{
-          fontSize: 12, color: "primary.main", cursor: "pointer", textAlign: "center",
-          py: 0.5, borderRadius: 1, "&:hover": { bgcolor: alpha(color, 0.08) },
-        }}
+        sx={{ fontSize: 12, color: "primary.main", cursor: "pointer", textAlign: "center", py: 0.5, borderRadius: 1, "&:hover": { bgcolor: alpha(color, 0.08) } }}
       >
         View all {entity}s →
       </Box>
     </Box>
   );
 }
-
-// ── OntologyMini ──────────────────────────────────────────────────────────────
 
 function OntologyMini() {
   const theme = useTheme();
@@ -310,10 +524,8 @@ function OntologyMini() {
     staleTime: 60_000,
   });
 
-  // Map entity key → stat data
   const stats: Record<string, StatData> = statsRaw ?? {};
 
-  // Map ontology node entity → stats key
   const ENTITY_STAT_KEY: Record<string, string> = {
     Asset: "asset", Finding: "finding", Risk: "risk",
     Control: "control", Remediation: "remediation",
@@ -322,7 +534,6 @@ function OntologyMini() {
     Client: "asset",
   };
 
-  // Count badge for each node
   function nodeCount(entity: string): number | null {
     const key = ENTITY_STAT_KEY[entity];
     return key && stats[key] ? stats[key].total : null;
@@ -350,7 +561,6 @@ function OntologyMini() {
       </Typography>
 
       <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-        {/* Graph */}
         <Box sx={{ flex: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2.5, overflowX: "auto", minWidth: 0 }}>
           <svg viewBox="0 0 1120 640" style={{ width: "100%", minWidth: 480, height: "auto", display: "block" }}>
             <defs>
@@ -376,7 +586,6 @@ function OntologyMini() {
                        onDoubleClick={() => navigate(`/${ONT_ROUTES[n.entity] ?? ""}`)}
                     >
                       <circle cx={n.cx} cy={n.cy} r={lit ? 12 : 9} fill={n.color} stroke={isDark ? "#0b0f14" : "#fff"} strokeWidth={2} style={{ transition: "r 0.15s" }} />
-                      {/* Count badge inside node */}
                       {cnt !== null && cnt > 0 && (
                         <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle"
                           fontFamily="monospace" fontSize={cnt > 99 ? 7 : 9} fontWeight={700} fill="#fff">
@@ -394,9 +603,8 @@ function OntologyMini() {
             </g>
           </svg>
 
-          {/* Legend + link row */}
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider", alignItems: "center" }}>
-            {STAGES.map((s) => (
+            {STAGE_DEFS.map((s) => (
               <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                 <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: s.color }} />
                 <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{s.label.toLowerCase()}</Typography>
@@ -412,14 +620,8 @@ function OntologyMini() {
           </Box>
         </Box>
 
-        {/* Stat panel — slides in when a node with known stats is selected */}
         {sel && selNode && selStats && (
-          <OntologyStatPanel
-            entity={selStatKey ?? sel}
-            stats={selStats}
-            color={selNode.color}
-            route={ONT_ROUTES[sel] ?? ""}
-          />
+          <OntologyStatPanel entity={selStatKey ?? sel} stats={selStats} color={selNode.color} route={ONT_ROUTES[sel] ?? ""} />
         )}
       </Box>
     </Box>
@@ -437,6 +639,20 @@ export default function Hub() {
     return () => { document.head.removeChild(link); };
   }, []);
 
+  const { data: accounts = [], isLoading: acctLoading } = useQuery<Client[]>({
+    queryKey: ["clients"],
+    queryFn: clientsApi.list,
+    staleTime: 60_000,
+  });
+
+  const { data: dash = null, isLoading: dashLoading } = useQuery<DashSummary | null>({
+    queryKey: ["dashboard-summary"],
+    queryFn: () => dashboardApi.summary().catch(() => null),
+    staleTime: 60_000,
+  });
+
+  const loading = acctLoading || dashLoading;
+
   const RAIL = "linear-gradient(180deg,#2563eb,#0f766e 25%,#b45309 50%,#b91c1c 65%,#15803d 80%,#4338ca)";
 
   return (
@@ -450,10 +666,7 @@ export default function Hub() {
           borderBottom: "1px solid", borderColor: "divider",
           height: 52,
         }}>
-          <MegaMenuBar
-            brand={<OwletLogo height={32} />}
-            trailing={<AppControls />}
-          />
+          <MegaMenuBar brand={<OwletLogo height={32} />} trailing={<AppControls />} />
         </Box>
 
         {/* Main content */}
@@ -481,61 +694,15 @@ export default function Hub() {
             {/* Vertical rail */}
             <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.35 }} />
 
-            {STAGES.map((stage, si) => (
-              <Box
+            {STAGE_DEFS.map((stage, si) => (
+              <StageSection
                 key={stage.id}
-                id={`stage-${stage.id}`}
-                sx={{
-                  position: "relative", pl: "64px",
-                  mb: si < STAGES.length - 1 ? 6 : 0,
-                  scrollMarginTop: 24,
-                  opacity: 0, transform: "translateY(12px)",
-                  animation: `hubrise 0.5s ease ${si * 0.07}s forwards`,
-                  "@keyframes hubrise": { to: { opacity: 1, transform: "translateY(0)" } },
-                }}
-              >
-                {/* Stage node */}
-                <Box sx={{
-                  position: "absolute", left: 0, top: 0,
-                  width: 48, height: 48, borderRadius: "50%",
-                  bgcolor: "background.default",
-                  border: `2px solid ${stage.color}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "monospace", fontWeight: 700, fontSize: "1rem",
-                  color: stage.color,
-                  boxShadow: `0 0 18px -4px ${stage.color}60`,
-                  zIndex: 2,
-                }}>
-                  {stage.num}
-                </Box>
-
-                {/* Stage header */}
-                <Box sx={{ pt: "4px", mb: 2 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                    <Box sx={{ width: 4, height: 16, borderRadius: 2, bgcolor: stage.color }} />
-                    <Typography sx={{ fontSize: "0.71rem", fontWeight: 700, color: stage.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Stage {stage.num} · {stage.label}
-                    </Typography>
-                  </Box>
-                  <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 18, md: 22 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.5 }}>
-                    {stage.title}
-                  </Typography>
-                  <Typography sx={{ color: "text.secondary", fontSize: "0.88rem", maxWidth: 540 }}>
-                    {stage.sub}
-                  </Typography>
-                </Box>
-
-                {/* Product cards */}
-                <Box sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-                  gap: 1.5,
-                }}>
-                  {stage.products.map((p) => (
-                    <ProductCard key={p.abbrev} p={p} stageColor={stage.color} stageBg={stage.bgColor} />
-                  ))}
-                </Box>
-              </Box>
+                stage={stage}
+                si={si}
+                accounts={accounts}
+                dash={dash}
+                loading={loading}
+              />
             ))}
           </Box>
 

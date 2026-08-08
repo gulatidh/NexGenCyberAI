@@ -55,8 +55,8 @@ export default function StaleAssets() {
 
       <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
         <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-          <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+          <InputLabel sx={{ color: "text.secondary" }}>Account</InputLabel>
+          <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Account"
             sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
             {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
           </Select>

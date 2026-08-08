@@ -40,7 +40,7 @@ function ClientSelector() {
           "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "primary.main" } }}
       >
         <MenuItem value="" disabled>
-          <em>{isLoading ? "Loading…" : clients.length === 0 ? "No clients" : "Select client…"}</em>
+          <em>{isLoading ? "Loading…" : clients.length === 0 ? "No accounts" : "Select account…"}</em>
         </MenuItem>
         {clients.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>)}
       </Select>

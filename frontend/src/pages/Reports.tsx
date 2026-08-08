@@ -391,8 +391,8 @@ export default function Reports() {
             </Grid>
             <Grid size={{ xs: 12, sm: 3 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-                <Select value={clientId} label="Client"
+                <InputLabel sx={{ color: "text.secondary" }}>Account</InputLabel>
+                <Select value={clientId} label="Account"
                   onChange={(e) => { setClientId(e.target.value); setProjectId(""); }}
                   sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}

@@ -87,7 +87,7 @@ const PRODUCT_TOUR_TABS = [
   "Scan Progress",
   "Compliance Heatmap",
   "AI Playbook",
-  "Client Comparison",
+  "Account Comparison",
 ] as const;
 
 const PRODUCT_TOUR_SCREENS: React.FC<{ color: string }>[] = [
@@ -229,10 +229,10 @@ const PRODUCT_TOUR_SCREENS: React.FC<{ color: string }>[] = [
       </Box>
     </Box>
   ),
-  // 5 — Client Comparison
+  // 5 — Account Comparison
   ({ color }) => (
     <Box sx={{ p: 2.5 }}>
-      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Client Comparison</Typography>
+      <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: 1, mb: 2 }}>Account Comparison</Typography>
       <Box sx={{ display: "flex", gap: 1, mb: 1.5, pb: 0.75, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <Typography sx={{ flex: 2, fontSize: 9, color: "rgba(255,255,255,0.4)", fontWeight: 700 }}>CLIENT</Typography>
         {["CRIT", "HIGH", "MED", "RISKS", "COMP"].map((h) => (
@@ -309,7 +309,7 @@ const FAQS = [
     a: "Select a completed scan and choose 'Generate from Scan.' Owlet pulls all findings, infers the scope and testing methodology from the connector type, then uses an LLM to write an executive summary, per-finding detailed remediation, and a conclusion. Reports export as PDF or DOCX — full engagement report or remediation-only plan.",
   },
   {
-    q: "Can I use Owlet across multiple clients or teams?",
+    q: "Can I use Owlet across multiple accounts or teams?",
     a: "Yes. Owlet supports multi-client workspaces — each client has isolated assets, scans, findings, threat entries, and risk scores. A global client selector in the top nav switches context instantly. Soft-delete lets you archive clients without losing historical data.",
   },
 ];

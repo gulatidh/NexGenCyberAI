@@ -201,7 +201,7 @@ export default function Missions() {
               <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 12, fontWeight: 600, borderColor: "divider" } }}>
                 <TableCell>Active</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Client</TableCell>
+                <TableCell>Account</TableCell>
                 <TableCell>Workflow Type</TableCell>
                 <TableCell>Schedule</TableCell>
                 <TableCell>Next Run</TableCell>
@@ -305,8 +305,8 @@ export default function Missions() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "text.secondary" }}>Client</InputLabel>
-                <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Client"
+                <InputLabel sx={{ color: "text.secondary" }}>Account</InputLabel>
+                <Select value={clientId} onChange={(e) => setClientId(e.target.value)} label="Account"
                   sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
                   {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
                 </Select>

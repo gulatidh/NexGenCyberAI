@@ -666,7 +666,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
   const restoreMut = useMutation({
     mutationFn: (id: string) => adminApi.restoreClient(id),
     onSuccess: () => {
-      toast.success("Client restored successfully");
+      toast.success("Account restored successfully");
       qc.invalidateQueries({ queryKey: ["admin-deleted-clients"] });
       qc.invalidateQueries({ queryKey: ["clients"] });
     },
@@ -676,7 +676,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
   const permDeleteMut = useMutation({
     mutationFn: (id: string) => adminApi.permanentlyDeleteClient(id),
     onSuccess: () => {
-      toast.success("Client permanently deleted");
+      toast.success("Account permanently deleted");
       qc.invalidateQueries({ queryKey: ["admin-deleted-clients"] });
       setConfirmPerm(null);
     },
@@ -707,8 +707,8 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
     <Box>
       <SectionHeader
         icon={<DeleteSweep />}
-        title="Deleted Clients"
-        subtitle="Soft-deleted clients — restorable within 30 days, then auto-purged"
+        title="Deleted Accounts"
+        subtitle="Soft-deleted accounts — restorable within 30 days, then auto-purged"
       />
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -742,7 +742,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["Client", "Deleted On", "Days Remaining", "Status", "Actions"].map((h) => (
+                {["Account", "Deleted On", "Days Remaining", "Status", "Actions"].map((h) => (
                   <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
                 ))}
               </TableRow>
@@ -793,7 +793,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
                     <TableCell>
                       <Box sx={{ display: "flex", gap: 0.5 }}>
                         {!expired && (
-                          <Tooltip title="Restore client">
+                          <Tooltip title="Restore account">
                             <IconButton size="small" sx={{ color: "#34A853" }}
                               onClick={() => restoreMut.mutate(c.id)}
                               disabled={restoreMut.isPending}>
@@ -821,7 +821,7 @@ function DeletedClientsTab({ isAdmin }: { isAdmin: boolean }) {
       <Dialog open={Boolean(confirmPerm)} onClose={() => setConfirmPerm(null)}
         slotProps={{ paper: { sx: { bgcolor: "background.paper", minWidth: 440 } } }}>
         <DialogTitle sx={{ color: "#EA4335", display: "flex", alignItems: "center", gap: 1 }}>
-          <DeleteForever /> Permanently Delete Client?
+          <DeleteForever /> Permanently Delete Account?
         </DialogTitle>
         <DialogContent>
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -968,7 +968,7 @@ const TABS = [
   { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
   { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
   { label: "Users",            icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
-  { label: "Deleted Clients",  icon: <DeleteSweep fontSize="small" />, adminOnly: true },
+  { label: "Deleted Accounts",  icon: <DeleteSweep fontSize="small" />, adminOnly: true },
 ];
 
 export default function Settings() {

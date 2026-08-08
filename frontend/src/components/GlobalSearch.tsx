@@ -60,7 +60,7 @@ const NAV_ITEMS: SearchItem[] = [
   { id: "ctem",           label: "CTEM Programs",       Icon: Engineering,      path: "/governance/ctem",            section: "5 · Respond",  keywords: ["ctem", "exposure management", "scope", "validate", "mobilise"] },
   // Report
   { id: "posture",        label: "Posture Trends",      Icon: TrendingUp,       path: "/posture-trends",             section: "6 · Report",   keywords: ["posture", "trend", "history", "chart", "audit readiness"] },
-  { id: "comparison",     label: "Client Comparison",   Icon: CompareArrows,    path: "/client-comparison",          section: "6 · Report",   keywords: ["compare", "benchmark", "client", "multi"] },
+  { id: "comparison",     label: "Account Comparison",   Icon: CompareArrows,    path: "/client-comparison",          section: "6 · Report",   keywords: ["compare", "benchmark", "client", "multi"] },
   // Automate
   { id: "agents",         label: "AI Buddies",          Icon: SmartToy,         path: "/agents",                     section: "7 · Automate", keywords: ["agent", "buddy", "buddies", "ai", "orchestrator", "llm", "automation", "run agent"] },
   { id: "workflows",      label: "Workflows",           Icon: Schedule,         path: "/missions",                   section: "7 · Automate", keywords: ["mission", "workflow", "pipeline", "scheduled", "automated"] },

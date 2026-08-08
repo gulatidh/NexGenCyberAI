@@ -79,7 +79,7 @@ const MENU: MenuItem[] = [
       {
         heading: "Environment",
         items: [
-          { name: "Platform Setup",    desc: "Clients, AI providers, and platform settings.",                  route: "/platform",                     Icon: Tune        },
+          { name: "Platform Setup",    desc: "Accounts, AI providers, and platform settings.",                  route: "/platform",                     Icon: Tune        },
           { name: "Clients",           desc: "Manage client organisations and their details.",                 route: "/platform/clients",             Icon: People      },
           { name: "Connections",       desc: "Scanner connectors, enterprise tools, and SIEM integrations.",  route: "/platform/connections",         Icon: Cable       },
           { name: "Help",              desc: "Documentation, guides, and support resources.",                 route: "/platform/help",                Icon: HubIcon     },
@@ -135,7 +135,7 @@ const MENU: MenuItem[] = [
         items: [
           { name: "Compliance Heatmap",  desc: "Control coverage heatmap across all frameworks.",            route: "/compliance-heatmap",           Icon: GppBad      },
           { name: "Ask Your Data",       desc: "Natural language SQL queries over findings, risks, assets.", route: "/intelligence/nl-query",        Icon: Search      },
-          { name: "Client Comparison",   desc: "Compare security posture across multiple clients.",          route: "/client-comparison",            Icon: Assessment  },
+          { name: "Account Comparison",   desc: "Compare security posture across multiple clients.",          route: "/client-comparison",            Icon: Assessment  },
           { name: "Reports",             desc: "AI-generated security posture and trend reports.",           route: "/intelligence/reports",         Icon: Description },
         ],
       },
@@ -209,10 +209,11 @@ const MENU: MenuItem[] = [
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 function MegaPanel({
-  item, topPx, onClose, onMouseEnter, onMouseLeave,
+  item, topPx, panelLeft, onClose, onMouseEnter, onMouseLeave,
 }: {
   item: MenuItem;
   topPx: number;
+  panelLeft: number;
   onClose: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -232,8 +233,7 @@ function MegaPanel({
       sx={{
         position: "fixed",
         top: topPx - 1,           // -1 to close the 1px gap at bar border
-        left: "50%",
-        transform: "translateX(-50%)",
+        left: panelLeft,
         width: "58%",
         minWidth: 560,
         maxWidth: 920,
@@ -246,8 +246,8 @@ function MegaPanel({
         px: 3, py: 2.5,
         animation: "mmIn 0.15s ease",
         "@keyframes mmIn": {
-          from: { opacity: 0, transform: "translateX(-50%) translateY(-6px)" },
-          to:   { opacity: 1, transform: "translateX(-50%) translateY(0)" },
+          from: { opacity: 0, transform: "translateY(-6px)" },
+          to:   { opacity: 1, transform: "translateY(0)" },
         },
       }}
     >
@@ -322,6 +322,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState<string | null>(null);
+  const [panelLeft, setPanelLeft] = useState(0);
   const barRef = useRef<HTMLDivElement>(null!);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -329,8 +330,18 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
 
   const clearLeave = () => { if (leaveTimer.current) clearTimeout(leaveTimer.current); };
 
-  const enter = useCallback((id: string) => { clearLeave(); setOpen(id); }, []);
-  const leave = useCallback(() => { leaveTimer.current = setTimeout(() => setOpen(null), 250); }, []);
+  const enter = useCallback((id: string, el?: HTMLElement) => {
+    clearLeave();
+    setOpen(id);
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const panelW = Math.min(920, Math.max(560, vw * 0.58));
+      // Align to the button's left edge, clamped so panel stays within viewport
+      setPanelLeft(Math.max(8, Math.min(rect.left, vw - panelW - 8)));
+    }
+  }, []);
+  const leave = useCallback(() => { leaveTimer.current = setTimeout(() => setOpen(null), 350); }, []);
   const closeAll = useCallback(() => { clearLeave(); setOpen(null); }, []);
 
   useEffect(() => {
@@ -436,8 +447,8 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
                   aria-haspopup="true"
                   aria-expanded={isOpen}
                   aria-controls={`mega-panel-${item.id}`}
-                  onMouseEnter={() => enter(item.id)}
-                  onFocus={() => enter(item.id)}
+                  onMouseEnter={(e) => enter(item.id, e.currentTarget)}
+                  onFocus={(e) => enter(item.id, e.currentTarget)}
                   onKeyDown={(e: React.KeyboardEvent) => {
                     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(isOpen ? null : item.id); }
                     if (e.key === "Escape") closeAll();
@@ -478,6 +489,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
         <MegaPanel
           item={activeItem}
           topPx={barBottom}
+          panelLeft={panelLeft}
           onClose={closeAll}
           onMouseEnter={clearLeave}
           onMouseLeave={leave}

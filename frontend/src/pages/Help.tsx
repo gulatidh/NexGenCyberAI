@@ -47,7 +47,7 @@ const GROUPS: Group[] = [
           { text: "Authenticate with your work Microsoft account. Complete MFA if your organisation requires it." },
           { text: "On first sign-in you may see a consent screen asking to 'Sign in and read your profile'. Click Accept — the platform reads your name and email to create your session token." },
           { text: "If you see 'Access required': your account authenticated fine but hasn't been granted a platform role yet. Ask any global admin to open Administration → Grant access and assign you a role.", detail: "You can authenticate without a role, but every API call returns 403 until a role is assigned. The sign-in itself works regardless." },
-          { text: "Once in, the top toolbar shows your name. Select a client from the global client selector before navigating to any data page." },
+          { text: "Once in, the top toolbar shows your name. Select an account from the global account selector before navigating to any data page." },
         ],
         tips: [
           "Why Entra ID? No password resets, no credential sprawl, and every sign-in is covered by your organisation's Conditional Access policies (MFA, device compliance, location). Your JWT is validated on every API call — losing your Entra account immediately revokes platform access with no stale sessions.",
@@ -59,34 +59,34 @@ const GROUPS: Group[] = [
       },
       {
         id: "first-client",
-        title: "Create your first client",
-        summary: "Clients are the top-level multi-tenant containers in Owlet AI. Every piece of security data — connectors, scans, findings, risks, threat entries, remediation actions — lives under a client and is invisible across client boundaries.",
+        title: "Create your first account",
+        summary: "Accounts are the top-level multi-tenant containers in Owlet AI. Every piece of security data — connectors, scans, findings, risks, threat entries, remediation actions — lives under an account and is invisible across account boundaries.",
         steps: [
-          { text: "Why create a client first? You cannot run a scan, add a connector, or view findings without one. Everything in the platform is scoped to a client." },
-          { text: "Open the Clients tab from the left navigation." },
-          { text: "Click 'Add client'. Fill in: Name (display label), Slug (URL-safe unique ID, auto-generated from name and editable), Industry, and Primary contact email." },
-          { text: "Click 'Create'. You land on the new Client Detail page — the hub for that client, with tabs for Overview, Projects, Connectors, Scans, and more." },
+          { text: "Why create an account first? You cannot run a scan, add a connector, or view findings without one. Everything in the platform is scoped to an account." },
+          { text: "Open Hub → Stage 01 Setup → Accounts card, or navigate to Platform → Accounts from the left navigation." },
+          { text: "Click 'Add Account'. Fill in: Name (display label), Slug (URL-safe unique ID, auto-generated from name and editable), Industry, and Primary contact email." },
+          { text: "Click 'Create'. You land on the new Account Detail page — the hub for that account, with tabs for Overview, Projects, Connectors, Scans, and more." },
           { text: "Add connectors under the Connectors tab next. Connectors define where scans run and what credentials to use." },
-          { text: "Select the new client in the top toolbar's global selector. This scopes all pages — Dashboard, Risk Overview, Findings, all registers — to this client." },
+          { text: "Select the new account in the top toolbar's global selector. This scopes all pages — Dashboard, Risk Overview, Findings, all registers — to this account." },
         ],
         tips: [
-          "Recommended pattern: one client per customer or business unit. MSPs typically create one client per managed customer; single-org teams often create one per environment (prod vs. staging).",
-          "Soft-delete is available — deleting a client preserves all data for 30 days and is fully restorable by an admin. Permanent delete must be explicitly triggered separately.",
+          "Recommended pattern: one account per customer or business unit. MSPs typically create one account per managed customer; single-org teams often create one per environment (prod vs. staging).",
+          "Soft-delete is available — deleting an account preserves all data for 30 days and is fully restorable by an admin from Settings → Deleted Accounts.",
         ],
         warnings: [
-          "Slug must be unique across all clients and cannot be changed after creation. Choose something stable — it becomes part of internal database references.",
+          "Slug must be unique across all accounts and cannot be changed after creation. Choose something stable — it becomes part of internal database references.",
         ],
       },
       {
         id: "nav-tour",
         title: "Where to find things in the nav",
-        summary: "The left navigation is divided into workflow sections. The global client selector in the top toolbar controls which client's data every page shows — changing it there updates all pages simultaneously.",
+        summary: "The left navigation is divided into workflow sections. The global account selector in the top toolbar controls which account's data every page shows — changing it there updates all pages simultaneously.",
         steps: [
-          { text: "Top toolbar (always visible): global client selector dropdown. Change it to instantly re-scope every page. All pages use the ClientContext hook — if a page looks empty, check that the right client is selected here first.", detail: "Do NOT read localStorage directly or add per-page client selectors. The global selector in AppLayout is the single source of truth." },
-          { text: "Dashboard — aggregate KPIs across all accessible clients: open findings by severity, recent scan activity, risk exposure, agent run counts." },
-          { text: "Risk Overview — executive-level risk dashboard for the active client. FAIR-lite ALE estimates, heat map, and domain breakdown. Requires the Risk Manager agent to have run first." },
+          { text: "Top toolbar (always visible): global account selector dropdown. Change it to instantly re-scope every page. All pages use the ClientContext hook — if a page looks empty, check that the right account is selected here first.", detail: "Do NOT read localStorage directly or add per-page selectors. The global selector in AppLayout is the single source of truth." },
+          { text: "Dashboard — aggregate KPIs across all accessible accounts: open findings by severity, recent scan activity, risk exposure, agent run counts." },
+          { text: "Risk Overview — executive-level risk dashboard for the active account. FAIR-lite ALE estimates, heat map, and domain breakdown. Requires the Risk Manager agent to have run first." },
           { text: "Assessments — run and review scans. One tile per scan target. Connects to connectors, findings, and AI verdicts." },
-          { text: "Findings — raw findings table across all scans for the active client. Filter/search, per-row status updates, and bulk cleanup." },
+          { text: "Findings — raw findings table across all scans for the active account. Filter/search, per-row status updates, and bulk cleanup." },
           { text: "Risk Register — FAIR-scored risks + AI agent analysis narratives. The direct output of the Risk Manager agent.", detail: "Risk Register (row-level list) ≠ Risk Overview (aggregate dashboard). They're fed by the same data but serve different audiences." },
           { text: "Security section: Threat Register (Threat Intel agent output), Control Deficiencies (Compliance Monitor output), Remediation Tracker (Remediation agent output). Each is populated by running its matching agent from AI Buddies." },
           { text: "Frameworks — view seeded framework controls (NIST CSF, CIS v8, GDPR, ISO 27001, PCI DSS) and build Custom Standards by picking controls from any existing framework." },
@@ -97,8 +97,8 @@ const GROUPS: Group[] = [
           { text: "Settings section additions: Webhooks (→ /webhooks), API Keys (→ /api-keys)." },
         ],
         tips: [
-          "Habit to build: select your client in the top toolbar before navigating anywhere. Every page reads the global selection — no data shows until a client is active.",
-          "Connectors and Projects don't have standalone nav entries. They're tabs inside the Client Detail page: open Clients → click a client card.",
+          "Habit to build: select your account in the top toolbar before navigating anywhere. Every page reads the global selection — no data shows until an account is active.",
+          "Connectors and Projects don't have standalone nav entries. They're tabs inside the Account Detail page: open Platform → Accounts → click an account card.",
           "The Analyst / Executive toggle in the top toolbar switches the Dashboard between a detailed operational view and a summary executive view.",
         ],
       },
@@ -107,7 +107,7 @@ const GROUPS: Group[] = [
         title: "Advanced features overview",
         summary: "Owlet has 7 advanced features beyond the core scan → findings → agents flow: Attack Path Visualisation, Natural Language Query, Posture Trends, CTEM workflow, Security Document RAG, Webhooks, and API Keys.",
         steps: [
-          { text: "Attack Path Visualisation (Intelligence → Attack Paths): SVG graph that maps your open findings onto MITRE ATT&CK phases — Initial Access through Exfiltration. See which findings chain together into a realistic attack path.", detail: "No configuration needed — the graph is generated automatically from your current findings. Select a client and navigate to /attack-paths." },
+          { text: "Attack Path Visualisation (Intelligence → Attack Paths): SVG graph that maps your open findings onto MITRE ATT&CK phases — Initial Access through Exfiltration. See which findings chain together into a realistic attack path.", detail: "No configuration needed — the graph is generated automatically from your current findings. Select an account and navigate to /attack-paths." },
           { text: "Natural Language Query (Intelligence → Ask Your Data): type a plain-English question about your security data — 'How many critical findings are unresolved?', 'Which scanner found the most highs?' — and the platform generates SQL, runs it safely, and returns a result table plus a plain-English summary.", detail: "Only SELECT queries are allowed. The safety validator blocks DROP, DELETE, INSERT, UPDATE, and other write keywords before execution." },
           { text: "Posture Trends (Governance → Posture Trends): Recharts area and line charts showing how your open finding counts, risk scores, and audit readiness percentage have changed over time. Takes a ?days= parameter (default 90). Manual snapshots trigger via the button on the page.", detail: "Snapshots must exist for the charts to show data. Click 'Capture Snapshot' on the Posture Trends page to seed the first data point." },
           { text: "CTEM Programs (Governance → CTEM): structured 5-phase Continuous Threat Exposure Management workflow — Scope, Discover, Prioritise, Validate, Mobilise. Create a program per engagement or quarter. Advance phases with notes recording decisions made." },
@@ -140,7 +140,7 @@ const GROUPS: Group[] = [
         summary: "Cloud connectors query your cloud provider's read-only APIs to detect misconfigurations, exposed resources, and identity risks — no agent installation, no network probing, no changes to your infrastructure.",
         steps: [
           { text: "What cloud connectors do: they call cloud provider control-plane APIs (Azure Resource Graph, AWS Config, GCP Security Command Center, Entra ID Microsoft Graph) and translate the results into findings using Owlet's rule library.", detail: "This is fundamentally different from workflow scanners like Nmap or ZAP that actively probe targets. Cloud connectors read configuration state — they never touch your data plane." },
-          { text: "Open the Client whose environment you want to connect. Switch to the Connectors tab on the Client Detail page." },
+          { text: "Open the Account whose environment you want to connect. Switch to the Connectors tab on the Account Detail page." },
           { text: "Click 'Add connector'. Pick the cloud type: Azure Security, AWS Security, GCP Security, Entra ID, Container Security, On-Premises, etc." },
           { text: "Paste credentials. Azure: Tenant ID + Client ID + Client Secret + Subscription ID of a service principal. AWS: Access Key ID + Secret Access Key. GCP: service account JSON. Entra ID: same as Azure but scoped to Graph API.", detail: "Credentials are encrypted with the platform's Fernet key before being stored. They're decrypted at scan time only and never returned to the UI after saving." },
           { text: "Click 'Test connection'. The platform makes a low-privilege API call (e.g. list resource groups) to confirm reachability and credential validity before saving." },
@@ -162,7 +162,7 @@ const GROUPS: Group[] = [
         summary: "Workflow scanners run as GitHub Actions jobs. The platform dispatches the job, the workflow runs the tool in a cloud runner, and findings are posted back authenticated by a per-scan HMAC token. Nothing runs on your infrastructure.",
         steps: [
           { text: "What each scanner does:", detail: "ZAP (DAST): OWASP Top 10 web vulnerabilities against a live URL. Semgrep / CodeQL / SonarQube (SAST): static analysis of source code. Nmap / OpenVAS (Network): port scanning and service enumeration. Trivy / OWASP DC (SCA): CVEs in OS packages and language dependencies. Gitleaks / TruffleHog (Secrets): secrets committed to git history including rotated ones." },
-          { text: "On the Client Detail → Connectors tab, click 'Add connector' and pick the scanner type." },
+          { text: "On the Account Detail → Connectors tab, click 'Add connector' and pick the scanner type." },
           { text: "Fill in the target field — format depends on scanner:", detail: "SAST/Secrets: Git repo URL. Network: host, IP, or CIDR. Container (Trivy): Docker image ref or repo URL. Web (ZAP): target HTTP/HTTPS URL." },
           { text: "For private repos, paste a Git PAT or deploy key. It's stored encrypted and injected into the clone URL at scan time — never logged in Actions inputs." },
           { text: "Save the connector. Start a scan from Assessments → New scan → pick this connector." },
@@ -183,7 +183,7 @@ const GROUPS: Group[] = [
         summary: "Upload a JAR / WAR / EAR / ZIP / tar.gz / DLL / EXE — CodeQL analyses the bytecode with --build-mode=none. Useful for vendor binaries or compiled artifacts where you have no source access.",
         steps: [
           { text: "Why binary mode: CodeQL decodes compiled Java (.class/.jar) and C# IL (.dll/.exe) into its intermediate representation and runs the same query suites as source mode. This catches SQL injection, XSS, path traversal, and other dataflow vulnerabilities in closed-source code." },
-          { text: "Ensure you have a CodeQL connector for the client (the connector is the access anchor, even in binary mode)." },
+          { text: "Ensure you have a CodeQL connector for the account (the connector is the access anchor, even in binary mode)." },
           { text: "Open Assessments → New Assessment → SAST tab → click CodeQL. Pick the connector. A 'SCAN MODE' chooser appears — select 'Upload binary'." },
           { text: "Click 'Choose binary archive' and select your file. 500 MB hard cap.", detail: "If your artifact exceeds 500 MB, ZIP only the JARs containing application code — exclude third-party libraries to reduce size." },
           { text: "Click 'Start Scan'. The platform: (1) creates a PENDING scan record, (2) uploads the binary to App Service /home/data/uploads/<scan_id>/, (3) dispatches the CodeQL GitHub Actions workflow only after upload confirms success." },
@@ -255,7 +255,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "What a scan does end-to-end: the platform creates a PENDING scan record, dispatches the job (GitHub Actions for most scanners; local BackgroundTask for AI Code Review), the tool runs, findings are ingested and scored with RPS (Risk Priority Score), and the AI verdict is auto-generated.", detail: "RPS scoring uses: CVSS base score (NVD), exploit probability (EPSS), active exploitation status (CISA KEV), and optionally live cloud context from Wiz / CrowdStrike Spotlight if those integrations are configured." },
           { text: "Open Assessments from the left nav. Click 'New scan'." },
-          { text: "Select the Client and the Connector. The connector type determines which scan options appear." },
+          { text: "Select the Account and the Connector. The connector type determines which scan options appear." },
           { text: "Choose scan type: configuration (posture checks), vulnerability (CVE/weakness detection), compliance (framework-mapped), or full (all). For most workflow scanners, 'vulnerability' is the right choice." },
           { text: "Optionally tag a Framework — NIST CSF 2.0, NIST 800-53, CIS v8, OWASP, GDPR, ISO 27001, PCI DSS, etc. Findings will be control-mapped using control_id and control_mappings fields." },
           { text: "Click 'Start'. The tile appears in PENDING state, transitions to RUNNING when the workflow picks it up, then COMPLETED (or FAILED) when done." },
@@ -273,7 +273,7 @@ const GROUPS: Group[] = [
         title: "Understanding the Assessment tile view",
         summary: "The Assessments page is a tile grid — one tile per scanner target per version. Each tile surfaces status, severity counts, and actions without needing to open the detail page.",
         steps: [
-          { text: "Tile header: 'Category · Client' (e.g. DAST · Acme Corp, Network · TechCorp). Category comes from the connector type." },
+          { text: "Tile header: 'Category · Account' (e.g. DAST · Acme Corp, Network · TechCorp). Category comes from the connector type." },
           { text: "Status chip (top-right of tile): pending → running → completed → failed. 'Failed' means the GitHub Actions workflow errored or findings ingestion failed — check Actions logs." },
           { text: "Action icons (visible on hover, top-right): trash icon (deletes scan + all its findings + verdict — irreversible), replay icon (re-triggers as a new version), yellow history badge with count (opens version history dialog)." },
           { text: "Severity chips (tile footer): Critical / High / Medium / Low / Info counts. These populate as findings are ingested — they update in near-real-time during a running scan." },
@@ -282,7 +282,7 @@ const GROUPS: Group[] = [
         ],
         tips: [
           "The grid shows only the most recent version per target. If you've rescanned, the tile shows a yellow badge with the total run count. Click it to browse all historical runs.",
-          "Use the filter chips above the grid (Client, Connector type, Status) to narrow when managing many clients or many scan types simultaneously.",
+          "Use the filter chips above the grid (Account, Connector type, Status) to narrow when managing many accounts or many scan types simultaneously.",
         ],
       },
       {
@@ -347,10 +347,10 @@ const GROUPS: Group[] = [
       {
         id: "risk-overview",
         title: "Risk Overview — the executive dashboard",
-        summary: "Risk Overview translates raw scan findings into financial risk estimates using FAIR-lite ALE (Annual Loss Expectancy). It's the board-level view of your client's security posture — not individual CVEs, but aggregated business risk by domain with dollar-range estimates.",
+        summary: "Risk Overview translates raw scan findings into financial risk estimates using FAIR-lite ALE (Annual Loss Expectancy). It's the board-level view of your account's security posture — not individual CVEs, but aggregated business risk by domain with dollar-range estimates.",
         steps: [
           { text: "What FAIR-lite ALE means: each risk is scored with a likelihood (probability of a loss event in a year) and impact (estimated financial loss range). ALE = likelihood × impact. Total Exposure = sum of all open risk ALEs.", detail: "Owlet derives likelihood from CVSS + EPSS + KEV data. Impact is mapped to a loss magnitude band based on the risk category and available threat intel." },
-          { text: "Select a client from the top toolbar, then open Risk Overview from the left nav." },
+          { text: "Select an account from the top toolbar, then open Risk Overview from the left nav." },
           { text: "Top KPI strip: Total Exposure (ALE high estimate), Net Exposure (after applied controls), Open Critical/High count, 30-Day Breach Probability.", detail: "30-Day Breach Probability is derived from EPSS scores of open critical findings — the probability that at least one critical finding is actively exploited in the next 30 days." },
           { text: "Risk by Domain bar chart: groups risks into stable categories — Identity, Cloud Security, Application Security, Network, Data Protection, Compliance. Each bar shows ALE for that domain." },
           { text: "Heat map: likelihood vs. impact quadrant. Risks in the top-right (high likelihood + high impact) are immediate priorities." },
@@ -372,7 +372,7 @@ const GROUPS: Group[] = [
           { text: "Step 4 — Risk Overview updates automatically.", detail: "No manual refresh needed. Once the Risk Manager or Orchestrator writes risk entries, navigate to Risk Overview and the data is there." },
         ],
         tips: [
-          "Full workflow: Scan → Findings → Risk Agent → Risk Register → Risk Overview. If Risk Overview looks empty: (1) is the right client selected? (2) has at least one scan completed? (3) has the Risk Manager or Orchestrator agent been run?",
+          "Full workflow: Scan → Findings → Risk Agent → Risk Register → Risk Overview. If Risk Overview looks empty: (1) is the right account selected? (2) has at least one scan completed? (3) has the Risk Manager or Orchestrator agent been run?",
           "Risk Overview is only as good as your scans. Running multiple scanner types (network + SAST + cloud connector) gives the ALE model richer signal.",
         ],
         warnings: [
@@ -382,10 +382,10 @@ const GROUPS: Group[] = [
       {
         id: "risk-register",
         title: "Risk Register — prioritised risks + AI analysis",
-        summary: "The Risk Register is the row-level list of all FAIR-scored risks for the active client. Each entry has a likelihood/impact score, ALE estimate, status lifecycle, and a link to the source scan. AI agent narratives are attached as collapsible tiles below.",
+        summary: "The Risk Register is the row-level list of all FAIR-scored risks for the active account. Each entry has a likelihood/impact score, ALE estimate, status lifecycle, and a link to the source scan. AI agent narratives are attached as collapsible tiles below.",
         steps: [
           { text: "Risk Register vs Risk Overview: Register is the detailed row-level list (one row per risk). Overview is the aggregate dashboard (domains, heat map, total ALE). Same underlying data, different views for different audiences." },
-          { text: "Open Risk Register from the left nav. Ensure the correct client is selected in the top toolbar." },
+          { text: "Open Risk Register from the left nav. Ensure the correct account is selected in the top toolbar." },
           { text: "Filter with slicer chips: SEVERITY (Critical / High / Medium / Low), STATUS (open / mitigated / accepted / closed), CATEGORY (domain label)." },
           { text: "Update a risk's status: click the status chip in the row directly, or expand the row and use the status dropdown. Changes are immediate — no save button needed.", detail: "Use 'Accepted' for risks you've formally decided to tolerate (e.g. legacy system, remediation cost exceeds impact)." },
           { text: "Scroll below the risk table to AI Agent Risk Analysis: one collapsible tile per agent type that ran (Risk Manager, Threat Intel, Remediation). Click a tile to read the full narrative." },
@@ -412,7 +412,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "What the Threat Register is for: it answers 'which threat actors and techniques are relevant to our current findings?' — turning vulnerability data into threat intelligence the blue team can act on directly." },
           { text: "How it gets populated: run the Threat Intel agent from AI Buddies → select a completed scan → choose Threat Intel → Run. The agent maps each finding to the most relevant MITRE ATT&CK technique (e.g. T1190 Exploit Public-Facing Application) and writes structured entries.", detail: "The Orchestrator agent also populates the Threat Register as part of its full-assessment run." },
-          { text: "Select your client in the top toolbar. Open Threat Register from the left nav (Security section)." },
+          { text: "Select your account in the top toolbar. Open Threat Register from the left nav (Security section)." },
           { text: "KPI strip: total entries, active count, mitigated count, false positive count." },
           { text: "Filter by Status (active / mitigated / false positive) or Severity. Each row shows: severity chip, finding title, MITRE technique ID (e.g. T1190), technique name, tactic (Initial Access / Execution / Persistence / etc.), and confidence level." },
           { text: "Use the ⋮ menu on any row to update status. Move to 'Mitigated' when the underlying vulnerability is remediated. Move to 'False Positive' when the detection is incorrect." },
@@ -432,7 +432,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "What the Control Deficiencies register is for: it answers 'which framework controls are we failing and why?' — exactly what an auditor needs." },
           { text: "How it gets populated: run the Compliance Monitor agent from AI Buddies → select a scan → choose Compliance Monitor → select a framework → Run. The Orchestrator also populates this register." },
-          { text: "Select your client in the top toolbar. Open Control Deficiencies from the left nav (Security section)." },
+          { text: "Select your account in the top toolbar. Open Control Deficiencies from the left nav (Security section)." },
           { text: "KPI strip: total deficiencies, open, in-remediation, closed, and Avg Audit Readiness percentage bar. Readiness rises as deficiencies move to 'closed'." },
           { text: "Filter by Status, Severity, or Framework. Each row shows the control ID in monospace (e.g. PR.DS-1 for NIST CSF, 8.7 for ISO 27001, REQ-6-3-1 for PCI DSS), the gap description, framework chip, and regulatory reference." },
           { text: "Use the status icon on a row to move a deficiency through: open → in_remediation (work started) → closed (control satisfied). Audit Readiness bar updates immediately." },
@@ -452,7 +452,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "What the Remediation Tracker is for: it bridges the gap between 'we have 847 findings' and 'here's what the team should do this week'." },
           { text: "How it gets populated: run the Remediation agent from AI Buddies → select a scan → choose Remediation → Run. The Orchestrator also populates this register." },
-          { text: "Select your client in the top toolbar. Open Remediation Tracker from the left nav (Security section)." },
+          { text: "Select your account in the top toolbar. Open Remediation Tracker from the left nav (Security section)." },
           { text: "Toggle between band-grouped view (default — Quick Win / Near Term / Medium Term / Strategic sections) and flat table. Toggle with the Assignment icon top-right." },
           { text: "KPI strip: total actions, completion %, actions by band." },
           { text: "Band definitions:", detail: "Quick Win: 0–30 days, low effort / high impact. Near Term: 30–90 days. Medium Term: 90–180 days. Strategic: 180+ days, architectural or process changes." },
@@ -478,7 +478,7 @@ const GROUPS: Group[] = [
         summary: "AI Buddies agents take a completed scan's findings and produce two outputs: human-readable narrative analysis and structured register entries. Each agent specialises in a different register — risk scoring, threat intel, compliance gaps, or remediation planning.",
         steps: [
           { text: "What agents do under the hood: findings from the selected scan are packaged into a structured LLM prompt. The LLM returns structured JSON which is parsed into register entries (Risk, ThreatEntry, ControlDeficiency, RemediationAction) and a narrative. Both are persisted to the database.", detail: "Provider auto-failover: if your primary LLM is unavailable, the platform automatically tries the next in order — Azure OpenAI → OpenAI → Gemini → Bedrock → Anthropic." },
-          { text: "Select your client in the top toolbar. Open AI Buddies from the left nav." },
+          { text: "Select your account in the top toolbar. Open AI Buddies from the left nav." },
           { text: "Pick the Scan to analyse. Only completed scans appear — running or pending scans have no findings yet." },
           { text: "Select a Framework from the Framework dropdown. This controls which compliance framework the Compliance Monitor and Framework Analyst evaluate your findings against. Standard options: NIST CSF, ISO 27001, PCI DSS, GDPR, CIS v8, SOC 2, and more. Your custom frameworks appear with a blue 'Custom' chip." },
           { text: "Choose which agents to run:", detail: "Risk Manager → Risk Register + Risk Overview. Threat Intel → Threat Register (MITRE ATT&CK mappings). Compliance Monitor → Control Deficiencies (framework control gaps). Remediation → Remediation Tracker (time-banded actions). Orchestrator → all 4 registers in one run." },
@@ -544,7 +544,7 @@ const GROUPS: Group[] = [
         steps: [
           { text: "What workflows do: they run a pre-defined security mission (cloud security assessment, SOC design review, GRC advisory, threat model update, etc.) on a schedule. Each run produces a structured 7-section AI report and optionally sends an email summary and refreshes ALE scores." },
           { text: "Open Workflows from the left nav. Click 'New workflow'." },
-          { text: "Fill in: Name (descriptive label), Client, Mission type, Schedule." },
+          { text: "Fill in: Name (descriptive label), Account, Mission type, Schedule." },
           { text: "Choose a schedule — presets: Daily 06:00, Weekly Monday 08:00, Monthly 1st 09:00. Or paste a custom 5-field cron expression.", detail: "Cron runs in UTC on App Service. Add UTC offset for your timezone — e.g. for UTC+8, 'Daily 06:00 local' = '0 22 * * *' in cron." },
           { text: "Toggle 'Send summary email' to receive the report by email after each run." },
           { text: "Toggle 'Update risk quantification' to re-run the ALE model after the workflow completes." },
@@ -643,13 +643,13 @@ const GROUPS: Group[] = [
         summary: "Download full reports and remediation plans as PDF or Word documents",
         steps: [
           { text: "Four export formats are available from the Export & History tab: Full Report PDF, Full Report DOCX (Word), Remediation Plan PDF, Remediation Plan DOCX." },
-          { text: "Full Report: Contains Document Control, Executive Summary, Scope & Methodology, all findings with full detail, and Conclusion. Suitable for client delivery." },
+          { text: "Full Report: Contains Document Control, Executive Summary, Scope & Methodology, all findings with full detail, and Conclusion. Suitable for account delivery." },
           { text: "Remediation Plan: Contains only actionable remediation items grouped by priority — a working document for the engineering team, not client-facing." },
           { text: "How to export: Report detail → Export & History tab → click the format button. The file downloads immediately.", detail: "If export fails: verify the report has findings. Empty reports generate empty documents." },
         ],
         tips: [
           "DOCX format is editable — use it when clients need to add their own branding.",
-          "PDF is preferred for final client delivery — it cannot be accidentally modified.",
+          "PDF is preferred for final delivery — it cannot be accidentally modified.",
         ],
       },
     ],
@@ -706,7 +706,7 @@ const GROUPS: Group[] = [
         summary: "After building your custom standard, use it in AI Agents exactly like any built-in framework. The Compliance Monitor and Framework Analyst agents will evaluate scan findings specifically against the controls you selected.",
         steps: [
           { text: "Make sure your custom framework has controls added to it (Custom Standards page). An empty custom framework produces empty agent output." },
-          { text: "Open AI Buddies from the left nav. Select your client in the top toolbar." },
+          { text: "Open AI Buddies from the left nav. Select your account in the top toolbar." },
           { text: "Choose a completed scan from the Scan selector." },
           { text: "Open the Framework dropdown. Scroll to the bottom of the list — your custom frameworks appear there with a blue 'Custom' chip and their control count." },
           { text: "Select your custom framework from the dropdown." },
@@ -732,7 +732,7 @@ const GROUPS: Group[] = [
           { text: "Select your custom policy from the dropdown." },
           { text: "Click 'Scan' in the toolbar. The Scan wizard opens — pick a connector and scope (full policy / failing controls only / selected rows / custom IDs)." },
           { text: "Start the scan. The scan runs the connector and tags findings with your custom policy slug. The Frameworks page refreshes automatically when it completes.", detail: "Custom policy controls are drawn from standard frameworks, so the connector's output is mapped to those source controls. For a full gap analysis with AI reasoning, also run AI Buddies → Compliance Monitor with your custom policy selected." },
-          { text: "The framework detail view (accordions, status chips, score donut) works identically for custom policies — it shows compliance status for each control in your policy based on all findings from this client." },
+          { text: "The framework detail view (accordions, status chips, score donut) works identically for custom policies — it shows compliance status for each control in your policy based on all findings from this account." },
         ],
         tips: [
           "The purple info note in the Scan wizard is a reminder: for deep gap analysis with explanations, combine a connector scan with the Compliance Monitor agent.",
@@ -747,8 +747,8 @@ const GROUPS: Group[] = [
         title: "View compliance posture for a specific scan",
         summary: "The Frameworks page has a Scan dropdown (between Project and Framework) that scopes the entire compliance view — score, status chips, finding links — to a single completed scan. Use this to produce a per-engagement compliance report.",
         steps: [
-          { text: "Open Frameworks. Select your client and a framework." },
-          { text: "The Scan dropdown (labelled 'Scan') sits between the Project and Framework dropdowns. It lists all completed scans for the client, filtered by the selected project." },
+          { text: "Open Frameworks. Select your account and a framework." },
+          { text: "The Scan dropdown (labelled 'Scan') sits between the Project and Framework dropdowns. It lists all completed scans for the account, filtered by the selected project." },
           { text: "Choose a scan from the list. The framework detail reloads and now shows statuses derived live from that scan's findings only — not the aggregate across all scans.", detail: "Live derivation logic: for each framework control, the platform looks for findings from the selected scan that map to that control (via control_id match or control_mappings cross-reference). Non-compliant = open findings exist; Partial = some open, some remediated; Compliant = only historical findings (all remediated); N/A = no findings from this scan touch this control." },
           { text: "A blue 'Scoped: [scan name]' chip appears in the summary banner to confirm the view is filtered." },
           { text: "The score donut and control counts all reflect only the selected scan — this is the compliance posture at that point in time." },

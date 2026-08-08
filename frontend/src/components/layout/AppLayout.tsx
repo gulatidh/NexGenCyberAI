@@ -112,7 +112,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Governance",
     items: [
       { label: "Posture Trends",    icon: <TrendingUp />,    path: "/posture-trends" },
-      { label: "Client Comparison", icon: <CompareArrows />, path: "/client-comparison" },
+      { label: "Account Comparison", icon: <CompareArrows />, path: "/client-comparison" },
     ],
   },
   {

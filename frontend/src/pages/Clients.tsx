@@ -12,7 +12,7 @@ import { Client } from "../types";
 import { toast } from "react-toastify";
 
 const FORM_FIELDS = [
-  { key: "name",          label: "Client Name *" },
+  { key: "name",          label: "Account Name *" },
   { key: "slug",          label: "Slug (URL-safe) *" },
   { key: "industry",      label: "Industry" },
   { key: "country",       label: "Country" },
@@ -167,7 +167,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });
       setPendingDelete(null);
-      toast.success("Client moved to trash — restorable for 30 days from Settings → Deleted Clients");
+      toast.success("Account moved to trash — restorable for 30 days from Settings → Deleted Accounts");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Delete failed"),
   });
@@ -196,7 +196,7 @@ export default function Clients() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Clients</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Accounts</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Manage client profiles and their security posture
           </Typography>
