@@ -25,8 +25,9 @@ import {
   Visibility, VisibilityOff, LinkOutlined,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
-  NewReleases, Psychology, Webhook, VpnKey,
+  NewReleases, Psychology, Webhook, VpnKey, MenuBook,
 } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import Skeleton from "@mui/material/Skeleton";
 import LinearProgress from "@mui/material/LinearProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1122,6 +1123,7 @@ const TABS = [
 
 export default function Settings() {
   const [tab, setTab] = useState(0);
+  const navigate = useNavigate();
 
   const { data: me } = useQuery<MyAccess>({
     queryKey: ["my-access"], queryFn: adminApi.me, retry: 0, staleTime: 60_000,
@@ -1166,6 +1168,19 @@ export default function Settings() {
             />
           ))}
         </Tabs>
+        <Divider sx={{ my: 1 }} />
+        <Box
+          onClick={() => navigate("/help")}
+          sx={{
+            display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1.25,
+            cursor: "pointer", borderLeft: "3px solid transparent",
+            "&:hover": { bgcolor: "action.hover", borderColor: "rgba(0,188,212,0.5)" },
+            transition: "all .12s",
+          }}
+        >
+          <MenuBook sx={{ fontSize: 16, color: "#00BCD4" }} />
+          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 13 }}>Help</Typography>
+        </Box>
       </Box>
 
       {/* Tab panels */}
