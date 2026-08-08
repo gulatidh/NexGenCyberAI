@@ -760,9 +760,9 @@ export const dataModelApi = {
     api.get(`/clients/${clientId}/data-model/connections`, {
       params: { entity_type: entityType, entity_id: entityId },
     }).then(r => r.data),
-  list: (clientId: string, entityType: string, search?: string) =>
+  list: (clientId: string, entityType: string, search?: string, limit?: number) =>
     api.get(`/clients/${clientId}/data-model/list`, {
-      params: { entity_type: entityType, ...(search ? { search } : {}) },
+      params: { entity_type: entityType, ...(search ? { search } : {}), ...(limit ? { limit } : {}) },
     }).then(r => r.data),
 };
 

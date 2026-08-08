@@ -326,17 +326,18 @@ async def list_entity_records(
     client_id: str,
     entity_type: str = Query(...),
     search: Optional[str] = Query(None),
+    limit: int = Query(20),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return top-20 records of the requested entity type for the search picker."""
+    """Return top-N records of the requested entity type for the search picker."""
     results = []
 
     if entity_type == "asset":
         q = db.query(Asset).filter(Asset.client_id == client_id)
         if search:
             q = q.filter(Asset.name.ilike(f"%{search}%"))
-        for a in q.limit(20).all():
+        for a in q.limit(limit).all():
             results.append({"id": a.id, "label": a.name,
                             "detail": a.asset_class or a.asset_type or "",
                             "entity": "asset"})
@@ -349,7 +350,7 @@ async def list_entity_records(
         )
         if search:
             q = q.filter(Finding.title.ilike(f"%{search}%"))
-        for f in q.order_by(Finding.severity).limit(20).all():
+        for f in q.order_by(Finding.severity).limit(limit).all():
             sev = f.severity.value if hasattr(f.severity, "value") else (f.severity or "")
             results.append({"id": f.id, "label": f.title,
                             "detail": sev, "entity": "finding"})
@@ -358,7 +359,7 @@ async def list_entity_records(
         q = db.query(Risk).filter(Risk.client_id == client_id, Risk.status == "open")
         if search:
             q = q.filter(Risk.title.ilike(f"%{search}%"))
-        for r in q.limit(20).all():
+        for r in q.limit(limit).all():
             lvl = r.risk_level.value if hasattr(r.risk_level, "value") else (r.risk_level or "")
             results.append({"id": r.id, "label": r.title,
                             "detail": lvl, "entity": "risk"})
@@ -367,7 +368,7 @@ async def list_entity_records(
         q = db.query(RemediationAction).filter(RemediationAction.client_id == client_id)
         if search:
             q = q.filter(RemediationAction.action.ilike(f"%{search}%"))
-        for rm in q.limit(20).all():
+        for rm in q.limit(limit).all():
             results.append({"id": rm.id, "label": rm.title or rm.action[:60],
                             "detail": rm.band or "", "entity": "remediation"})
 

@@ -539,10 +539,45 @@ function OntologyMini() {
     return key && stats[key] ? stats[key].total : null;
   }
 
+  function edgeWeightFromStats(e: OEdge): number {
+    const fk = ENTITY_STAT_KEY[e.from]; const tk = ENTITY_STAT_KEY[e.to];
+    if (!fk || !tk) return 1.4;
+    const fc = stats[fk] ? stats[fk].total : 0;
+    const tc = stats[tk] ? stats[tk].total : 0;
+    if (!fc && !tc) return 1.4;
+    const allTotals = Object.values(stats).map((s: StatData) => s?.total ?? 0);
+    const maxCount = Math.max(...allTotals, 1);
+    const norm = Math.log1p(Math.min(fc || maxCount, tc || maxCount)) / Math.log1p(maxCount);
+    return 1.4 + norm * 4.5;
+  }
+
+  function nodeHealthColorMini(entity: string): string | null {
+    const key = ENTITY_STAT_KEY[entity];
+    if (!key || !stats[key] || !stats[key].total) return null;
+    const bd = (stats[key] as any).breakdown ?? {};
+    if (key === "finding") {
+      if ((bd.critical ?? 0) > 0) return "#ef4444";
+      if ((bd.high ?? 0) > 0) return "#f97316";
+      return "#22c55e";
+    }
+    if (key === "risk") {
+      if ((bd.critical ?? 0) > 0) return "#ef4444";
+      if ((bd.high ?? 0) > 0) return "#f97316";
+      return "#22c55e";
+    }
+    if (key === "remediation") {
+      return ((bd.open ?? 0) + (bd.in_progress ?? 0)) > 0 ? "#f59e0b" : "#22c55e";
+    }
+    if (key === "technique") {
+      return (bd.critical ?? 0) + (bd.high ?? 0) > 0 ? "#ef4444" : "#f59e0b";
+    }
+    return stats[key].total > 0 ? "#22c55e" : null;
+  }
+
   const eStyle = (e: OEdge) => {
     const hit = sel && (e.from === sel || e.to === sel);
     const dim = sel && !hit;
-    return { stroke: hit ? "#4338ca" : edgeCol, strokeWidth: hit ? 2.4 : 1.6, opacity: dim ? 0.1 : 1, strokeDasharray: e.dashed ? "3 4" : undefined };
+    return { stroke: hit ? "#4338ca" : edgeCol, strokeWidth: hit ? 2.4 : edgeWeightFromStats(e), opacity: dim ? 0.1 : 1, strokeDasharray: e.dashed ? "3 4" : undefined };
   };
 
   const selNode = ONT_NODES.find(n => n.entity === sel);
@@ -585,6 +620,11 @@ function OntologyMini() {
                        onClick={() => setSel((p) => p === n.entity ? null : n.entity)}
                        onDoubleClick={() => navigate(`/${ONT_ROUTES[n.entity] ?? ""}`)}
                     >
+                      {nodeHealthColorMini(n.entity) && (
+                        <circle cx={n.cx} cy={n.cy} r={lit ? 18 : 14} fill="none"
+                          stroke={nodeHealthColorMini(n.entity)!} strokeWidth={2.5} opacity={0.5}
+                          style={{transition:"r 0.15s"}}/>
+                      )}
                       <circle cx={n.cx} cy={n.cy} r={lit ? 12 : 9} fill={n.color} stroke={isDark ? "#0b0f14" : "#fff"} strokeWidth={2} style={{ transition: "r 0.15s" }} />
                       {cnt !== null && cnt > 0 && (
                         <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle"
