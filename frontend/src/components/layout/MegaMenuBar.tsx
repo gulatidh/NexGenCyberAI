@@ -209,11 +209,13 @@ const MENU: MenuItem[] = [
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 function MegaPanel({
-  item, topPx, onClose,
+  item, topPx, onClose, onMouseEnter, onMouseLeave,
 }: {
   item: MenuItem;
   topPx: number;
   onClose: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -225,21 +227,31 @@ function MegaPanel({
     <Box
       role="region"
       aria-label={`${item.label} menu`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       sx={{
-        position: "fixed", top: topPx, left: 0, right: 0,
+        position: "fixed",
+        top: topPx - 1,           // -1 to close the 1px gap at bar border
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "58%",
+        minWidth: 560,
+        maxWidth: 920,
         zIndex: 1300,
         bgcolor: "background.paper",
-        borderBottom: "1px solid", borderColor: "divider",
-        boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 32px rgba(0,0,0,0.12)",
-        px: { xs: 2, md: 6 }, py: 3,
-        animation: "mmIn 0.17s ease",
+        border: "1px solid", borderColor: "divider",
+        borderTop: "none",
+        borderRadius: "0 0 12px 12px",
+        boxShadow: isDark ? "0 12px 40px rgba(0,0,0,0.55)" : "0 8px 32px rgba(0,0,0,0.13)",
+        px: 3, py: 2.5,
+        animation: "mmIn 0.15s ease",
         "@keyframes mmIn": {
-          from: { opacity: 0, transform: "translateY(-6px)" },
-          to:   { opacity: 1, transform: "translateY(0)" },
+          from: { opacity: 0, transform: "translateX(-50%) translateY(-6px)" },
+          to:   { opacity: 1, transform: "translateX(-50%) translateY(0)" },
         },
       }}
     >
-      <Box sx={{ display: "flex", gap: { xs: 3, md: 5 }, flexWrap: "wrap", maxWidth: 1200, mx: "auto" }}>
+      <Box sx={{ display: "flex", gap: { xs: 2, md: 4 }, flexWrap: "wrap" }}>
         {item.columns.map((col) => (
           <Box key={col.heading} sx={{ flex: "1 1 240px", minWidth: 210 }}>
             {/* Column header */}
@@ -409,6 +421,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
         ) : (
           /* ── Desktop: hover mega menu ───────────────────────────────────── */
           <Box
+            onMouseEnter={clearLeave}
             onMouseLeave={leave}
             sx={{ display: "flex", alignItems: "center", height: "100%", flexGrow: 1 }}
           >
@@ -460,11 +473,15 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
         )}
       </Box>
 
-      {/* Desktop panel */}
+      {/* Desktop panel — handlers go directly on the fixed Box inside MegaPanel */}
       {!isMobile && activeItem && (
-        <Box id={`mega-panel-${activeItem.id}`} onMouseEnter={clearLeave} onMouseLeave={leave}>
-          <MegaPanel item={activeItem} topPx={barBottom} onClose={closeAll} />
-        </Box>
+        <MegaPanel
+          item={activeItem}
+          topPx={barBottom}
+          onClose={closeAll}
+          onMouseEnter={clearLeave}
+          onMouseLeave={leave}
+        />
       )}
     </>
   );
