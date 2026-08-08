@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
 import {
   Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
   ListItemIcon, ListItemText, Divider, Avatar, Menu, MenuItem,
   IconButton, Chip, Tooltip, Collapse, ToggleButton, ToggleButtonGroup,
-  Alert, Snackbar, Select, FormControl,
+  Alert, Snackbar, Select, FormControl, Breadcrumbs,
 } from "@mui/material";
+import { NavigateNext } from "@mui/icons-material";
 import {
   Dashboard, People, BugReport, Security, Policy,
   SmartToy, Assessment, Logout, AccountCircle,
@@ -127,6 +128,57 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+// ── Breadcrumb ────────────────────────────────────────────────────────────────
+
+// Build a flat path→{label, section} lookup from NAV_GROUPS
+const PATH_META: Record<string, { label: string; section: string }> = {};
+NAV_GROUPS.forEach((g) => {
+  const section = g.section ?? "";
+  g.items.forEach((item) => {
+    PATH_META[item.path] = { label: item.label, section };
+    (item.children || []).forEach((c) => {
+      PATH_META[c.path] = { label: c.label, section };
+    });
+  });
+});
+
+function AppBreadcrumb() {
+  const { pathname } = useLocation();
+
+  // Try exact match first, then longest prefix match
+  const meta = PATH_META[pathname] ?? (() => {
+    const match = Object.keys(PATH_META)
+      .filter((p) => p !== "/" && pathname.startsWith(p))
+      .sort((a, b) => b.length - a.length)[0];
+    return match ? PATH_META[match] : null;
+  })();
+
+  if (!meta) return null;
+
+  return (
+    <Box sx={{
+      px: 3, py: 0.75,
+      borderBottom: "1px solid",
+      borderColor: "divider",
+      bgcolor: "background.default",
+    }}>
+      <Breadcrumbs separator={<NavigateNext sx={{ fontSize: 14 }} />} sx={{ fontSize: 12 }}>
+        <Link to="/" style={{ textDecoration: "none" }}>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", "&:hover": { color: "primary.main" }, cursor: "pointer" }}>
+            Hub
+          </Typography>
+        </Link>
+        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+          {meta.section}
+        </Typography>
+        <Typography sx={{ fontSize: 12, color: "text.primary", fontWeight: 500 }}>
+          {meta.label}
+        </Typography>
+      </Breadcrumbs>
+    </Box>
+  );
+}
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -585,6 +637,7 @@ export default function AppLayout() {
             </Menu>
           </Toolbar>
         </AppBar>
+        <AppBreadcrumb />
         <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: "auto" }}>
           <Outlet />
         </Box>
