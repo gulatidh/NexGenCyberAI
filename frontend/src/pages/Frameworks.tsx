@@ -44,6 +44,7 @@ type FrameworkFamily = typeof FAMILY_ORDER[number];
 
 function getFrameworkFamily(key: string, name?: string, isCustom?: boolean): FrameworkFamily {
   if (isCustom) return "Custom";
+  if (!key) return "Other";
   const k = key.toLowerCase();
   const n = (name || "").toLowerCase();
   if (k.startsWith("cis_") || k === "cis_v8" || n.startsWith("cis ")) return "CIS";

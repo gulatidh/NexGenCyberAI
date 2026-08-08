@@ -98,8 +98,7 @@ async def list_frameworks(db: Session = Depends(get_db), _=Depends(get_current_u
 @router.get("/frameworks/all/")
 async def list_frameworks_all(db: Session = Depends(get_db), _=Depends(get_current_user)):
     """Merged catalog: standard frameworks + user-created custom frameworks.
-    Returns [{value, label, is_custom, control_count}] used by Frameworks page
-    and AI Agents framework selector.
+    Returns [{framework, name, is_custom, total_controls}] matching FrameworkCatalogEntry.
     """
     try:
         # Standard frameworks
@@ -114,21 +113,21 @@ async def list_frameworks_all(db: Session = Depends(get_db), _=Depends(get_curre
             if fw_value not in valid_values:
                 continue
             out.append({
-                "value": fw_value,
-                "label": display_name,
+                "framework": fw_value,
+                "name": display_name,
                 "is_custom": False,
-                "control_count": by_fw.get(fw_value, 0),
+                "total_controls": by_fw.get(fw_value, 0),
             })
-        out.sort(key=lambda e: e["label"].lower())
+        out.sort(key=lambda e: e["name"].lower())
 
         # Custom frameworks
         customs = db.query(CustomFramework).order_by(CustomFramework.name).all()
         for cf in customs:
             out.append({
-                "value": cf.slug,
-                "label": cf.name,
+                "framework": cf.slug,
+                "name": cf.name,
                 "is_custom": True,
-                "control_count": len(cf.controls) if cf.controls else 0,
+                "total_controls": len(cf.controls) if cf.controls else 0,
             })
 
         return out

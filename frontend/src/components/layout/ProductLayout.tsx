@@ -30,6 +30,7 @@ import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import NotificationBell from "./NotificationBell";
 import AssistantWidget from "../AssistantWidget";
+import GlobalSearch from "../GlobalSearch";
 
 export interface ProductNavItem {
   label: string;
@@ -164,6 +165,9 @@ export default function ProductLayout({ product }: Props) {
 
         {/* Client selector */}
         <ClientSelector />
+
+        {/* Global search */}
+        <GlobalSearch />
 
         {/* Notifications */}
         <NotificationBell />
