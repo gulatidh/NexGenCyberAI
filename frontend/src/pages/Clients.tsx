@@ -216,7 +216,7 @@ export default function Clients() {
       ) : (
         <Grid container spacing={2}>
           {clients.map((c) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={c.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={c.id}>
               <ClientCard client={c} onEdit={openEdit} onDelete={(cl) => setPendingDelete(cl)} />
             </Grid>
           ))}

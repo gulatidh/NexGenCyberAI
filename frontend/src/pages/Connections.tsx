@@ -552,14 +552,7 @@ export default function Connections() {
     const tr = testResults[conn.id];
     const isActive = conn.status === "active";
     return (
-      <Card
-        sx={{
-          bgcolor: "background.paper",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 2,
-          height: "100%",
-        }}
-      >
+      <Card sx={{ height: "100%" }}>
         <CardContent>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
             <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>
@@ -783,7 +776,7 @@ export default function Connections() {
         ) : (
           <Grid container spacing={2}>
             {platformConnectors.map((conn) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={conn.id}>
                 <ConnectorCard conn={conn} />
               </Grid>
             ))}
@@ -868,7 +861,7 @@ export default function Connections() {
                   </Box>
                   <Grid container spacing={2}>
                     {group.map((conn) => (
-                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={conn.id}>
                         <ConnectorCard conn={conn} showScanReadyChip />
                       </Grid>
                     ))}
@@ -910,7 +903,7 @@ export default function Connections() {
               const isDefault = aiConfig?.default_provider === provider.provider;
               const label = PROVIDER_LOGOS[provider.provider] || provider.provider;
               return (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }} key={provider.provider}>
+                <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={provider.provider}>
                   <Card
                     sx={{
                       bgcolor: "background.paper",

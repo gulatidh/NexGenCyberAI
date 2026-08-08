@@ -1248,7 +1248,7 @@ export default function Agents() {
               </Box>
               <Grid container spacing={2}>
                 {group.agents.map((agent) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.id}>
+                  <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={agent.id}>
                     <Card sx={{
                       bgcolor: "background.paper",
                       border: `1px solid ${agent.is_enabled ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)"}`,
@@ -1343,7 +1343,7 @@ export default function Agents() {
           </Box>
           <Grid container spacing={2}>
             {hiddenData.groups.flatMap((g) => g.agents).map((agent: any) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4 }} key={agent.id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={agent.id}>
                 <Card variant="outlined" sx={{ opacity: 0.55, borderStyle: "dashed" }}>
                   <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>

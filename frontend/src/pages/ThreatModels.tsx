@@ -231,7 +231,7 @@ export default function ThreatModels() {
             const sc = STATUS_COLOR[m.status] || "rgba(255,255,255,0.4)";
             const inFlight = m.status === "pending" || m.status === "generating";
             return (
-              <Grid key={m.id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid key={m.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                 <Card
                   onClick={() => navigate(`${tmBase}/${m.id}?client=${m.client_id}`)}
                   sx={{

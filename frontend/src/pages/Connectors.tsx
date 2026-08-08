@@ -459,8 +459,8 @@ export default function Connectors() {
                     const sp = STATUS_PROPS[conn.status] || STATUS_PROPS.inactive;
                     const tr = testResults[conn.id];
                     return (
-                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={conn.id}>
-                        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={conn.id}>
+                        <Card>
                           <CardContent>
                             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                               <Typography sx={{ color: "text.primary", fontWeight: 600 }}>{conn.name}</Typography>

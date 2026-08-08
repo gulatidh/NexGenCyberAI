@@ -329,7 +329,7 @@ export default function ClientDetail() {
           </Box>
           <Grid container spacing={2}>
             {projects.map((p) => (
-              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
+              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                 <ProjectCardCompact project={p} clientId={clientId!}
                   onDelete={() => {
                     if (window.confirm(`Delete project "${p.name}"?`)) deleteProjectMutation.mutate(p.id);
@@ -361,7 +361,7 @@ export default function ClientDetail() {
           ) : (
             <Grid container spacing={2}>
               {connectors.map((c) => (
-                <Grid key={c.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid key={c.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
                   <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
                     <CardContent>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>

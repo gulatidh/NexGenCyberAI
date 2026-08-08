@@ -163,7 +163,7 @@ export default function Projects() {
       <Grid container spacing={2}>
         {isLoading ? (
           [0, 1, 2].map((i) => (
-            <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid key={i} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <Skeleton variant="rectangular" height={180} sx={{ borderRadius: 2, bgcolor: "rgba(255,255,255,0.04)" }} />
             </Grid>
           ))
@@ -177,7 +177,7 @@ export default function Projects() {
           </Grid>
         ) : (
           projects.map((p) => (
-            <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
+            <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <ProjectCard project={p} clientId={clientId}
                 onEdit={() => openEdit(p)}
                 onDelete={() => {
