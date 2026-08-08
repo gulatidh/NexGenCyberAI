@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  Box, Typography, Button, Chip, IconButton, Tab, Tabs, TextField,
+  Box, Typography, Button, Chip, IconButton, TextField,
   Select, MenuItem, FormControl, InputLabel, Dialog, DialogTitle,
   DialogContent, DialogActions, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, Alert, CircularProgress,
@@ -9,8 +9,9 @@ import {
 import {
   ArrowBack, Save, PictureAsPdf, Description,
   Add, Edit, Delete, GppGood, CheckCircle, Shield,
-  FileDownload, Replay,
+  FileDownload, Replay, BugReport, MenuBook, Assignment,
 } from "@mui/icons-material";
+import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
@@ -19,6 +20,9 @@ import { useActiveClient } from "../contexts/ClientContext";
 import { vaptApi } from "../services/api";
 
 const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+
+const VAPT_TAB_MAP: Record<string, number> = { doc: 0, scope: 1, findings: 2, export: 3 };
+const VAPT_TAB_KEY: Record<number, string> = { 0: "doc", 1: "scope", 2: "findings", 3: "export" };
 
 const SEV_COLORS: Record<string, string> = {
   critical: "#C62828",
@@ -535,17 +539,24 @@ export default function VAPTReportDetail() {
         </Box>
       </Box>
 
-      {/* ── Tabs ──────────────────────────────────────────────────────────── */}
-      <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
-          <Tab label="Document Control" />
-          <Tab label="Scope & Methodology" />
-          <Tab label={`Findings (${(report.findings || []).length})`} />
-          <Tab label="Export & History" />
-        </Tabs>
-      </Box>
-
-      <Box sx={{ flex: 1, overflow: "auto", p: 3 }}>
+      <PageDetailLayout
+        entityName={report?.title ?? "VAPT Report"}
+        entityType="VAPT Report"
+        avatarColor="#EA4335"
+        navItems={[
+          { id: "doc",      label: "Document Control",                               Icon: Description,  color: "#4285F4" },
+          { id: "scope",    label: "Scope & Method",                                 Icon: Assignment,   color: "#34A853" },
+          { id: "findings", label: `Findings (${(report?.findings || []).length})`,  Icon: BugReport,    color: "#EA4335" },
+          { id: "export",   label: "Export & History",                               Icon: FileDownload, color: "#FF9800" },
+          { id: "help",     label: "Help",                                           Icon: MenuBook,     color: "#00BCD4" },
+        ] as DetailNavItem[]}
+        activeId={VAPT_TAB_KEY[tab] ?? "doc"}
+        onSelect={(id: string) => {
+          if (id === "help") navigate("/help");
+          else setTab(VAPT_TAB_MAP[id] ?? 0);
+        }}
+      >
+      <Box sx={{ flex: 1, overflow: "auto" }}>
 
         {/* ── Tab 0: Document Control ──────────────────────────────────────── */}
         {tab === 0 && (
@@ -882,6 +893,7 @@ export default function VAPTReportDetail() {
           </Box>
         )}
       </Box>
+      </PageDetailLayout>
 
       {/* ── Finding dialog ────────────────────────────────────────────────── */}
       <FindingDialog

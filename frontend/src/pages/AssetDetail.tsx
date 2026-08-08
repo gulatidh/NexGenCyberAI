@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Card, Chip, CircularProgress, Button, IconButton,
-  Tabs, Tab, Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Grid, Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, LinearProgress,
 } from "@mui/material";
-import { ArrowBack, PlayArrow, Refresh } from "@mui/icons-material";
+import {
+  ArrowBack, PlayArrow, Refresh,
+  BugReport, Warning, Timeline, AccountTree, FileCopy, GppGood, MenuBook, DataObject,
+} from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { clientsApi, assetsApi, connectorsApi, attackPathApi } from "../services/api";
@@ -14,6 +17,7 @@ import {
   ResponsiveContainer, Legend,
 } from "recharts";
 import { fmt, fromNow } from "../utils/datetime";
+import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -27,6 +31,15 @@ const CLASS_COLOR: Record<string, string> = {
 };
 const STATUS_COLOR: Record<string, string> = {
   active: "#00e676", stale: "#ff9800", deleted: "rgba(255,255,255,0.4)",
+};
+
+const ASSET_TAB_MAP: Record<string, number> = {
+  findings: 0, risks: 1, cves: 2, metadata: 3,
+  timeline: 4, attack_path: 5, duplicates: 6, compliance: 7,
+};
+const ASSET_TAB_KEY: Record<number, string> = {
+  0: "findings", 1: "risks", 2: "cves", 3: "metadata",
+  4: "timeline", 5: "attack_path", 6: "duplicates", 7: "compliance",
 };
 
 export default function AssetDetailPage() {
@@ -106,290 +119,300 @@ export default function AssetDetailPage() {
     { label: "Last Synced", value: fromNow(asset.last_synced_at) },
   ];
 
+  const navItems: DetailNavItem[] = [
+    { id: "findings",    label: `Findings (${findings.length})`,  Icon: BugReport,    color: "#EA4335" },
+    { id: "risks",       label: `Risks (${risks.length})`,        Icon: Warning,      color: "#FF9800" },
+    { id: "cves",        label: "CVEs",                           Icon: BugReport,    color: "#FF5722" },
+    { id: "timeline",    label: "Timeline",                       Icon: Timeline,     color: "#4285F4" },
+    { id: "attack_path", label: "Attack Path",                    Icon: AccountTree,  color: "#9C27B0" },
+    { id: "compliance",  label: "Compliance",                     Icon: GppGood,      color: "#34A853" },
+    { id: "metadata",    label: "Metadata",                       Icon: DataObject,   color: "#757575" },
+    { id: "duplicates",  label: "Duplicates",                     Icon: FileCopy,     color: "#607D8B" },
+    { id: "help",        label: "Help",                           Icon: MenuBook,     color: "#00BCD4" },
+  ];
+
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        <IconButton onClick={() => navigate(assetsBase)} sx={{ color: "text.secondary" }}>
-          <ArrowBack />
-        </IconButton>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>Asset Inventory</Typography>
-      </Box>
-
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
-            <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>{asset.name}</Typography>
-            <Chip label={klass} size="small"
-              sx={{ bgcolor: `${CLASS_COLOR[klass] || "#888"}20`, color: CLASS_COLOR[klass] || "#888", fontSize: 11 }} />
-            <Chip label={asset.status} size="small"
-              sx={{ bgcolor: `${STATUS_COLOR[asset.status] || "#888"}20`, color: STATUS_COLOR[asset.status] || "#888", fontSize: 11 }} />
-          </Box>
-          <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
-            {asset.external_id}
-          </Typography>
+    <PageDetailLayout
+      entityName={asset?.name ?? "Asset"}
+      entityType="Asset"
+      avatarColor="#9C27B0"
+      navItems={navItems}
+      activeId={ASSET_TAB_KEY[tab] ?? "findings"}
+      onSelect={(id: string) => {
+        if (id === "help") navigate("/help");
+        else setTab(ASSET_TAB_MAP[id] ?? 0);
+      }}
+    >
+      <Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+          <IconButton onClick={() => navigate(assetsBase)} sx={{ color: "text.secondary" }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>Asset Inventory</Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Tooltip title="Refresh inventory for this connector">
-            <span>
-              <Button startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                sx={{ color: "text.secondary", borderColor: "divider" }}
-                variant="outlined">
-                Refresh
-              </Button>
-            </span>
-          </Tooltip>
-          <Tooltip title="Run on-demand scan against this asset">
-            <span>
-              <Button startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
-                onClick={() => scanMutation.mutate()}
-                disabled={scanMutation.isPending}
-                sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
-                variant="contained">
-                Scan This Asset
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
-      </Box>
 
-      {scanMutation.isSuccess && (
-        <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
-          Scan started. Findings will appear here once it completes.
-        </Alert>
-      )}
-
-      {/* Summary cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>Severity Breakdown</Typography>
-            <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-              {(["critical", "high", "medium", "low", "info"] as const).map((s) => {
-                const count = asset.severity_breakdown?.[s] ?? findings.filter((f) => f.status === "open" && ((f.severity as any)?.value ?? f.severity) === s).length;
-                return count > 0 ? (
-                  <Chip key={s} label={`${count} ${s}`} size="small"
-                    sx={{ bgcolor: `${SEV_COLOR[s]}22`, color: SEV_COLOR[s], fontSize: 10, height: 20 }} />
-                ) : null;
-              })}
-              {openFindings === 0 && <Typography variant="body2" sx={{ color: "text.secondary" }}>No open findings</Typography>}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+              <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>{asset.name}</Typography>
+              <Chip label={klass} size="small"
+                sx={{ bgcolor: `${CLASS_COLOR[klass] || "#888"}20`, color: CLASS_COLOR[klass] || "#888", fontSize: 11 }} />
+              <Chip label={asset.status} size="small"
+                sx={{ bgcolor: `${STATUS_COLOR[asset.status] || "#888"}20`, color: STATUS_COLOR[asset.status] || "#888", fontSize: 11 }} />
             </Box>
-            <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
-              {openFindings} open of {findings.length} total
+            <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+              {asset.external_id}
             </Typography>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>Linked Risks</Typography>
-            <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "text.secondary", fontWeight: 700 }}>
-              {risks.length}
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Unique CVEs</Typography>
-            <Typography variant="h4" sx={{ color: (asset.cve_count ?? 0) > 0 ? "#4285F4" : "text.secondary", fontWeight: 700 }}>
-              {asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              {asset.last_scan_date ? `Last scan ${fromNow(asset.last_scan_date)}` : "No scans yet"}
-            </Typography>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Metadata grid */}
-      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          {metaItems.map((m) => (
-            <Grid key={m.label} size={{ xs: 6, sm: 4, md: 3 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{m.label}</Typography>
-              <Typography variant="body2" sx={{ color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {m.value}
-              </Typography>
-            </Grid>
-          ))}
-        </Grid>
-      </Card>
-
-      {/* Tabs */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)}
-        sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "text.secondary", textTransform: "none" },
-          "& .Mui-selected": { color: "#4285F4" }, "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
-        <Tab label={`Findings (${findings.length})`} />
-        <Tab label={`Risks (${risks.length})`} />
-        <Tab label={`CVEs (${asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length})`} />
-        <Tab label="Raw Metadata" />
-        <Tab label="Timeline" />
-        <Tab label="Attack Path" />
-        <Tab label="Duplicates" />
-        <Tab label="Compliance" />
-      </Tabs>
-
-      {tab === 0 && (
-        findings.length === 0 ? (
-          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <Typography sx={{ color: "text.secondary" }}>No findings linked to this asset.</Typography>
-          </Card>
-        ) : (
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
-                    <TableCell>SEVERITY</TableCell>
-                    <TableCell>TITLE</TableCell>
-                    <TableCell>CVE</TableCell>
-                    <TableCell>CVSS</TableCell>
-                    <TableCell>STATUS</TableCell>
-                    <TableCell>FOUND</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {findings.map((f) => {
-                    const sev = (typeof f.severity === "object" ? (f.severity as any).value : f.severity) || "info";
-                    return (
-                      <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
-                        <TableCell>
-                          <Chip label={sev} size="small"
-                            sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
-                        </TableCell>
-                        <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
-                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {f.title}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
-                        <TableCell sx={{ fontSize: 12, color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
-                          {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
-                        </TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f.status || "open"}</TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
-                          {fromNow(f.created_at)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
-        )
-      )}
-
-      {tab === 1 && (
-        risks.length === 0 ? (
-          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <Typography sx={{ color: "text.secondary" }}>No risks linked to this asset.</Typography>
-          </Card>
-        ) : (
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
-                    <TableCell>LEVEL</TableCell>
-                    <TableCell>TITLE</TableCell>
-                    <TableCell>SCORE</TableCell>
-                    <TableCell>OWNER</TableCell>
-                    <TableCell>STATUS</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {risks.map((r) => {
-                    const lvl = (typeof r.risk_level === "object" ? (r.risk_level as any).value : r.risk_level) || "low";
-                    return (
-                      <TableRow key={r.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
-                        <TableCell>
-                          <Chip label={lvl} size="small"
-                            sx={{ bgcolor: `${RISK_COLOR[lvl] || "#888"}20`, color: RISK_COLOR[lvl] || "#888", fontSize: 10, height: 18 }} />
-                        </TableCell>
-                        <TableCell sx={{ color: "text.primary" }}>{r.title}</TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
-                          {r.risk_score != null ? r.risk_score.toFixed(1) : "—"}
-                        </TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.owner || "—"}</TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.status}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
-        )
-      )}
-
-      {tab === 2 && (() => {
-        const cveIds = asset.cves ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id!))).sort();
-        return cveIds.length === 0 ? (
-          <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-            <Typography sx={{ color: "text.secondary" }}>No CVEs found for findings on this asset.</Typography>
-          </Card>
-        ) : (
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
-                    <TableCell>CVE ID</TableCell>
-                    <TableCell>TITLE</TableCell>
-                    <TableCell>SEVERITY</TableCell>
-                    <TableCell align="right">CVSS</TableCell>
-                    <TableCell>STATUS</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {cveIds.map((cveId) => {
-                    const f = findings.find((fi) => fi.cve_id === cveId);
-                    const sev = f ? ((f.severity as any)?.value ?? f.severity) : "info";
-                    return (
-                      <TableRow key={cveId} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
-                            {cveId}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
-                          <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {f?.title || "—"}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={sev} size="small"
-                            sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}22`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontSize: 12, color: f?.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
-                          {f?.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
-                        </TableCell>
-                        <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f?.status || "open"}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
-        );
-      })()}
-
-      {tab === 3 && (
-        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-          <Box component="pre" sx={{ color: "text.secondary", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
-            {JSON.stringify(asset.provider_metadata || {}, null, 2)}
           </Box>
-        </Card>
-      )}
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Tooltip title="Refresh inventory for this connector">
+              <span>
+                <Button startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  sx={{ color: "text.secondary", borderColor: "divider" }}
+                  variant="outlined">
+                  Refresh
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip title="Run on-demand scan against this asset">
+              <span>
+                <Button startIcon={scanMutation.isPending ? <CircularProgress size={14} sx={{ color: "#0d1117" }} /> : <PlayArrow />}
+                  onClick={() => scanMutation.mutate()}
+                  disabled={scanMutation.isPending}
+                  sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}
+                  variant="contained">
+                  Scan This Asset
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
+        </Box>
 
-      {tab === 4 && <AssetTimeline clientId={clientId} assetId={assetId} />}
-      {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
-      {tab === 6 && <AssetDuplicates clientId={clientId} assetId={assetId} />}
-      {tab === 7 && <AssetComplianceTab clientId={clientId} assetId={assetId} />}
-    </Box>
+        {scanMutation.isSuccess && (
+          <Alert severity="info" sx={{ mb: 2, bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
+            Scan started. Findings will appear here once it completes.
+          </Alert>
+        )}
+
+        {/* Summary cards */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>Severity Breakdown</Typography>
+              <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                {(["critical", "high", "medium", "low", "info"] as const).map((s) => {
+                  const count = asset.severity_breakdown?.[s] ?? findings.filter((f) => f.status === "open" && ((f.severity as any)?.value ?? f.severity) === s).length;
+                  return count > 0 ? (
+                    <Chip key={s} label={`${count} ${s}`} size="small"
+                      sx={{ bgcolor: `${SEV_COLOR[s]}22`, color: SEV_COLOR[s], fontSize: 10, height: 20 }} />
+                  ) : null;
+                })}
+                {openFindings === 0 && <Typography variant="body2" sx={{ color: "text.secondary" }}>No open findings</Typography>}
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                {openFindings} open of {findings.length} total
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>Linked Risks</Typography>
+              <Typography variant="h4" sx={{ color: risks.length > 0 ? "#ff9800" : "text.secondary", fontWeight: 700 }}>
+                {risks.length}
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>Unique CVEs</Typography>
+              <Typography variant="h4" sx={{ color: (asset.cve_count ?? 0) > 0 ? "#4285F4" : "text.secondary", fontWeight: 700 }}>
+                {asset.cve_count ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id))).length}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {asset.last_scan_date ? `Last scan ${fromNow(asset.last_scan_date)}` : "No scans yet"}
+              </Typography>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Metadata grid */}
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2, mb: 3 }}>
+          <Grid container spacing={2}>
+            {metaItems.map((m) => (
+              <Grid key={m.label} size={{ xs: 6, sm: 4, md: 3 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>{m.label}</Typography>
+                <Typography variant="body2" sx={{ color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {m.value}
+                </Typography>
+              </Grid>
+            ))}
+          </Grid>
+        </Card>
+
+        {/* Tab panels */}
+        {tab === 0 && (
+          findings.length === 0 ? (
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary" }}>No findings linked to this asset.</Typography>
+            </Card>
+          ) : (
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                      <TableCell>SEVERITY</TableCell>
+                      <TableCell>TITLE</TableCell>
+                      <TableCell>CVE</TableCell>
+                      <TableCell>CVSS</TableCell>
+                      <TableCell>STATUS</TableCell>
+                      <TableCell>FOUND</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {findings.map((f) => {
+                      const sev = (typeof f.severity === "object" ? (f.severity as any).value : f.severity) || "info";
+                      return (
+                        <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                          <TableCell>
+                            <Chip label={sev} size="small"
+                              sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
+                          </TableCell>
+                          <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
+                            <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {f.title}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ color: f.cve_id ? "#4285F4" : "text.secondary", fontSize: 12 }}>{f.cve_id || "—"}</TableCell>
+                          <TableCell sx={{ fontSize: 12, color: f.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
+                            {f.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f.status || "open"}</TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>
+                            {fromNow(f.created_at)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+          )
+        )}
+
+        {tab === 1 && (
+          risks.length === 0 ? (
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary" }}>No risks linked to this asset.</Typography>
+            </Card>
+          ) : (
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                      <TableCell>LEVEL</TableCell>
+                      <TableCell>TITLE</TableCell>
+                      <TableCell>SCORE</TableCell>
+                      <TableCell>OWNER</TableCell>
+                      <TableCell>STATUS</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {risks.map((r) => {
+                      const lvl = (typeof r.risk_level === "object" ? (r.risk_level as any).value : r.risk_level) || "low";
+                      return (
+                        <TableRow key={r.id} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                          <TableCell>
+                            <Chip label={lvl} size="small"
+                              sx={{ bgcolor: `${RISK_COLOR[lvl] || "#888"}20`, color: RISK_COLOR[lvl] || "#888", fontSize: 10, height: 18 }} />
+                          </TableCell>
+                          <TableCell sx={{ color: "text.primary" }}>{r.title}</TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>
+                            {r.risk_score != null ? r.risk_score.toFixed(1) : "—"}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.owner || "—"}</TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.status}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+          )
+        )}
+
+        {tab === 2 && (() => {
+          const cveIds = asset.cves ?? Array.from(new Set(findings.filter((f) => f.cve_id).map((f) => f.cve_id!))).sort();
+          return cveIds.length === 0 ? (
+            <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+              <Typography sx={{ color: "text.secondary" }}>No CVEs found for findings on this asset.</Typography>
+            </Card>
+          ) : (
+            <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                      <TableCell>CVE ID</TableCell>
+                      <TableCell>TITLE</TableCell>
+                      <TableCell>SEVERITY</TableCell>
+                      <TableCell align="right">CVSS</TableCell>
+                      <TableCell>STATUS</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {cveIds.map((cveId) => {
+                      const f = findings.find((fi) => fi.cve_id === cveId);
+                      const sev = f ? ((f.severity as any)?.value ?? f.severity) : "info";
+                      return (
+                        <TableRow key={cveId} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ color: "#4285F4", fontFamily: "monospace", fontSize: 12 }}>
+                              {cveId}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
+                            <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {f?.title || "—"}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip label={sev} size="small"
+                              sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}22`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }} />
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontSize: 12, color: f?.cvss_score != null ? (f.cvss_score >= 9 ? "#f44336" : f.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
+                            {f?.cvss_score != null ? f.cvss_score.toFixed(1) : "—"}
+                          </TableCell>
+                          <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{f?.status || "open"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
+          );
+        })()}
+
+        {tab === 3 && (
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+            <Box component="pre" sx={{ color: "text.secondary", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
+              {JSON.stringify(asset.provider_metadata || {}, null, 2)}
+            </Box>
+          </Card>
+        )}
+
+        {tab === 4 && <AssetTimeline clientId={clientId} assetId={assetId} />}
+        {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
+        {tab === 6 && <AssetDuplicates clientId={clientId} assetId={assetId} />}
+        {tab === 7 && <AssetComplianceTab clientId={clientId} assetId={assetId} />}
+      </Box>
+    </PageDetailLayout>
   );
 }
 

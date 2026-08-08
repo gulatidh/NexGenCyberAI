@@ -12,7 +12,7 @@ import React, { useState } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Card, CardContent, Tabs, Tab, Chip, Button,
+  Box, Typography, Card, CardContent, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
   Dialog, DialogTitle, DialogContent, TextField, Select,
@@ -21,7 +21,9 @@ import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
+  MenuBook, Group, VerifiedUser, Timeline,
 } from "@mui/icons-material";
+import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
@@ -30,6 +32,19 @@ import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdDiagram from "../components/DfdDiagram";
 import DfdReactFlow from "../components/DfdReactFlow";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
+
+const TM_NAV: DetailNavItem[] = [
+  { id: "diagram",         label: "Diagram",          Icon: AccountTree,     color: "#4285F4" },
+  { id: "components",      label: "Components",       Icon: Hub,             color: "#FF9800" },
+  { id: "threats",         label: "Threats",          Icon: Security,        color: "#EA4335" },
+  { id: "coverage",        label: "Coverage",         Icon: PlaylistAddCheck, color: "#34A853" },
+  { id: "mitigations",     label: "Mitigations",      Icon: AddTask,         color: "#9C27B0" },
+  { id: "attack_chains",   label: "Attack Chains",    Icon: AccountTree,     color: "#FF5722" },
+  { id: "adversaries",     label: "Adversaries",      Icon: Group,           color: "#607D8B" },
+  { id: "detection_rules", label: "Detection Rules",  Icon: VerifiedUser,    color: "#00BCD4" },
+  { id: "maturity",        label: "Maturity",         Icon: Timeline,        color: "#757575" },
+  { id: "help",            label: "Help",             Icon: MenuBook,        color: "#00BCD4" },
+];
 
 interface Component {
   id: string; name: string; type: string;
@@ -816,25 +831,27 @@ export default function ThreatModelDetail() {
         </Card>
       )}
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)}
-        className="no-print"
-        sx={{
-          borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
-          "& .Mui-selected": { color: "#4285F4" },
-          "& .MuiTabs-indicator": { backgroundColor: "#4285F4" },
-        }}>
-        <Tab value="diagram" label="Diagram" />
-        <Tab value="components" label={`Components (${data.component_count})`} />
-        <Tab value="threats" label={`Threats (${data.threat_count})`} />
-        <Tab value="coverage" label="Coverage" />
-        <Tab value="maturity" label="Maturity" />
-        <Tab value="mitigations" label={`Mitigations (${data.mitigation_count})`} />
-        <Tab value="attack_chains" label={`Attack Chains (${(data.attack_trees_json || []).length})`} />
-        <Tab value="adversaries" label={`Adversaries (${(data.adversary_profiles_json || []).length})`} />
-        <Tab value="detection_rules" label={`Detection Rules (${(data.sigma_rules_json || []).length})`} />
-      </Tabs>
-
+      <PageDetailLayout
+        entityName={data?.name || (data?.methodology ? `Threat Model · ${data.methodology.toUpperCase()}` : "Threat Model")}
+        entityType="Threat Model"
+        avatarColor="#EA4335"
+        navItems={TM_NAV.map(item => {
+          if (!data) return item;
+          if (item.id === "components")      return { ...item, label: `Components (${data.component_count ?? 0})` };
+          if (item.id === "threats")         return { ...item, label: `Threats (${data.threat_count ?? 0})` };
+          if (item.id === "mitigations")     return { ...item, label: `Mitigations (${data.mitigation_count ?? 0})` };
+          if (item.id === "attack_chains")   return { ...item, label: `Attack Chains (${(data.attack_trees_json || []).length})` };
+          if (item.id === "adversaries")     return { ...item, label: `Adversaries (${(data.adversary_profiles_json || []).length})` };
+          if (item.id === "detection_rules") return { ...item, label: `Detection Rules (${(data.sigma_rules_json || []).length})` };
+          return item;
+        })}
+        activeId={tab}
+        onSelect={(id: string) => {
+          if (id === "help") navigate("/help");
+          else setTab(id);
+        }}
+        fullWidth={printing}
+      >
       {/* DIAGRAM */}
       {(tab === "diagram" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
@@ -1206,6 +1223,7 @@ export default function ThreatModelDetail() {
           onValidated={() => qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] })}
         />
       )}
+      </PageDetailLayout>
     </Box>
   );
 }

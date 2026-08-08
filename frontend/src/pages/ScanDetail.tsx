@@ -1,15 +1,16 @@
 import React, { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
-  Box, Typography, Card, CardContent, Chip, Button, CircularProgress, Tabs, Tab,
+  Box, Typography, Card, CardContent, Chip, Button, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Alert, Grid,
   Divider, LinearProgress, Tooltip, Collapse, IconButton, Dialog, DialogTitle,
   DialogContent, DialogActions, Menu, MenuItem as MuiMenuItem,
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
-  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close,
+  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close, MenuBook,
 } from "@mui/icons-material";
+import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { assessmentsApi, findingsApi, agentsApi } from "../services/api";
@@ -441,6 +442,13 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
   );
 }
 
+// ── Nav ──────────────────────────────────────────────────────────────────────
+
+const BASE_NAV: DetailNavItem[] = [
+  { id: "verdict",  label: "AI Verdict",  Icon: AutoAwesome, color: "#4285F4" },
+  { id: "findings", label: "Findings",    Icon: BugReport,   color: "#EA4335" },
+];
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ScanDetail() {
@@ -525,6 +533,35 @@ export default function ScanDetail() {
 
   return (
     <Box className="scan-detail-print-area">
+      <PageDetailLayout
+        entityName={data ? (data.name || `${data.scan_type} scan`) : "Assessment"}
+        entityType="Assessment"
+        avatarColor="#4285F4"
+        navItems={[
+          ...BASE_NAV.map((item: DetailNavItem) =>
+            item.id === "findings"
+              ? { ...item, label: `Findings (${data?.findings?.length ?? 0})` }
+              : item
+          ),
+          ...(data?.agent_runs ?? []).map((ar: any) => ({
+            id: `agent-${ar.id}`,
+            label: ar.input_data?.agent_name || ar.output_data?.agent_name
+              ? (ar.input_data?.agent_name || ar.output_data?.agent_name || ar.agent_type || "agent").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+              : ar.agent_type
+                ? ar.agent_type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+                : "Agent",
+            Icon: SmartToy,
+            color: "#9C27B0",
+          } as DetailNavItem)),
+          { id: "help", label: "Help", Icon: MenuBook, color: "#00BCD4" } as DetailNavItem,
+        ]}
+        activeId={tab}
+        onSelect={(id: string) => {
+          if (id === "help") navigate("/help");
+          else setTab(id);
+        }}
+        fullWidth={printing}
+      >
       {/* Print stylesheet — flatten tabs into a single document, swap dark
           chrome for paper-friendly contrast, hide nav/buttons. Triggered
           by either the Print/PDF button or Ctrl+P. */}
@@ -680,22 +717,6 @@ export default function ScanDetail() {
         </Box>
       )}
 
-      {/* Top-level tabs: Verdict | Findings | one tab per agent run */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)}
-        className="no-print"
-        sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)", mb: 2,
-          "& .MuiTab-root": { color: "text.secondary", textTransform: "none", fontWeight: 600 },
-          "& .Mui-selected": { color: "#4285F4" },
-          "& .MuiTabs-indicator": { backgroundColor: "#4285F4" } }}>
-        <Tab icon={<AutoAwesome sx={{ fontSize: 16 }} />} iconPosition="start" value="verdict" label="AI Verdict" />
-        <Tab icon={<BugReport sx={{ fontSize: 16 }} />} iconPosition="start" value="findings"
-          label={`Findings (${data.findings.length})`} />
-        {data.agent_runs.map((ar) => (
-          <Tab key={ar.id} icon={<SmartToy sx={{ fontSize: 16 }} />} iconPosition="start"
-            value={`agent-${ar.id}`} label={agentLabel(ar)} />
-        ))}
-      </Tabs>
-
       {/* AI Verdict tab */}
       {(tab === "verdict" || printing) && (
         verdict ? (
@@ -823,6 +844,7 @@ export default function ScanDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+      </PageDetailLayout>
     </Box>
   );
 }
