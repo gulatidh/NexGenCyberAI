@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import React, { Suspense, Component, ErrorInfo, ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeModeProvider } from "./theme/ThemeModeContext";
@@ -10,7 +10,30 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { AuthProvider } from "./auth/AuthProvider";
 import { loginRequest } from "./auth/msalConfig";
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Typography, Button } from "@mui/material";
+
+// ── Global error boundary — prevents a single component crash from blanking the app
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(_error: Error, info: ErrorInfo) { console.error("AppErrorBoundary caught:", _error, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", bgcolor: "#0d1117", color: "white", p: 4 }}>
+          <Typography variant="h5" sx={{ mb: 2, color: "#EA4335" }}>Something went wrong</Typography>
+          <Typography sx={{ mb: 3, color: "rgba(255,255,255,0.6)", fontSize: 13, maxWidth: 500, textAlign: "center" }}>
+            {(this.state.error as Error).message}
+          </Typography>
+          <Button variant="outlined" onClick={() => { this.setState({ error: null }); window.location.reload(); }}>
+            Reload page
+          </Button>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ── Static imports (always-needed layout + landing) ───────────────────────────
 import AppLayout from "./components/layout/AppLayout";
@@ -97,7 +120,7 @@ function LoginPage() {
       height: "100vh", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", background: "#0F0F0F",
     }}>
-      <img src={`${process.env.PUBLIC_URL}/monitara-logo.jpg`} alt="Owlet AI"
+      <img src="/monitara-logo.jpg" alt="Owlet AI"
         style={{ width: 90, height: 90, marginBottom: 16 }} />
       <h1 style={{ fontFamily: "Inter, sans-serif", fontSize: 36, margin: 0, letterSpacing: "-0.02em", fontWeight: 800 }}>
         <span style={{ color: "#4285F4" }}>O</span>
@@ -317,6 +340,7 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
+    <AppErrorBoundary>
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
@@ -334,5 +358,6 @@ export default function App() {
         </ThemeModeProvider>
       </QueryClientProvider>
     </AuthProvider>
+    </AppErrorBoundary>
   );
 }

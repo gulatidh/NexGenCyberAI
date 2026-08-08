@@ -556,7 +556,7 @@ export default function LandingPage() {
         <Container maxWidth="lg">
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Owlet" style={{ width: 32, height: 32 }} />
+              <img src={"/monitara-logo.svg"} alt="Owlet" style={{ width: 32, height: 32 }} />
               <Typography sx={{ fontWeight: 800, fontSize: 20, letterSpacing: "-0.02em" }}>
                 <Box component="span" sx={{ color: "#4285F4" }}>Aeg</Box>
                 <Box component="span" sx={{ color: CYAN }}>is</Box>
@@ -1521,7 +1521,7 @@ export default function LandingPage() {
             {/* Brand column */}
             <Grid size={{ xs: 12, md: 4 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-                <img src={`${process.env.PUBLIC_URL}/monitara-logo.svg`} alt="Owlet" style={{ width: 28, height: 28, opacity: 0.8 }} />
+                <img src={"/monitara-logo.svg"} alt="Owlet" style={{ width: 28, height: 28, opacity: 0.8 }} />
                 <Typography sx={{ fontWeight: 800, fontSize: 18, letterSpacing: "-0.02em" }}>
                   <Box component="span" sx={{ color: "#4285F4" }}>Aeg</Box>
                   <Box component="span" sx={{ color: CYAN }}>is</Box>

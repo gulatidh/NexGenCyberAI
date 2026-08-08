@@ -259,14 +259,14 @@ export default function AppLayout() {
           {expanded ? (
             <Box
               component="img"
-              src={`${process.env.PUBLIC_URL}/aegis-logo.svg`}
+              src={"/aegis-logo.svg"}
               alt="Owlet AI"
               sx={{ height: 42, width: "auto", maxWidth: 190, flexShrink: 0 }}
             />
           ) : (
             <Box
               component="img"
-              src={`${process.env.PUBLIC_URL}/aegis-icon.svg`}
+              src={"/aegis-icon.svg"}
               alt="Owlet AI"
               sx={{ width: 36, height: 36, flexShrink: 0 }}
             />
