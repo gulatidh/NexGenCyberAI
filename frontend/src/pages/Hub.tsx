@@ -1,26 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Avatar, Card, CardActionArea,
-  List, ListItemButton, ListItemText, Divider,
-  FormControl, Select, MenuItem, Drawer, IconButton,
-  Tooltip, useMediaQuery, useTheme, alpha,
+  Box, Typography, Card, CardActionArea, alpha, useTheme,
 } from "@mui/material";
 import {
   Shield, BugReport, Psychology, Radar, Assessment,
-  GppBad, PlaylistAddCheck, SmartToy, Cable, Settings,
-  Storage, Menu as MenuIcon, Help as HelpOutline,
-  Dashboard, AutoStories, Tune, Policy,
+  GppBad, PlaylistAddCheck, SmartToy, AutoStories, Tune, Policy,
   Hub as HubIcon,
 } from "@mui/icons-material";
-import MegaMenuBar from "../components/layout/MegaMenuBar";
-import OwletLogo from "../components/OwletLogo";
-import { useMsal } from "@azure/msal-react";
-import { useQuery } from "@tanstack/react-query";
-import { adminApi, clientsApi } from "../services/api";
 import AssistantWidget from "../components/AssistantWidget";
-import { MyAccess, Client } from "../types";
-import { useActiveClient } from "../contexts/ClientContext";
+import MegaMenuBar from "../components/layout/MegaMenuBar";
+import AppControls from "../components/layout/AppControls";
+import OwletLogo from "../components/OwletLogo";
 
 // ── Stage + product data ──────────────────────────────────────────────────────
 
@@ -50,180 +41,65 @@ const STAGES: Stage[] = [
     title: "Stand up the environment",
     sub: "Get the tenant ready — clients, connectors, and AI providers.",
     products: [
-      { abbrev: "ST", name: "Setup",    desc: "Clients, assets, connectors, AI providers, and platform settings.", route: "/platform",    Icon: Tune },
+      { abbrev: "ST", name: "Setup",         desc: "Clients, assets, connectors, AI providers, and platform settings.",          route: "/platform",                     Icon: Tune       },
+      { abbrev: "TM", name: "Threat Models", desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",            route: "/threat-intel/threat-models",   Icon: HubIcon    },
+      { abbrev: "FW", name: "Frameworks",    desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",                route: "/compliance/frameworks",         Icon: Policy     },
     ],
   },
   {
-    num: "02", id: "design", label: "Design",
-    color: "#7c3aed", bgColor: "#F5F3FF",
-    title: "Define the blueprint",
-    sub: "Model how data moves, then pick which standards it has to satisfy.",
-    products: [
-      { abbrev: "TM", name: "Threat Models",  desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.", route: "/threat-intel/threat-models", Icon: HubIcon   },
-      { abbrev: "FW", name: "Frameworks",     desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",    route: "/compliance/frameworks",     Icon: Policy    },
-    ],
-  },
-  {
-    num: "03", id: "discover", label: "Discover",
+    num: "02", id: "discover", label: "Discover",
     color: "#0f766e", bgColor: "#F0FDFA",
     title: "Find what's actually exposed",
     sub: "Scan the environment — manually or through a guided AI conversation.",
     products: [
       { abbrev: "VM", name: "Vulnerability Management", desc: "Scans, findings, posture trends, CVE enrichment, and scan import.",    route: "/vulnerability",                Icon: BugReport  },
-      { abbrev: "AI", name: "AI Assisted Scan",         desc: "Conversational guided assessment — describe your environment, launch a scan.", route: "/intelligence/ai-assisted-scan", Icon: SmartToy   },
+      { abbrev: "CV", name: "CVE Blast Radius",         desc: "Which assets does a CVE actually affect? Map the full exposure.",      route: "/cve-pivot",                    Icon: Shield     },
+      { abbrev: "AI", name: "AI Assisted Scan",         desc: "Conversational guided assessment — describe your environment, launch.", route: "/intelligence/ai-assisted-scan",Icon: SmartToy   },
     ],
   },
   {
-    num: "04", id: "analyse", label: "Analyse",
+    num: "03", id: "analyse", label: "Analyse",
     color: "#b45309", bgColor: "#FFFBEB",
     title: "Turn findings into risk",
     sub: "Score findings, map attack paths, and query your entire posture in plain language.",
     products: [
-      { abbrev: "RM", name: "Risk Manager",       desc: "FAIR-scored risk register, ALE exposure, and attack path graph.", route: "/risk",          Icon: Assessment  },
-      { abbrev: "IG", name: "Smart Intelligence", desc: "Natural language queries, compliance heatmap, and asset inventory.", route: "/intelligence", Icon: Psychology  },
+      { abbrev: "RM", name: "Risk Manager",       desc: "FAIR-scored risk register, ALE exposure, and attack path graph.",   route: "/risk",              Icon: Assessment },
+      { abbrev: "IG", name: "Smart Intelligence", desc: "NL queries, compliance heatmap, client comparison, and reports.",  route: "/intelligence",      Icon: Psychology },
     ],
   },
   {
-    num: "05", id: "respond", label: "Respond",
+    num: "04", id: "respond", label: "Respond",
     color: "#b91c1c", bgColor: "#FEF2F2",
     title: "Act on the picture",
     sub: "Map risk to real adversary behaviour, then track remediation programs.",
     products: [
-      { abbrev: "TI", name: "Threat Intelligence", desc: "MITRE ATT&CK threat register and attack path visualisation.", route: "/threat-intel",    Icon: Radar           },
-      { abbrev: "GR", name: "Governance",           desc: "CTEM programs, control gaps, remediation tracker, and scorecard.", route: "/governance", Icon: PlaylistAddCheck },
+      { abbrev: "TI", name: "Threat Intelligence", desc: "MITRE ATT&CK threat register and attack path visualisation.",         route: "/threat-intel",   Icon: Radar           },
+      { abbrev: "GR", name: "Governance",          desc: "CTEM programs, control gaps, remediation tracker, and scorecard.",   route: "/governance",     Icon: PlaylistAddCheck },
     ],
   },
   {
-    num: "06", id: "report", label: "Report",
+    num: "05", id: "report", label: "Report",
     color: "#15803d", bgColor: "#F0FDF4",
     title: "Prove it happened",
     sub: "Close the loop with evidence the client — or the auditor — can keep.",
     products: [
-      { abbrev: "PT", name: "Pen Testing / VAPT",   desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",           route: "/vapt",       Icon: Shield        },
-      { abbrev: "CM", name: "Compliance Monitor",   desc: "Framework assessments, evidence packages, and audit-ready output.", route: "/compliance", Icon: GppBad        },
+      { abbrev: "PT", name: "Pen Testing / VAPT", desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",               route: "/vapt",       Icon: Shield   },
+      { abbrev: "CM", name: "Compliance Monitor", desc: "Framework assessments, evidence packages, and audit-ready output.",    route: "/compliance", Icon: GppBad   },
     ],
   },
   {
-    num: "07", id: "automate", label: "Automate",
+    num: "06", id: "automate", label: "Automate",
     color: "#4338ca", bgColor: "#EEF2FF",
     title: "Let AI carry the load",
     sub: "Agents run the loop — analysis, intel, remediation, knowledge — on repeat.",
     products: [
-      { abbrev: "AB", name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.", route: "/ai-advisor",           Icon: SmartToy   },
+      { abbrev: "AB", name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.", route: "/ai-advisor",            Icon: SmartToy   },
       { abbrev: "KB", name: "Knowledge & Docs", desc: "Knowledge base, security doc RAG, and ask-your-data queries.",          route: "/intelligence/knowledge", Icon: AutoStories },
     ],
   },
 ];
 
-const QUICK_NAV = [
-  { label: "Dashboard",  Icon: Dashboard,    route: "/dashboard"   },
-  { label: "Connectors", Icon: Cable,        route: "/connections" },
-  { label: "Assets",     Icon: Storage,      route: "/assets"      },
-  { label: "AI Buddies", Icon: SmartToy,     route: "/agents"      },
-  { label: "Settings",   Icon: Settings,     route: "/settings"    },
-  { label: "Help",       Icon: HelpOutline,  route: "/help"        },
-];
-
-// ── Client picker ─────────────────────────────────────────────────────────────
-
-function ClientPicker() {
-  const { clientId, setClientId } = useActiveClient();
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["clients"], queryFn: clientsApi.list, staleTime: 60_000,
-  });
-  return (
-    <FormControl fullWidth size="small" sx={{ px: 1.5, py: 1 }}>
-      <Select
-        displayEmpty value={clientId || ""}
-        onChange={(e) => setClientId(e.target.value as string)}
-        disabled={isLoading || clients.length === 0}
-        sx={{ fontSize: 12, bgcolor: "background.default", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-      >
-        <MenuItem value="" disabled><em>{isLoading ? "Loading…" : "Select client…"}</em></MenuItem>
-        {clients.map((c) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 12 }}>{c.name}</MenuItem>)}
-      </Select>
-    </FormControl>
-  );
-}
-
-// ── Sidebar content ───────────────────────────────────────────────────────────
-
-function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const navigate = useNavigate();
-  const { accounts } = useMsal();
-  const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0, staleTime: 60_000 });
-
-  const go = (p: string) => { navigate(p); onClose?.(); };
-
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Logo */}
-      <Box sx={{ px: 1.5, py: 1.5 }}>
-        <OwletLogo height={32} />
-      </Box>
-
-      <Divider />
-      <ClientPicker />
-      <Divider />
-
-      {/* Stage nav */}
-      <Typography sx={{ px: 2, pt: 1.5, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.disabled", textTransform: "uppercase", letterSpacing: 1 }}>
-        Phases
-      </Typography>
-      <List dense disablePadding sx={{ px: 1 }}>
-        {STAGES.map((s) => (
-          <ListItemButton
-            key={s.id}
-            onClick={() => { document.getElementById(`stage-${s.id}`)?.scrollIntoView({ behavior: "smooth" }); onClose?.(); }}
-            sx={{ borderRadius: 1.5, mb: 0.25, gap: 1, "&:hover": { bgcolor: alpha(s.color, 0.07) } }}
-          >
-            <Box sx={{
-              width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
-              border: `1.5px solid ${s.color}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Typography sx={{ fontFamily: "monospace", fontSize: "0.58rem", fontWeight: 700, color: s.color, lineHeight: 1 }}>
-                {s.num}
-              </Typography>
-            </Box>
-            <ListItemText
-              primary={s.label}
-              slotProps={{ primary: { sx: { fontSize: 13 } } }}
-            />
-          </ListItemButton>
-        ))}
-      </List>
-
-      <Divider sx={{ mt: 1 }} />
-
-      {/* Quick nav */}
-      <Typography sx={{ px: 2, pt: 1.5, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.disabled", textTransform: "uppercase", letterSpacing: 1 }}>
-        Quick Access
-      </Typography>
-      <List dense disablePadding sx={{ px: 1 }}>
-        {QUICK_NAV.map(({ label, Icon, route }) => (
-          <ListItemButton key={label} onClick={() => go(route)} sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}>
-            <Icon sx={{ fontSize: 16, color: "text.secondary" }} />
-            <ListItemText primary={label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
-          </ListItemButton>
-        ))}
-      </List>
-
-      {/* User */}
-      <Box sx={{ mt: "auto", px: 2, py: 1.5, borderTop: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Avatar sx={{ width: 28, height: 28, fontSize: 11, bgcolor: "primary.main" }}>
-          {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
-        </Avatar>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography noWrap sx={{ fontSize: 12, fontWeight: 600 }}>{accounts[0]?.name || "User"}</Typography>
-          {me?.is_admin && <Typography sx={{ fontSize: 10, color: "primary.main", fontWeight: 600 }}>Admin</Typography>}
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-
-// ── Product card (sample4 style) ──────────────────────────────────────────────
+// ── Product card ──────────────────────────────────────────────────────────────
 
 function ProductCard({ p, stageColor, stageBg }: { p: StageProduct; stageColor: string; stageBg: string }) {
   const navigate = useNavigate();
@@ -233,32 +109,22 @@ function ProductCard({ p, stageColor, stageBg }: { p: StageProduct; stageColor: 
 
   return (
     <Card elevation={0} sx={{
-      border: "1px solid", borderColor: "divider",
-      borderRadius: 2, overflow: "hidden",
+      border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden",
       transition: "box-shadow .18s, transform .18s, border-color .18s",
       "&:hover": { boxShadow: `0 4px 20px ${alpha(stageColor, 0.18)}`, transform: "translateY(-2px)", borderColor: stageColor },
     }}>
       <CardActionArea onClick={() => navigate(p.route)} sx={{ display: "flex", alignItems: "center", p: 0 }}>
-        {/* Left accent */}
         <Box sx={{
-          width: 68, flexShrink: 0, alignSelf: "stretch",
-          bgcolor: cardBg,
+          width: 68, flexShrink: 0, alignSelf: "stretch", bgcolor: cardBg,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0.5,
           borderRight: "1px solid", borderColor: "divider",
         }}>
           <p.Icon sx={{ fontSize: 22, color: stageColor }} />
-          <Typography sx={{ fontSize: 10, fontWeight: 800, color: stageColor, letterSpacing: 0.5 }}>
-            {p.abbrev}
-          </Typography>
+          <Typography sx={{ fontSize: 10, fontWeight: 800, color: stageColor, letterSpacing: 0.5 }}>{p.abbrev}</Typography>
         </Box>
-        {/* Right content */}
         <Box sx={{ px: 2, py: 1.5, flexGrow: 1, textAlign: "left" }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, mb: 0.4 }}>
-            {p.name}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.45 }}>
-            {p.desc}
-          </Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, mb: 0.4 }}>{p.name}</Typography>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.45 }}>{p.desc}</Typography>
         </Box>
       </CardActionArea>
     </Card>
@@ -305,7 +171,7 @@ const ONT_EDGES: OEdge[] = [
   { from:"SmartIntel",  to:"Control",     x1:440, y1:560, x2:250,  y2:470, dashed:true },
 ];
 const ONT_ROUTES: Record<string, string> = {
-  Client:"clients", Asset:"assets", Control:"compliance/frameworks",
+  Client:"platform/clients", Asset:"platform/assets", Control:"compliance/frameworks",
   DataFlow:"threat-intel/threat-models", Finding:"vulnerability/findings",
   SmartIntel:"intelligence/nl-query", Risk:"risk/register",
   Evidence:"compliance/evidence", AttackPath:"threat-intel/attack-paths",
@@ -337,7 +203,6 @@ function OntologyMini() {
       <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 2.5, maxWidth: 600 }}>
         Eleven entities, one connected data model. Click any node to trace connections — double-click to open that module.
       </Typography>
-
       <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2.5, overflowX: "auto" }}>
         <svg viewBox="0 0 1120 640" style={{ width: "100%", minWidth: 540, height: "auto", display: "block" }}>
           <defs>
@@ -370,19 +235,18 @@ function OntologyMini() {
             })}
           </g>
         </svg>
-
-        {/* Legend + link */}
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider", alignItems: "center" }}>
           {STAGES.map((s) => (
-            <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 0.75, fontSize: 11, color: "text.secondary" }}>
+            <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
               <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: s.color }} />
               <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{s.label.toLowerCase()}</Typography>
             </Box>
           ))}
-          <Box
-            onClick={() => navigate("/data-model")}
-            sx={{ ml: "auto", fontSize: 12, color: "primary.main", border: "1px solid", borderColor: "divider", px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer", "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.06) } }}
-          >
+          <Box onClick={() => navigate("/data-model")} sx={{
+            ml: "auto", fontSize: 12, color: "primary.main",
+            border: "1px solid", borderColor: "divider", px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer",
+            "&:hover": { bgcolor: alpha("#1565C0", 0.06) },
+          }}>
             Full screen →
           </Box>
         </Box>
@@ -393,14 +257,7 @@ function OntologyMini() {
 
 // ── Main Hub ──────────────────────────────────────────────────────────────────
 
-const DRAWER_WIDTH = 220;
-
 export default function Hub() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const navigate = useNavigate();
-
   useEffect(() => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
@@ -409,152 +266,119 @@ export default function Hub() {
     return () => { document.head.removeChild(link); };
   }, []);
 
-  const RAIL = "linear-gradient(180deg,#2563eb,#7c3aed 22%,#0f766e 38%,#b45309 54%,#b91c1c 70%,#15803d 84%,#4338ca)";
+  const RAIL = "linear-gradient(180deg,#2563eb,#0f766e 25%,#b45309 50%,#b91c1c 65%,#15803d 80%,#4338ca)";
 
   return (
     <>
-      <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "background.default" }}>
 
-        {/* Mobile drawer */}
-        <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}
-          sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: DRAWER_WIDTH, bgcolor: "background.paper" } }}>
-          <SidebarContent onClose={() => setDrawerOpen(false)} />
-        </Drawer>
-
-        {/* Desktop sidebar — same style as ProductLayout */}
+        {/* Top bar */}
         <Box sx={{
-          width: DRAWER_WIDTH, flexShrink: 0,
+          position: "sticky", top: 0, zIndex: 1200,
           bgcolor: "background.paper",
-          borderRight: "1px solid", borderColor: "divider",
-          display: { xs: "none", md: "flex" }, flexDirection: "column",
-          position: "sticky", top: 0, height: "100vh", overflowY: "auto",
+          borderBottom: "1px solid", borderColor: "divider",
+          height: 52,
         }}>
-          <SidebarContent />
+          <MegaMenuBar
+            brand={<OwletLogo height={32} />}
+            trailing={<AppControls />}
+          />
         </Box>
 
-        {/* Page content */}
-        <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+        {/* Main content */}
+        <Box sx={{ flex: 1, overflow: "auto", px: { xs: 2.5, md: 6 }, py: { xs: 4, md: 6 }, pb: 12, maxWidth: 1200, mx: "auto", width: "100%" }}>
 
-          {/* Top bar with mega menu */}
-          <Box sx={{
-            position: "sticky", top: 0, zIndex: 1200,
-            bgcolor: "background.paper",
-            borderBottom: "1px solid", borderColor: "divider",
-            height: 52,
-          }}>
-            <MegaMenuBar
-              brand={
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {isMobile && (
-                    <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ mr: 0.5 }}>
-                      <MenuIcon fontSize="small" />
-                    </IconButton>
-                  )}
-                  <OwletLogo height={36} />
-                </Box>
-              }
-              trailing={
-                <Tooltip title="Dashboard">
-                  <IconButton size="small" onClick={() => navigate("/dashboard")} sx={{ color: "text.secondary" }}>
-                    <Dashboard fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              }
-            />
+          {/* Hero */}
+          <Box sx={{ mb: 7 }}>
+            <Typography sx={{
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+              fontSize: { xs: 28, md: 42 }, letterSpacing: "-0.02em", lineHeight: 1.1, mb: 1.5,
+            }}>
+              One{" "}
+              <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+                signal path
+              </Box>
+              , from setup to evidence.
+            </Typography>
+            <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 560 }}>
+              Six stages run in order — each hands its output to the next. Hover the nav above to jump anywhere, or click a card below.
+            </Typography>
           </Box>
 
-          {/* Main scrollable area */}
-          <Box sx={{ flex: 1, overflow: "auto", px: { xs: 2.5, md: 5 }, py: { xs: 4, md: 6 }, pb: 12 }}>
+          {/* Pipeline */}
+          <Box sx={{ position: "relative" }}>
+            {/* Vertical rail */}
+            <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.35 }} />
 
-            {/* Hero */}
-            <Box sx={{ mb: 6 }}>
-              <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: { xs: 26, md: 36 }, letterSpacing: "-0.02em", lineHeight: 1.1, mb: 1.5 }}>
-                One{" "}
-                <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-                  signal path
+            {STAGES.map((stage, si) => (
+              <Box
+                key={stage.id}
+                id={`stage-${stage.id}`}
+                sx={{
+                  position: "relative", pl: "64px",
+                  mb: si < STAGES.length - 1 ? 6 : 0,
+                  scrollMarginTop: 24,
+                  opacity: 0, transform: "translateY(12px)",
+                  animation: `hubrise 0.5s ease ${si * 0.07}s forwards`,
+                  "@keyframes hubrise": { to: { opacity: 1, transform: "translateY(0)" } },
+                }}
+              >
+                {/* Stage node */}
+                <Box sx={{
+                  position: "absolute", left: 0, top: 0,
+                  width: 48, height: 48, borderRadius: "50%",
+                  bgcolor: "background.default",
+                  border: `2px solid ${stage.color}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "monospace", fontWeight: 700, fontSize: "1rem",
+                  color: stage.color,
+                  boxShadow: `0 0 18px -4px ${stage.color}60`,
+                  zIndex: 2,
+                }}>
+                  {stage.num}
                 </Box>
-                , from setup to evidence.
-              </Typography>
-              <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 560 }}>
-                Seven stages run in order — each hands its output to the next. Every product card opens directly into that module.
-              </Typography>
-            </Box>
 
-            {/* Pipeline */}
-            <Box sx={{ position: "relative" }}>
-              {/* Rail */}
-              <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.4 }} />
-
-              {STAGES.map((stage, si) => (
-                <Box
-                  key={stage.id}
-                  id={`stage-${stage.id}`}
-                  sx={{
-                    position: "relative", pl: "64px",
-                    mb: si < STAGES.length - 1 ? 6 : 0,
-                    scrollMarginTop: 24,
-                    opacity: 0, transform: "translateY(12px)",
-                    animation: `hubrise 0.5s ease ${si * 0.06}s forwards`,
-                    "@keyframes hubrise": { to: { opacity: 1, transform: "translateY(0)" } },
-                  }}
-                >
-                  {/* Stage node */}
-                  <Box sx={{
-                    position: "absolute", left: 0, top: 0,
-                    width: 48, height: 48, borderRadius: "50%",
-                    bgcolor: "background.default",
-                    border: `2px solid ${stage.color}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "monospace", fontWeight: 700, fontSize: "1rem",
-                    color: stage.color,
-                    boxShadow: `0 0 0 4px background.default, 0 0 18px -4px ${stage.color}`,
-                    zIndex: 2,
-                  }}>
-                    {stage.num}
-                  </Box>
-
-                  {/* Stage header */}
-                  <Box sx={{ pt: "4px", mb: 2 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                      <Box sx={{ width: 4, height: 16, borderRadius: 2, bgcolor: stage.color }} />
-                      <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: stage.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                        Stage {stage.num} · {stage.label}
-                      </Typography>
-                    </Box>
-                    <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 18, md: 22 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.5 }}>
-                      {stage.title}
-                    </Typography>
-                    <Typography sx={{ color: "text.secondary", fontSize: "0.88rem", maxWidth: 540 }}>
-                      {stage.sub}
+                {/* Stage header */}
+                <Box sx={{ pt: "4px", mb: 2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                    <Box sx={{ width: 4, height: 16, borderRadius: 2, bgcolor: stage.color }} />
+                    <Typography sx={{ fontSize: "0.71rem", fontWeight: 700, color: stage.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Stage {stage.num} · {stage.label}
                     </Typography>
                   </Box>
-
-                  {/* Product cards */}
-                  <Box sx={{
-                    display: "grid",
-                    gridTemplateColumns: stage.products.length === 1 ? "minmax(0,520px)" : { xs: "1fr", sm: "1fr 1fr" },
-                    gap: 1.5,
-                  }}>
-                    {stage.products.map((p) => (
-                      <ProductCard key={p.abbrev} p={p} stageColor={stage.color} stageBg={stage.bgColor} />
-                    ))}
-                  </Box>
+                  <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 18, md: 22 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.5 }}>
+                    {stage.title}
+                  </Typography>
+                  <Typography sx={{ color: "text.secondary", fontSize: "0.88rem", maxWidth: 540 }}>
+                    {stage.sub}
+                  </Typography>
                 </Box>
-              ))}
-            </Box>
 
-            {/* Ontology section */}
-            <OntologyMini />
+                {/* Product cards */}
+                <Box sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+                  gap: 1.5,
+                }}>
+                  {stage.products.map((p) => (
+                    <ProductCard key={p.abbrev} p={p} stageColor={stage.color} stageBg={stage.bgColor} />
+                  ))}
+                </Box>
+              </Box>
+            ))}
+          </Box>
 
-            {/* Footer */}
-            <Box sx={{ mt: 8, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-              <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
-                SETUP · DESIGN · DISCOVER · ANALYSE · RESPOND · REPORT · AUTOMATE
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
-                Owlet · NexGenAI
-              </Typography>
-            </Box>
+          {/* Ontology */}
+          <OntologyMini />
+
+          {/* Footer */}
+          <Box sx={{ mt: 8, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+            <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
+              SETUP · DISCOVER · ANALYSE · RESPOND · REPORT · AUTOMATE
+            </Typography>
+            <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
+              Owlet · NexGenAI
+            </Typography>
           </Box>
         </Box>
       </Box>
