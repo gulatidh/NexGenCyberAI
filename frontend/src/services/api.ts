@@ -372,6 +372,11 @@ export const adminApi = {
     since_hours?: number; limit?: number; offset?: number;
   }) =>
     apiClient.get("/admin/access-logs/", { params }).then((r) => r.data),
+  promptLogs: (params?: {
+    user_id?: string; endpoint?: string; status?: string;
+    since_hours?: number; limit?: number; offset?: number;
+  }) =>
+    apiClient.get("/admin/prompt-logs", { params }).then((r) => r.data),
   listDeletedClients: () => apiClient.get("/admin/clients/deleted").then((r) => r.data),
   restoreClient: (clientId: string) =>
     apiClient.post(`/admin/clients/${clientId}/restore`).then((r) => r.data),

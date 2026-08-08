@@ -15,7 +15,7 @@ import {
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, AccountTree, Psychology, Description, AutoFixHigh,
-  TrendingUp, GridView, CompareArrows, VpnKey, Webhook,
+  TrendingUp, GridView, CompareArrows, VpnKey, Webhook, Shield,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -120,9 +120,10 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Configure",
     items: [
       { label: "Settings", icon: <Settings />, path: "/settings" },
-      { label: "Webhooks", icon: <Webhook />,  path: "/webhooks" },
-      { label: "API Keys", icon: <VpnKey />,   path: "/api-keys" },
-      { label: "Help",     icon: <MenuBook />, path: "/help" },
+      { label: "Webhooks",     icon: <Webhook />,  path: "/webhooks" },
+      { label: "API Keys",     icon: <VpnKey />,   path: "/api-keys" },
+      { label: "AI Guardrails", icon: <Shield />,   path: "/ai-guardrails" },
+      { label: "Help",          icon: <MenuBook />, path: "/help" },
     ],
   },
 ];

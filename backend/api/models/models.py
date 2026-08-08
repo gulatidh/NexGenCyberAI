@@ -1447,3 +1447,24 @@ class RemediationJob(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
 
+
+# ── Prompt Audit Log ───────────────────────────────────────────────────────────
+
+class PromptAuditLog(Base):
+    """Lightweight audit trail for every LLM call — stores metadata only, never full prompt text."""
+    __tablename__ = "prompt_audit_logs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    user_id = Column(String(200), index=True)
+    client_id = Column(String(36), index=True, nullable=True)
+    endpoint = Column(String(100))          # e.g. "agent_run", "nl_query", "assistant"
+    provider = Column(String(50))           # e.g. "azure_openai", "anthropic"
+    model = Column(String(100), nullable=True)
+    input_chars = Column(Integer, default=0)   # character count of prompt (not stored)
+    output_chars = Column(Integer, default=0)  # character count of response
+    tokens_used = Column(Integer, default=0)
+    latency_ms = Column(Integer, default=0)
+    status = Column(String(20), default="ok")  # ok | error | rate_limited | blocked
+    block_reason = Column(String(200), nullable=True)  # set when status=blocked
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+

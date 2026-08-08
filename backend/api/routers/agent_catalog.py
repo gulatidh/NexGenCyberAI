@@ -332,6 +332,7 @@ async def run_agent(
             lines.append(f"- Previous AI verdict (one-liner): {verdict_summary}")
         lines.append("")
         lines.append("## Top findings (severity-ordered, capped at 30)")
+        lines.append("<findings>")
         for f in findings_for_prompt[:30]:
             extra = []
             if f["cve"]:
@@ -341,7 +342,9 @@ async def run_agent(
             if f["control"]:
                 extra.append(f["control"])
             tail = f" [{' · '.join(extra)}]" if extra else ""
-            lines.append(f"- [{f['severity']}] {f['title']} on `{f['resource'] or 'n/a'}`{tail}")
+            title_safe = (f["title"] or "").replace("<", "&lt;").replace(">", "&gt;")
+            lines.append(f"- [{f['severity']}] {title_safe} on `{f['resource'] or 'n/a'}`{tail}")
+        lines.append("</findings>")
         context_block = "\n".join(lines)
 
     # ── Build asset context if asset_ids are supplied ──────────────────────
@@ -563,6 +566,26 @@ async def run_agent(
         db.commit()
         db.refresh(ar)
         run_id = ar.id
+
+        # ── Prompt audit log (best-effort, never blocks response) ──
+        try:
+            from core.ai_providers import log_llm_call
+            _uid = (
+                user.get("sub") or user.get("upn") or user.get("email") or
+                user.get("unique_name") or "unknown"
+            ) if isinstance(user, dict) else "unknown"
+            log_llm_call(
+                endpoint="agent_run",
+                user_id=_uid,
+                client_id=effective_client_id,
+                provider="",
+                input_chars=len(str(payload.input_data or "")),
+                output_chars=len(str(ar.output_data or "")),
+                tokens_used=ar.tokens_used or 0,
+                status="completed" if ar.status == "completed" else "error",
+            )
+        except Exception:
+            pass
 
         # ── Post-run: extract learnings (Phase 5B) and post blackboard
         # summary (Phase 5D). Both are background tasks so the user sees

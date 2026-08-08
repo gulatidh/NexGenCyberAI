@@ -67,6 +67,7 @@ import PostureTrends from "./pages/PostureTrends";
 import ComplianceHeatmap from "./pages/ComplianceHeatmap";
 import ClientComparison from "./pages/ClientComparison";
 import EvidencePackage from "./pages/EvidencePackage";
+import AIGuardrails from "./pages/AIGuardrails";
 import RemediationJobs from "./pages/RemediationJobs";
 import AgentRunTrash from "./pages/AgentRunTrash";
 import SampleHub from "./pages/SampleHub";
@@ -288,6 +289,7 @@ function ProtectedApp() {
           <Route path="/posture-trends" element={<PostureTrends />} />
           <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
           <Route path="/client-comparison" element={<ClientComparison />} />
+          <Route path="/ai-guardrails" element={<AIGuardrails />} />
           <Route path="/remediation-jobs" element={<Navigate to="/governance/remediation-jobs" replace />} />
           <Route path="/sample1" element={<SampleHub />} />
           <Route path="/sample2" element={<SampleHubCmd />} />

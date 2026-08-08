@@ -9,8 +9,8 @@ import {
   Radar, GppGood, GppBad, SmartToy, Policy, Storage, AutoStories,
   Psychology, Description, Assessment, PlaylistAddCheck, TrendingUp,
   Engineering, GridView, People, LibraryAdd, AccountTree, Schedule,
-  Settings, Add, PlayArrow, SearchOff, AutoFixHigh, CompareArrows,
-  VpnKey, Webhook, MenuBook, BarChart, SyncAlt, Apps, History,
+  Settings, Add, PlayArrow, SearchOff, CompareArrows,
+  VpnKey, Webhook, MenuBook, BarChart, Apps, History,
   AccessTime,
 } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";

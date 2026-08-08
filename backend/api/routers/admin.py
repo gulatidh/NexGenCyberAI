@@ -487,3 +487,54 @@ async def list_access_logs(
             for r in rows
         ],
     }
+
+
+@router.get("/prompt-logs")
+def list_prompt_logs(
+    user_id: Optional[str] = None,
+    endpoint: Optional[str] = None,
+    status: Optional[str] = None,
+    since_hours: Optional[int] = None,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    _=Depends(require_role(AccessRole.ADMIN)),
+):
+    """Admin-only view of LLM prompt audit log — metadata only, no prompt text stored."""
+    from api.models.models import PromptAuditLog
+    q = db.query(PromptAuditLog)
+    if user_id:
+        q = q.filter(PromptAuditLog.user_id.ilike(f"%{user_id}%"))
+    if endpoint:
+        q = q.filter(PromptAuditLog.endpoint == endpoint)
+    if status:
+        q = q.filter(PromptAuditLog.status == status)
+    if since_hours:
+        q = q.filter(PromptAuditLog.created_at >= datetime.now(timezone.utc) - timedelta(hours=int(since_hours)))
+    total = q.count()
+    limit = max(1, min(int(limit or 100), 500))
+    offset = max(0, int(offset or 0))
+    rows = q.order_by(PromptAuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "client_id": r.client_id,
+                "endpoint": r.endpoint,
+                "provider": r.provider,
+                "model": r.model,
+                "input_chars": r.input_chars,
+                "output_chars": r.output_chars,
+                "tokens_used": r.tokens_used,
+                "latency_ms": r.latency_ms,
+                "status": r.status,
+                "block_reason": r.block_reason,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }

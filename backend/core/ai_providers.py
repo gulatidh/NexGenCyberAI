@@ -39,6 +39,48 @@ class AIProvider(str, Enum):
     CUSTOM_OPENAI = "custom_openai"   # any OpenAI-compatible endpoint: Ollama, Azure AI Foundry, Together AI …
 
 
+def log_llm_call(
+    endpoint: str,
+    user_id: str = "system",
+    client_id: Optional[str] = None,
+    provider: str = "",
+    model: str = "",
+    input_chars: int = 0,
+    output_chars: int = 0,
+    tokens_used: int = 0,
+    latency_ms: int = 0,
+    status: str = "ok",
+    block_reason: Optional[str] = None,
+) -> None:
+    """Best-effort audit log — swallows all errors so it never disrupts the LLM call."""
+    try:
+        import uuid
+        from datetime import datetime, timezone
+        from db.database import SessionLocal
+        from api.models.models import PromptAuditLog
+        db = SessionLocal()
+        try:
+            db.add(PromptAuditLog(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                client_id=client_id,
+                endpoint=endpoint,
+                provider=provider,
+                model=model,
+                input_chars=input_chars,
+                output_chars=output_chars,
+                tokens_used=tokens_used,
+                latency_ms=latency_ms,
+                status=status,
+                block_reason=block_reason,
+            ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+
 class ProviderUnavailableError(RuntimeError):
     """Raised when every configured AI provider fails to initialise.
 

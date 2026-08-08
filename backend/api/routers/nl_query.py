@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 import re
 
@@ -80,7 +80,7 @@ def _rewrite_to_tsql(sql: str) -> str:
 
 
 class NLQueryRequest(BaseModel):
-    question: str
+    question: str = Field(..., max_length=2000, description="Natural language question — max 2000 characters")
 
 
 class NLQueryResponse(BaseModel):
@@ -119,7 +119,7 @@ Rules:
     llm = get_llm()
     resp = await llm.ainvoke([
         SystemMessage(content=system_prompt),
-        HumanMessage(content=payload.question),
+        HumanMessage(content=f"<question>{payload.question}</question>"),
     ])
     raw_sql = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
 

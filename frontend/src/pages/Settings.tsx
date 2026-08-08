@@ -512,6 +512,154 @@ function AccessLogsTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ── Prompt Logs tab ──────────────────────────────────────────────────────────
+
+const PROMPT_STATUS_COLOR: Record<string, string> = {
+  completed: "#34A853",
+  ok: "#34A853",
+  error: "#EA4335",
+  rate_limited: "#FBBC04",
+  blocked: "#FF7043",
+};
+
+function PromptLogsTab({ isAdmin }: { isAdmin: boolean }) {
+  const [userId, setUserId] = useState("");
+  const [endpoint, setEndpoint] = useState("");
+  const [status, setStatus] = useState("");
+  const [sinceHours, setSinceHours] = useState<number | "">(24);
+  const [page, setPage] = useState(1);
+
+  const params = {
+    user_id: userId || undefined,
+    endpoint: endpoint || undefined,
+    status: status || undefined,
+    since_hours: sinceHours || undefined,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  };
+  const { data, isLoading, refetch } = useQuery<any>({
+    queryKey: ["prompt-logs", params],
+    queryFn: () => adminApi.promptLogs(params),
+    enabled: isAdmin,
+  });
+
+  if (!isAdmin) return <Alert severity="warning">Admin access required to view prompt logs.</Alert>;
+
+  const totalTokens = (data?.items || []).reduce((s: number, r: any) => s + (r.tokens_used || 0), 0);
+  const blocked = (data?.items || []).filter((r: any) => r.status === "blocked" || r.status === "error").length;
+
+  return (
+    <Box>
+      <SectionHeader
+        icon={<History />}
+        title="Prompt Logs"
+        subtitle="LLM call audit trail — metadata only, no prompt text stored"
+      />
+
+      {/* Quick stats */}
+      <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+        {[
+          { label: "Total calls", value: data?.total ?? "—" },
+          { label: "Tokens used (page)", value: totalTokens.toLocaleString() },
+          { label: "Errors / blocked (page)", value: blocked },
+        ].map((s) => (
+          <Card key={s.label} variant="outlined" sx={{ px: 2, py: 1, minWidth: 140 }}>
+            <Typography variant="caption" color="text.secondary">{s.label}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{s.value}</Typography>
+          </Card>
+        ))}
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+        <TextField size="small" label="User" value={userId} onChange={(e) => setUserId(e.target.value)} sx={{ width: 200 }} />
+        <FormControl size="small" sx={{ width: 140 }}>
+          <InputLabel>Endpoint</InputLabel>
+          <Select value={endpoint} label="Endpoint" onChange={(e) => setEndpoint(e.target.value)}>
+            <MenuItem value="">All</MenuItem>
+            {["agent_run", "nl_query", "assistant", "ai_code_review"].map((ep) => (
+              <MenuItem key={ep} value={ep}>{ep}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ width: 120 }}>
+          <InputLabel>Status</InputLabel>
+          <Select value={status} label="Status" onChange={(e) => setStatus(e.target.value)}>
+            <MenuItem value="">All</MenuItem>
+            {["ok", "completed", "error", "rate_limited", "blocked"].map((s) => (
+              <MenuItem key={s} value={s}>{s}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ width: 130 }}>
+          <InputLabel>Time range</InputLabel>
+          <Select value={sinceHours} label="Time range" onChange={(e) => setSinceHours(e.target.value as number)}>
+            {[1, 6, 24, 48, 168].map((h) => <MenuItem key={h} value={h}>{h === 168 ? "7 days" : `${h}h`}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <IconButton size="small" onClick={() => refetch()}><Refresh /></IconButton>
+      </Box>
+
+      {isLoading ? <CircularProgress size={24} /> : (
+        <>
+          <TableContainer component={Card} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  {["Time", "User", "Endpoint", "Provider", "Tokens", "In chars", "Out chars", "Latency", "Status"].map((h) => (
+                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(data?.items || []).map((row: any) => (
+                  <TableRow key={row.id} hover>
+                    <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{fmt(row.created_at)}</TableCell>
+                    <TableCell sx={{ fontSize: 11, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {row.user_id || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={row.endpoint || "?"} size="small" sx={{ fontSize: 10, height: 18 }} />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 11 }}>{row.provider || "—"}</TableCell>
+                    <TableCell sx={{ fontSize: 11, textAlign: "right" }}>{row.tokens_used?.toLocaleString() || "—"}</TableCell>
+                    <TableCell sx={{ fontSize: 11, textAlign: "right" }}>{row.input_chars?.toLocaleString() || "—"}</TableCell>
+                    <TableCell sx={{ fontSize: 11, textAlign: "right" }}>{row.output_chars?.toLocaleString() || "—"}</TableCell>
+                    <TableCell sx={{ fontSize: 11, textAlign: "right" }}>{row.latency_ms ? `${row.latency_ms}ms` : "—"}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={row.status || "?"}
+                        size="small"
+                        sx={{
+                          fontSize: 10,
+                          height: 18,
+                          bgcolor: (PROMPT_STATUS_COLOR[row.status] || "#9e9e9e") + "22",
+                          color: PROMPT_STATUS_COLOR[row.status] || "#9e9e9e",
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {(data?.items || []).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ textAlign: "center", py: 4, color: "text.secondary", fontSize: 13 }}>
+                      No prompt logs found for the selected filters.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {data?.total > PAGE_SIZE && (
+            <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+              <Pagination count={Math.ceil(data.total / PAGE_SIZE)} page={page} onChange={(_, p) => setPage(p)} size="small" />
+            </Box>
+          )}
+        </>
+      )}
+    </Box>
+  );
+}
+
 // ── Users tab ────────────────────────────────────────────────────────────────
 const ROLE_COLOR: Record<AccessRole, string> = { admin: "#f06292", editor: "#4285F4", reader: "rgba(255,255,255,0.6)" };
 const ROLE_ICON: Record<AccessRole, React.ReactNode> = {
@@ -967,6 +1115,7 @@ const TABS = [
   { label: "API Keys",         icon: <VpnKey fontSize="small" /> },
   { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
   { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
+  { label: "Prompt Logs",      icon: <Psychology fontSize="small" />, adminOnly: true },
   { label: "Users",            icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
   { label: "Deleted Accounts",  icon: <DeleteSweep fontSize="small" />, adminOnly: true },
 ];
@@ -1029,8 +1178,9 @@ export default function Settings() {
       <TabPanel value={tab} index={6}><APIKeysPage /></TabPanel>
       <TabPanel value={tab} index={7}><SyncTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={8}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={9}><UsersTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={10}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={9}><PromptLogsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={10}><UsersTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={11}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

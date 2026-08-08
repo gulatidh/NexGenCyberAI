@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from core.ai_providers import ProviderUnavailableError, get_llm
@@ -30,7 +30,7 @@ class _Msg(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=4000, description="User message — max 4000 characters")
     current_page: Optional[str] = None
     history: Optional[List[_Msg]] = []
 
@@ -70,7 +70,7 @@ async def chat(payload: ChatRequest, _=Depends(get_current_user)):
             messages.append(HumanMessage(content=msg.content))
         elif msg.role == "assistant":
             messages.append(AIMessage(content=msg.content))
-    messages.append(HumanMessage(content=payload.message))
+    messages.append(HumanMessage(content=f"<user_message>{payload.message}</user_message>"))
 
     try:
         response = await llm.ainvoke(messages)
