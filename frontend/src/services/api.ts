@@ -753,6 +753,19 @@ export const evidenceApi = {
     `${API_BASE}/clients/${clientId}/evidence/package${framework ? `?framework=${framework}` : ''}`,
 };
 
+export const dataModelApi = {
+  stats: (clientId: string) =>
+    api.get(`/clients/${clientId}/data-model/stats`).then(r => r.data),
+  connections: (clientId: string, entityType: string, entityId: string) =>
+    api.get(`/clients/${clientId}/data-model/connections`, {
+      params: { entity_type: entityType, entity_id: entityId },
+    }).then(r => r.data),
+  list: (clientId: string, entityType: string, search?: string) =>
+    api.get(`/clients/${clientId}/data-model/list`, {
+      params: { entity_type: entityType, ...(search ? { search } : {}) },
+    }).then(r => r.data),
+};
+
 export const remediationJobsApi = {
   list: (clientId: string) =>
     api.get(`/clients/${clientId}/remediation-jobs/`).then(r => r.data),

@@ -2,16 +2,20 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Card, CardActionArea, alpha, useTheme,
+  Chip, CircularProgress, Divider, Tooltip,
 } from "@mui/material";
 import {
   Shield, BugReport, Psychology, Radar, Assessment,
   GppBad, PlaylistAddCheck, SmartToy, AutoStories, Tune, Policy,
   Hub as HubIcon,
 } from "@mui/icons-material";
+import { useQuery } from "@tanstack/react-query";
 import AssistantWidget from "../components/AssistantWidget";
 import MegaMenuBar from "../components/layout/MegaMenuBar";
 import AppControls from "../components/layout/AppControls";
 import OwletLogo from "../components/OwletLogo";
+import { dataModelApi } from "../services/api";
+import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Stage + product data ──────────────────────────────────────────────────────
 
@@ -179,14 +183,150 @@ const ONT_ROUTES: Record<string, string> = {
   Report:"vapt/reports",
 };
 
+// ── Severity / level colour helpers ───────────────────────────────────────────
+
+const SEV_COLOR: Record<string, string> = {
+  critical: "#b91c1c", high: "#ea580c", medium: "#d97706",
+  low: "#16a34a", info: "#0284c7",
+  critical_risk: "#b91c1c", high_risk: "#ea580c", medium_risk: "#d97706", low_risk: "#16a34a",
+};
+
+function severityColor(k: string) { return SEV_COLOR[k] ?? "#6b7280"; }
+
+// ── OntologyStatPanel — right panel shown when a node is selected ─────────────
+
+interface StatData {
+  total: number;
+  breakdown: Record<string, number>;
+  key: string;
+  status?: Record<string, number>;
+}
+
+function OntologyStatPanel({
+  entity, stats, color, route,
+}: {
+  entity: string;
+  stats: StatData;
+  color: string;
+  route: string;
+}) {
+  const navigate = useNavigate();
+  const breakdownEntries = Object.entries(stats.breakdown)
+    .filter(([, v]) => v > 0)
+    .sort(([, a], [, b]) => b - a);
+  const maxVal = Math.max(...breakdownEntries.map(([, v]) => v), 1);
+
+  return (
+    <Box sx={{
+      width: 260, flexShrink: 0,
+      border: "1px solid", borderColor: "divider",
+      borderRadius: 2, bgcolor: "background.paper",
+      p: 2, display: "flex", flexDirection: "column", gap: 1.5,
+    }}>
+      {/* Header */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color }} />
+          <Typography sx={{ fontWeight: 700, fontSize: 14, textTransform: "capitalize" }}>
+            {entity}
+          </Typography>
+        </Box>
+        <Typography sx={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>
+          {stats.total}
+        </Typography>
+      </Box>
+
+      <Divider />
+
+      {/* Breakdown bars */}
+      {breakdownEntries.length > 0 ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {breakdownEntries.map(([k, v]) => (
+            <Box key={k}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.25 }}>
+                <Typography sx={{ fontSize: 11, color: "text.secondary", textTransform: "capitalize" }}>{k}</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 600 }}>{v}</Typography>
+              </Box>
+              <Box sx={{ height: 5, borderRadius: 3, bgcolor: "action.hover", overflow: "hidden" }}>
+                <Box sx={{
+                  height: "100%", borderRadius: 3,
+                  bgcolor: severityColor(k),
+                  width: `${Math.round((v / maxVal) * 100)}%`,
+                  transition: "width 0.4s ease",
+                }} />
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      ) : (
+        <Typography sx={{ fontSize: 12, color: "text.disabled", textAlign: "center", py: 1 }}>No data</Typography>
+      )}
+
+      {/* Status chips (findings only) */}
+      {stats.status && Object.keys(stats.status).length > 0 && (
+        <>
+          <Divider />
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {Object.entries(stats.status).filter(([, v]) => v > 0).map(([k, v]) => (
+              <Chip key={k} label={`${k}: ${v}`} size="small"
+                sx={{ fontSize: 10, height: 20, bgcolor: "action.hover" }} />
+            ))}
+          </Box>
+        </>
+      )}
+
+      <Divider />
+
+      {/* Navigate link */}
+      <Box
+        onClick={() => navigate(`/${route}`)}
+        sx={{
+          fontSize: 12, color: "primary.main", cursor: "pointer", textAlign: "center",
+          py: 0.5, borderRadius: 1, "&:hover": { bgcolor: alpha(color, 0.08) },
+        }}
+      >
+        View all {entity}s →
+      </Box>
+    </Box>
+  );
+}
+
+// ── OntologyMini ──────────────────────────────────────────────────────────────
+
 function OntologyMini() {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { clientId } = useActiveClient();
   const [sel, setSel] = useState<string | null>(null);
   const isDark = theme.palette.mode === "dark";
   const edgeCol  = isDark ? "#3a4250" : "#c3c9d4";
   const raisedBg = isDark ? "#141b25" : "#f2f4f8";
   const lineBdr  = isDark ? "#232b36" : "#e6e9ef";
+
+  const { data: statsRaw, isLoading } = useQuery({
+    queryKey: ["ontology-stats", clientId],
+    queryFn: () => clientId ? dataModelApi.stats(clientId) : Promise.resolve(null),
+    enabled: !!clientId,
+    staleTime: 60_000,
+  });
+
+  // Map entity key → stat data
+  const stats: Record<string, StatData> = statsRaw ?? {};
+
+  // Map ontology node entity → stats key
+  const ENTITY_STAT_KEY: Record<string, string> = {
+    Asset: "asset", Finding: "finding", Risk: "risk",
+    Control: "control", Remediation: "remediation",
+    Technique: "technique", Report: "report",
+    SmartIntel: "finding", DataFlow: "asset", AttackPath: "risk", Evidence: "report",
+    Client: "asset",
+  };
+
+  // Count badge for each node
+  function nodeCount(entity: string): number | null {
+    const key = ENTITY_STAT_KEY[entity];
+    return key && stats[key] ? stats[key].total : null;
+  }
 
   const eStyle = (e: OEdge) => {
     const hit = sel && (e.from === sel || e.to === sel);
@@ -194,62 +334,93 @@ function OntologyMini() {
     return { stroke: hit ? "#4338ca" : edgeCol, strokeWidth: hit ? 2.4 : 1.6, opacity: dim ? 0.1 : 1, strokeDasharray: e.dashed ? "3 4" : undefined };
   };
 
+  const selNode = ONT_NODES.find(n => n.entity === sel);
+  const selStatKey = sel ? ENTITY_STAT_KEY[sel] : null;
+  const selStats = selStatKey ? stats[selStatKey] : null;
+
   return (
     <Box sx={{ mt: 6, pt: 5, borderTop: "1px solid", borderColor: "divider" }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
         <Box sx={{ width: 4, height: 20, borderRadius: 2, bgcolor: "#4338ca" }} />
         <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Data Ontology</Typography>
+        {isLoading && <CircularProgress size={14} sx={{ ml: 1 }} />}
       </Box>
       <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 2.5, maxWidth: 600 }}>
-        Eleven entities, one connected data model. Click any node to trace connections — double-click to open that module.
+        Live entity counts across your security data. Click any node to see the breakdown.
       </Typography>
-      <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2.5, overflowX: "auto" }}>
-        <svg viewBox="0 0 1120 640" style={{ width: "100%", minWidth: 540, height: "auto", display: "block" }}>
-          <defs>
-            <marker id="ont-a"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={edgeCol}/></marker>
-            <marker id="ont-lit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/></marker>
-          </defs>
-          <g>
-            {ONT_EDGES.map((e, i) => {
-              const s = eStyle(e);
-              const lit = sel && (e.from === sel || e.to === sel);
-              return <line key={i} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} opacity={s.opacity} strokeDasharray={s.strokeDasharray} markerEnd={lit ? "url(#ont-lit)" : "url(#ont-a)"} style={{ transition: "stroke 0.2s, opacity 0.2s" }} />;
-            })}
-          </g>
-          <g>
-            {ONT_NODES.map((n) => {
-              const lit = sel === n.entity;
-              const dim = !!sel && !lit;
-              return (
-                <g key={n.entity} style={{ cursor: "pointer", opacity: dim ? 0.2 : 1, transition: "opacity 0.18s" }}
-                   onClick={() => setSel((p) => p === n.entity ? null : n.entity)}
-                   onDoubleClick={() => navigate(`/${ONT_ROUTES[n.entity] ?? ""}`)}
-                >
-                  <circle cx={n.cx} cy={n.cy} r={lit ? 10 : 7} fill={n.color} stroke={isDark ? "#0b0f14" : "#fff"} strokeWidth={2} style={{ transition: "r 0.15s" }} />
-                  <rect x={n.labelX} y={n.cy+12} width={n.labelW} height={22} rx={11} fill={lit ? n.color : raisedBg} stroke={lit ? n.color : lineBdr} strokeWidth={1} style={{ transition: "fill 0.15s" }} />
-                  <text x={n.cx} y={n.cy+27} textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontSize={11} fontWeight={lit ? 600 : 500} fill={lit ? "#fff" : theme.palette.text.primary} style={{ transition: "fill 0.15s" }}>
-                    {n.label}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-        </svg>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider", alignItems: "center" }}>
-          {STAGES.map((s) => (
-            <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-              <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: s.color }} />
-              <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{s.label.toLowerCase()}</Typography>
+
+      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+        {/* Graph */}
+        <Box sx={{ flex: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2.5, overflowX: "auto", minWidth: 0 }}>
+          <svg viewBox="0 0 1120 640" style={{ width: "100%", minWidth: 480, height: "auto", display: "block" }}>
+            <defs>
+              <marker id="ont-a"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={edgeCol}/></marker>
+              <marker id="ont-lit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4338ca"/></marker>
+            </defs>
+            <g>
+              {ONT_EDGES.map((e, i) => {
+                const s = eStyle(e);
+                const lit = sel && (e.from === sel || e.to === sel);
+                return <line key={i} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} opacity={s.opacity} strokeDasharray={s.strokeDasharray} markerEnd={lit ? "url(#ont-lit)" : "url(#ont-a)"} style={{ transition: "stroke 0.2s, opacity 0.2s" }} />;
+              })}
+            </g>
+            <g>
+              {ONT_NODES.map((n) => {
+                const lit = sel === n.entity;
+                const dim = !!sel && !lit;
+                const cnt = nodeCount(n.entity);
+                return (
+                  <Tooltip key={n.entity} title={cnt !== null ? `${n.label}: ${cnt} total` : n.label} placement="top">
+                    <g style={{ cursor: "pointer", opacity: dim ? 0.2 : 1, transition: "opacity 0.18s" }}
+                       onClick={() => setSel((p) => p === n.entity ? null : n.entity)}
+                       onDoubleClick={() => navigate(`/${ONT_ROUTES[n.entity] ?? ""}`)}
+                    >
+                      <circle cx={n.cx} cy={n.cy} r={lit ? 12 : 9} fill={n.color} stroke={isDark ? "#0b0f14" : "#fff"} strokeWidth={2} style={{ transition: "r 0.15s" }} />
+                      {/* Count badge inside node */}
+                      {cnt !== null && cnt > 0 && (
+                        <text x={n.cx} y={n.cy} textAnchor="middle" dominantBaseline="middle"
+                          fontFamily="monospace" fontSize={cnt > 99 ? 7 : 9} fontWeight={700} fill="#fff">
+                          {cnt > 999 ? "999+" : cnt}
+                        </text>
+                      )}
+                      <rect x={n.labelX} y={n.cy+14} width={n.labelW} height={22} rx={11} fill={lit ? n.color : raisedBg} stroke={lit ? n.color : lineBdr} strokeWidth={1} style={{ transition: "fill 0.15s" }} />
+                      <text x={n.cx} y={n.cy+29} textAnchor="middle" dominantBaseline="middle" fontFamily="monospace" fontSize={11} fontWeight={lit ? 600 : 500} fill={lit ? "#fff" : theme.palette.text.primary} style={{ transition: "fill 0.15s" }}>
+                        {n.label}
+                      </text>
+                    </g>
+                  </Tooltip>
+                );
+              })}
+            </g>
+          </svg>
+
+          {/* Legend + link row */}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider", alignItems: "center" }}>
+            {STAGES.map((s) => (
+              <Box key={s.id} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: s.color }} />
+                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{s.label.toLowerCase()}</Typography>
+              </Box>
+            ))}
+            <Box onClick={() => navigate("/data-model")} sx={{
+              ml: "auto", fontSize: 12, color: "primary.main",
+              border: "1px solid", borderColor: "divider", px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer",
+              "&:hover": { bgcolor: alpha("#1565C0", 0.06) },
+            }}>
+              Relationship Explorer →
             </Box>
-          ))}
-          <Box onClick={() => navigate("/data-model")} sx={{
-            ml: "auto", fontSize: 12, color: "primary.main",
-            border: "1px solid", borderColor: "divider", px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer",
-            "&:hover": { bgcolor: alpha("#1565C0", 0.06) },
-          }}>
-            Full screen →
           </Box>
         </Box>
+
+        {/* Stat panel — slides in when a node with known stats is selected */}
+        {sel && selNode && selStats && (
+          <OntologyStatPanel
+            entity={selStatKey ?? sel}
+            stats={selStats}
+            color={selNode.color}
+            route={ONT_ROUTES[sel] ?? ""}
+          />
+        )}
       </Box>
     </Box>
   );

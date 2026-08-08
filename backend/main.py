@@ -69,6 +69,10 @@ try:
     from api.routers import cve_pivot as _cve_pivot
 except ImportError:
     _cve_pivot = None
+try:
+    from api.routers import data_model as _data_model
+except ImportError:
+    _data_model = None
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("nexgencyberai")
 
@@ -1716,7 +1720,8 @@ except Exception as _e:
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _comments, _webhooks, _ctem, _evidence, _documents,
-             _compliance_heatmap, _client_comparison, _remediation_jobs, _cve_pivot):
+             _compliance_heatmap, _client_comparison, _remediation_jobs, _cve_pivot,
+             _data_model):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router, prefix="/api/v1")
 
