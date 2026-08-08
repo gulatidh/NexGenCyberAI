@@ -33,6 +33,18 @@ const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
 const COLLAPSE_KEY = "nav-collapsed";
 
+const SECTION_COLORS: Record<string, string> = {
+  "Overview":      "#4285F4",
+  "Foundation":    "#34A853",
+  "Scanning":      "#EA4335",
+  "Threat & Risk": "#FF5722",
+  "Compliance":    "#FF9800",
+  "Automation":    "#9C27B0",
+  "Intelligence":  "#00BCD4",
+  "Governance":    "#FBBC04",
+  "Configure":     "#607D8B",
+};
+
 type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean; children?: NavItem[] };
 type NavGroup = { section?: string; items: NavItem[] };
 
@@ -210,6 +222,20 @@ export default function AppLayout() {
     p === "/assets"
       ? pathname === "/assets" || /^\/assets\/(?!technologies)[^/]+$/.test(pathname)
       : pathname === p || pathname.startsWith(p + "/");
+
+  // Show section mini-nav only when pathname EXACTLY matches a nav item —
+  // detail pages (e.g. /clients/123) won't match any item exactly, so they
+  // use their own PageDetailLayout sidebar instead.
+  const activeSectionGroup = pathname === "/" ? null :
+    NAV_GROUPS.find(g =>
+      g.items.some(item =>
+        pathname === item.path ||
+        (item.children || []).some(c => pathname === c.path)
+      )
+    ) ?? null;
+  const sectionColor = activeSectionGroup?.section
+    ? SECTION_COLORS[activeSectionGroup.section] ?? "#4285F4"
+    : "#4285F4";
 
   const renderLeaf = (item: NavItem, indented: boolean) => {
     const active = isActive(item.path);
@@ -638,8 +664,89 @@ export default function AppLayout() {
           </Toolbar>
         </AppBar>
         <AppBreadcrumb />
-        <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: "auto" }}>
-          <Outlet />
+        {/* Section mini-nav + page content */}
+        <Box component="main" sx={{ flexGrow: 1, overflow: "auto" }}>
+          <Box sx={{ display: "flex", minHeight: "100%" }}>
+            {/* Context-aware section mini-nav — only on exact-match routes */}
+            {activeSectionGroup && (
+              <Box sx={{
+                width: 178, flexShrink: 0,
+                bgcolor: mode !== "light" ? "#0F1825" : "#F0F4FA",
+                borderRight: "1px solid", borderColor: "divider",
+                position: "sticky", top: 0, alignSelf: "flex-start",
+                maxHeight: "calc(100vh - 112px)", overflowY: "auto",
+                display: "flex", flexDirection: "column",
+              }}>
+                {/* Section label */}
+                <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Box sx={{
+                    display: "inline-flex", alignItems: "center", gap: 0.75,
+                    px: 1.25, py: 0.5, borderRadius: 1,
+                    bgcolor: `${sectionColor}22`,
+                  }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: sectionColor }} />
+                    <Typography sx={{
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: 0.8,
+                      textTransform: "uppercase", color: sectionColor, lineHeight: 1,
+                    }}>
+                      {activeSectionGroup.section}
+                    </Typography>
+                  </Box>
+                </Box>
+                {/* Items */}
+                <Box sx={{ pt: 0.5, pb: 2 }}>
+                  {activeSectionGroup.items
+                    .filter(item => !item.adminOnly || me?.is_admin || me?.is_admin_anywhere)
+                    .map(item => {
+                      const active = isActive(item.path);
+                      return (
+                        <Box
+                          key={item.path}
+                          onClick={() => navigate(item.path)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.25,
+                            px: 1.5, py: 1, cursor: "pointer",
+                            borderLeft: "3px solid",
+                            borderColor: active ? sectionColor : "transparent",
+                            bgcolor: active ? `${sectionColor}12` : "transparent",
+                            "&:hover": {
+                              bgcolor: active ? `${sectionColor}12`
+                                : mode !== "light" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+                            },
+                            transition: "all .12s ease",
+                          }}
+                        >
+                          <Box sx={{
+                            width: 26, height: 26, borderRadius: 1.25,
+                            bgcolor: `${sectionColor}22`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0,
+                          }}>
+                            {React.cloneElement(
+                              item.icon as React.ReactElement<Record<string, unknown>>,
+                              { sx: { fontSize: 14, color: sectionColor } },
+                            )}
+                          </Box>
+                          <Typography sx={{
+                            fontSize: 12.5,
+                            color: active ? "text.primary" : "text.secondary",
+                            fontWeight: active ? 600 : 400,
+                            lineHeight: 1.3, flex: 1,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {item.label}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                </Box>
+              </Box>
+            )}
+            {/* Page content */}
+            <Box sx={{ flex: 1, p: 3, minWidth: 0 }}>
+              <Outlet />
+            </Box>
+          </Box>
         </Box>
       </Box>
       <Snackbar open={!!bootstrapSnack} autoHideDuration={6000} onClose={() => setBootstrapSnack("")}
