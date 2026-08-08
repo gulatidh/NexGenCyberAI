@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import {
   Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable, Edit, Delete,
-  OpenInNew, Psychology, Hub, Cloud,
+  OpenInNew, Psychology, Hub, Cloud, DriveFileMove, ContentCopy, FolderShared,
 } from "@mui/icons-material";
 import { Cancel } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -437,6 +437,34 @@ export default function Connections() {
       setTestResults((prev) => ({ ...prev, [vars.connId]: { success: false, message: e.message } })),
   });
 
+  // ── Move / copy state ────────────────────────────────────────────────────────
+  const [moveConn, setMoveConn] = useState<Connector | null>(null);
+  const [copyConn, setCopyConn] = useState<Connector | null>(null);
+  const [targetProjectId, setTargetProjectId] = useState<string>("");
+  const [copyName, setCopyName] = useState("");
+
+  const moveMutation = useMutation({
+    mutationFn: ({ id, pid }: { id: string; pid: string | null }) =>
+      connectorsApi.moveConnector(selectedClientId, id, pid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connectors"] });
+      setMoveConn(null);
+      toast.success("Connector moved");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Move failed"),
+  });
+
+  const copyMutation = useMutation({
+    mutationFn: ({ id, pid, name }: { id: string; pid: string | null; name: string }) =>
+      connectorsApi.copyConnector(selectedClientId, id, pid, name || undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["connectors"] });
+      setCopyConn(null);
+      toast.success("Connector copied");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Copy failed"),
+  });
+
   // ── Dialog helpers ───────────────────────────────────────────────────────────
   const closeDialog = () => {
     setOpen(false);
@@ -547,6 +575,21 @@ export default function Connections() {
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 1, fontSize: 13 }}>
             {CONNECTOR_ICONS[conn.connector_type] || conn.connector_type}
           </Typography>
+          {/* Scope badge */}
+          {conn.project_id ? (
+            <Chip
+              size="small"
+              label={projects.find((p) => p.id === conn.project_id)?.name || "Project-scoped"}
+              sx={{ mb: 1, height: 18, fontSize: 10, bgcolor: "rgba(66,133,244,0.10)", color: "#4285F4" }}
+            />
+          ) : (
+            <Chip
+              size="small"
+              icon={<FolderShared sx={{ fontSize: "12px !important" }} />}
+              label="Client-wide"
+              sx={{ mb: 1, height: 18, fontSize: 10, bgcolor: "rgba(52,168,83,0.10)", color: "#34A853" }}
+            />
+          )}
           {showScanReadyChip && isActive && (
             <Chip
               size="small"
@@ -600,6 +643,20 @@ export default function Connections() {
               }}
             >
               Delete
+            </Button>
+            <Button
+              size="small" variant="outlined" startIcon={<DriveFileMove sx={{ fontSize: 14 }} />}
+              onClick={() => { setTargetProjectId(conn.project_id || ""); setMoveConn(conn); }}
+              sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#FBBC04", color: "#FBBC04" } }}
+            >
+              Move
+            </Button>
+            <Button
+              size="small" variant="outlined" startIcon={<ContentCopy sx={{ fontSize: 14 }} />}
+              onClick={() => { setTargetProjectId(conn.project_id || ""); setCopyName(`${conn.name} (copy)`); setCopyConn(conn); }}
+              sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#34A853", color: "#34A853" } }}
+            >
+              Copy
             </Button>
           </Box>
         </CardContent>
@@ -1194,6 +1251,89 @@ export default function Connections() {
             sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}
           >
             {createMutation.isPending ? <CircularProgress size={18} /> : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Move connector dialog ──────────────────────────────────────────── */}
+      <Dialog open={!!moveConn} onClose={() => setMoveConn(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Move Connector</DialogTitle>
+        <DialogContent sx={{ pt: "12px !important" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Move <strong>{moveConn?.name}</strong> to a different project, or promote it to client-wide so all projects can use it.
+          </Typography>
+          <FormControl fullWidth size="small">
+            <InputLabel>Destination project</InputLabel>
+            <Select
+              value={targetProjectId}
+              label="Destination project"
+              onChange={(e) => setTargetProjectId(e.target.value)}
+            >
+              <MenuItem value="">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <FolderShared sx={{ fontSize: 16, color: "#34A853" }} />
+                  <span>Client-wide (no project)</span>
+                </Box>
+              </MenuItem>
+              {projects.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setMoveConn(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={moveMutation.isPending}
+            onClick={() => moveConn && moveMutation.mutate({ id: moveConn.id, pid: targetProjectId || null })}
+          >
+            Move
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Copy connector dialog ──────────────────────────────────────────── */}
+      <Dialog open={!!copyConn} onClose={() => setCopyConn(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Copy Connector</DialogTitle>
+        <DialogContent sx={{ pt: "12px !important", display: "flex", flexDirection: "column", gap: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Create a copy of <strong>{copyConn?.name}</strong> with the same credentials, under a different project or client-wide.
+          </Typography>
+          <TextField
+            size="small"
+            label="Name for the copy"
+            fullWidth
+            value={copyName}
+            onChange={(e) => setCopyName(e.target.value)}
+          />
+          <FormControl fullWidth size="small">
+            <InputLabel>Destination project</InputLabel>
+            <Select
+              value={targetProjectId}
+              label="Destination project"
+              onChange={(e) => setTargetProjectId(e.target.value)}
+            >
+              <MenuItem value="">
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <FolderShared sx={{ fontSize: 16, color: "#34A853" }} />
+                  <span>Client-wide (no project)</span>
+                </Box>
+              </MenuItem>
+              {projects.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCopyConn(null)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={copyMutation.isPending || !copyName.trim()}
+            onClick={() => copyConn && copyMutation.mutate({ id: copyConn.id, pid: targetProjectId || null, name: copyName })}
+          >
+            Copy
           </Button>
         </DialogActions>
       </Dialog>

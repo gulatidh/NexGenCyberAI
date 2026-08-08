@@ -1,8 +1,8 @@
 """Connector management endpoints."""
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Body
 from sqlalchemy.orm import Session
-from typing import List
-import json
+from typing import List, Optional
+import json, uuid
 from api.models.models import Connector, ConnectorStatus, Project
 from api.schemas.schemas import ConnectorCreate, ConnectorUpdate, ConnectorResponse
 from db.database import get_db
@@ -25,7 +25,11 @@ async def list_connectors(
     require_scoped_role(AccessRole.READER, AccessScope.CLIENT, client_id, db, user)
     q = db.query(Connector).filter(Connector.client_id == client_id)
     if project_id:
-        q = q.filter(Connector.project_id == project_id)
+        # Return project-specific connectors + client-wide (no project) connectors
+        from sqlalchemy import or_
+        q = q.filter(
+            or_(Connector.project_id == project_id, Connector.project_id.is_(None))
+        )
     return q.all()
 
 
@@ -38,13 +42,14 @@ async def create_connector(
     user=Depends(get_current_user),
 ):
     require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
-    project = db.query(Project).filter(Project.id == payload.project_id, Project.client_id == client_id).first()
-    if not project:
-        raise HTTPException(status_code=400, detail="project_id is required and must belong to this client")
+    if payload.project_id:
+        project = db.query(Project).filter(Project.id == payload.project_id, Project.client_id == client_id).first()
+        if not project:
+            raise HTTPException(status_code=400, detail="project_id must belong to this client")
     enc = encrypt(json.dumps(payload.credentials))
     connector = Connector(
         client_id=client_id,
-        project_id=payload.project_id,
+        project_id=payload.project_id or None,
         name=payload.name,
         connector_type=payload.connector_type,
         credentials_enc=enc,
@@ -162,3 +167,61 @@ async def delete_connector(client_id: str, connector_id: str, db: Session = Depe
         raise HTTPException(status_code=404, detail="Connector not found")
     db.delete(c)
     db.commit()
+
+
+@router.patch("/{connector_id}/move", response_model=ConnectorResponse)
+async def move_connector(
+    client_id: str,
+    connector_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    target_project_id: Optional[str] = Body(default=None, embed=True),
+):
+    """Move connector to a different project, or promote to client-wide (target_project_id=null)."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
+    c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    if target_project_id:
+        project = db.query(Project).filter(Project.id == target_project_id, Project.client_id == client_id).first()
+        if not project:
+            raise HTTPException(status_code=400, detail="target_project_id must belong to this client")
+    c.project_id = target_project_id or None
+    db.commit()
+    db.refresh(c)
+    return c
+
+
+@router.post("/{connector_id}/copy", response_model=ConnectorResponse, status_code=201)
+async def copy_connector(
+    client_id: str,
+    connector_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    target_project_id: Optional[str] = Body(default=None, embed=True),
+    name: Optional[str] = Body(default=None, embed=True),
+):
+    """Clone a connector (same type + credentials) to a different project or client-wide."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
+    src = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    if target_project_id:
+        project = db.query(Project).filter(Project.id == target_project_id, Project.client_id == client_id).first()
+        if not project:
+            raise HTTPException(status_code=400, detail="target_project_id must belong to this client")
+    copy = Connector(
+        id=str(uuid.uuid4()),
+        client_id=client_id,
+        project_id=target_project_id or None,
+        name=name or f"{src.name} (copy)",
+        connector_type=src.connector_type,
+        credentials_enc=src.credentials_enc,
+        config=src.config or {},
+    )
+    db.add(copy)
+    db.commit()
+    db.refresh(copy)
+    background_tasks.add_task(sync_connector_assets_bg, copy.id)
+    return copy

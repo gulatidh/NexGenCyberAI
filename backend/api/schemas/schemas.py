@@ -80,8 +80,8 @@ class ProjectResponse(BaseModel):
 class ConnectorCreate(BaseModel):
     name: str
     connector_type: ConnectorType
-    project_id: str                 # required — connectors must belong to a project
-    credentials: Dict[str, Any]     # plaintext; encrypted server-side
+    project_id: Optional[str] = None  # null = client-wide (visible to all projects)
+    credentials: Dict[str, Any]       # plaintext; encrypted server-side
     config: Optional[Dict[str, Any]] = {}
 
 class ConnectorUpdate(BaseModel):

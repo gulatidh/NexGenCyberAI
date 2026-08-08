@@ -105,6 +105,10 @@ export const connectorsApi = {
     apiClient.delete(`/clients/${clientId}/connectors/${connectorId}`),
   health: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/connectors/health`).then((r) => r.data),
+  moveConnector: (clientId: string, connectorId: string, targetProjectId: string | null) =>
+    apiClient.patch(`/clients/${clientId}/connectors/${connectorId}/move`, { target_project_id: targetProjectId }).then((r) => r.data),
+  copyConnector: (clientId: string, connectorId: string, targetProjectId: string | null, name?: string) =>
+    apiClient.post(`/clients/${clientId}/connectors/${connectorId}/copy`, { target_project_id: targetProjectId, name }).then((r) => r.data),
 };
 
 export const projectsApi = {
