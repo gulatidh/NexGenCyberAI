@@ -266,10 +266,14 @@ export default function ClientDetail() {
               <Box
                 key={id}
                 onClick={() => {
-                  if (id === "findings") {
-                    navigate(findingsBase);
-                  } else if (id === "connectors") {
+                  if (id === "connectors") {
                     navigate("/connections");
+                  } else if (id === "scans") {
+                    navigate("/vulnerability/scans");
+                  } else if (id === "assets") {
+                    navigate("/platform/assets");
+                  } else if (id === "findings") {
+                    navigate("/vulnerability/findings");
                   } else if (id === "help") {
                     navigate("/help");
                   } else {
@@ -502,7 +506,7 @@ export default function ClientDetail() {
                   <CardContent>
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Recent Scans</Typography>
-                      <Button size="small" onClick={() => setTab("scans")} sx={{ color: "primary.main", fontSize: 11 }}>
+                      <Button size="small" onClick={() => navigate("/vulnerability/scans")} sx={{ color: "primary.main", fontSize: 11 }}>
                         View all →
                       </Button>
                     </Box>
@@ -647,7 +651,7 @@ export default function ClientDetail() {
                 </Typography>
               </Box>
               <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 13 }} />}
-                onClick={() => navigate(`${assetsBase}?clientId=${clientId}`)}
+                onClick={() => navigate("/platform/assets")}
                 sx={{ color: "primary.main", fontSize: 12 }}>
                 Open Asset Inventory
               </Button>
@@ -710,7 +714,7 @@ export default function ClientDetail() {
                 </Typography>
               </Box>
               <Button size="small" endIcon={<OpenInNew sx={{ fontSize: 13 }} />}
-                onClick={() => navigate(`${scansBase}`)}
+                onClick={() => navigate("/vulnerability/scans")}
                 sx={{ color: "primary.main", fontSize: 12 }}>
                 Manage Scans
               </Button>
