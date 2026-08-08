@@ -14,6 +14,7 @@ import {
   Hub as HubIcon,
 } from "@mui/icons-material";
 import MegaMenuBar from "../components/layout/MegaMenuBar";
+import OwletLogo from "../components/OwletLogo";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
 import { adminApi, clientsApi } from "../services/api";
@@ -157,14 +158,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Logo */}
-      <Box sx={{ px: 2, py: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Box sx={{ width: 32, height: 32, borderRadius: 1.5, background: "linear-gradient(135deg,#1565C0,#0288D1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Shield sx={{ color: "#fff", fontSize: 18 }} />
-        </Box>
-        <Box>
-          <Typography sx={{ fontWeight: 800, fontSize: 14, lineHeight: 1.1 }}>Owlet</Typography>
-          <Typography sx={{ fontSize: 10, color: "text.secondary" }}>Security Platform</Typography>
-        </Box>
+      <Box sx={{ px: 1.5, py: 1.5 }}>
+        <OwletLogo height={32} />
       </Box>
 
       <Divider />
@@ -449,16 +444,13 @@ export default function Hub() {
           }}>
             <MegaMenuBar
               brand={
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                   {isMobile && (
                     <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ mr: 0.5 }}>
                       <MenuIcon fontSize="small" />
                     </IconButton>
                   )}
-                  <Box sx={{ width: 26, height: 26, borderRadius: 1, background: "linear-gradient(135deg,#1565C0,#0288D1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Shield sx={{ color: "#fff", fontSize: 15 }} />
-                  </Box>
-                  <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Owlet</Typography>
+                  <OwletLogo height={36} />
                 </Box>
               }
               trailing={

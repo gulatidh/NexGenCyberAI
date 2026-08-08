@@ -31,6 +31,7 @@ import { useThemeMode } from "../../theme/ThemeModeContext";
 import NotificationBell from "./NotificationBell";
 import AssistantWidget from "../AssistantWidget";
 import GlobalSearch from "../GlobalSearch";
+import OwletLogo from "../OwletLogo";
 
 export interface ProductNavItem {
   label: string;
@@ -134,13 +135,8 @@ export default function ProductLayout({ product }: Props) {
 
         {/* Back label */}
         <Tooltip title="Back to product list">
-          <Box
-            onClick={() => navigate("/hub")}
-            sx={{ display: "flex", alignItems: "center", gap: 0.25, cursor: "pointer", mr: 0.5 }}
-          >
-            <Typography sx={{ fontWeight: 800, fontSize: 14, color: "primary.main", userSelect: "none" }}>
-              Owlet
-            </Typography>
+          <Box onClick={() => navigate("/hub")} sx={{ cursor: "pointer", mr: 0.5, display: "flex", alignItems: "center" }}>
+            <OwletLogo height={28} />
           </Box>
         </Tooltip>
 
