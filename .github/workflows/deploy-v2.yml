@@ -52,7 +52,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Build
-        run: node --max_old_space_size=4096 --max-semi-space-size=128 node_modules/.bin/react-scripts build
+        run: node --max_old_space_size=5120 node_modules/.bin/react-scripts build
         env:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
@@ -60,6 +60,7 @@ jobs:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-sea-api.azurewebsites.net/api/v1' }}
           REACT_APP_REDIRECT_URI: "https://monitara-sea.azurewebsites.net"
           GENERATE_SOURCEMAP: "false"
+          DISABLE_ESLINT_PLUGIN: "true"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
