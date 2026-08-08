@@ -1,597 +1,1081 @@
-import { useState } from "react";
+/**
+ * SampleAzure — Azure-Portal-style full-page layout sample
+ * Route: /sample3
+ * Renders its own top bar + left blade — NOT inside AppLayout.
+ */
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Typography, Card, CardActionArea, Avatar,
-  List, ListItemButton, ListItemText, Divider,
-  FormControl, Select, MenuItem, InputLabel,
-  Drawer, IconButton, Chip, useMediaQuery, useTheme,
+  Box, Typography, IconButton, Chip, Avatar,
+  Tooltip, alpha, Badge, Dialog, DialogContent,
+  List, ListItemButton, ListItemIcon, ListItemText,
+  Divider,
 } from "@mui/material";
 import {
-  Shield, BugReport, Psychology,
-  Radar, Assessment, GppBad, PlaylistAddCheck,
-  SmartToy, Search, Cable, Settings,
-  Tune, Restore, Storage, Menu as MenuIcon,
-  Help as HelpOutline, Dashboard,
+  Menu as MenuIcon, Search, Notifications, Settings,
+  Dashboard, Security, BugReport, Hub as HubIcon, Cable,
+  Radar, GppGood, SmartToy, Policy, Storage,
+  AutoStories, Psychology, Description, Assessment, GppBad,
+  PlaylistAddCheck, TrendingUp, Engineering, GridView,
+  Add, PlayArrow, People, LibraryAdd, AccountTree, Schedule,
+  SearchOff,
 } from "@mui/icons-material";
-import { useMsal } from "@azure/msal-react";
-import { useQuery } from "@tanstack/react-query";
-import { adminApi, clientsApi } from "../services/api";
-import AssistantWidget from "../components/AssistantWidget";
-import { MyAccess, Client } from "../types";
-import { useActiveClient } from "../contexts/ClientContext";
+import { useTheme } from "@mui/material/styles";
 
-// ── Product catalogue ────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
-interface Product {
-  abbrev: string;
-  name: string;
-  description: string;
-  route: string;
-  icon: React.ReactNode;
-  color: string;
-  bgColor: string;
-}
+const BLADE_COLLAPSED = 52;
+const BLADE_EXPANDED  = 236;
+const TOPBAR_HEIGHT   = 52;
 
-interface Category {
+// ── Search item type ─────────────────────────────────────────────────────────
+
+interface SearchItem {
   id: string;
   label: string;
-  color: string;
-  products: Product[];
+  Icon: React.ElementType;
+  path: string;
+  section?: string;
+  keywords?: string[];
+  pinned?: boolean;
+  type?: "nav" | "action";
+  color?: string;
 }
 
-const CATEGORIES: Category[] = [
-  {
-    id: "threat-risk",
-    label: "Threat & Risk",
-    color: "#1565C0",
-    products: [
-      {
-        abbrev: "TI",
-        name: "Threat Intelligence",
-        description: "MITRE ATT&CK mapped threats and attack path analysis",
-        route: "/threat-intel",
-        icon: <Radar />,
-        color: "#1565C0",
-        bgColor: "#E3F2FD",
-      },
-      {
-        abbrev: "RM",
-        name: "Risk Manager",
-        description: "FAIR-scored risk register and ALE exposure dashboard",
-        route: "/risk",
-        icon: <Assessment />,
-        color: "#1565C0",
-        bgColor: "#E3F2FD",
-      },
-    ],
-  },
-  {
-    id: "vulnerability",
-    label: "Vulnerability",
-    color: "#00695C",
-    products: [
-      {
-        abbrev: "VM",
-        name: "Vulnerability Management",
-        description: "Scans, findings, posture trends, and scan import",
-        route: "/vulnerability",
-        icon: <BugReport />,
-        color: "#00695C",
-        bgColor: "#E0F2F1",
-      },
-      {
-        abbrev: "PT",
-        name: "Pen Testing",
-        description: "VAPT reports with retest lifecycle and PDF/DOCX export",
-        route: "/vapt",
-        icon: <Shield />,
-        color: "#00695C",
-        bgColor: "#E0F2F1",
-      },
-    ],
-  },
-  {
-    id: "compliance",
-    label: "Compliance",
-    color: "#6A1B9A",
-    products: [
-      {
-        abbrev: "CM",
-        name: "Compliance Monitor",
-        description: "Framework control gaps, custom standards, and evidence packages",
-        route: "/compliance",
-        icon: <GppBad />,
-        color: "#6A1B9A",
-        bgColor: "#F3E5F5",
-      },
-      {
-        abbrev: "GR",
-        name: "Governance",
-        description: "CTEM programs, remediation tracker, and security scorecard",
-        route: "/governance",
-        icon: <PlaylistAddCheck />,
-        color: "#6A1B9A",
-        bgColor: "#F3E5F5",
-      },
-    ],
-  },
-  {
-    id: "ai-intelligence",
-    label: "AI & Intelligence",
-    color: "#E65100",
-    products: [
-      {
-        abbrev: "AI",
-        name: "AI Security Advisor",
-        description: "AI agents, workflows, and 60+ advisory specialist catalog",
-        route: "/ai-advisor",
-        icon: <SmartToy />,
-        color: "#E65100",
-        bgColor: "#FBE9E7",
-      },
-      {
-        abbrev: "IG",
-        name: "Smart Intelligence",
-        description: "Natural language queries, security doc RAG, and knowledge base",
-        route: "/intelligence",
-        icon: <Psychology />,
-        color: "#E65100",
-        bgColor: "#FBE9E7",
-      },
-    ],
-  },
-  {
-    id: "platform",
-    label: "Setup",
-    color: "#37474F",
-    products: [
-      {
-        abbrev: "ST",
-        name: "Setup",
-        description: "Clients, assets, connectors, ticket sync, and platform settings",
-        route: "/platform",
-        icon: <Tune />,
-        color: "#37474F",
-        bgColor: "#ECEFF1",
-      },
-    ],
-  },
+// ── Stage color map (matches pipeline rail) ───────────────────────────────────
+
+const STAGE_META: { num: string; label: string; color: string }[] = [
+  { num: "01", label: "Setup",    color: "#3b82f6" },
+  { num: "02", label: "Design",   color: "#a855f7" },
+  { num: "03", label: "Discover", color: "#14b8a6" },
+  { num: "04", label: "Analyse",  color: "#f59e0b" },
+  { num: "05", label: "Respond",  color: "#ef4444" },
+  { num: "06", label: "Report",   color: "#22c55e" },
+  { num: "07", label: "Automate", color: "#6366f1" },
 ];
 
-const QUICK_ACCESS = [
-  { label: "Connectors",     icon: <Cable sx={{ fontSize: 16 }} />,         route: "/platform/connections" },
-  { label: "Assets",         icon: <Storage sx={{ fontSize: 16 }} />,        route: "/platform/assets" },
-  { label: "Search Data",    icon: <Search sx={{ fontSize: 16 }} />,         route: "/intelligence/nl-query" },
-  { label: "Settings",       icon: <Settings sx={{ fontSize: 16 }} />,       route: "/platform/settings" },
-  { label: "Help",           icon: <HelpOutline sx={{ fontSize: 16 }} />,    route: "/platform/help" },
+// ── Nav items aligned to pipeline stages ──────────────────────────────────────
+
+const NAV_ITEMS: SearchItem[] = [
+  // ── home ──────────────────────────────────────────────────────────────────
+  { id: "dashboard",    label: "Dashboard",           Icon: Dashboard,        path: "/dashboard",              pinned: true, keywords: ["home", "overview", "summary", "main"] },
+
+  // ── 01 · Setup ────────────────────────────────────────────────────────────
+  { id: "clients",      label: "Clients",             Icon: People,           path: "/clients",                section: "01 · Setup",    keywords: ["customers", "tenants", "organisations", "workspace"] },
+  { id: "assets",       label: "Assets",              Icon: Storage,          path: "/assets",                 section: "01 · Setup",    keywords: ["inventory", "resources", "servers", "cloud", "hosts"] },
+  { id: "connections",  label: "Connectors",          Icon: Cable,            path: "/connections",            section: "01 · Setup",    keywords: ["connectors", "integrations", "azure", "aws", "configure", "api", "providers"] },
+  { id: "settings",     label: "Settings",            Icon: Settings,         path: "/settings",               section: "01 · Setup",    keywords: ["config", "api keys", "webhooks", "auth", "admin"] },
+
+  // ── 02 · Design ───────────────────────────────────────────────────────────
+  { id: "threat-models",label: "Threat Models",       Icon: HubIcon,              path: "/threat-models",          section: "02 · Design",   keywords: ["dfd", "stride", "data flow", "diagram", "model", "attack surface"] },
+  { id: "frameworks",   label: "Frameworks",          Icon: Policy,           path: "/frameworks",             section: "02 · Design",   keywords: ["nist", "cis", "gdpr", "iso", "pci", "compliance", "controls", "standards"] },
+  { id: "custom-fw",    label: "Custom Policy",       Icon: LibraryAdd,       path: "/custom-frameworks",      section: "02 · Design",   keywords: ["custom framework", "policy", "standard", "build"] },
+
+  // ── 03 · Discover ─────────────────────────────────────────────────────────
+  { id: "scans",        label: "Scans",               Icon: BugReport,        path: "/scans",                  section: "03 · Discover", keywords: ["assessment", "scan", "test", "nmap", "zap", "trivy", "semgrep"] },
+  { id: "findings",     label: "Findings",            Icon: Security,         path: "/findings",               section: "03 · Discover", keywords: ["vulnerabilities", "issues", "alerts", "bugs", "cve", "open"] },
+  { id: "ai-scan",      label: "AI Assisted Scan",    Icon: SmartToy,         path: "/ai-assisted-scan",       section: "03 · Discover", keywords: ["ai scan", "guided", "wizard", "conversational", "chat"] },
+
+  // ── 04 · Analyse ──────────────────────────────────────────────────────────
+  { id: "risks",        label: "Risk Register",       Icon: Assessment,       path: "/risks",                  section: "04 · Analyse",  keywords: ["risk register", "risks", "fair", "score", "likelihood", "impact"] },
+  { id: "attack",       label: "Attack Paths",        Icon: AccountTree,      path: "/attack-paths",           section: "04 · Analyse",  keywords: ["attack chain", "kill chain", "mitre", "path", "graph"] },
+  { id: "nlquery",      label: "Ask Your Data",       Icon: Psychology,       path: "/nl-query",               section: "04 · Analyse",  keywords: ["nl query", "natural language", "sql", "ask", "question", "query"] },
+  { id: "data-model",   label: "Data Model",          Icon: GridView,         path: "/data-model",             section: "04 · Analyse",  keywords: ["ontology", "entity", "graph", "schema", "relationships"] },
+
+  // ── 05 · Respond ──────────────────────────────────────────────────────────
+  { id: "threat-intel", label: "Threat Intelligence", Icon: Radar,            path: "/threat-register",        section: "05 · Respond",  keywords: ["threat", "intel", "ioc", "mitre", "att&ck", "ttp"] },
+  { id: "gaps",         label: "Control Gaps",        Icon: GppBad,           path: "/control-deficiencies",   section: "05 · Respond",  keywords: ["gaps", "deficiencies", "control", "compliance", "missing"] },
+  { id: "remediation",  label: "Remediation",         Icon: PlaylistAddCheck, path: "/governance/remediation", section: "05 · Respond",  keywords: ["fix", "remediate", "action", "ticket", "patch", "tracker"] },
+  { id: "ctem",         label: "CTEM Programs",       Icon: Engineering,      path: "/governance/ctem",        section: "05 · Respond",  keywords: ["ctem", "exposure management", "scope", "validate", "mobilise"] },
+
+  // ── 06 · Report ───────────────────────────────────────────────────────────
+  { id: "vapt",         label: "VAPT Reports",        Icon: GppGood,          path: "/vapt/reports",           section: "06 · Report",   keywords: ["penetration test", "pen test", "report", "vapt", "engagement", "pdf"] },
+  { id: "posture",      label: "Posture Trends",      Icon: TrendingUp,       path: "/posture-trends",         section: "06 · Report",   keywords: ["posture", "trend", "history", "graph", "chart", "audit"] },
+  { id: "evidence",     label: "Compliance Monitor",  Icon: Description,      path: "/compliance/deficiencies",section: "06 · Report",   keywords: ["compliance monitor", "evidence", "control deficiency", "audit ready"] },
+
+  // ── 07 · Automate ─────────────────────────────────────────────────────────
+  { id: "agents",       label: "AI Buddies",          Icon: SmartToy,         path: "/agents",                 section: "07 · Automate", keywords: ["agent", "buddy", "buddies", "ai", "orchestrator", "llm", "run agent", "automation"] },
+  { id: "knowledge",    label: "Knowledge Base",      Icon: AutoStories,      path: "/knowledge",              section: "07 · Automate", keywords: ["kb", "knowledge", "articles", "docs", "wiki"] },
+  { id: "sec-docs",     label: "Security Docs",       Icon: Description,      path: "/security-docs",          section: "07 · Automate", keywords: ["document", "upload", "policy", "rag", "question", "ask docs"] },
+  { id: "workflows",    label: "Workflows",           Icon: Schedule,         path: "/missions",               section: "07 · Automate", keywords: ["mission", "workflow", "pipeline", "scheduled", "automated"] },
 ];
 
-// ── Client picker ────────────────────────────────────────────────────────────
+const QUICK_ACTIONS: SearchItem[] = [
+  { id: "a-scan",   label: "New Scan",       Icon: Add,        path: "/scans",        type: "action", color: "#42A5F5", keywords: ["launch scan", "start scan", "new scan"] },
+  { id: "a-agent",  label: "Run AI Buddy",   Icon: PlayArrow,  path: "/agents",       type: "action", color: "#5C6BC0", keywords: ["run agent", "launch agent", "ai"] },
+  { id: "a-vapt",   label: "New VAPT Report",Icon: GppGood,    path: "/vapt/reports", type: "action", color: "#66BB6A", keywords: ["create report", "new report", "vapt"] },
+  { id: "a-nlq",    label: "Ask Your Data",  Icon: Psychology, path: "/nl-query",     type: "action", color: "#FFA726", keywords: ["ask", "query", "nl"] },
+];
 
-function ClientPicker({ compact = false }: { compact?: boolean }) {
-  const { clientId, setClientId } = useActiveClient();
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ["clients"],
-    queryFn: () => clientsApi.list(),
-    staleTime: 60_000,
-  });
 
-  return (
-    <Box sx={{ px: compact ? 0 : 1.5, py: compact ? 0 : 1 }}>
-      <FormControl fullWidth size="small">
-        {!compact && <InputLabel sx={{ fontSize: 12 }}>Active Client</InputLabel>}
-        <Select
-          label={compact ? undefined : "Active Client"}
-          displayEmpty={compact}
-          value={clientId || ""}
-          onChange={(e) => setClientId(e.target.value as string)}
-          disabled={isLoading || clients.length === 0}
-          sx={{
-            fontSize: 13,
-            bgcolor: "background.default",
-            "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
-          }}
-        >
-          <MenuItem value="" disabled>
-            <em>{isLoading ? "Loading…" : clients.length === 0 ? "No clients" : compact ? "Select client…" : "Select client…"}</em>
-          </MenuItem>
-          {clients.map((c) => (
-            <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>{c.name}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Box>
+// ── Search scoring ────────────────────────────────────────────────────────────
+
+function scoreItem(item: SearchItem, words: string[]): number {
+  const label = item.label.toLowerCase();
+  const kws   = (item.keywords ?? []).join(" ").toLowerCase();
+  const sec   = (item.section ?? "").toLowerCase();
+
+  let score = 0;
+  for (const w of words) {
+    if (label === w)                  score += 100; // exact label
+    else if (label.startsWith(w))     score += 80;  // label starts with
+    else if (label.includes(w))       score += 60;  // label contains
+    else if (kws.includes(w))         score += 40;  // keyword match
+    else if (sec.includes(w))         score += 10;  // section match
+    else return -1;                                  // word not found anywhere → exclude
+  }
+  return score;
+}
+
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const regex = new RegExp(`(${query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").split(/\s+/).join("|")})`, "gi");
+  const parts = text.split(regex);
+  return parts.map((part, i) =>
+    regex.test(part)
+      ? <Box key={i} component="mark" sx={{ bgcolor: "rgba(66,133,244,0.25)", color: "inherit", borderRadius: "2px", px: "1px" }}>{part}</Box>
+      : part
   );
 }
 
-// ── Product card ─────────────────────────────────────────────────────────────
+// ── Command Palette ───────────────────────────────────────────────────────────
 
-function ProductCard({ product }: { product: Product }) {
-  const navigate = useNavigate();
-  return (
-    <Card
-      elevation={0}
-      sx={{
-        border: "1px solid rgba(0,0,0,0.09)",
-        borderRadius: 2,
-        overflow: "hidden",
-        transition: "box-shadow .18s ease, transform .18s ease",
-        "&:hover": { boxShadow: "0 4px 20px rgba(0,0,0,0.12)", transform: "translateY(-2px)" },
-      }}
-    >
-      <CardActionArea
-        onClick={() => navigate(product.route)}
-        sx={{ display: "flex", alignItems: "center", p: 0 }}
-      >
-        <Box sx={{
-          width: 72, flexShrink: 0, alignSelf: "stretch",
-          bgcolor: product.bgColor,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", gap: 0.5,
-          borderRight: "1px solid rgba(0,0,0,0.06)",
-        }}>
-          <Box sx={{ color: product.color, "& svg": { fontSize: 22 } }}>{product.icon}</Box>
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: product.color, letterSpacing: 0.5 }}>
-            {product.abbrev}
-          </Typography>
-        </Box>
-        <Box sx={{ px: 2, py: 1.5, flexGrow: 1, textAlign: "left" }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 14, color: "text.primary", lineHeight: 1.3, mb: 0.4 }}>
-            {product.name}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.4 }}>
-            {product.description}
-          </Typography>
-        </Box>
-      </CardActionArea>
-    </Card>
-  );
-}
-
-function CategorySection({ category }: { category: Category }) {
-  return (
-    <Box id={`cat-${category.id}`} sx={{ mb: 4, scrollMarginTop: 24 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-        <Box sx={{ width: 4, height: 20, borderRadius: 2, bgcolor: category.color }} />
-        <Typography sx={{ fontWeight: 700, fontSize: 15, color: "text.primary" }}>
-          {category.label}
-        </Typography>
-      </Box>
-      <Box sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" },
-        gap: 1.5,
-      }}>
-        {category.products.map((p) => <ProductCard key={p.abbrev} product={p} />)}
-      </Box>
-    </Box>
-  );
-}
-
-// ── Sidebar content (shared between desktop sidebar + mobile drawer) ──────────
-
-function SidebarContent({
-  accounts, me, activeCategory, scrollTo, navigate, onClose,
+function CommandPalette({
+  open, onClose, initialQuery = "",
 }: {
-  accounts: any[];
-  me: MyAccess | undefined;
-  activeCategory: string;
-  scrollTo: (id: string) => void;
-  navigate: ReturnType<typeof useNavigate>;
-  onClose?: () => void;
+  open: boolean;
+  onClose: () => void;
+  initialQuery?: string;
 }) {
-  const action = (fn: () => void) => () => { fn(); onClose?.(); };
-
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", py: 2 }}>
-      {/* Logo */}
-      <Box sx={{ px: 2, mb: 2.5 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Box sx={{
-            width: 36, height: 36, borderRadius: 1.5,
-            background: "linear-gradient(135deg, #1565C0, #0288D1)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Shield sx={{ color: "#fff", fontSize: 20 }} />
-          </Box>
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 15, color: "text.primary", lineHeight: 1.1 }}>
-              Owlet
-            </Typography>
-            <Typography sx={{ fontSize: 10.5, color: "text.secondary", lineHeight: 1 }}>
-              Security Platform
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-
-      <Divider />
-      <ClientPicker />
-      <Divider sx={{ mb: 1 }} />
-
-      {/* Dashboard — pinned above product catalogue */}
-      <List dense disablePadding sx={{ px: 1, mb: 0.5 }}>
-        <ListItemButton
-          onClick={action(() => navigate("/dashboard"))}
-          sx={{
-            borderRadius: 1.5, gap: 1,
-            bgcolor: "rgba(21,101,192,0.07)",
-            border: "1px solid rgba(21,101,192,0.2)",
-            "&:hover": { bgcolor: "rgba(21,101,192,0.12)" },
-          }}
-        >
-          <Box sx={{ color: "#1565C0", display: "flex" }}><Dashboard sx={{ fontSize: 18 }} /></Box>
-          <ListItemText
-            primary="Dashboard"
-            slotProps={{ primary: { sx: { fontSize: 13, fontWeight: 700, color: "#1565C0" } } }}
-          />
-        </ListItemButton>
-      </List>
-
-      <Divider sx={{ mb: 1 }} />
-
-      {/* Category nav */}
-      <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
-        Products
-      </Typography>
-      <List dense disablePadding sx={{ px: 1 }}>
-        {CATEGORIES.map((cat) => (
-          <ListItemButton
-            key={cat.id}
-            selected={activeCategory === cat.id}
-            onClick={action(() => scrollTo(cat.id))}
-            sx={{
-              borderRadius: 1.5, mb: 0.25,
-              "&.Mui-selected": {
-                bgcolor: `${cat.color}12`,
-                borderLeft: `3px solid ${cat.color}`,
-                pl: "11px",
-                "& .MuiListItemText-primary": { color: cat.color, fontWeight: 700 },
-              },
-            }}
-          >
-            <ListItemText primary={cat.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
-          </ListItemButton>
-        ))}
-      </List>
-
-      <Divider sx={{ my: 1.5 }} />
-
-      {/* Quick Access */}
-      <Typography sx={{ px: 2, pb: 0.5, fontSize: 10, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1 }}>
-        Quick Access
-      </Typography>
-      <List dense disablePadding sx={{ px: 1 }}>
-        {QUICK_ACCESS.map((item) => (
-          <ListItemButton
-            key={item.label}
-            onClick={action(() => {
-              if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
-              else navigate(item.route);
-            })}
-            sx={{ borderRadius: 1.5, mb: 0.25, gap: 1 }}
-          >
-            <Box sx={{ color: "text.secondary" }}>{item.icon}</Box>
-            <ListItemText primary={item.label} slotProps={{ primary: { sx: { fontSize: 13 } } }} />
-          </ListItemButton>
-        ))}
-      </List>
-
-      {/* User footer */}
-      <Box sx={{ mt: "auto", pt: 1.5, px: 2, borderTop: "1px solid", borderColor: "divider" }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar sx={{ width: 30, height: 30, fontSize: 12, bgcolor: "#1565C0" }}>
-            {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
-          </Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography noWrap sx={{ fontSize: 12, fontWeight: 600, color: "text.primary" }}>
-              {accounts[0]?.name || accounts[0]?.username || "User"}
-            </Typography>
-            {me?.is_admin && (
-              <Typography sx={{ fontSize: 10, color: "#1565C0", fontWeight: 600 }}>Admin</Typography>
-            )}
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-
-// ── Main Hub page ─────────────────────────────────────────────────────────────
-
-export default function Hub() {
-  const { accounts } = useMsal();
-  const [activeCategory, setActiveCategory] = useState("threat-risk");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-
-  const { data: me } = useQuery<MyAccess>({
-    queryKey: ["my-access"], queryFn: adminApi.me, retry: 0, staleTime: 60_000,
-  });
-
-  const displayName = accounts[0]?.name?.split(" ")[0]
-    || accounts[0]?.username?.split("@")[0]
-    || "there";
-
+  const theme   = useTheme();
   const navigate = useNavigate();
+  const [query, setQuery]       = useState(initialQuery);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const scrollTo = (id: string) => {
-    setActiveCategory(id);
-    document.getElementById(`cat-${id}`)?.scrollIntoView({ behavior: "smooth" });
+  useEffect(() => {
+    if (open) {
+      setQuery(initialQuery);
+      setActiveIdx(0);
+      setTimeout(() => inputRef.current?.focus(), 60);
+    }
+  }, [open, initialQuery]);
+
+  // All searchable items
+  const allItems = useMemo(() => [...NAV_ITEMS, ...QUICK_ACTIONS], []);
+
+  const { grouped, flat } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+
+    if (!q) {
+      // Default: pinned nav + quick actions, grouped
+      const pinned = NAV_ITEMS.filter((n) => n.pinned);
+      const sections = new Map<string, SearchItem[]>();
+      NAV_ITEMS.filter((n) => !n.pinned).forEach((n) => {
+        const s = n.section ?? "Other";
+        if (!sections.has(s)) sections.set(s, []);
+        sections.get(s)!.push(n);
+      });
+      const grouped: { header: string; items: SearchItem[] }[] = [
+        { header: "FAVOURITES", items: pinned },
+        { header: "QUICK ACTIONS", items: QUICK_ACTIONS },
+        ...Array.from(sections.entries()).map(([h, items]) => ({ header: h.toUpperCase(), items })),
+      ];
+      const flat = grouped.flatMap((g) => g.items);
+      return { grouped, flat };
+    }
+
+    // Scored search
+    const scored = allItems
+      .map((item) => ({ item, score: scoreItem(item, words) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    if (!scored.length) return { grouped: [], flat: [] };
+
+    // Group scored results by section (or "Actions" for action type)
+    const sectionMap = new Map<string, SearchItem[]>();
+    scored.forEach(({ item }) => {
+      const s = item.type === "action" ? "QUICK ACTIONS" : (item.section ?? "FAVOURITES").toUpperCase();
+      if (!sectionMap.has(s)) sectionMap.set(s, []);
+      sectionMap.get(s)!.push(item);
+    });
+    const grouped = Array.from(sectionMap.entries()).map(([header, items]) => ({ header, items }));
+    const flat = scored.map(({ item }) => item);
+    return { grouped, flat };
+  }, [query, allItems]);
+
+  const go = useCallback((item: SearchItem) => { onClose(); navigate(item.path); }, [onClose, navigate]);
+
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, flat.length - 1)); }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
+    if (e.key === "Enter" && flat[activeIdx]) go(flat[activeIdx]);
+    if (e.key === "Escape") onClose();
   };
 
-  const sidebarProps = { accounts, me, activeCategory, scrollTo, navigate };
+  const isDark = theme.palette.mode === "dark";
 
   return (
-    <>
-    <Box sx={{ display: "flex", height: "100%", bgcolor: "background.default", flexDirection: "column" }}>
-
-      {/* ── Mobile drawer ──────────────────────────────────────────────────── */}
-      <Drawer
-        anchor="left"
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: 240 } }}
-      >
-        <SidebarContent {...sidebarProps} onClose={() => setDrawerOpen(false)} />
-      </Drawer>
-
-      <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
-
-        {/* ── Desktop sidebar ───────────────────────────────────────────────── */}
-        <Box sx={{
-          width: 220, flexShrink: 0,
-          bgcolor: "background.paper",
-          borderRight: "1px solid", borderColor: "divider",
-          display: { xs: "none", md: "flex" },
-          flexDirection: "column",
-        }}>
-          <SidebarContent {...sidebarProps} />
-        </Box>
-
-        {/* ── Main content ──────────────────────────────────────────────────── */}
-        <Box sx={{ flexGrow: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-
-          {/* Mobile top bar */}
-          {isMobile && (
-            <Box sx={{
-              position: "sticky", top: 0, zIndex: 100,
-              bgcolor: "background.paper",
-              borderBottom: "1px solid", borderColor: "divider",
-              px: 1.5, py: 1,
-              display: "flex", alignItems: "center", gap: 1,
-            }}>
-              <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ color: "text.secondary" }}>
-                <MenuIcon />
-              </IconButton>
-              <Box sx={{
-                width: 28, height: 28, borderRadius: 1,
-                background: "linear-gradient(135deg, #1565C0, #0288D1)",
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              }}>
-                <Shield sx={{ color: "#fff", fontSize: 16 }} />
-              </Box>
-              <Typography sx={{ fontWeight: 800, fontSize: 14, color: "text.primary", flexShrink: 0 }}>
-                Owlet
-              </Typography>
-              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                <ClientPicker compact />
-              </Box>
-              <Avatar sx={{ width: 28, height: 28, fontSize: 11, bgcolor: "#1565C0", flexShrink: 0 }}>
-                {(accounts[0]?.name || "U").charAt(0).toUpperCase()}
-              </Avatar>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 2, overflow: "hidden",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.55)",
+            mt: "6vh", verticalAlign: "top",
+            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            maxHeight: "75vh",
+          },
+        },
+        backdrop: { sx: { backdropFilter: "blur(6px)", bgcolor: alpha("#000", 0.5) } },
+      }}
+    >
+      <DialogContent sx={{ p: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {/* Search input */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 1.25, borderBottom: `1px solid ${theme.palette.divider}` }}>
+          <Search sx={{ color: "text.disabled", fontSize: 20, flexShrink: 0 }} />
+          <Box
+            component="input"
+            ref={inputRef}
+            value={query}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setQuery(e.target.value); setActiveIdx(0); }}
+            onKeyDown={handleKey}
+            placeholder="Search resources, features, actions…"
+            sx={{
+              flex: 1, border: "none", outline: "none",
+              background: "transparent", color: "text.primary",
+              fontSize: "1rem", fontFamily: "inherit",
+              "&::placeholder": { color: isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.35)" },
+            }}
+          />
+          {query && (
+            <Box
+              onClick={() => { setQuery(""); setActiveIdx(0); inputRef.current?.focus(); }}
+              sx={{ cursor: "pointer", fontSize: "0.72rem", color: "text.disabled", px: 0.75, py: 0.15, borderRadius: 0.5, bgcolor: alpha(theme.palette.divider, 0.6), "&:hover": { color: "text.primary" } }}
+            >
+              clear
             </Box>
           )}
+          <Box sx={{ px: 0.75, py: 0.15, borderRadius: 0.5, bgcolor: alpha(theme.palette.divider, 0.6), fontFamily: "monospace", fontSize: "0.65rem", color: "text.disabled", flexShrink: 0 }}>
+            esc
+          </Box>
+        </Box>
 
-          <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 2, md: 3 }, flexGrow: 1 }}>
+        {/* Results */}
+        <Box sx={{ flex: 1, overflowY: "auto", "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-thumb": { bgcolor: alpha(theme.palette.divider, 0.8), borderRadius: 2 } }}>
+          {flat.length === 0 && query.trim() ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 5, gap: 1 }}>
+              <SearchOff sx={{ fontSize: 36, color: "text.disabled" }} />
+              <Typography variant="body2" color="text.disabled">No results for "{query}"</Typography>
+              <Typography variant="caption" color="text.disabled">Try "agent", "scan", "risk", "compliance"…</Typography>
+            </Box>
+          ) : (
+            grouped.map((group) => (
+              <Box key={group.header}>
+                <Typography variant="caption" sx={{
+                  display: "block", px: 2, py: 0.6,
+                  color: "text.disabled", fontWeight: 700,
+                  letterSpacing: "0.08em", fontSize: "0.65rem",
+                  bgcolor: alpha(theme.palette.background.default, 0.6),
+                  position: "sticky", top: 0, zIndex: 1,
+                }}>
+                  {group.header}
+                </Typography>
+                <List dense disablePadding>
+                  {group.items.map((item) => {
+                    const globalIdx = flat.indexOf(item);
+                    const isActive = globalIdx === activeIdx;
+                    const { Icon } = item;
+                    const iconColor = item.color ?? (isActive ? theme.palette.primary.main : undefined);
+                    return (
+                      <ListItemButton
+                        key={item.id}
+                        selected={isActive}
+                        onClick={() => go(item)}
+                        onMouseEnter={() => setActiveIdx(globalIdx)}
+                        sx={{
+                          px: 2, py: 0.85,
+                          borderLeft: isActive ? `3px solid ${theme.palette.primary.main}` : "3px solid transparent",
+                          "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <Icon sx={{ fontSize: 18, color: iconColor ?? (isActive ? "primary.main" : "text.disabled") }} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" sx={{ color: isActive ? "text.primary" : "text.secondary", fontSize: "0.86rem" }}>
+                              {highlightText(item.label, query)}
+                            </Typography>
+                          }
+                          secondary={item.section && (
+                            <Typography variant="caption" sx={{ color: "text.disabled", fontSize: "0.7rem" }}>
+                              {item.section}
+                            </Typography>
+                          )}
+                          sx={{ m: 0 }}
+                        />
+                        {item.type === "action" && (
+                          <Chip label="action" size="small" sx={{ height: 18, fontSize: "0.62rem", ml: 1, opacity: 0.7 }} />
+                        )}
+                        {isActive && <Typography variant="caption" color="text.disabled" sx={{ ml: 1, flexShrink: 0 }}>↵</Typography>}
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              </Box>
+            ))
+          )}
+        </Box>
 
-            {/* Welcome */}
-            <Box sx={{ mb: { xs: 2.5, md: 4 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: "text.primary", mb: 0.5, fontSize: { xs: 20, md: 24 } }}>
-                Hi, {displayName}
+        {/* Footer hints */}
+        <Box sx={{ px: 2, py: 0.75, borderTop: `1px solid ${theme.palette.divider}`, display: "flex", gap: 2, alignItems: "center", flexShrink: 0 }}>
+          {([["↑↓", "navigate"], ["↵", "open"], ["esc", "close"]] as const).map(([k, a]) => (
+            <Box key={k} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Box sx={{ px: 0.75, py: 0.1, borderRadius: 0.5, bgcolor: alpha(theme.palette.divider, 0.6), fontFamily: "monospace", fontSize: "0.65rem" }}>{k}</Box>
+              <Typography variant="caption" color="text.disabled">{a}</Typography>
+            </Box>
+          ))}
+          <Typography variant="caption" color="text.disabled" sx={{ ml: "auto" }}>
+            {flat.length} result{flat.length !== 1 ? "s" : ""}
+          </Typography>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Left blade ────────────────────────────────────────────────────────────────
+
+function LeftBlade({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const isDark = theme.palette.mode === "dark";
+  const bladeBg = isDark ? "#1a1a2e" : "#1e3a5f";
+  const hoverBg = alpha("#fff", 0.08);
+
+  // colour lookup by section key
+  const stageColorOf = (sec: string): string => {
+    const m = STAGE_META.find((s) => sec.startsWith(s.num));
+    return m ? m.color : alpha("#fff", 0.5);
+  };
+
+  const pinned = NAV_ITEMS.filter((n) => n.pinned);
+
+  const sections = useMemo(() => {
+    const map = new Map<string, SearchItem[]>();
+    STAGE_META.forEach((s) => map.set(`${s.num} · ${s.label}`, []));
+    NAV_ITEMS.filter((n) => !n.pinned).forEach((n) => {
+      const sec = n.section ?? "Other";
+      if (!map.has(sec)) map.set(sec, []);
+      map.get(sec)!.push(n);
+    });
+    return map;
+  }, []);
+
+  const navItem = (nav: SearchItem, iconColor?: string) => {
+    const { Icon } = nav;
+    const ic = iconColor ?? alpha("#fff", 0.65);
+    return (
+      <Tooltip key={nav.id} title={expanded ? "" : nav.label} placement="right">
+        <Box
+          onClick={() => navigate(nav.path)}
+          sx={{
+            display: "flex", alignItems: "center",
+            gap: expanded ? 1.5 : 0,
+            px: expanded ? 1.5 : 0,
+            justifyContent: expanded ? "flex-start" : "center",
+            height: 36, cursor: "pointer", borderRadius: 1,
+            mx: 0.5, mb: 0.15,
+            transition: "background 0.15s",
+            "&:hover": { bgcolor: hoverBg },
+          }}
+        >
+          <Icon sx={{ fontSize: 17, color: ic, flexShrink: 0 }} />
+          {expanded && (
+            <Typography sx={{ color: alpha("#fff", 0.82), fontSize: "0.8rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {nav.label}
+            </Typography>
+          )}
+        </Box>
+      </Tooltip>
+    );
+  };
+
+  return (
+    <Box sx={{
+      position: "fixed",
+      top: TOPBAR_HEIGHT, left: 0, bottom: 0,
+      width: expanded ? BLADE_EXPANDED : BLADE_COLLAPSED,
+      bgcolor: bladeBg,
+      transition: "width 0.2s ease",
+      overflow: "hidden",
+      display: "flex", flexDirection: "column",
+      zIndex: 1100,
+      boxShadow: "2px 0 8px rgba(0,0,0,0.35)",
+    }}>
+
+      {/* Home row */}
+      <Box sx={{ pt: 1, pb: 0.5 }}>
+        {pinned.map((n) => navItem(n, alpha("#fff", 0.55)))}
+      </Box>
+
+      <Divider sx={{ borderColor: alpha("#fff", 0.08), mx: 1, mb: 0.5 }} />
+
+      {/* Stage sections */}
+      <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", pb: 2, "&::-webkit-scrollbar": { width: 3 }, "&::-webkit-scrollbar-thumb": { bgcolor: alpha("#fff", 0.12), borderRadius: 2 } }}>
+        {Array.from(sections.entries()).map(([sec, items]) => {
+          if (items.length === 0) return null;
+          const color = stageColorOf(sec);
+          const meta  = STAGE_META.find((s) => sec.startsWith(s.num));
+          return (
+            <Box key={sec} sx={{ mb: 0.5 }}>
+              {/* Stage header */}
+              {expanded ? (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 1.5, pt: 1.5, pb: 0.5 }}>
+                  {/* Colored stage node */}
+                  <Box sx={{
+                    width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                    border: `1.5px solid ${color}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: `0 0 8px -2px ${color}`,
+                  }}>
+                    <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.55rem", fontWeight: 700, color, lineHeight: 1 }}>
+                      {meta?.num}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.65rem", fontWeight: 600, color, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                    {meta?.label}
+                  </Typography>
+                </Box>
+              ) : (
+                /* Collapsed: just a colored 2px left accent line before icons */
+                <Box sx={{ width: 2, height: 6, bgcolor: color, ml: "25px", borderRadius: 1, mb: 0.25, mt: 1 }} />
+              )}
+
+              {items.map((n) => navItem(n, color))}
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+// ── Top bar ───────────────────────────────────────────────────────────────────
+
+function TopBar({
+  onMenuClick,
+  onSearchOpen,
+  searchQuery,
+  onSearchChange,
+}: {
+  onMenuClick: () => void;
+  onSearchOpen: () => void;
+  searchQuery: string;
+  onSearchChange: (v: string) => void;
+}) {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const isDark = theme.palette.mode === "dark";
+  const barBg = isDark ? "#0f1117" : "#003087";
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <Box sx={{
+      position: "fixed", top: 0, left: 0, right: 0, height: TOPBAR_HEIGHT,
+      bgcolor: barBg, zIndex: 1200,
+      display: "flex", alignItems: "center", px: 1, gap: 1,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+    }}>
+      {/* Hamburger */}
+      <IconButton onClick={onMenuClick} sx={{ color: alpha("#fff", 0.8), "&:hover": { color: "#fff", bgcolor: alpha("#fff", 0.08) } }}>
+        <MenuIcon />
+      </IconButton>
+
+      {/* Logo */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 2, cursor: "pointer" }} onClick={() => navigate("/hub")}>
+        <Box sx={{ width: 26, height: 26, borderRadius: "6px", bgcolor: "#4285F4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Typography sx={{ color: "#fff", fontSize: "0.75rem", fontWeight: 800 }}>O</Typography>
+        </Box>
+        <Typography sx={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
+          Owlet
+        </Typography>
+      </Box>
+
+      {/* Search bar — real inline input, opens palette on focus/enter */}
+      <Box sx={{
+        flex: 1, maxWidth: 600, mx: "auto",
+        display: "flex", alignItems: "center", gap: 1,
+        bgcolor: alpha("#fff", 0.1),
+        border: `1px solid ${alpha("#fff", 0.15)}`,
+        borderRadius: 1, px: 1.5, py: 0.5,
+        transition: "all 0.15s",
+        "&:focus-within": { bgcolor: alpha("#fff", 0.16), borderColor: alpha("#fff", 0.35) },
+        "&:hover": { bgcolor: alpha("#fff", 0.13) },
+      }}>
+        <Search sx={{ fontSize: 16, color: alpha("#fff", 0.55), flexShrink: 0 }} />
+        <Box
+          component="input"
+          ref={inputRef}
+          value={searchQuery}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value)}
+          onFocus={onSearchOpen}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); onSearchOpen(); }
+          }}
+          placeholder="Search resources, features, actions… (⌘K)"
+          sx={{
+            flex: 1, border: "none", outline: "none",
+            background: "transparent", color: "#fff",
+            fontSize: "0.85rem", fontFamily: "inherit",
+            "&::placeholder": { color: alpha("#fff", 0.45) },
+          }}
+        />
+        <Box sx={{ px: 0.75, py: 0.15, borderRadius: 0.5, bgcolor: alpha("#fff", 0.12), fontFamily: "monospace", fontSize: "0.65rem", color: alpha("#fff", 0.5), whiteSpace: "nowrap", flexShrink: 0 }}>
+          ⌘K
+        </Box>
+      </Box>
+
+      {/* Right utilities */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
+        <Tooltip title="Notifications">
+          <IconButton sx={{ color: alpha("#fff", 0.7), "&:hover": { color: "#fff", bgcolor: alpha("#fff", 0.08) } }}>
+            <Badge badgeContent={3} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", minWidth: 16, height: 16 } }}>
+              <Notifications sx={{ fontSize: 20 }} />
+            </Badge>
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Settings">
+          <IconButton onClick={() => navigate("/settings")} sx={{ color: alpha("#fff", 0.7), "&:hover": { color: "#fff", bgcolor: alpha("#fff", 0.08) } }}>
+            <Settings sx={{ fontSize: 20 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Dheeraj Gulati">
+          <Avatar sx={{ width: 30, height: 30, bgcolor: "#4285F4", fontSize: "0.8rem", cursor: "pointer", ml: 0.5 }}>D</Avatar>
+        </Tooltip>
+      </Box>
+    </Box>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
+export default function Hub() {
+  const navigate = useNavigate();
+  const [bladeExpanded, setBladeExpanded]   = useState(false);
+  const [paletteOpen,   setPaletteOpen]     = useState(false);
+  const [searchQuery,   setSearchQuery]     = useState("");
+
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const closePalette = useCallback(() => { setPaletteOpen(false); setSearchQuery(""); }, []);
+
+  // ⌘K shortcut
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPaletteOpen((v) => !v); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  const contentLeft = bladeExpanded ? BLADE_EXPANDED : BLADE_COLLAPSED;
+
+  return (
+    <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
+      <TopBar
+        onMenuClick={() => setBladeExpanded((v) => !v)}
+        onSearchOpen={openPalette}
+        searchQuery={searchQuery}
+        onSearchChange={(v) => { setSearchQuery(v); setPaletteOpen(true); }}
+      />
+      <LeftBlade expanded={bladeExpanded} onToggle={() => setBladeExpanded((v) => !v)} />
+
+      {/* ── Pipeline main content ─────────────────────────────────────── */}
+      <Box sx={{
+        ml: `${contentLeft}px`,
+        mt: `${TOPBAR_HEIGHT}px`,
+        transition: "margin-left 0.2s ease",
+        minHeight: `calc(100vh - ${TOPBAR_HEIGHT}px)`,
+      }}>
+        <Pipeline navigate={navigate} />
+      </Box>
+
+      <CommandPalette open={paletteOpen} onClose={closePalette} initialQuery={searchQuery} />
+    </Box>
+  );
+}
+
+// ── Pipeline stage data ───────────────────────────────────────────────────────
+
+interface StageChip  { label: string; route: string }
+interface StageModule { tag: string; name: string; desc: string; route: string; chips: StageChip[] }
+interface Stage { num: string; id: string; color: string; title: string; sub: string; modules: StageModule[] }
+
+const STAGES: Stage[] = [
+  {
+    num: "01", id: "setup", color: "#3b82f6",
+    title: "Stand up the environment",
+    sub: "Nothing downstream works without this. Get the tenant ready — clients, connectors, and AI providers.",
+    modules: [
+      { tag: "ST", name: "Setup", route: "/platform",
+        desc: "Clients, assets, connectors, AI providers, and platform settings.",
+        chips: [
+          { label: "Clients",      route: "/clients" },
+          { label: "Assets",       route: "/assets" },
+          { label: "Connectors",   route: "/connections" },
+          { label: "AI providers", route: "/connections" },
+          { label: "Settings",     route: "/settings" },
+        ] },
+    ],
+  },
+  {
+    num: "02", id: "design", color: "#a855f7",
+    title: "Define the blueprint",
+    sub: "Model how data actually moves, then pick which standards it has to satisfy.",
+    modules: [
+      { tag: "TM", name: "Threat Models", route: "/threat-intel/threat-models",
+        desc: "Data flow diagrams, STRIDE analysis, and Sigma detection rules.",
+        chips: [
+          { label: "Data flow diagrams",    route: "/threat-intel/threat-models" },
+          { label: "STRIDE analysis",       route: "/threat-intel/threat-models" },
+          { label: "Sigma detection rules", route: "/threat-intel/threat-models" },
+        ] },
+      { tag: "FW", name: "Frameworks", route: "/compliance/frameworks",
+        desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR, and custom standards.",
+        chips: [
+          { label: "NIST CSF",      route: "/compliance/frameworks" },
+          { label: "CIS Controls",  route: "/compliance/frameworks" },
+          { label: "ISO 27001",     route: "/compliance/frameworks" },
+          { label: "PCI DSS",       route: "/compliance/frameworks" },
+          { label: "GDPR",          route: "/compliance/frameworks" },
+          { label: "Custom policy", route: "/compliance/custom-frameworks" },
+        ] },
+    ],
+  },
+  {
+    num: "03", id: "discover", color: "#14b8a6",
+    title: "Find what's actually exposed",
+    sub: "Scan the environment the blueprint just described — manually or through a guided AI conversation.",
+    modules: [
+      { tag: "VM", name: "Vulnerability Management", route: "/vulnerability",
+        desc: "Scans, findings, posture trends, CVE enrichment, and scan import.",
+        chips: [
+          { label: "Scans",           route: "/vulnerability/scans" },
+          { label: "Findings",        route: "/vulnerability/findings" },
+          { label: "CVE enrichment",  route: "/vulnerability/findings" },
+          { label: "Posture trends",  route: "/vulnerability/posture" },
+          { label: "Scan import",     route: "/vulnerability/scans" },
+        ] },
+      { tag: "AI", name: "AI Assisted Scan", route: "/intelligence/ai-assisted-scan",
+        desc: "Conversational guided assessment — describe your environment, launch a scan.",
+        chips: [
+          { label: "Guided wizard",    route: "/intelligence/ai-assisted-scan" },
+          { label: "Environment chat", route: "/intelligence/ai-assisted-scan" },
+          { label: "Auto-launch",      route: "/intelligence/ai-assisted-scan" },
+        ] },
+    ],
+  },
+  {
+    num: "04", id: "analyse", color: "#f59e0b",
+    title: "Turn findings into risk",
+    sub: "Raw findings get scored, attack paths mapped, and the whole posture becomes queryable in plain language.",
+    modules: [
+      { tag: "RM", name: "Risk Manager", route: "/risk",
+        desc: "FAIR-scored risk register, ALE exposure, and attack path graph.",
+        chips: [
+          { label: "Risk register",    route: "/risk/register" },
+          { label: "FAIR / ALE",       route: "/risk/overview" },
+          { label: "Attack paths",     route: "/threat-intel/attack-paths" },
+          { label: "CVE blast radius", route: "/cve-pivot" },
+        ] },
+      { tag: "IG", name: "Smart Intelligence", route: "/intelligence",
+        desc: "Natural language queries, compliance heatmap, and asset inventory.",
+        chips: [
+          { label: "Ask your data",      route: "/intelligence/nl-query" },
+          { label: "Compliance heatmap", route: "/intelligence/reports" },
+          { label: "Asset inventory",    route: "/assets" },
+          { label: "Data model",         route: "/data-model" },
+        ] },
+    ],
+  },
+  {
+    num: "05", id: "respond", color: "#ef4444",
+    title: "Act on the picture",
+    sub: "Map risk to real adversary behaviour, then push it into a tracked remediation program.",
+    modules: [
+      { tag: "TI", name: "Threat Intelligence", route: "/threat-intel",
+        desc: "MITRE ATT&CK threat register and attack path visualisation.",
+        chips: [
+          { label: "Threat register", route: "/threat-intel/register" },
+          { label: "MITRE ATT&CK",    route: "/threat-intel/register" },
+          { label: "Attack paths",    route: "/threat-intel/attack-paths" },
+        ] },
+      { tag: "GR", name: "Governance", route: "/governance",
+        desc: "CTEM programs, control gaps, remediation tracker, and scorecard.",
+        chips: [
+          { label: "CTEM programs",   route: "/governance/ctem" },
+          { label: "Control gaps",    route: "/compliance/deficiencies" },
+          { label: "Remediation",     route: "/governance/remediation" },
+        ] },
+    ],
+  },
+  {
+    num: "06", id: "report", color: "#22c55e",
+    title: "Prove it happened",
+    sub: "Close the loop with evidence the client — or the auditor — can actually keep.",
+    modules: [
+      { tag: "PT", name: "Pen Testing / VAPT", route: "/vapt",
+        desc: "VAPT reports with retest lifecycle and PDF/DOCX export.",
+        chips: [
+          { label: "VAPT reports",     route: "/vapt/reports" },
+          { label: "Retest lifecycle", route: "/vapt/reports" },
+          { label: "PDF / DOCX",       route: "/vapt/reports" },
+        ] },
+      { tag: "CM", name: "Compliance Monitor", route: "/compliance",
+        desc: "Framework assessments, evidence packages, and audit-ready output.",
+        chips: [
+          { label: "Framework assessments", route: "/compliance/frameworks" },
+          { label: "Evidence packages",     route: "/compliance/evidence" },
+          { label: "Control deficiencies",  route: "/compliance/deficiencies" },
+        ] },
+    ],
+  },
+  {
+    num: "07", id: "automate", color: "#6366f1",
+    title: "Let AI carry the load",
+    sub: "Once the first run is done, agents run the loop — analysis, intel, remediation, knowledge — on repeat.",
+    modules: [
+      { tag: "AB", name: "AI Buddies", route: "/agents",
+        desc: "60+ AI agents — orchestrator, risk manager, threat intel, remediation.",
+        chips: [
+          { label: "Orchestrator", route: "/agents" },
+          { label: "Risk Manager", route: "/agents" },
+          { label: "Threat Intel", route: "/agents" },
+          { label: "Remediation",  route: "/agents" },
+        ] },
+      { tag: "KB", name: "Knowledge & Docs", route: "/knowledge",
+        desc: "Knowledge base, security doc RAG, and ask-your-data queries.",
+        chips: [
+          { label: "Knowledge base", route: "/knowledge" },
+          { label: "Security docs",  route: "/security-docs" },
+          { label: "Ask your data",  route: "/intelligence/nl-query" },
+        ] },
+    ],
+  },
+];
+
+// ── Pipeline component ────────────────────────────────────────────────────────
+
+function FeatureChip({ label, route, color, nav }: { label: string; route: string; color: string; nav: (p: string) => void }) {
+  const [active, setActive] = useState(false);
+  return (
+    <Box
+      component="button"
+      onClick={() => { setActive((v) => !v); nav(route); }}
+      sx={{
+        fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem",
+        color: active ? "#fff" : "text.secondary",
+        bgcolor: active ? alpha(color, 0.18) : "background.default",
+        border: "1px solid", borderColor: active ? color : "divider",
+        px: 1.25, py: 0.65, borderRadius: "6px",
+        cursor: "pointer", transition: "all 0.14s",
+        "&:hover": { borderColor: color, color: "text.primary" },
+      }}
+    >
+      {active ? `✓ ${label}` : label}
+    </Box>
+  );
+}
+
+function ModuleCard({ mod, color, nav }: { mod: StageModule; color: string; nav: (p: string) => void }) {
+  return (
+    <Box sx={{
+      bgcolor: "background.paper",
+      border: "1px solid", borderColor: "divider",
+      borderRadius: "10px", p: "16px 18px",
+      transition: "border-color 0.15s, transform 0.15s",
+      "&:hover": { borderColor: color, transform: "translateY(-1px)" },
+    }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 1, cursor: "pointer" }} onClick={() => nav(mod.route)}>
+        <Box sx={{
+          fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.66rem", fontWeight: 700,
+          color, bgcolor: alpha(color, 0.14),
+          px: 0.9, py: 0.4, borderRadius: "4px", letterSpacing: "0.05em", flexShrink: 0,
+        }}>
+          {mod.tag}
+        </Box>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.94rem", "&:hover": { color } }}>
+          {mod.name}
+        </Typography>
+      </Box>
+      <Typography sx={{ color: "text.secondary", fontSize: "0.81rem", lineHeight: 1.55, mb: 1.25 }}>
+        {mod.desc}
+      </Typography>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        {mod.chips.map((c) => (
+          <FeatureChip key={c.label} label={c.label} route={c.route} color={color} nav={nav} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function Pipeline({ navigate: nav }: { navigate: (p: string) => void }) {
+  const RAIL = "linear-gradient(180deg,#3b82f6,#a855f7 25%,#14b8a6 42%,#f59e0b 58%,#ef4444 75%,#22c55e 88%,#6366f1)";
+
+  // Load fonts
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&display=swap";
+    document.head.appendChild(link);
+    return () => { document.head.removeChild(link); };
+  }, []);
+
+  return (
+    <Box sx={{ maxWidth: 900, px: { xs: 2.5, md: 5 }, py: { xs: 4, md: 7 }, pb: 14 }}>
+
+      {/* Hero */}
+      <Box sx={{ pb: 6, borderBottom: "1px solid", borderColor: "divider", mb: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, mb: 2.5 }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: RAIL, boxShadow: "0 0 10px 1px #3b82f688" }} />
+          <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.72rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "text.disabled" }}>
+            Owlet · Security Operations Platform
+          </Typography>
+        </Box>
+        <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: { xs: 28, md: 40 }, letterSpacing: "-0.02em", lineHeight: 1.08, mb: 2 }}>
+          One{" "}
+          <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+            signal path
+          </Box>
+          ,{" "}from setup to evidence.
+        </Typography>
+        <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 580 }}>
+          Seven stages run in order — each one hands its output to the next. Click any chip to jump straight there.
+        </Typography>
+      </Box>
+
+      {/* Pipeline */}
+      <Box sx={{ position: "relative", mt: 7 }}>
+        {/* Rail */}
+        <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.5 }} />
+
+        {STAGES.map((stage, si) => (
+          <Box
+            key={stage.id}
+            id={`stage-${stage.id}`}
+            sx={{
+              position: "relative", pl: "64px",
+              mb: si < STAGES.length - 1 ? 8 : 0,
+              opacity: 0, transform: "translateY(14px)",
+              animation: `s3rise 0.55s ease ${si * 0.07}s forwards`,
+              "@keyframes s3rise": { to: { opacity: 1, transform: "translateY(0)" } },
+            }}
+          >
+            {/* Node */}
+            <Box sx={{
+              position: "absolute", left: 0, top: 0,
+              width: 48, height: 48, borderRadius: "50%",
+              bgcolor: "background.default",
+              border: `2px solid ${stage.color}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: "1.05rem",
+              color: stage.color,
+              boxShadow: `0 0 0 5px background.default, 0 0 22px -4px ${stage.color}`,
+              zIndex: 2,
+            }}>
+              {stage.num}
+            </Box>
+
+            {/* Stage header */}
+            <Box sx={{ pt: "5px", mb: 2.5 }}>
+              <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.75rem", color: stage.color, letterSpacing: "0.1em", textTransform: "uppercase", mb: 0.75 }}>
+                Stage {stage.num} · {STAGES[si].id.charAt(0).toUpperCase() + STAGES[si].id.slice(1)}
               </Typography>
-              <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-                Select a product to get started.
+              <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 20, md: 24 }, fontWeight: 600, letterSpacing: "-0.01em", mb: 0.75 }}>
+                {stage.title}
+              </Typography>
+              <Typography sx={{ color: "text.secondary", fontSize: "0.9rem", maxWidth: 560 }}>
+                {stage.sub}
               </Typography>
             </Box>
 
-            {/* Mobile quick-access chips */}
-            {isMobile && (
-              <Box sx={{
-                display: "flex", gap: 1, mb: 3,
-                overflowX: "auto",
-                pb: 0.5,
-                "&::-webkit-scrollbar": { display: "none" },
-              }}>
-                {QUICK_ACCESS.map((item) => (
-                  <Chip
-                    key={item.label}
-                    icon={item.icon as any}
-                    label={item.label}
-                    onClick={() => {
-                      if (item.route === "__assistant__") window.dispatchEvent(new CustomEvent("owlet:open-assistant"));
-                      else navigate(item.route);
-                    }}
-                    size="small"
-                    sx={{
-                      flexShrink: 0,
-                      fontSize: 12, fontWeight: 600,
-                      bgcolor: "background.paper",
-                      border: "1px solid", borderColor: "divider",
-                      cursor: "pointer",
-                      "&:hover": { bgcolor: "action.hover" },
-                    }}
-                  />
-                ))}
-                <Chip
-                  icon={<Restore sx={{ fontSize: 15 }} /> as any}
-                  label="Classic View"
-                  onClick={() => navigate("/dashboard")}
-                  size="small"
-                  sx={{
-                    flexShrink: 0, fontSize: 12, opacity: 0.6,
-                    bgcolor: "background.paper",
-                    border: "1px solid", borderColor: "divider",
-                    cursor: "pointer",
-                  }}
-                />
-              </Box>
-            )}
-
-            {/* Mobile category filter chips */}
-            {isMobile && (
-              <Box sx={{
-                display: "flex", gap: 1, mb: 2.5,
-                overflowX: "auto",
-                "&::-webkit-scrollbar": { display: "none" },
-              }}>
-                {CATEGORIES.map((cat) => (
-                  <Chip
-                    key={cat.id}
-                    label={cat.label}
-                    onClick={() => scrollTo(cat.id)}
-                    size="small"
-                    sx={{
-                      flexShrink: 0, fontSize: 11, fontWeight: 600,
-                      bgcolor: activeCategory === cat.id ? `${cat.color}18` : "background.paper",
-                      color: activeCategory === cat.id ? cat.color : "text.secondary",
-                      border: "1px solid",
-                      borderColor: activeCategory === cat.id ? cat.color : "divider",
-                      cursor: "pointer",
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-
-            {/* Category sections */}
-            {CATEGORIES.map((cat) => (
-              <CategorySection key={cat.id} category={cat} />
-            ))}
-
-            {/* Bottom hint */}
-            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "background.paper", border: "1px solid", borderColor: "divider" }}>
-              <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>
-                <strong style={{ color: "#1565C0" }}>Setup</strong> — clients, assets, connectors, and settings are in{" "}
-                <Box component="span"
-                  onClick={() => navigate("/platform")}
-                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
-                  Setup
-                </Box>.{" "}
-                <Box component="span"
-                  onClick={() => navigate("/platform/clients")}
-                  sx={{ color: "#1565C0", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
-                  Clients
-                </Box>{" "}
-                manage your multi-tenant data containers.
-              </Typography>
+            {/* Module cards */}
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: stage.modules.length === 1 ? "1fr" : { xs: "1fr", sm: "1fr 1fr" },
+              gap: 1.5,
+            }}>
+              {stage.modules.map((mod) => (
+                <ModuleCard key={mod.tag} mod={mod} color={stage.color} nav={nav} />
+              ))}
             </Box>
+          </Box>
+        ))}
+      </Box>
+
+      {/* ── Data Ontology section ── */}
+      <OntologySection nav={nav} />
+
+      {/* Footer */}
+      <Box sx={{ mt: 8, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
+        <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "text.disabled", letterSpacing: "0.02em" }}>
+          SETUP → DESIGN → DISCOVER → ANALYSE → RESPOND → REPORT → AUTOMATE
+        </Typography>
+        <Box sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.69rem", color: "text.secondary", border: "1px solid", borderColor: "divider", px: 1.5, py: 0.75, borderRadius: "20px" }}>
+          Owlet · NexGenAI
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// ── Ontology section ──────────────────────────────────────────────────────────
+
+interface ONode { entity: string; label: string; cx: number; cy: number; labelX: number; labelW: number; color: string }
+interface OEdge { from: string; to: string; x1: number; y1: number; x2: number; y2: number; dashed?: boolean }
+
+const ONT_NODES: ONode[] = [
+  { entity:"Client",      label:"Client",             cx: 70,  cy:300, labelX: 35.0, labelW: 70,  color:"#2563eb" },
+  { entity:"Asset",       label:"Asset",              cx:250,  cy:190, labelX:215.0, labelW: 70,  color:"#2563eb" },
+  { entity:"Control",     label:"Control",            cx:250,  cy:470, labelX:213.5, labelW: 73,  color:"#8b5cf6" },
+  { entity:"DataFlow",    label:"Data Flow",          cx:440,  cy: 90, labelX:396.5, labelW: 87,  color:"#8b5cf6" },
+  { entity:"Finding",     label:"Finding",            cx:440,  cy:280, labelX:403.5, labelW: 73,  color:"#0ea5a4" },
+  { entity:"SmartIntel",  label:"Smart Intelligence", cx:440,  cy:560, labelX:365.0, labelW:150,  color:"#6366f1" },
+  { entity:"Risk",        label:"Risk",               cx:640,  cy:220, labelX:605.0, labelW: 70,  color:"#f59e0b" },
+  { entity:"Evidence",    label:"Evidence",           cx:640,  cy:470, labelX:600.0, labelW: 80,  color:"#22c55e" },
+  { entity:"AttackPath",  label:"Attack Path",        cx:830,  cy:130, labelX:779.5, labelW:101,  color:"#f59e0b" },
+  { entity:"Technique",   label:"MITRE Technique",    cx:830,  cy:300, labelX:765.5, labelW:129,  color:"#ef4444" },
+  { entity:"Remediation", label:"Remediation",        cx:830,  cy:420, labelX:779.5, labelW:101,  color:"#ef4444" },
+  { entity:"Report",      label:"Report",             cx:1020, cy:300, labelX:985.0, labelW: 70,  color:"#22c55e" },
+];
+
+const ONT_EDGES: OEdge[] = [
+  { from:"Client",      to:"Asset",       x1: 70, y1:300, x2:250, y2:190 },
+  { from:"Asset",       to:"DataFlow",    x1:250, y1:190, x2:440, y2: 90 },
+  { from:"Asset",       to:"Finding",     x1:250, y1:190, x2:440, y2:280 },
+  { from:"Finding",     to:"Risk",        x1:440, y1:280, x2:640, y2:220 },
+  { from:"Risk",        to:"AttackPath",  x1:640, y1:220, x2:830, y2:130 },
+  { from:"DataFlow",    to:"Technique",   x1:440, y1: 90, x2:830, y2:300 },
+  { from:"AttackPath",  to:"Technique",   x1:830, y1:130, x2:830, y2:300 },
+  { from:"Risk",        to:"Remediation", x1:640, y1:220, x2:830, y2:420 },
+  { from:"Technique",   to:"Remediation", x1:830, y1:300, x2:830, y2:420 },
+  { from:"Control",     to:"Evidence",    x1:250, y1:470, x2:640, y2:470 },
+  { from:"Remediation", to:"Evidence",    x1:830, y1:420, x2:640, y2:470 },
+  { from:"Finding",     to:"Report",      x1:440, y1:280, x2:1020, y2:300 },
+  { from:"Remediation", to:"Report",      x1:830, y1:420, x2:1020, y2:300 },
+  { from:"Evidence",    to:"Report",      x1:640, y1:470, x2:1020, y2:300 },
+  { from:"SmartIntel",  to:"Asset",       x1:440, y1:560, x2:250,  y2:190, dashed:true },
+  { from:"SmartIntel",  to:"Finding",     x1:440, y1:560, x2:440,  y2:280, dashed:true },
+  { from:"SmartIntel",  to:"Risk",        x1:440, y1:560, x2:640,  y2:220, dashed:true },
+  { from:"SmartIntel",  to:"Control",     x1:440, y1:560, x2:250,  y2:470, dashed:true },
+];
+
+const ONT_ENTITY_ROUTES: Record<string,string> = {
+  Client:"clients", Asset:"assets", Control:"compliance/frameworks",
+  DataFlow:"threat-intel/threat-models", Finding:"vulnerability/findings",
+  SmartIntel:"intelligence/nl-query", Risk:"risk/register",
+  Evidence:"compliance/evidence", AttackPath:"threat-intel/attack-paths",
+  Technique:"threat-intel/register", Remediation:"governance/remediation",
+  Report:"vapt/reports",
+};
+
+function OntologySection({ nav }: { nav: (p: string) => void }) {
+  const theme = useTheme();
+  const [sel, setSel] = useState<string | null>(null);
+  const edgeColor = theme.palette.mode === "dark" ? "#3a4250" : "#c3c9d4";
+  const raisedBg  = theme.palette.mode === "dark" ? "#141b25" : "#f2f4f8";
+  const lineColor = theme.palette.mode === "dark" ? "#232b36" : "#e6e9ef";
+
+  const toggle = (e: string) => setSel((p) => (p === e ? null : e));
+
+  const edgeStyle = (e: OEdge) => {
+    const hit = sel && (e.from === sel || e.to === sel);
+    const dim = sel && !hit;
+    return { stroke: hit ? "#6366f1" : edgeColor, strokeWidth: hit ? 2.4 : 1.6, opacity: dim ? 0.1 : 1, strokeDasharray: e.dashed ? "3 4" : undefined };
+  };
+
+  return (
+    <Box sx={{ mt: 10 }}>
+      {/* Section header — same style as stage headers */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
+        <Box sx={{ width: 48, height: 48, borderRadius: "50%", bgcolor: "background.default", border: "2px solid #6366f1", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: "0.85rem", color: "#6366f1", boxShadow: "0 0 22px -4px #6366f1", flexShrink: 0 }}>
+          OM
+        </Box>
+        <Box>
+          <Typography sx={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.75rem", color: "#6366f1", letterSpacing: "0.1em", textTransform: "uppercase", mb: 0.5 }}>
+            Data Ontology
+          </Typography>
+          <Typography sx={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: { xs: 18, md: 22 }, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            Eleven entities, one connected data model.
+          </Typography>
+          <Typography sx={{ color: "text.secondary", fontSize: "0.85rem", mt: 0.5 }}>
+            Click any node to trace what feeds it. Double-click to open that module.
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* SVG panel */}
+      <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: "10px", p: 2.5, overflowX: "auto" }}>
+        <svg viewBox="0 0 1120 640" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", minWidth: 560, height: "auto", display: "block" }}>
+          <defs>
+            <marker id="h-arr"     viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill={edgeColor}/></marker>
+            <marker id="h-arr-lit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker>
+          </defs>
+          <g>
+            {ONT_EDGES.map((e, i) => {
+              const s = edgeStyle(e);
+              const lit = sel && (e.from === sel || e.to === sel);
+              return <line key={i} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} stroke={s.stroke} strokeWidth={s.strokeWidth} opacity={s.opacity} strokeDasharray={s.strokeDasharray} markerEnd={lit ? "url(#h-arr-lit)" : "url(#h-arr)"} style={{ transition: "stroke 0.2s, opacity 0.2s" }} />;
+            })}
+          </g>
+          <g>
+            {ONT_NODES.map((n) => {
+              const lit = sel === n.entity;
+              const dim = !!sel && sel !== n.entity;
+              return (
+                <g key={n.entity} style={{ cursor: "pointer", opacity: dim ? 0.22 : 1, transition: "opacity 0.18s" }}
+                   onClick={() => toggle(n.entity)}
+                   onDoubleClick={() => nav(`/${ONT_ENTITY_ROUTES[n.entity] ?? ""}`)}
+                >
+                  <circle cx={n.cx} cy={n.cy} r={lit ? 10 : 7} fill={n.color} stroke={theme.palette.mode === "dark" ? "#0b0f14" : "#fff"} strokeWidth={2} style={{ transition: "r 0.15s" }} />
+                  <rect x={n.labelX} y={n.cy + 12} width={n.labelW} height={22} rx={11} fill={lit ? n.color : raisedBg} stroke={lit ? n.color : lineColor} strokeWidth={1} style={{ transition: "fill 0.15s" }} />
+                  <text x={n.cx} y={n.cy + 27} textAnchor="middle" dominantBaseline="middle" fontFamily="'IBM Plex Mono', monospace" fontSize={11} fontWeight={lit ? 600 : 500} fill={lit ? "#fff" : theme.palette.text.primary} style={{ transition: "fill 0.15s" }}>
+                    {n.label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        {/* Legend */}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mt: 2, pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
+          {[["#2563eb","foundation"],["#8b5cf6","design"],["#0ea5a4","discover"],["#f59e0b","analyse"],["#ef4444","respond"],["#22c55e","report"],["#6366f1","cross-cutting"]].map(([c,l]) => (
+            <Box key={l} sx={{ display: "flex", alignItems: "center", gap: 0.75, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", color: "text.secondary" }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: c }} />
+              {l}
+            </Box>
+          ))}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", color: "text.secondary" }}>
+            <Box sx={{ width: 22, borderTop: `1.5px dashed ${edgeColor}` }} />
+            cross-cutting correlation
+          </Box>
+          <Box
+            onClick={() => nav("/data-model")}
+            sx={{ ml: "auto", fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.7rem", color: "#6366f1", border: "1px solid", borderColor: "#6366f155", px: 1.5, py: 0.5, borderRadius: "20px", cursor: "pointer", "&:hover": { bgcolor: alpha("#6366f1", 0.08) } }}
+          >
+            Full screen →
           </Box>
         </Box>
       </Box>
     </Box>
-    <AssistantWidget />
-    </>
   );
 }

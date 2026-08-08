@@ -72,6 +72,7 @@ import AgentRunTrash from "./pages/AgentRunTrash";
 import SampleHub from "./pages/SampleHub";
 import SampleHubCmd from "./pages/SampleHubCmd";
 import SampleAzure from "./pages/SampleAzure";
+import SampleHub4 from "./pages/SampleHub4";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -151,6 +152,7 @@ function ProtectedApp() {
 
         {/* ── Samples (full-page, no AppLayout) ──────────────────────────── */}
         <Route path="/sample3" element={<SampleAzure />} />
+        <Route path="/sample4" element={<SampleHub4 />} />
 
         {/* ── v2 Products ────────────────────────────────────────────────── */}
         <Route path="/threat-intel" element={<ProductLayout product={THREAT_INTEL} />}>
