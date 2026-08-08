@@ -13,6 +13,7 @@ import {
   Dashboard, AutoStories, Tune, Policy,
   Hub as HubIcon,
 } from "@mui/icons-material";
+import MegaMenuBar from "../components/layout/MegaMenuBar";
 import { useMsal } from "@azure/msal-react";
 import { useQuery } from "@tanstack/react-query";
 import { adminApi, clientsApi } from "../services/api";
@@ -439,26 +440,35 @@ export default function Hub() {
         {/* Page content */}
         <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
-          {/* Top bar — same style as ProductLayout */}
+          {/* Top bar with mega menu */}
           <Box sx={{
-            position: "sticky", top: 0, zIndex: 10,
+            position: "sticky", top: 0, zIndex: 1200,
             bgcolor: "background.paper",
             borderBottom: "1px solid", borderColor: "divider",
-            px: 2, py: 0, height: 52,
-            display: "flex", alignItems: "center", gap: 1.5,
+            height: 52,
           }}>
-            {isMobile && (
-              <IconButton size="small" onClick={() => setDrawerOpen(true)}>
-                <MenuIcon fontSize="small" />
-              </IconButton>
-            )}
-            <Typography sx={{ fontWeight: 700, fontSize: 15 }}>Platform Overview</Typography>
-            <Box sx={{ flex: 1 }} />
-            <Tooltip title="Go to Dashboard">
-              <IconButton size="small" onClick={() => navigate("/dashboard")} sx={{ color: "text.secondary" }}>
-                <Dashboard fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <MegaMenuBar
+              brand={
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {isMobile && (
+                    <IconButton size="small" onClick={() => setDrawerOpen(true)} sx={{ mr: 0.5 }}>
+                      <MenuIcon fontSize="small" />
+                    </IconButton>
+                  )}
+                  <Box sx={{ width: 26, height: 26, borderRadius: 1, background: "linear-gradient(135deg,#1565C0,#0288D1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Shield sx={{ color: "#fff", fontSize: 15 }} />
+                  </Box>
+                  <Typography sx={{ fontWeight: 800, fontSize: 14 }}>Owlet</Typography>
+                </Box>
+              }
+              trailing={
+                <Tooltip title="Dashboard">
+                  <IconButton size="small" onClick={() => navigate("/dashboard")} sx={{ color: "text.secondary" }}>
+                    <Dashboard fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              }
+            />
           </Box>
 
           {/* Main scrollable area */}
