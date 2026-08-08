@@ -22,7 +22,7 @@ export default defineConfig({
           "vendor-query": ["@tanstack/react-query"],
           "vendor-msal": ["@azure/msal-react", "@azure/msal-browser"],
           "vendor-charts": ["recharts"],
-          "vendor-flow": ["reactflow"],
+          "vendor-flow": ["@xyflow/react"],
         },
       },
     },
