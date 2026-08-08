@@ -347,9 +347,9 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
 
   return (
     <>
-      {/* Click-outside backdrop */}
+      {/* Click-outside backdrop — starts BELOW the bar so it never covers nav buttons */}
       {activeItem && (
-        <Box onClick={closeAll} sx={{ position: "fixed", inset: 0, zIndex: 1299 }} />
+        <Box onClick={closeAll} sx={{ position: "fixed", top: barBottom, left: 0, right: 0, bottom: 0, zIndex: 1299 }} />
       )}
 
       {/* Bar row */}
