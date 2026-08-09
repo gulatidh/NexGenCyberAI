@@ -36,6 +36,10 @@ const COLLAPSE_KEY = "nav-collapsed";
 const SECTION_COLORS: Record<string, string> = {
   "Overview":      "#4285F4",
   "Foundation":    "#34A853",
+  "Discover":      "#0f766e",
+  "Analyse":       "#b45309",
+  "Respond":       "#b91c1c",
+  "Automate":      "#4338ca",
   "Scanning":      "#EA4335",
   "Threat & Risk": "#FF5722",
   "Compliance":    "#FF9800",
@@ -74,6 +78,49 @@ const NAV_GROUPS: NavGroup[] = [
       ] },
       { label: "Frameworks",    icon: <Policy />,     path: "/frameworks" },
       { label: "Custom Policy", icon: <LibraryAdd />, path: "/custom-frameworks" },
+    ],
+  },
+  {
+    section: "Discover",
+    items: [
+      { label: "Discover",    icon: <BugReport />, path: "/discover" },
+      { label: "Assessments", icon: <BugReport />, path: "/vulnerability/scans" },
+      { label: "Findings",    icon: <Security />,  path: "/vulnerability/findings" },
+      { label: "Assets",      icon: <Storage />,   path: "/platform/assets" },
+      { label: "Posture Trends", icon: <TrendingUp />, path: "/vulnerability/posture" },
+    ],
+  },
+  {
+    section: "Analyse",
+    items: [
+      { label: "Analyse",        icon: <Insights />,   path: "/analyse" },
+      { label: "Risk Register",  icon: <Assessment />, path: "/risk/register" },
+      { label: "Risk Overview",  icon: <Insights />,   path: "/risk/overview" },
+      { label: "Attack Paths",   icon: <AccountTree />, path: "/threat-intel/attack-paths" },
+      { label: "Threat Models",  icon: <Hub />,        path: "/threat-intel/threat-models" },
+      { label: "Ask Your Data",  icon: <Psychology />, path: "/intelligence/nl-query" },
+    ],
+  },
+  {
+    section: "Respond",
+    items: [
+      { label: "Respond",            icon: <Radar />,           path: "/respond" },
+      { label: "Threat Register",    icon: <Radar />,           path: "/threat-intel/register" },
+      { label: "Control Gaps",       icon: <GppBad />,          path: "/compliance/deficiencies" },
+      { label: "Remediation",        icon: <PlaylistAddCheck />, path: "/governance/remediation" },
+      { label: "CTEM Programs",      icon: <Radar />,           path: "/governance/ctem" },
+      { label: "VAPT Reports",       icon: <GppGood />,         path: "/vapt/reports" },
+    ],
+  },
+  {
+    section: "Automate",
+    items: [
+      { label: "Automate",      icon: <SmartToy />,    path: "/automate" },
+      { label: "AI Buddies",    icon: <SmartToy />,    path: "/ai-advisor/agents" },
+      { label: "AI Workflows",  icon: <Schedule />,    path: "/ai-advisor/workflows" },
+      { label: "Knowledge Base", icon: <AutoStories />, path: "/intelligence/knowledge" },
+      { label: "API Keys",      icon: <VpnKey />,      path: "/api-keys" },
+      { label: "Help",          icon: <MenuBook />,    path: "/help" },
     ],
   },
   {

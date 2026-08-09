@@ -98,6 +98,10 @@ const EvidencePackage     = React.lazy(() => import("./pages/EvidencePackage"));
 const AIGuardrails        = React.lazy(() => import("./pages/AIGuardrails"));
 const RemediationJobs     = React.lazy(() => import("./pages/RemediationJobs"));
 const AgentRunTrash       = React.lazy(() => import("./pages/AgentRunTrash"));
+const DiscoverPage        = React.lazy(() => import("./pages/DiscoverPage"));
+const AnalysePage         = React.lazy(() => import("./pages/AnalysePage"));
+const RespondPage         = React.lazy(() => import("./pages/RespondPage"));
+const AutomatePage        = React.lazy(() => import("./pages/AutomatePage"));
 const SampleHub           = React.lazy(() => import("./pages/SampleHub"));
 const SampleHubCmd        = React.lazy(() => import("./pages/SampleHubCmd"));
 const SampleAzure         = React.lazy(() => import("./pages/SampleAzure"));
@@ -184,6 +188,14 @@ function ProtectedApp() {
         <Routes>
           {/* ── v2 Hub ─────────────────────────────────────────────────────── */}
           <Route path="/hub" element={<Hub />} />
+
+          {/* ── Section landing pages (v3 theme) ──────────────────────────── */}
+          <Route element={<Shell />}>
+            <Route path="/discover"  element={<DiscoverPage />} />
+            <Route path="/analyse"   element={<AnalysePage />} />
+            <Route path="/respond"   element={<RespondPage />} />
+            <Route path="/automate"  element={<AutomatePage />} />
+          </Route>
 
           {/* ── Samples (full-page, no AppLayout) ──────────────────────────── */}
           <Route path="/sample3" element={<SampleAzure />} />
