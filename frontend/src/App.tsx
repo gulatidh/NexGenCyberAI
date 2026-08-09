@@ -189,12 +189,50 @@ function ProtectedApp() {
           {/* ── v2 Hub ─────────────────────────────────────────────────────── */}
           <Route path="/hub" element={<Hub />} />
 
-          {/* ── Section landing pages (v3 theme) ──────────────────────────── */}
+          {/* ── Section pages (v3 theme) — each is a layout with nested routes ── */}
           <Route element={<Shell />}>
-            <Route path="/discover"  element={<DiscoverPage />} />
-            <Route path="/analyse"   element={<AnalysePage />} />
-            <Route path="/respond"   element={<RespondPage />} />
-            <Route path="/automate"  element={<AutomatePage />} />
+            <Route path="/discover" element={<DiscoverPage />}>
+              <Route path="scans"              element={<Scans />} />
+              <Route path="scans/:scanId"      element={<ScanDetail />} />
+              <Route path="scans/:scanId/diff" element={<ScanDiff />} />
+              <Route path="findings"           element={<Findings />} />
+              <Route path="assets"             element={<Assets />} />
+              <Route path="assets/:assetId"    element={<AssetDetail />} />
+              <Route path="technologies"       element={<Technologies />} />
+              <Route path="posture"            element={<PostureTrends />} />
+              <Route path="ai-scan"            element={<AIAssistedScan />} />
+              <Route path="cve-pivot"          element={<CVEPivot />} />
+            </Route>
+            <Route path="/analyse" element={<AnalysePage />}>
+              <Route path="risks"             element={<Risks />} />
+              <Route path="risk-overview"     element={<RiskOverviewPage />} />
+              <Route path="ai-analysis"       element={<RiskAIAnalysis />} />
+              <Route path="attack-paths"      element={<AttackPaths />} />
+              <Route path="threat-models"     element={<ThreatModels />} />
+              <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
+              <Route path="nl-query"          element={<NLQuery />} />
+              <Route path="compliance-heatmap" element={<ComplianceHeatmap />} />
+              <Route path="comparison"        element={<ClientComparison />} />
+            </Route>
+            <Route path="/respond" element={<RespondPage />}>
+              <Route path="threats"              element={<ThreatRegister />} />
+              <Route path="gaps"                 element={<ControlDeficiencies />} />
+              <Route path="remediation"          element={<RemediationTracker />} />
+              <Route path="remediation-jobs"     element={<RemediationJobs />} />
+              <Route path="ctem"                 element={<CTEMPage />} />
+              <Route path="vapt-reports"         element={<VAPTReports />} />
+              <Route path="vapt-reports/:reportId" element={<VAPTReportDetail />} />
+              <Route path="security-docs"        element={<SecurityDocs />} />
+            </Route>
+            <Route path="/automate" element={<AutomatePage />}>
+              <Route path="agents"    element={<Agents />} />
+              <Route path="workflows" element={<Missions />} />
+              <Route path="knowledge" element={<KnowledgeBase />} />
+              <Route path="reports"   element={<Reports />} />
+              <Route path="ai-scan"   element={<AIAssistedScan />} />
+              <Route path="nl-query"  element={<NLQuery />} />
+              <Route path="ai-guardrails" element={<AIGuardrails />} />
+            </Route>
           </Route>
 
           {/* ── Samples (full-page, no AppLayout) ──────────────────────────── */}

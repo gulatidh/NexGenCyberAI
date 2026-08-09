@@ -83,43 +83,49 @@ const NAV_GROUPS: NavGroup[] = [
   {
     section: "Discover",
     items: [
-      { label: "Discover",    icon: <BugReport />, path: "/discover" },
-      { label: "Assessments", icon: <BugReport />, path: "/vulnerability/scans" },
-      { label: "Findings",    icon: <Security />,  path: "/vulnerability/findings" },
-      { label: "Assets",      icon: <Storage />,   path: "/platform/assets" },
-      { label: "Posture Trends", icon: <TrendingUp />, path: "/vulnerability/posture" },
+      { label: "Overview",     icon: <BugReport />,  path: "/discover" },
+      { label: "Assessments",  icon: <BugReport />,  path: "/discover/scans" },
+      { label: "Findings",     icon: <Security />,   path: "/discover/findings" },
+      { label: "Assets",       icon: <Storage />,    path: "/discover/assets" },
+      { label: "AI Assisted",  icon: <SmartToy />,   path: "/discover/ai-scan" },
+      { label: "CVE Blast",    icon: <Radar />,      path: "/discover/cve-pivot" },
+      { label: "Technologies", icon: <Apps />,       path: "/discover/technologies" },
+      { label: "Posture",      icon: <TrendingUp />, path: "/discover/posture" },
     ],
   },
   {
     section: "Analyse",
     items: [
-      { label: "Analyse",        icon: <Insights />,   path: "/analyse" },
-      { label: "Risk Register",  icon: <Assessment />, path: "/risk/register" },
-      { label: "Risk Overview",  icon: <Insights />,   path: "/risk/overview" },
-      { label: "Attack Paths",   icon: <AccountTree />, path: "/threat-intel/attack-paths" },
-      { label: "Threat Models",  icon: <Hub />,        path: "/threat-intel/threat-models" },
-      { label: "Ask Your Data",  icon: <Psychology />, path: "/intelligence/nl-query" },
+      { label: "Overview",          icon: <Insights />,   path: "/analyse" },
+      { label: "Risk Register",     icon: <Assessment />, path: "/analyse/risks" },
+      { label: "Risk Overview",     icon: <Insights />,   path: "/analyse/risk-overview" },
+      { label: "Attack Paths",      icon: <AccountTree />, path: "/analyse/attack-paths" },
+      { label: "Threat Models",     icon: <Hub />,        path: "/analyse/threat-models" },
+      { label: "Compliance",        icon: <GridView />,   path: "/analyse/compliance-heatmap" },
+      { label: "Ask Your Data",     icon: <Psychology />, path: "/analyse/nl-query" },
+      { label: "Comparison",        icon: <CompareArrows />, path: "/analyse/comparison" },
     ],
   },
   {
     section: "Respond",
     items: [
-      { label: "Respond",            icon: <Radar />,           path: "/respond" },
-      { label: "Threat Register",    icon: <Radar />,           path: "/threat-intel/register" },
-      { label: "Control Gaps",       icon: <GppBad />,          path: "/compliance/deficiencies" },
-      { label: "Remediation",        icon: <PlaylistAddCheck />, path: "/governance/remediation" },
-      { label: "CTEM Programs",      icon: <Radar />,           path: "/governance/ctem" },
-      { label: "VAPT Reports",       icon: <GppGood />,         path: "/vapt/reports" },
+      { label: "Overview",       icon: <Radar />,           path: "/respond" },
+      { label: "Threat Intel",   icon: <Radar />,           path: "/respond/threats" },
+      { label: "Control Gaps",   icon: <GppBad />,          path: "/respond/gaps" },
+      { label: "Remediation",    icon: <PlaylistAddCheck />, path: "/respond/remediation" },
+      { label: "CTEM",           icon: <Schedule />,        path: "/respond/ctem" },
+      { label: "VAPT Reports",   icon: <GppGood />,         path: "/respond/vapt-reports" },
+      { label: "Security Docs",  icon: <Description />,     path: "/respond/security-docs" },
     ],
   },
   {
     section: "Automate",
     items: [
-      { label: "Automate",      icon: <SmartToy />,    path: "/automate" },
-      { label: "AI Buddies",    icon: <SmartToy />,    path: "/ai-advisor/agents" },
-      { label: "AI Workflows",  icon: <Schedule />,    path: "/ai-advisor/workflows" },
-      { label: "Knowledge Base", icon: <AutoStories />, path: "/intelligence/knowledge" },
-      { label: "API Keys",      icon: <VpnKey />,      path: "/api-keys" },
+      { label: "Overview",      icon: <SmartToy />,    path: "/automate" },
+      { label: "AI Buddies",    icon: <SmartToy />,    path: "/automate/agents" },
+      { label: "AI Workflows",  icon: <Schedule />,    path: "/automate/workflows" },
+      { label: "Knowledge",     icon: <AutoStories />, path: "/automate/knowledge" },
+      { label: "Reports",       icon: <BarChart />,    path: "/automate/reports" },
       { label: "Help",          icon: <MenuBook />,    path: "/help" },
     ],
   },
@@ -263,12 +269,16 @@ export default function AppLayout() {
   // Expand/collapse state for parent nav items with children (e.g. Assets).
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
-  // Active-route test. "/assets" must NOT light up for /assets/technologies
-  // (that's its own leaf) but should for the asset-detail route /assets/:id.
-  const isActive = (p: string) =>
-    p === "/assets"
-      ? pathname === "/assets" || /^\/assets\/(?!technologies)[^/]+$/.test(pathname)
-      : pathname === p || pathname.startsWith(p + "/");
+  // Active-route test.
+  // Section overview items (exact nav roots like /discover, /analyse) only highlight
+  // when exactly at that path — not when on a sub-page like /discover/findings.
+  // Asset root is special: /assets/:id is a sub-detail but /assets/technologies is its own leaf.
+  const EXACT_MATCH_PATHS = new Set(["/discover", "/analyse", "/respond", "/automate"]);
+  const isActive = (p: string) => {
+    if (EXACT_MATCH_PATHS.has(p)) return pathname === p;
+    if (p === "/assets") return pathname === "/assets" || /^\/assets\/(?!technologies)[^/]+$/.test(pathname);
+    return pathname === p || pathname.startsWith(p + "/");
+  };
 
   // Show section mini-nav only when pathname EXACTLY matches a nav item —
   // detail pages (e.g. /clients/123) won't match any item exactly, so they
@@ -277,7 +287,10 @@ export default function AppLayout() {
     NAV_GROUPS.find(g =>
       g.items.some(item =>
         pathname === item.path ||
-        (item.children || []).some(c => pathname === c.path)
+        pathname.startsWith(item.path + "/") ||
+        (item.children || []).some(c =>
+          pathname === c.path || pathname.startsWith(c.path + "/")
+        )
       )
     ) ?? null;
   const sectionColor = activeSectionGroup?.section

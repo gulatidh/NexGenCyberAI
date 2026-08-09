@@ -5,7 +5,7 @@
  */
 import { alpha, Box, Divider, Typography, useTheme } from "@mui/material";
 import { InfoOutlined, ArrowBack, HelpOutlined } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "../services/api";
 
@@ -202,6 +202,48 @@ export default function SectionPage({ section }: { section: SectionDef }) {
         </Box>
         <Typography sx={{ fontSize: 11, color: "#00BCD4", fontWeight: 600 }}>Open →</Typography>
       </Box>
+    </Box>
+  );
+}
+
+// ── SectionLayout ──────────────────────────────────────────────────────────────
+// Layout wrapper used as the route element for nested section routes.
+// At /discover: renders the full SectionPage overview.
+// At /discover/findings etc: renders a context bar + Outlet (the sub-page).
+
+export function SectionLayout({ section, basePath }: { section: SectionDef; basePath: string }) {
+  const navigate = useNavigate();
+  const isRoot = useMatch(basePath);
+
+  if (isRoot) {
+    return <SectionPage section={section} />;
+  }
+
+  return (
+    <Box>
+      {/* Section context breadcrumb */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
+        <Box
+          onClick={() => navigate(basePath)}
+          sx={{
+            display: "flex", alignItems: "center", gap: 0.75, cursor: "pointer",
+            color: "text.secondary", fontSize: 12.5,
+            "&:hover": { color: "text.primary" }, transition: "color .12s",
+          }}
+        >
+          <ArrowBack sx={{ fontSize: 14 }} />
+          {section.label}
+        </Box>
+        <Typography sx={{ color: "text.disabled", fontSize: 12 }}>·</Typography>
+        <Box sx={{
+          px: 1, py: 0.25, borderRadius: 1,
+          bgcolor: alpha(section.color, 0.1), color: section.color,
+          fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em",
+        }}>
+          Stage {section.num}
+        </Box>
+      </Box>
+      <Outlet />
     </Box>
   );
 }
