@@ -1,131 +1,89 @@
 /**
- * Product definitions for Owlet v2.
- * Each product maps to a route prefix and a set of sub-nav items.
+ * Product definitions — 5 top-level sections shown in MegaMenuBar.
  */
 import React from "react";
 import {
   Radar, Assessment, BugReport, Shield, GppBad,
-  PlaylistAddCheck, SmartToy, Psychology, TrendingUp,
-  Security, FindInPage, Policy, LibraryAdd, Description,
-  Hub, Search, MenuBook, VerifiedUser, AccountTree, DeviceHub,
+  PlaylistAddCheck, SmartToy, TrendingUp,
+  Security, FindInPage, Policy, Description,
+  Hub, Search, MenuBook, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
-  Devices, HelpOutlined, AutoFixHigh, AltRoute, FolderZip, Delete,
+  Devices, HelpOutlined, AutoFixHigh, AltRoute, Psychology,
+  GridView,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
-export const THREAT_INTEL: ProductDef = {
-  name: "Threat Intelligence",
-  abbrev: "TI",
-  icon: <Radar />,
-  color: "#1565C0",
-  bgColor: "#E3F2FD",
-  basePath: "/threat-intel",
-  nav: [
-    { label: "Threat Register",  icon: <Radar />,     path: "/register" },
-    { label: "Threat Models",    icon: <DeviceHub />, path: "/threat-models" },
-    { label: "Attack Paths",     icon: <Hub />,       path: "/attack-paths" },
-  ],
-};
-
-export const RISK_MANAGER: ProductDef = {
-  name: "Risk Manager",
-  abbrev: "RM",
-  icon: <Assessment />,
-  color: "#1565C0",
-  bgColor: "#E3F2FD",
-  basePath: "/risk",
-  nav: [
-    { label: "Risk Overview",    icon: <Assessment />, path: "/overview" },
-    { label: "Risk Register",    icon: <Security />,   path: "/register" },
-    { label: "AI Risk Analysis", icon: <SmartToy />,   path: "/ai-analysis" },
-  ],
-};
-
-export const VULN_MGMT: ProductDef = {
-  name: "Vulnerability Management",
-  abbrev: "VM",
+export const DISCOVER_PRODUCT: ProductDef = {
+  name: "Discover",
+  abbrev: "DC",
   icon: <BugReport />,
-  color: "#00695C",
-  bgColor: "#E0F2F1",
-  basePath: "/vulnerability",
+  color: "#0f766e",
+  bgColor: "#ECFDF5",
+  basePath: "/discover",
   nav: [
-    { label: "Assessments", icon: <BugReport />, path: "/scans" },
-    { label: "Findings", icon: <FindInPage />, path: "/findings" },
+    { label: "Overview",       icon: <GridView />,   path: "" },
+    { label: "Assessments",    icon: <BugReport />,  path: "/scans" },
+    { label: "Findings",       icon: <FindInPage />, path: "/findings" },
+    { label: "Assets",         icon: <Storage />,    path: "/assets" },
+    { label: "Technologies",   icon: <Devices />,    path: "/technologies" },
+    { label: "AI Scan",        icon: <SmartToy />,   path: "/ai-scan" },
+    { label: "CVE Blast",      icon: <Radar />,      path: "/cve-pivot" },
     { label: "Posture Trends", icon: <TrendingUp />, path: "/posture" },
   ],
 };
 
-export const PEN_TEST: ProductDef = {
-  name: "Pen Testing & Red Team",
-  abbrev: "PT",
+export const ANALYSE_PRODUCT: ProductDef = {
+  name: "Analyse",
+  abbrev: "AN",
+  icon: <Assessment />,
+  color: "#b45309",
+  bgColor: "#FFFBEB",
+  basePath: "/analyse",
+  nav: [
+    { label: "Overview",      icon: <GridView />,   path: "" },
+    { label: "Risk Register", icon: <Security />,   path: "/risks" },
+    { label: "Risk Overview", icon: <Assessment />, path: "/risk-overview" },
+    { label: "AI Risk",       icon: <SmartToy />,   path: "/ai-analysis" },
+    { label: "Attack Paths",  icon: <AltRoute />,   path: "/attack-paths" },
+    { label: "Threat Models", icon: <DeviceHub />,  path: "/threat-models" },
+    { label: "Compliance",    icon: <Policy />,     path: "/compliance-heatmap" },
+    { label: "Ask Your Data", icon: <Search />,     path: "/nl-query" },
+  ],
+};
+
+export const RESPOND_PRODUCT: ProductDef = {
+  name: "Respond",
+  abbrev: "RE",
   icon: <Shield />,
-  color: "#00695C",
-  bgColor: "#E0F2F1",
-  basePath: "/vapt",
+  color: "#b91c1c",
+  bgColor: "#FEF2F2",
+  basePath: "/respond",
   nav: [
-    { label: "Pentest Scans",    icon: <BugReport />,    path: "/scans" },
-    { label: "VAPT Reports",     icon: <Description />,  path: "/reports" },
-    { label: "Attack Paths",     icon: <AltRoute />,     path: "/attack-paths" },
-    { label: "Evidence Package", icon: <FolderZip />,    path: "/evidence" },
+    { label: "Overview",        icon: <GridView />,         path: "" },
+    { label: "Threat Intel",    icon: <Radar />,            path: "/threats" },
+    { label: "Control Gaps",    icon: <GppBad />,           path: "/gaps" },
+    { label: "Remediation",     icon: <PlaylistAddCheck />, path: "/remediation" },
+    { label: "AI Remediations", icon: <AutoFixHigh />,      path: "/remediation-jobs" },
+    { label: "CTEM",            icon: <AccountTree />,      path: "/ctem" },
+    { label: "VAPT Reports",    icon: <Description />,      path: "/vapt-reports" },
+    { label: "Security Docs",   icon: <MenuBook />,         path: "/security-docs" },
   ],
 };
 
-export const COMPLIANCE_MONITOR: ProductDef = {
-  name: "Compliance Monitor",
-  abbrev: "CM",
-  icon: <GppBad />,
-  color: "#6A1B9A",
-  bgColor: "#F3E5F5",
-  basePath: "/compliance",
-  nav: [
-    { label: "Control Deficiencies", icon: <GppBad />, path: "/deficiencies" },
-    { label: "Frameworks", icon: <Policy />, path: "/frameworks" },
-    { label: "Custom Policy",    icon: <LibraryAdd />, path: "/custom-frameworks" },
-    { label: "Evidence Package", icon: <VerifiedUser />, path: "/evidence" },
-  ],
-};
-
-export const GOVERNANCE: ProductDef = {
-  name: "Governance",
-  abbrev: "GR",
-  icon: <PlaylistAddCheck />,
-  color: "#6A1B9A",
-  bgColor: "#F3E5F5",
-  basePath: "/governance",
-  nav: [
-    { label: "CTEM Programs", icon: <AccountTree />, path: "/ctem" },
-    { label: "Remediation Tracker", icon: <PlaylistAddCheck />, path: "/remediation" },
-    { label: "AI Remediations", icon: <AutoFixHigh />, path: "/remediation-jobs" },
-  ],
-};
-
-export const AI_ADVISOR: ProductDef = {
-  name: "AI Security Advisor",
-  abbrev: "AI",
-  icon: <SmartToy />,
-  color: "#E65100",
-  bgColor: "#FBE9E7",
-  basePath: "/ai-advisor",
-  nav: [
-    { label: "AI Buddies", icon: <SmartToy />, path: "/agents" },
-    { label: "Workflows", icon: <Hub />, path: "/workflows" },
-    { label: "Run Trash", icon: <Delete />, path: "/run-trash" },
-  ],
-};
-
-export const INTELLIGENCE: ProductDef = {
-  name: "Smart Intelligence",
-  abbrev: "IG",
+export const AUTOMATE_PRODUCT: ProductDef = {
+  name: "Automate",
+  abbrev: "AT",
   icon: <Psychology />,
-  color: "#E65100",
-  bgColor: "#FBE9E7",
-  basePath: "/intelligence",
+  color: "#4338ca",
+  bgColor: "#EEF2FF",
+  basePath: "/automate",
   nav: [
-    { label: "AI Assisted Scan", icon: <SmartToy />, path: "/ai-assisted-scan" },
-    { label: "Ask Your Data", icon: <Search />, path: "/nl-query" },
-    { label: "Security Docs", icon: <Description />, path: "/security-docs" },
-    { label: "Reports", icon: <Assessment />, path: "/reports" },
-    { label: "Knowledge Base", icon: <MenuBook />, path: "/knowledge" },
+    { label: "Overview",       icon: <GridView />,   path: "" },
+    { label: "AI Buddies",     icon: <SmartToy />,   path: "/agents" },
+    { label: "AI Workflows",   icon: <Hub />,        path: "/workflows" },
+    { label: "Reports",        icon: <Assessment />, path: "/reports" },
+    { label: "Knowledge Base", icon: <MenuBook />,   path: "/knowledge" },
+    { label: "AI Guardrails",  icon: <Shield />,     path: "/ai-guardrails" },
   ],
 };
 
@@ -137,20 +95,20 @@ export const PLATFORM: ProductDef = {
   bgColor: "#ECEFF1",
   basePath: "/platform",
   nav: [
-    { label: "Clients",              icon: <People />,        path: "/clients" },
-    { label: "Assets",               icon: <Storage />,        path: "/assets" },
-    { label: "Technology Inventory", icon: <Devices />,        path: "/assets/technologies" },
-    { label: "Connections",          icon: <Cable />,          path: "/connections" },
-    { label: "Ticket Sync",          icon: <SyncAlt />,        path: "/ticket-sync" },
-    { label: "Settings",             icon: <SettingsIcon />,   path: "/settings" },
-    { label: "Help",                 icon: <HelpOutlined />,    path: "/help" },
+    { label: "Clients",              icon: <People />,      path: "/clients" },
+    { label: "Assets",               icon: <Storage />,     path: "/assets" },
+    { label: "Technology Inventory", icon: <Devices />,     path: "/assets/technologies" },
+    { label: "Connections",          icon: <Cable />,       path: "/connections" },
+    { label: "Ticket Sync",          icon: <SyncAlt />,     path: "/ticket-sync" },
+    { label: "Settings",             icon: <SettingsIcon />,path: "/settings" },
+    { label: "Help",                 icon: <HelpOutlined />,path: "/help" },
   ],
 };
 
 export const ALL_PRODUCTS = [
-  VULN_MGMT, PEN_TEST,
-  THREAT_INTEL, RISK_MANAGER,
-  COMPLIANCE_MONITOR, GOVERNANCE,
-  AI_ADVISOR, INTELLIGENCE,
   PLATFORM,
+  DISCOVER_PRODUCT,
+  ANALYSE_PRODUCT,
+  RESPOND_PRODUCT,
+  AUTOMATE_PRODUCT,
 ];

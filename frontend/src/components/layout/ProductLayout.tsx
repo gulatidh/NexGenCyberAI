@@ -34,6 +34,7 @@ export default function ProductLayout({ product }: Props) {
   const fullPath = (rel: string) => product.basePath + rel;
   const isActive = (rel: string) => {
     const fp = fullPath(rel);
+    if (rel === "") return pathname === fp; // exact match for overview item
     return pathname === fp || pathname.startsWith(fp + "/");
   };
 

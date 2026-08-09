@@ -35,21 +35,19 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
   }
 }
 
-// ── Static imports (always-needed layout + landing) ───────────────────────────
+// ── Static imports ────────────────────────────────────────────────────────────
 import AppLayout from "./components/layout/AppLayout";
 import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
 import LandingV2 from "./pages/LandingV2";
 import {
-  THREAT_INTEL, RISK_MANAGER, VULN_MGMT, PEN_TEST,
-  COMPLIANCE_MONITOR, GOVERNANCE, AI_ADVISOR, INTELLIGENCE, PLATFORM,
+  DISCOVER_PRODUCT, ANALYSE_PRODUCT, RESPOND_PRODUCT, AUTOMATE_PRODUCT, PLATFORM,
 } from "./products";
 
-// ── Lazy page imports (code-split per route, reduces webpack peak memory) ──────
+// ── Lazy page imports ─────────────────────────────────────────────────────────
 const Dashboard         = React.lazy(() => import("./pages/Dashboard"));
 const Clients           = React.lazy(() => import("./pages/Clients"));
 const ClientDetail      = React.lazy(() => import("./pages/ClientDetail"));
-const Connectors        = React.lazy(() => import("./pages/Connectors"));
 const Connections       = React.lazy(() => import("./pages/Connections"));
 const Scans             = React.lazy(() => import("./pages/Scans"));
 const ScanDetail        = React.lazy(() => import("./pages/ScanDetail"));
@@ -61,7 +59,6 @@ const Findings          = React.lazy(() => import("./pages/Findings"));
 const Risks             = React.lazy(() => import("./pages/Risks"));
 const RiskAIAnalysis    = React.lazy(() => import("./pages/RiskAIAnalysis"));
 const Assets            = React.lazy(() => import("./pages/Assets"));
-const StaleAssets       = React.lazy(() => import("./pages/StaleAssets"));
 const AssetDetail       = React.lazy(() => import("./pages/AssetDetail"));
 const Frameworks        = React.lazy(() => import("./pages/Frameworks"));
 const RiskOverviewPage  = React.lazy(() => import("./pages/RiskOverview"));
@@ -186,197 +183,159 @@ function ProtectedApp() {
     >
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* ── v2 Hub ─────────────────────────────────────────────────────── */}
+          {/* ── Hub ──────────────────────────────────────────────────────── */}
           <Route path="/hub" element={<Hub />} />
 
-          {/* ── Section pages (v3 theme) — each is a layout with nested routes ── */}
-          <Route element={<Shell />}>
-            <Route path="/discover" element={<DiscoverPage />}>
-              <Route path="scans"              element={<Scans />} />
-              <Route path="scans/:scanId"      element={<ScanDetail />} />
-              <Route path="scans/:scanId/diff" element={<ScanDiff />} />
-              <Route path="findings"           element={<Findings />} />
-              <Route path="assets"             element={<Assets />} />
-              <Route path="assets/:assetId"    element={<AssetDetail />} />
-              <Route path="technologies"       element={<Technologies />} />
-              <Route path="posture"            element={<PostureTrends />} />
-              <Route path="ai-scan"            element={<AIAssistedScan />} />
-              <Route path="cve-pivot"          element={<CVEPivot />} />
-            </Route>
-            <Route path="/analyse" element={<AnalysePage />}>
-              <Route path="risks"             element={<Risks />} />
-              <Route path="risk-overview"     element={<RiskOverviewPage />} />
-              <Route path="ai-analysis"       element={<RiskAIAnalysis />} />
-              <Route path="attack-paths"      element={<AttackPaths />} />
-              <Route path="threat-models"     element={<ThreatModels />} />
-              <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
-              <Route path="nl-query"          element={<NLQuery />} />
-              <Route path="compliance-heatmap" element={<ComplianceHeatmap />} />
-              <Route path="comparison"        element={<ClientComparison />} />
-            </Route>
-            <Route path="/respond" element={<RespondPage />}>
-              <Route path="threats"              element={<ThreatRegister />} />
-              <Route path="gaps"                 element={<ControlDeficiencies />} />
-              <Route path="remediation"          element={<RemediationTracker />} />
-              <Route path="remediation-jobs"     element={<RemediationJobs />} />
-              <Route path="ctem"                 element={<CTEMPage />} />
-              <Route path="vapt-reports"         element={<VAPTReports />} />
-              <Route path="vapt-reports/:reportId" element={<VAPTReportDetail />} />
-              <Route path="security-docs"        element={<SecurityDocs />} />
-            </Route>
-            <Route path="/automate" element={<AutomatePage />}>
-              <Route path="agents"    element={<Agents />} />
-              <Route path="workflows" element={<Missions />} />
-              <Route path="knowledge" element={<KnowledgeBase />} />
-              <Route path="reports"   element={<Reports />} />
-              <Route path="ai-scan"   element={<AIAssistedScan />} />
-              <Route path="nl-query"  element={<NLQuery />} />
-              <Route path="ai-guardrails" element={<AIGuardrails />} />
-            </Route>
+          {/* ── DISCOVER ─────────────────────────────────────────────────── */}
+          <Route path="/discover" element={<ProductLayout product={DISCOVER_PRODUCT} />}>
+            <Route index element={<DiscoverPage />} />
+            <Route path="scans"              element={<Scans />} />
+            <Route path="scans/:scanId"      element={<ScanDetail />} />
+            <Route path="scans/:scanId/diff" element={<ScanDiff />} />
+            <Route path="findings"           element={<Findings />} />
+            <Route path="assets"             element={<Assets />} />
+            <Route path="assets/:assetId"    element={<AssetDetail />} />
+            <Route path="technologies"       element={<Technologies />} />
+            <Route path="posture"            element={<PostureTrends />} />
+            <Route path="ai-scan"            element={<AIAssistedScan />} />
+            <Route path="cve-pivot"          element={<CVEPivot />} />
           </Route>
 
-          {/* ── Samples (full-page, no AppLayout) ──────────────────────────── */}
+          {/* ── ANALYSE ──────────────────────────────────────────────────── */}
+          <Route path="/analyse" element={<ProductLayout product={ANALYSE_PRODUCT} />}>
+            <Route index element={<AnalysePage />} />
+            <Route path="risks"                  element={<Risks />} />
+            <Route path="risk-overview"          element={<RiskOverviewPage />} />
+            <Route path="ai-analysis"            element={<RiskAIAnalysis />} />
+            <Route path="attack-paths"           element={<AttackPaths />} />
+            <Route path="threat-models"          element={<ThreatModels />} />
+            <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
+            <Route path="nl-query"               element={<NLQuery />} />
+            <Route path="compliance-heatmap"     element={<ComplianceHeatmap />} />
+            <Route path="comparison"             element={<ClientComparison />} />
+          </Route>
+
+          {/* ── RESPOND ──────────────────────────────────────────────────── */}
+          <Route path="/respond" element={<ProductLayout product={RESPOND_PRODUCT} />}>
+            <Route index element={<RespondPage />} />
+            <Route path="threats"                element={<ThreatRegister />} />
+            <Route path="gaps"                   element={<ControlDeficiencies />} />
+            <Route path="remediation"            element={<RemediationTracker />} />
+            <Route path="remediation-jobs"       element={<RemediationJobs />} />
+            <Route path="ctem"                   element={<CTEMPage />} />
+            <Route path="vapt-reports"           element={<VAPTReports />} />
+            <Route path="vapt-reports/:reportId" element={<VAPTReportDetail />} />
+            <Route path="security-docs"          element={<SecurityDocs />} />
+          </Route>
+
+          {/* ── AUTOMATE ─────────────────────────────────────────────────── */}
+          <Route path="/automate" element={<ProductLayout product={AUTOMATE_PRODUCT} />}>
+            <Route index element={<AutomatePage />} />
+            <Route path="agents"       element={<Agents />} />
+            <Route path="workflows"    element={<Missions />} />
+            <Route path="knowledge"    element={<KnowledgeBase />} />
+            <Route path="reports"      element={<Reports />} />
+            <Route path="ai-scan"      element={<AIAssistedScan />} />
+            <Route path="nl-query"     element={<NLQuery />} />
+            <Route path="ai-guardrails" element={<AIGuardrails />} />
+            <Route path="run-trash"    element={<AgentRunTrash />} />
+          </Route>
+
+          {/* ── SETUP / PLATFORM ─────────────────────────────────────────── */}
+          <Route path="/platform" element={<ProductLayout product={PLATFORM} />}>
+            <Route index element={<Navigate to="clients" replace />} />
+            <Route path="clients"             element={<Clients />} />
+            <Route path="clients/:clientId"   element={<ClientDetail />} />
+            <Route path="assets"              element={<Assets />} />
+            <Route path="assets/technologies" element={<Technologies />} />
+            <Route path="assets/:assetId"     element={<AssetDetail />} />
+            <Route path="connections"         element={<Connections />} />
+            <Route path="ticket-sync"         element={<TicketSyncPage />} />
+            <Route path="settings"            element={<Settings />} />
+            <Route path="help"                element={<Help />} />
+          </Route>
+
+          {/* ── Samples ──────────────────────────────────────────────────── */}
           <Route path="/sample3" element={<SampleAzure />} />
           <Route path="/sample4" element={<SampleHub4 />} />
 
-          {/* ── v2 Products ────────────────────────────────────────────────── */}
-          <Route path="/threat-intel" element={<ProductLayout product={THREAT_INTEL} />}>
-            <Route index element={<Navigate to="register" replace />} />
-            <Route path="register" element={<ThreatRegister />} />
-            <Route path="threat-models" element={<ThreatModels />} />
-            <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
-            <Route path="attack-paths" element={<AttackPaths />} />
-          </Route>
+          {/* ── Redirects from old v2 product routes ─────────────────────── */}
+          <Route path="/vulnerability"   element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/vulnerability/*" element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/risk"            element={<Navigate to="/analyse/risks" replace />} />
+          <Route path="/risk/*"          element={<Navigate to="/analyse/risks" replace />} />
+          <Route path="/threat-intel"    element={<Navigate to="/respond/threats" replace />} />
+          <Route path="/threat-intel/*"  element={<Navigate to="/respond/threats" replace />} />
+          <Route path="/compliance"      element={<Navigate to="/respond/gaps" replace />} />
+          <Route path="/compliance/*"    element={<Navigate to="/respond/gaps" replace />} />
+          <Route path="/governance"      element={<Navigate to="/respond/remediation" replace />} />
+          <Route path="/governance/*"    element={<Navigate to="/respond/remediation" replace />} />
+          <Route path="/ai-advisor"      element={<Navigate to="/automate/agents" replace />} />
+          <Route path="/ai-advisor/*"    element={<Navigate to="/automate/agents" replace />} />
+          <Route path="/intelligence"    element={<Navigate to="/automate/agents" replace />} />
+          <Route path="/intelligence/*"  element={<Navigate to="/automate/agents" replace />} />
+          <Route path="/vapt"            element={<Navigate to="/respond/vapt-reports" replace />} />
+          <Route path="/vapt/*"          element={<Navigate to="/respond/vapt-reports" replace />} />
 
-          <Route path="/risk" element={<ProductLayout product={RISK_MANAGER} />}>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route path="overview" element={<RiskOverviewPage />} />
-            <Route path="register" element={<Risks />} />
-            <Route path="ai-analysis" element={<RiskAIAnalysis />} />
-          </Route>
+          {/* ── Redirects from old v1 shell routes ───────────────────────── */}
+          <Route path="/scans"                  element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/scans/:id"              element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/scans/:id/diff"         element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/findings"               element={<Navigate to="/discover/findings" replace />} />
+          <Route path="/assets"                 element={<Navigate to="/discover/assets" replace />} />
+          <Route path="/assets/technologies"    element={<Navigate to="/discover/technologies" replace />} />
+          <Route path="/assets/:id"             element={<Navigate to="/discover/assets" replace />} />
+          <Route path="/risks"                  element={<Navigate to="/analyse/risks" replace />} />
+          <Route path="/risk-overview"          element={<Navigate to="/analyse/risk-overview" replace />} />
+          <Route path="/attack-paths"           element={<Navigate to="/analyse/attack-paths" replace />} />
+          <Route path="/threat-models"          element={<Navigate to="/analyse/threat-models" replace />} />
+          <Route path="/threat-models/:id"      element={<Navigate to="/analyse/threat-models" replace />} />
+          <Route path="/nl-query"               element={<Navigate to="/analyse/nl-query" replace />} />
+          <Route path="/compliance-heatmap"     element={<Navigate to="/analyse/compliance-heatmap" replace />} />
+          <Route path="/client-comparison"      element={<Navigate to="/analyse/comparison" replace />} />
+          <Route path="/threat-register"        element={<Navigate to="/respond/threats" replace />} />
+          <Route path="/control-deficiencies"   element={<Navigate to="/respond/gaps" replace />} />
+          <Route path="/remediation-tracker"    element={<Navigate to="/respond/remediation" replace />} />
+          <Route path="/remediation-jobs"       element={<Navigate to="/respond/remediation-jobs" replace />} />
+          <Route path="/ctem"                   element={<Navigate to="/respond/ctem" replace />} />
+          <Route path="/vapt-reports"           element={<Navigate to="/respond/vapt-reports" replace />} />
+          <Route path="/vapt-reports/:id"       element={<Navigate to="/respond/vapt-reports" replace />} />
+          <Route path="/security-docs"          element={<Navigate to="/respond/security-docs" replace />} />
+          <Route path="/ai-assisted-scan"       element={<Navigate to="/discover/ai-scan" replace />} />
+          <Route path="/cve-pivot"              element={<Navigate to="/discover/cve-pivot" replace />} />
+          <Route path="/posture-trends"         element={<Navigate to="/discover/posture" replace />} />
+          <Route path="/ai-guardrails"          element={<Navigate to="/automate/ai-guardrails" replace />} />
+          <Route path="/agents"                 element={<Navigate to="/automate/agents" replace />} />
+          <Route path="/missions"               element={<Navigate to="/automate/workflows" replace />} />
+          <Route path="/knowledge"              element={<Navigate to="/automate/knowledge" replace />} />
+          <Route path="/reports"               element={<Navigate to="/automate/reports" replace />} />
+          <Route path="/frameworks"             element={<Navigate to="/analyse/compliance-heatmap" replace />} />
+          <Route path="/custom-frameworks"      element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/webhooks"               element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/api-keys"               element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/data-model"             element={<Navigate to="/discover/assets" replace />} />
+          <Route path="/connections"            element={<Navigate to="/platform/connections" replace />} />
+          <Route path="/clients"                element={<Navigate to="/platform/clients" replace />} />
+          <Route path="/clients/:id"            element={<Navigate to="/platform/clients" replace />} />
+          <Route path="/ticket-sync"            element={<Navigate to="/platform/ticket-sync" replace />} />
+          <Route path="/settings"               element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/help"                   element={<Navigate to="/platform/help" replace />} />
+          <Route path="/ai-settings"            element={<Navigate to="/platform/settings" replace />} />
 
-          <Route path="/vulnerability" element={<ProductLayout product={VULN_MGMT} />}>
-            <Route index element={<Navigate to="scans" replace />} />
-            <Route path="scans" element={<Scans />} />
-            <Route path="scans/:scanId" element={<ScanDetail />} />
-            <Route path="scans/:scanId/diff" element={<ScanDiff />} />
-            <Route path="findings" element={<Findings />} />
-            <Route path="posture" element={<PostureTrends />} />
-          </Route>
-
-          <Route path="/vapt" element={<ProductLayout product={PEN_TEST} />}>
-            <Route index element={<Navigate to="scans" replace />} />
-            <Route path="scans" element={<Scans />} />
-            <Route path="scans/:scanId" element={<ScanDetail />} />
-            <Route path="scans/:scanId/diff" element={<ScanDiff />} />
-            <Route path="reports" element={<VAPTReports />} />
-            <Route path="reports/:reportId" element={<VAPTReportDetail />} />
-            <Route path="attack-paths" element={<AttackPaths />} />
-            <Route path="evidence" element={<EvidencePackage />} />
-          </Route>
-
-          <Route path="/compliance" element={<ProductLayout product={COMPLIANCE_MONITOR} />}>
-            <Route index element={<Navigate to="deficiencies" replace />} />
-            <Route path="deficiencies" element={<ControlDeficiencies />} />
-            <Route path="frameworks" element={<Frameworks />} />
-            <Route path="custom-frameworks" element={<CustomFrameworks />} />
-            <Route path="evidence" element={<EvidencePackage />} />
-          </Route>
-
-          <Route path="/governance" element={<ProductLayout product={GOVERNANCE} />}>
-            <Route index element={<Navigate to="ctem" replace />} />
-            <Route path="ctem" element={<CTEMPage />} />
-            <Route path="remediation" element={<RemediationTracker />} />
-            <Route path="remediation-jobs" element={<RemediationJobs />} />
-          </Route>
-
-          <Route path="/ai-advisor" element={<ProductLayout product={AI_ADVISOR} />}>
-            <Route index element={<Navigate to="agents" replace />} />
-            <Route path="agents" element={<Agents />} />
-            <Route path="workflows" element={<Missions />} />
-            <Route path="run-trash" element={<AgentRunTrash />} />
-          </Route>
-
-          <Route path="/intelligence" element={<ProductLayout product={INTELLIGENCE} />}>
-            <Route index element={<Navigate to="ai-assisted-scan" replace />} />
-            <Route path="ai-assisted-scan" element={<AIAssistedScan />} />
-            <Route path="nl-query" element={<NLQuery />} />
-            <Route path="security-docs" element={<SecurityDocs />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="knowledge" element={<KnowledgeBase />} />
-          </Route>
-
-          <Route path="/platform" element={<ProductLayout product={PLATFORM} />}>
-            <Route index element={<Navigate to="clients" replace />} />
-            <Route path="clients" element={<Clients />} />
-            <Route path="clients/:clientId" element={<ClientDetail />} />
-            <Route path="assets" element={<Assets />} />
-            <Route path="assets/technologies" element={<Technologies />} />
-            <Route path="assets/:assetId" element={<AssetDetail />} />
-            <Route path="connections" element={<Connections />} />
-            <Route path="ticket-sync" element={<TicketSyncPage />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="help" element={<Help />} />
-          </Route>
-
-          {/* ── v1 AppLayout routes (classic view) ───────────────────────── */}
+          {/* ── Admin-only Shell pages (kept in AppLayout) ───────────────── */}
           <Route element={<Shell />}>
             <Route index element={<Navigate to="/hub" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/risk-overview" element={<RiskOverviewPage />} />
-            <Route path="/threat-register" element={<ThreatRegister />} />
-            <Route path="/control-deficiencies" element={<ControlDeficiencies />} />
-            <Route path="/remediation-tracker" element={<Navigate to="/governance/remediation" replace />} />
-            <Route path="/custom-frameworks" element={<CustomFrameworks />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/clients/:clientId" element={<ClientDetail />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/connections" element={<Connections />} />
-            <Route path="/connectors" element={<Connectors />} />
-            <Route path="/scans" element={<Scans />} />
-            <Route path="/scans/:scanId" element={<ScanDetail />} />
-            <Route path="/scans/:scanId/diff" element={<ScanDiff />} />
-            <Route path="/findings" element={<Findings />} />
-            <Route path="/risks" element={<Risks />} />
-            <Route path="/assets" element={<Assets />} />
-            <Route path="/stale-assets" element={<StaleAssets />} />
-            <Route path="/assets/technologies" element={<Technologies />} />
-            <Route path="/assets/:assetId" element={<AssetDetail />} />
-            <Route path="/frameworks" element={<Frameworks />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/ai-settings" element={<Navigate to="/settings" replace />} />
-            <Route path="/email-settings" element={<EmailSettings />} />
-            <Route path="/access-logs" element={<AccessLogs />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/sync" element={<SyncPage />} />
-            <Route path="/help" element={<Help />} />
-            <Route path="/threat-models" element={<ThreatModels />} />
-            <Route path="/threat-models/:modelId" element={<ThreatModelDetail />} />
-            <Route path="/account" element={<Account />} />
-            <Route path="/missions" element={<Missions />} />
-            <Route path="/knowledge" element={<KnowledgeBase />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/vapt-reports" element={<Navigate to="/vapt/reports" replace />} />
-            <Route path="/vapt-reports/:reportId" element={<Navigate to="/vapt/reports" replace />} />
-            <Route path="/ticket-sync" element={<TicketSyncPage />} />
-            <Route path="/ctem" element={<CTEMPage />} />
-            <Route path="/security-docs" element={<SecurityDocs />} />
-            <Route path="/webhooks" element={<Navigate to="/settings" replace />} />
-            <Route path="/api-keys" element={<Navigate to="/settings" replace />} />
-            <Route path="/attack-paths" element={<AttackPaths />} />
-            <Route path="/cve-pivot" element={<CVEPivot />} />
-            <Route path="/data-model" element={<OntologyPage />} />
-            <Route path="/nl-query" element={<NLQuery />} />
-            <Route path="/ai-assisted-scan" element={<AIAssistedScan />} />
-            <Route path="/posture-trends" element={<PostureTrends />} />
-            <Route path="/compliance-heatmap" element={<ComplianceHeatmap />} />
-            <Route path="/client-comparison" element={<ClientComparison />} />
-            <Route path="/ai-guardrails" element={<AIGuardrails />} />
-            <Route path="/remediation-jobs" element={<Navigate to="/governance/remediation-jobs" replace />} />
-            <Route path="/sample1" element={<SampleHub />} />
-            <Route path="/sample2" element={<SampleHubCmd />} />
-            <Route path="/1+2" element={<SampleHubCmd />} />
+            <Route path="/dashboard"       element={<Dashboard />} />
+            <Route path="/account"         element={<Account />} />
+            <Route path="/admin"           element={<Admin />} />
+            <Route path="/sync"            element={<SyncPage />} />
+            <Route path="/email-settings"  element={<EmailSettings />} />
+            <Route path="/access-logs"     element={<AccessLogs />} />
+            <Route path="/projects"        element={<Projects />} />
+            <Route path="/stale-assets"    element={<Navigate to="/discover/assets" replace />} />
+            <Route path="/sample1"         element={<SampleHub />} />
+            <Route path="/sample2"         element={<SampleHubCmd />} />
+            <Route path="/1+2"             element={<SampleHubCmd />} />
           </Route>
         </Routes>
       </Suspense>

@@ -1,5 +1,4 @@
-import { SectionLayout } from "../components/SectionPage";
-import { SectionDef } from "../components/SectionPage";
+import SectionPage, { SectionDef } from "../components/SectionPage";
 
 export const RESPOND_SECTION: SectionDef = {
   num: "04", label: "Respond", color: "#b91c1c",
@@ -25,5 +24,5 @@ export const RESPOND_SECTION: SectionDef = {
 };
 
 export default function RespondPage() {
-  return <SectionLayout section={RESPOND_SECTION} basePath="/respond" />;
+  return <SectionPage section={RESPOND_SECTION} />;
 }

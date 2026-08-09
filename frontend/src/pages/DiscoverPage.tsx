@@ -1,5 +1,4 @@
-import { SectionLayout } from "../components/SectionPage";
-import { SectionDef } from "../components/SectionPage";
+import SectionPage, { SectionDef } from "../components/SectionPage";
 
 export const DISCOVER_SECTION: SectionDef = {
   num: "02", label: "Discover", color: "#0f766e",
@@ -20,10 +19,10 @@ export const DISCOVER_SECTION: SectionDef = {
     { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                  route: "/discover/technologies" },
     { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",               route: "/discover/posture" },
     { name: "Asset Inventory",      desc: "Discovered assets — servers, apps, containers, and cloud resources.",          route: "/discover/assets" },
-    { name: "Pentest Scans",        desc: "Pentest scan sessions with structured findings and red-team evidence.",        route: "/vapt/scans" },
+    { name: "Pentest Scans",        desc: "Pentest scan sessions with structured findings and red-team evidence.",        route: "/respond/vapt-reports" },
   ],
 };
 
 export default function DiscoverPage() {
-  return <SectionLayout section={DISCOVER_SECTION} basePath="/discover" />;
+  return <SectionPage section={DISCOVER_SECTION} />;
 }

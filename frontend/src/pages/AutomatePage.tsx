@@ -1,5 +1,4 @@
-import { SectionLayout } from "../components/SectionPage";
-import { SectionDef } from "../components/SectionPage";
+import SectionPage, { SectionDef } from "../components/SectionPage";
 
 export const AUTOMATE_SECTION: SectionDef = {
   num: "06", label: "Automate", color: "#4338ca",
@@ -25,5 +24,5 @@ export const AUTOMATE_SECTION: SectionDef = {
 };
 
 export default function AutomatePage() {
-  return <SectionLayout section={AUTOMATE_SECTION} basePath="/automate" />;
+  return <SectionPage section={AUTOMATE_SECTION} />;
 }

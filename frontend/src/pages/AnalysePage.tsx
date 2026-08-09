@@ -1,5 +1,4 @@
-import { SectionLayout } from "../components/SectionPage";
-import { SectionDef } from "../components/SectionPage";
+import SectionPage, { SectionDef } from "../components/SectionPage";
 
 export const ANALYSE_SECTION: SectionDef = {
   num: "03", label: "Analyse", color: "#b45309",
@@ -7,9 +6,9 @@ export const ANALYSE_SECTION: SectionDef = {
   sub: "Score findings, apply FAIR-lite ALE modelling, and query your entire posture in plain language.",
   info: "Risk domains are automatically normalised. Attack paths are derived from finding combinations — no manual correlation needed.",
   stats: [
-    { label: "Open Risks",     field: "open_risks",       color: "#b45309" },
-    { label: "Critical Risks", field: "critical_risks",   color: "#b91c1c" },
-    { label: "Threat Entries", field: "total_threats",    color: "#ea580c" },
+    { label: "Open Risks",     field: "open_risks",         color: "#b45309" },
+    { label: "Critical Risks", field: "critical_risks",     color: "#b91c1c" },
+    { label: "Threat Entries", field: "total_threats",      color: "#ea580c" },
     { label: "Attack Paths",   field: "total_attack_paths", color: "#d97706" },
   ],
   cards: [
@@ -25,5 +24,5 @@ export const ANALYSE_SECTION: SectionDef = {
 };
 
 export default function AnalysePage() {
-  return <SectionLayout section={ANALYSE_SECTION} basePath="/analyse" />;
+  return <SectionPage section={ANALYSE_SECTION} />;
 }
