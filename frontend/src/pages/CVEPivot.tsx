@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clientsApi, cveApi } from "../services/api";
 import { Client, CveImpact } from "../types";
 import { fromNow } from "../utils/datetime";
+import StatRow, { PageTitle } from "../components/StatRow";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -133,10 +134,7 @@ export default function CVEPivot() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>CVE Blast Radius</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Select a client to see every CVE across all scans — click any row to see which assets are affected.
-          </Typography>
+          <PageTitle title="CVE Blast Radius" description="Select a client to see every CVE across all scans — click any row to see which assets are affected." color="#0f766e" />
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -157,6 +155,12 @@ export default function CVEPivot() {
           />
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Total CVEs",     value: cves.length,                                                                       color: "#0f766e" },
+        { label: "Critical",       value: cves.filter((c: any) => c.max_severity === "critical").length,                     color: "#b91c1c" },
+        { label: "Total Findings", value: cves.reduce((s: number, c: any) => s + (c.finding_count ?? 0), 0),                 color: "#ea580c" },
+        { label: "Assets Exposed", value: cves.reduce((s: number, c: any) => s + (c.affected_assets ?? 0), 0),               color: "#d97706" },
+      ]} />
 
       {!clientId ? (
         <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>

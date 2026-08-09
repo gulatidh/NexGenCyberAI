@@ -20,6 +20,7 @@ import { findingsApi, projectsApi, scansApi, postureApi } from "../services/api"
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import FixWithAIDialog from "../components/FixWithAIDialog";
 import { fromNow } from "../utils/datetime";
+import StatRow, { PageTitle } from "../components/StatRow";
 
 const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 
@@ -507,10 +508,11 @@ export default function Findings() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Findings</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {scanId ? "Findings for selected scan (no deduplication)" : "Consolidated findings across all scans — deduplicated by vulnerability"}
-          </Typography>
+          <PageTitle
+            title="Findings"
+            description={scanId ? "Findings for selected scan (no deduplication)" : "Consolidated findings across all scans — deduplicated by vulnerability"}
+            color="#0f766e"
+          />
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
@@ -633,6 +635,12 @@ export default function Findings() {
           )}
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Critical", value: sevCounts["critical"] ?? 0, color: "#b91c1c" },
+        { label: "High",     value: sevCounts["high"]     ?? 0, color: "#ea580c" },
+        { label: "Medium",   value: sevCounts["medium"]   ?? 0, color: "#d97706" },
+        { label: "Total",    value: findings.length,            color: "#0f766e" },
+      ]} />
 
       {/* MTTR strip — compact row shown when posture history is available */}
       {clientId && latestPosture && (

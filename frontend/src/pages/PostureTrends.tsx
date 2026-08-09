@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { postureApi, scansApi } from "../services/api";
 import { toast } from "react-toastify";
+import StatRow, { PageTitle } from "../components/StatRow";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -272,14 +273,10 @@ export default function PostureTrends() {
       {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Posture Trends
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Track your security posture over time — findings, risks, MTTR, and compliance
-          </Typography>
+          <PageTitle title="Posture Trends" description="Track your security posture over time — findings, risks, MTTR, and compliance" color="#0f766e" />
         </Box>
         <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+
           {/* Scan selector */}
           {clientId && (
             <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -342,6 +339,12 @@ export default function PostureTrends() {
           )}
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Compliance",    value: latest ? `${latest.compliance_score ?? 0}%` : "—",        color: "#34A853" },
+        { label: "Open Findings", value: latest ? (latest.critical_findings ?? 0) + (latest.high_findings ?? 0) + (latest.medium_findings ?? 0) : 0, color: "#ea580c" },
+        { label: "Open Risks",    value: latest?.open_risks ?? 0,                                   color: "#b45309" },
+        { label: "Snapshots",     value: sorted.length,                                             color: "#4285F4" },
+      ]} />
 
       {!clientId && (
         <Alert severity="info">Select a client to view posture trends.</Alert>

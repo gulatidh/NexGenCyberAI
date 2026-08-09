@@ -12,6 +12,7 @@ import { connectorsApi, assetsApi, projectsApi } from "../services/api";
 import { Connector, Asset, Project } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
 import { fromNow } from "../utils/datetime";
+import StatRow, { PageTitle } from "../components/StatRow";
 
 const CLASS_COLOR: Record<string, string> = {
   vm: "#4285F4",
@@ -209,10 +210,7 @@ export default function Assets() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Asset Inventory</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            All cloud resources discovered by your connectors
-          </Typography>
+          <PageTitle title="Asset Inventory" description="All cloud resources discovered by your connectors" color="#0f766e" />
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
@@ -246,6 +244,12 @@ export default function Assets() {
           </Button>
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Total",      value: activeCount + newCount + reappearedCount + staleCount, color: "#0f766e" },
+        { label: "Active",     value: activeCount,     color: "#34A853" },
+        { label: "New",        value: newCount,        color: "#4285F4" },
+        { label: "Stale",      value: staleCount,      color: "#9E9E9E" },
+      ]} />
 
       {clientId && (
         <>

@@ -21,6 +21,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Scan, Client, Connector, ScanType, FrameworkType, FrameworkCatalogEntry, Project } from "../types";
 import { toast } from "react-toastify";
 import { fromNow } from "../utils/datetime";
+import StatRow, { PageTitle } from "../components/StatRow";
 import { CREDENTIAL_FIELDS } from "./Connections";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -948,10 +949,7 @@ export default function Scans() {
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Assessments</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Every scan across all clients · click a tile for the AI verdict, findings, and agent runs
-          </Typography>
+          <PageTitle title="Assessments" description="Every scan across all clients · click a tile for the AI verdict, findings, and agent runs" color="#0f766e" />
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <Button variant="outlined" startIcon={<Refresh />}
@@ -971,6 +969,12 @@ export default function Scans() {
           </Tooltip>
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Total",     value: tiles?.length ?? 0,                                               color: "#0f766e" },
+        { label: "Running",   value: tiles?.filter((t: any) => t.status === "running").length   ?? 0,  color: "#4285F4" },
+        { label: "Completed", value: tiles?.filter((t: any) => t.status === "completed").length ?? 0,  color: "#34A853" },
+        { label: "Failed",    value: tiles?.filter((t: any) => t.status === "failed").length    ?? 0,  color: "#b91c1c" },
+      ]} />
 
       {/* ── Top-level scanner / import groups ──────────────────────────── */}
       <Box sx={{ mb: 3 }}>

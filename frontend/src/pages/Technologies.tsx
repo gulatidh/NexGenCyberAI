@@ -14,6 +14,7 @@ import BreakdownBySubcategory from "../components/technologies/BreakdownBySubcat
 import BreakdownByType from "../components/technologies/BreakdownByType";
 import TechnologyTable from "../components/technologies/TechnologyTable";
 import TechnologyDetailDrawer from "../components/technologies/TechnologyDetailDrawer";
+import StatRow, { PageTitle } from "../components/StatRow";
 
 const EMPTY_FILTERS: FilterState = {
   search: "", status: "", category: "", type: "",
@@ -60,10 +61,7 @@ export default function Technologies() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2.5, flexWrap: "wrap", gap: 1 }}>
         <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Technology Inventory</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Discover, classify, and assess technologies running across your environment
-          </Typography>
+          <PageTitle title="Technology Inventory" description="Discover, classify, and assess technologies running across your environment" color="#0f766e" />
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
@@ -86,6 +84,12 @@ export default function Technologies() {
           </Button>
         </Box>
       </Box>
+      <StatRow stats={[
+        { label: "Total",      value: inventory?.summary?.total ?? 0,       color: "#0f766e" },
+        { label: "Shown",      value: filteredTechnologies.length,           color: "#4285F4" },
+        { label: "Categories", value: inventory?.categories?.length ?? 0,   color: "#d97706" },
+        { label: "Types",      value: inventory?.types?.length ?? 0,        color: "#9C27B0" },
+      ]} />
 
       <SearchAndFilters state={filters} options={inventory?.filter_options || null} onChange={setFilters} />
 
