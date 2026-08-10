@@ -19,6 +19,7 @@ interface CardDef {
   name: string;
   desc: string;
   route: string;
+  group?: string;
 }
 
 interface StageDef {
@@ -36,15 +37,15 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Configure accounts, connectors, and AI providers before any scanning begins.",
     info: "Complete this stage first — every downstream scan depends on at least one connected account and a configured AI provider.",
     cards: [
-      { name: "Accounts",         desc: "Client profiles, contact details, and security posture scoping.",          route: "/platform/clients" },
-      { name: "Asset Inventory",  desc: "Discovered assets — servers, apps, containers, and cloud resources.",       route: "/platform/assets" },
-      { name: "Connections",      desc: "Scanner integrations, enterprise tools, and SIEM connectors.",              route: "/connections" },
-      { name: "AI Settings",      desc: "AI provider credentials, model selection, and automatic failover config.",  route: "/ai-settings" },
-      { name: "AI Guardrails",    desc: "AI safety controls, prompt audit logs, and guardrail coverage status.",     route: "/ai-guardrails" },
-      { name: "Threat Models",    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",       route: "/threat-intel/threat-models" },
-      { name: "Frameworks",       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",           route: "/compliance/frameworks" },
-      { name: "Custom Standards", desc: "Build your own control framework from existing platform controls.",          route: "/compliance/custom-frameworks" },
-      { name: "Data Model",       desc: "Platform ontology — eleven entities, one interactive graph.",               route: "/data-model" },
+      { name: "Accounts",         desc: "Client profiles, contact details, and security posture scoping.",          route: "/platform/clients",              group: "Environment" },
+      { name: "Asset Inventory",  desc: "Discovered assets — servers, apps, containers, and cloud resources.",       route: "/platform/assets",               group: "Environment" },
+      { name: "Connections",      desc: "Scanner integrations, enterprise tools, and SIEM connectors.",              route: "/connections",                   group: "Environment" },
+      { name: "AI Settings",      desc: "AI provider credentials, model selection, and automatic failover config.",  route: "/ai-settings",                   group: "Environment" },
+      { name: "AI Guardrails",    desc: "AI safety controls, prompt audit logs, and guardrail coverage status.",     route: "/ai-guardrails",                 group: "Design" },
+      { name: "Threat Models",    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",       route: "/threat-intel/threat-models",    group: "Design" },
+      { name: "Frameworks",       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",           route: "/compliance/frameworks",         group: "Design" },
+      { name: "Custom Standards", desc: "Build your own control framework from existing platform controls.",          route: "/compliance/custom-frameworks",  group: "Design" },
+      { name: "Data Model",       desc: "Platform ontology — eleven entities, one interactive graph.",               route: "/data-model",                    group: "Design" },
     ],
   },
   {
@@ -53,12 +54,12 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Scan the environment via inbuilt scanners, enterprise integrations, or an AI-guided conversation.",
     info: "CVE enrichment and severity scoring run automatically after each scan. Import results from external scanners via the Import tab in Assessments.",
     cards: [
-      { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",             route: "/discover/scans" },
-      { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",          route: "/discover/findings" },
-      { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan" },
-      { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                  route: "/discover/cve-pivot" },
-      { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                  route: "/discover/technologies" },
-      { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",               route: "/discover/posture" },
+      { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",             route: "/discover/scans",        group: "Scanning" },
+      { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",          route: "/discover/findings",     group: "Scanning" },
+      { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
+      { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                  route: "/discover/cve-pivot",    group: "Scanning" },
+      { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                  route: "/discover/technologies", group: "Visibility" },
+      { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",               route: "/discover/posture",      group: "Visibility" },
     ],
   },
   {
@@ -67,14 +68,14 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Score findings, apply FAIR-lite ALE modelling, and query your entire posture in plain language.",
     info: "Risk domains are automatically normalised. Attack paths are derived from finding combinations — no manual correlation needed.",
     cards: [
-      { name: "Risk Register",      desc: "FAIR-scored risk register with domain heatmap and financial ALE.",         route: "/analyse/risks" },
-      { name: "Risk Overview",      desc: "Executive summary of ALE exposure, risk domains, and top risks.",          route: "/analyse/risk-overview" },
-      { name: "AI Risk Analysis",   desc: "AI-generated risk narrative with actionable recommendations.",             route: "/analyse/ai-analysis" },
-      { name: "Attack Paths",       desc: "MITRE-phased attack chain graph derived from live findings.",              route: "/analyse/attack-paths" },
-      { name: "Compliance Heatmap", desc: "Control coverage heatmap across all active frameworks.",                   route: "/analyse/compliance-heatmap" },
-      { name: "Ask Your Data",      desc: "Natural language SQL queries over findings, risks, and assets.",           route: "/analyse/nl-query" },
-      { name: "Account Comparison", desc: "Compare security posture side-by-side across multiple accounts.",          route: "/analyse/comparison" },
-      { name: "Reports",            desc: "AI-generated security posture and trend reports.",                         route: "/automate/reports" },
+      { name: "Risk Register",      desc: "FAIR-scored risk register with domain heatmap and financial ALE.",         route: "/analyse/risks",              group: "Risk" },
+      { name: "Risk Overview",      desc: "Executive summary of ALE exposure, risk domains, and top risks.",          route: "/analyse/risk-overview",      group: "Risk" },
+      { name: "AI Risk Analysis",   desc: "AI-generated risk narrative with actionable recommendations.",             route: "/analyse/ai-analysis",        group: "Risk" },
+      { name: "Attack Paths",       desc: "MITRE-phased attack chain graph derived from live findings.",              route: "/analyse/attack-paths",       group: "Risk" },
+      { name: "Compliance Heatmap", desc: "Control coverage heatmap across all active frameworks.",                   route: "/analyse/compliance-heatmap", group: "Intelligence" },
+      { name: "Ask Your Data",      desc: "Natural language SQL queries over findings, risks, and assets.",           route: "/analyse/nl-query",           group: "Intelligence" },
+      { name: "Account Comparison", desc: "Compare security posture side-by-side across multiple accounts.",          route: "/analyse/comparison",         group: "Intelligence" },
+      { name: "Reports",            desc: "AI-generated security posture and trend reports.",                         route: "/automate/reports",           group: "Intelligence" },
     ],
   },
   {
@@ -83,14 +84,14 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Map risk to real adversary behaviour, then track remediation through structured CTEM programs.",
     info: "Threat entries are mapped to MITRE ATT&CK automatically. CTEM programs progress through 5 phases: Scope → Discover → Prioritise → Validate → Mobilise.",
     cards: [
-      { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",                route: "/respond/threats" },
-      { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",            route: "/respond/gaps" },
-      { name: "Remediation Tracker",  desc: "Priority-banded remediation actions tracked to completion.",                   route: "/respond/remediation" },
-      { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",            route: "/respond/remediation-jobs" },
-      { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                      route: "/respond/ctem" },
-      { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, or Linear.",              route: "/platform/connections" },
-      { name: "Webhooks",             desc: "Event-driven alerts to Slack, Teams, or any HTTP endpoint.",                  route: "/platform/settings" },
-      { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",                     route: "/respond/security-docs" },
+      { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",                route: "/respond/threats",         group: "Actions" },
+      { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",            route: "/respond/gaps",            group: "Actions" },
+      { name: "Remediation Tracker",  desc: "Priority-banded remediation actions tracked to completion.",                   route: "/respond/remediation",     group: "Actions" },
+      { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",            route: "/respond/remediation-jobs", group: "Actions" },
+      { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                      route: "/respond/ctem",            group: "Programs" },
+      { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, or Linear.",              route: "/platform/connections",    group: "Programs" },
+      { name: "Webhooks",             desc: "Event-driven alerts to Slack, Teams, or any HTTP endpoint.",                  route: "/platform/settings",       group: "Programs" },
+      { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",                     route: "/respond/security-docs",   group: "Programs" },
     ],
   },
   {
@@ -99,12 +100,12 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Close the loop with evidence the auditor — or the client — can actually use.",
     info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs of findings, control deficiencies, remediation actions, and agent logs.",
     cards: [
-      { name: "VAPT Reports",        desc: "Engagement reports with retest versioning and PDF/DOCX export.",         route: "/respond/vapt-reports" },
-      { name: "Pentest Scans",       desc: "Pentest scan sessions with structured findings and evidence.",           route: "/vapt/scans" },
-      { name: "Evidence Package",    desc: "Audit-ready ZIP of findings, deficiencies, and agent logs.",             route: "/vapt/evidence" },
-      { name: "Compliance Monitor",  desc: "Framework compliance status scored against all active controls.",        route: "/compliance/frameworks" },
-      { name: "Control Gaps",        desc: "Deficiency register with framework and severity breakdown.",             route: "/respond/gaps" },
-      { name: "Compliance Evidence", desc: "Compliance audit evidence package for framework assessments.",           route: "/compliance/evidence" },
+      { name: "VAPT Reports",        desc: "Engagement reports with retest versioning and PDF/DOCX export.",         route: "/respond/vapt-reports",       group: "Evidence" },
+      { name: "Pentest Scans",       desc: "Pentest scan sessions with structured findings and evidence.",           route: "/vapt/scans",                 group: "Evidence" },
+      { name: "Evidence Package",    desc: "Audit-ready ZIP of findings, deficiencies, and agent logs.",             route: "/vapt/evidence",              group: "Evidence" },
+      { name: "Compliance Monitor",  desc: "Framework compliance status scored against all active controls.",        route: "/compliance/frameworks",      group: "Compliance" },
+      { name: "Control Gaps",        desc: "Deficiency register with framework and severity breakdown.",             route: "/respond/gaps",               group: "Compliance" },
+      { name: "Compliance Evidence", desc: "Compliance audit evidence package for framework assessments.",           route: "/compliance/evidence",        group: "Compliance" },
     ],
   },
   {
@@ -113,11 +114,11 @@ const STAGE_DEFS: StageDef[] = [
     sub: "Agents run the full analysis loop — risk, intel, remediation, compliance — on demand or on repeat.",
     info: "AI Buddies output structured data directly into the Risk, Threat, Compliance, and Remediation registers. The Orchestrator runs all four in sequence from one trigger.",
     cards: [
-      { name: "AI Buddies",     desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents" },
-      { name: "AI Workflows",   desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows" },
-      { name: "Knowledge Base", desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge" },
-      { name: "API Keys",       desc: "M2M API keys for CI/CD pipelines and programmatic integrations.",            route: "/platform/settings" },
-      { name: "Help & Docs",    desc: "Documentation, setup guides, and platform support resources.",               route: "/platform/help" },
+      { name: "AI Buddies",     desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",    group: "Agents" },
+      { name: "AI Workflows",   desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows", group: "Agents" },
+      { name: "Knowledge Base", desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge", group: "Agents" },
+      { name: "API Keys",       desc: "M2M API keys for CI/CD pipelines and programmatic integrations.",            route: "/platform/settings",  group: "Platform" },
+      { name: "Help & Docs",    desc: "Documentation, setup guides, and platform support resources.",               route: "/platform/help",      group: "Platform" },
     ],
   },
 ];
@@ -218,16 +219,42 @@ function StageSection({ stage, si }: { stage: StageDef; si: number }) {
         </Box>
       </Box>
 
-      {/* Cards — 4 per row on desktop */}
-      <Box sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
-        gap: 1.5,
-      }}>
-        {stage.cards.map((card) => (
-          <HubCard key={card.name} card={card} color={stage.color} />
-        ))}
-      </Box>
+      {/* Cards grouped with labeled dividers */}
+      {(() => {
+        const groups: Array<{ name: string; cards: CardDef[] }> = [];
+        for (const card of stage.cards) {
+          const g = card.group ?? "";
+          if (groups.length === 0 || groups[groups.length - 1].name !== g) {
+            groups.push({ name: g, cards: [] });
+          }
+          groups[groups.length - 1].cards.push(card);
+        }
+        return groups.map((g, gi) => (
+          <Box key={g.name || gi}>
+            {/* Group label + rule */}
+            {g.name && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.25, mt: gi > 0 ? 2.5 : 0 }}>
+                <Typography sx={{
+                  fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em",
+                  textTransform: "uppercase", color: "text.disabled", whiteSpace: "nowrap",
+                }}>
+                  {g.name}
+                </Typography>
+                <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+              </Box>
+            )}
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+              gap: 1.5,
+            }}>
+              {g.cards.map((card) => (
+                <HubCard key={card.name} card={card} color={stage.color} />
+              ))}
+            </Box>
+          </Box>
+        ));
+      })()}
     </Box>
   );
 }
