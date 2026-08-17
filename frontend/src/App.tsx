@@ -217,8 +217,9 @@ function ProtectedApp() {
             <Route path="risk-overview"      element={<RiskOverviewPage />} />
             <Route path="ai-analysis"        element={<RiskAIAnalysis />} />
             <Route path="attack-paths"       element={<AttackPaths />} />
-            <Route path="threat-models"      element={<ThreatModels />} />
-            <Route path="nl-query"           element={<NLQuery />} />
+            <Route path="threat-models"          element={<ThreatModels />} />
+            <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
+            <Route path="nl-query"               element={<NLQuery />} />
             <Route path="compliance-heatmap" element={<ComplianceHeatmap />} />
             <Route path="comparison"         element={<ClientComparison />} />
           </Route>
@@ -251,7 +252,6 @@ function ProtectedApp() {
             <Route path="/discover/scans/:scanId"          element={<ScanDetail />} />
             <Route path="/discover/scans/:scanId/diff"     element={<ScanDiff />} />
             <Route path="/discover/assets/:assetId"        element={<AssetDetail />} />
-            <Route path="/analyse/threat-models/:modelId"  element={<ThreatModelDetail />} />
             <Route path="/respond/vapt-reports/:reportId"  element={<VAPTReportDetail />} />
             <Route path="/report/vapt-reports/:reportId"   element={<VAPTReportDetail />} />
           </Route>

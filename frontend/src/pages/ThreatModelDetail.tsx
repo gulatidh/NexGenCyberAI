@@ -16,6 +16,7 @@ import {
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
   Dialog, DialogTitle, DialogContent, TextField, Select,
+  Tabs, Tab,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
@@ -23,7 +24,7 @@ import {
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
   MenuBook, Group, VerifiedUser, Timeline,
 } from "@mui/icons-material";
-import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
+import { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
@@ -831,27 +832,39 @@ export default function ThreatModelDetail() {
         </Card>
       )}
 
-      <PageDetailLayout
-        entityName={data?.name || (data?.methodology ? `Threat Model · ${data.methodology.toUpperCase()}` : "Threat Model")}
-        entityType="Threat Model"
-        avatarColor="#EA4335"
-        navItems={TM_NAV.map(item => {
-          if (!data) return item;
-          if (item.id === "components")      return { ...item, label: `Components (${data.component_count ?? 0})` };
-          if (item.id === "threats")         return { ...item, label: `Threats (${data.threat_count ?? 0})` };
-          if (item.id === "mitigations")     return { ...item, label: `Mitigations (${data.mitigation_count ?? 0})` };
-          if (item.id === "attack_chains")   return { ...item, label: `Attack Chains (${(data.attack_trees_json || []).length})` };
-          if (item.id === "adversaries")     return { ...item, label: `Adversaries (${(data.adversary_profiles_json || []).length})` };
-          if (item.id === "detection_rules") return { ...item, label: `Detection Rules (${(data.sigma_rules_json || []).length})` };
-          return item;
-        })}
-        activeId={tab}
-        onSelect={(id: string) => {
-          if (id === "help") navigate("/help");
-          else setTab(id);
-        }}
-        fullWidth={printing}
-      >
+      {/* Horizontal tab bar — replaces PageDetailLayout left sidebar */}
+      {!printing && (
+        <Box sx={{ borderBottom: "1px solid", borderColor: "divider", mb: 2 }}>
+          <Tabs
+            value={tab}
+            onChange={(_, v: string) => { if (v === "help") navigate("/help"); else setTab(v); }}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{ minHeight: 40, "& .MuiTab-root": { minHeight: 40, fontSize: 12, py: 0, px: 1.5, textTransform: "none" } }}
+          >
+            {TM_NAV.map(item => {
+              let label = item.label;
+              if (data) {
+                if (item.id === "components")      label = `Components (${data.component_count ?? 0})`;
+                if (item.id === "threats")         label = `Threats (${data.threat_count ?? 0})`;
+                if (item.id === "mitigations")     label = `Mitigations (${data.mitigation_count ?? 0})`;
+                if (item.id === "attack_chains")   label = `Attack Chains (${(data.attack_trees_json || []).length})`;
+                if (item.id === "adversaries")     label = `Adversaries (${(data.adversary_profiles_json || []).length})`;
+                if (item.id === "detection_rules") label = `Detection Rules (${(data.sigma_rules_json || []).length})`;
+              }
+              return (
+                <Tab
+                  key={item.id}
+                  value={item.id}
+                  icon={<item.Icon sx={{ fontSize: "14px !important" }} />}
+                  iconPosition="start"
+                  label={label}
+                />
+              );
+            })}
+          </Tabs>
+        </Box>
+      )}
       {/* DIAGRAM */}
       {(tab === "diagram" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
@@ -1223,7 +1236,6 @@ export default function ThreatModelDetail() {
           onValidated={() => qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] })}
         />
       )}
-      </PageDetailLayout>
     </Box>
   );
 }
