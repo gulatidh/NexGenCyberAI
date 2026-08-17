@@ -72,12 +72,13 @@ interface MenuItem {
   id: string;
   label: string;
   color: string;
+  overviewPath: string;
   columns: MegaColumn[];
 }
 
 const MENU: MenuItem[] = [
   {
-    id: "setup", label: "Setup", color: "#2563eb",
+    id: "setup", label: "Setup", color: "#2563eb", overviewPath: "/platform",
     columns: [
       {
         heading: "Environment",
@@ -100,7 +101,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "discover", label: "Discover", color: "#0f766e",
+    id: "discover", label: "Discover", color: "#0f766e", overviewPath: "/discover",
     columns: [
       {
         heading: "Scanning",
@@ -122,7 +123,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "analyse", label: "Analyse", color: "#b45309",
+    id: "analyse", label: "Analyse", color: "#b45309", overviewPath: "/analyse",
     columns: [
       {
         heading: "Risk",
@@ -145,7 +146,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "respond", label: "Respond", color: "#b91c1c",
+    id: "respond", label: "Respond", color: "#b91c1c", overviewPath: "/respond",
     columns: [
       {
         heading: "Threat Intelligence",
@@ -166,7 +167,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "report", label: "Report", color: "#15803d",
+    id: "report", label: "Report", color: "#15803d", overviewPath: "/respond/vapt-reports",
     columns: [
       {
         heading: "Pen Testing",
@@ -188,7 +189,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "automate", label: "Automate", color: "#4338ca",
+    id: "automate", label: "Automate", color: "#4338ca", overviewPath: "/automate",
     columns: [
       {
         heading: "AI Agents",
@@ -455,8 +456,9 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
                   aria-controls={`mega-panel-${item.id}`}
                   onMouseEnter={(e) => enter(item.id, e.currentTarget)}
                   onFocus={(e) => enter(item.id, e.currentTarget)}
+                  onClick={() => { closeAll(); navigate(item.overviewPath); }}
                   onKeyDown={(e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(isOpen ? null : item.id); }
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); closeAll(); navigate(item.overviewPath); }
                     if (e.key === "Escape") closeAll();
                     if (e.key === "ArrowRight" && idx < MENU.length - 1) enter(MENU[idx + 1].id);
                     if (e.key === "ArrowLeft"  && idx > 0)               enter(MENU[idx - 1].id);

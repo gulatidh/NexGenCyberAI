@@ -95,6 +95,7 @@ const EvidencePackage     = React.lazy(() => import("./pages/EvidencePackage"));
 const AIGuardrails        = React.lazy(() => import("./pages/AIGuardrails"));
 const RemediationJobs     = React.lazy(() => import("./pages/RemediationJobs"));
 const AgentRunTrash       = React.lazy(() => import("./pages/AgentRunTrash"));
+const SetupPage           = React.lazy(() => import("./pages/SetupPage"));
 const DiscoverPage        = React.lazy(() => import("./pages/DiscoverPage"));
 const AnalysePage         = React.lazy(() => import("./pages/AnalysePage"));
 const RespondPage         = React.lazy(() => import("./pages/RespondPage"));
@@ -243,7 +244,7 @@ function ProtectedApp() {
 
           {/* ── SETUP / PLATFORM ─────────────────────────────────────────── */}
           <Route path="/platform" element={<ProductLayout product={PLATFORM} />}>
-            <Route index element={<Navigate to="clients" replace />} />
+            <Route index element={<SetupPage />} />
             <Route path="clients"             element={<Clients />} />
             <Route path="clients/:clientId"   element={<ClientDetail />} />
             <Route path="assets"              element={<Assets />} />
