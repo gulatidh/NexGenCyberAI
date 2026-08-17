@@ -97,6 +97,9 @@ const RemediationJobs     = React.lazy(() => import("./pages/RemediationJobs"));
 const AgentRunTrash       = React.lazy(() => import("./pages/AgentRunTrash"));
 const ReportPage          = React.lazy(() => import("./pages/ReportPage"));
 const SetupPage           = React.lazy(() => import("./pages/SetupPage"));
+const AISettings          = React.lazy(() => import("./pages/AISettings"));
+const Webhooks            = React.lazy(() => import("./pages/Webhooks"));
+const APIKeysPage         = React.lazy(() => import("./pages/APIKeysPage"));
 const DiscoverPage        = React.lazy(() => import("./pages/DiscoverPage"));
 const AnalysePage         = React.lazy(() => import("./pages/AnalysePage"));
 const RespondPage         = React.lazy(() => import("./pages/RespondPage"));
@@ -252,6 +255,8 @@ function ProtectedApp() {
             <Route path="ai-scan"      element={<AIAssistedScan />} />
             <Route path="nl-query"     element={<NLQuery />} />
             <Route path="ai-guardrails" element={<AIGuardrails />} />
+            <Route path="webhooks"     element={<Webhooks />} />
+            <Route path="api-keys"     element={<APIKeysPage />} />
             <Route path="run-trash"    element={<AgentRunTrash />} />
           </Route>
 
@@ -265,6 +270,7 @@ function ProtectedApp() {
             <Route path="assets/:assetId"     element={<AssetDetail />} />
             <Route path="connections"         element={<Connections />} />
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
+            <Route path="ai-settings"         element={<AISettings />} />
             <Route path="settings"            element={<Settings />} />
             <Route path="help"                element={<Help />} />
           </Route>
@@ -327,8 +333,8 @@ function ProtectedApp() {
           <Route path="/reports"               element={<Navigate to="/automate/reports" replace />} />
           <Route path="/frameworks"             element={<Navigate to="/analyse/compliance-heatmap" replace />} />
           <Route path="/custom-frameworks"      element={<Navigate to="/platform/settings" replace />} />
-          <Route path="/webhooks"               element={<Navigate to="/platform/settings" replace />} />
-          <Route path="/api-keys"               element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/webhooks"               element={<Navigate to="/automate/webhooks" replace />} />
+          <Route path="/api-keys"               element={<Navigate to="/automate/api-keys" replace />} />
           <Route path="/data-model"             element={<Navigate to="/discover/assets" replace />} />
           <Route path="/connections"            element={<Navigate to="/platform/connections" replace />} />
           <Route path="/clients"                element={<Navigate to="/platform/clients" replace />} />
@@ -336,7 +342,7 @@ function ProtectedApp() {
           <Route path="/ticket-sync"            element={<Navigate to="/platform/ticket-sync" replace />} />
           <Route path="/settings"               element={<Navigate to="/platform/settings" replace />} />
           <Route path="/help"                   element={<Navigate to="/platform/help" replace />} />
-          <Route path="/ai-settings"            element={<Navigate to="/platform/settings" replace />} />
+          <Route path="/ai-settings"            element={<Navigate to="/platform/ai-settings" replace />} />
 
           {/* ── Admin-only Shell pages (kept in AppLayout) ───────────────── */}
           <Route element={<Shell />}>

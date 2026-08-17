@@ -10,6 +10,7 @@ export interface ProductNavItem {
   label: string;
   icon: React.ReactNode;
   path: string;
+  group?: string;
 }
 
 export interface ProductDef {
@@ -83,48 +84,70 @@ export default function ProductLayout({ product }: Props) {
                   </Typography>
                 </Box>
               </Box>
-              {/* Nav items */}
+              {/* Nav items — grouped */}
               <Box sx={{ pt: 0.5, pb: 2 }}>
-                {product.nav.map(item => {
-                  const active = isActive(item.path);
-                  return (
-                    <Box
-                      key={item.path}
-                      onClick={() => navigate(fullPath(item.path))}
-                      sx={{
-                        display: "flex", alignItems: "center", gap: 1.25,
-                        px: 1.5, py: 1, cursor: "pointer",
-                        borderLeft: "3px solid",
-                        borderColor: active ? product.color : "transparent",
-                        bgcolor: active ? `${product.color}12` : "transparent",
-                        "&:hover": {
-                          bgcolor: active ? `${product.color}12` : "rgba(128,128,128,0.06)",
-                        },
-                        transition: "all .12s ease",
-                      }}
-                    >
-                      <Box sx={{
-                        width: 26, height: 26, borderRadius: 1.25,
-                        bgcolor: `${product.color}22`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                        color: product.color,
-                        "& svg": { fontSize: "14px !important" },
-                      }}>
-                        {item.icon}
-                      </Box>
-                      <Typography sx={{
-                        fontSize: 12.5,
-                        color: active ? "text.primary" : "text.secondary",
-                        fontWeight: active ? 600 : 400,
-                        lineHeight: 1.3, flex: 1,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
-                        {item.label}
-                      </Typography>
-                    </Box>
+                {(() => {
+                  const ungrouped = product.nav.filter(i => !i.group);
+                  const groupNames = Array.from(
+                    new Set(product.nav.filter(i => i.group).map(i => i.group!))
                   );
-                })}
+                  const NavItem = ({ item }: { item: ProductNavItem }) => {
+                    const active = isActive(item.path);
+                    return (
+                      <Box
+                        key={item.path}
+                        onClick={() => navigate(fullPath(item.path))}
+                        sx={{
+                          display: "flex", alignItems: "center", gap: 1.25,
+                          px: 1.5, py: 0.875, cursor: "pointer",
+                          borderLeft: "3px solid",
+                          borderColor: active ? product.color : "transparent",
+                          bgcolor: active ? `${product.color}12` : "transparent",
+                          "&:hover": { bgcolor: active ? `${product.color}12` : "rgba(128,128,128,0.06)" },
+                          transition: "all .12s ease",
+                        }}
+                      >
+                        <Box sx={{
+                          width: 24, height: 24, borderRadius: 1.25,
+                          bgcolor: `${product.color}22`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0, color: product.color,
+                          "& svg": { fontSize: "13px !important" },
+                        }}>
+                          {item.icon}
+                        </Box>
+                        <Typography sx={{
+                          fontSize: 12.5,
+                          color: active ? "text.primary" : "text.secondary",
+                          fontWeight: active ? 600 : 400,
+                          lineHeight: 1.3, flex: 1,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {item.label}
+                        </Typography>
+                      </Box>
+                    );
+                  };
+                  return (
+                    <>
+                      {ungrouped.map(item => <NavItem key={item.path} item={item} />)}
+                      {groupNames.map(g => (
+                        <Box key={g}>
+                          <Typography sx={{
+                            px: 1.75, pt: 1.75, pb: 0.5,
+                            fontSize: 9.5, fontWeight: 700, letterSpacing: "0.08em",
+                            textTransform: "uppercase", color: "text.disabled",
+                          }}>
+                            {g}
+                          </Typography>
+                          {product.nav.filter(i => i.group === g).map(item => (
+                            <NavItem key={item.path} item={item} />
+                          ))}
+                        </Box>
+                      ))}
+                    </>
+                  );
+                })()}
               </Box>
             </Box>
           )}
