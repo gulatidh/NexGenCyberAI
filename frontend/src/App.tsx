@@ -44,6 +44,7 @@ function RedirectWithId({ to }: { to: string }) {
 // ── Static imports ────────────────────────────────────────────────────────────
 import AppLayout from "./components/layout/AppLayout";
 import ProductLayout from "./components/layout/ProductLayout";
+import DetailLayout from "./components/layout/DetailLayout";
 import Hub from "./pages/Hub";
 import LandingV2 from "./pages/LandingV2";
 import {
@@ -200,55 +201,59 @@ function ProtectedApp() {
           {/* ── DISCOVER ─────────────────────────────────────────────────── */}
           <Route path="/discover" element={<ProductLayout product={DISCOVER_PRODUCT} />}>
             <Route index element={<DiscoverPage />} />
-            <Route path="scans"              element={<Scans />} />
-            <Route path="scans/:scanId"      element={<ScanDetail />} />
-            <Route path="scans/:scanId/diff" element={<ScanDiff />} />
-            <Route path="findings"           element={<Findings />} />
-            <Route path="assets"             element={<Assets />} />
-            <Route path="assets/:assetId"    element={<AssetDetail />} />
-            <Route path="technologies"       element={<Technologies />} />
-            <Route path="posture"            element={<PostureTrends />} />
-            <Route path="ai-scan"            element={<AIAssistedScan />} />
-            <Route path="cve-pivot"          element={<CVEPivot />} />
+            <Route path="scans"        element={<Scans />} />
+            <Route path="findings"     element={<Findings />} />
+            <Route path="assets"       element={<Assets />} />
+            <Route path="technologies" element={<Technologies />} />
+            <Route path="posture"      element={<PostureTrends />} />
+            <Route path="ai-scan"      element={<AIAssistedScan />} />
+            <Route path="cve-pivot"    element={<CVEPivot />} />
           </Route>
 
           {/* ── ANALYSE ──────────────────────────────────────────────────── */}
           <Route path="/analyse" element={<ProductLayout product={ANALYSE_PRODUCT} />}>
             <Route index element={<AnalysePage />} />
-            <Route path="risks"                  element={<Risks />} />
-            <Route path="risk-overview"          element={<RiskOverviewPage />} />
-            <Route path="ai-analysis"            element={<RiskAIAnalysis />} />
-            <Route path="attack-paths"           element={<AttackPaths />} />
-            <Route path="threat-models"          element={<ThreatModels />} />
-            <Route path="threat-models/:modelId" element={<ThreatModelDetail />} />
-            <Route path="nl-query"               element={<NLQuery />} />
-            <Route path="compliance-heatmap"     element={<ComplianceHeatmap />} />
-            <Route path="comparison"             element={<ClientComparison />} />
+            <Route path="risks"              element={<Risks />} />
+            <Route path="risk-overview"      element={<RiskOverviewPage />} />
+            <Route path="ai-analysis"        element={<RiskAIAnalysis />} />
+            <Route path="attack-paths"       element={<AttackPaths />} />
+            <Route path="threat-models"      element={<ThreatModels />} />
+            <Route path="nl-query"           element={<NLQuery />} />
+            <Route path="compliance-heatmap" element={<ComplianceHeatmap />} />
+            <Route path="comparison"         element={<ClientComparison />} />
           </Route>
 
           {/* ── RESPOND ──────────────────────────────────────────────────── */}
           <Route path="/respond" element={<ProductLayout product={RESPOND_PRODUCT} />}>
             <Route index element={<RespondPage />} />
-            <Route path="threats"                element={<ThreatRegister />} />
-            <Route path="gaps"                   element={<ControlDeficiencies />} />
-            <Route path="remediation"            element={<RemediationTracker />} />
-            <Route path="remediation-jobs"       element={<RemediationJobs />} />
-            <Route path="ctem"                   element={<CTEMPage />} />
-            <Route path="vapt-reports"           element={<VAPTReports />} />
-            <Route path="vapt-reports/:reportId" element={<VAPTReportDetail />} />
-            <Route path="security-docs"          element={<SecurityDocs />} />
+            <Route path="threats"          element={<ThreatRegister />} />
+            <Route path="gaps"             element={<ControlDeficiencies />} />
+            <Route path="remediation"      element={<RemediationTracker />} />
+            <Route path="remediation-jobs" element={<RemediationJobs />} />
+            <Route path="ctem"             element={<CTEMPage />} />
+            <Route path="vapt-reports"     element={<VAPTReports />} />
+            <Route path="security-docs"    element={<SecurityDocs />} />
           </Route>
 
           {/* ── REPORT ───────────────────────────────────────────────────── */}
           <Route path="/report" element={<ProductLayout product={REPORT_PRODUCT} />}>
-            <Route index                          element={<ReportPage />} />
-            <Route path="vapt-reports"            element={<VAPTReports />} />
-            <Route path="vapt-reports/:reportId"  element={<VAPTReportDetail />} />
-            <Route path="gaps"                    element={<ControlDeficiencies />} />
-            <Route path="frameworks"              element={<Frameworks />} />
-            <Route path="custom-frameworks"       element={<CustomFrameworks />} />
-            <Route path="evidence"                element={<EvidencePackage />} />
-            <Route path="reports"                 element={<Reports />} />
+            <Route index                    element={<ReportPage />} />
+            <Route path="vapt-reports"      element={<VAPTReports />} />
+            <Route path="gaps"              element={<ControlDeficiencies />} />
+            <Route path="frameworks"        element={<Frameworks />} />
+            <Route path="custom-frameworks" element={<CustomFrameworks />} />
+            <Route path="evidence"          element={<EvidencePackage />} />
+            <Route path="reports"           element={<Reports />} />
+          </Route>
+
+          {/* ── DETAIL PAGES (full chrome, no product sidebar) ───────────── */}
+          <Route element={<DetailLayout />}>
+            <Route path="/discover/scans/:scanId"          element={<ScanDetail />} />
+            <Route path="/discover/scans/:scanId/diff"     element={<ScanDiff />} />
+            <Route path="/discover/assets/:assetId"        element={<AssetDetail />} />
+            <Route path="/analyse/threat-models/:modelId"  element={<ThreatModelDetail />} />
+            <Route path="/respond/vapt-reports/:reportId"  element={<VAPTReportDetail />} />
+            <Route path="/report/vapt-reports/:reportId"   element={<VAPTReportDetail />} />
           </Route>
 
           {/* ── AUTOMATE ─────────────────────────────────────────────────── */}
