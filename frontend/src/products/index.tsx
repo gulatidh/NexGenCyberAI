@@ -95,6 +95,7 @@ export const PLATFORM: ProductDef = {
   bgColor: "#ECEFF1",
   basePath: "/platform",
   nav: [
+    { label: "Overview",             icon: <GridView />,    path: "" },
     { label: "Accounts",             icon: <People />,      path: "/clients" },
     { label: "Assets",               icon: <Storage />,     path: "/assets" },
     { label: "Technology Inventory", icon: <Devices />,     path: "/assets/technologies" },

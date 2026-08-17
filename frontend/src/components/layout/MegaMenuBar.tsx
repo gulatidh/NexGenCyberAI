@@ -167,7 +167,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "report", label: "Report", color: "#15803d", overviewPath: "/respond/vapt-reports",
+    id: "report", label: "Report", color: "#15803d", overviewPath: "/respond",
     columns: [
       {
         heading: "Pen Testing",
