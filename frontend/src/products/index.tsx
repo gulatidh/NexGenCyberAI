@@ -9,7 +9,7 @@ import {
   Hub, Search, MenuBook, AccountTree, DeviceHub,
   People, Storage, Cable, SyncAlt, Tune, Settings as SettingsIcon,
   Devices, HelpOutlined, AutoFixHigh, AltRoute, Psychology,
-  GridView,
+  GridView, FolderZip, LibraryAdd, VerifiedUser,
 } from "@mui/icons-material";
 import { ProductDef } from "../components/layout/ProductLayout";
 
@@ -87,6 +87,24 @@ export const AUTOMATE_PRODUCT: ProductDef = {
   ],
 };
 
+export const REPORT_PRODUCT: ProductDef = {
+  name: "Report",
+  abbrev: "RP",
+  icon: <Description />,
+  color: "#15803d",
+  bgColor: "#F0FDF4",
+  basePath: "/report",
+  nav: [
+    { label: "Overview",           icon: <GridView />,        path: "" },
+    { label: "VAPT Reports",       icon: <Description />,     path: "/vapt-reports" },
+    { label: "Control Gaps",       icon: <GppBad />,          path: "/gaps" },
+    { label: "Frameworks",         icon: <Policy />,          path: "/frameworks" },
+    { label: "Custom Standards",   icon: <LibraryAdd />,      path: "/custom-frameworks" },
+    { label: "Evidence Package",   icon: <FolderZip />,       path: "/evidence" },
+    { label: "Reports",            icon: <Assessment />,      path: "/reports" },
+  ],
+};
+
 export const PLATFORM: ProductDef = {
   name: "Setup",
   abbrev: "ST",
@@ -108,6 +126,7 @@ export const PLATFORM: ProductDef = {
 
 export const ALL_PRODUCTS = [
   PLATFORM,
+  REPORT_PRODUCT,
   DISCOVER_PRODUCT,
   ANALYSE_PRODUCT,
   RESPOND_PRODUCT,

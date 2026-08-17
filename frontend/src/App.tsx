@@ -41,7 +41,7 @@ import ProductLayout from "./components/layout/ProductLayout";
 import Hub from "./pages/Hub";
 import LandingV2 from "./pages/LandingV2";
 import {
-  DISCOVER_PRODUCT, ANALYSE_PRODUCT, RESPOND_PRODUCT, AUTOMATE_PRODUCT, PLATFORM,
+  DISCOVER_PRODUCT, ANALYSE_PRODUCT, RESPOND_PRODUCT, AUTOMATE_PRODUCT, REPORT_PRODUCT, PLATFORM,
 } from "./products";
 
 // ── Lazy page imports ─────────────────────────────────────────────────────────
@@ -95,6 +95,7 @@ const EvidencePackage     = React.lazy(() => import("./pages/EvidencePackage"));
 const AIGuardrails        = React.lazy(() => import("./pages/AIGuardrails"));
 const RemediationJobs     = React.lazy(() => import("./pages/RemediationJobs"));
 const AgentRunTrash       = React.lazy(() => import("./pages/AgentRunTrash"));
+const ReportPage          = React.lazy(() => import("./pages/ReportPage"));
 const SetupPage           = React.lazy(() => import("./pages/SetupPage"));
 const DiscoverPage        = React.lazy(() => import("./pages/DiscoverPage"));
 const AnalysePage         = React.lazy(() => import("./pages/AnalysePage"));
@@ -227,6 +228,18 @@ function ProtectedApp() {
             <Route path="vapt-reports"           element={<VAPTReports />} />
             <Route path="vapt-reports/:reportId" element={<VAPTReportDetail />} />
             <Route path="security-docs"          element={<SecurityDocs />} />
+          </Route>
+
+          {/* ── REPORT ───────────────────────────────────────────────────── */}
+          <Route path="/report" element={<ProductLayout product={REPORT_PRODUCT} />}>
+            <Route index                          element={<ReportPage />} />
+            <Route path="vapt-reports"            element={<VAPTReports />} />
+            <Route path="vapt-reports/:reportId"  element={<VAPTReportDetail />} />
+            <Route path="gaps"                    element={<ControlDeficiencies />} />
+            <Route path="frameworks"              element={<Frameworks />} />
+            <Route path="custom-frameworks"       element={<CustomFrameworks />} />
+            <Route path="evidence"                element={<EvidencePackage />} />
+            <Route path="reports"                 element={<Reports />} />
           </Route>
 
           {/* ── AUTOMATE ─────────────────────────────────────────────────── */}

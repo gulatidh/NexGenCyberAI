@@ -95,7 +95,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "05", id: "report", label: "Report", color: "#15803d", path: "/respond",
+    num: "05", id: "report", label: "Report", color: "#15803d", path: "/report",
     title: "Prove it happened",
     sub: "Close the loop with evidence the auditor — or the client — can actually use.",
     info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs of findings, control deficiencies, remediation actions, and agent logs.",

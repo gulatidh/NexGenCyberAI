@@ -42,6 +42,7 @@ function getActivePhase(pathname: string): string | null {
   if (pathname.startsWith("/intelligence/reports"))         return "analyse";
   if (pathname.startsWith("/compliance/deficiencies"))      return "respond";
   if (pathname.startsWith("/governance"))                   return "respond";
+  if (pathname.startsWith("/report"))                       return "report";
   if (pathname.startsWith("/vapt"))                         return "report";
   if (pathname.startsWith("/compliance"))                   return "report";
   if (pathname.startsWith("/ai-advisor"))                   return "automate";
@@ -167,7 +168,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "report", label: "Report", color: "#15803d", overviewPath: "/respond",
+    id: "report", label: "Report", color: "#15803d", overviewPath: "/report",
     columns: [
       {
         heading: "Pen Testing",
