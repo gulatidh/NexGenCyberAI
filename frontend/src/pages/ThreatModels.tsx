@@ -66,7 +66,11 @@ export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const tmBase = location.pathname.startsWith("/threat-intel") ? "/threat-intel/threat-models" : "/threat-models";
+  const tmBase = location.pathname.startsWith("/threat-intel")
+    ? "/threat-intel/threat-models"
+    : location.pathname.startsWith("/analyse")
+    ? "/analyse/threat-models"
+    : "/threat-models";
   const { canAct } = useViewMode();
   const { clientId: selectedClientId } = useActiveClient();
   const [openCreate, setOpenCreate] = useState(false);

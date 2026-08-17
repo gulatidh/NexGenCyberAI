@@ -1,5 +1,5 @@
 import React, { Suspense, Component, ErrorInfo, ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeModeProvider } from "./theme/ThemeModeContext";
 import { ViewModeProvider } from "./theme/ViewModeContext";
@@ -33,6 +33,12 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
     }
     return this.props.children;
   }
+}
+
+// Redirect that preserves the :id param for old deep-links
+function RedirectWithId({ to }: { to: string }) {
+  const { id } = useParams();
+  return <Navigate to={id ? `${to}/${id}` : to} replace />;
 }
 
 // ── Static imports ────────────────────────────────────────────────────────────
@@ -311,7 +317,7 @@ function ProtectedApp() {
           <Route path="/risk-overview"          element={<Navigate to="/analyse/risk-overview" replace />} />
           <Route path="/attack-paths"           element={<Navigate to="/analyse/attack-paths" replace />} />
           <Route path="/threat-models"          element={<Navigate to="/analyse/threat-models" replace />} />
-          <Route path="/threat-models/:id"      element={<Navigate to="/analyse/threat-models" replace />} />
+          <Route path="/threat-models/:id"      element={<RedirectWithId to="/analyse/threat-models" />} />
           <Route path="/nl-query"               element={<Navigate to="/analyse/nl-query" replace />} />
           <Route path="/compliance-heatmap"     element={<Navigate to="/analyse/compliance-heatmap" replace />} />
           <Route path="/client-comparison"      element={<Navigate to="/analyse/comparison" replace />} />
