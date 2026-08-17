@@ -1,4 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
+import {
+  BugReport, FindInPage, SmartToy, TrendingUp, Storage, Devices, Radar,
+} from "@mui/icons-material";
 
 export const DISCOVER_SECTION: SectionDef = {
   num: "02", label: "Discover", color: "#0f766e",
@@ -13,14 +16,14 @@ export const DISCOVER_SECTION: SectionDef = {
   ],
   cards: [
     // Scanning
-    { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
-    { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },
-    { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
-    { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",              route: "/discover/posture",      group: "Scanning" },
+    { name: "Assessments",          icon: <BugReport />,   desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
+    { name: "Findings",             icon: <FindInPage />,  desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },
+    { name: "AI Assisted Scan",     icon: <SmartToy />,    desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
+    { name: "Posture Trends",       icon: <TrendingUp />,  desc: "Time-series charts of open findings and audit readiness score.",              route: "/discover/posture",      group: "Scanning" },
     // Assets & CVE
-    { name: "Asset Inventory",      desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
-    { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
-    { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
+    { name: "Asset Inventory",      icon: <Storage />,     desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
+    { name: "Technology Inventory", icon: <Devices />,     desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
+    { name: "CVE Blast Radius",     icon: <Radar />,       desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
   ],
 };
 

@@ -1,4 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
+import {
+  Radar, GppBad, AccountTree, PlaylistAddCheck, AutoFixHigh, Description, MenuBook,
+} from "@mui/icons-material";
 
 export const RESPOND_SECTION: SectionDef = {
   num: "04", label: "Respond", color: "#b91c1c",
@@ -13,14 +16,14 @@ export const RESPOND_SECTION: SectionDef = {
   ],
   cards: [
     // Threat Intelligence
-    { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",         route: "/respond/threats",          group: "Threat Intelligence" },
-    { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",     route: "/respond/gaps",             group: "Threat Intelligence" },
-    { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                route: "/respond/ctem",             group: "Threat Intelligence" },
+    { name: "Threat Register",      icon: <Radar />,            desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",        route: "/respond/threats",          group: "Threat Intelligence" },
+    { name: "Control Deficiencies", icon: <GppBad />,           desc: "Framework control gaps identified by the compliance monitor agent.",    route: "/respond/gaps",             group: "Threat Intelligence" },
+    { name: "CTEM Programs",        icon: <AccountTree />,      desc: "5-phase continuous threat exposure management programs.",               route: "/respond/ctem",             group: "Threat Intelligence" },
     // Remediation
-    { name: "Remediation",          desc: "Priority-banded remediation actions tracked to completion.",            route: "/respond/remediation",      group: "Remediation" },
-    { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",     route: "/respond/remediation-jobs", group: "Remediation" },
-    { name: "VAPT Reports",         desc: "Engagement reports with retest versioning and PDF/DOCX export.",        route: "/respond/vapt-reports",     group: "Remediation" },
-    { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",              route: "/respond/security-docs",    group: "Remediation" },
+    { name: "Remediation",          icon: <PlaylistAddCheck />, desc: "Priority-banded remediation actions tracked to completion.",           route: "/respond/remediation",      group: "Remediation" },
+    { name: "AI Remediations",      icon: <AutoFixHigh />,      desc: "AI-generated remediation plans dispatched as automated workflows.",    route: "/respond/remediation-jobs", group: "Remediation" },
+    { name: "VAPT Reports",         icon: <Description />,      desc: "Engagement reports with retest versioning and PDF/DOCX export.",       route: "/respond/vapt-reports",     group: "Remediation" },
+    { name: "Security Docs",        icon: <MenuBook />,         desc: "Upload security policies and query them with AI via RAG.",             route: "/respond/security-docs",    group: "Remediation" },
   ],
 };
 

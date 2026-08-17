@@ -3,6 +3,7 @@
  * Matches Hub.tsx visual language exactly: circle node, Space Grotesk heading,
  * info callout, HubCard grid.  Used by Discover, Analyse, Respond, Automate pages.
  */
+import React from "react";
 import { alpha, Box, Divider, Typography, useTheme } from "@mui/material";
 import { InfoOutlined, ArrowBack, HelpOutlined } from "@mui/icons-material";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
@@ -11,7 +12,7 @@ import { dashboardApi } from "../services/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface CardDef { name: string; desc: string; route: string; group?: string; }
+export interface CardDef { name: string; desc: string; route: string; group?: string; icon?: React.ReactNode; }
 
 export interface SectionDef {
   num: string;

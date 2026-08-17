@@ -1,4 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
+import {
+  SmartToy, Hub, BugReport, MenuBook, Assessment, Search, Shield, Webhook, VpnKey,
+} from "@mui/icons-material";
 
 export const AUTOMATE_SECTION: SectionDef = {
   num: "06", label: "Automate", color: "#4338ca",
@@ -13,16 +16,16 @@ export const AUTOMATE_SECTION: SectionDef = {
   ],
   cards: [
     // AI Agents
-    { name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",        group: "AI Agents" },
-    { name: "AI Workflows",     desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows",     group: "AI Agents" },
-    { name: "AI Assisted Scan", desc: "Conversational guided assessment — describe the environment, AI configures.",route: "/automate/ai-scan",       group: "AI Agents" },
+    { name: "AI Buddies",       icon: <SmartToy />,    desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",        group: "AI Agents" },
+    { name: "AI Workflows",     icon: <Hub />,         desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows",     group: "AI Agents" },
+    { name: "AI Assisted Scan", icon: <BugReport />,   desc: "Conversational guided assessment — describe the environment, AI configures.",route: "/automate/ai-scan",       group: "AI Agents" },
     // Knowledge
-    { name: "Knowledge Base",   desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge",     group: "Knowledge" },
-    { name: "Reports",          desc: "AI-generated security posture and trend reports.",                           route: "/automate/reports",       group: "Knowledge" },
-    { name: "Ask Your Data",    desc: "SQL-backed natural language queries over all your data.",                    route: "/automate/nl-query",      group: "Knowledge" },
-    { name: "AI Guardrails",    desc: "AI safety controls, prompt audit logs, and guardrail coverage.",             route: "/automate/ai-guardrails", group: "Knowledge" },
-    { name: "Webhooks",         desc: "Event-driven alerts on critical findings and completed scans.",              route: "/automate/webhooks",      group: "Knowledge" },
-    { name: "API Keys",         desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/automate/api-keys",      group: "Knowledge" },
+    { name: "Knowledge Base",   icon: <MenuBook />,    desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge",     group: "Knowledge" },
+    { name: "Reports",          icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                           route: "/automate/reports",       group: "Knowledge" },
+    { name: "Ask Your Data",    icon: <Search />,      desc: "SQL-backed natural language queries over all your data.",                    route: "/automate/nl-query",      group: "Knowledge" },
+    { name: "AI Guardrails",    icon: <Shield />,      desc: "AI safety controls, prompt audit logs, and guardrail coverage.",             route: "/automate/ai-guardrails", group: "Knowledge" },
+    { name: "Webhooks",         icon: <Webhook />,     desc: "Event-driven alerts on critical findings and completed scans.",              route: "/automate/webhooks",      group: "Knowledge" },
+    { name: "API Keys",         icon: <VpnKey />,      desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/automate/api-keys",      group: "Knowledge" },
   ],
 };
 
