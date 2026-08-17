@@ -664,7 +664,7 @@ export default function Connections() {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>
-            Connections
+            Connectors
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             All integrations in one place — cloud platforms, enterprise scanners, and AI providers

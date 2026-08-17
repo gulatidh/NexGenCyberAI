@@ -50,7 +50,7 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 type NavItem = { label: string; icon: React.ReactNode; path: string; adminOnly?: boolean; children?: NavItem[] };
-type NavGroup = { section?: string; items: NavItem[] };
+type NavGroup = { section?: string; path?: string; items: NavItem[] };
 
 // Grouped navigation. Sections collapse into a small icon-rail when the
 // sidebar is collapsed; when expanded the section label sits above each
@@ -60,15 +60,15 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Overview",
     items: [
       { label: "Dashboard", icon: <Dashboard />, path: "/dashboard" },
-      { label: "Reports",   icon: <BarChart />,  path: "/reports" },
+      { label: "Reports",   icon: <BarChart />,  path: "/automate/agents" },
     ],
   },
   {
     section: "Foundation",
     items: [
       { label: "Accounts",    icon: <People />,  path: "/clients" },
-      { label: "Connections", icon: <Cable />,   path: "/connections", children: [
-        { label: "All Connections", icon: <Cable />,   path: "/connections" },
+      { label: "Connectors", icon: <Cable />,   path: "/connections", children: [
+        { label: "All Connectors", icon: <Cable />,   path: "/connections" },
         { label: "Ticket Sync",     icon: <SyncAlt />, path: "/ticket-sync" },
       ] },
       { label: "Assets", icon: <Storage />, path: "/assets", children: [
@@ -82,6 +82,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     section: "Discover",
+    path: "/discover",
     items: [
       { label: "Overview",     icon: <BugReport />,  path: "/discover" },
       { label: "Assessments",  icon: <BugReport />,  path: "/discover/scans" },
@@ -95,19 +96,21 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     section: "Analyse",
+    path: "/analyse",
     items: [
-      { label: "Overview",          icon: <Insights />,   path: "/analyse" },
-      { label: "Risk Register",     icon: <Assessment />, path: "/analyse/risks" },
-      { label: "Risk Overview",     icon: <Insights />,   path: "/analyse/risk-overview" },
-      { label: "Attack Paths",      icon: <AccountTree />, path: "/analyse/attack-paths" },
-      { label: "Threat Models",     icon: <Hub />,        path: "/analyse/threat-models" },
-      { label: "Compliance",        icon: <GridView />,   path: "/analyse/compliance-heatmap" },
-      { label: "Ask Your Data",     icon: <Psychology />, path: "/analyse/nl-query" },
-      { label: "Comparison",        icon: <CompareArrows />, path: "/analyse/comparison" },
+      { label: "Overview",                icon: <Insights />,      path: "/analyse" },
+      { label: "Risk Register",           icon: <Assessment />,    path: "/analyse/risks" },
+      { label: "Risk Overview",           icon: <Insights />,      path: "/analyse/risk-overview" },
+      { label: "Attack Paths",            icon: <AccountTree />,   path: "/analyse/attack-paths" },
+      { label: "AI Threat Intelligence",  icon: <Hub />,           path: "/analyse/threat-models" },
+      { label: "Compliance Heatmap",      icon: <GridView />,      path: "/analyse/compliance-heatmap" },
+      { label: "Ask Your Data",           icon: <Psychology />,    path: "/automate/agents" },
+      { label: "Project Comparison",      icon: <CompareArrows />, path: "/analyse/comparison" },
     ],
   },
   {
     section: "Respond",
+    path: "/respond",
     items: [
       { label: "Overview",       icon: <Radar />,           path: "/respond" },
       { label: "Threat Intel",   icon: <Radar />,           path: "/respond/threats" },
@@ -120,12 +123,13 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     section: "Automate",
+    path: "/automate",
     items: [
       { label: "Overview",      icon: <SmartToy />,    path: "/automate" },
       { label: "AI Buddies",    icon: <SmartToy />,    path: "/automate/agents" },
       { label: "AI Workflows",  icon: <Schedule />,    path: "/automate/workflows" },
       { label: "Knowledge",     icon: <AutoStories />, path: "/automate/knowledge" },
-      { label: "Reports",       icon: <BarChart />,    path: "/automate/reports" },
+      { label: "Reports",       icon: <BarChart />,    path: "/automate/agents" },
       { label: "Help",          icon: <MenuBook />,    path: "/help" },
     ],
   },
@@ -141,7 +145,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Threat & Risk",
     items: [
       { label: "Risk Overview",       icon: <Insights />,   path: "/risk-overview" },
-      { label: "Threat Models",       icon: <Hub />,        path: "/threat-models" },
+      { label: "AI Threat Intelligence", icon: <Hub />,      path: "/threat-models" },
       { label: "Threat Intelligence", icon: <Radar />,      path: "/threat-register" },
       { label: "Risk Register",       icon: <Assessment />, path: "/risks" },
     ],
@@ -169,7 +173,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "AI Assisted Scan",   icon: <SmartToy />,    path: "/ai-assisted-scan" },
       { label: "Attack Paths",       icon: <AccountTree />, path: "/attack-paths" },
       { label: "CVE Blast Radius",   icon: <BugReport />,   path: "/cve-pivot" },
-      { label: "Ask Your Data",      icon: <Psychology />,  path: "/nl-query" },
+      { label: "Ask Your Data",      icon: <Psychology />,  path: "/automate/agents" },
       { label: "Security Docs",      icon: <Description />, path: "/security-docs" },
       { label: "Compliance Heatmap", icon: <GridView />,    path: "/compliance-heatmap" },
     ],
@@ -178,7 +182,7 @@ const NAV_GROUPS: NavGroup[] = [
     section: "Governance",
     items: [
       { label: "Posture Trends",    icon: <TrendingUp />,    path: "/posture-trends" },
-      { label: "Account Comparison", icon: <CompareArrows />, path: "/client-comparison" },
+      { label: "Project Comparison", icon: <CompareArrows />, path: "/client-comparison" },
     ],
   },
   {
@@ -444,10 +448,13 @@ export default function AppLayout() {
               {group.section && expanded && (
                 <Typography
                   variant="caption"
+                  onClick={group.path ? () => navigate(group.path!) : undefined}
                   sx={{
                     display: "block", color: "text.secondary", fontSize: 10,
                     fontWeight: 700, letterSpacing: 1, mt: gi === 0 ? 1 : 1.5, mb: 0.5, mx: 2.5,
                     textTransform: "uppercase",
+                    cursor: group.path ? "pointer" : "default",
+                    "&:hover": group.path ? { color: "primary.main" } : {},
                   }}
                 >
                   {group.section}

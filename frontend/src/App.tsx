@@ -260,6 +260,8 @@ function ProtectedApp() {
           <Route path="/sample4" element={<SampleHub4 />} />
 
           {/* ── Redirects from old v2 product routes ─────────────────────── */}
+          <Route path="/setup"           element={<Navigate to="/platform" replace />} />
+          <Route path="/setup/*"         element={<Navigate to="/platform" replace />} />
           <Route path="/vulnerability"   element={<Navigate to="/discover/scans" replace />} />
           <Route path="/vulnerability/*" element={<Navigate to="/discover/scans" replace />} />
           <Route path="/risk"            element={<Navigate to="/analyse/risks" replace />} />

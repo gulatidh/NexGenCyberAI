@@ -45,8 +45,8 @@ export const ANALYSE_PRODUCT: ProductDef = {
     { label: "Risk Overview", icon: <Assessment />, path: "/risk-overview" },
     { label: "AI Risk",       icon: <SmartToy />,   path: "/ai-analysis" },
     { label: "Attack Paths",  icon: <AltRoute />,   path: "/attack-paths" },
-    { label: "Threat Models", icon: <DeviceHub />,  path: "/threat-models" },
-    { label: "Compliance",    icon: <Policy />,     path: "/compliance-heatmap" },
+    { label: "AI Threat Intelligence", icon: <DeviceHub />,  path: "/threat-models" },
+    { label: "Compliance Heatmap",    icon: <Policy />,     path: "/compliance-heatmap" },
     { label: "Ask Your Data", icon: <Search />,     path: "/nl-query" },
   ],
 };
@@ -95,10 +95,10 @@ export const PLATFORM: ProductDef = {
   bgColor: "#ECEFF1",
   basePath: "/platform",
   nav: [
-    { label: "Clients",              icon: <People />,      path: "/clients" },
+    { label: "Accounts",             icon: <People />,      path: "/clients" },
     { label: "Assets",               icon: <Storage />,     path: "/assets" },
     { label: "Technology Inventory", icon: <Devices />,     path: "/assets/technologies" },
-    { label: "Connections",          icon: <Cable />,       path: "/connections" },
+    { label: "Connectors",           icon: <Cable />,       path: "/connections" },
     { label: "Ticket Sync",          icon: <SyncAlt />,     path: "/ticket-sync" },
     { label: "Settings",             icon: <SettingsIcon />,path: "/settings" },
     { label: "Help",                 icon: <HelpOutlined />,path: "/help" },

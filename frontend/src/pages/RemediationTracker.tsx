@@ -361,7 +361,7 @@ export default function RemediationTracker() {
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Remediation Tracker</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>Remediation</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Priority-banded action items from the Remediation agent — track to closure
           </Typography>

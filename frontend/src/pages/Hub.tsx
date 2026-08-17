@@ -23,7 +23,7 @@ interface CardDef {
 }
 
 interface StageDef {
-  num: string; id: string; label: string; color: string;
+  num: string; id: string; label: string; color: string; path: string;
   title: string; sub: string; info: string;
   cards: CardDef[];
 }
@@ -32,12 +32,12 @@ interface StageDef {
 
 const STAGE_DEFS: StageDef[] = [
   {
-    num: "01", id: "setup", label: "Setup", color: "#2563eb",
+    num: "01", id: "setup", label: "Setup", color: "#2563eb", path: "/platform",
     title: "Stand up the environment",
     sub: "Configure accounts, connectors, and AI providers before any scanning begins.",
     info: "Complete this stage first — every downstream scan depends on at least one connected account and a configured AI provider.",
     cards: [
-      { name: "Accounts",         desc: "Client profiles, contact details, and security posture scoping.",          route: "/platform/clients",              group: "Environment" },
+      { name: "Accounts",         desc: "Account profiles, contact details, and security posture scoping.",          route: "/platform/clients",              group: "Environment" },
       { name: "Asset Inventory",  desc: "Discovered assets — servers, apps, containers, and cloud resources.",       route: "/platform/assets",               group: "Environment" },
       { name: "Connections",      desc: "Scanner integrations, enterprise tools, and SIEM connectors.",              route: "/connections",                   group: "Environment" },
       { name: "AI Settings",      desc: "AI provider credentials, model selection, and automatic failover config.",  route: "/ai-settings",                   group: "Environment" },
@@ -49,7 +49,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "02", id: "discover", label: "Discover", color: "#0f766e",
+    num: "02", id: "discover", label: "Discover", color: "#0f766e", path: "/discover",
     title: "Find what's actually exposed",
     sub: "Scan the environment via inbuilt scanners, enterprise integrations, or an AI-guided conversation.",
     info: "CVE enrichment and severity scoring run automatically after each scan. Import results from external scanners via the Import tab in Assessments.",
@@ -63,7 +63,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "03", id: "analyse", label: "Analyse", color: "#b45309",
+    num: "03", id: "analyse", label: "Analyse", color: "#b45309", path: "/analyse",
     title: "Turn findings into insight",
     sub: "Score findings, apply FAIR-lite ALE modelling, and query your entire posture in plain language.",
     info: "Risk domains are automatically normalised. Attack paths are derived from finding combinations — no manual correlation needed.",
@@ -79,7 +79,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "04", id: "respond", label: "Respond", color: "#b91c1c",
+    num: "04", id: "respond", label: "Respond", color: "#b91c1c", path: "/respond",
     title: "Act on the picture",
     sub: "Map risk to real adversary behaviour, then track remediation through structured CTEM programs.",
     info: "Threat entries are mapped to MITRE ATT&CK automatically. CTEM programs progress through 5 phases: Scope → Discover → Prioritise → Validate → Mobilise.",
@@ -95,7 +95,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "05", id: "report", label: "Report", color: "#15803d",
+    num: "05", id: "report", label: "Report", color: "#15803d", path: "/respond",
     title: "Prove it happened",
     sub: "Close the loop with evidence the auditor — or the client — can actually use.",
     info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs of findings, control deficiencies, remediation actions, and agent logs.",
@@ -109,7 +109,7 @@ const STAGE_DEFS: StageDef[] = [
     ],
   },
   {
-    num: "06", id: "automate", label: "Automate", color: "#4338ca",
+    num: "06", id: "automate", label: "Automate", color: "#4338ca", path: "/automate",
     title: "Let AI carry the load",
     sub: "Agents run the full analysis loop — risk, intel, remediation, compliance — on demand or on repeat.",
     info: "AI Buddies output structured data directly into the Risk, Threat, Compliance, and Remediation registers. The Orchestrator runs all four in sequence from one trigger.",
@@ -163,6 +163,7 @@ function HubCard({ card, color }: { card: CardDef; color: string }) {
 // ── StageSection ──────────────────────────────────────────────────────────────
 
 function StageSection({ stage, si }: { stage: StageDef; si: number }) {
+  const navigate = useNavigate();
   return (
     <Box
       id={`stage-${stage.id}`}
@@ -194,7 +195,15 @@ function StageSection({ stage, si }: { stage: StageDef; si: number }) {
       <Box sx={{ pt: "4px", mb: 2.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
           <Box sx={{ width: 4, height: 16, borderRadius: 2, bgcolor: stage.color }} />
-          <Typography sx={{ fontSize: "0.71rem", fontWeight: 700, color: stage.color, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          <Typography
+            onClick={() => navigate(stage.path)}
+            sx={{
+              fontSize: "0.71rem", fontWeight: 700, color: stage.color,
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              cursor: "pointer",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
             Stage {stage.num} · {stage.label}
           </Typography>
         </Box>
@@ -265,7 +274,7 @@ interface ONode { entity: string; label: string; cx: number; cy: number; labelX:
 interface OEdge { from: string; to: string; x1: number; y1: number; x2: number; y2: number; dashed?: boolean }
 
 const ONT_NODES: ONode[] = [
-  { entity:"Client",      label:"Client",             cx: 70,  cy:300, labelX: 35,   labelW: 70,  color:"#2563eb" },
+  { entity:"Account",     label:"Account",            cx: 70,  cy:300, labelX: 35,   labelW: 70,  color:"#2563eb" },
   { entity:"Asset",       label:"Asset",              cx:250,  cy:190, labelX:215,   labelW: 70,  color:"#2563eb" },
   { entity:"Control",     label:"Control",            cx:250,  cy:470, labelX:213.5, labelW: 73,  color:"#7c3aed" },
   { entity:"DataFlow",    label:"Data Flow",          cx:440,  cy: 90, labelX:396.5, labelW: 87,  color:"#7c3aed" },
@@ -279,7 +288,7 @@ const ONT_NODES: ONode[] = [
   { entity:"Report",      label:"Report",             cx:1020, cy:300, labelX:985,   labelW: 70,  color:"#15803d" },
 ];
 const ONT_EDGES: OEdge[] = [
-  { from:"Client",      to:"Asset",       x1: 70, y1:300, x2:250,  y2:190 },
+  { from:"Account",     to:"Asset",       x1: 70, y1:300, x2:250,  y2:190 },
   { from:"Asset",       to:"DataFlow",    x1:250, y1:190, x2:440,  y2: 90 },
   { from:"Asset",       to:"Finding",     x1:250, y1:190, x2:440,  y2:280 },
   { from:"Finding",     to:"Risk",        x1:440, y1:280, x2:640,  y2:220 },
