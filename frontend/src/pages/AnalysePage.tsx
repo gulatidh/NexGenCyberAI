@@ -12,14 +12,16 @@ export const ANALYSE_SECTION: SectionDef = {
     { label: "Attack Paths",   field: "total_attack_paths", color: "#d97706" },
   ],
   cards: [
-    { name: "Risk Register",      desc: "FAIR-scored risk register with domain heatmap and financial ALE.",         route: "/analyse/risks" },
-    { name: "Risk Overview",      desc: "Executive summary of ALE exposure, risk domains, and top risks.",          route: "/analyse/risk-overview" },
-    { name: "AI Risk Analysis",   desc: "AI-generated risk narrative with actionable recommendations.",             route: "/analyse/ai-analysis" },
-    { name: "Attack Paths",       desc: "MITRE-phased attack chain graph derived from live findings.",              route: "/analyse/attack-paths" },
-    { name: "Threat Models",      desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models" },
-    { name: "Compliance Heatmap", desc: "Control coverage heatmap across all active frameworks.",                   route: "/analyse/compliance-heatmap" },
-    { name: "Ask Your Data",      desc: "Natural language SQL queries over findings, risks, and assets.",           route: "/analyse/nl-query" },
-    { name: "Account Comparison", desc: "Compare security posture side-by-side across multiple accounts.",          route: "/analyse/comparison" },
+    // Risk
+    { name: "Risk Register",          desc: "FAIR-scored risk register with domain heatmap and financial ALE.",        route: "/analyse/risks",              group: "Risk" },
+    { name: "Risk Overview",          desc: "Executive summary of ALE exposure, risk domains, and top risks.",         route: "/analyse/risk-overview",      group: "Risk" },
+    { name: "AI Risk Analysis",       desc: "AI-generated risk narrative with actionable recommendations.",            route: "/analyse/ai-analysis",        group: "Risk" },
+    { name: "Attack Paths",           desc: "MITRE-phased attack chain graph derived from live findings.",             route: "/analyse/attack-paths",       group: "Risk" },
+    // Intelligence
+    { name: "AI Threat Intelligence", desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",     route: "/analyse/threat-models",      group: "Intelligence" },
+    { name: "Compliance Heatmap",     desc: "Control coverage heatmap across all active frameworks.",                  route: "/analyse/compliance-heatmap", group: "Intelligence" },
+    { name: "Ask Your Data",          desc: "Natural language SQL queries over findings, risks, and assets.",          route: "/analyse/nl-query",           group: "Intelligence" },
+    { name: "Comparison",             desc: "Compare security posture side-by-side across multiple accounts.",         route: "/analyse/comparison",         group: "Intelligence" },
   ],
 };
 

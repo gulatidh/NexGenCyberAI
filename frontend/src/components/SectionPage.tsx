@@ -11,7 +11,7 @@ import { dashboardApi } from "../services/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface CardDef { name: string; desc: string; route: string; }
+interface CardDef { name: string; desc: string; route: string; group?: string; }
 
 export interface SectionDef {
   num: string;
@@ -156,21 +156,42 @@ export default function SectionPage({ section }: { section: SectionDef }) {
         </Box>
       )}
 
-      {/* ── Feature cards ────────────────────────────────────────────── */}
-      <Typography sx={{
-        fontSize: 10, fontWeight: 700, color: "text.secondary",
-        textTransform: "uppercase", letterSpacing: 1.2, mb: 1.5,
-      }}>
-        Features
-      </Typography>
-      <Box sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
-        gap: 1.5, mb: 5,
-      }}>
-        {section.cards.map(card => (
-          <SectionCard key={card.name} card={card} color={section.color} />
-        ))}
+      {/* ── Feature cards (grouped) ───────────────────────────────────── */}
+      <Box sx={{ mb: 5 }}>
+        {(() => {
+          const groups: Array<{ name: string; cards: CardDef[] }> = [];
+          for (const card of section.cards) {
+            const g = card.group ?? "";
+            if (groups.length === 0 || groups[groups.length - 1].name !== g) {
+              groups.push({ name: g, cards: [] });
+            }
+            groups[groups.length - 1].cards.push(card);
+          }
+          return groups.map((g, gi) => (
+            <Box key={g.name || gi} sx={{ mb: gi < groups.length - 1 ? 3 : 0 }}>
+              {g.name && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.25, mt: gi > 0 ? 0.5 : 0 }}>
+                  <Typography sx={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: "0.12em",
+                    textTransform: "uppercase", color: "text.disabled", whiteSpace: "nowrap",
+                  }}>
+                    {g.name}
+                  </Typography>
+                  <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+                </Box>
+              )}
+              <Box sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
+                gap: 1.5,
+              }}>
+                {g.cards.map(card => (
+                  <SectionCard key={card.name} card={card} color={section.color} />
+                ))}
+              </Box>
+            </Box>
+          ));
+        })()}
       </Box>
 
       {/* ── Help ─────────────────────────────────────────────────────── */}

@@ -12,14 +12,17 @@ export const AUTOMATE_SECTION: SectionDef = {
     { label: "API Keys",       field: "total_api_keys",   color: "#7c3aed" },
   ],
   cards: [
-    { name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.",   route: "/automate/agents" },
-    { name: "AI Workflows",     desc: "Multi-agent workflow missions and automated analysis pipelines.",              route: "/automate/workflows" },
-    { name: "Knowledge Base",   desc: "Platform knowledge base and Aegis reference documentation.",                  route: "/automate/knowledge" },
-    { name: "AI Assisted Scan", desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan" },
-    { name: "Ask Your Data",    desc: "Natural language SQL queries over findings, risks, and assets.",              route: "/analyse/nl-query" },
-    { name: "Reports",          desc: "AI-generated security posture and trend reports.",                             route: "/automate/reports" },
-    { name: "API Keys",         desc: "M2M API keys for CI/CD pipelines and programmatic integrations.",             route: "/platform/settings" },
-    { name: "Help & Docs",      desc: "Documentation, setup guides, and platform support resources.",                route: "/platform/help" },
+    // AI Agents
+    { name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",        group: "AI Agents" },
+    { name: "AI Workflows",     desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows",     group: "AI Agents" },
+    { name: "AI Assisted Scan", desc: "Conversational guided assessment — describe the environment, AI configures.",route: "/automate/ai-scan",       group: "AI Agents" },
+    // Knowledge
+    { name: "Knowledge Base",   desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge",     group: "Knowledge" },
+    { name: "Reports",          desc: "AI-generated security posture and trend reports.",                           route: "/automate/reports",       group: "Knowledge" },
+    { name: "Ask Your Data",    desc: "SQL-backed natural language queries over all your data.",                    route: "/automate/nl-query",      group: "Knowledge" },
+    { name: "AI Guardrails",    desc: "AI safety controls, prompt audit logs, and guardrail coverage.",             route: "/automate/ai-guardrails", group: "Knowledge" },
+    { name: "Webhooks",         desc: "Event-driven alerts on critical findings and completed scans.",              route: "/automate/webhooks",      group: "Knowledge" },
+    { name: "API Keys",         desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/automate/api-keys",      group: "Knowledge" },
   ],
 };
 

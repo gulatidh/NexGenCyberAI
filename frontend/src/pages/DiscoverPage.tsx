@@ -12,14 +12,15 @@ export const DISCOVER_SECTION: SectionDef = {
     { label: "Total Assets",    field: "total_assets",     color: "#0284c7" },
   ],
   cards: [
-    { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",             route: "/discover/scans" },
-    { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",          route: "/discover/findings" },
-    { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.",  route: "/discover/ai-scan" },
-    { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                  route: "/discover/cve-pivot" },
-    { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                  route: "/discover/technologies" },
-    { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",               route: "/discover/posture" },
-    { name: "Asset Inventory",      desc: "Discovered assets — servers, apps, containers, and cloud resources.",          route: "/discover/assets" },
-    { name: "Pentest Scans",        desc: "Pentest scan sessions with structured findings and red-team evidence.",        route: "/respond/vapt-reports" },
+    // Scanning
+    { name: "Assessments",          desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
+    { name: "Findings",             desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },
+    { name: "AI Assisted Scan",     desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
+    { name: "Posture Trends",       desc: "Time-series charts of open findings and audit readiness score.",              route: "/discover/posture",      group: "Scanning" },
+    // Assets & CVE
+    { name: "Asset Inventory",      desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
+    { name: "Technology Inventory", desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
+    { name: "CVE Blast Radius",     desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
   ],
 };
 

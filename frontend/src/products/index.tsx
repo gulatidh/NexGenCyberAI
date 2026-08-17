@@ -1,6 +1,7 @@
 /**
  * Product definitions — top-level sections shown in MegaMenuBar.
- * nav items: no group → rendered at top (Overview); group → rendered under that section header.
+ * nav: no group → Overview (top); group → labelled section in sidebar.
+ * absolute: true → path used as-is, not prefixed with basePath.
  */
 import React from "react";
 import {
@@ -22,16 +23,16 @@ export const DISCOVER_PRODUCT: ProductDef = {
   bgColor: "#ECFDF5",
   basePath: "/discover",
   nav: [
-    { label: "Overview",            icon: <GridView />,   path: "" },
+    { label: "Overview",         icon: <GridView />,   path: "" },
     // Scanning
-    { label: "Assessments",         icon: <BugReport />,  path: "/scans",        group: "Scanning" },
-    { label: "Findings",            icon: <FindInPage />, path: "/findings",     group: "Scanning" },
-    { label: "AI Assisted Scan",    icon: <SmartToy />,   path: "/ai-scan",      group: "Scanning" },
-    { label: "Posture Trends",      icon: <TrendingUp />, path: "/posture",      group: "Scanning" },
+    { label: "Assessments",      icon: <BugReport />,  path: "/scans",        group: "Scanning" },
+    { label: "Findings",         icon: <FindInPage />, path: "/findings",     group: "Scanning" },
+    { label: "AI Assisted Scan", icon: <SmartToy />,   path: "/ai-scan",      group: "Scanning" },
+    { label: "Posture Trends",   icon: <TrendingUp />, path: "/posture",      group: "Scanning" },
     // Assets & CVE
-    { label: "Asset Inventory",     icon: <Storage />,    path: "/assets",       group: "Assets & CVE" },
-    { label: "Technologies",        icon: <Devices />,    path: "/technologies", group: "Assets & CVE" },
-    { label: "CVE Blast Radius",    icon: <Radar />,      path: "/cve-pivot",    group: "Assets & CVE" },
+    { label: "Asset Inventory",  icon: <Storage />,    path: "/assets",       group: "Assets & CVE" },
+    { label: "Technologies",     icon: <Devices />,    path: "/technologies", group: "Assets & CVE" },
+    { label: "CVE Blast Radius", icon: <Radar />,      path: "/cve-pivot",    group: "Assets & CVE" },
   ],
 };
 
@@ -45,15 +46,15 @@ export const ANALYSE_PRODUCT: ProductDef = {
   nav: [
     { label: "Overview",               icon: <GridView />,   path: "" },
     // Risk
-    { label: "Risk Register",          icon: <Security />,   path: "/risks",               group: "Risk" },
-    { label: "Risk Overview",          icon: <Assessment />, path: "/risk-overview",        group: "Risk" },
-    { label: "AI Risk Analysis",       icon: <SmartToy />,   path: "/ai-analysis",          group: "Risk" },
-    { label: "Attack Paths",           icon: <AltRoute />,   path: "/attack-paths",         group: "Risk" },
+    { label: "Risk Register",          icon: <Security />,   path: "/risks",              group: "Risk" },
+    { label: "Risk Overview",          icon: <Assessment />, path: "/risk-overview",      group: "Risk" },
+    { label: "AI Risk Analysis",       icon: <SmartToy />,   path: "/ai-analysis",        group: "Risk" },
+    { label: "Attack Paths",           icon: <AltRoute />,   path: "/attack-paths",       group: "Risk" },
     // Intelligence
-    { label: "AI Threat Intelligence", icon: <DeviceHub />,  path: "/threat-models",        group: "Intelligence" },
-    { label: "Compliance Heatmap",     icon: <Policy />,     path: "/compliance-heatmap",   group: "Intelligence" },
-    { label: "Ask Your Data",          icon: <Search />,     path: "/nl-query",             group: "Intelligence" },
-    { label: "Comparison",             icon: <Assessment />, path: "/comparison",           group: "Intelligence" },
+    { label: "AI Threat Intelligence", icon: <DeviceHub />,  path: "/threat-models",      group: "Intelligence" },
+    { label: "Compliance Heatmap",     icon: <Policy />,     path: "/compliance-heatmap", group: "Intelligence" },
+    { label: "Ask Your Data",          icon: <Search />,     path: "/nl-query",           group: "Intelligence" },
+    { label: "Comparison",             icon: <Assessment />, path: "/comparison",         group: "Intelligence" },
   ],
 };
 
@@ -86,18 +87,18 @@ export const AUTOMATE_PRODUCT: ProductDef = {
   bgColor: "#EEF2FF",
   basePath: "/automate",
   nav: [
-    { label: "Overview",       icon: <GridView />,   path: "" },
+    { label: "Overview",         icon: <GridView />,    path: "" },
     // AI Agents
-    { label: "AI Buddies",     icon: <SmartToy />,   path: "/agents",       group: "AI Agents" },
-    { label: "AI Workflows",   icon: <Hub />,        path: "/workflows",    group: "AI Agents" },
-    { label: "AI Assisted Scan", icon: <BugReport />, path: "/ai-scan",     group: "AI Agents" },
+    { label: "AI Buddies",       icon: <SmartToy />,    path: "/agents",        group: "AI Agents" },
+    { label: "AI Workflows",     icon: <Hub />,         path: "/workflows",     group: "AI Agents" },
+    { label: "AI Assisted Scan", icon: <BugReport />,   path: "/ai-scan",       group: "AI Agents" },
     // Knowledge
-    { label: "Knowledge Base", icon: <MenuBook />,   path: "/knowledge",    group: "Knowledge" },
-    { label: "Reports",        icon: <Assessment />, path: "/reports",      group: "Knowledge" },
-    { label: "Ask Your Data",  icon: <Search />,     path: "/nl-query",     group: "Knowledge" },
-    { label: "AI Guardrails",  icon: <Shield />,     path: "/ai-guardrails",group: "Knowledge" },
-    { label: "Webhooks",       icon: <Webhook />,    path: "/webhooks",     group: "Knowledge" },
-    { label: "API Keys",       icon: <VpnKey />,     path: "/api-keys",     group: "Knowledge" },
+    { label: "Knowledge Base",   icon: <MenuBook />,    path: "/knowledge",     group: "Knowledge" },
+    { label: "Reports",          icon: <Assessment />,  path: "/reports",       group: "Knowledge" },
+    { label: "Ask Your Data",    icon: <Search />,      path: "/nl-query",      group: "Knowledge" },
+    { label: "AI Guardrails",    icon: <Shield />,      path: "/ai-guardrails", group: "Knowledge" },
+    { label: "Webhooks",         icon: <Webhook />,     path: "/webhooks",      group: "Knowledge" },
+    { label: "API Keys",         icon: <VpnKey />,      path: "/api-keys",      group: "Knowledge" },
   ],
 };
 
@@ -109,15 +110,15 @@ export const REPORT_PRODUCT: ProductDef = {
   bgColor: "#F0FDF4",
   basePath: "/report",
   nav: [
-    { label: "Overview",           icon: <GridView />,    path: "" },
+    { label: "Overview",         icon: <GridView />,    path: "" },
     // Pen Testing
-    { label: "VAPT Reports",       icon: <Description />, path: "/vapt-reports",      group: "Pen Testing" },
-    { label: "Evidence Package",   icon: <FolderZip />,   path: "/evidence",          group: "Pen Testing" },
-    { label: "Reports",            icon: <Assessment />,  path: "/reports",           group: "Pen Testing" },
+    { label: "VAPT Reports",     icon: <Description />, path: "/vapt-reports",      group: "Pen Testing" },
+    { label: "Evidence Package", icon: <FolderZip />,   path: "/evidence",          group: "Pen Testing" },
+    { label: "Reports",          icon: <Assessment />,  path: "/reports",           group: "Pen Testing" },
     // Compliance
-    { label: "Frameworks",         icon: <Policy />,      path: "/frameworks",        group: "Compliance" },
-    { label: "Custom Standards",   icon: <LibraryAdd />,  path: "/custom-frameworks", group: "Compliance" },
-    { label: "Control Gaps",       icon: <GppBad />,      path: "/gaps",              group: "Compliance" },
+    { label: "Frameworks",       icon: <Policy />,      path: "/frameworks",        group: "Compliance" },
+    { label: "Custom Standards", icon: <LibraryAdd />,  path: "/custom-frameworks", group: "Compliance" },
+    { label: "Control Gaps",     icon: <GppBad />,      path: "/gaps",              group: "Compliance" },
   ],
 };
 
@@ -131,15 +132,20 @@ export const PLATFORM: ProductDef = {
   nav: [
     { label: "Overview",             icon: <GridView />,     path: "" },
     // Environment
-    { label: "Accounts",             icon: <People />,       path: "/clients",              group: "Environment" },
-    { label: "Asset Inventory",      icon: <Storage />,      path: "/assets",               group: "Environment" },
-    { label: "Technology Inventory", icon: <Devices />,      path: "/assets/technologies",  group: "Environment" },
-    { label: "Connectors",           icon: <Cable />,        path: "/connections",          group: "Environment" },
-    { label: "Ticket Sync",          icon: <SyncAlt />,      path: "/ticket-sync",          group: "Environment" },
+    { label: "Accounts",             icon: <People />,       path: "/clients",             group: "Environment" },
+    { label: "Asset Inventory",      icon: <Storage />,      path: "/assets",              group: "Environment" },
+    { label: "Technology Inventory", icon: <Devices />,      path: "/assets/technologies", group: "Environment" },
+    { label: "Connectors",           icon: <Cable />,        path: "/connections",         group: "Environment" },
+    { label: "Ticket Sync",          icon: <SyncAlt />,      path: "/ticket-sync",         group: "Environment" },
     // Design
-    { label: "AI Settings",          icon: <SmartToy />,     path: "/ai-settings",          group: "Design" },
-    { label: "Settings",             icon: <SettingsIcon />, path: "/settings",             group: "Design" },
-    { label: "Help",                 icon: <HelpOutlined />, path: "/help",                 group: "Design" },
+    { label: "AI Settings",          icon: <SmartToy />,     path: "/ai-settings",                  group: "Design" },
+    { label: "AI Guardrails",        icon: <Shield />,       path: "/automate/ai-guardrails",        group: "Design", absolute: true },
+    { label: "Threat Models",        icon: <DeviceHub />,    path: "/analyse/threat-models",         group: "Design", absolute: true },
+    { label: "Frameworks",           icon: <Policy />,       path: "/report/frameworks",             group: "Design", absolute: true },
+    { label: "Custom Standards",     icon: <LibraryAdd />,   path: "/report/custom-frameworks",      group: "Design", absolute: true },
+    { label: "Data Model",           icon: <AccountTree />,  path: "/data-model",                    group: "Design", absolute: true },
+    { label: "Settings",             icon: <SettingsIcon />, path: "/settings",            group: "Design" },
+    { label: "Help",                 icon: <HelpOutlined />, path: "/help",                group: "Design" },
   ],
 };
 

@@ -11,6 +11,7 @@ export interface ProductNavItem {
   icon: React.ReactNode;
   path: string;
   group?: string;
+  absolute?: boolean;
 }
 
 export interface ProductDef {
@@ -31,11 +32,11 @@ export default function ProductLayout({ product }: Props) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  // product.nav paths are relative to basePath (e.g. "/scans" → "/vulnerability/scans")
-  const fullPath = (rel: string) => product.basePath + rel;
-  const isActive = (rel: string) => {
-    const fp = fullPath(rel);
-    if (rel === "") return pathname === fp; // exact match for overview item
+  const itemFullPath = (item: ProductNavItem) =>
+    item.absolute ? item.path : product.basePath + item.path;
+  const isActive = (item: ProductNavItem) => {
+    const fp = itemFullPath(item);
+    if (item.path === "" && !item.absolute) return pathname === product.basePath;
     return pathname === fp || pathname.startsWith(fp + "/");
   };
 
@@ -92,11 +93,11 @@ export default function ProductLayout({ product }: Props) {
                     new Set(product.nav.filter(i => i.group).map(i => i.group!))
                   );
                   const NavItem = ({ item }: { item: ProductNavItem }) => {
-                    const active = isActive(item.path);
+                    const active = isActive(item);
                     return (
                       <Box
                         key={item.path}
-                        onClick={() => navigate(fullPath(item.path))}
+                        onClick={() => navigate(itemFullPath(item))}
                         sx={{
                           display: "flex", alignItems: "center", gap: 1.25,
                           px: 1.5, py: 0.875, cursor: "pointer",

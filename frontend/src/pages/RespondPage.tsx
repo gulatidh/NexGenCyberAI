@@ -12,14 +12,15 @@ export const RESPOND_SECTION: SectionDef = {
     { label: "Threat Entries",    field: "total_threats",       color: "#7c3aed" },
   ],
   cards: [
-    { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",          route: "/respond/threats" },
-    { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",      route: "/respond/gaps" },
-    { name: "Remediation Tracker",  desc: "Priority-banded remediation actions tracked to completion.",             route: "/respond/remediation" },
-    { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",      route: "/respond/remediation-jobs" },
-    { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                 route: "/respond/ctem" },
-    { name: "VAPT Reports",         desc: "Engagement reports with retest versioning and PDF/DOCX export.",         route: "/respond/vapt-reports" },
-    { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",               route: "/respond/security-docs" },
-    { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, or Linear.",         route: "/platform/connections" },
+    // Threat Intelligence
+    { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",         route: "/respond/threats",          group: "Threat Intelligence" },
+    { name: "Control Deficiencies", desc: "Framework control gaps identified by the compliance monitor agent.",     route: "/respond/gaps",             group: "Threat Intelligence" },
+    { name: "CTEM Programs",        desc: "5-phase continuous threat exposure management programs.",                route: "/respond/ctem",             group: "Threat Intelligence" },
+    // Remediation
+    { name: "Remediation",          desc: "Priority-banded remediation actions tracked to completion.",            route: "/respond/remediation",      group: "Remediation" },
+    { name: "AI Remediations",      desc: "AI-generated remediation plans dispatched as automated workflows.",     route: "/respond/remediation-jobs", group: "Remediation" },
+    { name: "VAPT Reports",         desc: "Engagement reports with retest versioning and PDF/DOCX export.",        route: "/respond/vapt-reports",     group: "Remediation" },
+    { name: "Security Docs",        desc: "Upload security policies and query them with AI via RAG.",              route: "/respond/security-docs",    group: "Remediation" },
   ],
 };
 
