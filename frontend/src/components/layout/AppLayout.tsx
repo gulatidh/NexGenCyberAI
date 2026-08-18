@@ -12,7 +12,7 @@ import {
   SmartToy, Assessment, Logout, AccountCircle,
   BarChart, Menu as MenuIcon, Storage, Insights, Apps,
   Schedule, AutoStories, MenuBook, Hub,
-  ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, Check, History,
+  ChevronLeft, ChevronRight, DarkMode, LightMode, Palette, BlurOn, Check, History,
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, AccountTree, Psychology, Description, AutoFixHigh,
@@ -643,7 +643,7 @@ export default function AppLayout() {
             <NotificationBell />
             <Tooltip title="Theme">
               <IconButton onClick={(e) => setThemeAnchor(e.currentTarget)} sx={{ color: "text.secondary" }}>
-                {mode === "light" ? <LightMode /> : mode === "custom" ? <Palette /> : <DarkMode />}
+                {mode === "light" ? <LightMode /> : mode === "glass" ? <BlurOn /> : mode === "custom" ? <Palette /> : <DarkMode />}
               </IconButton>
             </Tooltip>
             <Menu
@@ -666,6 +666,11 @@ export default function AppLayout() {
                 <Palette fontSize="small" sx={{ mr: 1.25, color: "#9C27B0" }} />
                 Custom…
                 {mode === "custom" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
+              </MenuItem>
+              <MenuItem onClick={() => { setMode("glass"); setThemeAnchor(null); }}>
+                <BlurOn fontSize="small" sx={{ mr: 1.25, color: "#8A6FFF" }} />
+                Liquid Glass
+                {mode === "glass" && <Check fontSize="small" sx={{ ml: "auto", color: "#34A853" }} />}
               </MenuItem>
               {mode === "custom" && (
                 <Box sx={{ px: 2, py: 1, borderTop: "1px solid", borderColor: "divider" }}>

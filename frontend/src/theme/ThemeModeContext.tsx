@@ -34,7 +34,7 @@ export function useThemeMode(): ThemeModeCtx {
 function loadInitialMode(): ThemeMode {
   try {
     const v = window.localStorage.getItem(MODE_KEY);
-    if (v === "dark" || v === "light" || v === "custom") return v;
+    if (v === "dark" || v === "light" || v === "glass" || v === "custom") return v;
   } catch { /* SSR / private mode */ }
   return "light"; // v2 default — light theme
 }
