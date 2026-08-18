@@ -1325,6 +1325,266 @@ def _seed_mas_trm_custom_policy() -> None:
         logger.info("Seeded MAS TRM custom policy with %d controls (reference_ids tagged).", inserted)
 
 
+def _seed_gcc_im8_custom_policy() -> None:
+    """Idempotent: create the 'Singapore GCC IM8' custom policy if it does not yet exist.
+
+    Maps IM8 2023 (GCC) controls to NIST CSF 2.0, ISO 27001:2022, PCI DSS v4.0,
+    and CIS Controls v8 equivalents.  Each tuple is (im8_ref, framework_id, control_id).
+    """
+    from api.models.models import CustomFramework, CustomFrameworkControl, FrameworkControl
+    from sqlalchemy.orm import Session
+
+    CONTROL_MAP: list[tuple[str, str, str]] = [
+        # GOV-1  IT Security Policy
+        ("GOV-1", "nist_csf",  "GV.PO-01"), ("GOV-1", "nist_csf",  "GV.PO-02"),
+        ("GOV-1", "iso_27001", "5.1"),       ("GOV-1", "iso_27001", "5.2"),
+        ("GOV-1", "pci_dss",   "REQ-12-1"),
+        # GOV-2  IT Security Risk Management
+        ("GOV-2", "nist_csf",  "GV.RM-01"), ("GOV-2", "nist_csf",  "GV.RM-02"),
+        ("GOV-2", "nist_csf",  "ID.RA-03"), ("GOV-2", "nist_csf",  "ID.RA-04"),
+        ("GOV-2", "iso_27001", "5.3"),       ("GOV-2", "pci_dss",   "REQ-12-2"),
+        # GOV-3  IT Security Roles and Responsibilities
+        ("GOV-3", "nist_csf",  "GV.RR-01"), ("GOV-3", "nist_csf",  "GV.RR-02"),
+        ("GOV-3", "nist_csf",  "GV.RR-03"), ("GOV-3", "iso_27001", "5.2"),
+        ("GOV-3", "iso_27001", "5.4"),       ("GOV-3", "cis_v8",    "CIS-14.1"),
+        # GOV-4  IT Security Awareness and Training
+        ("GOV-4", "nist_csf",  "PR.AT-01"), ("GOV-4", "nist_csf",  "PR.AT-04"),
+        ("GOV-4", "iso_27001", "6.3"),       ("GOV-4", "cis_v8",    "CIS-14.1"),
+        # GOV-5  IT Security Audit and Penetration Testing
+        ("GOV-5", "nist_csf",  "ID.IM-02"), ("GOV-5", "nist_csf",  "DE.CM-08"),
+        ("GOV-5", "iso_27001", "5.35"),      ("GOV-5", "iso_27001", "5.36"),
+        ("GOV-5", "pci_dss",   "REQ-11-2"), ("GOV-5", "pci_dss",   "REQ-11-3"),
+        ("GOV-5", "cis_v8",    "CIS-18.1"),
+        # GOV-6  System Baseline and Configuration Standards
+        ("GOV-6", "nist_csf",  "PR.IP-01"), ("GOV-6", "nist_csf",  "PR.PS-01"),
+        ("GOV-6", "iso_27001", "8.9"),       ("GOV-6", "cis_v8",    "CIS-4.1"),
+        ("GOV-6", "cis_v8",    "CIS-4.2"),
+        # GOV-7  Software Asset Management
+        ("GOV-7", "nist_csf",  "ID.AM-05"), ("GOV-7", "nist_csf",  "ID.AM-07"),
+        # ACC-1  User Access Management
+        ("ACC-1", "nist_csf",  "PR.AA-01"), ("ACC-1", "nist_csf",  "PR.AC-01"),
+        ("ACC-1", "nist_csf",  "PR.AC-04"), ("ACC-1", "iso_27001", "5.15"),
+        ("ACC-1", "iso_27001", "5.18"),      ("ACC-1", "pci_dss",   "REQ-7-1"),
+        ("ACC-1", "pci_dss",   "REQ-7-2"),   ("ACC-1", "pci_dss",   "REQ-7-4"),
+        # ACC-2  Multi-Factor Authentication
+        ("ACC-2", "nist_csf",  "PR.AC-07"), ("ACC-2", "iso_27001", "5.17"),
+        ("ACC-2", "iso_27001", "8.5"),       ("ACC-2", "pci_dss",   "REQ-8-4"),
+        # ACC-3  Privileged Access Management
+        ("ACC-3", "nist_csf",  "PR.AA-02"), ("ACC-3", "nist_csf",  "PR.AA-03"),
+        ("ACC-3", "iso_27001", "8.2"),       ("ACC-3", "pci_dss",   "REQ-7-3"),
+        ("ACC-3", "pci_dss",   "REQ-8-7"),
+        # ACC-4  Password and Credential Policy
+        ("ACC-4", "nist_csf",  "PR.AA-01"), ("ACC-4", "iso_27001", "5.17"),
+        ("ACC-4", "pci_dss",   "REQ-8-2"),   ("ACC-4", "pci_dss",   "REQ-8-3"),
+        # ACC-5  Remote Access Security
+        ("ACC-5", "nist_csf",  "PR.AC-03"), ("ACC-5", "iso_27001", "6.7"),
+        ("ACC-5", "pci_dss",   "REQ-8-8"),
+        # ACC-6  Identity and Access Governance
+        ("ACC-6", "nist_csf",  "PR.AA-05"), ("ACC-6", "iso_27001", "5.15"),
+        ("ACC-6", "iso_27001", "5.18"),      ("ACC-6", "pci_dss",   "REQ-7-4"),
+        # ACC-7  Service Account Management
+        ("ACC-7", "nist_csf",  "PR.AA-02"), ("ACC-7", "iso_27001", "8.2"),
+        # NET-1  Network Segmentation and Zoning
+        ("NET-1", "nist_csf",  "PR.IR-01"), ("NET-1", "nist_csf",  "PR.PT-04"),
+        ("NET-1", "iso_27001", "8.20"),      ("NET-1", "iso_27001", "8.22"),
+        ("NET-1", "cis_v8",    "CIS-12.1"),
+        # NET-2  Firewall and Gateway Management
+        ("NET-2", "nist_csf",  "PR.IR-01"), ("NET-2", "nist_csf",  "PR.PT-04"),
+        ("NET-2", "iso_27001", "8.20"),      ("NET-2", "iso_27001", "8.21"),
+        # NET-3  Internet Access Controls
+        ("NET-3", "nist_csf",  "PR.PT-04"), ("NET-3", "iso_27001", "8.23"),
+        # NET-4  Email Security
+        ("NET-4", "iso_27001", "5.14"),
+        # NET-5  Wireless Network Security
+        ("NET-5", "iso_27001", "8.20"),      ("NET-5", "nist_csf",  "PR.PT-04"),
+        # NET-6  DNS Security
+        ("NET-6", "nist_csf",  "PR.PT-04"), ("NET-6", "iso_27001", "8.23"),
+        # SYS-1  Patch and Vulnerability Management
+        ("SYS-1", "nist_csf",  "PR.PS-02"), ("SYS-1", "nist_csf",  "DE.CM-08"),
+        ("SYS-1", "iso_27001", "8.8"),       ("SYS-1", "pci_dss",   "REQ-6-1"),
+        ("SYS-1", "pci_dss",   "REQ-6-2"),   ("SYS-1", "cis_v8",    "CIS-7.1"),
+        ("SYS-1", "cis_v8",    "CIS-7.2"),
+        # SYS-2  Endpoint Protection (EDR/AV)
+        ("SYS-2", "nist_csf",  "DE.CM-04"), ("SYS-2", "iso_27001", "8.7"),
+        ("SYS-2", "pci_dss",   "REQ-5-1"),   ("SYS-2", "pci_dss",   "REQ-5-2"),
+        ("SYS-2", "cis_v8",    "CIS-10.1"),
+        # SYS-3  System Hardening
+        ("SYS-3", "nist_csf",  "PR.IP-01"), ("SYS-3", "nist_csf",  "PR.PS-01"),
+        ("SYS-3", "iso_27001", "8.9"),       ("SYS-3", "cis_v8",    "CIS-4.1"),
+        # SYS-4  Mobile Device Management
+        ("SYS-4", "nist_csf",  "PR.AC-03"), ("SYS-4", "iso_27001", "8.1"),
+        # SYS-5  Vulnerability Scanning
+        ("SYS-5", "nist_csf",  "DE.CM-08"), ("SYS-5", "nist_csf",  "ID.RA-01"),
+        ("SYS-5", "iso_27001", "8.8"),       ("SYS-5", "pci_dss",   "REQ-11-2"),
+        # APP-1  Secure Software Development Lifecycle (SSDLC)
+        ("APP-1", "nist_csf",  "PR.IP-02"), ("APP-1", "iso_27001", "5.8"),
+        ("APP-1", "iso_27001", "8.25"),      ("APP-1", "iso_27001", "8.31"),
+        ("APP-1", "pci_dss",   "REQ-6-3"),   ("APP-1", "pci_dss",   "REQ-6-4"),
+        # APP-2  SAST/DAST/Penetration Testing
+        ("APP-2", "nist_csf",  "ID.IM-02"), ("APP-2", "iso_27001", "8.29"),
+        ("APP-2", "pci_dss",   "REQ-11-2"), ("APP-2", "pci_dss",   "REQ-11-3"),
+        ("APP-2", "cis_v8",    "CIS-16.1"),
+        # APP-3  Open Source / Software Composition Analysis
+        ("APP-3", "nist_csf",  "PR.PS-06"), ("APP-3", "iso_27001", "8.26"),
+        # APP-4  API Security
+        ("APP-4", "nist_csf",  "DE.CM-09"), ("APP-4", "iso_27001", "8.23"),
+        # APP-5  Web Application Security / WAF
+        ("APP-5", "nist_csf",  "PR.PT-04"), ("APP-5", "iso_27001", "8.26"),
+        ("APP-5", "iso_27001", "8.27"),      ("APP-5", "pci_dss",   "REQ-6-5"),
+        ("APP-5", "pci_dss",   "REQ-6-6"),   ("APP-5", "cis_v8",    "CIS-16.1"),
+        # APP-6  Secrets and Credential Management
+        ("APP-6", "nist_csf",  "PR.DS-01"), ("APP-6", "iso_27001", "8.24"),
+        # APP-7  Secure Code Repository
+        ("APP-7", "nist_csf",  "PR.PS-06"), ("APP-7", "iso_27001", "8.32"),
+        # DAT-1  Data Classification
+        ("DAT-1", "nist_csf",  "ID.AM-07"), ("DAT-1", "iso_27001", "5.12"),
+        ("DAT-1", "iso_27001", "5.13"),
+        # DAT-2  Data Encryption at Rest
+        ("DAT-2", "nist_csf",  "PR.DS-01"), ("DAT-2", "iso_27001", "8.24"),
+        ("DAT-2", "pci_dss",   "REQ-3-1"),   ("DAT-2", "pci_dss",   "REQ-3-2"),
+        # DAT-3  Data Encryption in Transit
+        ("DAT-3", "nist_csf",  "PR.DS-02"), ("DAT-3", "iso_27001", "8.24"),
+        ("DAT-3", "pci_dss",   "REQ-4-1"),
+        # DAT-4  Data Loss Prevention
+        ("DAT-4", "nist_csf",  "PR.DS-05"), ("DAT-4", "iso_27001", "8.12"),
+        ("DAT-4", "pci_dss",   "REQ-3-3"),
+        # DAT-5  Data Retention and Disposal
+        ("DAT-5", "nist_csf",  "PR.DS-10"), ("DAT-5", "iso_27001", "7.14"),
+        ("DAT-5", "iso_27001", "8.10"),
+        # DAT-6  Personal Data Protection (PDPA)
+        ("DAT-6", "nist_csf",  "GV.OC-03"), ("DAT-6", "iso_27001", "5.34"),
+        # DAT-7  Database Security
+        ("DAT-7", "nist_csf",  "PR.DS-01"), ("DAT-7", "iso_27001", "8.29"),
+        ("DAT-7", "pci_dss",   "REQ-3-1"),   ("DAT-7", "pci_dss",   "REQ-6-3"),
+        # CLD-1  Cloud Service Approval (GCC onboarding)
+        ("CLD-1", "nist_csf",  "GV.SC-09"), ("CLD-1", "iso_27001", "5.23"),
+        # CLD-2  Cloud Security Posture Management
+        ("CLD-2", "nist_csf",  "ID.RA-01"), ("CLD-2", "nist_csf",  "DE.CM-08"),
+        ("CLD-2", "iso_27001", "8.8"),
+        # CLD-3  Cloud Identity and Access Management
+        ("CLD-3", "nist_csf",  "PR.AA-01"), ("CLD-3", "nist_csf",  "PR.AA-02"),
+        ("CLD-3", "nist_csf",  "PR.AA-03"), ("CLD-3", "iso_27001", "5.15"),
+        ("CLD-3", "iso_27001", "5.18"),      ("CLD-3", "iso_27001", "8.2"),
+        # CLD-4  Cloud Data Residency and Sovereignty
+        ("CLD-4", "nist_csf",  "GV.OC-03"), ("CLD-4", "iso_27001", "5.23"),
+        # CLD-5  Cloud Network Security Controls
+        ("CLD-5", "nist_csf",  "PR.IR-01"), ("CLD-5", "nist_csf",  "PR.PT-04"),
+        ("CLD-5", "iso_27001", "8.20"),      ("CLD-5", "iso_27001", "8.22"),
+        # CLD-6  Serverless and Container Security
+        ("CLD-6", "nist_csf",  "PR.PS-06"), ("CLD-6", "iso_27001", "8.26"),
+        # CLD-7  Cloud Key Management
+        ("CLD-7", "nist_csf",  "PR.DS-01"), ("CLD-7", "nist_csf",  "PR.DS-02"),
+        ("CLD-7", "iso_27001", "8.24"),
+        # LOG-1  Security Event Logging
+        ("LOG-1", "nist_csf",  "PR.PS-04"), ("LOG-1", "nist_csf",  "DE.CM-03"),
+        ("LOG-1", "iso_27001", "8.15"),      ("LOG-1", "iso_27001", "8.16"),
+        ("LOG-1", "iso_27001", "8.17"),      ("LOG-1", "pci_dss",   "REQ-10-1"),
+        ("LOG-1", "pci_dss",   "REQ-10-2"),  ("LOG-1", "pci_dss",   "REQ-10-3"),
+        # LOG-2  Centralised Log Management / SIEM
+        ("LOG-2", "nist_csf",  "DE.CM-01"), ("LOG-2", "nist_csf",  "DE.AE-03"),
+        ("LOG-2", "iso_27001", "8.15"),      ("LOG-2", "cis_v8",    "CIS-13.1"),
+        # LOG-3  Log Integrity and Tamper Protection
+        ("LOG-3", "nist_csf",  "PR.DS-01"), ("LOG-3", "iso_27001", "8.15"),
+        ("LOG-3", "iso_27001", "8.17"),      ("LOG-3", "pci_dss",   "REQ-10-5"),
+        # LOG-4  Security Operations / SOC
+        ("LOG-4", "nist_csf",  "DE.CM-01"), ("LOG-4", "nist_csf",  "DE.CM-03"),
+        ("LOG-4", "iso_27001", "8.16"),      ("LOG-4", "cis_v8",    "CIS-13.1"),
+        # LOG-5  Privileged Activity Monitoring
+        ("LOG-5", "nist_csf",  "DE.CM-03"), ("LOG-5", "nist_csf",  "PR.PS-04"),
+        ("LOG-5", "iso_27001", "8.15"),      ("LOG-5", "iso_27001", "8.16"),
+        ("LOG-5", "pci_dss",   "REQ-10-2"),  ("LOG-5", "pci_dss",   "REQ-10-5"),
+        # INC-1  Incident Response Plan
+        ("INC-1", "nist_csf",  "RS.RP-01"), ("INC-1", "iso_27001", "5.24"),
+        ("INC-1", "iso_27001", "5.25"),      ("INC-1", "iso_27001", "5.26"),
+        ("INC-1", "pci_dss",   "REQ-12-5"),
+        # INC-2  Incident Reporting to GovTech / SingCERT
+        ("INC-2", "nist_csf",  "RS.CO-02"), ("INC-2", "nist_csf",  "RS.CO-03"),
+        ("INC-2", "iso_27001", "5.26"),      ("INC-2", "pci_dss",   "REQ-12-6"),
+        # INC-3  Incident Containment and Eradication
+        ("INC-3", "nist_csf",  "RS.MI-01"), ("INC-3", "nist_csf",  "RS.MI-02"),
+        ("INC-3", "nist_csf",  "RS.AN-01"), ("INC-3", "iso_27001", "5.25"),
+        ("INC-3", "iso_27001", "5.27"),
+        # INC-4  Tabletop Exercises and Drills
+        ("INC-4", "nist_csf",  "PR.IP-10"), ("INC-4", "nist_csf",  "RC.RP-05"),
+        ("INC-4", "iso_27001", "5.24"),      ("INC-4", "cis_v8",    "CIS-17.1"),
+        # BCM-1  Business Continuity Plan
+        ("BCM-1", "nist_csf",  "PR.IP-09"), ("BCM-1", "iso_27001", "5.29"),
+        ("BCM-1", "iso_27001", "5.30"),
+        # BCM-2  Backup and Recovery
+        ("BCM-2", "nist_csf",  "PR.IP-04"), ("BCM-2", "nist_csf",  "PR.DS-11"),
+        ("BCM-2", "nist_csf",  "RC.RP-03"), ("BCM-2", "iso_27001", "8.13"),
+        ("BCM-2", "cis_v8",    "CIS-11.1"), ("BCM-2", "cis_v8",    "CIS-11.2"),
+        # BCM-3  Disaster Recovery Testing
+        ("BCM-3", "nist_csf",  "RC.RP-05"), ("BCM-3", "nist_csf",  "PR.IP-10"),
+        ("BCM-3", "iso_27001", "5.29"),      ("BCM-3", "cis_v8",    "CIS-11.3"),
+        ("BCM-3", "cis_v8",    "CIS-11.4"),
+        # TPM-1  Vendor Security Assessment
+        ("TPM-1", "nist_csf",  "GV.SC-06"), ("TPM-1", "nist_csf",  "ID.RA-10"),
+        ("TPM-1", "iso_27001", "5.19"),      ("TPM-1", "iso_27001", "5.20"),
+        # TPM-2  Third-Party Access Controls
+        ("TPM-2", "nist_csf",  "PR.AA-01"), ("TPM-2", "nist_csf",  "PR.AC-04"),
+        ("TPM-2", "iso_27001", "5.19"),      ("TPM-2", "iso_27001", "6.7"),
+        # TPM-3  Software Supply Chain Security (SBOM)
+        ("TPM-3", "nist_csf",  "GV.SC-04"), ("TPM-3", "nist_csf",  "GV.SC-07"),
+        ("TPM-3", "iso_27001", "5.21"),
+        # TPM-4  Outsourced IT Operations Security
+        ("TPM-4", "nist_csf",  "GV.SC-05"), ("TPM-4", "nist_csf",  "GV.SC-09"),
+        ("TPM-4", "iso_27001", "5.19"),      ("TPM-4", "iso_27001", "5.22"),
+        ("TPM-4", "iso_27001", "5.23"),      ("TPM-4", "pci_dss",   "REQ-12-4"),
+        ("TPM-4", "cis_v8",    "CIS-15.1"),
+    ]
+
+    with Session(engine) as db:
+        if db.query(CustomFramework).filter_by(slug="gcc-im8").first():
+            return  # already seeded
+
+        cf = CustomFramework(
+            name="Singapore GCC IM8",
+            slug="gcc-im8",
+            description=(
+                "Singapore Government Instruction Manual 8 (IM8) 2023 — Government Commercial Cloud (GCC). "
+                "Controls mapped from NIST CSF 2.0, ISO/IEC 27001:2022, PCI DSS v4.0, and CIS Controls v8. "
+                "Covers: IT Governance, Access Control, Network Security, System Security, "
+                "Application Security, Data Security, Cloud Security (GCC-specific), "
+                "Logging & Monitoring, Incident Management, Business Continuity, Third Party Management."
+            ),
+            created_by="system",
+        )
+        db.add(cf)
+        db.flush()
+
+        seen_pairs: set[tuple] = set()
+        inserted = 0
+        missing: list[str] = []
+        for sort_order, (im8_ref, fw_id, ctrl_id) in enumerate(CONTROL_MAP):
+            pair = (fw_id, ctrl_id)
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            fc = (
+                db.query(FrameworkControl)
+                .filter_by(framework=fw_id, control_id=ctrl_id)
+                .first()
+            )
+            if fc:
+                db.add(CustomFrameworkControl(
+                    custom_framework_id=cf.id,
+                    framework_control_id=fc.id,
+                    reference_id=im8_ref,
+                    sort_order=sort_order,
+                ))
+                inserted += 1
+            else:
+                missing.append(f"{im8_ref}→{fw_id}/{ctrl_id}")
+        db.commit()
+        if missing:
+            logger.warning(
+                "GCC IM8 seed: %d control(s) not found in DB: %s",
+                len(missing), ", ".join(missing),
+            )
+        logger.info("Seeded Singapore GCC IM8 custom policy with %d controls.", inserted)
+
+
 def _prune_access_logs(retention_days: int = 90) -> None:
     """Delete access_logs rows older than the retention window. Runs at
     startup (workers recycle periodically, so this fires often enough)."""
@@ -1558,6 +1818,7 @@ _provision_entraid_connector()
 _provision_azure_connector()
 _seed_framework_controls()
 _seed_mas_trm_custom_policy()
+_seed_gcc_im8_custom_policy()
 _migrate_risk_scale_v2()
 _bootstrap_initial_admin()
 _fail_stale_threat_models()
