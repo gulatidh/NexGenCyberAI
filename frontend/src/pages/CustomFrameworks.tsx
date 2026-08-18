@@ -7,7 +7,7 @@ import {
   Alert, Tooltip, LinearProgress, InputAdornment, Divider, Tabs, Tab,
 } from "@mui/material";
 import {
-  Add, Delete, Refresh, Search, CheckBox, CheckBoxOutlineBlank,
+  Add, Delete, Edit, Refresh, Search, CheckBox, CheckBoxOutlineBlank,
   LibraryAdd, ArrowBack, Category, Build,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -442,16 +442,33 @@ function DomainManagerDialog({
 
 // ── Detail view ───────────────────────────────────────────────────────────────
 
-function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void }) {
+export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void }) {
   const qc = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nativeOpen, setNativeOpen] = useState(false);
   const [domainOpen, setDomainOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
   const [tab, setTab] = useState(0);
 
   const { data: cf, isLoading } = useQuery<CustomFrameworkDetail>({
     queryKey: ["custom-framework", cfId],
     queryFn: () => customFrameworksApi.get(cfId),
+  });
+
+  const renameMut = useMutation({
+    mutationFn: () => customFrameworksApi.update(cfId, {
+      name: editName.trim(),
+      description: editDesc.trim() || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["custom-framework", cfId] });
+      qc.invalidateQueries({ queryKey: ["custom-frameworks"] });
+      toast.success("Policy updated");
+      setEditOpen(false);
+    },
+    onError: () => toast.error("Failed to update policy"),
   });
 
   const removeMut = useMutation({
@@ -507,6 +524,12 @@ function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void })
           <Chip label={`${cf.domains.length} domains`} size="small" color="primary" variant="outlined" sx={{ mr: 0.5 }} />
         )}
         <Chip label={cf.slug} size="small" variant="outlined" sx={{ fontFamily: "monospace" }} />
+        <Tooltip title="Rename / edit policy">
+          <IconButton size="small" onClick={() => { setEditName(cf.name); setEditDesc(cf.description || ""); setEditOpen(true); }}
+            sx={{ color: "text.secondary" }}>
+            <Edit fontSize="small" />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* Action buttons */}
@@ -658,6 +681,25 @@ function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void })
         <DomainManagerDialog cfId={cfId} domains={cf.domains}
           onClose={() => setDomainOpen(false)} />
       )}
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit Policy</DialogTitle>
+        <DialogContent>
+          <TextField fullWidth label="Policy name" value={editName}
+            onChange={(e) => setEditName(e.target.value)} autoFocus sx={{ mb: 2, mt: 1 }} />
+          <TextField fullWidth label="Description (optional)" value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)} multiline rows={2}
+            placeholder="Describe what this policy covers and who it applies to" />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={!editName.trim() || renameMut.isPending}
+            onClick={() => renameMut.mutate()}
+            startIcon={renameMut.isPending ? <CircularProgress size={14} /> : <Edit />}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -670,6 +712,10 @@ export default function CustomFrameworks() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [selectedCf, setSelectedCf] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string>("");
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
 
   const { data: frameworks = [], isLoading, refetch } = useQuery<CustomFrameworkSummary[]>({
     queryKey: ["custom-frameworks"],
@@ -698,10 +744,31 @@ export default function CustomFrameworks() {
     onError: () => toast.error("Failed to delete policy"),
   });
 
+  const renameMut = useMutation({
+    mutationFn: () => customFrameworksApi.update(editId, {
+      name: editName.trim(),
+      description: editDesc.trim() || undefined,
+    }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ["custom-frameworks"] });
+      toast.success(`Renamed to "${updated.name}"`);
+      setEditOpen(false);
+    },
+    onError: () => toast.error("Failed to rename policy"),
+  });
+
   const handleDelete = useCallback((e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
     if (window.confirm(`Delete "${name}"? This cannot be undone.`)) deleteMut.mutate(id);
   }, [deleteMut]);
+
+  const handleEditOpen = useCallback((e: React.MouseEvent, cf: CustomFrameworkSummary) => {
+    e.stopPropagation();
+    setEditId(cf.id);
+    setEditName(cf.name);
+    setEditDesc(cf.description || "");
+    setEditOpen(true);
+  }, []);
 
   if (selectedCf) {
     return (
@@ -763,6 +830,12 @@ export default function CustomFrameworks() {
                   <Chip label={cf.slug} size="small" sx={{ fontFamily: "monospace", fontSize: 10 }} />
                 </Box>
               </Box>
+              <Tooltip title="Rename / edit policy">
+                <IconButton size="small" onClick={(e) => handleEditOpen(e, cf)}
+                  sx={{ color: "text.secondary" }}>
+                  <Edit fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <Tooltip title="Delete policy">
                 <IconButton size="small" onClick={(e) => handleDelete(e, cf.id, cf.name)}
                   sx={{ color: "error.main" }}>
@@ -773,6 +846,26 @@ export default function CustomFrameworks() {
           </Card>
         ))}
       </Box>
+
+      {/* Rename/edit dialog */}
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 700 }}>Rename Policy</DialogTitle>
+        <DialogContent>
+          <TextField fullWidth label="Policy name" value={editName}
+            onChange={(e) => setEditName(e.target.value)} autoFocus sx={{ mb: 2, mt: 1 }} />
+          <TextField fullWidth label="Description (optional)" value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)} multiline rows={2}
+            placeholder="Describe what this policy covers and who it applies to" />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={!editName.trim() || renameMut.isPending}
+            onClick={() => renameMut.mutate()}
+            startIcon={renameMut.isPending ? <CircularProgress size={14} /> : <Edit />}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Create dialog */}
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">

@@ -90,6 +90,11 @@ class CustomFrameworkSummary(BaseModel):
         from_attributes = True
 
 
+class CustomFrameworkUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+
+
 class AddControlsRequest(BaseModel):
     control_ids: List[str] = Field(..., description="List of FrameworkControl.id values to add")
 
@@ -287,6 +292,34 @@ async def get_custom_framework(
         controls=controls,
         domains=domains,
         native_controls=native_controls,
+    )
+
+
+@router.patch("/frameworks/custom/{cf_id}/", response_model=CustomFrameworkSummary)
+async def update_custom_framework(
+    cf_id: str,
+    payload: CustomFrameworkUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Rename or update description of a custom framework."""
+    fw = db.query(CustomFramework).filter(CustomFramework.id == cf_id).first()
+    if not fw:
+        raise HTTPException(status_code=404, detail="Custom framework not found")
+    if payload.name is not None:
+        new_slug = _unique_slug(db, _make_slug(payload.name), exclude_id=cf_id)
+        fw.name = payload.name
+        fw.slug = new_slug
+    if payload.description is not None:
+        fw.description = payload.description
+    db.commit()
+    db.refresh(fw)
+    return CustomFrameworkSummary(
+        id=fw.id,
+        name=fw.name,
+        slug=fw.slug,
+        description=fw.description,
+        control_count=len(fw.controls),
     )
 
 

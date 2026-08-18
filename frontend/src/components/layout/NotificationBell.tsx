@@ -100,7 +100,11 @@ export default function NotificationBell() {
                     </Typography>
                     {n.detail && (
                       <Typography sx={{ color: "text.secondary", fontSize: 11, mt: 0.2, wordBreak: "break-word" }}>
-                        {n.detail}
+                        {typeof n.detail === "string"
+                          ? n.detail
+                          : Array.isArray(n.detail)
+                            ? (n.detail as { msg?: string }[]).map((e) => e.msg || JSON.stringify(e)).join("; ")
+                            : JSON.stringify(n.detail)}
                       </Typography>
                     )}
                     <Typography sx={{ color: "text.secondary", fontSize: 10, mt: 0.3 }}>

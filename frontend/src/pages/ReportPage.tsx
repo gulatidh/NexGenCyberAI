@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  Description, FolderZip, Assessment, Policy, LibraryAdd, GppBad,
+  Description, FolderZip, Assessment, LibraryAdd, GppBad, BarChart,
 } from "@mui/icons-material";
 
 export const REPORT_SECTION: SectionDef = {
@@ -16,13 +16,13 @@ export const REPORT_SECTION: SectionDef = {
   ],
   cards: [
     // Pen Testing
-    { name: "VAPT Reports",     icon: <Description />,  desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports",      group: "Pen Testing" },
-    { name: "Evidence Package", icon: <FolderZip />,    desc: "ZIP of findings, deficiencies, and agent logs for auditors.",          route: "/report/evidence",          group: "Pen Testing" },
-    { name: "Reports",          icon: <Assessment />,   desc: "AI-generated security posture and trend reports.",                      route: "/report/reports",           group: "Pen Testing" },
+    { name: "VAPT Reports",          icon: <Description />, desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports", group: "Pen Testing" },
+    { name: "Evidence Package",      icon: <FolderZip />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",          route: "/report/evidence",     group: "Pen Testing" },
+    { name: "Reports",               icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                      route: "/report/reports",      group: "Pen Testing" },
     // Compliance
-    { name: "Frameworks",       icon: <Policy />,       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance posture.",      route: "/report/frameworks",        group: "Compliance" },
-    { name: "Custom Standards", icon: <LibraryAdd />,   desc: "Build and evaluate custom control frameworks.",                         route: "/report/custom-frameworks", group: "Compliance" },
-    { name: "Control Gaps",     icon: <GppBad />,       desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",              group: "Compliance" },
+    { name: "Framework Library",     icon: <LibraryAdd />,  desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",   group: "Compliance" },
+    { name: "Compliance Evaluation", icon: <BarChart />,    desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",   group: "Compliance" },
+    { name: "Control Gaps",          icon: <GppBad />,      desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",          group: "Compliance" },
   ],
 };
 

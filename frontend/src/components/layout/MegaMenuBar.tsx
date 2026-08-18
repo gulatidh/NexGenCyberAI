@@ -15,7 +15,7 @@ import {
   ExpandMore, BugReport, Psychology, Radar, Assessment,
   GppBad, PlaylistAddCheck, SmartToy, Tune, Policy,
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
-  Description, AltRoute, FolderZip, AccountTree,
+  Description, AltRoute, FolderZip, AccountTree, BarChart,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
   Hub as HubIcon, Devices, VpnKey, Webhook, ManageSearch,
 } from "@mui/icons-material";
@@ -74,8 +74,8 @@ const MENU: MenuItem[] = [
           { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",          route: "/automate/ai-guardrails",      Icon: Security      },
           { name: "Audit Logs",          desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",       route: "/platform/audit-logs",         Icon: ManageSearch  },
           { name: "Threat Models",       desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",     route: "/analyse/threat-models",       Icon: DeviceHub     },
-          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",         route: "/report/frameworks",           Icon: Policy        },
-          { name: "Custom Standards",    desc: "Build your own control framework from existing platform controls.",        route: "/report/custom-frameworks",    Icon: LibraryAdd    },
+          { name: "Framework Library",    desc: "Browse standard frameworks and manage custom compliance policies.",       route: "/report/frameworks",           Icon: LibraryAdd    },
+          { name: "Compliance Evaluation", desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",           Icon: BarChart      },
           { name: "Data Model",          desc: "Platform ontology — eleven entities, one interactive graph.",             route: "/data-model",                  Icon: AccountTree   },
         ],
       },
@@ -162,8 +162,8 @@ const MENU: MenuItem[] = [
       {
         heading: "Compliance",
         items: [
-          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance posture.",        route: "/report/frameworks",           Icon: Policy      },
-          { name: "Custom Standards",    desc: "Build and evaluate custom control frameworks.",                          route: "/report/custom-frameworks",    Icon: LibraryAdd  },
+          { name: "Framework Library",     desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",           Icon: LibraryAdd  },
+          { name: "Compliance Evaluation", desc: "Evaluate posture and run targeted scans against any framework.",      route: "/report/compliance",           Icon: BarChart    },
           { name: "Control Gaps",        desc: "Framework control deficiencies identified by the compliance monitor.",   route: "/report/gaps",                 Icon: GppBad      },
         ],
       },

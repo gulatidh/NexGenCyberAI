@@ -67,7 +67,9 @@ const Risks             = React.lazy(() => import("./pages/Risks"));
 const RiskAIAnalysis    = React.lazy(() => import("./pages/RiskAIAnalysis"));
 const Assets            = React.lazy(() => import("./pages/Assets"));
 const AssetDetail       = React.lazy(() => import("./pages/AssetDetail"));
-const Frameworks        = React.lazy(() => import("./pages/Frameworks"));
+const Frameworks           = React.lazy(() => import("./pages/Frameworks"));
+const FrameworkLibrary     = React.lazy(() => import("./pages/FrameworkLibrary"));
+const ComplianceEvaluation = React.lazy(() => import("./pages/ComplianceEvaluation"));
 const RiskOverviewPage  = React.lazy(() => import("./pages/RiskOverview"));
 const Projects          = React.lazy(() => import("./pages/Projects"));
 const Technologies      = React.lazy(() => import("./pages/Technologies"));
@@ -242,8 +244,9 @@ function ProtectedApp() {
             <Route index                    element={<ReportPage />} />
             <Route path="vapt-reports"      element={<VAPTReports />} />
             <Route path="gaps"              element={<ControlDeficiencies />} />
-            <Route path="frameworks"        element={<Frameworks />} />
-            <Route path="custom-frameworks" element={<CustomFrameworks />} />
+            <Route path="frameworks"        element={<FrameworkLibrary />} />
+            <Route path="compliance"        element={<ComplianceEvaluation />} />
+            <Route path="custom-frameworks" element={<Navigate to="/report/frameworks" replace />} />
             <Route path="evidence"          element={<EvidencePackage />} />
             <Route path="reports"           element={<Reports />} />
           </Route>

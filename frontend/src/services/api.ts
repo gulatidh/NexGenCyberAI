@@ -77,7 +77,12 @@ apiClient.interceptors.response.use(
     const method = (error.config?.method || "").toUpperCase();
     const url = error.config?.url || "";
     const status = error.response.status;
-    const detail = error.response?.data?.detail || error.message || "Unknown error";
+    const rawDetail = error.response?.data?.detail;
+    const detail: string = Array.isArray(rawDetail)
+      ? rawDetail.map((e: { msg?: string }) => e.msg || JSON.stringify(e)).join("; ")
+      : typeof rawDetail === "string"
+        ? rawDetail
+        : error.message || "Unknown error";
     addNotification({ type: "error", message: `${method} ${url} — ${status}`, detail });
     return Promise.reject(error);
   },
@@ -595,6 +600,8 @@ export const customFrameworksApi = {
     apiClient.post("/frameworks/custom/", data).then((r) => r.data),
   get: (id: string) => apiClient.get(`/frameworks/custom/${id}/`).then((r) => r.data),
   delete: (id: string) => apiClient.delete(`/frameworks/custom/${id}/`),
+  update: (id: string, data: { name?: string; description?: string }) =>
+    apiClient.patch(`/frameworks/custom/${id}/`, data).then((r) => r.data),
   addControls: (id: string, controlIds: string[]) =>
     apiClient.post(`/frameworks/custom/${id}/controls/`, { control_ids: controlIds }).then((r) => r.data),
   removeControl: (id: string, fkCtrlId: string) =>
