@@ -15,43 +15,21 @@ import {
   ExpandMore, BugReport, Psychology, Radar, Assessment,
   GppBad, PlaylistAddCheck, SmartToy, Tune, Policy,
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
-  Description, AltRoute, FolderZip, VerifiedUser, AccountTree,
+  Description, AltRoute, FolderZip, AccountTree,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
-  Hub as HubIcon, Devices, SyncAlt, VpnKey, Webhook,
+  Hub as HubIcon, Devices, VpnKey, Webhook,
 } from "@mui/icons-material";
 
 // ── Phase → route mapping for active highlight ────────────────────────────────
 
 function getActivePhase(pathname: string): string | null {
-  if (pathname.startsWith("/threat-intel/threat-models")) return "setup";
-  if (pathname.startsWith("/compliance/custom-frameworks"))  return "setup";
-  if (pathname.startsWith("/data-model"))                   return "setup";
-  if (pathname.startsWith("/platform/assets/technologies")) return "discover";
-  if (pathname.startsWith("/platform/assets"))              return "discover";
-  if (pathname.startsWith("/platform"))                     return "setup";
-  if (pathname.startsWith("/intelligence/ai-assisted-scan")) return "discover";
-  if (pathname.startsWith("/vulnerability"))                return "discover";
-  if (pathname.startsWith("/cve-pivot"))                    return "discover";
-  if (pathname.startsWith("/threat-intel/attack-paths"))    return "analyse";
-  if (pathname.startsWith("/threat-intel/register"))        return "respond";
-  if (pathname.startsWith("/threat-intel"))                 return "respond";
-  if (pathname.startsWith("/risk"))                         return "analyse";
-  if (pathname.startsWith("/compliance-heatmap"))           return "analyse";
-  if (pathname.startsWith("/intelligence/nl-query"))        return "analyse";
-  if (pathname.startsWith("/client-comparison"))            return "analyse";
-  if (pathname.startsWith("/intelligence/reports"))         return "analyse";
-  if (pathname.startsWith("/compliance/deficiencies"))      return "respond";
-  if (pathname.startsWith("/governance"))                   return "respond";
-  if (pathname.startsWith("/report"))                       return "report";
-  if (pathname.startsWith("/vapt"))                         return "report";
-  if (pathname.startsWith("/compliance"))                   return "report";
-  if (pathname.startsWith("/ai-advisor"))                   return "automate";
-  if (pathname.startsWith("/intelligence/knowledge"))       return "automate";
-  if (pathname.startsWith("/intelligence/security-docs"))   return "automate";
-  if (pathname.startsWith("/intelligence"))                 return "automate";
-  if (pathname.startsWith("/ai-settings"))                  return "setup";
-  if (pathname.startsWith("/webhooks"))                     return "automate";
-  if (pathname.startsWith("/api-keys"))                     return "automate";
+  if (pathname.startsWith("/platform"))  return "setup";
+  if (pathname.startsWith("/data-model")) return "setup";
+  if (pathname.startsWith("/discover"))  return "discover";
+  if (pathname.startsWith("/analyse"))   return "analyse";
+  if (pathname.startsWith("/respond"))   return "respond";
+  if (pathname.startsWith("/report"))    return "report";
+  if (pathname.startsWith("/automate"))  return "automate";
   return null;
 }
 
@@ -84,19 +62,20 @@ const MENU: MenuItem[] = [
       {
         heading: "Environment",
         items: [
-          { name: "Accounts",       desc: "Client profiles, contact details, and security posture scoping.",  route: "/platform/clients",  Icon: People  },
-          { name: "Connections",    desc: "Scanner connectors, enterprise tools, and SIEM integrations.",     route: "/connections",        Icon: Cable   },
-          { name: "AI Settings",    desc: "AI provider credentials, model selection, and failover config.",   route: "/ai-settings",        Icon: Tune    },
-          { name: "Help",           desc: "Documentation, setup guides, and platform support resources.",     route: "/platform/help",      Icon: HubIcon },
+          { name: "Accounts",            desc: "Client profiles, contact details, and security posture scoping.",         route: "/platform/clients",            Icon: People      },
+          { name: "Asset Inventory",     desc: "Discovered assets — servers, apps, containers, and cloud resources.",     route: "/platform/assets",             Icon: Storage     },
+          { name: "Connectors",          desc: "Scanner integrations, enterprise tools, and SIEM connectors.",            route: "/platform/connections",        Icon: Cable       },
+          { name: "AI Settings",         desc: "AI provider credentials, model selection, and automatic failover config.",route: "/platform/ai-settings",        Icon: Tune        },
         ],
       },
       {
         heading: "Design",
         items: [
-          { name: "Threat Models",     desc: "DFD diagrams, STRIDE threats, and Sigma detection rules.",      route: "/threat-intel/threat-models",   Icon: DeviceHub   },
-          { name: "Frameworks",        desc: "NIST, CIS, ISO 27001, PCI DSS, GDPR compliance mapping.",      route: "/compliance/frameworks",        Icon: Policy      },
-          { name: "Custom Standards",  desc: "Build your own control framework from existing controls.",      route: "/compliance/custom-frameworks", Icon: LibraryAdd  },
-          { name: "Data Model",        desc: "Platform ontology — eleven entities, one connected graph.",     route: "/data-model",                   Icon: AccountTree },
+          { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",          route: "/automate/ai-guardrails",      Icon: Security    },
+          { name: "Threat Models",       desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",     route: "/analyse/threat-models",       Icon: DeviceHub   },
+          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",         route: "/report/frameworks",           Icon: Policy      },
+          { name: "Custom Standards",    desc: "Build your own control framework from existing platform controls.",        route: "/report/custom-frameworks",    Icon: LibraryAdd  },
+          { name: "Data Model",          desc: "Platform ontology — eleven entities, one interactive graph.",             route: "/data-model",                  Icon: AccountTree },
         ],
       },
     ],
@@ -107,18 +86,18 @@ const MENU: MenuItem[] = [
       {
         heading: "Scanning",
         items: [
-          { name: "Assessments",          desc: "Launch scans, view versions, and manage imported data.",       route: "/vulnerability/scans",          Icon: BugReport   },
-          { name: "Findings",             desc: "All security findings with severity, CVE, and status.",        route: "/vulnerability/findings",       Icon: FindInPage  },
-          { name: "AI Assisted Scan",     desc: "Conversational guided assessment — one question at a time.",   route: "/intelligence/ai-assisted-scan",Icon: SmartToy    },
-          { name: "Posture Trends",       desc: "Time-series posture charts — open findings and audit score.",  route: "/vulnerability/posture",        Icon: TrendingUp  },
+          { name: "Assessments",         desc: "Launch scans, manage versions, and import external scan results.",        route: "/discover/scans",              Icon: BugReport   },
+          { name: "Findings",            desc: "All findings with severity, CVE enrichment, and remediation status.",     route: "/discover/findings",           Icon: FindInPage  },
+          { name: "AI Assisted Scan",    desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",       Icon: SmartToy    },
+          { name: "Posture Trends",      desc: "Time-series charts of open findings and audit readiness score.",          route: "/discover/posture",            Icon: TrendingUp  },
         ],
       },
       {
         heading: "Assets & CVE",
         items: [
-          { name: "Asset Inventory",      desc: "All discovered assets with compliance and CVE posture.",       route: "/platform/assets",              Icon: Storage     },
-          { name: "CVE Blast Radius",     desc: "Which assets does a CVE actually affect? Map the exposure.",  route: "/cve-pivot",                    Icon: Security    },
-          { name: "Technology Inventory", desc: "Software and technology stack across all assets.",            route: "/platform/assets/technologies", Icon: Devices     },
+          { name: "Asset Inventory",     desc: "All discovered assets with compliance and CVE posture.",                  route: "/discover/assets",             Icon: Storage     },
+          { name: "Technology Inventory",desc: "Software and technology stack across all assets.",                        route: "/discover/technologies",       Icon: Devices     },
+          { name: "CVE Blast Radius",    desc: "Map CVE exposure across assets — which assets are actually affected.",    route: "/discover/cve-pivot",          Icon: Radar       },
         ],
       },
     ],
@@ -129,19 +108,19 @@ const MENU: MenuItem[] = [
       {
         heading: "Risk",
         items: [
-          { name: "Risk Overview",     desc: "Executive summary of ALE, risk domains, and top exposures.",    route: "/risk/overview",                Icon: Assessment  },
-          { name: "Risk Register",     desc: "FAIR-scored risk register with domain heatmap.",                route: "/risk/register",                Icon: Security    },
-          { name: "AI Risk Analysis",  desc: "AI-generated risk narrative with actionable recommendations.",  route: "/risk/ai-analysis",             Icon: SmartToy    },
-          { name: "Attack Paths",      desc: "MITRE-phased attack chain graph from live findings.",           route: "/threat-intel/attack-paths",    Icon: AltRoute    },
+          { name: "Risk Register",         desc: "FAIR-scored risk register with domain heatmap and financial ALE.",     route: "/analyse/risks",               Icon: Security    },
+          { name: "Risk Overview",         desc: "Executive summary of ALE exposure, risk domains, and top risks.",      route: "/analyse/risk-overview",       Icon: Assessment  },
+          { name: "AI Risk Analysis",      desc: "AI-generated risk narrative with actionable recommendations.",         route: "/analyse/ai-analysis",         Icon: SmartToy    },
+          { name: "Attack Paths",          desc: "MITRE-phased attack chain graph derived from live findings.",          route: "/analyse/attack-paths",        Icon: AltRoute    },
         ],
       },
       {
         heading: "Intelligence",
         items: [
-          { name: "Compliance Heatmap",  desc: "Control coverage heatmap across all frameworks.",            route: "/compliance-heatmap",           Icon: GppBad      },
-          { name: "Ask Your Data",       desc: "Natural language SQL queries over findings, risks, assets.", route: "/intelligence/nl-query",        Icon: Search      },
-          { name: "Account Comparison",   desc: "Compare security posture across multiple clients.",          route: "/client-comparison",            Icon: Assessment  },
-          { name: "Reports",             desc: "AI-generated security posture and trend reports.",           route: "/intelligence/reports",         Icon: Description },
+          { name: "AI Threat Intelligence",desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",   route: "/analyse/threat-models",       Icon: DeviceHub   },
+          { name: "Compliance Heatmap",    desc: "Control coverage heatmap across all frameworks.",                      route: "/analyse/compliance-heatmap",  Icon: GppBad      },
+          { name: "Ask Your Data",         desc: "Natural language SQL queries over findings, risks, and assets.",       route: "/analyse/nl-query",            Icon: Search      },
+          { name: "Project Comparison",    desc: "Compare security posture across multiple accounts.",                   route: "/analyse/comparison",          Icon: Assessment  },
         ],
       },
     ],
@@ -152,17 +131,18 @@ const MENU: MenuItem[] = [
       {
         heading: "Threat Intelligence",
         items: [
-          { name: "Threat Register",      desc: "MITRE ATT&CK–mapped threat entries from AI threat intel.",  route: "/threat-intel/register",        Icon: Radar           },
-          { name: "Control Deficiencies", desc: "Framework control gaps from the compliance monitor agent.", route: "/compliance/deficiencies",      Icon: GppBad          },
-          { name: "CTEM Programs",        desc: "5-phase exposure management: scope → validate → mobilise.", route: "/governance/ctem",              Icon: AccountTree     },
+          { name: "Threat Register",     desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",          route: "/respond/threats",             Icon: Radar           },
+          { name: "Control Deficiencies",desc: "Framework control gaps identified by the compliance monitor agent.",      route: "/respond/gaps",                Icon: GppBad          },
+          { name: "CTEM Programs",       desc: "5-phase exposure management: scope → discover → validate → mobilise.",   route: "/respond/ctem",                Icon: AccountTree     },
         ],
       },
       {
         heading: "Remediation",
         items: [
-          { name: "Remediation Tracker",  desc: "Priority-banded remediation actions from the AI agent.",   route: "/governance/remediation",       Icon: PlaylistAddCheck },
-          { name: "AI Remediations",      desc: "AI-generated remediation plans with automated workflows.",  route: "/governance/remediation-jobs",  Icon: AutoFixHigh     },
-          { name: "Ticket Sync",          desc: "Push findings and remediations to Jira, ServiceNow, Linear.", route: "/connections",                Icon: SyncAlt         },
+          { name: "Remediation",         desc: "Priority-banded remediation actions from the AI agent.",                 route: "/respond/remediation",         Icon: PlaylistAddCheck },
+          { name: "AI Remediations",     desc: "AI-generated remediation plans with automated workflows.",               route: "/respond/remediation-jobs",    Icon: AutoFixHigh     },
+          { name: "VAPT Reports",        desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",  route: "/respond/vapt-reports",        Icon: Description     },
+          { name: "Security Docs",       desc: "Upload security policies and ask questions via RAG.",                    route: "/respond/security-docs",       Icon: MenuBook        },
         ],
       },
     ],
@@ -173,18 +153,17 @@ const MENU: MenuItem[] = [
       {
         heading: "Pen Testing",
         items: [
-          { name: "VAPT Reports",      desc: "Full engagement lifecycle with retest versioning.",             route: "/vapt/reports",                 Icon: Description },
-          { name: "Pentest Scans",     desc: "Pentest scan sessions with findings and evidence.",             route: "/vapt/scans",                   Icon: BugReport   },
-          { name: "Attack Paths",      desc: "MITRE-phased attack chain for pentest engagements.",            route: "/vapt/attack-paths",            Icon: AltRoute    },
-          { name: "Evidence Package",  desc: "ZIP of findings, deficiencies, and agent logs for auditors.",  route: "/vapt/evidence",                Icon: FolderZip   },
+          { name: "VAPT Reports",        desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",  route: "/report/vapt-reports",         Icon: Description },
+          { name: "Evidence Package",    desc: "ZIP of findings, deficiencies, and agent logs for auditors.",            route: "/report/evidence",             Icon: FolderZip   },
+          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",              Icon: Assessment  },
         ],
       },
       {
         heading: "Compliance",
         items: [
-          { name: "Frameworks",        desc: "Compliance posture scored per control across all frameworks.", route: "/compliance/frameworks",        Icon: Policy      },
-          { name: "Control Gaps",      desc: "Framework control deficiencies identified by the AI agent.",   route: "/compliance/deficiencies",      Icon: GppBad      },
-          { name: "Evidence Package",  desc: "Compliance audit evidence ZIP with agent logs.",               route: "/compliance/evidence",          Icon: VerifiedUser },
+          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance posture.",        route: "/report/frameworks",           Icon: Policy      },
+          { name: "Custom Standards",    desc: "Build and evaluate custom control frameworks.",                          route: "/report/custom-frameworks",    Icon: LibraryAdd  },
+          { name: "Control Gaps",        desc: "Framework control deficiencies identified by the compliance monitor.",   route: "/report/gaps",                 Icon: GppBad      },
         ],
       },
     ],
@@ -195,19 +174,20 @@ const MENU: MenuItem[] = [
       {
         heading: "AI Agents",
         items: [
-          { name: "AI Buddies",       desc: "60+ AI agents — orchestrator, risk, threat intel, remediation.", route: "/ai-advisor/agents",           Icon: SmartToy    },
-          { name: "Workflows",        desc: "Multi-agent workflow missions and automated pipelines.",          route: "/ai-advisor/workflows",        Icon: HubIcon     },
-          { name: "AI Assisted Scan", desc: "Conversational guided assessment wizard.",                       route: "/intelligence/ai-assisted-scan",Icon: Psychology  },
+          { name: "AI Buddies",          desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",        Icon: SmartToy    },
+          { name: "AI Workflows",        desc: "Multi-agent workflow missions and automated analysis pipelines.",         route: "/automate/workflows",          Icon: HubIcon     },
+          { name: "AI Assisted Scan",    desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/automate/ai-scan",      Icon: Psychology  },
         ],
       },
       {
         heading: "Knowledge",
         items: [
-          { name: "Knowledge Base",  desc: "Platform knowledge base and reference documentation.",           route: "/intelligence/knowledge",       Icon: MenuBook    },
-          { name: "Security Docs",   desc: "Upload security policies and ask questions via RAG.",            route: "/intelligence/security-docs",   Icon: Description },
-          { name: "Ask Your Data",   desc: "SQL-backed natural language queries over all your data.",        route: "/intelligence/nl-query",        Icon: Search      },
-          { name: "Webhooks",        desc: "Event-driven alerts on critical findings and completed scans.",  route: "/webhooks",                     Icon: Webhook     },
-          { name: "API Keys",        desc: "M2M API keys for CI/CD pipelines and programmatic access.",     route: "/api-keys",                     Icon: VpnKey      },
+          { name: "Knowledge Base",      desc: "Platform knowledge base and Aegis reference documentation.",             route: "/automate/knowledge",          Icon: MenuBook    },
+          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/automate/reports",            Icon: Assessment  },
+          { name: "Ask Your Data",       desc: "SQL-backed natural language queries over all your data.",                route: "/automate/nl-query",           Icon: Search      },
+          { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",         route: "/automate/ai-guardrails",      Icon: Security    },
+          { name: "Webhooks",            desc: "Event-driven alerts on critical findings and completed scans.",          route: "/automate/webhooks",           Icon: Webhook     },
+          { name: "API Keys",            desc: "M2M API keys for CI/CD pipelines and programmatic access.",             route: "/automate/api-keys",           Icon: VpnKey      },
         ],
       },
     ],
