@@ -740,24 +740,21 @@ def _ensure_added_columns() -> None:
     # Drop stale CHECK constraints on 'framework' columns so newly-added
     # FrameworkType enum values (e.g. gcc_im8) can be inserted by the seed.
     # SQLAlchemy creates these constraints at CREATE TABLE time; they don't
-    # update automatically when new enum values are added to the Python code.
-    # This is a no-op on SQLite (no such constraints) and idempotent on SQL Server.
+    # update when new enum values are added to Python code.
+    # Uses sys.check_constraints (SQL Server system catalog — INFORMATION_SCHEMA
+    # does not expose CHECK constraints via CONSTRAINT_COLUMN_USAGE).
     try:
         dialect = engine.dialect.name
         if dialect == "mssql":
             with engine.begin() as conn:
-                # Find and drop any CHECK constraints whose name contains
-                # 'framework' on tables used by the framework seed.
                 rows = conn.execute(text("""
-                    SELECT cc.CONSTRAINT_NAME, cc.TABLE_NAME
-                    FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc
-                    JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
-                      ON cc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
-                    WHERE ccu.COLUMN_NAME = 'framework'
-                      AND cc.TABLE_NAME IN (
-                        'framework_controls', 'findings', 'scans',
-                        'control_deficiencies', 'compliance_status'
-                      )
+                    SELECT chk.name AS constraint_name, tbl.name AS table_name
+                    FROM sys.check_constraints chk
+                    JOIN sys.tables tbl ON chk.parent_object_id = tbl.object_id
+                    JOIN sys.columns col
+                      ON chk.parent_object_id = col.object_id
+                     AND chk.parent_column_id  = col.column_id
+                    WHERE col.name = 'framework'
                 """)).fetchall()
                 for row in rows:
                     try:
@@ -919,8 +916,14 @@ def _provision_azure_connector() -> None:
 
 
 def _seed_framework_controls() -> None:
-    """Idempotent: load JSON files in data/frameworks/, upsert FrameworkControl rows."""
-    import os, glob, json, fcntl
+    """Idempotent: load JSON files in data/frameworks/, upsert FrameworkControl rows.
+
+    Each framework file is committed in its own transaction so a single bad file
+    cannot roll back the others. No file lock — the upsert is safe to run from
+    multiple workers simultaneously (last write wins, which is fine since the
+    source JSON is static per deploy).
+    """
+    import os, glob, json
     from sqlalchemy.orm import Session
     from api.models.models import FrameworkControl, FrameworkType
 
@@ -929,26 +932,18 @@ def _seed_framework_controls() -> None:
     if not files:
         return
 
-    lock_path = "/home/.frameworks_seed.lock"
-    lf = None
-    try:
-        lf = open(lock_path, "a")
-        fcntl.flock(lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (IOError, OSError):
-        if lf is not None:
-            lf.close()
-        return
-    try:
-        with Session(engine) as db:
-            for fp in files:
-                payload = json.loads(open(fp, "r", encoding="utf-8").read())
-                fw_value = payload["framework"]
-                try:
-                    fw_enum = FrameworkType(fw_value)
-                except ValueError:
-                    logger.warning("Unknown framework in %s: %s", fp, fw_value)
-                    continue
-                seen_ids = set()
+    for fp in files:
+        try:
+            payload = json.loads(open(fp, "r", encoding="utf-8").read())
+            fw_value = payload["framework"]
+            try:
+                fw_enum = FrameworkType(fw_value)
+            except ValueError:
+                logger.warning("Unknown framework key in %s: %s — add it to FrameworkType enum", fp, fw_value)
+                continue
+
+            with Session(engine) as db:
+                seen_ids: set = set()
                 for c in payload.get("controls", []):
                     cid = c["control_id"]
                     seen_ids.add(cid)
@@ -983,9 +978,8 @@ def _seed_framework_controls() -> None:
                     db.delete(s)
                 db.commit()
                 logger.info("Seeded %s: %d controls", fw_value, len(seen_ids))
-    finally:
-        fcntl.flock(lf, fcntl.LOCK_UN)
-        lf.close()
+        except Exception as exc:
+            logger.error("Failed to seed framework %s: %s", fp, exc)
 
 
 def _migrate_risk_scale_v2() -> None:
