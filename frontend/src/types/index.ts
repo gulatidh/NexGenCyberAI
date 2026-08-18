@@ -22,7 +22,7 @@ export type ScanType = "vulnerability" | "configuration" | "compliance" | "full"
 export type ScanStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type FrameworkType =
   | "nist_csf" | "nist_800_53" | "cis_v8"
-  | "gdpr" | "iso_27001" | "soc2" | "pci_dss"
+  | "gdpr" | "iso_27001" | "soc2" | "pci_dss" | "gcc_im8"
   | "cis_azure" | "cis_aws" | "cis_aws_db" | "cis_alibaba"
   | "cis_gcp" | "cis_gcp_workspace" | "cis_m365" | "cis_aks" | "cis_azure_compute"
   | "cis_windows_server" | "cis_ubuntu" | "cis_esxi"

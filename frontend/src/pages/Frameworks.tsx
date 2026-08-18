@@ -50,7 +50,7 @@ function getFrameworkFamily(key: string, name?: string, isCustom?: boolean): Fra
   if (k.startsWith("cis_") || k === "cis_v8" || n.startsWith("cis ")) return "CIS";
   if (k.startsWith("nist_") || n.startsWith("nist")) return "NIST";
   if (k.startsWith("zap_") || n.includes("owasp") || n.includes("zap")) return "OWASP";
-  if (["gdpr", "iso_27001", "soc2", "pci_dss"].includes(k)) return "Standards";
+  if (["gdpr", "iso_27001", "soc2", "pci_dss", "gcc_im8"].includes(k)) return "Standards";
   return "Other";
 }
 
