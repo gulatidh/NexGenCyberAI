@@ -9,7 +9,7 @@ import {
   Divider, FormControl, Select,
 } from "@mui/material";
 import {
-  DarkMode, LightMode, Palette, Logout, Settings,
+  DarkMode, LightMode, Palette, BlurOn, Logout, Settings,
   AccountCircle,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
@@ -69,12 +69,13 @@ export default function AppControls({ avatarColor = "#1565C0" }: Props) {
       {/* Theme */}
       <Tooltip title="Theme">
         <IconButton size="small" onClick={(e) => setThemeAnchor(e.currentTarget)} sx={{ color: "text.secondary" }}>
-          {mode === "light" ? <LightMode fontSize="small" /> : mode === "custom" ? <Palette fontSize="small" /> : <DarkMode fontSize="small" />}
+          {mode === "light" ? <LightMode fontSize="small" /> : mode === "glass" ? <BlurOn fontSize="small" /> : mode === "custom" ? <Palette fontSize="small" /> : <DarkMode fontSize="small" />}
         </IconButton>
       </Tooltip>
       <Menu anchorEl={themeAnchor} open={Boolean(themeAnchor)} onClose={() => setThemeAnchor(null)}>
         <MenuItem onClick={() => { setMode("dark");   setThemeAnchor(null); }}><DarkMode  fontSize="small" sx={{ mr: 1 }} />Dark</MenuItem>
         <MenuItem onClick={() => { setMode("light");  setThemeAnchor(null); }}><LightMode fontSize="small" sx={{ mr: 1 }} />Light</MenuItem>
+        <MenuItem onClick={() => { setMode("glass");  setThemeAnchor(null); }}><BlurOn    fontSize="small" sx={{ mr: 1, color: "#8A6FFF" }} />Liquid Glass</MenuItem>
         <MenuItem onClick={() => { setMode("custom"); setThemeAnchor(null); }}><Palette   fontSize="small" sx={{ mr: 1 }} />Custom</MenuItem>
       </Menu>
 
