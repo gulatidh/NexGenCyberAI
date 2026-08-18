@@ -737,6 +737,39 @@ def _ensure_added_columns() -> None:
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
+    # Drop stale CHECK constraints on 'framework' columns so newly-added
+    # FrameworkType enum values (e.g. gcc_im8) can be inserted by the seed.
+    # SQLAlchemy creates these constraints at CREATE TABLE time; they don't
+    # update automatically when new enum values are added to the Python code.
+    # This is a no-op on SQLite (no such constraints) and idempotent on SQL Server.
+    try:
+        dialect = engine.dialect.name
+        if dialect == "mssql":
+            with engine.begin() as conn:
+                # Find and drop any CHECK constraints whose name contains
+                # 'framework' on tables used by the framework seed.
+                rows = conn.execute(text("""
+                    SELECT cc.CONSTRAINT_NAME, cc.TABLE_NAME
+                    FROM INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc
+                    JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
+                      ON cc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+                    WHERE ccu.COLUMN_NAME = 'framework'
+                      AND cc.TABLE_NAME IN (
+                        'framework_controls', 'findings', 'scans',
+                        'control_deficiencies', 'compliance_status'
+                      )
+                """)).fetchall()
+                for row in rows:
+                    try:
+                        conn.execute(text(
+                            f"ALTER TABLE [{row[1]}] DROP CONSTRAINT [{row[0]}]"
+                        ))
+                        logger.info("Dropped stale CHECK constraint %s on %s", row[0], row[1])
+                    except Exception as exc2:
+                        logger.warning("Could not drop constraint %s: %s", row[0], exc2)
+    except Exception as exc:
+        logger.warning("Framework CHECK constraint cleanup failed: %s", exc)
+
 
 def _normalize_enum_case() -> None:
     """One-time migration: lowercase all enum column values so they match the Python enum .values."""
