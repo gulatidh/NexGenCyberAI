@@ -1581,16 +1581,33 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         ip = request.client.host if request.client else "unknown"
         now = _time_mod.time()
         window_start = now - _RATE_LIMIT_WINDOW
+
+        # Prefer per-user bucketing (JWT sub) over per-IP to handle shared NAT
+        user_key = ip
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            try:
+                import base64 as _b64, json as _json
+                token = auth_header.split(" ", 1)[1]
+                payload_b64 = token.split(".")[1]
+                payload_b64 += "=" * (-len(payload_b64) % 4)
+                claims = _json.loads(_b64.urlsafe_b64decode(payload_b64))
+                sub = claims.get("sub") or claims.get("upn") or claims.get("email")
+                if sub:
+                    user_key = sub
+            except Exception:
+                pass
+
         path = request.url.path
 
         # Tighter limit for expensive endpoints
         if request.method == "POST" and any(
             seg in path for seg in ("/scans/", "/agents/run", "/assistant/chat", "/findings/", "/playbook")
         ):
-            bucket_key = f"expensive:{ip}"
+            bucket_key = f"expensive:{user_key}"
             limit = _SCAN_RATE_LIMIT_MAX
         else:
-            bucket_key = f"global:{ip}"
+            bucket_key = f"global:{user_key}"
             limit = _RATE_LIMIT_MAX
 
         hits = _rate_buckets[bucket_key]

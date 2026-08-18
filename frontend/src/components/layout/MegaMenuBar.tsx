@@ -17,7 +17,7 @@ import {
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
   Description, AltRoute, FolderZip, AccountTree,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
-  Hub as HubIcon, Devices, VpnKey, Webhook,
+  Hub as HubIcon, Devices, VpnKey, Webhook, ManageSearch,
 } from "@mui/icons-material";
 
 // ── Phase → route mapping for active highlight ────────────────────────────────
@@ -71,11 +71,12 @@ const MENU: MenuItem[] = [
       {
         heading: "Design",
         items: [
-          { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",          route: "/automate/ai-guardrails",      Icon: Security    },
-          { name: "Threat Models",       desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",     route: "/analyse/threat-models",       Icon: DeviceHub   },
-          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",         route: "/report/frameworks",           Icon: Policy      },
-          { name: "Custom Standards",    desc: "Build your own control framework from existing platform controls.",        route: "/report/custom-frameworks",    Icon: LibraryAdd  },
-          { name: "Data Model",          desc: "Platform ontology — eleven entities, one interactive graph.",             route: "/data-model",                  Icon: AccountTree },
+          { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",          route: "/automate/ai-guardrails",      Icon: Security      },
+          { name: "Audit Logs",          desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",       route: "/platform/audit-logs",         Icon: ManageSearch  },
+          { name: "Threat Models",       desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",     route: "/analyse/threat-models",       Icon: DeviceHub     },
+          { name: "Frameworks",          desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",         route: "/report/frameworks",           Icon: Policy        },
+          { name: "Custom Standards",    desc: "Build your own control framework from existing platform controls.",        route: "/report/custom-frameworks",    Icon: LibraryAdd    },
+          { name: "Data Model",          desc: "Platform ontology — eleven entities, one interactive graph.",             route: "/data-model",                  Icon: AccountTree   },
         ],
       },
     ],

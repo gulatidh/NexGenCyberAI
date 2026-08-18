@@ -5,6 +5,7 @@ from sqlalchemy import text
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 import re
+import time
 
 from db.database import get_db
 from core.security import get_current_user
@@ -97,7 +98,7 @@ async def natural_language_query(
     client_id: str,
     payload: NLQueryRequest,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    user=Depends(get_current_user),
 ):
     from core.ai_providers import get_llm
     from langchain_core.messages import HumanMessage, SystemMessage
@@ -116,12 +117,29 @@ Rules:
 - Use GETDATE() not NOW() or DATE('now')
 - Boolean values are 1/0 not TRUE/FALSE"""
 
+    _t1 = time.time()
     llm = get_llm()
     resp = await llm.ainvoke([
         SystemMessage(content=system_prompt),
         HumanMessage(content=f"<question>{payload.question}</question>"),
     ])
     raw_sql = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+    _latency = int((time.time() - _t1) * 1000)
+    try:
+        from core.ai_providers import log_llm_call
+        _uid = (user.get("sub") or user.get("upn") or user.get("email") or user.get("unique_name") or "unknown") if isinstance(user, dict) else "unknown"
+        log_llm_call(
+            endpoint="nl_query",
+            user_id=_uid,
+            client_id=client_id,
+            provider=getattr(llm, "_llm_type", ""),
+            input_chars=len(payload.question),
+            output_chars=len(raw_sql),
+            latency_ms=_latency,
+            status="ok",
+        )
+    except Exception:
+        pass
 
     # Strip markdown fences if present
     raw_sql = re.sub(r"^```sql\s*", "", raw_sql, flags=re.I)

@@ -1,5 +1,6 @@
 """Platform Assistant — context-injected chat endpoint powered by the configured LLM provider."""
 import logging
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -40,7 +41,7 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/assistant/chat", response_model=ChatResponse)
-async def chat(payload: ChatRequest, _=Depends(get_current_user)):
+async def chat(payload: ChatRequest, user=Depends(get_current_user)):
     """Answer a platform usage question using injected portal documentation."""
     context = _load_context()
     page_hint = f"\n\nThe user is currently on page: {payload.current_page}" if payload.current_page else ""
@@ -56,6 +57,7 @@ async def chat(payload: ChatRequest, _=Depends(get_current_user)):
         f"{context}"
     )
 
+    _t1 = time.time()
     try:
         llm = get_llm()
     except ProviderUnavailableError:
@@ -74,6 +76,21 @@ async def chat(payload: ChatRequest, _=Depends(get_current_user)):
 
     try:
         response = await llm.ainvoke(messages)
+        _latency = int((time.time() - _t1) * 1000)
+        try:
+            from core.ai_providers import log_llm_call
+            _uid = (user.get("sub") or user.get("upn") or user.get("email") or user.get("unique_name") or "unknown") if isinstance(user, dict) else "unknown"
+            log_llm_call(
+                endpoint="assistant_chat",
+                user_id=_uid,
+                provider=getattr(llm, "_llm_type", ""),
+                input_chars=len(payload.message),
+                output_chars=len(str(response.content)),
+                latency_ms=_latency,
+                status="ok",
+            )
+        except Exception:
+            pass
         return ChatResponse(reply=str(response.content))
     except Exception as exc:
         logger.exception("Assistant LLM call failed")

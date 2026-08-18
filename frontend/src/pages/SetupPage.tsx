@@ -2,7 +2,7 @@ import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   People, Storage, Devices, Cable, SyncAlt,
   Tune, Shield, DeviceHub, Policy, LibraryAdd, AccountTree,
-  Settings as SettingsIcon, HelpOutlined,
+  Settings as SettingsIcon, HelpOutlined, ManageSearch,
 } from "@mui/icons-material";
 
 export const SETUP_SECTION: SectionDef = {
@@ -26,6 +26,7 @@ export const SETUP_SECTION: SectionDef = {
     // Design
     { name: "AI Settings",           icon: <Tune />,         desc: "AI provider credentials, model selection, and automatic failover config.", route: "/platform/ai-settings",          group: "Design" },
     { name: "AI Guardrails",         icon: <Shield />,       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",           route: "/automate/ai-guardrails",        group: "Design" },
+    { name: "Audit Logs",            icon: <ManageSearch />, desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",          route: "/platform/audit-logs",           group: "Design" },
     { name: "Threat Models",         icon: <DeviceHub />,    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models",         group: "Design" },
     { name: "Frameworks",            icon: <Policy />,       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",          route: "/report/frameworks",             group: "Design" },
     { name: "Custom Standards",      icon: <LibraryAdd />,   desc: "Build your own control framework from existing platform controls.",         route: "/report/custom-frameworks",      group: "Design" },

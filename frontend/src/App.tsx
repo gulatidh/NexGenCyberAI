@@ -100,6 +100,7 @@ const ComplianceHeatmap   = React.lazy(() => import("./pages/ComplianceHeatmap")
 const ClientComparison    = React.lazy(() => import("./pages/ClientComparison"));
 const EvidencePackage     = React.lazy(() => import("./pages/EvidencePackage"));
 const AIGuardrails        = React.lazy(() => import("./pages/AIGuardrails"));
+const AuditLogs           = React.lazy(() => import("./pages/AuditLogs"));
 const RemediationJobs     = React.lazy(() => import("./pages/RemediationJobs"));
 const AgentRunTrash       = React.lazy(() => import("./pages/AgentRunTrash"));
 const ReportPage          = React.lazy(() => import("./pages/ReportPage"));
@@ -282,6 +283,7 @@ function ProtectedApp() {
             <Route path="connections"         element={<Connections />} />
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
             <Route path="ai-settings"         element={<AISettings />} />
+            <Route path="audit-logs"          element={<AuditLogs />} />
             <Route path="settings"            element={<Settings />} />
             <Route path="help"                element={<Help />} />
           </Route>
