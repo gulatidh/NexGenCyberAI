@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.models.models import Finding, Scan
+from api.models.models import Finding, Scan, AIAgent
 from core.security import get_current_user
 from db.database import get_db
 
@@ -37,42 +37,48 @@ class ScanAdvisoryResponse(BaseModel):
     recommendations: List[AgentRecommendation]
 
 
-# Fallback recommendations by connector category
-_FALLBACK: dict = {
-    "sast": {
-        "banner": "Your code scan found security issues. Threat Intelligence will map these to known vulnerabilities and MITRE ATT&CK techniques, while Remediation Planner will provide developer-ready fix guidance.",
-        "recommendations": [
-            {"agent_key": "threat_intel", "match_score": 92, "reasoning": "Maps code vulnerabilities to CVE database and adversary exploitation patterns.", "bring": ["Completed scan"]},
-            {"agent_key": "remediation", "match_score": 88, "reasoning": "Generates step-by-step fix instructions and code snippets tailored to the specific issues found.", "bring": ["Completed scan"]},
-        ],
-    },
-    "cloud": {
-        "banner": "Your cloud posture scan identified configuration risks. Risk Manager will quantify business impact using FAIR methodology, and Compliance Monitor will check against CIS and NIST benchmarks.",
-        "recommendations": [
-            {"agent_key": "risk_manager", "match_score": 94, "reasoning": "Translates cloud misconfigurations into financial exposure estimates using FAIR-lite ALE model.", "bring": ["Completed scan", "Asset criticality context"]},
-            {"agent_key": "compliance_monitor", "match_score": 89, "reasoning": "Maps cloud findings to CIS, NIST CSF, and ISO 27001 controls to identify compliance gaps.", "bring": ["Completed scan", "Target framework"]},
-        ],
-    },
-    "default": {
-        "banner": "Your scan has completed. Run Threat Intelligence to enrich findings with CVE data and MITRE ATT&CK mapping, then use Remediation Planner to generate prioritised fix guidance.",
-        "recommendations": [
-            {"agent_key": "threat_intel", "match_score": 90, "reasoning": "Enriches findings with CVE details, threat actor profiles, and MITRE ATT&CK technique mapping.", "bring": ["Completed scan"]},
-            {"agent_key": "remediation", "match_score": 85, "reasoning": "Converts findings into a prioritised remediation plan with SLA targets and suggested owners.", "bring": ["Completed scan"]},
-        ],
-    },
-}
-
 _CLOUD_TYPES = {"azure", "aws", "gcp"}
 _SAST_TYPES = {"semgrep", "codeql", "ai_code_review", "sonarqube", "gitleaks", "trufflehog"}
+_NETWORK_TYPES = {"nmap", "openvas", "trivy", "tenable", "qualys", "rapid7", "burp_enterprise", "web"}
 
 
 def _get_fallback(connector_type: str) -> dict:
     ct = (connector_type or "").lower()
     if ct in _CLOUD_TYPES:
-        return _FALLBACK["cloud"]
+        return {
+            "banner": "Your cloud scan identified configuration and posture risks. These agents are best suited to quantify business impact, map to compliance frameworks, and assess IAM exposure.",
+            "recommendations": [
+                {"agent_key": "risk_manager", "match_score": 94, "reasoning": "Translates cloud misconfigurations into financial ALE exposure using FAIR methodology.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
+                {"agent_key": "iam_posture_advisor", "match_score": 88, "reasoning": "Reviews IAM policies and privilege chains — critical for cloud scans where over-privilege is the most common risk.", "bring": ["IAM posture assessment", "Privilege escalation paths", "Least-privilege recommendations"]},
+                {"agent_key": "compliance_monitor", "match_score": 82, "reasoning": "Maps cloud findings to CIS and NIST benchmarks to identify compliance gaps.", "bring": ["Control gap report", "Framework compliance %", "Audit evidence"]},
+            ],
+        }
     if ct in _SAST_TYPES:
-        return _FALLBACK["sast"]
-    return _FALLBACK["default"]
+        return {
+            "banner": "Your code scan found security vulnerabilities. These agents will enrich with CVE data, map to MITRE ATT&CK, and produce developer-ready remediation guidance.",
+            "recommendations": [
+                {"agent_key": "appsec_advisor", "match_score": 95, "reasoning": "Specifically designed for application security findings — reviews code-level risks and proposes secure design patterns.", "bring": ["AppSec risk findings", "Secure design recommendations", "OWASP mapping"]},
+                {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Maps code vulnerabilities to known CVEs and adversary exploitation techniques.", "bring": ["CVE enrichment", "MITRE ATT&CK techniques", "Exploit likelihood"]},
+                {"agent_key": "remediation", "match_score": 83, "reasoning": "Generates fix instructions and playbooks for the specific code issues found.", "bring": ["Prioritised remediation actions", "Developer fix guidance", "SLA targets"]},
+            ],
+        }
+    if ct in _NETWORK_TYPES:
+        return {
+            "banner": "Your network or vulnerability scan has results. Run these agents to prioritise remediation, map threat actor activity, and assess compliance posture.",
+            "recommendations": [
+                {"agent_key": "vuln_commander", "match_score": 93, "reasoning": "Purpose-built for vulnerability triage — cuts through severity noise with exploitability and asset criticality weighting.", "bring": ["Exploitability-ranked findings", "Top-10 actionable vulns", "Asset criticality context"]},
+                {"agent_key": "threat_intel", "match_score": 87, "reasoning": "Correlates network findings with active threat actor TTPs and MITRE ATT&CK techniques.", "bring": ["CVE enrichment", "Threat actor profiles", "MITRE techniques"]},
+                {"agent_key": "nist_assessment_advisor", "match_score": 80, "reasoning": "Maps network findings to NIST SP 800-53 controls for compliance posture reporting.", "bring": ["NIST control mapping", "Compliance gap report", "Audit-ready findings"]},
+            ],
+        }
+    return {
+        "banner": "Your scan has completed. These agents offer the best starting points for enrichment, risk quantification, and remediation planning.",
+        "recommendations": [
+            {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Enriches findings with CVE details, threat actor profiles, and MITRE ATT&CK technique mapping.", "bring": ["CVE enrichment", "MITRE techniques", "Threat actor profiles"]},
+            {"agent_key": "risk_manager", "match_score": 84, "reasoning": "Converts findings into risk-scored entries using FAIR methodology.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
+            {"agent_key": "remediation", "match_score": 79, "reasoning": "Generates a prioritised remediation plan with SLA targets and suggested owners.", "bring": ["Prioritised actions", "SLA targets", "Owner assignments"]},
+        ],
+    }
 
 
 @router.post("/clients/{client_id}/ai-review/scan-advisory", response_model=ScanAdvisoryResponse)
@@ -117,7 +123,20 @@ async def scan_advisory(
     elif "connector_type" in scan_summary:
         connector_type = scan_summary["connector_type"]
 
-    prompt = f"""You are a security AI orchestration advisor inside Monitara. Analyze this completed scan and recommend which AI agents to run next.
+    # Load full live agent catalog from DB — only enabled agents
+    all_agents = (
+        db.query(AIAgent)
+        .filter(AIAgent.is_enabled == True)
+        .order_by(AIAgent.group_key, AIAgent.name)
+        .all()
+    )
+    agent_lines = []
+    for a in all_agents:
+        desc = (a.description or a.objective or "AI security agent")[:120]
+        agent_lines.append(f'- {a.key} ({a.group_label}): {desc}')
+    agent_list = "\n".join(agent_lines) if agent_lines else "- orchestrator: Full pipeline\n- threat_intel: CVE enrichment\n- risk_manager: Risk scoring"
+
+    prompt = f"""You are a security AI orchestration advisor inside Monitara. Analyze this completed scan and recommend the 3 most relevant AI agents to run next.
 
 Scan: {scan.name}
 Connector type: {connector_type or "unknown"}
@@ -125,18 +144,20 @@ Findings: {total} total — {sev_counts['critical']} critical, {sev_counts['high
 Top findings: {', '.join(top_titles) if top_titles else 'none'}
 Resource types: {', '.join(sorted(resource_types)) if resource_types else 'various'}
 
-Available agents (use these exact keys):
-- orchestrator: Full pipeline — runs threat intel, compliance analysis, and remediation planning together
-- risk_manager: FAIR-based risk quantification and ALE scoring
-- threat_intel: CVE enrichment, threat actor correlation, MITRE ATT&CK mapping
-- compliance_monitor: Framework compliance gap analysis (NIST, ISO 27001, PCI DSS, CIS, GCC IM8, MAS TRM)
-- remediation: Prioritized remediation planning with SLA targets
-- ai_code_review: Source code security review (only relevant for SAST scans)
+Full agent catalog (agent_key · group · description):
+{agent_list}
+
+Your job: read the scan data carefully and pick the 3 agents that will deliver the most value for THIS specific scan. Consider:
+- What does the severity distribution suggest? (many criticals → triage/threat intel; compliance failures → compliance agents)
+- What does the connector type suggest? (cloud scan → cloud posture or risk agents; SAST → code-focused agents; network → vuln management)
+- Which groups have agents that directly address the dominant finding patterns?
+- Avoid recommending the same agent family twice unless there is a strong reason.
+- Do NOT always recommend the same 3 agents. Be creative and specific to this scan's data.
 
 Return ONLY valid JSON (no markdown, no explanation):
-{{"banner": "1-2 sentence analysis of this scan and why the recommended agents fit", "recommendations": [{{"agent_key": "one of the keys above", "match_score": 0-100, "reasoning": "one sentence why this agent is the best fit for this specific scan", "bring": ["list", "of", "what is available or needed"]}}]}}
+{{"banner": "2-sentence analysis of what this scan found and why these 3 agents are the best match", "recommendations": [{{"agent_key": "exact key from the catalog above", "match_score": 0-100, "reasoning": "one sentence explaining why this specific agent fits this specific scan", "bring": ["3-4 concise benefit bullets of what this agent will deliver"]}}]}}
 
-Return 2-3 recommendations ranked by fit. For vulnerability scans recommend threat_intel first. For compliance/config scans recommend compliance_monitor. For cloud scans recommend risk_manager. Always include remediation unless it is already the top pick. Never recommend ai_code_review unless connector_type is sast or ai_code_review."""
+Return exactly 3 recommendations ranked by fit score, descending."""
 
     try:
         from core.ai_providers import get_llm
