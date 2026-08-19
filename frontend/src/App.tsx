@@ -97,6 +97,7 @@ const CVEPivot            = React.lazy(() => import("./pages/CVEPivot"));
 const OntologyPage        = React.lazy(() => import("./pages/OntologyPage"));
 const NLQuery             = React.lazy(() => import("./pages/NLQuery"));
 const AIAssistedScan      = React.lazy(() => import("./pages/AIAssistedScan"));
+const AIAssistedReview    = React.lazy(() => import("./pages/AIAssistedReview"));
 const PostureTrends       = React.lazy(() => import("./pages/PostureTrends"));
 const ComplianceHeatmap   = React.lazy(() => import("./pages/ComplianceHeatmap"));
 const ClientComparison    = React.lazy(() => import("./pages/ClientComparison"));
@@ -272,6 +273,7 @@ function ProtectedApp() {
             <Route path="knowledge"    element={<KnowledgeBase />} />
             <Route path="reports"      element={<Reports />} />
             <Route path="ai-scan"      element={<AIAssistedScan />} />
+            <Route path="ai-review"    element={<AIAssistedReview />} />
             <Route path="nl-query"     element={<NLQuery />} />
             <Route path="ai-guardrails" element={<AIGuardrails />} />
             <Route path="webhooks"     element={<Webhooks />} />

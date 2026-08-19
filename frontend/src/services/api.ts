@@ -799,3 +799,9 @@ export const remediationJobsApi = {
   delete: (clientId: string, jobId: string) =>
     api.delete(`/clients/${clientId}/remediation-jobs/${jobId}`).then(r => r.data),
 };
+
+
+export const aiReviewApi = {
+  scanAdvisory: (clientId: string, scanId: string) =>
+    api.post(`/clients/${clientId}/ai-review/scan-advisory`, { scan_id: scanId }).then(r => r.data),
+};

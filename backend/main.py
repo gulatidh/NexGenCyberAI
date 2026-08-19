@@ -87,6 +87,13 @@ except Exception as _e:
     scan_import_router = None
     logger.warning("scan_import router not loaded: %s", _e)
 
+try:
+    from api.routers.ai_review import router as ai_review_router
+    logger.info("ai_review router loaded")
+except Exception as _e:
+    ai_review_router = None
+    logger.warning("ai_review router not loaded: %s", _e)
+
 settings = get_settings()
 
 # Create DB tables
@@ -2036,6 +2043,9 @@ for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
 
 if scan_import_router is not None:
     app.include_router(scan_import_router, prefix="/api/v1")
+
+if ai_review_router is not None:
+    app.include_router(ai_review_router, prefix="/api/v1")
 
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────

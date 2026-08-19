@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  SmartToy, Hub, BugReport, MenuBook, Assessment, Search, Shield, Webhook, VpnKey,
+  SmartToy, Hub, BugReport, MenuBook, Assessment, Search, Shield, Webhook, VpnKey, RateReview,
 } from "@mui/icons-material";
 
 export const AUTOMATE_SECTION: SectionDef = {
@@ -18,7 +18,8 @@ export const AUTOMATE_SECTION: SectionDef = {
     // AI Agents
     { name: "AI Buddies",       icon: <SmartToy />,    desc: "60+ AI agents — orchestrator, risk, threat intel, and remediation planner.", route: "/automate/agents",        group: "AI Agents" },
     { name: "AI Workflows",     icon: <Hub />,         desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows",     group: "AI Agents" },
-    { name: "AI Assisted Scan", icon: <BugReport />,   desc: "Conversational guided assessment — describe the environment, AI configures.",route: "/automate/ai-scan",       group: "AI Agents" },
+    { name: "AI Assisted Scan",   icon: <BugReport />,    desc: "Conversational guided assessment — describe the environment, AI configures.",  route: "/automate/ai-scan",    group: "AI Agents" },
+    { name: "AI Assisted Review", icon: <RateReview />, desc: "Select a completed assessment and let AI recommend which agents to run next.",    route: "/automate/ai-review",  group: "AI Agents" },
     // Knowledge
     { name: "Knowledge Base",   icon: <MenuBook />,    desc: "Platform knowledge base and Aegis reference documentation.",                 route: "/automate/knowledge",     group: "Knowledge" },
     { name: "Reports",          icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                           route: "/automate/reports",       group: "Knowledge" },
