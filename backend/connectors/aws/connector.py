@@ -72,147 +72,584 @@ class AWSConnector(BaseConnector):
         except Exception as exc:
             return ConnectorTestResult(success=False, message=str(exc))
 
-    async def get_resources(self) -> List[Dict[str, Any]]:
+    async def get_resources(self) -> List[Dict[str, Any]]:  # noqa: C901
         session = self._session()
+        region = self.config.get("region", "ap-southeast-1")
         resources = []
 
-        # S3 Buckets
+        def _tag_name(tags, fallback=""):
+            return next((t["Value"] for t in (tags or []) if t["Key"] == "Name"), fallback)
+
+        # ── S3 Buckets ────────────────────────────────────────────────────────
         try:
             s3 = session.client("s3")
-            buckets = s3.list_buckets().get("Buckets", [])
-            for b in buckets:
+            for b in s3.list_buckets().get("Buckets", []):
                 name = b["Name"]
-                config = {"versioning": None, "encryption": None, "public_access_blocked": None, "logging": None}
+                cfg: Dict[str, Any] = {}
                 try:
-                    v = s3.get_bucket_versioning(Bucket=name)
-                    config["versioning"] = v.get("Status") == "Enabled"
+                    cfg["versioning"] = s3.get_bucket_versioning(Bucket=name).get("Status") == "Enabled"
                 except Exception:
                     pass
                 try:
-                    enc = s3.get_bucket_encryption(Bucket=name)
-                    config["encryption"] = bool(enc.get("ServerSideEncryptionConfiguration"))
+                    cfg["encryption"] = bool(s3.get_bucket_encryption(Bucket=name).get("ServerSideEncryptionConfiguration"))
                 except Exception:
-                    config["encryption"] = False
+                    cfg["encryption"] = False
                 try:
-                    pab = s3.get_public_access_block(Bucket=name)
-                    pab_cfg = pab.get("PublicAccessBlockConfiguration", {})
-                    config["public_access_blocked"] = all([
-                        pab_cfg.get("BlockPublicAcls"), pab_cfg.get("BlockPublicPolicy"),
-                        pab_cfg.get("IgnorePublicAcls"), pab_cfg.get("RestrictPublicBuckets"),
-                    ])
+                    pab = s3.get_public_access_block(Bucket=name).get("PublicAccessBlockConfiguration", {})
+                    cfg["public_access_blocked"] = all([pab.get("BlockPublicAcls"), pab.get("BlockPublicPolicy"),
+                                                        pab.get("IgnorePublicAcls"), pab.get("RestrictPublicBuckets")])
                 except Exception:
                     pass
                 try:
-                    log = s3.get_bucket_logging(Bucket=name)
-                    config["logging"] = bool(log.get("LoggingEnabled"))
+                    cfg["logging"] = bool(s3.get_bucket_logging(Bucket=name).get("LoggingEnabled"))
                 except Exception:
                     pass
-                resources.append({
-                    "id": f"arn:aws:s3:::{name}", "name": name,
-                    "type": "AWS::S3::Bucket", "location": "",
-                    "config": config,
-                })
+                resources.append({"id": f"arn:aws:s3:::{name}", "name": name, "type": "AWS::S3::Bucket", "location": "", "config": cfg})
         except Exception as exc:
-            logger.debug("AWS get_resources S3 failed: %s", exc)
+            logger.debug("S3 failed: %s", exc)
 
-        # EC2 Instances
+        # ── EC2 Instances ─────────────────────────────────────────────────────
         try:
             ec2 = session.client("ec2")
-            pages = ec2.get_paginator("describe_instances").paginate()
-            for page in pages:
+            for page in ec2.get_paginator("describe_instances").paginate():
                 for res in page["Reservations"]:
                     for inst in res["Instances"]:
                         iid = inst.get("InstanceId", "")
-                        name = next((t["Value"] for t in inst.get("Tags", []) if t["Key"] == "Name"), iid)
                         resources.append({
-                            "id": iid, "name": name,
+                            "id": iid, "name": _tag_name(inst.get("Tags"), iid),
                             "type": "AWS::EC2::Instance",
-                            "location": inst.get("Placement", {}).get("AvailabilityZone", ""),
+                            "location": inst.get("Placement", {}).get("AvailabilityZone", region),
                             "config": {
                                 "state": inst.get("State", {}).get("Name"),
+                                "instance_type": inst.get("InstanceType"),
                                 "public_ip": inst.get("PublicIpAddress"),
+                                "private_ip": inst.get("PrivateIpAddress"),
                                 "iam_profile": bool(inst.get("IamInstanceProfile")),
                                 "ebs_optimized": inst.get("EbsOptimized"),
                                 "monitoring": inst.get("Monitoring", {}).get("State"),
+                                "platform": inst.get("Platform", "linux"),
                             },
                         })
         except Exception as exc:
-            logger.debug("AWS get_resources EC2 failed: %s", exc)
+            logger.debug("EC2 failed: %s", exc)
 
-        # RDS Instances
+        # ── VPCs ──────────────────────────────────────────────────────────────
+        try:
+            ec2 = session.client("ec2")
+            for page in ec2.get_paginator("describe_vpcs").paginate():
+                for vpc in page.get("Vpcs", []):
+                    vid = vpc.get("VpcId", "")
+                    resources.append({
+                        "id": vid, "name": _tag_name(vpc.get("Tags"), vid),
+                        "type": "AWS::EC2::VPC", "location": region,
+                        "config": {
+                            "cidr": vpc.get("CidrBlock"),
+                            "is_default": vpc.get("IsDefault"),
+                            "state": vpc.get("State"),
+                            "tenancy": vpc.get("InstanceTenancy"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("VPC failed: %s", exc)
+
+        # ── Security Groups ───────────────────────────────────────────────────
+        try:
+            ec2 = session.client("ec2")
+            for page in ec2.get_paginator("describe_security_groups").paginate():
+                for sg in page.get("SecurityGroups", []):
+                    any_open = any(
+                        any(r.get("CidrIp") == "0.0.0.0/0" or r.get("CidrIpv6") == "::/0"
+                            for r in perm.get("IpRanges", []) + [{"CidrIpv6": x.get("CidrIpv6")} for x in perm.get("Ipv6Ranges", [])])
+                        for perm in sg.get("IpPermissions", [])
+                    )
+                    resources.append({
+                        "id": sg.get("GroupId", ""), "name": sg.get("GroupName", ""),
+                        "type": "AWS::EC2::SecurityGroup", "location": region,
+                        "config": {"vpc_id": sg.get("VpcId"), "has_open_inbound": any_open,
+                                   "inbound_rule_count": len(sg.get("IpPermissions", []))},
+                    })
+        except Exception as exc:
+            logger.debug("SecurityGroups failed: %s", exc)
+
+        # ── Elastic Load Balancers (ALB/NLB) ──────────────────────────────────
+        try:
+            elbv2 = session.client("elbv2")
+            for page in elbv2.get_paginator("describe_load_balancers").paginate():
+                for lb in page.get("LoadBalancers", []):
+                    resources.append({
+                        "id": lb.get("LoadBalancerArn", ""), "name": lb.get("LoadBalancerName", ""),
+                        "type": "AWS::ElasticLoadBalancingV2::LoadBalancer", "location": region,
+                        "config": {
+                            "type": lb.get("Type"),
+                            "scheme": lb.get("Scheme"),
+                            "state": lb.get("State", {}).get("Code"),
+                            "dns_name": lb.get("DNSName"),
+                            "vpc_id": lb.get("VpcId"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("ELBv2 failed: %s", exc)
+
+        # ── RDS Instances ─────────────────────────────────────────────────────
         try:
             rds = session.client("rds")
-            paginator = rds.get_paginator("describe_db_instances")
-            for page in paginator.paginate():
+            for page in rds.get_paginator("describe_db_instances").paginate():
                 for db in page.get("DBInstances", []):
                     resources.append({
                         "id": db.get("DBInstanceArn", ""), "name": db.get("DBInstanceIdentifier", ""),
-                        "type": "AWS::RDS::DBInstance",
-                        "location": db.get("AvailabilityZone", ""),
+                        "type": "AWS::RDS::DBInstance", "location": db.get("AvailabilityZone", region),
                         "config": {
-                            "engine": db.get("Engine"),
-                            "engine_version": db.get("EngineVersion"),
+                            "engine": db.get("Engine"), "engine_version": db.get("EngineVersion"),
+                            "instance_class": db.get("DBInstanceClass"),
                             "publicly_accessible": db.get("PubliclyAccessible"),
                             "storage_encrypted": db.get("StorageEncrypted"),
                             "multi_az": db.get("MultiAZ"),
-                            "auto_minor_upgrade": db.get("AutoMinorVersionUpgrade"),
                             "backup_retention_days": db.get("BackupRetentionPeriod"),
                             "deletion_protection": db.get("DeletionProtection"),
                         },
                     })
         except Exception as exc:
-            logger.debug("AWS get_resources RDS failed: %s", exc)
+            logger.debug("RDS failed: %s", exc)
 
-        # Security Groups (summary)
+        # ── DynamoDB Tables ───────────────────────────────────────────────────
         try:
-            ec2 = session.client("ec2")
-            sg_paginator = ec2.get_paginator("describe_security_groups")
-            for page in sg_paginator.paginate():
-                for sg in page.get("SecurityGroups", []):
-                    any_open = any(
-                        any(
-                            r.get("CidrIp") == "0.0.0.0/0" or r.get("CidrIpv6") == "::/0"
-                            for r in (perm.get("IpRanges", []) + [{"CidrIpv6": x.get("CidrIpv6")} for x in perm.get("Ipv6Ranges", [])])
-                        )
-                        for perm in sg.get("IpPermissions", [])
-                    )
-                    resources.append({
-                        "id": sg.get("GroupId", ""), "name": sg.get("GroupName", ""),
-                        "type": "AWS::EC2::SecurityGroup", "location": "",
-                        "config": {
-                            "vpc_id": sg.get("VpcId"),
-                            "has_open_inbound": any_open,
-                            "inbound_rule_count": len(sg.get("IpPermissions", [])),
-                        },
-                    })
+            ddb = session.client("dynamodb")
+            for page in ddb.get_paginator("list_tables").paginate():
+                for tname in page.get("TableNames", []):
+                    try:
+                        tbl = ddb.describe_table(TableName=tname).get("Table", {})
+                        resources.append({
+                            "id": tbl.get("TableArn", tname), "name": tname,
+                            "type": "AWS::DynamoDB::Table", "location": region,
+                            "config": {
+                                "status": tbl.get("TableStatus"),
+                                "item_count": tbl.get("ItemCount"),
+                                "size_bytes": tbl.get("TableSizeBytes"),
+                                "billing_mode": tbl.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED"),
+                                "point_in_time_recovery": tbl.get("PointInTimeRecoveryDescription", {}).get("PointInTimeRecoveryStatus"),
+                            },
+                        })
+                    except Exception:
+                        pass
         except Exception as exc:
-            logger.debug("AWS get_resources SecurityGroups failed: %s", exc)
+            logger.debug("DynamoDB failed: %s", exc)
 
-        # Lambda Functions
+        # ── Lambda Functions ──────────────────────────────────────────────────
         try:
             lam = session.client("lambda")
-            paginator = lam.get_paginator("list_functions")
-            for page in paginator.paginate():
+            for page in lam.get_paginator("list_functions").paginate():
                 for fn in page.get("Functions", []):
                     resources.append({
-                        "id": fn.get("FunctionArn", ""),
-                        "name": fn.get("FunctionName", ""),
-                        "type": "AWS::Lambda::Function",
-                        "location": self.config.get("region", "ap-southeast-1"),
+                        "id": fn.get("FunctionArn", ""), "name": fn.get("FunctionName", ""),
+                        "type": "AWS::Lambda::Function", "location": region,
                         "config": {
-                            "runtime": fn.get("Runtime"),
-                            "handler": fn.get("Handler"),
-                            "memory_mb": fn.get("MemorySize"),
-                            "timeout_sec": fn.get("Timeout"),
+                            "runtime": fn.get("Runtime"), "handler": fn.get("Handler"),
+                            "memory_mb": fn.get("MemorySize"), "timeout_sec": fn.get("Timeout"),
                             "last_modified": fn.get("LastModified"),
                             "code_size_bytes": fn.get("CodeSize"),
                             "role": fn.get("Role"),
+                            "package_type": fn.get("PackageType"),
                         },
                     })
         except Exception as exc:
-            logger.debug("AWS get_resources Lambda failed: %s", exc)
+            logger.debug("Lambda failed: %s", exc)
 
-        return resources[:200]
+        # ── EKS Clusters ──────────────────────────────────────────────────────
+        try:
+            eks = session.client("eks")
+            for name in eks.list_clusters().get("clusters", []):
+                try:
+                    cl = eks.describe_cluster(name=name).get("cluster", {})
+                    resources.append({
+                        "id": cl.get("arn", name), "name": name,
+                        "type": "AWS::EKS::Cluster", "location": region,
+                        "config": {
+                            "status": cl.get("status"),
+                            "k8s_version": cl.get("version"),
+                            "endpoint_public": cl.get("resourcesVpcConfig", {}).get("endpointPublicAccess"),
+                            "endpoint_private": cl.get("resourcesVpcConfig", {}).get("endpointPrivateAccess"),
+                            "logging_enabled": bool(cl.get("logging", {}).get("clusterLogging")),
+                            "secrets_encrypted": bool(cl.get("encryptionConfig")),
+                        },
+                    })
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.debug("EKS failed: %s", exc)
+
+        # ── ECS Clusters ──────────────────────────────────────────────────────
+        try:
+            ecs = session.client("ecs")
+            arns = []
+            for page in ecs.get_paginator("list_clusters").paginate():
+                arns += page.get("clusterArns", [])
+            if arns:
+                for cl in ecs.describe_clusters(clusters=arns).get("clusters", []):
+                    resources.append({
+                        "id": cl.get("clusterArn", ""), "name": cl.get("clusterName", ""),
+                        "type": "AWS::ECS::Cluster", "location": region,
+                        "config": {
+                            "status": cl.get("status"),
+                            "running_tasks": cl.get("runningTasksCount"),
+                            "pending_tasks": cl.get("pendingTasksCount"),
+                            "active_services": cl.get("activeServicesCount"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("ECS failed: %s", exc)
+
+        # ── SQS Queues ────────────────────────────────────────────────────────
+        try:
+            sqs = session.client("sqs")
+            for page in sqs.get_paginator("list_queues").paginate():
+                for url in page.get("QueueUrls", []):
+                    name = url.split("/")[-1]
+                    resources.append({
+                        "id": url, "name": name,
+                        "type": "AWS::SQS::Queue", "location": region,
+                        "config": {"url": url, "is_fifo": name.endswith(".fifo")},
+                    })
+        except Exception as exc:
+            logger.debug("SQS failed: %s", exc)
+
+        # ── SNS Topics ────────────────────────────────────────────────────────
+        try:
+            sns = session.client("sns")
+            for page in sns.get_paginator("list_topics").paginate():
+                for t in page.get("Topics", []):
+                    arn = t.get("TopicArn", "")
+                    resources.append({
+                        "id": arn, "name": arn.split(":")[-1],
+                        "type": "AWS::SNS::Topic", "location": region,
+                        "config": {"arn": arn},
+                    })
+        except Exception as exc:
+            logger.debug("SNS failed: %s", exc)
+
+        # ── API Gateway (REST APIs) ────────────────────────────────────────────
+        try:
+            apigw = session.client("apigateway")
+            for page in apigw.get_paginator("get_rest_apis").paginate():
+                for api in page.get("items", []):
+                    resources.append({
+                        "id": api.get("id", ""), "name": api.get("name", ""),
+                        "type": "AWS::ApiGateway::RestApi", "location": region,
+                        "config": {
+                            "description": api.get("description"),
+                            "endpoint_type": api.get("endpointConfiguration", {}).get("types", [None])[0],
+                            "created_date": str(api.get("createdDate", "")),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("APIGateway failed: %s", exc)
+
+        # ── CloudFront Distributions ──────────────────────────────────────────
+        try:
+            cf = session.client("cloudfront")
+            for page in cf.get_paginator("list_distributions").paginate():
+                for dist in page.get("DistributionList", {}).get("Items", []):
+                    resources.append({
+                        "id": dist.get("ARN", ""), "name": dist.get("DomainName", ""),
+                        "type": "AWS::CloudFront::Distribution", "location": "global",
+                        "config": {
+                            "status": dist.get("Status"),
+                            "domain_name": dist.get("DomainName"),
+                            "https_only": dist.get("ViewerCertificate", {}).get("MinimumProtocolVersion"),
+                            "waf_enabled": bool(dist.get("WebACLId")),
+                            "price_class": dist.get("PriceClass"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("CloudFront failed: %s", exc)
+
+        # ── Route53 Hosted Zones ──────────────────────────────────────────────
+        try:
+            r53 = session.client("route53")
+            for page in r53.get_paginator("list_hosted_zones").paginate():
+                for zone in page.get("HostedZones", []):
+                    resources.append({
+                        "id": zone.get("Id", ""), "name": zone.get("Name", "").rstrip("."),
+                        "type": "AWS::Route53::HostedZone", "location": "global",
+                        "config": {
+                            "record_count": zone.get("ResourceRecordSetCount"),
+                            "private": zone.get("Config", {}).get("PrivateZone"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("Route53 failed: %s", exc)
+
+        # ── ElastiCache Clusters ──────────────────────────────────────────────
+        try:
+            ec_client = session.client("elasticache")
+            for page in ec_client.get_paginator("describe_cache_clusters").paginate():
+                for cl in page.get("CacheClusters", []):
+                    resources.append({
+                        "id": cl.get("ARN", cl.get("CacheClusterId", "")), "name": cl.get("CacheClusterId", ""),
+                        "type": "AWS::ElastiCache::CacheCluster", "location": cl.get("PreferredAvailabilityZone", region),
+                        "config": {
+                            "engine": cl.get("Engine"), "engine_version": cl.get("EngineVersion"),
+                            "status": cl.get("CacheClusterStatus"),
+                            "node_type": cl.get("CacheNodeType"),
+                            "num_nodes": cl.get("NumCacheNodes"),
+                            "at_rest_encrypted": cl.get("AtRestEncryptionEnabled"),
+                            "transit_encrypted": cl.get("TransitEncryptionEnabled"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("ElastiCache failed: %s", exc)
+
+        # ── Kinesis Streams ───────────────────────────────────────────────────
+        try:
+            kin = session.client("kinesis")
+            for page in kin.get_paginator("list_streams").paginate():
+                for sname in page.get("StreamNames", []):
+                    try:
+                        s = kin.describe_stream_summary(StreamName=sname).get("StreamDescriptionSummary", {})
+                        resources.append({
+                            "id": s.get("StreamARN", sname), "name": sname,
+                            "type": "AWS::Kinesis::Stream", "location": region,
+                            "config": {
+                                "status": s.get("StreamStatus"),
+                                "shard_count": s.get("OpenShardCount"),
+                                "retention_hours": s.get("RetentionPeriodHours"),
+                                "encryption_type": s.get("EncryptionType"),
+                            },
+                        })
+                    except Exception:
+                        pass
+        except Exception as exc:
+            logger.debug("Kinesis failed: %s", exc)
+
+        # ── Secrets Manager ───────────────────────────────────────────────────
+        try:
+            sm = session.client("secretsmanager")
+            for page in sm.get_paginator("list_secrets").paginate():
+                for sec in page.get("SecretList", []):
+                    resources.append({
+                        "id": sec.get("ARN", ""), "name": sec.get("Name", ""),
+                        "type": "AWS::SecretsManager::Secret", "location": region,
+                        "config": {
+                            "rotation_enabled": sec.get("RotationEnabled"),
+                            "last_rotated": str(sec.get("LastRotatedDate", "")),
+                            "last_accessed": str(sec.get("LastAccessedDate", "")),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("SecretsManager failed: %s", exc)
+
+        # ── KMS Keys ──────────────────────────────────────────────────────────
+        try:
+            kms = session.client("kms")
+            for page in kms.get_paginator("list_keys").paginate():
+                for k in page.get("Keys", []):
+                    try:
+                        meta = kms.describe_key(KeyId=k["KeyId"]).get("KeyMetadata", {})
+                        if meta.get("KeyState") != "Enabled":
+                            continue
+                        resources.append({
+                            "id": meta.get("Arn", k["KeyId"]), "name": meta.get("Description") or k["KeyId"],
+                            "type": "AWS::KMS::Key", "location": region,
+                            "config": {
+                                "key_usage": meta.get("KeyUsage"),
+                                "key_spec": meta.get("KeySpec"),
+                                "origin": meta.get("Origin"),
+                                "rotation_enabled": meta.get("KeyRotationStatus"),
+                                "key_manager": meta.get("KeyManager"),
+                            },
+                        })
+                    except Exception:
+                        pass
+        except Exception as exc:
+            logger.debug("KMS failed: %s", exc)
+
+        # ── ECR Repositories ──────────────────────────────────────────────────
+        try:
+            ecr = session.client("ecr")
+            for page in ecr.get_paginator("describe_repositories").paginate():
+                for repo in page.get("repositories", []):
+                    resources.append({
+                        "id": repo.get("repositoryArn", ""), "name": repo.get("repositoryName", ""),
+                        "type": "AWS::ECR::Repository", "location": region,
+                        "config": {
+                            "uri": repo.get("repositoryUri"),
+                            "image_tag_mutability": repo.get("imageTagMutability"),
+                            "scan_on_push": repo.get("imageScanningConfiguration", {}).get("scanOnPush"),
+                            "encryption_type": repo.get("encryptionConfiguration", {}).get("encryptionType"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("ECR failed: %s", exc)
+
+        # ── Redshift Clusters ─────────────────────────────────────────────────
+        try:
+            rs = session.client("redshift")
+            for page in rs.get_paginator("describe_clusters").paginate():
+                for cl in page.get("Clusters", []):
+                    resources.append({
+                        "id": cl.get("ClusterNamespaceArn", cl.get("ClusterIdentifier", "")),
+                        "name": cl.get("ClusterIdentifier", ""),
+                        "type": "AWS::Redshift::Cluster", "location": cl.get("AvailabilityZone", region),
+                        "config": {
+                            "status": cl.get("ClusterStatus"),
+                            "node_type": cl.get("NodeType"),
+                            "number_of_nodes": cl.get("NumberOfNodes"),
+                            "publicly_accessible": cl.get("PubliclyAccessible"),
+                            "encrypted": cl.get("Encrypted"),
+                            "db_name": cl.get("DBName"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("Redshift failed: %s", exc)
+
+        # ── OpenSearch / Elasticsearch Domains ────────────────────────────────
+        try:
+            oss = session.client("opensearch")
+            for domain_info in oss.list_domain_names().get("DomainNames", []):
+                try:
+                    d = oss.describe_domain(DomainName=domain_info["DomainName"]).get("DomainStatus", {})
+                    resources.append({
+                        "id": d.get("ARN", ""), "name": d.get("DomainName", ""),
+                        "type": "AWS::OpenSearchService::Domain", "location": region,
+                        "config": {
+                            "engine_version": d.get("EngineVersion"),
+                            "processing": d.get("Processing"),
+                            "endpoint": d.get("Endpoint"),
+                            "encryption_at_rest": d.get("EncryptionAtRestOptions", {}).get("Enabled"),
+                            "node_to_node_encryption": d.get("NodeToNodeEncryptionOptions", {}).get("Enabled"),
+                            "enforce_https": d.get("DomainEndpointOptions", {}).get("EnforceHTTPS"),
+                        },
+                    })
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.debug("OpenSearch failed: %s", exc)
+
+        # ── CloudFormation Stacks ─────────────────────────────────────────────
+        try:
+            cfn = session.client("cloudformation")
+            for page in cfn.get_paginator("describe_stacks").paginate():
+                for stack in page.get("Stacks", []):
+                    if stack.get("StackStatus") in ("DELETE_COMPLETE",):
+                        continue
+                    resources.append({
+                        "id": stack.get("StackId", ""), "name": stack.get("StackName", ""),
+                        "type": "AWS::CloudFormation::Stack", "location": region,
+                        "config": {
+                            "status": stack.get("StackStatus"),
+                            "drift_status": stack.get("DriftInformation", {}).get("StackDriftStatus"),
+                            "termination_protection": stack.get("EnableTerminationProtection"),
+                            "resource_count": len(stack.get("Outputs", [])),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("CloudFormation failed: %s", exc)
+
+        # ── Step Functions State Machines ─────────────────────────────────────
+        try:
+            sfn = session.client("stepfunctions")
+            for page in sfn.get_paginator("list_state_machines").paginate():
+                for sm in page.get("stateMachines", []):
+                    resources.append({
+                        "id": sm.get("stateMachineArn", ""), "name": sm.get("name", ""),
+                        "type": "AWS::StepFunctions::StateMachine", "location": region,
+                        "config": {
+                            "type": sm.get("type"),
+                            "creation_date": str(sm.get("creationDate", "")),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("StepFunctions failed: %s", exc)
+
+        # ── EventBridge Rules ─────────────────────────────────────────────────
+        try:
+            eb = session.client("events")
+            for page in eb.get_paginator("list_rules").paginate():
+                for rule in page.get("Rules", []):
+                    resources.append({
+                        "id": rule.get("Arn", ""), "name": rule.get("Name", ""),
+                        "type": "AWS::Events::Rule", "location": region,
+                        "config": {
+                            "state": rule.get("State"),
+                            "schedule": rule.get("ScheduleExpression"),
+                            "event_pattern": bool(rule.get("EventPattern")),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("EventBridge failed: %s", exc)
+
+        # ── Cognito User Pools ────────────────────────────────────────────────
+        try:
+            cog = session.client("cognito-idp")
+            for page in cog.get_paginator("list_user_pools").paginate(MaxResults=60):
+                for pool in page.get("UserPools", []):
+                    resources.append({
+                        "id": pool.get("Id", ""), "name": pool.get("Name", ""),
+                        "type": "AWS::Cognito::UserPool", "location": region,
+                        "config": {
+                            "status": pool.get("Status"),
+                            "last_modified": str(pool.get("LastModifiedDate", "")),
+                            "creation_date": str(pool.get("CreationDate", "")),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("Cognito failed: %s", exc)
+
+        # ── IAM Users ─────────────────────────────────────────────────────────
+        try:
+            iam = session.client("iam")
+            for page in iam.get_paginator("list_users").paginate():
+                for u in page.get("Users", []):
+                    resources.append({
+                        "id": u.get("Arn", ""), "name": u.get("UserName", ""),
+                        "type": "AWS::IAM::User", "location": "global",
+                        "config": {
+                            "path": u.get("Path"),
+                            "password_last_used": str(u.get("PasswordLastUsed", "")),
+                            "has_mfa": None,
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("IAM Users failed: %s", exc)
+
+        # ── IAM Roles ─────────────────────────────────────────────────────────
+        try:
+            iam = session.client("iam")
+            for page in iam.get_paginator("list_roles").paginate():
+                for role in page.get("Roles", []):
+                    if role.get("Path", "").startswith("/aws-service-role/"):
+                        continue
+                    resources.append({
+                        "id": role.get("Arn", ""), "name": role.get("RoleName", ""),
+                        "type": "AWS::IAM::Role", "location": "global",
+                        "config": {
+                            "path": role.get("Path"),
+                            "description": role.get("Description", ""),
+                            "max_session_duration": role.get("MaxSessionDuration"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("IAM Roles failed: %s", exc)
+
+        # ── Glue Jobs ─────────────────────────────────────────────────────────
+        try:
+            glue = session.client("glue")
+            for page in glue.get_paginator("get_jobs").paginate():
+                for job in page.get("Jobs", []):
+                    resources.append({
+                        "id": f"arn:aws:glue:{region}::job/{job.get('Name', '')}",
+                        "name": job.get("Name", ""),
+                        "type": "AWS::Glue::Job", "location": region,
+                        "config": {
+                            "role": job.get("Role"),
+                            "worker_type": job.get("WorkerType"),
+                            "glue_version": job.get("GlueVersion"),
+                            "max_retries": job.get("MaxRetries"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("Glue failed: %s", exc)
+
+        return resources
 
     # ── S3 Buckets ────────────────────────────────────────────────────────────
 
