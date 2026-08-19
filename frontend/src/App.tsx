@@ -119,6 +119,10 @@ const SampleHubCmd        = React.lazy(() => import("./pages/SampleHubCmd"));
 const SampleAzure         = React.lazy(() => import("./pages/SampleAzure"));
 const SampleHub4          = React.lazy(() => import("./pages/SampleHub4"));
 
+// Redirect helpers that preserve route params
+function RedirectScanDetail() { const { id } = useParams(); return <Navigate to={`/discover/scans/${id}`} replace />; }
+function RedirectScanDiff()   { const { id } = useParams(); return <Navigate to={`/discover/scans/${id}/diff`} replace />; }
+
 // ── Loading fallback ──────────────────────────────────────────────────────────
 const Shell = AppLayout;
 
@@ -317,8 +321,8 @@ function ProtectedApp() {
 
           {/* ── Redirects from old v1 shell routes ───────────────────────── */}
           <Route path="/scans"                  element={<Navigate to="/discover/scans" replace />} />
-          <Route path="/scans/:id"              element={<Navigate to="/discover/scans" replace />} />
-          <Route path="/scans/:id/diff"         element={<Navigate to="/discover/scans" replace />} />
+          <Route path="/scans/:id"              element={<RedirectScanDetail />} />
+          <Route path="/scans/:id/diff"         element={<RedirectScanDiff />} />
           <Route path="/findings"               element={<Navigate to="/discover/findings" replace />} />
           <Route path="/assets"                 element={<Navigate to="/discover/assets" replace />} />
           <Route path="/assets/technologies"    element={<Navigate to="/discover/technologies" replace />} />

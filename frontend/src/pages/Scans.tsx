@@ -569,7 +569,7 @@ interface AssessmentTileCardProps {
 
 function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot, setMoveScan }: AssessmentTileCardProps) {
   const location = useLocation();
-  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : location.pathname.startsWith("/discover") ? "/discover/scans" : "/scans";
   const status = tile.status as string;
   const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
   const cat = (tile.category as string) || "Other";
@@ -703,7 +703,7 @@ export default function Scans() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : "/scans";
+  const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : location.pathname.startsWith("/discover") ? "/discover/scans" : "/scans";
   const connBase = location.pathname.startsWith("/vulnerability") ? "/platform/connections" : "/connections";
   const { clientId: selectedClientId, setClientId: setSelectedClientId } = useActiveClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
