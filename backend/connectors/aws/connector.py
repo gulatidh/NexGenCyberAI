@@ -188,6 +188,30 @@ class AWSConnector(BaseConnector):
         except Exception as exc:
             logger.debug("AWS get_resources SecurityGroups failed: %s", exc)
 
+        # Lambda Functions
+        try:
+            lam = session.client("lambda")
+            paginator = lam.get_paginator("list_functions")
+            for page in paginator.paginate():
+                for fn in page.get("Functions", []):
+                    resources.append({
+                        "id": fn.get("FunctionArn", ""),
+                        "name": fn.get("FunctionName", ""),
+                        "type": "AWS::Lambda::Function",
+                        "location": self.config.get("region", "ap-southeast-1"),
+                        "config": {
+                            "runtime": fn.get("Runtime"),
+                            "handler": fn.get("Handler"),
+                            "memory_mb": fn.get("MemorySize"),
+                            "timeout_sec": fn.get("Timeout"),
+                            "last_modified": fn.get("LastModified"),
+                            "code_size_bytes": fn.get("CodeSize"),
+                            "role": fn.get("Role"),
+                        },
+                    })
+        except Exception as exc:
+            logger.debug("AWS get_resources Lambda failed: %s", exc)
+
         return resources[:200]
 
     # ── S3 Buckets ────────────────────────────────────────────────────────────
