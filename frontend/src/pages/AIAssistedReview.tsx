@@ -1,19 +1,18 @@
 import React, { useState, useMemo } from "react";
 import {
   Box, Typography, Grid, Card, CardContent, Chip, Stepper, Step, StepLabel,
-  Tabs, Tab, Button, CircularProgress, Dialog, DialogTitle, DialogContent,
-  DialogActions, Divider, Alert, TextField, MenuItem, Select, FormControl,
-  InputLabel, Tooltip, Skeleton, Checkbox, Avatar,
+  Tabs, Tab, Button, CircularProgress, Alert, Skeleton, Checkbox, Avatar,
+  Divider,
 } from "@mui/material";
 import {
-  AutoAwesome, RocketLaunch, Architecture, CheckCircle, PendingOutlined,
-  UploadFile, ArrowForward, SmartToy, BugReport, PlaylistAddCheck, Psychology,
+  AutoAwesome, RocketLaunch, CheckCircle, SmartToy, BugReport, PlaylistAddCheck,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 
 import { useActiveClient } from "../contexts/ClientContext";
-import { scansApi, agentsApi, aiReviewApi, agentCatalogApi } from "../services/api";
+import { scansApi, agentsApi, aiReviewApi, agentCatalogApi, customFrameworksApi } from "../services/api";
+import { AgentRunWizard, GROUP_COLOR, InputField } from "../components/AgentRunWizard";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -40,6 +39,7 @@ interface CatalogAgent {
   is_enabled: boolean;
   accent_color?: string;
   avatar_url?: string;
+  input_schema?: InputField[];
 }
 
 interface AgentGroup {
@@ -88,23 +88,6 @@ function getChip(ct: string) {
 function getScanConnectorType(scan: Scan): string {
   return scan.connector?.connector_type || scan.connector_type || "";
 }
-
-// Legacy orchestrator agents require a scan with findings
-function isLegacyAgent(agent: CatalogAgent): boolean {
-  return agent.legacy_orchestrator || agent.group_key === "operational";
-}
-
-// A&E agents use the multi-step file-upload wizard
-function isAEAgent(agent: CatalogAgent): boolean {
-  return agent.group_key === "architecture_engineering";
-}
-
-// All other non-legacy agents use the briefing dialog (prompt input)
-function isBriefingAgent(agent: CatalogAgent): boolean {
-  return !isLegacyAgent(agent) && !isAEAgent(agent);
-}
-
-const FRAMEWORKS = ["NIST CSF 2.0", "ISO 27001:2022", "CIS Controls v8", "PCI DSS v4.0", "GDPR", "GCC IM8", "MAS TRM"];
 
 // ── Match bars ─────────────────────────────────────────────────────────────────
 
@@ -174,7 +157,7 @@ function RecCard({ rec, allAgents, onOpenDialog, alreadyRan }: {
   const name = agent?.name || rec.agent_key;
   const catLabel = agent?.group_label || "";
   const brings = rec.bring || [];
-  const accentColor = agent?.accent_color || "#6366f1";
+  const accentColor = agent?.accent_color || GROUP_COLOR[agent?.group_key || ""] || "#6366f1";
 
   return (
     <Card sx={{
@@ -188,7 +171,7 @@ function RecCard({ rec, allAgents, onOpenDialog, alreadyRan }: {
       <Box sx={{ height: 4, background: `linear-gradient(90deg, ${accentColor}99 0%, ${accentColor}11 100%)`, borderTopRightRadius: 4 }} />
       <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <Chip label={catLabel} size="small"
-          sx={{ fontSize: 10, height: 18, bgcolor: "rgba(99,102,241,0.15)", color: "primary.main", alignSelf: "flex-start" }} />
+          sx={{ fontSize: 10, height: 18, bgcolor: `${accentColor}22`, color: accentColor, alignSelf: "flex-start" }} />
         <Typography sx={{ fontSize: 15, fontWeight: 700, mt: 0.5 }}>{name}</Typography>
         <MatchBars score={rec.match_score} />
         <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 1 }}>
@@ -205,7 +188,7 @@ function RecCard({ rec, allAgents, onOpenDialog, alreadyRan }: {
         )}
         <Box sx={{ mt: "auto", pt: 1.5 }}>
           <Button size="small" variant="contained" fullWidth startIcon={<RocketLaunch />}
-            onClick={() => agent && onOpenDialog(agent)} sx={{ fontSize: 12 }}>
+            onClick={() => agent && onOpenDialog(agent)} sx={{ fontSize: 12, bgcolor: accentColor, "&:hover": { bgcolor: accentColor, filter: "brightness(0.9)" } }}>
             Configure & run
           </Button>
         </Box>
@@ -224,12 +207,7 @@ function CatalogCard({ agent, onOpenDialog, alreadyRan, selectMode, selected, on
   selected: boolean;
   onToggle: (key: string) => void;
 }) {
-  const accentColor = agent.accent_color || "#6366f1";
-  const legacy = isLegacyAgent(agent);
-  const ae = isAEAgent(agent);
-
-  const btnLabel = ae ? "Start wizard" : legacy ? "Configure & run" : "Brief agent";
-  const BtnIcon = ae ? Architecture : legacy ? RocketLaunch : Psychology;
+  const accentColor = agent.accent_color || GROUP_COLOR[agent.group_key] || "#6366f1";
 
   return (
     <Card onClick={selectMode ? () => onToggle(agent.key) : undefined} sx={{
@@ -269,330 +247,15 @@ function CatalogCard({ agent, onOpenDialog, alreadyRan, selectMode, selected, on
         </Typography>
         {!selectMode && (
           <Box sx={{ mt: 1.5 }}>
-            <Button size="small" variant={ae ? "outlined" : "contained"} fullWidth startIcon={<BtnIcon />}
-              onClick={() => onOpenDialog(agent)} sx={{ fontSize: 11 }}>
-              {btnLabel}
+            <Button size="small" variant="contained" fullWidth startIcon={<SmartToy />}
+              onClick={() => onOpenDialog(agent)}
+              sx={{ fontSize: 11, bgcolor: accentColor, "&:hover": { bgcolor: accentColor, filter: "brightness(0.9)" } }}>
+              Run Agent
             </Button>
           </Box>
         )}
       </CardContent>
     </Card>
-  );
-}
-
-// ── Run dialog for legacy agents (scan gate) ──────────────────────────────────
-
-function LegacyRunDialog({ agent, completedScans, preselectedScanId, open, onClose, onRun }: {
-  agent: CatalogAgent | null;
-  completedScans: Scan[];
-  preselectedScanId?: string;
-  open: boolean;
-  onClose: () => void;
-  onRun: (scanId: string, framework: string) => void;
-}) {
-  const [scanId, setScanId] = useState(preselectedScanId || "");
-  const [framework, setFramework] = useState("nist_csf");
-
-  // Sync preselected scan when dialog opens
-  React.useEffect(() => {
-    if (open) setScanId(preselectedScanId || "");
-  }, [open, preselectedScanId]);
-
-  if (!agent) return null;
-  const accentColor = agent.accent_color || "#6366f1";
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar sx={{ width: 36, height: 36, bgcolor: `${accentColor}22`, color: accentColor, fontWeight: 700, fontSize: 15 }}>
-            {agent.name.charAt(0)}
-          </Avatar>
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{agent.name}</Typography>
-            <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{agent.group_label}</Typography>
-          </Box>
-        </Box>
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-          {agent.description}
-        </Typography>
-
-        <FormControl size="small" fullWidth required>
-          <InputLabel>Assessment *</InputLabel>
-          <Select label="Assessment *" value={scanId} onChange={e => setScanId(e.target.value)}>
-            {completedScans.length === 0
-              ? <MenuItem disabled value="">No completed assessments</MenuItem>
-              : completedScans.map(s => (
-                <MenuItem key={s.id} value={s.id}>
-                  {s.name}
-                  {s.summary && (
-                    <Typography component="span" sx={{ ml: 1, fontSize: 11, color: "text.secondary" }}>
-                      ({s.summary.critical || 0}C / {s.summary.high || 0}H)
-                    </Typography>
-                  )}
-                </MenuItem>
-              ))
-            }
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" fullWidth>
-          <InputLabel>Framework</InputLabel>
-          <Select label="Framework" value={framework} onChange={e => setFramework(e.target.value)}>
-            <MenuItem value="nist_csf">NIST CSF 2.0</MenuItem>
-            <MenuItem value="iso_27001">ISO 27001:2022</MenuItem>
-            <MenuItem value="cis_v8">CIS Controls v8</MenuItem>
-            <MenuItem value="pci_dss">PCI DSS v4.0</MenuItem>
-            <MenuItem value="gdpr">GDPR</MenuItem>
-          </Select>
-        </FormControl>
-
-        {completedScans.length === 0 && (
-          <Alert severity="warning" sx={{ fontSize: 12 }}>
-            This agent requires a completed assessment. Run a scan first.
-          </Alert>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ p: 2, pt: 0 }}>
-        <Button onClick={onClose} color="inherit" size="small">Cancel</Button>
-        <Button variant="contained" size="small" disabled={!scanId} startIcon={<RocketLaunch />}
-          onClick={() => { onRun(scanId, framework); onClose(); }}>
-          Run agent
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-// ── Briefing dialog for advisory/buddy agents (prompt input) ──────────────────
-
-function BriefingDialog({ agent, completedScans, preselectedScanId, open, onClose, onRun }: {
-  agent: CatalogAgent | null;
-  completedScans: Scan[];
-  preselectedScanId?: string;
-  open: boolean;
-  onClose: () => void;
-  onRun: (prompt: string, scanId?: string) => void;
-}) {
-  const [prompt, setPrompt] = useState("");
-  const [scanId, setScanId] = useState("");
-
-  React.useEffect(() => {
-    if (open) {
-      setPrompt("");
-      setScanId(preselectedScanId || "");
-    }
-  }, [open, preselectedScanId]);
-
-  if (!agent) return null;
-  const accentColor = agent.accent_color || "#6366f1";
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Avatar sx={{ width: 36, height: 36, bgcolor: `${accentColor}22`, color: accentColor, fontWeight: 700, fontSize: 15 }}>
-            {agent.name.charAt(0)}
-          </Avatar>
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 15 }}>{agent.name}</Typography>
-            <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{agent.group_label}</Typography>
-          </Box>
-        </Box>
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
-        <Box sx={{ p: 1.5, bgcolor: "rgba(99,102,241,0.06)", borderLeft: "3px solid", borderColor: "primary.main", borderRadius: "0 4px 4px 0" }}>
-          <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.6 }}>
-            {agent.description}
-          </Typography>
-        </Box>
-
-        <TextField
-          label="What would you like this agent to analyse or advise on? *"
-          multiline rows={4}
-          size="small"
-          fullWidth
-          required
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-          placeholder={`e.g. "Review our current IAM policies and identify privilege escalation risks" or "Assess our readiness for CMMC Level 2 certification"`}
-        />
-
-        <FormControl size="small" fullWidth>
-          <InputLabel>Attach assessment (optional)</InputLabel>
-          <Select label="Attach assessment (optional)" value={scanId} onChange={e => setScanId(e.target.value)}>
-            <MenuItem value="">None — use general knowledge</MenuItem>
-            {completedScans.map(s => (
-              <MenuItem key={s.id} value={s.id}>
-                {s.name}
-                {s.summary && (
-                  <Typography component="span" sx={{ ml: 1, fontSize: 11, color: "text.secondary" }}>
-                    ({s.summary.critical || 0}C / {s.summary.high || 0}H)
-                  </Typography>
-                )}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
-          Results will appear in <strong>AI Buddies</strong> under agent runs for this client.
-        </Typography>
-      </DialogContent>
-      <DialogActions sx={{ p: 2, pt: 0 }}>
-        <Button onClick={onClose} color="inherit" size="small">Cancel</Button>
-        <Button variant="contained" size="small" disabled={!prompt.trim()} startIcon={<Psychology />}
-          onClick={() => { onRun(prompt.trim(), scanId || undefined); onClose(); }}>
-          Brief &amp; run
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-// ── A&E Wizard modal ──────────────────────────────────────────────────────────
-
-interface WizardState {
-  environment: string;
-  system: string;
-  framework: string;
-  diagramFile: File | null;
-  cloudDetailsFile: File | null;
-}
-
-function AEWizardModal({ agent, open, onClose, onLaunch }: {
-  agent: CatalogAgent | null;
-  open: boolean;
-  onClose: () => void;
-  onLaunch: (state: WizardState) => void;
-}) {
-  const [step, setStep] = useState(0);
-  const [state, setState] = useState<WizardState>({ environment: "", system: "", framework: "", diagramFile: null, cloudDetailsFile: null });
-
-  const canLaunch = !!state.environment && !!state.system && !!state.diagramFile;
-
-  const handleClose = () => {
-    setStep(0);
-    setState({ environment: "", system: "", framework: "", diagramFile: null, cloudDetailsFile: null });
-    onClose();
-  };
-
-  const preflight = [
-    { label: "Environment defined", pass: !!state.environment },
-    { label: "System/workload described", pass: !!state.system },
-    { label: "Architecture diagram uploaded", pass: !!state.diagramFile },
-    { label: "Cloud infrastructure details", pass: !!state.cloudDetailsFile, optional: true },
-    { label: "Compliance framework selected", pass: !!state.framework, optional: true },
-  ];
-
-  const uploadRows = [
-    { label: "Architecture / data-flow diagram *", key: "diagramFile" as const, accept: ".png,.jpg,.jpeg,.pdf,.svg,.drawio,.vsdx" },
-    { label: "Cloud infrastructure details (optional)", key: "cloudDetailsFile" as const, accept: ".json,.csv,.txt,.pdf" },
-  ];
-
-  if (!agent) return null;
-
-  return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: 16 }}>{agent.name} — Input Wizard</Typography>
-        <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{agent.group_label}</Typography>
-        <Stepper activeStep={step} sx={{ mt: 1.5 }} alternativeLabel>
-          {["Define scope", "Bring inputs", "Readiness check"].map(l => (
-            <Step key={l}><StepLabel sx={{ "& .MuiStepLabel-label": { fontSize: 11 } }}>{l}</StepLabel></Step>
-          ))}
-        </Stepper>
-      </DialogTitle>
-      <Divider />
-      <DialogContent>
-        {step === 0 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Environment *</InputLabel>
-              <Select label="Environment *" value={state.environment}
-                onChange={e => setState(s => ({ ...s, environment: e.target.value }))}>
-                {["Azure", "AWS", "GCP", "On-premises", "Hybrid", "Multi-cloud"].map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <TextField size="small" label="System / workload *" multiline rows={2}
-              value={state.system} onChange={e => setState(s => ({ ...s, system: e.target.value }))}
-              placeholder="e.g. 'Customer-facing API on Azure AKS with SQL backend'" />
-            <FormControl size="small" fullWidth>
-              <InputLabel>Target framework (optional)</InputLabel>
-              <Select label="Target framework (optional)" value={state.framework}
-                onChange={e => setState(s => ({ ...s, framework: e.target.value }))}>
-                <MenuItem value="">None</MenuItem>
-                {FRAMEWORKS.map(v => <MenuItem key={v} value={v}>{v}</MenuItem>)}
-              </Select>
-            </FormControl>
-          </Box>
-        )}
-        {step === 1 && (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, pt: 1 }}>
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>Upload the inputs needed for this analysis.</Typography>
-            {uploadRows.map(item => {
-              const file = state[item.key];
-              return (
-                <Box key={item.key} sx={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  p: 1.5, border: "1px solid", borderColor: file ? "primary.main" : "rgba(255,255,255,0.1)",
-                  borderRadius: 1, bgcolor: file ? "rgba(99,102,241,0.06)" : "transparent",
-                }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    {file ? <CheckCircle sx={{ fontSize: 18, color: "primary.main" }} /> : <UploadFile sx={{ fontSize: 18, color: "text.secondary" }} />}
-                    <Box>
-                      <Typography sx={{ fontSize: 13 }}>{item.label}</Typography>
-                      {file && <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{(file as File).name}</Typography>}
-                    </Box>
-                  </Box>
-                  <Button size="small" variant={file ? "outlined" : "contained"} component="label" sx={{ fontSize: 11, minWidth: 80 }}>
-                    {file ? "Change" : "Upload"}
-                    <input type="file" hidden accept={item.accept} onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      setState(s => ({ ...s, [item.key]: f }));
-                    }} />
-                  </Button>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-        {step === 2 && (
-          <Box sx={{ pt: 1 }}>
-            <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>Preflight check before launch.</Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1, bgcolor: "rgba(0,0,0,0.2)", p: 1.5, borderRadius: 1 }}>
-              {preflight.map((item, i) => (
-                <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {item.pass
-                    ? <CheckCircle sx={{ fontSize: 15, color: "#22c55e" }} />
-                    : <PendingOutlined sx={{ fontSize: 15, color: item.optional ? "#f59e0b" : "#ef4444" }} />}
-                  <Typography sx={{ fontSize: 12, color: item.pass ? "#22c55e" : item.optional ? "#f59e0b" : "#ef4444" }}>
-                    {item.pass ? "PASS" : item.optional ? "SKIP" : "FAIL"}
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{item.label}{item.optional ? " (optional)" : ""}</Typography>
-                </Box>
-              ))}
-            </Box>
-            {!canLaunch && <Alert severity="warning" sx={{ mt: 2, fontSize: 12 }}>Complete required items before launching.</Alert>}
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions sx={{ p: 2, pt: 0 }}>
-        <Button onClick={handleClose} color="inherit" size="small">Cancel</Button>
-        {step > 0 && <Button onClick={() => setStep(s => s - 1)} size="small">Back</Button>}
-        {step < 2
-          ? <Button variant="contained" size="small"
-              disabled={step === 0 && (!state.environment || !state.system)}
-              onClick={() => setStep(s => s + 1)} endIcon={<ArrowForward />}>Next</Button>
-          : <Button variant="contained" size="small" disabled={!canLaunch}
-              startIcon={<RocketLaunch />} onClick={() => { onLaunch(state); handleClose(); }}>Launch</Button>
-        }
-      </DialogActions>
-    </Dialog>
   );
 }
 
@@ -606,25 +269,11 @@ export default function AIAssistedReview() {
 
   const [selectedScan, setSelectedScan] = useState<Scan | null>(null);
   const [catalogTab, setCatalogTab] = useState("all");
-
-  // Dialog state: which agent + which dialog type is open
-  const [dialogAgent, setDialogAgent] = useState<CatalogAgent | null>(null);
-  const [dialogType, setDialogType] = useState<"legacy" | "briefing" | "ae" | null>(null);
+  const [wizardAgent, setWizardAgent] = useState<CatalogAgent | null>(null);
 
   const [activeStep, setActiveStep] = useState(0);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
-
-  // Open the correct dialog for an agent
-  const openAgentDialog = (agent: CatalogAgent) => {
-    setDialogAgent(agent);
-    if (isAEAgent(agent)) setDialogType("ae");
-    else if (isLegacyAgent(agent)) setDialogType("legacy");
-    else setDialogType("briefing");
-    setActiveStep(2);
-  };
-
-  const closeDialog = () => { setDialogAgent(null); setDialogType(null); };
 
   // Load completed scans
   const { data: scansData, isLoading: scansLoading } = useQuery({
@@ -645,6 +294,12 @@ export default function AIAssistedReview() {
 
   const allGroups: AgentGroup[] = useMemo(() => catalogData?.groups || [], [catalogData]);
   const allAgents: CatalogAgent[] = useMemo(() => allGroups.flatMap(g => g.agents), [allGroups]);
+
+  // Frameworks for the wizard
+  const { data: allFrameworks = [] } = useQuery<any[]>({
+    queryKey: ["frameworks-all"],
+    queryFn: () => customFrameworksApi.listAll(),
+  });
 
   const catTabs = useMemo(() => [
     { value: "all", label: "All" },
@@ -677,7 +332,7 @@ export default function AIAssistedReview() {
   });
   const advisory: ScanAdvisory | undefined = advisoryMutation.data;
 
-  // Run mutations
+  // Run mutations — mirrors Agents.tsx exactly
   const legacyRunMutation = useMutation({
     mutationFn: ({ agentKey, scanId, framework }: { agentKey: string; scanId: string; framework: string }) =>
       agentsApi.run(clientId, { agent_type: agentKey, scan_id: scanId, input_data: { framework } }),
@@ -690,8 +345,8 @@ export default function AIAssistedReview() {
   });
 
   const buddyRunMutation = useMutation({
-    mutationFn: ({ agentId, prompt, scanId }: { agentId: string; prompt?: string; scanId?: string }) =>
-      agentCatalogApi.run(agentId, prompt, clientId, scanId, undefined),
+    mutationFn: ({ agentId, prompt, scanId, assetIds }: { agentId: string; prompt?: string; scanId?: string; assetIds?: string[] }) =>
+      agentCatalogApi.run(agentId, prompt, clientId, scanId, assetIds),
     onSuccess: () => {
       toast.success("Agent queued — check AI Buddies for results");
       qc.invalidateQueries({ queryKey: ["agent-runs-all"] });
@@ -708,25 +363,6 @@ export default function AIAssistedReview() {
     advisoryMutation.mutate(scan.id);
   };
 
-  // Called by LegacyRunDialog
-  const handleLegacyRun = (scanId: string, framework: string) => {
-    if (!dialogAgent) return;
-    legacyRunMutation.mutate({ agentKey: dialogAgent.key, scanId, framework });
-  };
-
-  // Called by BriefingDialog
-  const handleBriefingRun = (prompt: string, scanId?: string) => {
-    if (!dialogAgent) return;
-    buddyRunMutation.mutate({ agentId: dialogAgent.id, prompt, scanId });
-  };
-
-  // Called by AEWizardModal
-  const handleAELaunch = (state: WizardState) => {
-    if (!dialogAgent) return;
-    const context = `${dialogAgent.name} Review\nEnvironment: ${state.environment}\nSystem: ${state.system}\nFramework: ${state.framework || "none"}\nDiagram: ${state.diagramFile?.name || "none"}\nCloud details: ${state.cloudDetailsFile?.name || "none"}`;
-    buddyRunMutation.mutate({ agentId: dialogAgent.id, prompt: context, scanId: selectedScan?.id });
-  };
-
   const handleBatchRun = async () => {
     const toRun = Array.from(selectedAgents);
     let queued = 0;
@@ -734,16 +370,16 @@ export default function AIAssistedReview() {
     for (const agentKey of toRun) {
       const agent = allAgents.find(a => a.key === agentKey);
       if (!agent) continue;
-      // Stop at first agent that needs user input
-      if (isAEAgent(agent) || isBriefingAgent(agent)) {
+      // Stop at first agent that needs user input (non-legacy)
+      if (!agent.legacy_orchestrator) {
         needsInput = agent;
         break;
       }
-      if (isLegacyAgent(agent) && !selectedScan) continue;
+      if (!selectedScan) continue;
       try {
         await agentsApi.run(clientId, {
           agent_type: agentKey,
-          scan_id: selectedScan?.id,
+          scan_id: selectedScan.id,
           input_data: {},
         });
         queued++;
@@ -756,7 +392,7 @@ export default function AIAssistedReview() {
       qc.invalidateQueries({ queryKey: ["agent-runs-all"] });
     }
     if (needsInput) {
-      openAgentDialog(needsInput);
+      setWizardAgent(needsInput);
     } else {
       setSelectedAgents(new Set());
       setSelectMode(false);
@@ -768,6 +404,15 @@ export default function AIAssistedReview() {
     setSelectedAgents(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   };
 
+  // Scans in WizardScan format for AgentRunWizard
+  const wizardScans = completedScans.map(s => ({
+    id: s.id,
+    name: s.name,
+    connector_type: getScanConnectorType(s),
+    created_at: s.completed_at || s.created_at,
+    summary: s.summary,
+  }));
+
   return (
     <Box sx={{ p: 3, maxWidth: 1280, mx: "auto", pb: selectedAgents.size > 0 ? 12 : 3 }}>
       {/* Header */}
@@ -777,7 +422,7 @@ export default function AIAssistedReview() {
           <Typography variant="h5" sx={{ fontWeight: 700 }}>AI Assisted Review</Typography>
         </Box>
         <Typography variant="body2" sx={{ color: "text.secondary", mb: 2.5 }}>
-          Select a completed assessment for AI-guided agent recommendations, or browse and brief any agent directly. Strategic, advisory, and A&E agents run without a scan.
+          Select a completed assessment for AI-guided agent recommendations, or browse and brief any agent directly.
         </Typography>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ maxWidth: 600 }}>
           {WIZARD_STEPS.map(label => (
@@ -814,11 +459,17 @@ export default function AIAssistedReview() {
         )}
       </Box>
 
-      {/* Section 2 — AI recommendation */}
+      {/* Section 2 — AI recommendation (all relevant agents with %) */}
       {selectedScan && (
         <Box sx={{ mb: 4 }}>
           <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-            <AutoAwesome sx={{ fontSize: 16 }} />02 · AI RECOMMENDATION
+            <AutoAwesome sx={{ fontSize: 16 }} />
+            02 · AI RECOMMENDATION
+            {advisory?.recommendations?.length ? (
+              <Typography component="span" sx={{ ml: 1, fontSize: 12, color: "text.secondary", fontWeight: 400 }}>
+                ({advisory.recommendations.length} agents ranked by relevance)
+              </Typography>
+            ) : null}
           </Typography>
           {advisoryMutation.isPending ? (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 2, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 1 }}>
@@ -837,7 +488,7 @@ export default function AIAssistedReview() {
                 {advisory.recommendations.map((rec, i) => (
                   <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
                     <RecCard rec={rec} allAgents={allAgents} alreadyRan={alreadyRan.has(rec.agent_key)}
-                      onOpenDialog={(agent) => openAgentDialog(agent)} />
+                      onOpenDialog={(agent) => setWizardAgent(agent)} />
                   </Grid>
                 ))}
               </Grid>
@@ -866,20 +517,6 @@ export default function AIAssistedReview() {
           </Button>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, p: 2, mb: 2.5, bgcolor: "rgba(3,105,161,0.08)", border: "1px solid rgba(3,105,161,0.2)", borderRadius: 1 }}>
-          <Architecture sx={{ color: "#0284c7", fontSize: 20, mt: 0.2, flexShrink: 0 }} />
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: 13, color: "#0284c7", mb: 0.3 }}>
-              Tip: each agent has a different launch mode
-            </Typography>
-            <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-              <strong>Legacy/Operational agents</strong> require a completed assessment. &nbsp;
-              <strong>Advisory & specialist agents</strong> open a briefing dialog — type your question or context. &nbsp;
-              <strong>Architecture & Engineering agents</strong> use a multi-step wizard with file uploads.
-            </Typography>
-          </Box>
-        </Box>
-
         {catalogLoading ? (
           <Grid container spacing={2}>
             {[1, 2, 3, 4, 5, 6].map(i => <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}><Skeleton variant="rectangular" height={180} sx={{ borderRadius: 1 }} /></Grid>)}
@@ -901,7 +538,7 @@ export default function AIAssistedReview() {
                     alreadyRan={alreadyRan.has(agent.key)}
                     selectMode={selectMode} selected={selectedAgents.has(agent.key)}
                     onToggle={toggleAgentSelect}
-                    onOpenDialog={openAgentDialog} />
+                    onOpenDialog={(a) => setWizardAgent(a)} />
                 </Grid>
               ))}
             </Grid>
@@ -937,29 +574,23 @@ export default function AIAssistedReview() {
         </Box>
       )}
 
-      {/* Dialogs */}
-      <LegacyRunDialog
-        agent={dialogType === "legacy" ? dialogAgent : null}
-        completedScans={completedScans}
-        preselectedScanId={selectedScan?.id}
-        open={dialogType === "legacy" && !!dialogAgent}
-        onClose={closeDialog}
-        onRun={handleLegacyRun}
-      />
-      <BriefingDialog
-        agent={dialogType === "briefing" ? dialogAgent : null}
-        completedScans={completedScans}
-        preselectedScanId={selectedScan?.id}
-        open={dialogType === "briefing" && !!dialogAgent}
-        onClose={closeDialog}
-        onRun={handleBriefingRun}
-      />
-      <AEWizardModal
-        agent={dialogType === "ae" ? dialogAgent : null}
-        open={dialogType === "ae" && !!dialogAgent}
-        onClose={closeDialog}
-        onLaunch={handleAELaunch}
-      />
+      {/* AgentRunWizard — same component used by AI Buddies */}
+      {wizardAgent && (
+        <AgentRunWizard
+          agent={wizardAgent}
+          scans={wizardScans}
+          frameworks={allFrameworks}
+          clientId={clientId}
+          color={GROUP_COLOR[wizardAgent.group_key] || "#4285F4"}
+          onClose={() => setWizardAgent(null)}
+          onRunLegacy={(scanId, framework) =>
+            legacyRunMutation.mutate({ agentKey: wizardAgent.key, scanId, framework })
+          }
+          onRunCatalog={(agentId, prompt, scanId, assetIds) =>
+            buddyRunMutation.mutate({ agentId, prompt, scanId, assetIds })
+          }
+        />
+      )}
     </Box>
   );
 }

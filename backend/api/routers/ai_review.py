@@ -2,7 +2,8 @@
 AI Review — stateless scan advisory endpoint.
 
 Takes a completed scan_id and returns LLM-generated agent recommendations
-with match scores and reasoning. No DB writes — purely advisory.
+with match scores and reasoning. Returns ALL relevant agents (score >= 40),
+not limited to 3.
 """
 import json
 import logging
@@ -46,37 +47,44 @@ def _get_fallback(connector_type: str) -> dict:
     ct = (connector_type or "").lower()
     if ct in _CLOUD_TYPES:
         return {
-            "banner": "Your cloud scan identified configuration and posture risks. These agents are best suited to quantify business impact, map to compliance frameworks, and assess IAM exposure.",
+            "banner": "Your cloud scan identified configuration and posture risks. The following agents are ranked by relevance to help you quantify impact, map compliance gaps, and assess IAM exposure.",
             "recommendations": [
-                {"agent_key": "risk_manager", "match_score": 94, "reasoning": "Translates cloud misconfigurations into financial ALE exposure using FAIR methodology.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
-                {"agent_key": "iam_posture_advisor", "match_score": 88, "reasoning": "Reviews IAM policies and privilege chains — critical for cloud scans where over-privilege is the most common risk.", "bring": ["IAM posture assessment", "Privilege escalation paths", "Least-privilege recommendations"]},
-                {"agent_key": "compliance_monitor", "match_score": 82, "reasoning": "Maps cloud findings to CIS and NIST benchmarks to identify compliance gaps.", "bring": ["Control gap report", "Framework compliance %", "Audit evidence"]},
+                {"agent_key": "risk_manager", "match_score": 94, "reasoning": "Translates cloud misconfigurations into financial ALE exposure.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
+                {"agent_key": "iam_posture_advisor", "match_score": 88, "reasoning": "Reviews IAM policies and privilege chains — critical for cloud scans.", "bring": ["IAM posture assessment", "Privilege escalation paths", "Least-privilege recommendations"]},
+                {"agent_key": "compliance_monitor", "match_score": 82, "reasoning": "Maps cloud findings to CIS and NIST benchmarks.", "bring": ["Control gap report", "Framework compliance %", "Audit evidence"]},
+                {"agent_key": "threat_intel", "match_score": 76, "reasoning": "Correlates cloud misconfigs with known threat actor TTPs.", "bring": ["Threat actor profiles", "MITRE techniques", "CVE enrichment"]},
+                {"agent_key": "remediation", "match_score": 70, "reasoning": "Generates a prioritised remediation plan with SLA targets.", "bring": ["Prioritised actions", "SLA targets", "Owner assignments"]},
             ],
         }
     if ct in _SAST_TYPES:
         return {
-            "banner": "Your code scan found security vulnerabilities. These agents will enrich with CVE data, map to MITRE ATT&CK, and produce developer-ready remediation guidance.",
+            "banner": "Your code scan found security vulnerabilities. Agents are ranked by relevance to enrich with CVE data, map to MITRE ATT&CK, and produce developer-ready remediation guidance.",
             "recommendations": [
-                {"agent_key": "appsec_advisor", "match_score": 95, "reasoning": "Specifically designed for application security findings — reviews code-level risks and proposes secure design patterns.", "bring": ["AppSec risk findings", "Secure design recommendations", "OWASP mapping"]},
-                {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Maps code vulnerabilities to known CVEs and adversary exploitation techniques.", "bring": ["CVE enrichment", "MITRE ATT&CK techniques", "Exploit likelihood"]},
-                {"agent_key": "remediation", "match_score": 83, "reasoning": "Generates fix instructions and playbooks for the specific code issues found.", "bring": ["Prioritised remediation actions", "Developer fix guidance", "SLA targets"]},
+                {"agent_key": "appsec_advisor", "match_score": 95, "reasoning": "Purpose-built for application security findings.", "bring": ["AppSec risk findings", "Secure design recommendations", "OWASP mapping"]},
+                {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Maps code vulnerabilities to CVEs and adversary techniques.", "bring": ["CVE enrichment", "MITRE ATT&CK techniques", "Exploit likelihood"]},
+                {"agent_key": "remediation", "match_score": 83, "reasoning": "Generates fix instructions and playbooks for code issues.", "bring": ["Prioritised remediation actions", "Developer fix guidance", "SLA targets"]},
+                {"agent_key": "risk_manager", "match_score": 72, "reasoning": "Quantifies business risk from code vulnerabilities.", "bring": ["FAIR risk scores", "Risk heatmap", "ALE calculations"]},
+                {"agent_key": "compliance_monitor", "match_score": 65, "reasoning": "Maps code findings to OWASP ASVS and PCI DSS controls.", "bring": ["Control gap report", "Compliance %", "Audit evidence"]},
             ],
         }
     if ct in _NETWORK_TYPES:
         return {
-            "banner": "Your network or vulnerability scan has results. Run these agents to prioritise remediation, map threat actor activity, and assess compliance posture.",
+            "banner": "Your network or vulnerability scan has results. Agents are ranked by relevance to prioritise remediation, map threat actor activity, and assess compliance posture.",
             "recommendations": [
-                {"agent_key": "vuln_commander", "match_score": 93, "reasoning": "Purpose-built for vulnerability triage — cuts through severity noise with exploitability and asset criticality weighting.", "bring": ["Exploitability-ranked findings", "Top-10 actionable vulns", "Asset criticality context"]},
-                {"agent_key": "threat_intel", "match_score": 87, "reasoning": "Correlates network findings with active threat actor TTPs and MITRE ATT&CK techniques.", "bring": ["CVE enrichment", "Threat actor profiles", "MITRE techniques"]},
-                {"agent_key": "nist_assessment_advisor", "match_score": 80, "reasoning": "Maps network findings to NIST SP 800-53 controls for compliance posture reporting.", "bring": ["NIST control mapping", "Compliance gap report", "Audit-ready findings"]},
+                {"agent_key": "vuln_commander", "match_score": 93, "reasoning": "Purpose-built for vulnerability triage with exploitability weighting.", "bring": ["Exploitability-ranked findings", "Top-10 actionable vulns", "Asset criticality context"]},
+                {"agent_key": "threat_intel", "match_score": 87, "reasoning": "Correlates network findings with active threat actor TTPs.", "bring": ["CVE enrichment", "Threat actor profiles", "MITRE techniques"]},
+                {"agent_key": "nist_assessment_advisor", "match_score": 80, "reasoning": "Maps network findings to NIST SP 800-53 controls.", "bring": ["NIST control mapping", "Compliance gap report", "Audit-ready findings"]},
+                {"agent_key": "remediation", "match_score": 74, "reasoning": "Generates a prioritised remediation plan with SLA targets.", "bring": ["Prioritised actions", "SLA targets", "Owner assignments"]},
+                {"agent_key": "risk_manager", "match_score": 68, "reasoning": "Converts network findings into risk-scored entries.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
             ],
         }
     return {
-        "banner": "Your scan has completed. These agents offer the best starting points for enrichment, risk quantification, and remediation planning.",
+        "banner": "Your scan has completed. Agents are ranked by relevance for enrichment, risk quantification, and remediation planning.",
         "recommendations": [
-            {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Enriches findings with CVE details, threat actor profiles, and MITRE ATT&CK technique mapping.", "bring": ["CVE enrichment", "MITRE techniques", "Threat actor profiles"]},
+            {"agent_key": "threat_intel", "match_score": 88, "reasoning": "Enriches findings with CVE details and MITRE ATT&CK technique mapping.", "bring": ["CVE enrichment", "MITRE techniques", "Threat actor profiles"]},
             {"agent_key": "risk_manager", "match_score": 84, "reasoning": "Converts findings into risk-scored entries using FAIR methodology.", "bring": ["FAIR risk scores", "ALE calculations", "Risk heatmap"]},
-            {"agent_key": "remediation", "match_score": 79, "reasoning": "Generates a prioritised remediation plan with SLA targets and suggested owners.", "bring": ["Prioritised actions", "SLA targets", "Owner assignments"]},
+            {"agent_key": "remediation", "match_score": 79, "reasoning": "Generates a prioritised remediation plan with SLA targets.", "bring": ["Prioritised actions", "SLA targets", "Owner assignments"]},
+            {"agent_key": "compliance_monitor", "match_score": 72, "reasoning": "Maps findings to common compliance frameworks.", "bring": ["Control gap report", "Framework compliance %", "Audit evidence"]},
         ],
     }
 
@@ -136,7 +144,7 @@ async def scan_advisory(
         agent_lines.append(f'- {a.key} ({a.group_label}): {desc}')
     agent_list = "\n".join(agent_lines) if agent_lines else "- orchestrator: Full pipeline\n- threat_intel: CVE enrichment\n- risk_manager: Risk scoring"
 
-    prompt = f"""You are a security AI orchestration advisor inside Monitara. Analyze this completed scan and recommend the 3 most relevant AI agents to run next.
+    prompt = f"""You are a security AI orchestration advisor inside Monitara. Analyze this completed scan and score ALL agents for relevance.
 
 Scan: {scan.name}
 Connector type: {connector_type or "unknown"}
@@ -147,17 +155,24 @@ Resource types: {', '.join(sorted(resource_types)) if resource_types else 'vario
 Full agent catalog (agent_key · group · description):
 {agent_list}
 
-Your job: read the scan data carefully and pick the 3 agents that will deliver the most value for THIS specific scan. Consider:
-- What does the severity distribution suggest? (many criticals → triage/threat intel; compliance failures → compliance agents)
-- What does the connector type suggest? (cloud scan → cloud posture or risk agents; SAST → code-focused agents; network → vuln management)
-- Which groups have agents that directly address the dominant finding patterns?
-- Avoid recommending the same agent family twice unless there is a strong reason.
-- Do NOT always recommend the same 3 agents. Be creative and specific to this scan's data.
+Your job: score EVERY agent for relevance to THIS specific scan data. Score 0-100 where:
+- 80-100: highly relevant, directly addresses the dominant findings
+- 60-79: relevant, provides useful context
+- 40-59: somewhat useful, secondary value
+- 0-39: not relevant to this scan (EXCLUDE from output)
+
+Rules:
+- Score based on the actual scan data — severity distribution, connector type, resource types, finding titles
+- A cloud scan (azure/aws/gcp) → cloud posture, IAM, compliance agents score higher
+- A code scan (sast/ai_code_review) → appsec, threat intel, remediation agents score higher
+- A network/vuln scan → vuln triage, compliance, threat intel score higher
+- Be specific and diverse — score EVERY agent independently, don't cluster scores
+- Include ALL agents scoring >= 40, sort by score descending
 
 Return ONLY valid JSON (no markdown, no explanation):
-{{"banner": "2-sentence analysis of what this scan found and why these 3 agents are the best match", "recommendations": [{{"agent_key": "exact key from the catalog above", "match_score": 0-100, "reasoning": "one sentence explaining why this specific agent fits this specific scan", "bring": ["3-4 concise benefit bullets of what this agent will deliver"]}}]}}
+{{"banner": "2-sentence analysis of what this scan found", "recommendations": [{{"agent_key": "exact key from catalog", "match_score": 0-100, "reasoning": "one sentence why this agent fits this scan", "bring": ["2-3 concise benefit bullets"]}}]}}
 
-Return exactly 3 recommendations ranked by fit score, descending."""
+Include every agent with score >= 40, sorted descending by match_score."""
 
     try:
         from core.ai_providers import get_llm
@@ -165,7 +180,6 @@ Return exactly 3 recommendations ranked by fit score, descending."""
         llm = get_llm()
         resp = await llm.ainvoke([HumanMessage(content=prompt)])
         raw = resp.content.strip()
-        # Strip markdown fences if present
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
         if raw.endswith("```"):
@@ -174,14 +188,17 @@ Return exactly 3 recommendations ranked by fit score, descending."""
         data = json.loads(raw)
         banner = data.get("banner", "")
         recs_raw = data.get("recommendations", [])
+        # Filter to score >= 40 and sort descending (LLM should already do this, but enforce)
+        recs_raw = [r for r in recs_raw if int(r.get("match_score", 0)) >= 40]
+        recs_raw.sort(key=lambda r: int(r.get("match_score", 0)), reverse=True)
         recommendations = [
             AgentRecommendation(
                 agent_key=r.get("agent_key", "orchestrator"),
                 match_score=int(r.get("match_score", 80)),
                 reasoning=r.get("reasoning", ""),
-                bring=r.get("bring", ["Completed scan"]),
+                bring=r.get("bring", ["Analysis complete"]),
             )
-            for r in recs_raw[:3]
+            for r in recs_raw
         ]
         return ScanAdvisoryResponse(banner=banner, recommendations=recommendations)
     except Exception as exc:

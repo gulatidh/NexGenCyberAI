@@ -171,10 +171,10 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
 
 
 async def _run_config_review_task(run_id: str, client_id: str) -> None:
-    """Background task: pull asset configs and run LLM security review."""
+    """Background task: pull asset configs from a selected platform and run LLM security review."""
     import json
     from db.database import SessionLocal
-    from api.models.models import Asset, Finding, Severity, Scan, ScanType, ScanStatus
+    from api.models.models import Asset, Finding, Severity, Scan, ScanType, ScanStatus, Connector
     from core.ai_providers import get_llm
     db = SessionLocal()
     try:
@@ -184,39 +184,58 @@ async def _run_config_review_task(run_id: str, client_id: str) -> None:
         run.status = "running"
         db.commit()
 
-        # Create a scan record to hold findings if none linked
-        scan_id = run.scan_id
-        if not scan_id:
-            scan = Scan(
-                client_id=client_id,
-                name="AI Configuration Review",
-                scan_type=ScanType.CONFIGURATION,
-                status=ScanStatus.RUNNING,
-                started_at=datetime.now(timezone.utc),
-            )
-            db.add(scan)
-            db.commit()
-            db.refresh(scan)
-            scan_id = scan.id
-            run.scan_id = scan_id
-            db.commit()
+        # Determine connector_type from linked scan (user picked a platform connector)
+        source_scan_id = run.scan_id
+        connector_type_filter = None
+        connector_label = "All platforms"
+        if source_scan_id:
+            source_scan = db.query(Scan).filter(Scan.id == source_scan_id).first()
+            if source_scan and source_scan.connector:
+                ct = source_scan.connector.connector_type
+                connector_type_filter = ct.value if hasattr(ct, "value") else str(ct)
+                connector_label = connector_type_filter.upper()
 
-        assets = (
-            db.query(Asset)
-            .filter(Asset.client_id == client_id)
-            .limit(30)
-            .all()
+        # Always create a new scan record for the config review findings
+        scan_name = f"AI Configuration Review — {connector_label}"
+        new_scan = Scan(
+            client_id=client_id,
+            name=scan_name,
+            scan_type=ScanType.CONFIGURATION,
+            status=ScanStatus.RUNNING,
+            started_at=datetime.now(timezone.utc),
         )
+        db.add(new_scan)
+        db.commit()
+        db.refresh(new_scan)
+        run.scan_id = new_scan.id
+        db.commit()
+        review_scan_id = new_scan.id
+
+        # Query assets — filter by connector_type if one was selected
+        asset_query = db.query(Asset).filter(Asset.client_id == client_id)
+        if connector_type_filter:
+            # Join via connector: Asset.connector_id → Connector.connector_type
+            asset_query = (
+                asset_query
+                .join(Connector, Asset.connector_id == Connector.id)
+                .filter(Connector.connector_type == connector_type_filter)
+            )
+        assets = asset_query.limit(30).all()
 
         if not assets:
             run.status = "failed"
-            run.error_message = "No assets found. Connect a cloud platform and run an asset sync first."
+            no_assets_msg = (
+                f"No assets found for connector '{connector_type_filter}'. "
+                "Ensure the connector has synced assets (run a platform scan first)."
+                if connector_type_filter else
+                "No assets found. Connect a cloud platform and run an asset sync first."
+            )
+            run.error_message = no_assets_msg
             run.completed_at = datetime.now(timezone.utc)
-            if scan_id:
-                s = db.query(Scan).filter(Scan.id == scan_id).first()
-                if s and s.status == ScanStatus.RUNNING:
-                    s.status = ScanStatus.FAILED
-                    s.error_message = "No assets"
+            s = db.query(Scan).filter(Scan.id == review_scan_id).first()
+            if s and s.status == ScanStatus.RUNNING:
+                s.status = ScanStatus.FAILED
+                s.error_message = "No assets"
             db.commit()
             return
 
@@ -270,7 +289,7 @@ Return empty findings array if config looks secure. Max 20 findings."""
             except ValueError:
                 sev = Severity.MEDIUM
             db.add(Finding(
-                scan_id=scan_id,
+                scan_id=review_scan_id,
                 title=f.get("title", "Misconfiguration"),
                 description=f.get("description"),
                 severity=sev,
@@ -283,8 +302,8 @@ Return empty findings array if config looks secure. Max 20 findings."""
             sev_counts[sev_raw] = sev_counts.get(sev_raw, 0) + 1
             created += 1
 
-        # Mark the scan completed
-        s = db.query(Scan).filter(Scan.id == scan_id).first()
+        # Mark the config review scan completed
+        s = db.query(Scan).filter(Scan.id == review_scan_id).first()
         if s:
             s.status = ScanStatus.COMPLETED
             s.completed_at = datetime.now(timezone.utc)
