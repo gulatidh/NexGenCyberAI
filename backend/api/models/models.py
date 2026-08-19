@@ -180,6 +180,7 @@ class AgentType(str, enum.Enum):
     THREAT_INTEL = "threat_intel"
     REMEDIATION = "remediation"
     ORCHESTRATOR = "orchestrator"
+    CONFIGURATION_REVIEW = "configuration_review"
 
 class AssetStatus(str, enum.Enum):
     ACTIVE = "active"

@@ -170,6 +170,145 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
         result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result)
 
 
+async def _run_config_review_task(run_id: str, client_id: str) -> None:
+    """Background task: pull asset configs and run LLM security review."""
+    import json
+    from db.database import SessionLocal
+    from api.models.models import Asset, Finding, Severity, Scan, ScanType, ScanStatus
+    from core.ai_providers import get_llm
+    db = SessionLocal()
+    try:
+        run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+        if run is None:
+            return
+        run.status = "running"
+        db.commit()
+
+        # Create a scan record to hold findings if none linked
+        scan_id = run.scan_id
+        if not scan_id:
+            scan = Scan(
+                client_id=client_id,
+                name="AI Configuration Review",
+                scan_type=ScanType.CONFIGURATION,
+                status=ScanStatus.RUNNING,
+                started_at=datetime.now(timezone.utc),
+            )
+            db.add(scan)
+            db.commit()
+            db.refresh(scan)
+            scan_id = scan.id
+            run.scan_id = scan_id
+            db.commit()
+
+        assets = (
+            db.query(Asset)
+            .filter(Asset.client_id == client_id)
+            .limit(30)
+            .all()
+        )
+
+        if not assets:
+            run.status = "failed"
+            run.error_message = "No assets found. Connect a cloud platform and run an asset sync first."
+            run.completed_at = datetime.now(timezone.utc)
+            if scan_id:
+                s = db.query(Scan).filter(Scan.id == scan_id).first()
+                if s and s.status == ScanStatus.RUNNING:
+                    s.status = ScanStatus.FAILED
+                    s.error_message = "No assets"
+            db.commit()
+            return
+
+        lines = []
+        for a in assets:
+            meta = a.provider_metadata or {}
+            meta_str = json.dumps(meta)[:1500] if meta else "(no config)"
+            lines.append(f"Asset: {a.name}\nType: {a.asset_type or a.asset_class}\nID: {a.external_id}\nConfig:\n{meta_str}\n---")
+        config_context = "\n".join(lines)
+
+        prompt = f"""You are a cloud security configuration auditor. Review these asset configurations and identify security misconfigurations.
+
+Assets:
+{config_context}
+
+Return ONLY valid JSON (no markdown):
+{{
+  "findings": [
+    {{
+      "title": "...",
+      "description": "...",
+      "severity": "critical|high|medium|low|info",
+      "resource_id": "asset external_id",
+      "resource_type": "asset type",
+      "remediation": "...",
+      "control_id": "optional control like CIS 1.1"
+    }}
+  ],
+  "summary": "2-3 sentence overall assessment"
+}}
+
+Focus on: overly permissive IAM, unencrypted storage, missing logging, public exposure, weak authentication config.
+Return empty findings array if config looks secure. Max 20 findings."""
+
+        llm = get_llm()
+        response = llm.invoke(prompt)
+        raw = response.content if hasattr(response, "content") else str(response)
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        parsed = json.loads(raw)
+
+        created = 0
+        sev_counts: dict = {}
+        for f in parsed.get("findings", []):
+            sev_raw = (f.get("severity") or "medium").lower()
+            try:
+                sev = Severity(sev_raw)
+            except ValueError:
+                sev = Severity.MEDIUM
+            db.add(Finding(
+                scan_id=scan_id,
+                title=f.get("title", "Misconfiguration"),
+                description=f.get("description"),
+                severity=sev,
+                resource_id=f.get("resource_id"),
+                resource_type=f.get("resource_type"),
+                remediation=f.get("remediation"),
+                control_id=f.get("control_id"),
+                status="open",
+            ))
+            sev_counts[sev_raw] = sev_counts.get(sev_raw, 0) + 1
+            created += 1
+
+        # Mark the scan completed
+        s = db.query(Scan).filter(Scan.id == scan_id).first()
+        if s:
+            s.status = ScanStatus.COMPLETED
+            s.completed_at = datetime.now(timezone.utc)
+            s.summary = {"total": created, **sev_counts}
+
+        run.status = "completed"
+        run.output_data = {"summary": parsed.get("summary", ""), "findings_created": created}
+        run.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+    except Exception as exc:
+        try:
+            run = db.query(AgentRun).filter(AgentRun.id == run_id).first()
+            if run:
+                run.status = "failed"
+                run.error_message = str(exc)
+                run.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 async def _run_agent_task(
     run_id: str,
     client_id: str,
@@ -181,6 +320,10 @@ async def _run_agent_task(
     raw_context_str,
 ):
     """Background task: runs the agent in a fresh DB session so the HTTP thread is not blocked."""
+    if agent_type_val == "configuration_review":
+        await _run_config_review_task(run_id, client_id)
+        return
+
     from db.database import SessionLocal
     db = SessionLocal()
     try:
@@ -251,7 +394,7 @@ async def run_agent(
                 detail=f"Scan is still {scan_status}. Wait for it to complete before running an AI agent.",
             )
         finding_count = db.query(Finding).filter(Finding.scan_id == payload.scan_id).count()
-        if finding_count == 0:
+        if finding_count == 0 and payload.agent_type.value != "configuration_review":
             raise HTTPException(
                 status_code=422,
                 detail=(

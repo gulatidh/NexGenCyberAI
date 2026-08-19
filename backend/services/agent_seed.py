@@ -1170,6 +1170,13 @@ _CATALOG: List[Dict[str, Any]] = [
      "legacy_orchestrator": True,
      "system_prompt": _legacy_prompt("Master Operational Orchestrator",
                               "running the full operational agent pipeline (risk, framework, compliance, threat, remediation)")},
+    {"key": "configuration_review", "name": "Configuration Review", "group_key": "operational", "group_label": "Operational",
+     "description": "Pulls raw cloud asset configurations from connected platforms and runs an AI security review, identifying misconfigurations, IAM over-privilege, unencrypted storage, and missing controls.",
+     "objective": "Review live asset configurations from cloud connectors and generate structured findings for detected misconfigurations.",
+     "domain": "Cloud Configuration",
+     "legacy_orchestrator": True,
+     "system_prompt": _legacy_prompt("Cloud Configuration Security Reviewer",
+                              "reviewing raw cloud asset configurations to identify misconfigurations, overly permissive IAM, unencrypted storage, and missing security controls")},
 ]
 
 
