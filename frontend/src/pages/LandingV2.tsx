@@ -67,18 +67,7 @@ function NavBar({ onSignIn }: { onSignIn: () => void }) {
       px: { xs: 2, md: 6 }, py: 1.5,
       display: "flex", alignItems: "center", justifyContent: "space-between",
     }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-        <Box sx={{
-          width: 34, height: 34, borderRadius: 1.5,
-          background: "linear-gradient(135deg, #1565C0, #0288D1)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Shield sx={{ color: "#fff", fontSize: 18 }} />
-        </Box>
-        <Typography sx={{ fontWeight: 800, fontSize: 18, color: "#1A2027" }}>
-          Owlet
-        </Typography>
-      </Box>
+      <Box component="img" src="/aegis-logo.svg" alt="Owlet AI" sx={{ height: 38, width: "auto" }} />
       <Button
         variant="contained"
         onClick={onSignIn}
