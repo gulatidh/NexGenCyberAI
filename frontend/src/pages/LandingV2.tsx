@@ -67,7 +67,7 @@ function NavBar({ onSignIn }: { onSignIn: () => void }) {
       px: { xs: 2, md: 6 }, py: 1.5,
       display: "flex", alignItems: "center", justifyContent: "space-between",
     }}>
-      <Box component="img" src="/monitara-logo.svg" alt="Monitara" sx={{ height: 38, width: "auto" }} />
+      <Box component="img" src="/owlet-logo.svg" alt="Owlet" sx={{ height: 38, width: "auto" }} />
       <Button
         variant="contained"
         onClick={onSignIn}
