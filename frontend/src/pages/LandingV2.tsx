@@ -50,7 +50,7 @@ const FEATURES = [
 
 const TRUST_POINTS = [
   "Microsoft Entra ID — no separate passwords",
-  "Azure-hosted — data stays in your tenant",
+  "Self-hosted — data stays in your tenant",
   "Role-based access — Reader, Editor, Admin",
   "End-to-end encrypted credentials at rest",
 ];
@@ -160,20 +160,6 @@ function Hero({ onSignIn }: { onSignIn: () => void }) {
           }}
         >
           Sign in with Microsoft
-        </Button>
-        <Button
-          variant="outlined"
-          size="large"
-          onClick={onSignIn}
-          sx={{
-            textTransform: "none", fontWeight: 600, fontSize: 15,
-            borderRadius: 2.5, px: 3, py: 1.25,
-            borderColor: "rgba(21,101,192,0.4)",
-            color: "#1565C0",
-            "&:hover": { bgcolor: "rgba(21,101,192,0.06)", borderColor: "#1565C0" },
-          }}
-        >
-          Start Free Trial
         </Button>
       </Box>
 
