@@ -3,7 +3,7 @@ import { useActiveClient } from "../contexts/ClientContext";
 import { useMutation } from "@tanstack/react-query";
 import {
   Box, Typography, TextField, Button, Alert, CircularProgress,
-  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TablePagination,
   Card, CardContent, Chip, Collapse,
 } from "@mui/material";
 import { Send, Search, ExpandMore, ExpandLess } from "@mui/icons-material";
@@ -37,12 +37,15 @@ export default function NLQuery() {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<QueryResult | null>(null);
   const [showSql, setShowSql] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const queryMutation = useMutation({
     mutationFn: (q: string) => nlQueryApi.query(clientId, q),
     onSuccess: (data: QueryResult) => {
       setResult(data);
       setShowSql(false);
+      setPage(0);
     },
   });
 
@@ -221,49 +224,57 @@ export default function NLQuery() {
 
           {/* Data table */}
           {result.rows.length > 0 ? (
-            <TableContainer
-              component={Card}
-              variant="outlined"
-              sx={{ maxHeight: 500 }}
-            >
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {result.columns.map((col) => (
-                      <TableCell
-                        key={col}
-                        sx={{
-                          fontWeight: 700,
-                          fontSize: 11,
-                          bgcolor: "background.paper",
-                          color: "text.secondary",
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {col}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {result.rows.map((row, ri) => (
-                    <TableRow key={ri} hover>
-                      {row.map((cell, ci) => (
-                        <TableCell key={ci} sx={{ fontSize: 12, color: "text.primary" }}>
-                          {cell == null ? (
-                            <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                              —
-                            </Typography>
-                          ) : String(cell)}
+            <Card variant="outlined">
+              <TableContainer sx={{ maxHeight: "50vh", overflow: "auto" }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      {result.columns.map((col) => (
+                        <TableCell
+                          key={col}
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: 11,
+                            bgcolor: "background.paper",
+                            color: "text.secondary",
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {col}
                         </TableCell>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {result.rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, ri) => (
+                      <TableRow key={ri} hover>
+                        {row.map((cell, ci) => (
+                          <TableCell key={ci} sx={{ fontSize: 12, color: "text.primary" }}>
+                            {cell == null ? (
+                              <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                                —
+                              </Typography>
+                            ) : String(cell)}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                component="div"
+                count={result.rows.length}
+                page={page}
+                onPageChange={(_, p) => setPage(p)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                sx={{ borderTop: "1px solid", borderColor: "divider", color: "text.secondary", "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: 12 } }}
+              />
+            </Card>
           ) : (
             <Card
               variant="outlined"

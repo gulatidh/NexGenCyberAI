@@ -4,7 +4,7 @@ import {
   CircularProgress, InputAdornment, Alert, Tabs, Tab,
   ToggleButton, ToggleButtonGroup, FormControl, InputLabel, Select, MenuItem,
   FormControlLabel, Switch, Table, TableHead, TableRow, TableCell, TableBody,
-  TableContainer, Tooltip,
+  TableContainer, TablePagination, Tooltip,
 } from "@mui/material";
 import {
   Search, ExpandMore, ExpandLess, Storage, AutoStories, OpenInNew, Hub,
@@ -30,6 +30,8 @@ function ThreatIntelBrowser() {
   const [minCvss, setMinCvss] = useState<string>("");
   const [minScore, setMinScore] = useState<string>("");
   const [ransomware, setRansomware] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const isLib = source === "attack" || source === "capec";
   const isNvd = source === "nvd_recent";
@@ -52,8 +54,12 @@ function ThreatIntelBrowser() {
   const rows = data?.rows || [];
   const cols = rows.length ? Object.keys(rows[0]).filter((k) => k !== "ref") : [];
   const cats = data?.facets?.categories || [];
+  const pagedRows = rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-  const resetFilters = () => { setQ(""); setCategory(""); setCwe(""); setMinCvss(""); setMinScore(""); setRansomware(false); };
+  const resetFilters = () => { setQ(""); setCategory(""); setCwe(""); setMinCvss(""); setMinScore(""); setRansomware(false); setPage(0); };
+
+  // Reset to page 0 whenever source or filters change
+  React.useEffect(() => { setPage(0); }, [source, q, category, cwe, minCvss, minScore, ransomware]);
 
   return (
     <Box>
@@ -126,40 +132,52 @@ function ThreatIntelBrowser() {
           No entries — adjust filters, or run a Sync for this feed first.
         </Alert>
       ) : (
-        <TableContainer component={Card} sx={{ bgcolor: "background.paper", maxHeight: "62vh" }}>
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                {cols.map((c) => (
-                  <TableCell key={c} sx={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: "text.secondary", bgcolor: "background.paper" }}>
-                    {c.replace(/_/g, " ")}
-                  </TableCell>
-                ))}
-                <TableCell sx={{ bgcolor: "background.paper", width: 36 }} />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r, i) => (
-                <TableRow key={i} hover
-                  onClick={() => { if (r.ref) window.open(r.ref, "_blank", "noopener"); }}
-                  sx={{ cursor: r.ref ? "pointer" : "default", "&:hover": r.ref ? { bgcolor: "rgba(66,133,244,0.06)" } : {} }}>
+        <>
+          <TableContainer component={Card} sx={{ bgcolor: "background.paper", maxHeight: "58vh", overflow: "auto" }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
                   {cols.map((c) => (
-                    <TableCell key={c} sx={{ fontSize: 12, color: "text.primary", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c === "description" ? "normal" : "nowrap" }}>
-                      {typeof r[c] === "boolean" ? (r[c] ? "yes" : "—") : (r[c] ?? "—")}
+                    <TableCell key={c} sx={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: "text.secondary", bgcolor: "background.paper" }}>
+                      {c.replace(/_/g, " ")}
                     </TableCell>
                   ))}
-                  <TableCell sx={{ width: 36 }}>
-                    {r.ref && (
-                      <Tooltip title="Open authoritative source">
-                        <OpenInNew sx={{ fontSize: 15, color: "text.secondary" }} />
-                      </Tooltip>
-                    )}
-                  </TableCell>
+                  <TableCell sx={{ bgcolor: "background.paper", width: 36 }} />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {pagedRows.map((r, i) => (
+                  <TableRow key={i} hover
+                    onClick={() => { if (r.ref) window.open(r.ref, "_blank", "noopener"); }}
+                    sx={{ cursor: r.ref ? "pointer" : "default", "&:hover": r.ref ? { bgcolor: "rgba(66,133,244,0.06)" } : {} }}>
+                    {cols.map((c) => (
+                      <TableCell key={c} sx={{ fontSize: 12, color: "text.primary", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: c === "description" ? "normal" : "nowrap" }}>
+                        {typeof r[c] === "boolean" ? (r[c] ? "yes" : "—") : (r[c] ?? "—")}
+                      </TableCell>
+                    ))}
+                    <TableCell sx={{ width: 36 }}>
+                      {r.ref && (
+                        <Tooltip title="Open authoritative source">
+                          <OpenInNew sx={{ fontSize: 15, color: "text.secondary" }} />
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            component="div"
+            count={rows.length}
+            page={page}
+            onPageChange={(_, p) => setPage(p)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            sx={{ borderTop: "1px solid", borderColor: "divider", color: "text.secondary", "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": { fontSize: 12 } }}
+          />
+        </>
       )}
     </Box>
   );
