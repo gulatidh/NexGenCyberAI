@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import FrameworkAdvisor from "../components/FrameworkAdvisor";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, Chip, CircularProgress, Button,
@@ -808,6 +809,9 @@ export default function Frameworks() {
           </Box>
         )}
       </Drawer>
+      <FrameworkAdvisor onSelectFrameworks={(keys) => {
+        if (keys.length > 0) setFramework(keys[0]);
+      }} />
     </Box>
   );
 }

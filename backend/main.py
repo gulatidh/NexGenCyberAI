@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog, tickets, users
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog, tickets, users, framework_advisor
 
 # Optional new routers — imported individually so a missing file never breaks boot.
 try:
@@ -2020,6 +2020,7 @@ app.include_router(threat_register.router, prefix="/api/v1")
 app.include_router(control_deficiencies.router, prefix="/api/v1")
 app.include_router(remediation_tracker.router, prefix="/api/v1")
 app.include_router(custom_frameworks.router, prefix="/api/v1")
+app.include_router(framework_advisor.router, prefix="/api/v1")
 app.include_router(assistant.router, prefix="/api/v1")
 app.include_router(vapt_reports.router, prefix="/api/v1")
 app.include_router(changelog.router, prefix="/api/v1")

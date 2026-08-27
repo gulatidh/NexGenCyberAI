@@ -426,6 +426,9 @@ export const frameworksApi = {
       .post(`/frameworks/${framework}/import/`, fd, { headers: { "Content-Type": "multipart/form-data" } })
       .then((r) => r.data);
   },
+  advisorSteps: () => apiClient.get("/frameworks/advisor/steps").then((r) => r.data),
+  advisorRecommend: (answers: Record<string, string | string[]>) =>
+    apiClient.post("/frameworks/advisor/recommend", { answers }).then((r) => r.data),
 };
 
 export const assetsApi = {
