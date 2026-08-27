@@ -656,6 +656,27 @@ const GROUPS: Group[] = [
     color: "#00897B",
     topics: [
       {
+        id: "framework-advisor",
+        title: "AI Framework Advisor — find the right framework",
+        summary: "Not sure which compliance framework to adopt? The Framework Advisor is a 7-step wizard that asks about your industry, geography, data types, org size, cloud posture, obligations, and existing certifications — then uses AI to recommend the most applicable frameworks, explain why each applies, and show the adoption sequence.",
+        steps: [
+          { text: "Open Frameworks (Report → Frameworks or Automate → Frameworks)." },
+          { text: "Click the glowing ✨ button in the bottom-right corner of the page to open the advisor." },
+          { text: "Answer each question by clicking the option chips. Multi-select questions let you pick several; single-select advances automatically." },
+          { text: "If none of the chips match, click 'Something else' — a text field appears so you can type a custom answer." },
+          { text: "After all 7 questions the AI generates a ranked list of recommended frameworks with priority (mandatory / recommended / optional), effort estimate, and overlap insights." },
+          { text: "Tick the frameworks you want to explore, then click 'Compare in Platform' — the Frameworks page reloads pre-filtered to your selection." },
+        ],
+        tips: [
+          "Mandatory frameworks are legal/regulatory obligations based on your geography and data types — treat these as non-negotiable. Recommended ones are best-practice for your industry.",
+          "Overlap insights show how much of one framework is covered by another — useful for planning adoption order. Adopting ISO 27001 first can cover 40–65% of SOC 2 controls.",
+          "The adoption sequence at the bottom of the recommendations is ordered by foundational value — start with the framework that gives you the most coverage across your other obligations.",
+        ],
+        warnings: [
+          "Recommendations are AI-generated based on your inputs. Always validate mandatory framework requirements with your legal or compliance team before committing to an adoption roadmap.",
+        ],
+      },
+      {
         id: "framework-library",
         title: "What the framework library is",
         summary: "Owlet ships with a pre-seeded library of industry compliance frameworks — NIST CSF 2.0, ISO 27001:2022, PCI DSS 4.0, GDPR, CIS Controls v8, and more. Each framework is a structured list of controls with IDs, domains, and descriptions. Scan findings are automatically mapped to these controls when you tag a framework at scan time.",

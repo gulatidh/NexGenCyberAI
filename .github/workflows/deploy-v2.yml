@@ -1,11 +1,11 @@
 ##############################################################################
 # Monitara v2 — Deploy to monitara-sea App Service (Southeast Asia)
 #
-# Triggers on workflow_dispatch.
-# Backend: nexgencyberai-sea-api (SEA)
-# No backend deploy — frontend only.
+# Triggers automatically on every push to main, and on workflow_dispatch.
+# Deploys BOTH frontend (monitara-sea) and backend (nexgencyberai-sea-api)
+# in parallel so a single push ships everything.
 #
-# Required GitHub Secrets (same as main deploy.yml):
+# Required GitHub Secrets:
 #   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
 #   REACT_APP_AZURE_CLIENT_ID   – Frontend Entra App Registration client ID
 #   REACT_APP_AZURE_TENANT_ID
@@ -16,6 +16,8 @@
 name: Monitara v2 — Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -26,10 +28,12 @@ env:
   NODE_VERSION: "22"
   AZ_RESOURCE_GROUP: "nexgencyberai-sea-rg"
   AZ_FRONTEND_APP: "monitara-sea"
+  AZ_BACKEND_APP: "nexgencyberai-sea-api"
+  AZ_SUBSCRIPTION: "4e6778be-a1f5-4b94-a58d-14a190484c15"
 
 jobs:
 
-  # ── 1. Type Check + Build ──────────────────────────────────────────────────
+  # ── 1. Frontend: Type Check + Build ────────────────────────────────────────
   frontend-build:
     name: Frontend — Type Check + Build
     runs-on: ubuntu-latest
@@ -67,11 +71,34 @@ jobs:
           path: frontend/build/
           retention-days: 1
 
-  # ── 2. Deploy to monitara-sea ──────────────────────────────────────────────
-  deploy:
-    name: Deploy — monitara-sea
+  # ── 2. Backend: Package ────────────────────────────────────────────────────
+  backend-build:
+    name: Backend — Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Package backend zip
+        run: |
+          cd backend
+          zip -qr ../backend.zip . \
+            --exclude "*.pyc" \
+            --exclude "__pycache__/*" \
+            --exclude "nexgencyberai.db" \
+            --exclude ".env"
+          echo "Backend zip: $(du -sh ../backend.zip | cut -f1)"
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: v2-backend-build
+          path: backend.zip
+          retention-days: 1
+
+  # ── 3. Deploy both in parallel ─────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy — Frontend (monitara-sea)
     needs: frontend-build
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -81,7 +108,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Download build artifact
+      - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
           name: v2-frontend-build
@@ -101,23 +128,58 @@ jobs:
           done
           $ok || { echo "ERROR: startup-file config failed after 3 attempts"; exit 1; }
 
-      - name: Package and deploy
+      - name: Package and deploy frontend
         run: |
           set -euo pipefail
-
           cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
           echo "Frontend zip: $(du -sh frontend.zip | cut -f1)"
 
           for attempt in $(seq 1 5); do
-            echo "Attempt $attempt — deploying to $AZ_FRONTEND_APP..."
+            echo "Attempt $attempt — deploying frontend..."
             az webapp deploy \
               --name "$AZ_FRONTEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
               --src-path frontend.zip \
               --type zip \
               --async true \
-              --timeout 300 && { echo "Deployed successfully to https://monitara-sea.azurewebsites.net"; exit 0; }
+              --timeout 300 && { echo "Frontend deployed → https://monitara-sea.azurewebsites.net"; exit 0; }
             echo "Attempt $attempt failed — waiting 30s before retry"
             sleep 30
           done
-          echo "Deploy failed after 5 attempts"; exit 1
+          echo "Frontend deploy failed after 5 attempts"; exit 1
+
+  deploy-backend:
+    name: Deploy — Backend (nexgencyberai-sea-api)
+    needs: backend-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: v2-backend-build
+          path: .
+
+      - name: Deploy backend
+        run: |
+          set -euo pipefail
+          echo "Backend zip: $(du -sh backend.zip | cut -f1)"
+
+          for attempt in $(seq 1 5); do
+            echo "Attempt $attempt — deploying backend..."
+            az webapp deploy \
+              --name "$AZ_BACKEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
+              --src-path backend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Backend deployed → https://nexgencyberai-sea-api.azurewebsites.net"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30s before retry"
+            sleep 30
+          done
+          echo "Backend deploy failed after 5 attempts"; exit 1
