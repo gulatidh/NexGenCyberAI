@@ -83,10 +83,10 @@ const STANDARD_FRAMEWORKS = [
   {
     key: "gcc_im8",
     label: "GCC IM8 (Singapore)",
-    description: "Singapore Government Commercial Cloud Instruction Manual 8 — cybersecurity baseline for GCC workloads.",
+    description: "Singapore Government Commercial Cloud Instruction Manual 8 Reform 2025 — cybersecurity baseline for GCC workloads.",
     color: "#C62828",
     Icon: CloudQueue,
-    controls: 52,
+    controls: 137,
     family: "Standards",
   },
 ];
