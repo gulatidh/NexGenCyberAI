@@ -315,7 +315,7 @@ const FAQS = [
   },
 ];
 
-const NAV_LINKS = ["Features", "Process", "Integrations", "FAQ"];
+const NAV_LINKS = ["Features", "Audit", "Process", "Integrations", "FAQ"];
 
 const TERMINAL_LINES = [
   { text: "$ owlet agent run --orchestrator --scan-id a4f9bc12", color: CYAN, delay: 0 },
