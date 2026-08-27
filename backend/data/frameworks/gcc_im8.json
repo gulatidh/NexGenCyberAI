@@ -1,102 +1,1103 @@
 {
   "framework": "gcc_im8",
-  "version": "IM8 2023 (GCC)",
-  "source": "https://www.developer.tech.gov.sg/guidelines/standards-and-best-practices/im8.html",
+  "version": "IM8 Reform 2025.05.13",
+  "source": "https://raw.githubusercontent.com/GovTechSG/tech-standards/refs/heads/master/catalogs/im8-reform.json",
   "controls": [
-
-    { "control_id": "GOV", "parent": null, "domain": "IT Governance", "title": "IT Governance", "description": "Policies and controls governing IT security management, roles, responsibilities, and risk management across Singapore Government agencies.", "weight": 0 },
-
-    { "control_id": "GOV-1", "parent": "GOV", "domain": "IT Governance", "title": "IT Security Policy", "description": "The agency shall establish, document, and maintain an IT security policy that is approved by senior management, communicated to all staff, and reviewed at least annually or upon significant changes.", "weight": 3 },
-    { "control_id": "GOV-2", "parent": "GOV", "domain": "IT Governance", "title": "IT Security Risk Management", "description": "The agency shall conduct an IT security risk assessment at least annually or when there are significant system or environment changes. Residual risks must be formally accepted by the system owner.", "weight": 3 },
-    { "control_id": "GOV-3", "parent": "GOV", "domain": "IT Governance", "title": "IT Security Roles and Responsibilities", "description": "The agency shall designate an IT Security Manager (ITSM) and define security roles and responsibilities for all staff. Segregation of duties shall be enforced for critical functions.", "weight": 2 },
-    { "control_id": "GOV-4", "parent": "GOV", "domain": "IT Governance", "title": "IT Security Awareness and Training", "description": "All staff with access to government systems shall complete IT security awareness training annually. Staff in security-sensitive roles shall receive role-specific training.", "weight": 2 },
-    { "control_id": "GOV-5", "parent": "GOV", "domain": "IT Governance", "title": "IT Security Audit", "description": "The agency shall conduct periodic IT security audits and vulnerability assessments. Findings shall be tracked to remediation. Penetration testing shall be conducted at least annually for internet-facing systems.", "weight": 3 },
-    { "control_id": "GOV-6", "parent": "GOV", "domain": "IT Governance", "title": "System Baseline and Configuration Standards", "description": "All systems shall be configured according to an approved security baseline. Deviations from baseline must be documented and approved. Configuration reviews shall be conducted at least annually.", "weight": 2 },
-    { "control_id": "GOV-7", "parent": "GOV", "domain": "IT Governance", "title": "Software Asset Management", "description": "The agency shall maintain an inventory of all licensed software. Unlicensed or end-of-life software shall not be used in production environments.", "weight": 2 },
-
-    { "control_id": "ACC", "parent": null, "domain": "Access Control", "title": "Access Control", "description": "Controls governing user access provisioning, authentication, privileged access management, and remote access to government systems.", "weight": 0 },
-
-    { "control_id": "ACC-1", "parent": "ACC", "domain": "Access Control", "title": "User Access Management", "description": "User accounts shall be provisioned based on least privilege and business need-to-know. Access rights shall be reviewed at least every six months and revoked promptly upon cessation of employment or role change.", "weight": 3 },
-    { "control_id": "ACC-2", "parent": "ACC", "domain": "Access Control", "title": "Multi-Factor Authentication (MFA)", "description": "MFA shall be enforced for all administrative access, remote access, and access to sensitive government systems and data. Single-factor authentication is not permitted for privileged accounts.", "weight": 3 },
-    { "control_id": "ACC-3", "parent": "ACC", "domain": "Access Control", "title": "Privileged Access Management", "description": "Privileged accounts (admin, root, service accounts) shall be inventoried, managed through a Privileged Access Management (PAM) solution, and subject to enhanced monitoring. Shared privileged accounts are prohibited.", "weight": 3 },
-    { "control_id": "ACC-4", "parent": "ACC", "domain": "Access Control", "title": "Password and Credential Policy", "description": "Password policy shall enforce minimum complexity (12+ characters, mixed case, numbers, symbols), maximum validity of 90 days for privileged accounts, and prohibition of password reuse for the last 12 passwords.", "weight": 2 },
-    { "control_id": "ACC-5", "parent": "ACC", "domain": "Access Control", "title": "Remote Access Security", "description": "Remote access to government systems shall use government-approved VPN or secure gateway with MFA. All remote sessions shall be logged. Direct RDP/SSH exposure to the internet is prohibited.", "weight": 3 },
-    { "control_id": "ACC-6", "parent": "ACC", "domain": "Access Control", "title": "Identity and Access Governance", "description": "The agency shall implement identity governance controls including access certification, role-based access control (RBAC), and just-in-time (JIT) provisioning for sensitive environments.", "weight": 2 },
-    { "control_id": "ACC-7", "parent": "ACC", "domain": "Access Control", "title": "Service Account Management", "description": "Service accounts shall use unique credentials, follow least privilege, and not be used for interactive logon. Service account credentials shall be rotated at least annually and stored in an approved secrets management solution.", "weight": 2 },
-
-    { "control_id": "NET", "parent": null, "domain": "Network Security", "title": "Network Security", "description": "Controls governing government intranet, internet connectivity, network segmentation, and secure communications.", "weight": 0 },
-
-    { "control_id": "NET-1", "parent": "NET", "domain": "Network Security", "title": "Network Segmentation and Zoning", "description": "Government networks shall be segmented into security zones (Internet, DMZ, Intranet, Restricted). Traffic between zones shall be controlled by firewalls with deny-by-default rules. Network diagrams shall be maintained and reviewed annually.", "weight": 3 },
-    { "control_id": "NET-2", "parent": "NET", "domain": "Network Security", "title": "Firewall and Gateway Management", "description": "Firewalls shall be configured with minimum necessary rules. Firewall rule reviews shall be conducted at least every six months. Internet-facing services shall be placed in a DMZ.", "weight": 3 },
-    { "control_id": "NET-3", "parent": "NET", "domain": "Network Security", "title": "Internet Access Controls", "description": "Internet access from government networks shall go through an approved Secure Web Gateway (SWG) with content filtering, malware scanning, and SSL inspection. Proxy bypass is prohibited without approval.", "weight": 2 },
-    { "control_id": "NET-4", "parent": "NET", "domain": "Network Security", "title": "Email Security", "description": "Government email systems shall implement SPF, DKIM, and DMARC. Anti-spam, anti-phishing, and anti-malware controls shall be applied. Sensitive data shall not be transmitted via unencrypted email.", "weight": 2 },
-    { "control_id": "NET-5", "parent": "NET", "domain": "Network Security", "title": "Wireless Network Security", "description": "Wireless networks shall use WPA3 or WPA2-Enterprise with 802.1X authentication. Guest wireless networks shall be isolated from the government intranet. Rogue access point detection shall be implemented.", "weight": 2 },
-    { "control_id": "NET-6", "parent": "NET", "domain": "Network Security", "title": "DNS Security", "description": "Government DNS infrastructure shall implement DNSSEC for authoritative zones. DNS filtering shall be used to block access to known malicious domains. Internal DNS resolvers shall not be exposed to the internet.", "weight": 2 },
-
-    { "control_id": "SYS", "parent": null, "domain": "System Security", "title": "System and Endpoint Security", "description": "Controls governing endpoint protection, patch management, and system hardening for government devices and servers.", "weight": 0 },
-
-    { "control_id": "SYS-1", "parent": "SYS", "domain": "System Security", "title": "Patch and Vulnerability Management", "description": "Critical and high severity patches shall be applied within 30 days of release. Medium severity patches shall be applied within 90 days. An exception process with compensating controls is required for systems that cannot be patched within the timeline.", "weight": 3 },
-    { "control_id": "SYS-2", "parent": "SYS", "domain": "System Security", "title": "Endpoint Protection", "description": "All government endpoints (workstations, laptops, servers) shall have approved antivirus/EDR solutions installed with real-time protection enabled and definitions updated daily. USB and removable media controls shall be implemented.", "weight": 3 },
-    { "control_id": "SYS-3", "parent": "SYS", "domain": "System Security", "title": "System Hardening", "description": "All systems shall be hardened according to approved CIS Benchmarks or equivalent. Unnecessary services, ports, and accounts shall be disabled. Operating system hardening guides shall be applied before system deployment.", "weight": 2 },
-    { "control_id": "SYS-4", "parent": "SYS", "domain": "System Security", "title": "Mobile Device Management", "description": "Government mobile devices shall be enrolled in an approved Mobile Device Management (MDM) solution. Remote wipe capability shall be enabled. Personal devices used for government work (BYOD) shall comply with MDM policy.", "weight": 2 },
-    { "control_id": "SYS-5", "parent": "SYS", "domain": "System Security", "title": "Vulnerability Scanning", "description": "Authenticated vulnerability scans shall be conducted monthly on all internet-facing and sensitive internal systems. Scan results shall be reviewed and critical/high findings remediated within defined SLAs.", "weight": 2 },
-
-    { "control_id": "APP", "parent": null, "domain": "Application Security", "title": "Application Security", "description": "Controls governing secure software development, application security testing, and API security for government digital services.", "weight": 0 },
-
-    { "control_id": "APP-1", "parent": "APP", "domain": "Application Security", "title": "Secure Software Development Lifecycle (SSDLC)", "description": "The agency shall implement a Secure Software Development Lifecycle (SSDLC) incorporating security requirements, threat modelling, secure design review, and security testing at each phase before deployment.", "weight": 3 },
-    { "control_id": "APP-2", "parent": "APP", "domain": "Application Security", "title": "Application Security Testing", "description": "Static Application Security Testing (SAST) shall be performed during development. Dynamic Application Security Testing (DAST) and penetration testing shall be conducted before go-live and at least annually for production systems.", "weight": 3 },
-    { "control_id": "APP-3", "parent": "APP", "domain": "Application Security", "title": "Open Source and Third-Party Component Security", "description": "Software Composition Analysis (SCA) shall be performed to identify and remediate known vulnerabilities in open source and third-party libraries. Dependency versions shall be tracked and kept updated.", "weight": 2 },
-    { "control_id": "APP-4", "parent": "APP", "domain": "Application Security", "title": "API Security", "description": "APIs shall implement authentication (OAuth 2.0 / API keys), rate limiting, input validation, and output encoding. API inventory shall be maintained. Sensitive data shall not be exposed in API responses beyond what is necessary.", "weight": 2 },
-    { "control_id": "APP-5", "parent": "APP", "domain": "Application Security", "title": "Web Application Security", "description": "Public-facing web applications shall be protected by a Web Application Firewall (WAF). OWASP Top 10 vulnerabilities shall be addressed. Security headers (CSP, HSTS, X-Frame-Options) shall be configured.", "weight": 3 },
-    { "control_id": "APP-6", "parent": "APP", "domain": "Application Security", "title": "Secrets and Credential Management", "description": "Application secrets, API keys, and database credentials shall be stored in an approved secrets management solution (e.g., Azure Key Vault). Hardcoded credentials in source code are prohibited and enforced via SAST/secrets scanning.", "weight": 3 },
-    { "control_id": "APP-7", "parent": "APP", "domain": "Application Security", "title": "Secure Code Repository Management", "description": "Source code repositories shall enforce branch protection, require pull request reviews, and integrate with SAST and secrets scanning pipelines. Public exposure of government source code repositories is prohibited without approval.", "weight": 2 },
-
-    { "control_id": "DAT", "parent": null, "domain": "Data Security", "title": "Data and Information Security", "description": "Controls governing government data classification, handling, encryption, and data loss prevention.", "weight": 0 },
-
-    { "control_id": "DAT-1", "parent": "DAT", "domain": "Data Security", "title": "Data Classification", "description": "All government data shall be classified according to the Government Data Classification Framework (GDCF): Restricted, Confidential, Official, or Public. Data handling requirements shall be applied based on classification.", "weight": 3 },
-    { "control_id": "DAT-2", "parent": "DAT", "domain": "Data Security", "title": "Data Encryption at Rest", "description": "Data classified as Confidential or Restricted shall be encrypted at rest using AES-256 or equivalent. Database encryption and full-disk encryption shall be implemented on all systems storing sensitive government data.", "weight": 3 },
-    { "control_id": "DAT-3", "parent": "DAT", "domain": "Data Security", "title": "Data Encryption in Transit", "description": "All data transmissions involving government data shall use TLS 1.2 or higher. TLS 1.0 and 1.1 are prohibited. Certificate management shall include automated renewal and monitoring for expiry.", "weight": 3 },
-    { "control_id": "DAT-4", "parent": "DAT", "domain": "Data Security", "title": "Data Loss Prevention (DLP)", "description": "DLP controls shall be implemented to prevent unauthorised exfiltration of sensitive government data via email, web upload, removable media, and cloud storage. DLP policies shall be tuned to data classification labels.", "weight": 2 },
-    { "control_id": "DAT-5", "parent": "DAT", "domain": "Data Security", "title": "Data Retention and Disposal", "description": "Government data shall be retained according to the Government Records Management Framework. Data disposal shall use approved methods (DoD 5220.22-M or equivalent for electronic media; physical destruction for classified media).", "weight": 2 },
-    { "control_id": "DAT-6", "parent": "DAT", "domain": "Data Security", "title": "Personal Data Protection", "description": "Systems processing personal data shall comply with the Personal Data Protection Act (PDPA) and government personal data protection policies. Data minimisation, purpose limitation, and subject access controls shall be implemented.", "weight": 3 },
-    { "control_id": "DAT-7", "parent": "DAT", "domain": "Data Security", "title": "Database Security", "description": "Databases storing government data shall implement access controls, audit logging, and activity monitoring. Database queries shall use parameterised statements. Database access from application accounts shall follow least privilege.", "weight": 2 },
-
-    { "control_id": "CLD", "parent": null, "domain": "Cloud Security (GCC)", "title": "Government Commercial Cloud (GCC) Security", "description": "Controls specific to Singapore Government Commercial Cloud (GCC) environments including AWS GCC, Azure GCC, and GCC+.", "weight": 0 },
-
-    { "control_id": "CLD-1", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Service Approval and Onboarding", "description": "Cloud services used by government agencies shall be approved by GovTech and onboarded through the Government Commercial Cloud (GCC) programme. Unapproved cloud services (Shadow IT) are prohibited for government data.", "weight": 3 },
-    { "control_id": "CLD-2", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Security Posture Management (CSPM)", "description": "Cloud environments shall be monitored continuously using approved CSPM tools. Cloud misconfiguration findings shall be remediated within defined SLAs. Cloud security benchmarks (CIS AWS/Azure/GCP) shall be applied.", "weight": 3 },
-    { "control_id": "CLD-3", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Identity and Access Management", "description": "Cloud IAM shall follow least privilege. Root/global administrator accounts shall use MFA and not be used for routine operations. Service accounts and managed identities shall be used in place of long-lived access keys.", "weight": 3 },
-    { "control_id": "CLD-4", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Data Residency and Sovereignty", "description": "Government data classified Restricted or above shall remain within approved GCC regions (Singapore). Data replication to non-approved regions is prohibited without explicit GovTech approval.", "weight": 3 },
-    { "control_id": "CLD-5", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Network Security Controls", "description": "Cloud virtual networks shall implement security groups/NSGs with deny-by-default. Public-facing resources shall be protected by WAF and DDoS protection. Network flow logs shall be enabled for all VPCs/VNets.", "weight": 2 },
-    { "control_id": "CLD-6", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Serverless and Container Security", "description": "Serverless functions and containers shall be scanned for vulnerabilities using approved tools. Container images shall be pulled from approved registries. Runtime security monitoring shall be implemented for containerised workloads.", "weight": 2 },
-    { "control_id": "CLD-7", "parent": "CLD", "domain": "Cloud Security (GCC)", "title": "Cloud Key Management", "description": "Cryptographic keys used in cloud environments shall be managed through cloud-native KMS (AWS KMS, Azure Key Vault). Customer-managed keys (CMK) shall be used for government-classified data. Key rotation shall be automated.", "weight": 2 },
-
-    { "control_id": "LOG", "parent": null, "domain": "Logging and Monitoring", "title": "Security Logging and Monitoring", "description": "Controls governing security event logging, SIEM integration, and continuous monitoring of government systems.", "weight": 0 },
-
-    { "control_id": "LOG-1", "parent": "LOG", "domain": "Logging and Monitoring", "title": "Security Event Logging", "description": "All government systems shall enable security event logging covering authentication events, privilege escalation, system changes, and data access. Logs shall be retained for at least 12 months (online) and 5 years (archived).", "weight": 3 },
-    { "control_id": "LOG-2", "parent": "LOG", "domain": "Logging and Monitoring", "title": "Centralised Log Management (SIEM)", "description": "Security logs from all in-scope systems shall be forwarded to a centralised SIEM. SIEM use cases shall cover critical attack patterns including brute force, lateral movement, and data exfiltration. Alerts shall be triaged within defined SLAs.", "weight": 3 },
-    { "control_id": "LOG-3", "parent": "LOG", "domain": "Logging and Monitoring", "title": "Log Integrity and Tamper Protection", "description": "Security logs shall be stored in an immutable, tamper-evident manner. Write access to log stores shall be restricted. Log forwarding shall be monitored for gaps or failures.", "weight": 2 },
-    { "control_id": "LOG-4", "parent": "LOG", "domain": "Logging and Monitoring", "title": "Security Operations and Threat Monitoring", "description": "The agency shall establish or subscribe to a Security Operations Centre (SOC) function with 24/7 monitoring capability for critical systems. Threat intelligence feeds shall be integrated into monitoring.", "weight": 2 },
-    { "control_id": "LOG-5", "parent": "LOG", "domain": "Logging and Monitoring", "title": "Privileged Activity Monitoring", "description": "All privileged user activity (admin logins, configuration changes, access to sensitive data) shall be logged and reviewed. Privileged session recording shall be implemented for critical systems.", "weight": 2 },
-
-    { "control_id": "INC", "parent": null, "domain": "Incident Management", "title": "Incident Management", "description": "Controls governing cybersecurity incident detection, response, reporting, and recovery for government agencies.", "weight": 0 },
-
-    { "control_id": "INC-1", "parent": "INC", "domain": "Incident Management", "title": "Incident Response Plan", "description": "The agency shall maintain a documented Cybersecurity Incident Response Plan (CIRP) that is reviewed and tested at least annually. The plan shall define incident classification, escalation procedures, and roles.", "weight": 3 },
-    { "control_id": "INC-2", "parent": "INC", "domain": "Incident Management", "title": "Incident Reporting to GovTech", "description": "Cybersecurity incidents affecting government systems shall be reported to GovTech / SingCERT within defined timeframes: Critical incidents within 1 hour, High within 4 hours, Medium within 24 hours.", "weight": 3 },
-    { "control_id": "INC-3", "parent": "INC", "domain": "Incident Management", "title": "Incident Containment and Eradication", "description": "Incident response procedures shall include containment, eradication, and recovery steps. Forensic evidence shall be preserved. Root cause analysis shall be completed and lessons learned documented within 30 days.", "weight": 2 },
-    { "control_id": "INC-4", "parent": "INC", "domain": "Incident Management", "title": "Tabletop Exercises and Drills", "description": "The agency shall conduct cybersecurity incident simulation exercises (tabletop or functional) at least annually to validate the Incident Response Plan and team readiness.", "weight": 2 },
-
-    { "control_id": "BCM", "parent": null, "domain": "Business Continuity", "title": "Business Continuity and Disaster Recovery", "description": "Controls governing IT business continuity planning, backup management, and disaster recovery for government digital services.", "weight": 0 },
-
-    { "control_id": "BCM-1", "parent": "BCM", "domain": "Business Continuity", "title": "Business Continuity Plan (BCP)", "description": "The agency shall maintain a Business Continuity Plan covering critical IT systems. The BCP shall define Recovery Time Objectives (RTO) and Recovery Point Objectives (RPO) and be reviewed annually.", "weight": 2 },
-    { "control_id": "BCM-2", "parent": "BCM", "domain": "Business Continuity", "title": "Backup and Recovery", "description": "Critical government data and systems shall be backed up regularly (daily minimum for critical systems). Backups shall be encrypted and stored in a separate location. Recovery restoration shall be tested at least annually.", "weight": 3 },
-    { "control_id": "BCM-3", "parent": "BCM", "domain": "Business Continuity", "title": "Disaster Recovery Testing", "description": "Disaster recovery exercises shall be conducted at least annually for critical government systems. DR test results shall be documented and used to improve DR plans. RTO and RPO targets shall be validated during tests.", "weight": 2 },
-
-    { "control_id": "TPM", "parent": null, "domain": "Third Party Management", "title": "Third Party and Supply Chain Security", "description": "Controls governing vendor risk management, cloud service provider requirements, and IT outsourcing security for government agencies.", "weight": 0 },
-
-    { "control_id": "TPM-1", "parent": "TPM", "domain": "Third Party Management", "title": "Vendor Security Assessment", "description": "Third-party vendors with access to government systems or data shall undergo a security assessment before onboarding and at least every two years. Security requirements shall be included in contracts.", "weight": 2 },
-    { "control_id": "TPM-2", "parent": "TPM", "domain": "Third Party Management", "title": "Third-Party Access Controls", "description": "Third-party access to government systems shall be provisioned on a just-in-time basis with MFA enforced. All third-party sessions shall be logged and monitored. Access shall be revoked immediately upon contract end.", "weight": 3 },
-    { "control_id": "TPM-3", "parent": "TPM", "domain": "Third Party Management", "title": "Software Supply Chain Security", "description": "The agency shall assess the security of software supply chains including open source libraries and commercial software. Software Bill of Materials (SBOM) shall be requested for critical software products.", "weight": 2 },
-    { "control_id": "TPM-4", "parent": "TPM", "domain": "Third Party Management", "title": "Outsourced IT Operations Security", "description": "IT outsourcing agreements shall include security requirements, right-to-audit clauses, breach notification obligations, and compliance with IM8. Outsourced operations shall be subject to periodic security reviews.", "weight": 2 }
+    {
+      "control_id": "AS-1",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Input Validation",
+      "description": "Validate all application inputs to ensure that they match the expected type, structure, or format.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-2",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Parameterised Interfaces",
+      "description": "Use parameterised interfaces for database queries or system commands.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-3",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Output Sanitisation",
+      "description": "Sanitise all application outputs that will be used to render a HTML document.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-4",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Authentication Mechanism Rate-Limiting",
+      "description": "Apply rate-limiting on all authentication mechanisms to deter brute-force attacks.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-5",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Password Requirements",
+      "description": "Where SSO or passwordless is not supported, verify that user-defined passwords are at least {{ insert: param, as-5_prm_1 }} characters in length and {{ insert: param, as-5_prm_2 }}.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-6",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Password Salting and Hashing",
+      "description": "Store passwords as salted hashes using a password hashing scheme that is resistant to offline attacks such as those described in NIST [SP 800-63b](#e59c5a7c-8b1f-49ca-8de0-6ee0882180ce). The salt should be:",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-7",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Access Control Check Enforcement",
+      "description": "Perform access control checks on all authenticated requests.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-8",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Secrets Management",
+      "description": "Securely store secrets in an appropriate secrets management solution with access control enforcement, encryption, and monitoring.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-9",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Content Security Policy (CSP)",
+      "description": "Set minimally permissive CSP response headers to mitigate cross-site scripting attacks.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-10",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "HTTP Strict Transport Security (HSTS)",
+      "description": "Set HTTP Strict Transport Security (HSTS) response headers with a maximum age value of at least 1 year (31536000 seconds) to mitigate protocol downgrade attacks.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-11",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Session Management",
+      "description": "Require users to re-authenticate after their session exceeds {{ insert: param, as-11_prm_1 }} hour(s) or terminate the session.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-12",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Malware Scanning of Uploaded Files",
+      "description": "Scan file uploads for malware before further processing by the system or users.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-13",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Exposure of Internal System Details",
+      "description": "Prevent the unnecessary disclosure of internal system details to end users.",
+      "weight": 3
+    },
+    {
+      "control_id": "AS-14",
+      "parent": null,
+      "domain": "Application Security",
+      "title": "Secure Cryptographic Libraries",
+      "description": "Use reputable and secure cryptographic libraries and functions to handle cryptographic operations.",
+      "weight": 3
+    },
+    {
+      "control_id": "SC-1",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Code Repository",
+      "description": "Manage the codebase in a central code repository with version control.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-2",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Commit Signing",
+      "description": "Configure the code repository to reject unsigned commits.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-3",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Peer Review",
+      "description": "Require peer review and approval by a designated reviewer before merging into the default branch.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-4",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Dependency Manifest Version Pinning",
+      "description": "Pin direct and transitive dependency versions in the application's dependency manifest.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-5",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Build and Release Process",
+      "description": "Use a consistent build and release process that generates a record of how the release artefact was built and deployed.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-6",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Dependency Installation during Deployment",
+      "description": "Only install pinned versions in the manifest when installing dependencies during deployment.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-7",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Software Artefact Signing",
+      "description": "Sign software artefacts such as code and container images using a trusted source during build.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-8",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Software Artefact Signature Verification",
+      "description": "Verify the signatures of code and artefacts before deployment or runtime.",
+      "weight": 2
+    },
+    {
+      "control_id": "SC-9",
+      "parent": null,
+      "domain": "Software Supply Chain",
+      "title": "Internal Code Collaboration and Sharing",
+      "description": "Share source code internally to enhance code quality, accelerate innovation, and improve problem-solving efficiency.",
+      "weight": 2
+    },
+    {
+      "control_id": "ST-1",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Vulnerability Assessment",
+      "description": "Run regular {{ insert: param, st-1_prm_1 }} vulnerability assessment scans for eligible hosts at least every {{ insert: param, st-1_prm_2 }} day(s).",
+      "weight": 2
+    },
+    {
+      "control_id": "ST-2",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Cloud Security Posture Management",
+      "description": "Set up cloud security posture management that performs continuous configuration scans on cloud assets.",
+      "weight": 2
+    },
+    {
+      "control_id": "ST-3",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Public Vulnerability Disclosure Programme",
+      "description": "Establish a public reporting channel for disclosing vulnerabilities in public-facing systems via {{ insert: param, st-3_prm_1 }}.",
+      "weight": 2
+    },
+    {
+      "control_id": "ST-4",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Security Testing Programme",
+      "description": "Conduct and document a {{ insert: param, st-4_prm_1 }} by internal teams or independent external parties every {{ insert: param, st-4_prm_2 }} day(s).",
+      "weight": 2
+    },
+    {
+      "control_id": "ST-5",
+      "parent": null,
+      "domain": "Security Testing",
+      "title": "Vulnerability Management",
+      "description": "Triage, prioritise and then remediate or risk accept vulnerabilities that materially impact security within the following timeframe based on severity:",
+      "weight": 2
+    },
+    {
+      "control_id": "NS-1",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Public and Private Subnet Segmentation",
+      "description": "Place private resources (e.g., databases) in private subnets and public resources (e.g., reverse proxies, web servers) in public subnets within a virtual network.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-2",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Access Restrictions on CSP Resources Outside Virtual Network",
+      "description": "Restrict access to CSP resources outside of a virtual network (e.g., Lambda, DynamoDb, API Gateways, S3, CloudFront) using access controls or application layer authorisation.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-3",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Deny by Default - Allow by Exception",
+      "description": "Deny network communications traffic by default and allow network communications traffic by exception at managed interfaces.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-4",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Inter-Private Network Connectivity",
+      "description": "Route network traffic between private networks without going through the internet.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-5",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Network and Application Layer Filtering",
+      "description": "Filter direct traffic from the internet to protect against network and application layer attacks.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-6",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Valid and Trusted SSL/TLS Certificates",
+      "description": "Ensure that deployed SSL/TLS certificates are:",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-7",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Secure Inter-Service Communication",
+      "description": "Ensure communications between services are secure by making them authenticated, authorised and encrypted.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-8",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Secure Government Enterprise Network (GEN) connectivity",
+      "description": "Route network traffic between on-premises systems and GCC systems through a secure intermediary.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-9",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Intrusion Prevention System (IPS)/Intrusion Detection System (IDS)",
+      "description": "Set up and configure an Intrusion Prevention System (IPS)/Intrusion Detection System (IDS) in the network.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-10",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Private Network Connectivity",
+      "description": "Implement strong access controls, encryption, and logging for remote developer, maintainer, or administrator access to private network resources.",
+      "weight": 3
+    },
+    {
+      "control_id": "NS-11",
+      "parent": null,
+      "domain": "Network Security",
+      "title": "Alerts on Firewall Configuration Changes",
+      "description": "Generate alerts to inform appointed administrators on changes to firewall rules, including the enabling or disabling of rules.",
+      "weight": 3
+    },
+    {
+      "control_id": "BR-1",
+      "parent": null,
+      "domain": "Backup and Recovery",
+      "title": "Backup",
+      "description": "Backup all important data and systems at least every {{ insert: param, br-1_prm_1 }} day(s), and store backups in a secure and separate location.",
+      "weight": 2
+    },
+    {
+      "control_id": "BR-2",
+      "parent": null,
+      "domain": "Backup and Recovery",
+      "title": "Recovery Testing",
+      "description": "Conduct testing of recovery processes at least every {{ insert: param, br-2_prm_1 }} day(s) to ensure their effectiveness.",
+      "weight": 2
+    },
+    {
+      "control_id": "BR-3",
+      "parent": null,
+      "domain": "Backup and Recovery",
+      "title": "Backup Retention",
+      "description": "Prevent backups from being modified or deleted for {{ insert: param, br-3_prm_1 }} day(s) or as stipulated in the agency's data retention policies.",
+      "weight": 2
+    },
+    {
+      "control_id": "BR-4",
+      "parent": null,
+      "domain": "Backup and Recovery",
+      "title": "Disaster Recovery Plan",
+      "description": "Develop, maintain, and regularly test a disaster recovery plan that ensures critical functions and data can be restored within the Recovery Time Objective (RTO) and Recovery Point Objective (RPO) as determined by business requirements and risk assessments.",
+      "weight": 2
+    },
+    {
+      "control_id": "DP-1",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Data Residency",
+      "description": "Enforce data residency of primary data in {{ insert: param, dp-1_prm_1 }}.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-2",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Data at Rest Encryption",
+      "description": "Encrypt data at rest.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-3",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Data in Transit Encryption",
+      "description": "Encrypt data in transit.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-4",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Government on Commercial Cloud (GCC)",
+      "description": "Host systems classified as CONFIDENTIAL (CLOUD-ELIGIBLE), RESTRICTED, or OFFICIAL-CLOSED on Commercial Cloud hosting environments in GCC.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-5",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Sanitisation",
+      "description": "Sanitise all hardware that stores data at rest. Shred or incinerate data storage meant for retirement.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-6",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Witness Sanitisation and Destruction of Storage Devices",
+      "description": "Witness the sanitisation and destruction process to ensure data is removed from storage.",
+      "weight": 3
+    },
+    {
+      "control_id": "DP-7",
+      "parent": null,
+      "domain": "Data Protection",
+      "title": "Data Loss Prevention",
+      "description": "Implement data loss prevention mechanisms that monitor data flows, detect sensitive data transfers, and block unauthorised sharing of sensitive data.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-1",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Separate Log Storage",
+      "description": "Store logs in a different system or system component than the system component that generated the logs.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-2",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Tamper-Resistant Log Storage",
+      "description": "Protect logs from unauthorised access, modification, and deletion.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-3",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Network Flow Logging",
+      "description": "Log network traffic going to and from network interfaces.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-4",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Audit Logging",
+      "description": "Log management and audit events.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-5",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Database Logging",
+      "description": "Log database audit events.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-6",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Access Logging",
+      "description": "Log access requests sent to web application firewalls, load balancers, proxies or web servers.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-7",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Host Security Event Logging",
+      "description": "Log security events on hosts.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-8",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Security Log Retention",
+      "description": "Retain security logs for at least {{ insert: param, lm-8_prm_1 }} day(s).",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-9",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Security Monitoring and Alerting",
+      "description": "Configure security monitoring to identify potential security violations or breaches and send automated alerts, and respond to them accordingly.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-10",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Resource Usage Monitoring and Alerting",
+      "description": "Configure resource usage monitoring to identify abnormal usage and send automated alerts.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-11",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Service Level Monitoring and Alerting",
+      "description": "Monitor, maintain and alert on service level objectives (SLOs) and indicators (SLIs) to ensure consistent service performance, availability and reliability.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-12",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Central Security Log Management and Monitoring",
+      "description": "Centralise security log management and monitoring with {{ insert: param, lm-12_prm_1 }}.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-13",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Anomalous Database Activity Monitoring",
+      "description": "Monitor database activities for anomalous activity.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-14",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Web Defacement Monitoring",
+      "description": "Plan for and implement measures to detect and recover from web defacements.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-15",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Structured Log Formatting",
+      "description": "Publish logs in a consistent, structured format that aligns with industry standards for easy parsing and analysis.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-16",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Key Signals Monitoring",
+      "description": "Monitor key user-facing signals to maintain robust service health and performance.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-17",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Software delivery performance monitoring",
+      "description": "Measure and analyse software delivery performance to optimise development velocity and operational efficiency.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-18",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Whole of Government Application Analytics (WOGAA)",
+      "description": "Implement Whole of Government Application Analytics (WOGAA) in public facing digital services.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-19",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "Log Sanitisation",
+      "description": "Sanitise logs to protect classified and sensitive data before it is recorded in any logging system or shared to any third party.",
+      "weight": 3
+    },
+    {
+      "control_id": "LM-20",
+      "parent": null,
+      "domain": "Logging and Monitoring",
+      "title": "User and Entity Behaviour Analytics",
+      "description": "Implement User and Entity Behaviour Analytics (UEBA) to monitor and analyse user activities for suspicious behaviour and potential threats.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-1",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Principle of Least Privilege",
+      "description": "Deny access by default and grant only the minimum permissions required for authorised accounts or processes to perform a specific function based on the account inventory implemented.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-2",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Multi-Factor Authentication (MFA)",
+      "description": "Require MFA for privileged accounts at login.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-3",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Inactive and Expired Accounts",
+      "description": "Disable or remove {{ insert: param, ac-3_prm_3 }} accounts within {{ insert: param, ac-3_prm_1 }} day(s) from last day of authorised use or have not been used for {{ insert: param, ac-3_prm_2 }} day(s).",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-4",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Access Review",
+      "description": "Perform an access review {{ insert: param, ac-4_prm_1 }} and remove unauthorised or unnecessary access rights within {{ insert: param, ac-4_prm_2 }} day(s).",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-5",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Endpoint Device Hardening",
+      "description": "Require hardened endpoint devices for remote developer, maintainer, or administrator access.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-6",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Default Credentials",
+      "description": "Change default credentials prior to first use.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-7",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Singpass/Corppass for External Users",
+      "description": "Use Singpass or Corppass MFA for digital services that require high level of identity assurance for external users.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-8",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Automated Account Lifecycle Management",
+      "description": "Automate account {{ insert: param, ac-8_prm_1 }} for internal users using an account lifecycle management tool.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-9",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Endpoint Device Management",
+      "description": "Implement and maintain an endpoint device management solution to ensure the security and integrity of endpoint devices used within the organisation.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-10",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Identity and Device-Based Access Control",
+      "description": "Adopt Identity and Device-Based Access Control for secure and context-aware connectivity to private organisational resources.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-11",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Single User Endpoints",
+      "description": "Assign each endpoint device to a single designated primary user and enforce the assignment to ensure accountability and enhance security monitoring.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-12",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Single Sign-On (SSO) for Internal Services and Accounts",
+      "description": "Use Single Sign-On (SSO) for internal services and accounts.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-13",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Static Credential Expiry and Rotation",
+      "description": "Rotate long-lived static credentials such as API keys, user access keys, and personal access tokens every {{ insert: param, ac-13_prm_1 }} day(s) or use short-lived credentials.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-14",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Inventory of Accounts",
+      "description": "Establish and maintain an inventory of all accounts and their access rights managed within the system.",
+      "weight": 3
+    },
+    {
+      "control_id": "AC-15",
+      "parent": null,
+      "domain": "Access Control",
+      "title": "Validation Testing of Automated Account Lifecycle Management",
+      "description": "Conduct validation tests on the system integrated with account management tools to ensure secure integration.",
+      "weight": 3
+    },
+    {
+      "control_id": "CS-1",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Unique Base Container Image Tags",
+      "description": "Use unique base container image tags instead of rolling tags.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-2",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Minimal Base Container Images",
+      "description": "Build container images with minimal base images.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-3",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Runtime Container Secrets",
+      "description": "Provide secrets and sensitive data to the container at runtime instead of image build time.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-4",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Non-Privileged Container User",
+      "description": "Create a non-root user and set it as the default user in the container image build instructions.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-5",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Dockerfile Linting",
+      "description": "Lint Dockerfiles before building container images.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-6",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Read-Only Container Root Filesystem",
+      "description": "Configure the container root filesystem to be read-only during runtime, except for designated non-persistent storage locations or mounted volumes for stateful storage (e.g., caches, service data).",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-7",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Container Image Scanning",
+      "description": "Scan container images in the {{ insert: param, cs-7_prm_1 }} for known vulnerabilities.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-8",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Private Container Image Registries",
+      "description": "Host built container images in private container registries.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-9",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Container Orchestrator API Access Control",
+      "description": "Disable public access to Container Orchestrator API endpoints from the internet.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-10",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Container Workload Segmentation",
+      "description": "Segregate container workloads to help contain attacks through isolation.",
+      "weight": 2
+    },
+    {
+      "control_id": "CS-11",
+      "parent": null,
+      "domain": "Container Security",
+      "title": "Container Runtime Security",
+      "description": "Detect and remediate changes to running containers with container runtime protection tools.",
+      "weight": 2
+    },
+    {
+      "control_id": "PM-1",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "Cybersecurity Incident Management Plan",
+      "description": "Develop, document, and disseminate an agency-level cybersecurity incident management plan to respond to cybersecurity incidents.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-2",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "Risk Assessment",
+      "description": "Develop and document a risk assessment by {{ insert: param, pm-2_prm_1 }} and get it approved by {{ insert: param, pm-2_prm_2 }} prior to {{ insert: param, pm-2_prm_3 }} and conduct a review every {{ insert: param, pm-2_prm_4 }} day(s).",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-3",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "System Security Plan (SSP) Development",
+      "description": "Develop and maintain a comprehensive System Security Plan (SSP) that accurately reflects the system characteristics and security controls in place for the organisation's systems and environments.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-4",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "Approval of Residual Risks",
+      "description": "Get acceptance and approval of the residual risks from agency's {{ insert: param, pm-4_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-5",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "Central Submission of Approved System Security Plan (SSP)",
+      "description": "Submit approved SSPs centrally to maintain a unified and up-to-date repository of security plans and practices.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-6",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "System Documentation",
+      "description": "Maintain detailed, up-to-date documentation of all system information and architecture.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-7",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "Certification",
+      "description": "Ensure that the Software as a Service (SaaS) provider is certified with {{ insert: param, pm-7_prm_1 }}.",
+      "weight": 1
+    },
+    {
+      "control_id": "PM-8",
+      "parent": null,
+      "domain": "Security Programme Management",
+      "title": "SaaS Whitelisting",
+      "description": "Maintain and enforce a whitelist of authorised software and services.",
+      "weight": 1
+    },
+    {
+      "control_id": "IS-1",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Management Agents",
+      "description": "Install CSP management agents on hosts to remotely and securely manage their configurations.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-2",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Automated Patch Management Tools",
+      "description": "Use automated patch management tools to facilitate security patching of operating systems and software included in the operating systems.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-3",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Restricted Administrator Privileges",
+      "description": "Restrict administrator privileges by disabling remote login for the root/administrator user and restricting sudo/administrators group access for other users.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-4",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Least Functionality",
+      "description": "Disable or remove unnecessary functions, system ports, protocols, software, and services on the host.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-5",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Host System Hardening",
+      "description": "Harden the host configuration with reference to industry standards.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-6",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Remote Administration",
+      "description": "Use remote administration tools to control and monitor remote access.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-7",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Malware Protection",
+      "description": "Detect and quarantine malware on hosts with anti-malware tools.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-8",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Endpoint Detection and Response (EDR)",
+      "description": "Monitor security threats on hosts with an EDR tool.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-9",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "End-of-Support (EOS) Assets",
+      "description": "Ensure deployed {{ insert: param, is-9_prm_1 }} assets have not reached end-of-support (EOS). Use of EOS assets will require risk acceptance by approved authority.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-10",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Synchronise time clocks",
+      "description": "Synchronise internal clocks to a common reference time source.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-11",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Central Domain Name Registration",
+      "description": "Register .gov.sg and .edu.sg domain names with GovTech as the sole registrar.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-12",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "DNS Security Extensions (DNSSEC)",
+      "description": "Implement DNS Security Extensions (DNSSEC) for public DNS records and servers.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-13",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Defensive Domain Name Registration",
+      "description": "Register second (.sg) and third (.com.sg, .org.sg, .net.sg, .edu.sg) level domain name variants of the system's primary domain name.",
+      "weight": 2
+    },
+    {
+      "control_id": "IS-14",
+      "parent": null,
+      "domain": "Infrastructure Security",
+      "title": "Singapore SMS Sender ID Registry Registration",
+      "description": "Register and use whitelisted SMS Sender IDs with the Singapore SMS Sender ID Registry for sending SMSes to members of the public.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-1",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Push Protection for Secrets",
+      "description": "Configure the code repository to prevent secrets from being pushed to the repository.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-2",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Default Branch Push Permissions",
+      "description": "Configure the code repository to prevent pushes (including force pushes) to the default branch.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-3",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Continuous Integration (CI) Tests",
+      "description": "Require Continuous Integration (CI) tests to pass before merging into the default branch.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-4",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Static Analysis",
+      "description": "Set up a static analysis job in the {{ insert: param, sd-4_prm_1 }}, and remediate or risk accept true positive vulnerability findings before deploying to production.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-5",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Dependency Scanning",
+      "description": "Schedule a scan at least every {{ insert: param, sd-5_prm_1 }} day(s) in the {{ insert: param, sd-5_prm_2 }} to identify the use of vulnerable software libraries.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-6",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Secret Detection",
+      "description": "Set up secret detection in the {{ insert: param, sd-6_prm_1 }} and remediate true positives within {{ insert: param, sd-6_prm_2 }} day(s).",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-7",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "CI Environment Variable Secrets Management",
+      "description": "Protect environment variable secrets used in CI jobs by limiting them to protected pipelines and masking them in job logs.",
+      "weight": 2
+    },
+    {
+      "control_id": "SD-8",
+      "parent": null,
+      "domain": "Secure Development",
+      "title": "Deployment Environment Segregation",
+      "description": "Segregate production and non-production environments including applications, services, data, secrets, roles, and networks.",
+      "weight": 2
+    },
+    {
+      "control_id": "DC-1",
+      "parent": null,
+      "domain": "Datacentre",
+      "title": "Separate hosting",
+      "description": "Physically separate Government resources from non-Government resources.",
+      "weight": 1
+    },
+    {
+      "control_id": "DC-2",
+      "parent": null,
+      "domain": "Datacentre",
+      "title": "Physical Access Controls",
+      "description": "Implement physical access controls to prohibit unauthorised access to the hosting environment or network rooms.",
+      "weight": 1
+    },
+    {
+      "control_id": "TP-1",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Software as a Service (SaaS) Service Level Agreement",
+      "description": "Obtain a service level agreement with the SaaS provider.",
+      "weight": 2
+    },
+    {
+      "control_id": "TP-2",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Third Party Audit",
+      "description": "Conduct a(n) {{ insert: param, tp-2_prm_1 }} audit by an independent third-party at least every {{ insert: param, tp-2_prm_2 }} day(s).",
+      "weight": 2
+    },
+    {
+      "control_id": "TP-3",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Scope for Offshoring",
+      "description": "Restrict offshore development to development and maintenance work.",
+      "weight": 2
+    },
+    {
+      "control_id": "TP-4",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Attestation Report Review",
+      "description": "Review the {{ insert: param, tp-4_prm_1 }} attestation report every {{ insert: param, tp-4_prm_2 }} day(s) and ensure that outstanding exceptions or findings are remediated.",
+      "weight": 2
+    },
+    {
+      "control_id": "TP-5",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Qualified Offshore Development Centre",
+      "description": "Engage offshore resources through a local third party that operates a {{ insert: param, tp-5_prm_1 }}.",
+      "weight": 2
+    },
+    {
+      "control_id": "TP-6",
+      "parent": null,
+      "domain": "Third Party Management",
+      "title": "Supplier Assessments and Reviews",
+      "description": "Seek an assessment by {{ insert: param, tp-6_prm_1 }} on the risks associated with suppliers or contractors before using or subscribing to the service.",
+      "weight": 2
+    },
+    {
+      "control_id": "CK-1",
+      "parent": null,
+      "domain": "Cryptography, Encryption and Key Management",
+      "title": "Cryptographic Key Establishment",
+      "description": "Use industry-standard cryptographic key establishment schemes and key derivation methods.",
+      "weight": 3
+    },
+    {
+      "control_id": "CK-2",
+      "parent": null,
+      "domain": "Cryptography, Encryption and Key Management",
+      "title": "Cryptographic Key Rotation",
+      "description": "Rotate cryptographic keys every {{ insert: param, ck-2_prm_1 }} days.",
+      "weight": 3
+    },
+    {
+      "control_id": "CK-3",
+      "parent": null,
+      "domain": "Cryptography, Encryption and Key Management",
+      "title": "Cryptographic Key Management",
+      "description": "Implement cryptographic key management processes to ensure cryptographic keys are well-managed and safeguarded throughout their lifecycle.",
+      "weight": 3
+    }
   ]
 }
