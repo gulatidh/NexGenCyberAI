@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Typography, Chip, Button, Dialog, DialogContent,
-  Fab, Tooltip, LinearProgress, CircularProgress, TextField,
+  LinearProgress, CircularProgress, TextField,
   IconButton, Divider, Checkbox, Paper, alpha, useTheme,
 } from "@mui/material";
 import {
@@ -45,6 +45,8 @@ interface AdvisorResult {
 }
 
 interface FrameworkAdvisorProps {
+  open: boolean;
+  onClose: () => void;
   onSelectFrameworks?: (frameworkKeys: string[]) => void;
 }
 
@@ -195,10 +197,9 @@ function RecommendationCard({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function FrameworkAdvisor({ onSelectFrameworks }: FrameworkAdvisorProps) {
+export default function FrameworkAdvisor({ open, onClose, onSelectFrameworks }: FrameworkAdvisorProps) {
   const theme = useTheme();
 
-  const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [multiSelected, setMultiSelected] = useState<string[]>([]);
@@ -232,7 +233,7 @@ export default function FrameworkAdvisor({ onSelectFrameworks }: FrameworkAdviso
   }
 
   function handleClose() {
-    setOpen(false);
+    onClose();
   }
 
   async function submitAnswers(finalAnswers: Record<string, string | string[]>) {
@@ -318,26 +319,6 @@ export default function FrameworkAdvisor({ onSelectFrameworks }: FrameworkAdviso
 
   return (
     <>
-      {/* Floating Fab — bottom-right above the AssistantWidget */}
-      <Tooltip title="Help me choose a framework" placement="left">
-        <Fab
-          color="primary"
-          size="medium"
-          onClick={() => setOpen(true)}
-          sx={{
-            position: "fixed",
-            bottom: 88,
-            right: 24,
-            zIndex: 1399,
-            background: "linear-gradient(135deg, #4285F4 0%, #7C3AED 100%)",
-            "&:hover": { background: "linear-gradient(135deg, #3b77e3 0%, #6d35d9 100%)" },
-            boxShadow: "0 8px 32px rgba(66,133,244,0.4)",
-          }}
-        >
-          <AutoAwesome />
-        </Fab>
-      </Tooltip>
-
       {/* Dialog */}
       <Dialog
         open={open}

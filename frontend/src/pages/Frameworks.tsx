@@ -9,7 +9,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, Radio, RadioGroup,
   FormControlLabel, Checkbox, Tabs, Tab, useTheme,
 } from "@mui/material";
-import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow } from "@mui/icons-material";
+import { ExpandMore, Refresh, Close, RestartAlt, UploadFile, PlayArrow, AutoAwesome } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { connectorsApi, frameworksApi, projectsApi, scansApi } from "../services/api";
@@ -93,6 +93,9 @@ export default function Frameworks() {
   const [selected, setSelected] = useState<ControlStatusEntry | null>(null);
   const [evidenceDraft, setEvidenceDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Framework Advisor state
+  const [advisorOpen, setAdvisorOpen] = useState(false);
 
   // Scan dialog state
   const [scanOpen, setScanOpen] = useState(false);
@@ -342,6 +345,18 @@ export default function Frameworks() {
               )}
             </Select>
           </FormControl>
+          <Button
+            variant="outlined"
+            startIcon={<AutoAwesome />}
+            onClick={() => setAdvisorOpen(true)}
+            sx={{
+              borderColor: "#7C3AED",
+              color: "#7C3AED",
+              "&:hover": { borderColor: "#6d35d9", bgcolor: "rgba(124,58,237,0.06)" },
+            }}
+          >
+            Framework Advisor
+          </Button>
           <Button variant="contained" startIcon={<PlayArrow />}
             disabled={!clientId || !framework || scanMutation.isPending}
             onClick={() => { setScanOpen(true); setScanConnectorId(""); setScanScope("full"); setScanCustomIds(""); }}
@@ -809,9 +824,13 @@ export default function Frameworks() {
           </Box>
         )}
       </Drawer>
-      <FrameworkAdvisor onSelectFrameworks={(keys) => {
-        if (keys.length > 0) setFramework(keys[0]);
-      }} />
+      <FrameworkAdvisor
+        open={advisorOpen}
+        onClose={() => setAdvisorOpen(false)}
+        onSelectFrameworks={(keys) => {
+          if (keys.length > 0) setFramework(keys[0]);
+        }}
+      />
     </Box>
   );
 }
