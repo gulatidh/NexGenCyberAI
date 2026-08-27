@@ -318,7 +318,7 @@ export default function FrameworkAdvisor({ onSelectFrameworks }: FrameworkAdviso
 
   return (
     <>
-      {/* Floating Fab */}
+      {/* Floating Fab — bottom-right above the AssistantWidget */}
       <Tooltip title="Help me choose a framework" placement="left">
         <Fab
           color="primary"
@@ -326,9 +326,9 @@ export default function FrameworkAdvisor({ onSelectFrameworks }: FrameworkAdviso
           onClick={() => setOpen(true)}
           sx={{
             position: "fixed",
-            bottom: 32,
-            right: 32,
-            zIndex: 1200,
+            bottom: 88,
+            right: 24,
+            zIndex: 1399,
             background: "linear-gradient(135deg, #4285F4 0%, #7C3AED 100%)",
             "&:hover": { background: "linear-gradient(135deg, #3b77e3 0%, #6d35d9 100%)" },
             boxShadow: "0 8px 32px rgba(66,133,244,0.4)",
