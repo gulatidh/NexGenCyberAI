@@ -154,9 +154,10 @@ const MENU: MenuItem[] = [
       {
         heading: "Pen Testing",
         items: [
-          { name: "VAPT Reports",        desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",  route: "/report/vapt-reports",         Icon: Description },
-          { name: "Evidence Package",    desc: "ZIP of findings, deficiencies, and agent logs for auditors.",            route: "/report/evidence",             Icon: FolderZip   },
-          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",              Icon: Assessment  },
+          { name: "VAPT Reports",        desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",  route: "/report/vapt-reports",         Icon: Description  },
+          { name: "Evidence Package",    desc: "ZIP of findings, deficiencies, and agent logs for auditors.",            route: "/report/evidence",             Icon: FolderZip    },
+          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",              Icon: Assessment   },
+          { name: "Audit Intelligence",  desc: "ICS Audit & Risk — how every audit activity maps to the platform.",      route: "/report/audit",                Icon: ManageSearch },
         ],
       },
       {

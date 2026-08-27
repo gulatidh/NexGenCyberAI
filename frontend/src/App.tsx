@@ -69,6 +69,7 @@ const Assets            = React.lazy(() => import("./pages/Assets"));
 const AssetDetail       = React.lazy(() => import("./pages/AssetDetail"));
 const Frameworks           = React.lazy(() => import("./pages/Frameworks"));
 const FrameworkLibrary     = React.lazy(() => import("./pages/FrameworkLibrary"));
+const AuditIntelligence    = React.lazy(() => import("./pages/AuditIntelligence"));
 const ComplianceEvaluation = React.lazy(() => import("./pages/ComplianceEvaluation"));
 const RiskOverviewPage  = React.lazy(() => import("./pages/RiskOverview"));
 const Projects          = React.lazy(() => import("./pages/Projects"));
@@ -254,6 +255,7 @@ function ProtectedApp() {
             <Route path="custom-frameworks" element={<Navigate to="/report/frameworks" replace />} />
             <Route path="evidence"          element={<EvidencePackage />} />
             <Route path="reports"           element={<Reports />} />
+            <Route path="audit"             element={<AuditIntelligence />} />
           </Route>
 
           {/* ── DETAIL PAGES (full chrome, no product sidebar) ───────────── */}
