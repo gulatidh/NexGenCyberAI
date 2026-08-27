@@ -6,8 +6,9 @@ import {
 } from "@mui/material";
 import {
   Policy, LibraryAdd, Add, Delete, Edit, Close, Refresh,
-  VerifiedUser, Security, Gavel, Lock, AccountBalance, CloudQueue,
+  VerifiedUser, Security, Gavel, Lock, AccountBalance, CloudQueue, AutoAwesome,
 } from "@mui/icons-material";
+import FrameworkAdvisor from "../components/FrameworkAdvisor";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFrameworksApi } from "../services/api";
 import { toast } from "react-toastify";
@@ -194,6 +195,9 @@ export default function FrameworkLibrary() {
   // Custom framework detail
   const [selectedCf, setSelectedCf] = useState<string | null>(null);
 
+  // Framework Advisor
+  const [advisorOpen, setAdvisorOpen] = useState(false);
+
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -273,8 +277,16 @@ export default function FrameworkLibrary() {
             Browse standard control frameworks and manage your custom compliance policies.
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
           <IconButton onClick={() => refetch()} size="small"><Refresh /></IconButton>
+          <Button
+            variant="outlined"
+            startIcon={<AutoAwesome />}
+            onClick={() => setAdvisorOpen(true)}
+            sx={{ borderColor: "#7C3AED", color: "#7C3AED", "&:hover": { borderColor: "#6d35d9", bgcolor: "rgba(124,58,237,0.06)" } }}
+          >
+            Framework Advisor
+          </Button>
           <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
             New Custom Policy
           </Button>
@@ -449,6 +461,8 @@ export default function FrameworkLibrary() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <FrameworkAdvisor open={advisorOpen} onClose={() => setAdvisorOpen(false)} />
     </Box>
   );
 }
