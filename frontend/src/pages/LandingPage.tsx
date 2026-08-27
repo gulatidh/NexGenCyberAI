@@ -9,7 +9,8 @@ import {
   Menu as MenuIcon, Close as CloseIcon, ExpandMore,
   AltRoute, QuestionAnswer, Analytics, Webhook, VpnKey,
   Gavel, Campaign, AutoAwesome, Terminal, Person, Groups,
-  BusinessCenter,
+  BusinessCenter, Timeline, ManageSearch, Policy, BarChart,
+  FindInPage, GppGood, TrackChanges, Summarize,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
@@ -1065,6 +1066,335 @@ export default function LandingPage() {
               </Grid>
             </Box>
           ))}
+        </Container>
+      </Box>
+
+      {/* ── ICS Audit Section ──────────────────────────────────────────────── */}
+      <Box id="audit" sx={{ py: { xs: 10, md: 16 }, borderTop: `1px solid ${BORDER}`, position: "relative", overflow: "hidden" }}>
+
+        {/* Background ambient glows */}
+        <Box sx={{ position: "absolute", top: "10%", left: "-10%", width: 600, height: 600, borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(0,212,255,0.04) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <Box sx={{ position: "absolute", bottom: "5%", right: "-5%", width: 500, height: 500, borderRadius: "50%",
+          background: "radial-gradient(ellipse, rgba(124,58,237,0.05) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+        <Container maxWidth="lg" sx={{ position: "relative" }}>
+
+          {/* Section header */}
+          <Box sx={{ textAlign: "center", mb: 8 }}>
+            <Chip label="ICS Audit & Risk Intelligence" size="small" sx={{
+              mb: 2.5, background: "rgba(0,212,255,0.08)", border: `1px solid rgba(0,212,255,0.22)`,
+              color: CYAN, fontWeight: 700, fontSize: 12, letterSpacing: 0.5,
+            }} />
+            <Typography sx={{ fontSize: { xs: 28, md: 42 }, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, mb: 2 }}>
+              Built for the way{" "}
+              <Box component="span" sx={{ background: `linear-gradient(135deg, ${CYAN} 0%, ${PURPLE} 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                auditors think
+              </Box>
+            </Typography>
+            <Typography sx={{ fontSize: 17, color: "rgba(255,255,255,0.42)", maxWidth: 600, mx: "auto", lineHeight: 1.7 }}>
+              Continuous, population-complete, evidence-automated — not point-in-time snapshots of a sample.
+            </Typography>
+          </Box>
+
+          {/* ── Quote banner ── */}
+          <Box sx={{
+            mb: 10, p: { xs: 4, md: 7 }, borderRadius: 4, textAlign: "center", position: "relative", overflow: "hidden",
+            background: "linear-gradient(135deg, rgba(0,212,255,0.04) 0%, rgba(124,58,237,0.07) 50%, rgba(16,185,129,0.04) 100%)",
+            border: `1px solid rgba(255,255,255,0.08)`,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
+          }}>
+            {/* Large decorative quote mark */}
+            <Typography sx={{
+              position: "absolute", top: -20, left: { xs: 16, md: 40 },
+              fontSize: 180, lineHeight: 1, color: "rgba(0,212,255,0.07)",
+              fontFamily: "Georgia, serif", fontWeight: 900, userSelect: "none",
+            }}>"</Typography>
+
+            <Box sx={{
+              display: "flex", flexDirection: { xs: "column", md: "row" },
+              gap: 0, alignItems: "stretch", justifyContent: "center",
+              position: "relative",
+            }}>
+              {[
+                { text: "Don't sample\nwhat you can measure.", accent: CYAN, bg: "rgba(0,212,255,0.05)", border: "rgba(0,212,255,0.15)" },
+                { text: "Don't measure\nwhat you can query.", accent: PURPLE, bg: "rgba(124,58,237,0.05)", border: "rgba(124,58,237,0.15)" },
+                { text: "Don't query\nwhat you can automate.", accent: GREEN, bg: "rgba(16,185,129,0.05)", border: "rgba(16,185,129,0.15)" },
+              ].map((part, i) => (
+                <Box key={i} sx={{
+                  flex: 1, px: { xs: 3, md: 4 }, py: 3,
+                  borderLeft: i > 0 ? { md: `1px solid rgba(255,255,255,0.07)` } : "none",
+                  borderTop: i > 0 ? { xs: `1px solid rgba(255,255,255,0.07)`, md: "none" } : "none",
+                }}>
+                  <Box sx={{ width: 36, height: 3, borderRadius: 2, background: part.accent, mx: "auto", mb: 2 }} />
+                  <Typography sx={{
+                    fontSize: { xs: 17, md: 20 }, fontWeight: 800, color: "rgba(255,255,255,0.92)",
+                    letterSpacing: "-0.02em", lineHeight: 1.35, whiteSpace: "pre-line",
+                  }}>
+                    {part.text}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Typography sx={{ mt: 4, fontSize: 13, color: "rgba(255,255,255,0.28)", fontStyle: "italic", letterSpacing: 0.3 }}>
+              The Aegis AI principle — Information &amp; Cyber Security Audit
+            </Typography>
+          </Box>
+
+          {/* ── ICS Audit Mapping Table ── */}
+          <Box sx={{ mb: 10 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
+              <Box sx={{ width: 4, height: 32, borderRadius: 2, background: `linear-gradient(180deg, ${CYAN}, ${PURPLE})` }} />
+              <Box>
+                <Typography sx={{ fontSize: { xs: 20, md: 26 }, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                  How Aegis maps to ICS Audit activities
+                </Typography>
+                <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.38)", mt: 0.25 }}>
+                  Every audit step has a platform-native equivalent — no manual evidence gathering
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Table header */}
+            <Box sx={{
+              display: { xs: "none", md: "grid" },
+              gridTemplateColumns: "200px 1fr 1fr",
+              gap: 0, mb: 1, px: 2,
+            }}>
+              {["ICS Audit Activity", "Aegis Feature", "What changes"].map((h) => (
+                <Typography key={h} sx={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.28)", textTransform: "uppercase", letterSpacing: 1 }}>{h}</Typography>
+              ))}
+            </Box>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {[
+                {
+                  icon: <VerifiedUser sx={{ fontSize: 18 }} />,
+                  color: "#4285F4",
+                  activity: "Control testing",
+                  feature: "Frameworks — NIST CSF, ISO 27001, CIS v8, PCI DSS, GDPR",
+                  change: "Live compliance status against every control, not just sampled ones. Custom frameworks for org-specific standards.",
+                },
+                {
+                  icon: <FindInPage sx={{ fontSize: 18 }} />,
+                  color: CYAN,
+                  activity: "Gap identification",
+                  feature: "Control Deficiencies register",
+                  change: "AI-populated gaps mapped to specific control IDs with finding evidence — no manual gap analysis.",
+                },
+                {
+                  icon: <Gavel sx={{ fontSize: 18 }} />,
+                  color: AMBER,
+                  activity: "Evidence collection",
+                  feature: "Evidence Package (ZIP export)",
+                  change: "One click: findings CSV, control gaps JSON, remediation log, agent run trail — regulator-ready.",
+                },
+                {
+                  icon: <TrendingUp sx={{ fontSize: 18 }} />,
+                  color: GREEN,
+                  activity: "Risk quantification",
+                  feature: "Risk Register — FAIR-lite ALE model",
+                  change: "Dollar-value risk per finding, not red/amber/green. Prioritisation grounded in financial exposure.",
+                },
+                {
+                  icon: <ManageSearch sx={{ fontSize: 18 }} />,
+                  color: PURPLE,
+                  activity: "Audit sampling & analytics",
+                  feature: "Ask Your Data — NL Query engine",
+                  change: "Query the full population in plain English. \"Show critical findings open > 30 days\" — no SQL needed.",
+                },
+                {
+                  icon: <Assessment sx={{ fontSize: 18 }} />,
+                  color: "#F472B6",
+                  activity: "Vulnerability review",
+                  feature: "Findings + VAPT Reports",
+                  change: "100% of scanned assets covered — not a 5% sample. AI writes executive summary and remediation plan.",
+                },
+                {
+                  icon: <Analytics sx={{ fontSize: 18 }} />,
+                  color: AMBER,
+                  activity: "Remediation tracking",
+                  feature: "MTTR + Remediation Tracker",
+                  change: "Auditable proof of fix timelines vs. SLA targets. Critical 24h, High 168h, Medium 720h.",
+                },
+                {
+                  icon: <Radar sx={{ fontSize: 18 }} />,
+                  color: DANGER,
+                  activity: "Threat landscape review",
+                  feature: "Threat Register — MITRE ATT&CK",
+                  change: "Structured TTP entries per finding. Auditor sees attacker profile, technique, and detection gap — not just CVE IDs.",
+                },
+                {
+                  icon: <Policy sx={{ fontSize: 18 }} />,
+                  color: GREEN,
+                  activity: "Policy review",
+                  feature: "Security Docs — RAG engine",
+                  change: "Upload policies, ask questions. \"Does our policy cover MFA for privileged access?\" — grounded answers.",
+                },
+                {
+                  icon: <Timeline sx={{ fontSize: 18 }} />,
+                  color: CYAN,
+                  activity: "Posture over time",
+                  feature: "Posture Trends — 90-day snapshots",
+                  change: "Proves improvement or deterioration over the audit period. Charts open findings by severity, audit readiness %.",
+                },
+              ].map((row, i) => (
+                <Box key={i} sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "200px 1fr 1fr" },
+                  gap: { xs: 1, md: 0 },
+                  p: { xs: 2.5, md: 2 },
+                  borderRadius: 2,
+                  background: i % 2 === 0 ? "rgba(255,255,255,0.022)" : "rgba(255,255,255,0.012)",
+                  border: `1px solid ${BORDER}`,
+                  transition: "all 0.2s",
+                  "&:hover": {
+                    background: `${row.color}08`,
+                    border: `1px solid ${row.color}25`,
+                    transform: "translateX(4px)",
+                  },
+                  alignItems: "center",
+                }}>
+                  {/* Activity */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box sx={{
+                      width: 34, height: 34, borderRadius: 1.5, flexShrink: 0,
+                      background: `${row.color}18`, border: `1px solid ${row.color}30`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: row.color,
+                    }}>
+                      {row.icon}
+                    </Box>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>
+                      {row.activity}
+                    </Typography>
+                  </Box>
+                  {/* Feature */}
+                  <Box sx={{ px: { md: 2 } }}>
+                    <Typography sx={{ fontSize: 13, color: row.color, fontWeight: 600 }}>{row.feature}</Typography>
+                  </Box>
+                  {/* Change */}
+                  <Box sx={{ px: { md: 2 } }}>
+                    <Typography sx={{ fontSize: 12.5, color: "rgba(255,255,255,0.46)", lineHeight: 1.55 }}>{row.change}</Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+
+          {/* ── Risk Management Table ── */}
+          <Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 4 }}>
+              <Box sx={{ width: 4, height: 32, borderRadius: 2, background: `linear-gradient(180deg, ${AMBER}, ${DANGER})` }} />
+              <Box>
+                <Typography sx={{ fontSize: { xs: 20, md: 26 }, fontWeight: 800, letterSpacing: "-0.02em" }}>
+                  Risk management — end to end
+                </Typography>
+                <Typography sx={{ fontSize: 14, color: "rgba(255,255,255,0.38)", mt: 0.25 }}>
+                  From identification to board-level reporting — all in one platform
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, gap: 2 }}>
+              {[
+                {
+                  icon: <Radar sx={{ fontSize: 22 }} />,
+                  color: DANGER,
+                  phase: "01 · Identify",
+                  title: "Risk Identification",
+                  body: "15+ scanners surface vulnerabilities across code, infrastructure, dependencies, and secrets. AI agents classify each finding into Risk Domains — Identity, Cloud Security, Data Protection, Network, Logging.",
+                  tags: ["SAST · DAST · Network", "Risk Domain mapping"],
+                },
+                {
+                  icon: <BarChart sx={{ fontSize: 22 }} />,
+                  color: AMBER,
+                  phase: "02 · Assess",
+                  title: "Risk Quantification",
+                  body: "FAIR-lite ALE model assigns a dollar-value annualised loss expectancy to each risk. Likelihood and impact are derived from CVSS scores, asset criticality, and threat intel — not colour-coded gut feel.",
+                  tags: ["FAIR-lite ALE model", "CVSS + asset weighting"],
+                },
+                {
+                  icon: <VerifiedUser sx={{ fontSize: 22 }} />,
+                  color: "#4285F4",
+                  phase: "03 · Control",
+                  title: "Control Assessment",
+                  body: "Every finding auto-maps to NIST CSF, ISO 27001, CIS v8, PCI DSS, and GDPR controls. Compliance heatmap shows coverage by domain. Custom frameworks let you define your own control baseline.",
+                  tags: ["5 built-in frameworks", "Custom standards"],
+                },
+                {
+                  icon: <TrackChanges sx={{ fontSize: 22 }} />,
+                  color: PURPLE,
+                  phase: "04 · Treat",
+                  title: "Risk Treatment Tracking",
+                  body: "Remediation Tracker assigns priority bands (Immediate / High / Near-Term / Long-Term). MTTR is measured against SLA targets per severity. Accept risk with justification and expiry, or suppress false positives.",
+                  tags: ["Priority bands", "MTTR vs SLA", "Risk acceptance"],
+                },
+                {
+                  icon: <GppGood sx={{ fontSize: 22 }} />,
+                  color: GREEN,
+                  phase: "05 · Monitor",
+                  title: "Continuous Monitoring",
+                  body: "Posture snapshots captured daily. 90-day trends chart open findings by severity, audit readiness %, and risk score. Webhooks fire on critical findings in real time — Slack, Teams, or any endpoint.",
+                  tags: ["Daily snapshots", "90-day trends", "Real-time alerts"],
+                },
+                {
+                  icon: <Summarize sx={{ fontSize: 22 }} />,
+                  color: CYAN,
+                  phase: "06 · Report",
+                  title: "Board & Audit Reporting",
+                  body: "VAPT reports generated by AI — executive summary, scope, methodology, per-finding remediation — exported as PDF or DOCX. Embeddable scorecard for board decks. Evidence package ZIP for regulators.",
+                  tags: ["PDF · DOCX export", "Embeddable scorecard", "Regulator-ready ZIP"],
+                },
+              ].map((card, i) => (
+                <Box key={i} sx={{
+                  p: 3, borderRadius: 2.5,
+                  background: CARD_BG,
+                  border: `1px solid ${BORDER}`,
+                  transition: "all 0.25s",
+                  "&:hover": {
+                    background: `${card.color}08`,
+                    border: `1px solid ${card.color}30`,
+                    transform: "translateY(-4px)",
+                    boxShadow: `0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px ${card.color}15`,
+                  },
+                }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                    <Box sx={{
+                      width: 46, height: 46, borderRadius: 2,
+                      background: `${card.color}18`, border: `1px solid ${card.color}30`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: card.color,
+                    }}>
+                      {card.icon}
+                    </Box>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: card.color, letterSpacing: 1, textTransform: "uppercase" }}>
+                      {card.phase}
+                    </Typography>
+                  </Box>
+
+                  <Typography sx={{ fontWeight: 800, fontSize: 16, mb: 1.5, letterSpacing: "-0.01em" }}>
+                    {card.title}
+                  </Typography>
+                  <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.44)", lineHeight: 1.65, mb: 2 }}>
+                    {card.body}
+                  </Typography>
+
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                    {card.tags.map((tag) => (
+                      <Chip key={tag} label={tag} size="small" sx={{
+                        background: `${card.color}12`, color: `${card.color}CC`,
+                        border: `1px solid ${card.color}22`, fontSize: 10, fontWeight: 600,
+                        height: 20,
+                      }} />
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+
         </Container>
       </Box>
 
