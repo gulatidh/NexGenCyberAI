@@ -14,6 +14,8 @@ import {
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { useMsal } from "@azure/msal-react";
+import { loginRequest } from "../auth/msalConfig";
 import { risksApi, projectsApi } from "../services/api";
 import { Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
@@ -113,6 +115,7 @@ function RiskDetailDrawer({
   risk: Risk | null; open: boolean; onClose: () => void; onUpdated: () => void;
 }) {
   const { clientId } = useActiveClient();
+  const { instance, accounts } = useMsal();
   const [tab, setTab] = useState(0);
   const [reevalOpen, setReevalOpen] = useState(false);
   const [reevalMeasures, setReevalMeasures] = useState<any[]>([]);
@@ -168,9 +171,16 @@ function RiskDetailDrawer({
   };
 
   const downloadExport = async (format: "pdf" | "docx") => {
-    const token = localStorage.getItem("aegis-token") || sessionStorage.getItem("aegis-token") || "";
+    let token = "";
+    try {
+      const account = accounts[0];
+      if (account) {
+        const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
+        token = resp.accessToken;
+      }
+    } catch { }
     const url = risksApi.exportSingleUrl(clientId!, risk.id, format);
-    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!resp.ok) { setSnack("Export failed."); return; }
     const blob = await resp.blob();
     const link = document.createElement("a");
@@ -410,6 +420,7 @@ function RiskDetailDrawer({
 export default function Risks() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const { instance, accounts } = useMsal();
   const navigate = useNavigate();
   const [projectId, setProjectId] = useState("");
   const [selected, setSelected] = useState<Risk | null>(null);
@@ -478,10 +489,17 @@ export default function Risks() {
 
   const downloadRegister = async (format: "pdf" | "docx") => {
     if (!clientId) return;
-    const token = localStorage.getItem("aegis-token") || sessionStorage.getItem("aegis-token") || "";
+    let token = "";
+    try {
+      const account = accounts[0];
+      if (account) {
+        const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
+        token = resp.accessToken;
+      }
+    } catch { }
     const url = risksApi.exportUrl(clientId, format);
     try {
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!resp.ok) { setSnack("Export failed."); return; }
       const blob = await resp.blob();
       const link = document.createElement("a");
