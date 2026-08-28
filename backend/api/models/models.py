@@ -233,6 +233,8 @@ class Client(Base):
     framework_assessments = relationship("FrameworkAssessment", back_populates="client", cascade="all, delete-orphan")
     control_statuses = relationship("ClientControlStatus", back_populates="client", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="client", cascade="all, delete-orphan")
+    risk_proposals = relationship("RiskProposal", backref="client", cascade="all, delete-orphan",
+                                  primaryjoin="Client.id == foreign(RiskProposal.client_id)")
 
 
 class Project(Base):
@@ -397,6 +399,43 @@ class Risk(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     client = relationship("Client", back_populates="risks")
+    # GCC IM8 / ISO 27001 structured assessment fields
+    risk_area = Column(String(100), nullable=True)
+    risk_type_gcim8 = Column(String(50), nullable=True)      # Security | Project
+    accessibility = Column(Integer, nullable=True)           # 1-5
+    discoverability = Column(Integer, nullable=True)         # 1-5
+    exploitability = Column(Integer, nullable=True)          # 1-5
+    authentication_score = Column(Integer, nullable=True)    # 1-5 (5=no auth, 1=strong MFA)
+    repeatability = Column(Integer, nullable=True)           # 1-5
+    likelihood_avg = Column(Float, nullable=True)            # avg of 5 factors (1-5)
+    consequence = Column(Integer, nullable=True)             # 1-5
+    risk_matrix_score = Column(Integer, nullable=True)       # 1-25 (consequence × likelihood_avg)
+    residual_risk_level = Column(String(50), nullable=True)  # low/medium/medium_high/high/critical
+    treatment_option = Column(String(50), nullable=True)     # avoid | mitigate | transfer | accept
+    proposal_id = Column(String(36), nullable=True)          # source RiskProposal.id
+
+
+class RiskProposal(Base):
+    """Staging gate for risk proposals before formal evaluation."""
+    __tablename__ = "risk_proposals"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    title = Column(String(500), nullable=False)
+    description = Column(Text)
+    category = Column(String(100))        # risk area
+    risk_type = Column(String(50))        # Security | Project
+    source = Column(String(50), default="manual")  # ai | finding | manual
+    source_finding_id = Column(String(36), nullable=True)
+    source_agent_run_id = Column(String(36), nullable=True)
+    status = Column(String(50), default="pending")  # pending | dismissed | archived | evaluated
+    dismissed_at = Column(DateTime(timezone=True), nullable=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    evaluated_at = Column(DateTime(timezone=True), nullable=True)
+    risk_id = Column(String(36), nullable=True)    # set when evaluated → Risk.id
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class FrameworkAssessment(Base):

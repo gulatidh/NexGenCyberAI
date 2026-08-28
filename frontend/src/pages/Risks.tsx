@@ -6,8 +6,9 @@ import {
   FormControl, InputLabel, Select, MenuItem, Button, Alert, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
 } from "@mui/material";
-import { Warning } from "@mui/icons-material";
+import { Warning, ChevronRight } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { risksApi, projectsApi } from "../services/api";
 import { Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
@@ -78,6 +79,7 @@ function KpiCard({ label, value, sublabel, color = "#4285F4" }: {
 export default function Risks() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const navigate = useNavigate();
   const [projectId, setProjectId] = useState("");
   const [selected, setSelected] = useState<Risk | null>(null);
 
@@ -143,11 +145,30 @@ export default function Risks() {
 
   return (
     <Box>
+      {/* Staging gateway banner */}
+      <Box
+        onClick={() => navigate("/analyse/risks/staging")}
+        sx={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          mb: 2.5, p: 1.5, px: 2,
+          bgcolor: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)",
+          borderRadius: 1.5, cursor: "pointer",
+          "&:hover": { bgcolor: "rgba(234,179,8,0.14)" },
+          transition: "background 0.15s",
+        }}>
+        <Typography variant="body2" sx={{ color: "#fde68a" }}>
+          New risks go through <strong>Risk Staging</strong> before appearing here — review and evaluate proposals first.
+        </Typography>
+        <Button size="small" endIcon={<ChevronRight />} sx={{ color: "#fde68a", fontWeight: 600 }}>
+          Open Staging
+        </Button>
+      </Box>
+
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, flexWrap: "wrap", gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Risk Register</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Prioritised risks with AI-generated insights
+            Formally evaluated risks — GCC IM8 &amp; ISO 27001 schema
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -170,8 +191,11 @@ export default function Risks() {
         <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Warning sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
           <Typography sx={{ color: "text.secondary" }}>
-            No risks yet. Run an AI risk assessment from the Agents page.
+            No evaluated risks yet. Review proposals in Risk Staging and evaluate them to add to the register.
           </Typography>
+          <Button variant="outlined" sx={{ mt: 2 }} onClick={() => navigate("/analyse/risks/staging")}>
+            Go to Risk Staging
+          </Button>
         </Card>
       ) : (
         <>

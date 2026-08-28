@@ -109,7 +109,8 @@ const MENU: MenuItem[] = [
       {
         heading: "Risk",
         items: [
-          { name: "Risk Register",         desc: "FAIR-scored risk register with domain heatmap and financial ALE.",     route: "/analyse/risks",               Icon: Security    },
+          { name: "Risk Staging",           desc: "Gate where AI and manual risk proposals land before formal evaluation.", route: "/analyse/risks/staging",        Icon: PlaylistAddCheck },
+          { name: "Risk Register",         desc: "Formally evaluated risks — GCC IM8 / ISO 27001 schema.",              route: "/analyse/risks",               Icon: Security    },
           { name: "Risk Overview",         desc: "Executive summary of ALE exposure, risk domains, and top risks.",      route: "/analyse/risk-overview",       Icon: Assessment  },
           { name: "AI Risk Analysis",      desc: "AI-generated risk narrative with actionable recommendations.",         route: "/analyse/ai-analysis",         Icon: SmartToy    },
           { name: "Attack Paths",          desc: "MITRE-phased attack chain graph derived from live findings.",          route: "/analyse/attack-paths",        Icon: AltRoute    },

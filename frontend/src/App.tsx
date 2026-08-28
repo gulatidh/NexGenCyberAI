@@ -64,6 +64,7 @@ const EmailSettings     = React.lazy(() => import("./pages/EmailSettings"));
 const AccessLogs        = React.lazy(() => import("./pages/AccessLogs"));
 const Findings          = React.lazy(() => import("./pages/Findings"));
 const Risks             = React.lazy(() => import("./pages/Risks"));
+const RiskStaging       = React.lazy(() => import("./pages/RiskStaging"));
 const RiskAIAnalysis    = React.lazy(() => import("./pages/RiskAIAnalysis"));
 const Assets            = React.lazy(() => import("./pages/Assets"));
 const AssetDetail       = React.lazy(() => import("./pages/AssetDetail"));
@@ -222,6 +223,7 @@ function ProtectedApp() {
           {/* ── ANALYSE ──────────────────────────────────────────────────── */}
           <Route path="/analyse" element={<ProductLayout product={ANALYSE_PRODUCT} />}>
             <Route index element={<AnalysePage />} />
+            <Route path="risks/staging"      element={<RiskStaging />} />
             <Route path="risks"              element={<Risks />} />
             <Route path="risk-overview"      element={<RiskOverviewPage />} />
             <Route path="ai-analysis"        element={<RiskAIAnalysis />} />

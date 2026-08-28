@@ -206,6 +206,27 @@ export const risksApi = {
   delete: (clientId: string, riskId: string) => apiClient.delete(`/clients/${clientId}/risks/${riskId}`),
 };
 
+export const riskProposalsApi = {
+  list: (clientId: string, status?: string) =>
+    apiClient.get(`/clients/${clientId}/risk-proposals/`, { params: status ? { status } : {} }).then((r) => r.data),
+  create: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/`, data).then((r) => r.data),
+  update: (clientId: string, id: string, data: any) =>
+    apiClient.patch(`/clients/${clientId}/risk-proposals/${id}`, data).then((r) => r.data),
+  delete: (clientId: string, id: string) =>
+    apiClient.delete(`/clients/${clientId}/risk-proposals/${id}`),
+  dismiss: (clientId: string, id: string) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/dismiss`).then((r) => r.data),
+  archive: (clientId: string, id: string) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/archive`).then((r) => r.data),
+  restore: (clientId: string, id: string) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/restore`).then((r) => r.data),
+  evaluate: (clientId: string, id: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/evaluate`, data).then((r) => r.data),
+  analyse: (clientId: string, data: any) =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/analyse`, data).then((r) => r.data),
+};
+
 export const agentsApi = {
   run: (clientId: string, data: any) => apiClient.post(`/clients/${clientId}/agents/run/`, data).then((r) => r.data),
   listRuns: (clientId: string) => apiClient.get(`/clients/${clientId}/agents/runs/`).then((r) => r.data),

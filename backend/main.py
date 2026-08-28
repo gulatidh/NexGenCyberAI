@@ -582,11 +582,22 @@ def _ensure_added_columns() -> None:
                 except Exception as exc:
                     logger.warning("findings.%s ALTER failed: %s", col, exc)
 
-        # risks: assignee_email, due_date (ISO string)
-        # Note: risks already has a due_date DateTime column from the model;
-        # only add assignee_email here (due_date was in the original schema).
+        # risks: assignee_email + GCC IM8 structured assessment columns
         _risk_additions = [
-            ("assignee_email",  "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("assignee_email",       "NVARCHAR(200) NULL",  "VARCHAR(200)"),
+            ("risk_area",            "NVARCHAR(100) NULL",  "VARCHAR(100)"),
+            ("risk_type_gcim8",      "NVARCHAR(50) NULL",   "VARCHAR(50)"),
+            ("accessibility",        "INT NULL",             "INTEGER"),
+            ("discoverability",      "INT NULL",             "INTEGER"),
+            ("exploitability",       "INT NULL",             "INTEGER"),
+            ("authentication_score", "INT NULL",             "INTEGER"),
+            ("repeatability",        "INT NULL",             "INTEGER"),
+            ("likelihood_avg",       "FLOAT NULL",           "FLOAT"),
+            ("consequence",          "INT NULL",             "INTEGER"),
+            ("risk_matrix_score",    "INT NULL",             "INTEGER"),
+            ("residual_risk_level",  "NVARCHAR(50) NULL",    "VARCHAR(50)"),
+            ("treatment_option",     "NVARCHAR(50) NULL",    "VARCHAR(50)"),
+            ("proposal_id",          "NVARCHAR(36) NULL",    "VARCHAR(36)"),
         ]
         for col, mssql_type, sqlite_type in _risk_additions:
             if risk_cols and col not in risk_cols:
@@ -740,6 +751,39 @@ def _ensure_added_columns() -> None:
                 logger.info("Added agent_runs.hidden_at column (%s)", dialect)
             except Exception as exc:
                 logger.warning("agent_runs.hidden_at ALTER failed: %s", exc)
+
+        # Migrate unstructured Risk rows to risk_proposals staging area (one-time, idempotent)
+        try:
+            import uuid as _uuid_mod
+            from datetime import datetime as _dt
+            with engine.begin() as conn:
+                proposal_count = conn.execute(text("SELECT COUNT(*) FROM risk_proposals")).scalar()
+                if proposal_count == 0:
+                    risk_count = conn.execute(text("SELECT COUNT(*) FROM risks")).scalar()
+                    if risk_count > 0:
+                        rows = conn.execute(text(
+                            "SELECT id, client_id, title, description, category, created_at FROM risks"
+                        )).fetchall()
+                        now_str = _dt.utcnow().isoformat()
+                        for row in rows:
+                            pid = str(_uuid_mod.uuid4())
+                            conn.execute(text("""
+                                INSERT INTO risk_proposals
+                                  (id, client_id, title, description, category, source, status, created_at)
+                                VALUES
+                                  (:id, :cid, :title, :desc, :cat, 'manual', 'pending', :ca)
+                            """), {
+                                "id": pid,
+                                "cid": row[1],
+                                "title": row[2] or "Untitled Risk",
+                                "desc": row[3],
+                                "cat": row[4],
+                                "ca": row[5] or now_str,
+                            })
+                        conn.execute(text("DELETE FROM risks"))
+                        logger.info("Migrated %d existing risks to risk_proposals staging", risk_count)
+        except Exception as exc:
+            logger.warning("Risk-to-proposal migration failed: %s", exc)
 
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
@@ -2033,6 +2077,13 @@ try:
     logger.info("ai_assisted_scan router loaded")
 except Exception as _e:
     logger.warning("ai_assisted_scan router not loaded: %s", _e)
+
+try:
+    from api.routers import risk_proposals as _risk_proposals
+    app.include_router(_risk_proposals.router, prefix="/api/v1")
+    logger.info("risk_proposals router loaded")
+except Exception as _e:
+    logger.warning("risk_proposals router not loaded: %s", _e)
 
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,

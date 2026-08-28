@@ -150,6 +150,40 @@ export interface Risk {
   status: string;
   mitigation_plan?: string;
   created_at?: string;
+  // GCC IM8 / ISO 27001 structured fields
+  risk_area?: string;
+  risk_type_gcim8?: string;
+  accessibility?: number;
+  discoverability?: number;
+  exploitability?: number;
+  authentication_score?: number;
+  repeatability?: number;
+  likelihood_avg?: number;
+  consequence?: number;
+  risk_matrix_score?: number;
+  residual_risk_level?: string;
+  treatment_option?: string;
+  proposal_id?: string;
+}
+
+export interface RiskProposal {
+  id: string;
+  client_id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  risk_type?: string;
+  source: "ai" | "finding" | "manual";
+  source_finding_id?: string;
+  source_agent_run_id?: string;
+  status: "pending" | "dismissed" | "archived" | "evaluated";
+  dismissed_at?: string;
+  archived_at?: string;
+  evaluated_at?: string;
+  risk_id?: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface AgentRun {
