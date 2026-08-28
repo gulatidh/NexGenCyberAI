@@ -52,6 +52,10 @@ _FRAMEWORK_NAMES = {
     "cis_f5": "CIS F5 Networks 1.0.0",
     "cis_palo_alto": "CIS Palo Alto Firewall 11 1.2.0",
     "cis_mssql": "CIS Microsoft SQL Server 2025 1.0.0",
+    # Singapore
+    "gcc_im8": "GCC IM8 Reform 2025 (Singapore)",
+    # NIST AI
+    "nist_ai_rmf": "NIST AI RMF 1.0 (AI 100-1)",
 }
 
 

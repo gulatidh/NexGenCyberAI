@@ -142,6 +142,8 @@ class FrameworkType(str, enum.Enum):
     CIS_MSSQL = "cis_mssql"
     # Singapore Government regulations
     GCC_IM8 = "gcc_im8"
+    # NIST AI frameworks
+    NIST_AI_RMF = "nist_ai_rmf"
     # ZAP — DAST baselines. Each control == one ZAP plugin rule (control_id "ZAP-<pluginId>").
     ZAP_UNAUTH_PASSIVE = "zap_unauth_passive"   # baseline profile, no auth
     ZAP_AUTH_ACTIVE = "zap_auth_active"         # active profile, with auth

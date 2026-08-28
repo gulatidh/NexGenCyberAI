@@ -7,6 +7,7 @@ import {
 import {
   Policy, LibraryAdd, Add, Delete, Edit, Close, Refresh,
   VerifiedUser, Security, Gavel, Lock, AccountBalance, CloudQueue, AutoAwesome,
+  SmartToy,
 } from "@mui/icons-material";
 import FrameworkAdvisor from "../components/FrameworkAdvisor";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,15 @@ const STANDARD_FRAMEWORKS = [
     color: "#1565C0",
     Icon: Security,
     controls: null,
+    family: "NIST",
+  },
+  {
+    key: "nist_ai_rmf",
+    label: "NIST AI RMF 1.0",
+    description: "NIST AI Risk Management Framework (AI 100-1) — Govern, Map, Measure, Manage AI risks across the AI lifecycle.",
+    color: "#1565C0",
+    Icon: SmartToy,
+    controls: 56,
     family: "NIST",
   },
   {

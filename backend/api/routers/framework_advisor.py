@@ -92,7 +92,7 @@ _FALLBACK = {
     "summary": "Unable to generate a recommendation at this time. Please check that an AI provider is configured and try again.",
 }
 
-_PLATFORM_FRAMEWORKS = {"nist_csf", "cis_v8", "iso_27001", "pci_dss", "gdpr", "gcc_im8"}
+_PLATFORM_FRAMEWORKS = {"nist_csf", "cis_v8", "iso_27001", "pci_dss", "gdpr", "gcc_im8", "nist_ai_rmf"}
 
 
 class RecommendRequest(BaseModel):
@@ -125,7 +125,7 @@ Respond with ONLY valid JSON (no markdown, no fences) matching this exact schema
   "recommendations": [
     {{
       "framework": "<human readable name>",
-      "framework_key": "<one of: nist_csf, cis_v8, iso_27001, pci_dss, gdpr, gcc_im8, soc2, hipaa, fedramp, nist_800_53, cyber_essentials, mas_trm, or other>",
+      "framework_key": "<one of: nist_csf, nist_ai_rmf, nist_800_53, cis_v8, iso_27001, pci_dss, gdpr, gcc_im8, soc2, hipaa, fedramp, cyber_essentials, mas_trm, or other>",
       "priority": "<mandatory|recommended|optional>",
       "rationale": "<2-3 sentences>",
       "applicable_because": ["<reason 1>", "<reason 2>"],
@@ -144,6 +144,7 @@ Respond with ONLY valid JSON (no markdown, no fences) matching this exact schema
 Rules:
 - Set available_in_platform: true ONLY for these exact keys: nist_csf, cis_v8, iso_27001, pci_dss, gdpr, gcc_im8
 - gcc_im8 (GCC IM8 Reform 2025) is MANDATORY for Singapore government agencies and organisations hosting on Government Commercial Cloud (GCC); RECOMMENDED for Singapore private sector or vendors serving Singapore government
+- nist_ai_rmf (NIST AI RMF 1.0) is MANDATORY for US federal agencies deploying AI; RECOMMENDED for any organisation developing, deploying, or procuring AI/ML systems regardless of geography
 - Order recommendations: mandatory first, then recommended, then optional
 - Maximum 6 recommendations total
 - overlap_insights only when genuine significant control overlap exists (>30%)
