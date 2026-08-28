@@ -601,6 +601,11 @@ def _ensure_added_columns() -> None:
             ("wizard_data_json",     "NVARCHAR(MAX) NULL",   "TEXT"),
             ("measures_json",        "NVARCHAR(MAX) NULL",   "TEXT"),
             ("ai_assessment_json",   "NVARCHAR(MAX) NULL",   "TEXT"),
+            # Impact factor breakdown (Phase N+1)
+            ("data_impact",          "INT NULL",             "INTEGER"),
+            ("operational_impact",   "INT NULL",             "INTEGER"),
+            ("financial_impact",     "INT NULL",             "INTEGER"),
+            ("impact_avg",           "FLOAT NULL",           "FLOAT"),
         ]
         for col, mssql_type, sqlite_type in _risk_additions:
             if risk_cols and col not in risk_cols:
@@ -613,6 +618,15 @@ def _ensure_added_columns() -> None:
                     logger.info("Added risks.%s column (%s)", col, dialect)
                 except Exception as exc:
                     logger.warning("risks.%s ALTER failed: %s", col, exc)
+
+        # Migrate risks.status 'open' → 'identified' (new standard status vocabulary)
+        try:
+            with engine.begin() as conn:
+                r = conn.execute(text("UPDATE risks SET status = 'identified' WHERE status = 'open'"))
+                if r.rowcount > 0:
+                    logger.info("Migrated %d risk(s): status 'open' → 'identified'", r.rowcount)
+        except Exception as exc:
+            logger.warning("risks.status migration failed: %s", exc)
 
         # ctem_phase_notes: ai_brief + ai_brief_generated_at + phase_data_json
         try:

@@ -85,12 +85,16 @@ class EvaluatePayload(BaseModel):
     authentication_score: int = 3
     repeatability: int = 3
     consequence: int = 3
+    # Impact factor breakdown
+    data_impact: int = 3
+    operational_impact: int = 3
+    financial_impact: int = 3
     treatment_option: Optional[str] = "mitigate"
     owner: Optional[str] = None
     assignee_email: Optional[str] = None
     due_date: Optional[str] = None
     mitigation_plan: Optional[str] = None
-    # New fields for rich wizard data
+    # Rich wizard data
     wizard_data: Optional[Dict[str, Any]] = None
     measures: Optional[List[Dict[str, Any]]] = None
     ai_assessment: Optional[Dict[str, Any]] = None
@@ -135,20 +139,24 @@ def _get_stats(client_id: str, db: Session) -> dict:
 def _build_ai_draft_prompt(title: str, description: str, category: str, risk_type: str) -> str:
     return f"""You are a cybersecurity risk analyst specialising in GCC IM8 and ISO 27001 risk assessments.
 
-A risk proposal has been submitted. Perform a comprehensive initial risk assessment and return a structured pre-fill for an 8-step risk evaluation wizard.
+A risk proposal has been submitted. Perform a comprehensive initial risk assessment and return a structured pre-fill for a 5-step risk evaluation wizard.
 
 Risk Title: {title}
 Description: {description or '(none provided)'}
 Risk Area / Category: {category or 'General'}
 Risk Type: {risk_type or 'Security'}
 
-You must score each likelihood factor on a 1-5 scale:
+You must score each LIKELIHOOD factor on a 1-5 scale (5=worst):
 - Accessibility: 1=physically isolated, 5=fully open/no restriction
 - Discoverability: 1=cannot find it, 5=indexed/trivially discoverable
 - Exploitability: 1=no exploit exists, 5=automated exploit tool exists
 - Authentication: 1=strong MFA+certs, 5=no authentication
 - Repeatability: 1=one-time only, 5=always repeatable/deterministic
-- Consequence: 1=negligible, 5=catastrophic/existential
+
+You must score each IMPACT factor on a 1-5 scale (5=worst):
+- Data Impact: 1=no data at risk, 5=complete data loss or public breach
+- Operational Impact: 1=no disruption, 5=complete operational failure
+- Financial & Regulatory Impact: 1=negligible cost, 5=catastrophic financial/regulatory consequence
 
 Suggest 5-8 specific security measures (controls) to mitigate or manage this risk.
 
@@ -172,8 +180,15 @@ Respond with ONLY valid JSON (no markdown fences):
     "repeatability": <1-5>,
     "repeatability_rationale": "<why this score>"
   }},
+  "impact_factors": {{
+    "data_impact": <1-5>,
+    "data_impact_rationale": "<why this score>",
+    "operational_impact": <1-5>,
+    "operational_impact_rationale": "<why this score>",
+    "financial_impact": <1-5>,
+    "financial_impact_rationale": "<why this score>"
+  }},
   "consequence": <1-5>,
-  "consequence_rationale": "<why this consequence score>",
   "treatment": "<Avoid|Mitigate|Transfer|Accept>",
   "treatment_rationale": "<why this treatment>",
   "measures": [
@@ -204,20 +219,25 @@ def _build_reevaluate_prompt(
 
     return f"""You are a cybersecurity risk analyst specialising in GCC IM8 and ISO 27001 risk assessments.
 
-Re-evaluate a risk that has been partially assessed. The user has adjusted the likelihood factor scores and updated the security measures checklist. Re-assess all factors considering the implemented controls and any additional context provided.
+Re-evaluate a risk that has been partially assessed. The user has adjusted the likelihood and impact factor scores and updated the security measures checklist. Re-assess all factors considering the implemented controls and any additional context provided.
 
 Risk: {title}
 Description: {description or '(none)'}
 Category: {category or 'General'}
 {context_block}
-Current likelihood factor values (user-adjusted, scale 1-5 where 5 is worst):
+Current LIKELIHOOD factor values (user-adjusted, scale 1-5 where 5 is worst):
 - Accessibility:    {wizard_data.get('accessibility', 3)}/5
 - Discoverability:  {wizard_data.get('discoverability', 3)}/5
 - Exploitability:   {wizard_data.get('exploitability', 3)}/5
 - Authentication:   {wizard_data.get('authentication_score', 3)}/5 (5=no auth, 1=strong MFA)
 - Repeatability:    {wizard_data.get('repeatability', 3)}/5
-- Consequence:      {wizard_data.get('consequence', 3)}/5
-- Treatment intent: {wizard_data.get('treatment_option', 'mitigate')}
+
+Current IMPACT factor values (user-adjusted, scale 1-5 where 5 is worst):
+- Data Impact:           {wizard_data.get('data_impact', 3)}/5
+- Operational Impact:    {wizard_data.get('operational_impact', 3)}/5
+- Financial & Regulatory:{wizard_data.get('financial_impact', 3)}/5
+
+Treatment intent: {wizard_data.get('treatment_option', 'mitigate')}
 
 Security measures checklist:
 {measures_text}
@@ -228,9 +248,10 @@ Summary:
 - {len(pending)} measures PENDING (planned but not yet implemented)
 
 Instructions:
-1. Re-score each likelihood factor considering IN PLACE measures AND any extra context. If context reveals mitigating factors (e.g. components on same host, air-gapped network), reduce scores accordingly. If it reveals amplifying factors (e.g. internet-facing, shared credentials), increase scores.
-2. For each NOT POSSIBLE measure, suggest a specific, practical alternative control.
-3. Update the overall commentary to reflect the analyst's context and current control state.
+1. Re-score each likelihood factor considering IN PLACE measures AND any extra context. If context reveals mitigating factors, reduce scores accordingly. If amplifying factors, increase scores.
+2. Re-score each impact factor considering the controls in place and any context.
+3. For each NOT POSSIBLE measure, suggest a specific, practical alternative control.
+4. Update the overall commentary to reflect the analyst's context and current control state.
 
 Respond with ONLY valid JSON (no markdown fences):
 {{
@@ -252,8 +273,15 @@ Respond with ONLY valid JSON (no markdown fences):
     "repeatability": <1-5>,
     "repeatability_rationale": "<updated rationale>"
   }},
+  "impact_factors": {{
+    "data_impact": <1-5>,
+    "data_impact_rationale": "<updated rationale>",
+    "operational_impact": <1-5>,
+    "operational_impact_rationale": "<updated rationale>",
+    "financial_impact": <1-5>,
+    "financial_impact_rationale": "<updated rationale>"
+  }},
   "consequence": <1-5>,
-  "consequence_rationale": "<updated rationale>",
   "treatment": "<Avoid|Mitigate|Transfer|Accept>",
   "treatment_rationale": "<updated rationale>",
   "measures": {json.dumps(measures)},
@@ -539,17 +567,24 @@ async def evaluate_proposal(
     if not p:
         raise HTTPException(status_code=404, detail="Proposal not found")
 
-    factors = [
+    likelihood_factors = [
         payload.accessibility, payload.discoverability, payload.exploitability,
         payload.authentication_score, payload.repeatability,
     ]
-    likelihood_avg = round(sum(factors) / len(factors), 2)
-    risk_matrix_score = round(payload.consequence * likelihood_avg)
+    likelihood_avg = round(sum(likelihood_factors) / len(likelihood_factors), 2)
+
+    impact_avg = round(
+        (payload.data_impact + payload.operational_impact + payload.financial_impact) / 3, 2
+    )
+    # consequence kept as the rounded impact_avg for backward compatibility
+    consequence_val = round(impact_avg)
+
+    risk_matrix_score = round(likelihood_avg * impact_avg)
     risk_level = _matrix_to_level(risk_matrix_score)
     residual = _residual_label(risk_matrix_score)
 
     legacy_likelihood = round(likelihood_avg * 2)
-    legacy_impact = payload.consequence * 2
+    legacy_impact = round(impact_avg * 2)
 
     risk = Risk(
         client_id=client_id,
@@ -563,7 +598,7 @@ async def evaluate_proposal(
         owner=payload.owner,
         assignee_email=payload.assignee_email,
         mitigation_plan=payload.mitigation_plan,
-        status="open",
+        status="identified",
         risk_area=payload.risk_area or payload.category,
         risk_type_gcim8=payload.risk_type_gcim8,
         accessibility=payload.accessibility,
@@ -572,7 +607,11 @@ async def evaluate_proposal(
         authentication_score=payload.authentication_score,
         repeatability=payload.repeatability,
         likelihood_avg=likelihood_avg,
-        consequence=payload.consequence,
+        consequence=consequence_val,
+        data_impact=payload.data_impact,
+        operational_impact=payload.operational_impact,
+        financial_impact=payload.financial_impact,
+        impact_avg=impact_avg,
         risk_matrix_score=risk_matrix_score,
         residual_risk_level=residual,
         treatment_option=payload.treatment_option,

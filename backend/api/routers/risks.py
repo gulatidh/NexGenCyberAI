@@ -209,6 +209,11 @@ async def reevaluate_risk(
             "authentication": payload.wizard_data.get("authentication_score", risk.authentication_score or 3),
             "repeatability": payload.wizard_data.get("repeatability", risk.repeatability or 3),
         },
+        "impact_factors": {
+            "data_impact": payload.wizard_data.get("data_impact", getattr(risk, "data_impact", None) or 3),
+            "operational_impact": payload.wizard_data.get("operational_impact", getattr(risk, "operational_impact", None) or 3),
+            "financial_impact": payload.wizard_data.get("financial_impact", getattr(risk, "financial_impact", None) or 3),
+        },
         "consequence": payload.wizard_data.get("consequence", risk.consequence or 3),
         "workarounds": [],
         "overall_commentary": "Re-assessment complete.",
@@ -225,9 +230,16 @@ async def reevaluate_risk(
         lf.get("authentication", risk.authentication_score or 3),
         lf.get("repeatability", risk.repeatability or 3),
     ]
-    consequence = result.get("consequence", risk.consequence or 3)
     likelihood_avg = round(sum(factors) / len(factors), 2)
-    matrix_score = round(consequence * likelihood_avg)
+
+    imp = result.get("impact_factors", {})
+    data_imp = imp.get("data_impact", payload.wizard_data.get("data_impact", getattr(risk, "data_impact", None) or 3))
+    oper_imp = imp.get("operational_impact", payload.wizard_data.get("operational_impact", getattr(risk, "operational_impact", None) or 3))
+    fin_imp = imp.get("financial_impact", payload.wizard_data.get("financial_impact", getattr(risk, "financial_impact", None) or 3))
+    impact_avg = round((data_imp + oper_imp + fin_imp) / 3, 2)
+    consequence = round(impact_avg)
+
+    matrix_score = round(likelihood_avg * impact_avg)
 
     risk.accessibility = factors[0]
     risk.discoverability = factors[1]
@@ -236,11 +248,15 @@ async def reevaluate_risk(
     risk.repeatability = factors[4]
     risk.likelihood_avg = likelihood_avg
     risk.consequence = consequence
+    risk.data_impact = data_imp
+    risk.operational_impact = oper_imp
+    risk.financial_impact = fin_imp
+    risk.impact_avg = impact_avg
     risk.risk_matrix_score = matrix_score
     risk.residual_risk_level = _residual_label(matrix_score)
     risk.risk_level = _matrix_to_level(matrix_score)
     risk.likelihood = round(likelihood_avg * 2)
-    risk.impact = consequence * 2
+    risk.impact = round(impact_avg * 2)
     risk.risk_score = round(risk.likelihood * risk.impact / 10, 2)
     risk.wizard_data_json = json.dumps(payload.wizard_data)
     risk.measures_json = json.dumps(measures_list)

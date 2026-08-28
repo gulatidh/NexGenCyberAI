@@ -63,12 +63,26 @@ const FACTOR_LABELS: Record<string, string[]> = {
     "Usually repeatable — reliable most of the time",
     "Always repeatable — deterministic, automated",
   ],
-  consequence: [
-    "Negligible — no business impact",
-    "Minor — limited impact, easily remediated",
-    "Moderate — noticeable disruption, moderate cost",
-    "Major — significant disruption, data loss, compliance breach",
-    "Critical — catastrophic, existential business risk",
+  data_impact: [
+    "No data impact — no sensitive data at risk",
+    "Limited exposure — internal non-sensitive data only",
+    "Moderate — PII or business-critical data at risk",
+    "Significant — confidential or regulated data breach",
+    "Catastrophic — complete data loss or public breach",
+  ],
+  operational_impact: [
+    "No disruption — system continues normally",
+    "Minor disruption — degraded performance only",
+    "Moderate — key processes affected or delayed",
+    "Significant — major operations disrupted",
+    "Catastrophic — complete operational failure",
+  ],
+  financial_impact: [
+    "Negligible financial or regulatory cost",
+    "Minor cost — easily absorbed within budget",
+    "Moderate — material financial loss or regulatory fine",
+    "Major — significant financial impact or formal regulatory action",
+    "Catastrophic — existential financial or regulatory consequence",
   ],
 };
 
@@ -90,21 +104,25 @@ function matrixLabelDisplay(score: number): string {
   return l === "medium_high" ? "MEDIUM-HIGH" : l.toUpperCase();
 }
 
+function scoreColor(val: number): string {
+  return val <= 1 ? "#34A853" : val === 2 ? "#81C784" : val === 3 ? "#FBBC04" : val === 4 ? "#FF7043" : "#EA4335";
+}
+
 // ── Risk Matrix ──────────────────────────────────────────────────────────────
 
-function RiskMatrix({ consequence, likelihood }: { consequence: number; likelihood: number }) {
+function RiskMatrix({ impact, likelihood }: { impact: number; likelihood: number }) {
   const likelihoodCol = Math.max(1, Math.min(5, Math.round(likelihood)));
-  const consequenceRow = Math.max(1, Math.min(5, consequence));
+  const impactRow = Math.max(1, Math.min(5, Math.round(impact)));
   return (
     <Box>
       <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>
-        5×5 Risk Matrix — GCC IM8
+        5×5 Risk Matrix — GCC IM8 / ISO 27001
       </Typography>
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
         <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", mr: 0.5 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 9, writingMode: "vertical-rl",
             transform: "rotate(180deg)", whiteSpace: "nowrap", lineHeight: 1 }}>
-            Consequence ↑
+            Impact ↑
           </Typography>
         </Box>
         <Box>
@@ -115,16 +133,16 @@ function RiskMatrix({ consequence, likelihood }: { consequence: number; likeliho
                 sx={{ width: 40, textAlign: "center", color: "text.secondary", fontSize: 10 }}>{c}</Typography>
             ))}
           </Box>
-          {[5,4,3,2,1].map((cons) => (
-            <Box key={cons} sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+          {[5,4,3,2,1].map((imp) => (
+            <Box key={imp} sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
               <Typography variant="caption"
                 sx={{ width: 32, textAlign: "right", pr: 0.5, color: "text.secondary", fontSize: 10 }}>
-                {cons}
+                {imp}
               </Typography>
               {[1,2,3,4,5].map((lik) => {
-                const score = cons * lik;
+                const score = imp * lik;
                 const label = matrixLabel(score);
-                const isActive = cons === consequenceRow && lik === likelihoodCol;
+                const isActive = imp === impactRow && lik === likelihoodCol;
                 return (
                   <Box key={lik} sx={{
                     width: 40, height: 28,
@@ -151,37 +169,42 @@ function RiskMatrix({ consequence, likelihood }: { consequence: number; likeliho
   );
 }
 
-// ── Factor Slider Step ────────────────────────────────────────────────────────
+// ── Compact Factor Slider ─────────────────────────────────────────────────────
 
-function FactorStep({
+function CompactFactorSlider({
   factor, label, description, value, onChange, rationale,
 }: {
   factor: string; label: string; description: string;
   value: number; onChange: (v: number) => void; rationale?: string;
 }) {
   const labels = FACTOR_LABELS[factor] || [];
+  const color = scoreColor(value);
   return (
-    <Box>
-      <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>{label}</Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>{description}</Typography>
-      <Box sx={{ px: 2 }}>
+    <Box sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1,
+      border: "1px solid", borderColor: "divider", mb: 1.5 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>{description}</Typography>
+        </Box>
+        <Chip label={`${value}/5`} size="small"
+          sx={{ fontWeight: 700, bgcolor: `${color}20`, color, flexShrink: 0, ml: 1 }} />
+      </Box>
+      <Box sx={{ px: 1 }}>
         <Slider value={value} min={1} max={5} step={1}
           marks={[1,2,3,4,5].map((v) => ({ value: v, label: String(v) }))}
           onChange={(_, v) => onChange(v as number)}
-          sx={{ "& .MuiSlider-mark": { bgcolor: "divider" } }} />
+          sx={{ color, "& .MuiSlider-mark": { bgcolor: "divider" } }} />
       </Box>
-      <Box sx={{ mt: 2, p: 2, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1,
-        borderLeft: "3px solid", borderColor: "primary.main" }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          Level {value}: {labels[value - 1] || `Score ${value}/5`}
-        </Typography>
-      </Box>
+      <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.25 }}>
+        Level {value}: {labels[value - 1] || `Score ${value}/5`}
+      </Typography>
       {rationale && (
-        <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1,
+        <Box sx={{ mt: 1, p: 1, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1,
           borderLeft: "3px solid", borderColor: "#4285F4" }}>
           <Typography variant="caption" sx={{ color: "#90CAF9", fontStyle: "italic", display: "flex", alignItems: "flex-start", gap: 0.5 }}>
-            <AutoAwesome sx={{ fontSize: 13, mt: 0.1, flexShrink: 0 }} />
-            AI rationale: {rationale}
+            <AutoAwesome sx={{ fontSize: 12, mt: 0.1, flexShrink: 0 }} />
+            {rationale}
           </Typography>
         </Box>
       )}
@@ -225,11 +248,10 @@ function MeasuresStep({
     <Box>
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Security Measures</Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-        Mark each control as <strong>In Place</strong>, <strong>Not Possible</strong> (AI suggests workaround), or <strong>Pending</strong>.
-        Optionally add context so the AI adjusts likelihood scores when re-assessing.
+        Mark each control as <strong>In Place</strong>, <strong>Not Possible</strong>, or <strong>Pending</strong>.
+        Add context so AI adjusts scores when re-assessing.
       </Typography>
 
-      {/* Context field */}
       <Box sx={{ mb: 3, p: 1.5, bgcolor: "rgba(124,58,237,0.06)", borderRadius: 1, border: "1px solid rgba(124,58,237,0.2)" }}>
         <Typography variant="caption" sx={{ fontWeight: 700, color: "#9C6AFF", display: "block", mb: 0.75 }}>
           Additional context for AI re-assessment (optional)
@@ -271,7 +293,7 @@ function MeasuresStep({
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>{m.text}</Typography>
                     {m.status === "not_possible" && !wa && (
                       <Typography variant="caption" sx={{ color: "#FFC107", mt: 0.5, display: "block" }}>
-                        Click "Re-assess with AI" below — AI will suggest a workaround for this.
+                        Click "Re-assess with AI" — AI will suggest a workaround.
                       </Typography>
                     )}
                     {wa && (
@@ -284,20 +306,15 @@ function MeasuresStep({
                       </Box>
                     )}
                   </Box>
-                  <ToggleButtonGroup
-                    size="small"
-                    exclusive
-                    value={m.status}
+                  <ToggleButtonGroup size="small" exclusive value={m.status}
                     onChange={(_, val) => { if (val) onMeasureChange(m.id, val); }}
                     sx={{ flexShrink: 0 }}>
                     {(["pending", "in_place", "not_possible"] as const).map((s) => {
                       const c = STATUS_CONFIG[s];
                       return (
                         <ToggleButton key={s} value={s}
-                          sx={{
-                            fontSize: 10, py: 0.4, px: 1,
-                            "&.Mui-selected": { bgcolor: `${c.color}20`, color: c.color, borderColor: `${c.color}60` },
-                          }}>
+                          sx={{ fontSize: 10, py: 0.4, px: 1,
+                            "&.Mui-selected": { bgcolor: `${c.color}20`, color: c.color, borderColor: `${c.color}60` } }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
                             {c.icon}
                             <span>{c.label}</span>
@@ -332,12 +349,8 @@ function MeasuresStep({
 
 const STEPS = [
   "Basic Info",
-  "Accessibility",
-  "Discoverability",
-  "Exploitability",
-  "Authentication",
-  "Repeatability",
-  "Consequence",
+  "Likelihood Factors",
+  "Impact Factors",
   "Security Measures",
   "Review & Treatment",
 ];
@@ -347,12 +360,17 @@ interface FormData {
   description: string;
   risk_area: string;
   risk_type_gcim8: string;
+  // Likelihood factors
   accessibility: number;
   discoverability: number;
   exploitability: number;
   authentication_score: number;
   repeatability: number;
-  consequence: number;
+  // Impact factors
+  data_impact: number;
+  operational_impact: number;
+  financial_impact: number;
+  // Treatment
   treatment_option: string;
   owner: string;
   assignee_email: string;
@@ -363,7 +381,8 @@ interface FormData {
 const DEFAULT_FORM: FormData = {
   title: "", description: "", risk_area: "", risk_type_gcim8: "Security",
   accessibility: 3, discoverability: 3, exploitability: 3,
-  authentication_score: 3, repeatability: 3, consequence: 3,
+  authentication_score: 3, repeatability: 3,
+  data_impact: 3, operational_impact: 3, financial_impact: 3,
   treatment_option: "mitigate", owner: "", assignee_email: "", due_date: "", mitigation_plan: "",
 };
 
@@ -373,7 +392,9 @@ interface Rationales {
   exploitability?: string;
   authentication?: string;
   repeatability?: string;
-  consequence?: string;
+  data_impact?: string;
+  operational_impact?: string;
+  financial_impact?: string;
 }
 
 // ── Wizard ────────────────────────────────────────────────────────────────────
@@ -404,7 +425,6 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
     setForm((f) => ({ ...f, [key]: val }));
   }, []);
 
-  // Auto-run AI draft when wizard opens (or restore saved draft)
   useEffect(() => {
     if (open && proposal && clientId) {
       setStep(0);
@@ -421,8 +441,6 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         risk_type_gcim8: proposal.risk_type || "Security",
       });
 
-      // If a saved draft exists (from a previous AI run or re-assess), restore it
-      // without calling the LLM again — saves time and cost.
       if (proposal.ai_draft_json) {
         try {
           const saved = JSON.parse(proposal.ai_draft_json);
@@ -435,7 +453,6 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         }
       }
 
-      // No saved draft — call AI fresh
       setAiLoading(true);
       riskProposalsApi.aiDraft(clientId, proposal.id)
         .then((result: any) => {
@@ -443,9 +460,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
           setAiAssessment(result);
           setSnackMsg("AI pre-fill complete — all steps populated from risk description.");
         })
-        .catch(() => {
-          // silently fall through — user can still fill manually
-        })
+        .catch(() => { /* silently fall through */ })
         .finally(() => setAiLoading(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -454,6 +469,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
   const _applyAiResult = (result: any) => {
     const bi = result.basic_info || {};
     const lf = result.likelihood_factors || {};
+    const impact = result.impact_factors || {};
 
     setForm((f) => ({
       ...f,
@@ -465,8 +481,11 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
       exploitability: lf.exploitability || f.exploitability,
       authentication_score: lf.authentication || f.authentication_score,
       repeatability: lf.repeatability || f.repeatability,
-      consequence: result.consequence || f.consequence,
-      treatment_option: (result.treatment || f.treatment_option).toLowerCase(),
+      // Impact factors — fall back to consequence for legacy AI responses
+      data_impact: impact.data_impact || result.consequence || f.data_impact,
+      operational_impact: impact.operational_impact || result.consequence || f.operational_impact,
+      financial_impact: impact.financial_impact || result.consequence || f.financial_impact,
+      treatment_option: ((result.treatment || f.treatment_option) as string).toLowerCase(),
     }));
 
     setRationales({
@@ -475,7 +494,9 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
       exploitability: lf.exploitability_rationale,
       authentication: lf.authentication_rationale,
       repeatability: lf.repeatability_rationale,
-      consequence: result.consequence_rationale,
+      data_impact: impact.data_impact_rationale,
+      operational_impact: impact.operational_impact_rationale,
+      financial_impact: impact.financial_impact_rationale,
     });
 
     if (result.measures?.length) {
@@ -501,7 +522,9 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         exploitability: form.exploitability,
         authentication_score: form.authentication_score,
         repeatability: form.repeatability,
-        consequence: form.consequence,
+        data_impact: form.data_impact,
+        operational_impact: form.operational_impact,
+        financial_impact: form.financial_impact,
         treatment_option: form.treatment_option,
       };
       const result = await riskProposalsApi.reevaluate(clientId, proposal.id, wizardData, measures, extraContext);
@@ -523,7 +546,10 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
     ((form.accessibility + form.discoverability + form.exploitability +
       form.authentication_score + form.repeatability) / 5).toFixed(2)
   );
-  const matrix_score = Math.round(form.consequence * likelihood_avg);
+  const impact_avg = parseFloat(
+    ((form.data_impact + form.operational_impact + form.financial_impact) / 3).toFixed(2)
+  );
+  const matrix_score = Math.round(likelihood_avg * impact_avg);
   const risk_label = matrixLabel(matrix_score);
   const risk_display = matrixLabelDisplay(matrix_score);
 
@@ -538,7 +564,9 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         exploitability: form.exploitability,
         authentication_score: form.authentication_score,
         repeatability: form.repeatability,
-        consequence: form.consequence,
+        data_impact: form.data_impact,
+        operational_impact: form.operational_impact,
+        financial_impact: form.financial_impact,
         treatment_option: form.treatment_option,
         rationales,
       };
@@ -553,7 +581,10 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         exploitability: form.exploitability,
         authentication_score: form.authentication_score,
         repeatability: form.repeatability,
-        consequence: form.consequence,
+        consequence: Math.round(impact_avg),
+        data_impact: form.data_impact,
+        operational_impact: form.operational_impact,
+        financial_impact: form.financial_impact,
         treatment_option: form.treatment_option,
         owner: form.owner,
         assignee_email: form.assignee_email,
@@ -580,13 +611,14 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 6, gap: 2 }}>
           <CircularProgress size={40} sx={{ color: "#7C3AED" }} />
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            AI is analysing the risk and pre-filling all 9 steps…
+            AI is analysing the risk and pre-filling all 5 steps…
           </Typography>
         </Box>
       );
     }
 
     switch (step) {
+      // ── Step 0: Basic Info ───────────────────────────────────────────────
       case 0:
         return (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -623,37 +655,83 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
             </FormControl>
           </Box>
         );
-      case 1:
-        return <FactorStep factor="accessibility" label="Accessibility"
-          description="How accessible is the system or resource to a potential attacker?"
-          value={form.accessibility} onChange={(v) => set("accessibility", v)}
-          rationale={rationales.accessibility} />;
-      case 2:
-        return <FactorStep factor="discoverability" label="Discoverability"
-          description="How easily can an attacker discover this vulnerability or entry point?"
-          value={form.discoverability} onChange={(v) => set("discoverability", v)}
-          rationale={rationales.discoverability} />;
+
+      // ── Step 1: Likelihood Factors ──────────────────────────────────────
+      case 1: {
+        return (
+          <Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Likelihood Factors</Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Rate how likely this risk can be triggered (1=lowest, 5=highest).
+                </Typography>
+              </Box>
+              <Chip
+                label={`Avg: ${likelihood_avg}/5`}
+                size="small"
+                sx={{ fontWeight: 700, bgcolor: `${scoreColor(Math.round(likelihood_avg))}20`, color: scoreColor(Math.round(likelihood_avg)) }}
+              />
+            </Box>
+            <CompactFactorSlider factor="accessibility" label="Accessibility"
+              description="How accessible is the system to a potential attacker?"
+              value={form.accessibility} onChange={(v) => set("accessibility", v)}
+              rationale={rationales.accessibility} />
+            <CompactFactorSlider factor="discoverability" label="Discoverability"
+              description="How easily can an attacker discover this vulnerability?"
+              value={form.discoverability} onChange={(v) => set("discoverability", v)}
+              rationale={rationales.discoverability} />
+            <CompactFactorSlider factor="exploitability" label="Exploitability"
+              description="How difficult is exploitation once discovered?"
+              value={form.exploitability} onChange={(v) => set("exploitability", v)}
+              rationale={rationales.exploitability} />
+            <CompactFactorSlider factor="authentication_score" label="Authentication"
+              description="Authentication strength protecting this resource (5=no auth, 1=strong MFA)."
+              value={form.authentication_score} onChange={(v) => set("authentication_score", v)}
+              rationale={rationales.authentication} />
+            <CompactFactorSlider factor="repeatability" label="Repeatability"
+              description="Can the attack be repeated reliably once exploited?"
+              value={form.repeatability} onChange={(v) => set("repeatability", v)}
+              rationale={rationales.repeatability} />
+          </Box>
+        );
+      }
+
+      // ── Step 2: Impact Factors ──────────────────────────────────────────
+      case 2: {
+        return (
+          <Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>Impact Factors</Typography>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Rate the business impact if this risk materialises (1=lowest, 5=highest).
+                </Typography>
+              </Box>
+              <Chip
+                label={`Avg: ${impact_avg}/5`}
+                size="small"
+                sx={{ fontWeight: 700, bgcolor: `${scoreColor(Math.round(impact_avg))}20`, color: scoreColor(Math.round(impact_avg)) }}
+              />
+            </Box>
+            <CompactFactorSlider factor="data_impact" label="Data Impact"
+              description="What is the impact on data confidentiality and integrity?"
+              value={form.data_impact} onChange={(v) => set("data_impact", v)}
+              rationale={rationales.data_impact} />
+            <CompactFactorSlider factor="operational_impact" label="Operational Impact"
+              description="What is the impact on business operations and service availability?"
+              value={form.operational_impact} onChange={(v) => set("operational_impact", v)}
+              rationale={rationales.operational_impact} />
+            <CompactFactorSlider factor="financial_impact" label="Financial & Regulatory Impact"
+              description="What is the financial cost and regulatory consequence?"
+              value={form.financial_impact} onChange={(v) => set("financial_impact", v)}
+              rationale={rationales.financial_impact} />
+          </Box>
+        );
+      }
+
+      // ── Step 3: Security Measures ───────────────────────────────────────
       case 3:
-        return <FactorStep factor="exploitability" label="Exploitability"
-          description="How difficult is it to actually exploit this vulnerability once discovered?"
-          value={form.exploitability} onChange={(v) => set("exploitability", v)}
-          rationale={rationales.exploitability} />;
-      case 4:
-        return <FactorStep factor="authentication_score" label="Authentication"
-          description="How strong is the authentication protecting this resource? (5 = no auth, 1 = strong MFA)"
-          value={form.authentication_score} onChange={(v) => set("authentication_score", v)}
-          rationale={rationales.authentication} />;
-      case 5:
-        return <FactorStep factor="repeatability" label="Repeatability"
-          description="If the vulnerability is exploited, can the attack be repeated reliably?"
-          value={form.repeatability} onChange={(v) => set("repeatability", v)}
-          rationale={rationales.repeatability} />;
-      case 6:
-        return <FactorStep factor="consequence" label="Consequence"
-          description="What is the business impact if this risk materialises?"
-          value={form.consequence} onChange={(v) => set("consequence", v)}
-          rationale={rationales.consequence} />;
-      case 7:
         return (
           <MeasuresStep
             measures={measures}
@@ -665,16 +743,18 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
             onContextChange={setExtraContext}
           />
         );
-      case 8:
+
+      // ── Step 4: Review & Treatment ──────────────────────────────────────
+      case 4:
         return (
           <Box>
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, md: 5 }}>
-                <RiskMatrix consequence={form.consequence} likelihood={likelihood_avg} />
+                <RiskMatrix impact={impact_avg} likelihood={likelihood_avg} />
                 <Box sx={{ mt: 2, p: 2, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1 }}>
                   {[
                     ["Likelihood Avg", `${likelihood_avg} / 5`],
-                    ["Consequence", `${form.consequence} / 5`],
+                    ["Impact Avg", `${impact_avg} / 5`],
                     ["Matrix Score", `${matrix_score} / 25`],
                   ].map(([k, v]) => (
                     <Box key={k} sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
@@ -730,6 +810,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
             </Grid>
           </Box>
         );
+
       default:
         return null;
     }

@@ -24,9 +24,30 @@ const LEVEL_COLOR: Record<string, string> = {
   critical: "#EA4335", high: "#FF7043", medium_high: "#EF6C00",
   medium: "#FBBC04", low: "#34A853",
 };
-const STATUS_COLOR: Record<string, string> = {
-  open: "#FF7043", mitigated: "#34A853", accepted: "#4285F4", closed: "rgba(255,255,255,0.3)",
-};
+
+const RISK_STATUSES = [
+  { value: "identified",          label: "Identified",           color: "#FF7043" },
+  { value: "under_assessment",    label: "Under Assessment",     color: "#7C3AED" },
+  { value: "treatment_planned",   label: "Treatment Planned",    color: "#1565C0" },
+  { value: "accepted",            label: "Accepted",             color: "#4285F4" },
+  { value: "transferred",         label: "Transferred",          color: "#00ACC1" },
+  { value: "closed",              label: "Closed",               color: "#34A853" },
+  { value: "no_longer_applicable",label: "No Longer Applicable", color: "#757575" },
+  { value: "escalated",           label: "Escalated",            color: "#EA4335" },
+];
+
+const STATUS_COLOR: Record<string, string> = Object.fromEntries(
+  RISK_STATUSES.map((s) => [s.value, s.color])
+);
+// Legacy aliases
+STATUS_COLOR["open"] = "#FF7043";
+STATUS_COLOR["mitigated"] = "#34A853";
+
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(
+  RISK_STATUSES.map((s) => [s.value, s.label])
+);
+STATUS_LABEL["open"] = "Identified";
+STATUS_LABEL["mitigated"] = "Closed";
 
 const FACTOR_NAMES: [string, string][] = [
   ["accessibility", "Accessibility"],
@@ -34,6 +55,12 @@ const FACTOR_NAMES: [string, string][] = [
   ["exploitability", "Exploitability"],
   ["authentication_score", "Authentication"],
   ["repeatability", "Repeatability"],
+];
+
+const IMPACT_NAMES: [string, string][] = [
+  ["data_impact", "Data Impact"],
+  ["operational_impact", "Operational Impact"],
+  ["financial_impact", "Financial & Regulatory Impact"],
 ];
 
 const MEASURE_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -122,6 +149,7 @@ function RiskDetailDrawer({
   const [reevalWizard, setReevalWizard] = useState<any>({});
   const [reevalContext, setReevalContext] = useState("");
   const [reevalLoading, setReevalLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [snack, setSnack] = useState("");
 
   // Populate re-eval state from risk when opening
@@ -135,7 +163,9 @@ function RiskDetailDrawer({
         exploitability: (risk as any).exploitability || 3,
         authentication_score: (risk as any).authentication_score || 3,
         repeatability: (risk as any).repeatability || 3,
-        consequence: (risk as any).consequence || 3,
+        data_impact: (risk as any).data_impact || 3,
+        operational_impact: (risk as any).operational_impact || 3,
+        financial_impact: (risk as any).financial_impact || 3,
         treatment_option: (risk as any).treatment_option || "mitigate",
       };
       setReevalMeasures(measures.map((m: any) => ({ ...m })));
@@ -172,6 +202,20 @@ function RiskDetailDrawer({
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!clientId) return;
+    setStatusUpdating(true);
+    try {
+      await risksApi.update(clientId, risk.id, { status: newStatus });
+      setSnack(`Status updated to "${STATUS_LABEL[newStatus] || newStatus}".`);
+      onUpdated();
+    } catch {
+      setSnack("Status update failed.");
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
   const downloadExport = async (format: "pdf" | "docx") => {
     let token = "";
     try {
@@ -199,7 +243,7 @@ function RiskDetailDrawer({
         <Box sx={{ p: 2.5, borderBottom: "1px solid", borderColor: "divider" }}>
           <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1 }}>
             <Box sx={{ flex: 1, mr: 1 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
                 <Chip label={lv.toUpperCase().replace("_", "-")} size="small"
                   sx={{ bgcolor: `${LEVEL_COLOR[lv] || "#888"}25`, color: LEVEL_COLOR[lv] || "#888",
                     fontWeight: 700, fontSize: 10 }} />
@@ -212,6 +256,33 @@ function RiskDetailDrawer({
               <Typography sx={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{risk.title}</Typography>
             </Box>
             <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+          </Box>
+          {/* Status change */}
+          <Box sx={{ mb: 1 }}>
+            <FormControl size="small" disabled={statusUpdating}>
+              <Select
+                value={risk.status || "identified"}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                sx={{
+                  fontSize: 11, height: 28,
+                  color: STATUS_COLOR[risk.status || "identified"] || "#888",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: `${STATUS_COLOR[risk.status || "identified"] || "#888"}60`,
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: STATUS_COLOR[risk.status || "identified"] || "#888",
+                  },
+                }}>
+                {RISK_STATUSES.map((s) => (
+                  <MenuItem key={s.value} value={s.value} sx={{ fontSize: 12 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: s.color, flexShrink: 0 }} />
+                      {s.label}
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Tooltip title="Re-evaluate with updated measures">
@@ -276,6 +347,45 @@ function RiskDetailDrawer({
                 })}
               </Box>
               <Divider sx={{ mb: 2 }} />
+              {/* Impact Factors */}
+              {(() => {
+                const hasImpactFactors = (risk as any).data_impact || (risk as any).operational_impact || (risk as any).financial_impact;
+                if (!hasImpactFactors) return null;
+                return (
+                  <>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.secondary",
+                      textTransform: "uppercase", fontSize: 11, letterSpacing: 0.8 }}>
+                      Impact Factors
+                    </Typography>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
+                      {IMPACT_NAMES.map(([key, label]) => {
+                        const val: number = Number((risk as any)[key] ?? wizardData[key] ?? 3);
+                        const impRationale = (aiData.impact_factors as any)?.[`${key}_rationale`] || "";
+                        const color = val <= 1 ? "#34A853" : val === 2 ? "#81C784" : val === 3 ? "#FBBC04" : val === 4 ? "#FF7043" : "#EA4335";
+                        return (
+                          <Box key={key} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1,
+                            border: "1px solid", borderColor: "divider" }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: impRationale ? 0.5 : 0 }}>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                                <Typography variant="caption" sx={{ color: "text.secondary" }}>Impact factor</Typography>
+                              </Box>
+                              <Chip label={`${val}/5`} size="small"
+                                sx={{ fontWeight: 700, bgcolor: `${color}20`, color }} />
+                            </Box>
+                            {impRationale && (
+                              <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+                                {impRationale}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                    <Divider sx={{ mb: 2 }} />
+                  </>
+                );
+              })()}
               <Box sx={{ display: "flex", gap: 2 }}>
                 <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 24, color: LEVEL_COLOR[lv] || "#ff9800" }}>{score}</Typography>
@@ -283,9 +393,9 @@ function RiskDetailDrawer({
                 </Box>
                 <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 18 }}>
-                    {(risk as any).consequence || wizardData.consequence || "—"}/5
+                    {(risk as any).impact_avg?.toFixed(1) || (risk as any).consequence || wizardData.consequence || "—"}/5
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary" }}>Consequence</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>Impact Avg</Typography>
                 </Box>
                 <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 14, mt: 0.5, textTransform: "capitalize" }}>
@@ -426,6 +536,37 @@ function RiskDetailDrawer({
             </Box>
           </Box>
 
+          {/* Impact factor sliders */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Impact Factors
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+              Adjust impact scores before re-assessing. AI will factor these in.
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {IMPACT_NAMES.map(([key, label]) => {
+                const currentVal = reevalWizard[key] ?? 3;
+                const color = currentVal <= 1 ? "#34A853" : currentVal === 2 ? "#81C784" : currentVal === 3 ? "#FBBC04" : currentVal === 4 ? "#FF7043" : "#EA4335";
+                return (
+                  <Box key={key} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                      <Chip label={`${currentVal}/5`} size="small"
+                        sx={{ fontWeight: 700, bgcolor: `${color}20`, color }} />
+                    </Box>
+                    <Box sx={{ px: 1 }}>
+                      <Slider size="small" value={currentVal} min={1} max={5} step={1}
+                        marks={[1,2,3,4,5].map((v) => ({ value: v, label: String(v) }))}
+                        onChange={(_, v) => setReevalWizard((prev: any) => ({ ...prev, [key]: v as number }))}
+                        sx={{ color }} />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
           {/* Measures checklist */}
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
@@ -519,7 +660,7 @@ export default function Risks() {
       const lv = lvOf(r);
       const simpleLevel = lv.replace("medium_high", "medium");
       if (simpleLevel in out) out[simpleLevel]++;
-      if (r.status === "mitigated" || r.status === "closed") mitigated++;
+      if (r.status === "mitigated" || r.status === "closed" || r.status === "no_longer_applicable") mitigated++;
       if (r.risk_score != null) { scoreSum += r.risk_score; scoreCount++; }
       if (r.category) cats[r.category] = (cats[r.category] || 0) + 1;
     }
@@ -538,7 +679,8 @@ export default function Risks() {
   const filtered = useMemo(() => risks.filter((r) => {
     const lv = lvOf(r).replace("medium_high", "medium");
     if (levelFilters.size && !levelFilters.has(lv)) return false;
-    if (statusFilters.size && !statusFilters.has((r.status || "open"))) return false;
+    const rStatus = r.status === "open" ? "identified" : (r.status || "identified");
+    if (statusFilters.size && !statusFilters.has(rStatus)) return false;
     if (categoryFilters.size && !categoryFilters.has(r.category || "")) return false;
     return true;
   }), [risks, levelFilters, statusFilters, categoryFilters]);
@@ -726,14 +868,14 @@ export default function Risks() {
               ))}
               <Box sx={{ width: 1, height: 18, bgcolor: "rgba(255,255,255,0.1)", mx: 1 }} />
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 1 }}>STATUS</Typography>
-              {["open","mitigated","accepted","closed"].map((s) => (
-                <Chip key={s} size="small" label={s.charAt(0).toUpperCase() + s.slice(1)}
-                  onClick={() => toggle(statusFilters, setStatusFilters, s)}
+              {RISK_STATUSES.map((s) => (
+                <Chip key={s.value} size="small" label={s.label}
+                  onClick={() => toggle(statusFilters, setStatusFilters, s.value)}
                   sx={{ cursor: "pointer",
-                    bgcolor: statusFilters.has(s) ? `${STATUS_COLOR[s]}25` : "rgba(255,255,255,0.04)",
-                    color: statusFilters.has(s) ? STATUS_COLOR[s] : "text.secondary",
-                    border: statusFilters.has(s) ? `1px solid ${STATUS_COLOR[s]}` : "1px solid transparent",
-                    fontWeight: statusFilters.has(s) ? 700 : 400 }} />
+                    bgcolor: statusFilters.has(s.value) ? `${s.color}25` : "rgba(255,255,255,0.04)",
+                    color: statusFilters.has(s.value) ? s.color : "text.secondary",
+                    border: statusFilters.has(s.value) ? `1px solid ${s.color}` : "1px solid transparent",
+                    fontWeight: statusFilters.has(s.value) ? 700 : 400 }} />
               ))}
               {(levelFilters.size + statusFilters.size + categoryFilters.size > 0) && (
                 <Button size="small" sx={{ ml: 1, color: "text.secondary", fontSize: 11 }}
@@ -803,9 +945,15 @@ export default function Risks() {
                           {(r as any).treatment_option || "—"}
                         </TableCell>
                         <TableCell>
-                          <Chip label={r.status || "open"} size="small"
-                            sx={{ bgcolor: `${STATUS_COLOR[r.status || "open"] || "#888"}25`,
-                              color: STATUS_COLOR[r.status || "open"] || "#888", fontSize: 10, height: 18 }} />
+                          {(() => {
+                            const st = r.status || "identified";
+                            const stColor = STATUS_COLOR[st] || "#888";
+                            const stLabel = STATUS_LABEL[st] || st;
+                            return (
+                              <Chip label={stLabel} size="small"
+                                sx={{ bgcolor: `${stColor}25`, color: stColor, fontSize: 10, height: 18 }} />
+                            );
+                          })()}
                         </TableCell>
                         <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{fromNow(r.created_at)}</TableCell>
                       </TableRow>

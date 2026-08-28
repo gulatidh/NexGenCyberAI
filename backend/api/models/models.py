@@ -410,12 +410,17 @@ class Risk(Base):
     authentication_score = Column(Integer, nullable=True)    # 1-5 (5=no auth, 1=strong MFA)
     repeatability = Column(Integer, nullable=True)           # 1-5
     likelihood_avg = Column(Float, nullable=True)            # avg of 5 factors (1-5)
-    consequence = Column(Integer, nullable=True)             # 1-5
-    risk_matrix_score = Column(Integer, nullable=True)       # 1-25 (consequence × likelihood_avg)
+    consequence = Column(Integer, nullable=True)             # 1-5 (kept for backward compat, = round(impact_avg))
+    # Impact factor breakdown
+    data_impact = Column(Integer, nullable=True)             # 1-5
+    operational_impact = Column(Integer, nullable=True)      # 1-5
+    financial_impact = Column(Integer, nullable=True)        # 1-5
+    impact_avg = Column(Float, nullable=True)                # avg of 3 impact factors (1-5)
+    risk_matrix_score = Column(Integer, nullable=True)       # 1-25 (likelihood_avg × impact_avg)
     residual_risk_level = Column(String(50), nullable=True)  # low/medium/medium_high/high/critical
     treatment_option = Column(String(50), nullable=True)     # avoid | mitigate | transfer | accept
     proposal_id = Column(String(36), nullable=True)          # source RiskProposal.id
-    wizard_data_json = Column(Text, nullable=True)           # JSON: all 8 wizard step values
+    wizard_data_json = Column(Text, nullable=True)           # JSON: all wizard step values
     measures_json = Column(Text, nullable=True)              # JSON: security measures checklist
     ai_assessment_json = Column(Text, nullable=True)         # JSON: latest AI assessment
 

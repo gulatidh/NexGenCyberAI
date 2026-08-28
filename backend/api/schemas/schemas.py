@@ -232,6 +232,11 @@ class RiskResponse(BaseModel):
     repeatability: Optional[int] = None
     likelihood_avg: Optional[float] = None
     consequence: Optional[int] = None
+    # Impact factor breakdown
+    data_impact: Optional[int] = None
+    operational_impact: Optional[int] = None
+    financial_impact: Optional[int] = None
+    impact_avg: Optional[float] = None
     risk_matrix_score: Optional[int] = None
     residual_risk_level: Optional[str] = None
     treatment_option: Optional[str] = None
