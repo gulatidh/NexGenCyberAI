@@ -144,6 +144,8 @@ class FrameworkType(str, enum.Enum):
     GCC_IM8 = "gcc_im8"
     # NIST AI frameworks
     NIST_AI_RMF = "nist_ai_rmf"
+    NIST_AI_200_1 = "nist_ai_200_1"
+    NIST_AI_200_2 = "nist_ai_200_2"
     # ZAP — DAST baselines. Each control == one ZAP plugin rule (control_id "ZAP-<pluginId>").
     ZAP_UNAUTH_PASSIVE = "zap_unauth_passive"   # baseline profile, no auth
     ZAP_AUTH_ACTIVE = "zap_auth_active"         # active profile, with auth

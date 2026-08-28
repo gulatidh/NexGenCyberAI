@@ -56,6 +56,8 @@ _FRAMEWORK_NAMES = {
     "gcc_im8": "GCC IM8 Reform 2025 (Singapore)",
     # NIST AI
     "nist_ai_rmf": "NIST AI RMF 1.0 (AI 100-1)",
+    "nist_ai_200_1": "NIST AI 200-1 — AI Use Taxonomy",
+    "nist_ai_200_2": "NIST AI 200-2 — TEVV Framework",
 }
 
 
