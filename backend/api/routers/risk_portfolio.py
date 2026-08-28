@@ -44,14 +44,21 @@ BASE_PER_SEV = {
 # remediation status. Open/accepted carry full exposure; transferred carries
 # only residual risk; remediated/closed carry none.
 STATUS_FACTOR = {
+    # New status vocabulary
+    "identified":            1.00,
+    "under_assessment":      0.75,
+    "treatment_planned":     0.50,
+    "accepted":              1.00,
+    "transferred":           0.20,
+    "closed":                0.00,
+    "no_longer_applicable":  0.00,
+    "escalated":             1.00,
+    # Legacy vocabulary
     "open":                  1.00,
     "in_progress":           0.75,
     "compensating_control":  0.50,
-    "accepted":              1.00,
-    "transferred":           0.20,
     "remediated":            0.00,
-    "mitigated":             0.00,  # legacy synonym
-    "closed":                0.00,
+    "mitigated":             0.00,
 }
 
 # Canonical risk domains — we normalise risk.category onto this set so the
@@ -118,11 +125,13 @@ async def get_risk_portfolio(
     open_high = 0
     by_domain_exposure: Dict[str, float] = defaultdict(float)
     by_domain_count: Dict[str, int] = defaultdict(int)
+    by_domain_severity: Dict[str, Dict[str, int]] = defaultdict(lambda: {"critical": 0, "high": 0, "medium": 0, "low": 0})
     rows: List[Dict[str, Any]] = []
 
     # Frequency aggregator for breach probability — sum of likelihood-derived
     # event rates over open critical+high risks.
     annual_event_rate = 0.0
+    _open_statuses = {"open", "in_progress", "accepted", "identified", "under_assessment", "escalated"}
 
     for r in risks:
         lv = _lvl(r)
@@ -136,8 +145,9 @@ async def get_risk_portfolio(
         net_exposure += net_ale
         by_domain_exposure[domain] += net_ale
         by_domain_count[domain] += 1
+        by_domain_severity[domain][lv if lv in ("critical", "high", "medium", "low") else "low"] += 1
 
-        if status in ("open", "in_progress", "accepted") and lv in ("critical", "high"):
+        if status in _open_statuses and lv in ("critical", "high"):
             open_critical_high += 1
             if lv == "critical": open_critical += 1
             else:                open_high += 1
@@ -165,6 +175,12 @@ async def get_risk_portfolio(
             "owner": r.owner,
             "due_date": r.due_date.isoformat() if r.due_date else None,
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            # New fields for improved UI
+            "likelihood_avg": round(float(getattr(r, "likelihood_avg", None) or r.likelihood or 5), 2),
+            "impact_avg": round(float(getattr(r, "impact_avg", None) or r.impact or 5), 2),
+            "risk_matrix_score": int(getattr(r, "risk_matrix_score", None) or 0),
+            "treatment_option": getattr(r, "treatment_option", None) or "",
+            "status_label": _status(r).replace("_", " ").title(),
         })
 
     # 30-day breach probability — Poisson tail: P(>=1 event in 30 days)
@@ -183,6 +199,7 @@ async def get_risk_portfolio(
                 "domain": d,
                 "exposure": round(by_domain_exposure[d], 2),
                 "count": by_domain_count[d],
+                "severity_counts": dict(by_domain_severity[d]),
             }
             for d in by_domain_exposure
         ],
