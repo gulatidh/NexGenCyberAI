@@ -459,7 +459,13 @@ async def ai_draft_proposal(
         "overall_commentary": f"This risk requires assessment and appropriate controls. Score: medium.",
     }
 
-    return _call_llm_for_assessment(prompt, fallback)
+    result = _call_llm_for_assessment(prompt, fallback)
+
+    # Persist draft so re-opening the wizard restores the last AI result
+    p.ai_draft_json = json.dumps(result)
+    db.commit()
+
+    return result
 
 
 @router.post("/{proposal_id}/reevaluate")
@@ -502,7 +508,19 @@ async def reevaluate_proposal(
         "overall_commentary": "Re-assessment complete. Review implemented controls for effectiveness.",
     }
 
-    return _call_llm_for_assessment(prompt, fallback)
+    result = _call_llm_for_assessment(prompt, fallback)
+
+    # Persist the re-assessed result and measures back to the proposal
+    p.ai_draft_json = json.dumps(result)
+    # Merge measure statuses into result measures list
+    status_map = {m.id: m.status for m in payload.measures}
+    if result.get("measures"):
+        for m in result["measures"]:
+            if m.get("id") in status_map:
+                m["status"] = status_map[m["id"]]
+    db.commit()
+
+    return result
 
 
 @router.post("/{proposal_id}/evaluate")

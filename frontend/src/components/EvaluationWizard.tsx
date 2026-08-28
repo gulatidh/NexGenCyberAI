@@ -388,7 +388,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
     setForm((f) => ({ ...f, [key]: val }));
   }, []);
 
-  // Auto-run AI draft when wizard opens
+  // Auto-run AI draft when wizard opens (or restore saved draft)
   useEffect(() => {
     if (open && proposal && clientId) {
       setStep(0);
@@ -404,7 +404,22 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         risk_area: proposal.category || "",
         risk_type_gcim8: proposal.risk_type || "Security",
       });
-      // Immediately run AI draft
+
+      // If a saved draft exists (from a previous AI run or re-assess), restore it
+      // without calling the LLM again — saves time and cost.
+      if (proposal.ai_draft_json) {
+        try {
+          const saved = JSON.parse(proposal.ai_draft_json);
+          _applyAiResult(saved);
+          setAiAssessment(saved);
+          setSnackMsg("Restored previous AI assessment — adjust steps or Re-assess with AI.");
+          return;
+        } catch {
+          // fall through to fresh AI call
+        }
+      }
+
+      // No saved draft — call AI fresh
       setAiLoading(true);
       riskProposalsApi.aiDraft(clientId, proposal.id)
         .then((result: any) => {

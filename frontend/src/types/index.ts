@@ -182,6 +182,7 @@ export interface RiskProposal {
   evaluated_at?: string;
   risk_id?: string;
   notes?: string;
+  ai_draft_json?: string;
   created_at: string;
   updated_at?: string;
 }
