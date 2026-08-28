@@ -222,6 +222,23 @@ class RiskResponse(BaseModel):
     status: str
     mitigation_plan: Optional[str]
     created_at: Optional[datetime]
+    # GCC IM8 structured assessment fields
+    risk_area: Optional[str] = None
+    risk_type_gcim8: Optional[str] = None
+    accessibility: Optional[int] = None
+    discoverability: Optional[int] = None
+    exploitability: Optional[int] = None
+    authentication_score: Optional[int] = None
+    repeatability: Optional[int] = None
+    likelihood_avg: Optional[float] = None
+    consequence: Optional[int] = None
+    risk_matrix_score: Optional[int] = None
+    residual_risk_level: Optional[str] = None
+    treatment_option: Optional[str] = None
+    proposal_id: Optional[str] = None
+    wizard_data_json: Optional[str] = None
+    measures_json: Optional[str] = None
+    ai_assessment_json: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

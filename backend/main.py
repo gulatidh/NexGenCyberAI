@@ -598,6 +598,9 @@ def _ensure_added_columns() -> None:
             ("residual_risk_level",  "NVARCHAR(50) NULL",    "VARCHAR(50)"),
             ("treatment_option",     "NVARCHAR(50) NULL",    "VARCHAR(50)"),
             ("proposal_id",          "NVARCHAR(36) NULL",    "VARCHAR(36)"),
+            ("wizard_data_json",     "NVARCHAR(MAX) NULL",   "TEXT"),
+            ("measures_json",        "NVARCHAR(MAX) NULL",   "TEXT"),
+            ("ai_assessment_json",   "NVARCHAR(MAX) NULL",   "TEXT"),
         ]
         for col, mssql_type, sqlite_type in _risk_additions:
             if risk_cols and col not in risk_cols:

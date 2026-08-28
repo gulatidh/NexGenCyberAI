@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Box, Typography, Button, TextField, Select, MenuItem,
   FormControl, InputLabel, Slider, Radio, RadioGroup,
   FormControlLabel, FormLabel, Chip, CircularProgress,
-  Accordion, AccordionSummary, AccordionDetails, Alert,
-  LinearProgress, Grid,
+  Alert, LinearProgress, Grid, ToggleButton, ToggleButtonGroup,
+  Snackbar, Paper,
 } from "@mui/material";
-import { ExpandMore, AutoAwesome } from "@mui/icons-material";
+import { AutoAwesome, CheckCircle, Cancel, Schedule, Replay } from "@mui/icons-material";
 import { useActiveClient } from "../contexts/ClientContext";
 import { riskProposalsApi } from "../services/api";
 import { RiskProposal } from "../types";
@@ -26,8 +26,6 @@ const RISK_AREAS_PROJECT = [
   "Schedule Delay", "Resource / Budget Overrun", "Scope Creep",
   "Technology / Integration Risk", "Data Governance",
 ];
-
-const ALL_RISK_AREAS = [...RISK_AREAS_SECURITY, ...RISK_AREAS_PROJECT];
 
 const FACTOR_LABELS: Record<string, string[]> = {
   accessibility: [
@@ -75,11 +73,8 @@ const FACTOR_LABELS: Record<string, string[]> = {
 };
 
 const MATRIX_COLOURS: Record<string, string> = {
-  low: "#2e7d32",
-  medium: "#f57c00",
-  medium_high: "#e65100",
-  high: "#b71c1c",
-  critical: "#4a0000",
+  low: "#2e7d32", medium: "#f57c00", medium_high: "#e65100",
+  high: "#b71c1c", critical: "#4a0000",
 };
 
 function matrixLabel(score: number): string {
@@ -95,19 +90,17 @@ function matrixLabelDisplay(score: number): string {
   return l === "medium_high" ? "MEDIUM-HIGH" : l.toUpperCase();
 }
 
-// ── Risk Matrix 5×5 ──────────────────────────────────────────────────────────
+// ── Risk Matrix ──────────────────────────────────────────────────────────────
 
 function RiskMatrix({ consequence, likelihood }: { consequence: number; likelihood: number }) {
   const likelihoodCol = Math.max(1, Math.min(5, Math.round(likelihood)));
   const consequenceRow = Math.max(1, Math.min(5, consequence));
-
   return (
     <Box>
       <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>
         5×5 Risk Matrix — GCC IM8
       </Typography>
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
-        {/* Y-axis label */}
         <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", mr: 0.5 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 9, writingMode: "vertical-rl",
             transform: "rotate(180deg)", whiteSpace: "nowrap", lineHeight: 1 }}>
@@ -115,24 +108,20 @@ function RiskMatrix({ consequence, likelihood }: { consequence: number; likeliho
           </Typography>
         </Box>
         <Box>
-          {/* Header row */}
           <Box sx={{ display: "flex", mb: 0.5 }}>
             <Box sx={{ width: 32 }} />
-            {[1, 2, 3, 4, 5].map((c) => (
+            {[1,2,3,4,5].map((c) => (
               <Typography key={c} variant="caption"
-                sx={{ width: 40, textAlign: "center", color: "text.secondary", fontSize: 10 }}>
-                {c}
-              </Typography>
+                sx={{ width: 40, textAlign: "center", color: "text.secondary", fontSize: 10 }}>{c}</Typography>
             ))}
           </Box>
-          {/* Grid rows (consequence descending) */}
-          {[5, 4, 3, 2, 1].map((cons) => (
+          {[5,4,3,2,1].map((cons) => (
             <Box key={cons} sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
               <Typography variant="caption"
                 sx={{ width: 32, textAlign: "right", pr: 0.5, color: "text.secondary", fontSize: 10 }}>
                 {cons}
               </Typography>
-              {[1, 2, 3, 4, 5].map((lik) => {
+              {[1,2,3,4,5].map((lik) => {
                 const score = cons * lik;
                 const label = matrixLabel(score);
                 const isActive = cons === consequenceRow && lik === likelihoodCol;
@@ -142,26 +131,19 @@ function RiskMatrix({ consequence, likelihood }: { consequence: number; likeliho
                     bgcolor: isActive ? MATRIX_COLOURS[label] : "rgba(255,255,255,0.06)",
                     border: isActive ? "2px solid white" : "1px solid rgba(255,255,255,0.08)",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    borderRadius: 0.5,
-                    transition: "all 0.2s",
-                    mr: 0.5,
+                    borderRadius: 0.5, transition: "all 0.2s", mr: 0.5,
                   }}>
                     <Typography variant="caption" sx={{
                       fontSize: 9, fontWeight: isActive ? 800 : 400,
                       color: isActive ? "white" : "text.disabled",
-                    }}>
-                      {score}
-                    </Typography>
+                    }}>{score}</Typography>
                   </Box>
                 );
               })}
             </Box>
           ))}
-          {/* X-axis label */}
           <Box sx={{ display: "flex", pl: 4 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 9 }}>
-              Likelihood →
-            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 9 }}>Likelihood →</Typography>
           </Box>
         </Box>
       </Box>
@@ -172,10 +154,10 @@ function RiskMatrix({ consequence, likelihood }: { consequence: number; likeliho
 // ── Factor Slider Step ────────────────────────────────────────────────────────
 
 function FactorStep({
-  factor, label, description, value, onChange,
+  factor, label, description, value, onChange, rationale,
 }: {
   factor: string; label: string; description: string;
-  value: number; onChange: (v: number) => void;
+  value: number; onChange: (v: number) => void; rationale?: string;
 }) {
   const labels = FACTOR_LABELS[factor] || [];
   return (
@@ -183,19 +165,149 @@ function FactorStep({
       <Typography variant="h6" sx={{ mb: 1, fontWeight: 700 }}>{label}</Typography>
       <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>{description}</Typography>
       <Box sx={{ px: 2 }}>
-        <Slider
-          value={value}
-          min={1} max={5} step={1}
+        <Slider value={value} min={1} max={5} step={1}
           marks={[1,2,3,4,5].map((v) => ({ value: v, label: String(v) }))}
           onChange={(_, v) => onChange(v as number)}
-          sx={{ "& .MuiSlider-mark": { bgcolor: "divider" } }}
-        />
+          sx={{ "& .MuiSlider-mark": { bgcolor: "divider" } }} />
       </Box>
       <Box sx={{ mt: 2, p: 2, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1,
         borderLeft: "3px solid", borderColor: "primary.main" }}>
         <Typography variant="body2" sx={{ fontWeight: 600 }}>
           Level {value}: {labels[value - 1] || `Score ${value}/5`}
         </Typography>
+      </Box>
+      {rationale && (
+        <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1,
+          borderLeft: "3px solid", borderColor: "#4285F4" }}>
+          <Typography variant="caption" sx={{ color: "#90CAF9", fontStyle: "italic", display: "flex", alignItems: "flex-start", gap: 0.5 }}>
+            <AutoAwesome sx={{ fontSize: 13, mt: 0.1, flexShrink: 0 }} />
+            AI rationale: {rationale}
+          </Typography>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+// ── Measure item type ─────────────────────────────────────────────────────────
+
+interface MeasureItem {
+  id: string;
+  text: string;
+  category?: string;
+  status: "pending" | "in_place" | "not_possible";
+}
+
+interface WorkaroundMap {
+  [measureId: string]: string;
+}
+
+// ── Measures Step ─────────────────────────────────────────────────────────────
+
+function MeasuresStep({
+  measures, onMeasureChange, workarounds, onReassess, reassessing,
+}: {
+  measures: MeasureItem[];
+  onMeasureChange: (id: string, status: "pending" | "in_place" | "not_possible") => void;
+  workarounds: WorkaroundMap;
+  onReassess: () => void;
+  reassessing: boolean;
+}) {
+  const STATUS_CONFIG = {
+    pending:      { label: "Pending",      icon: <Schedule sx={{ fontSize: 14 }} />,      color: "#9E9E9E" },
+    in_place:     { label: "In Place",     icon: <CheckCircle sx={{ fontSize: 14 }} />,   color: "#4CAF50" },
+    not_possible: { label: "Not Possible", icon: <Cancel sx={{ fontSize: 14 }} />,        color: "#F44336" },
+  };
+
+  return (
+    <Box>
+      <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Security Measures</Typography>
+      <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
+        Mark each AI-recommended control as <strong>In Place</strong> (already implemented),{" "}
+        <strong>Not Possible</strong> (cannot implement — AI will suggest workarounds), or{" "}
+        <strong>Pending</strong> (planned).
+      </Typography>
+
+      {measures.length === 0 ? (
+        <Alert severity="info">No measures generated yet. Go back to trigger the AI assessment.</Alert>
+      ) : (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {measures.map((m) => {
+            const cfg = STATUS_CONFIG[m.status];
+            const wa = workarounds[m.id];
+            return (
+              <Paper key={m.id} variant="outlined" sx={{
+                p: 2, borderRadius: 1.5,
+                borderColor: m.status === "in_place" ? "rgba(76,175,80,0.4)"
+                  : m.status === "not_possible" ? "rgba(244,67,54,0.4)"
+                  : "divider",
+              }}>
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
+                  <Box sx={{ flex: 1, minWidth: 200 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                      {m.category && (
+                        <Chip label={m.category} size="small"
+                          sx={{ height: 16, fontSize: 9, bgcolor: "rgba(255,255,255,0.07)" }} />
+                      )}
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>
+                        {m.id}
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{m.text}</Typography>
+                    {m.status === "not_possible" && !wa && (
+                      <Typography variant="caption" sx={{ color: "#FFC107", mt: 0.5, display: "block" }}>
+                        Click "Re-assess with AI" below — AI will suggest a workaround for this.
+                      </Typography>
+                    )}
+                    {wa && (
+                      <Box sx={{ mt: 1, p: 1, bgcolor: "rgba(255,152,0,0.08)", borderRadius: 1,
+                        border: "1px solid rgba(255,152,0,0.25)" }}>
+                        <Typography variant="caption" sx={{ color: "#FFB74D", display: "flex", alignItems: "flex-start", gap: 0.5 }}>
+                          <AutoAwesome sx={{ fontSize: 12, mt: 0.1, flexShrink: 0 }} />
+                          Workaround: {wa}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={m.status}
+                    onChange={(_, val) => { if (val) onMeasureChange(m.id, val); }}
+                    sx={{ flexShrink: 0 }}>
+                    {(["pending", "in_place", "not_possible"] as const).map((s) => {
+                      const c = STATUS_CONFIG[s];
+                      return (
+                        <ToggleButton key={s} value={s}
+                          sx={{
+                            fontSize: 10, py: 0.4, px: 1,
+                            "&.Mui-selected": { bgcolor: `${c.color}20`, color: c.color, borderColor: `${c.color}60` },
+                          }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+                            {c.icon}
+                            <span>{c.label}</span>
+                          </Box>
+                        </ToggleButton>
+                      );
+                    })}
+                  </ToggleButtonGroup>
+                </Box>
+              </Paper>
+            );
+          })}
+        </Box>
+      )}
+
+      <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}>
+        <Button
+          variant="outlined"
+          startIcon={reassessing ? <CircularProgress size={16} /> : <Replay />}
+          onClick={onReassess}
+          disabled={reassessing || measures.length === 0}
+          sx={{ borderColor: "#7C3AED", color: "#7C3AED",
+            "&:hover": { borderColor: "#6d35d9", bgcolor: "rgba(124,58,237,0.06)" } }}>
+          {reassessing ? "Re-assessing…" : "Re-assess with AI"}
+        </Button>
       </Box>
     </Box>
   );
@@ -211,6 +323,7 @@ const STEPS = [
   "Authentication",
   "Repeatability",
   "Consequence",
+  "Security Measures",
   "Review & Treatment",
 ];
 
@@ -239,6 +352,15 @@ const DEFAULT_FORM: FormData = {
   treatment_option: "mitigate", owner: "", assignee_email: "", due_date: "", mitigation_plan: "",
 };
 
+interface Rationales {
+  accessibility?: string;
+  discoverability?: string;
+  exploitability?: string;
+  authentication?: string;
+  repeatability?: string;
+  consequence?: string;
+}
+
 // ── Wizard ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -252,17 +374,29 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
   const { clientId } = useActiveClient();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(DEFAULT_FORM);
-  const [aiResult, setAiResult] = useState<any>(null);
+  const [rationales, setRationales] = useState<Rationales>({});
+  const [measures, setMeasures] = useState<MeasureItem[]>([]);
+  const [workarounds, setWorkarounds] = useState<WorkaroundMap>({});
+  const [aiAssessment, setAiAssessment] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [reassessing, setReassessing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [snackMsg, setSnackMsg] = useState("");
 
-  // Populate form from proposal when it opens
-  React.useEffect(() => {
-    if (open && proposal) {
+  const set = useCallback(<K extends keyof FormData>(key: K, val: FormData[K]) => {
+    setForm((f) => ({ ...f, [key]: val }));
+  }, []);
+
+  // Auto-run AI draft when wizard opens
+  useEffect(() => {
+    if (open && proposal && clientId) {
       setStep(0);
-      setAiResult(null);
       setError("");
+      setMeasures([]);
+      setWorkarounds({});
+      setAiAssessment(null);
+      setRationales({});
       setForm({
         ...DEFAULT_FORM,
         title: proposal.title || "",
@@ -270,60 +404,113 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         risk_area: proposal.category || "",
         risk_type_gcim8: proposal.risk_type || "Security",
       });
+      // Immediately run AI draft
+      setAiLoading(true);
+      riskProposalsApi.aiDraft(clientId, proposal.id)
+        .then((result: any) => {
+          _applyAiResult(result);
+          setAiAssessment(result);
+          setSnackMsg("AI pre-fill complete — all steps populated from risk description.");
+        })
+        .catch(() => {
+          // silently fall through — user can still fill manually
+        })
+        .finally(() => setAiLoading(false));
     }
-  }, [open, proposal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, proposal?.id]);
 
-  const set = useCallback(<K extends keyof FormData>(key: K, val: FormData[K]) => {
-    setForm((f) => ({ ...f, [key]: val }));
-  }, []);
+  const _applyAiResult = (result: any) => {
+    const bi = result.basic_info || {};
+    const lf = result.likelihood_factors || {};
 
-  const likelihood_avg = parseFloat(
-    ((form.accessibility + form.discoverability + form.exploitability +
-      form.authentication_score + form.repeatability) / 5
-    ).toFixed(2)
-  );
-  const matrix_score = Math.round(form.consequence * likelihood_avg);
-  const risk_label = matrixLabel(matrix_score);
-  const risk_display = matrixLabelDisplay(matrix_score);
+    setForm((f) => ({
+      ...f,
+      description: bi.scenario || f.description,
+      risk_area: bi.risk_area || f.risk_area,
+      risk_type_gcim8: bi.risk_type || f.risk_type_gcim8,
+      accessibility: lf.accessibility || f.accessibility,
+      discoverability: lf.discoverability || f.discoverability,
+      exploitability: lf.exploitability || f.exploitability,
+      authentication_score: lf.authentication || f.authentication_score,
+      repeatability: lf.repeatability || f.repeatability,
+      consequence: result.consequence || f.consequence,
+      treatment_option: (result.treatment || f.treatment_option).toLowerCase(),
+    }));
 
-  const handleAiAssess = async () => {
-    if (!clientId) return;
-    setAiLoading(true);
+    setRationales({
+      accessibility: lf.accessibility_rationale,
+      discoverability: lf.discoverability_rationale,
+      exploitability: lf.exploitability_rationale,
+      authentication: lf.authentication_rationale,
+      repeatability: lf.repeatability_rationale,
+      consequence: result.consequence_rationale,
+    });
+
+    if (result.measures?.length) {
+      setMeasures(result.measures.map((m: any) => ({ ...m, status: "pending" as const })));
+    }
+
+    if (result.workarounds?.length) {
+      const wmap: WorkaroundMap = {};
+      for (const w of result.workarounds) {
+        wmap[w.measure_id] = w.alternative;
+      }
+      setWorkarounds(wmap);
+    }
+  };
+
+  const handleReassess = async () => {
+    if (!clientId || !proposal) return;
+    setReassessing(true);
     try {
-      const result = await riskProposalsApi.analyse(clientId, {
-        title: form.title,
-        description: form.description,
-        category: form.risk_area,
-        risk_type: form.risk_type_gcim8,
+      const wizardData = {
         accessibility: form.accessibility,
         discoverability: form.discoverability,
         exploitability: form.exploitability,
         authentication_score: form.authentication_score,
         repeatability: form.repeatability,
         consequence: form.consequence,
-      });
-      setAiResult(result);
-      if (result.recommended_treatment) {
-        const t = result.recommended_treatment.split(" ")[0].toLowerCase();
-        if (["avoid","mitigate","transfer","accept"].includes(t)) {
-          set("treatment_option", t);
-        }
-      }
-      if (result.mitigation_steps?.length && !form.mitigation_plan) {
-        set("mitigation_plan", result.mitigation_steps.join("\n"));
-      }
+        treatment_option: form.treatment_option,
+      };
+      const result = await riskProposalsApi.reevaluate(clientId, proposal.id, wizardData, measures);
+      _applyAiResult(result);
+      setAiAssessment(result);
+      setSnackMsg("AI has updated assessment based on your inputs.");
     } catch {
-      // ignore
+      setError("Re-assessment failed. Please try again.");
     } finally {
-      setAiLoading(false);
+      setReassessing(false);
     }
   };
+
+  const handleMeasureChange = (id: string, status: "pending" | "in_place" | "not_possible") => {
+    setMeasures((prev) => prev.map((m) => m.id === id ? { ...m, status } : m));
+  };
+
+  const likelihood_avg = parseFloat(
+    ((form.accessibility + form.discoverability + form.exploitability +
+      form.authentication_score + form.repeatability) / 5).toFixed(2)
+  );
+  const matrix_score = Math.round(form.consequence * likelihood_avg);
+  const risk_label = matrixLabel(matrix_score);
+  const risk_display = matrixLabelDisplay(matrix_score);
 
   const handleSubmit = async () => {
     if (!clientId || !proposal) return;
     setSubmitting(true);
     setError("");
     try {
+      const wizardData = {
+        accessibility: form.accessibility,
+        discoverability: form.discoverability,
+        exploitability: form.exploitability,
+        authentication_score: form.authentication_score,
+        repeatability: form.repeatability,
+        consequence: form.consequence,
+        treatment_option: form.treatment_option,
+        rationales,
+      };
       await riskProposalsApi.evaluate(clientId, proposal.id, {
         title: form.title,
         description: form.description,
@@ -340,6 +527,9 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         owner: form.owner,
         assignee_email: form.assignee_email,
         mitigation_plan: form.mitigation_plan,
+        wizard_data: wizardData,
+        measures,
+        ai_assessment: aiAssessment,
       });
       onEvaluated();
       onClose();
@@ -350,23 +540,34 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
     }
   };
 
-  const isFirstStep = step === 0;
   const isLastStep = step === STEPS.length - 1;
   const canProceed = step === 0 ? !!form.title.trim() : true;
 
   const renderStep = () => {
+    if (aiLoading && step === 0) {
+      return (
+        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 6, gap: 2 }}>
+          <CircularProgress size={40} sx={{ color: "#7C3AED" }} />
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            AI is analysing the risk and pre-filling all 9 steps…
+          </Typography>
+        </Box>
+      );
+    }
+
     switch (step) {
       case 0:
         return (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-            <TextField
-              label="Risk Title *" fullWidth value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-            />
-            <TextField
-              label="Description" fullWidth multiline minRows={3} value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-            />
+            {aiAssessment && (
+              <Alert severity="success" icon={<AutoAwesome />} sx={{ py: 0.5 }}>
+                AI pre-fill complete. Review and adjust any fields — your changes are kept.
+              </Alert>
+            )}
+            <TextField label="Risk Title *" fullWidth value={form.title}
+              onChange={(e) => set("title", e.target.value)} />
+            <TextField label="Scenario / Description" fullWidth multiline minRows={3}
+              value={form.description} onChange={(e) => set("description", e.target.value)} />
             <FormControl fullWidth>
               <InputLabel>Risk Area</InputLabel>
               <Select value={form.risk_area} label="Risk Area"
@@ -394,28 +595,44 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
       case 1:
         return <FactorStep factor="accessibility" label="Accessibility"
           description="How accessible is the system or resource to a potential attacker?"
-          value={form.accessibility} onChange={(v) => set("accessibility", v)} />;
+          value={form.accessibility} onChange={(v) => set("accessibility", v)}
+          rationale={rationales.accessibility} />;
       case 2:
         return <FactorStep factor="discoverability" label="Discoverability"
           description="How easily can an attacker discover this vulnerability or entry point?"
-          value={form.discoverability} onChange={(v) => set("discoverability", v)} />;
+          value={form.discoverability} onChange={(v) => set("discoverability", v)}
+          rationale={rationales.discoverability} />;
       case 3:
         return <FactorStep factor="exploitability" label="Exploitability"
           description="How difficult is it to actually exploit this vulnerability once discovered?"
-          value={form.exploitability} onChange={(v) => set("exploitability", v)} />;
+          value={form.exploitability} onChange={(v) => set("exploitability", v)}
+          rationale={rationales.exploitability} />;
       case 4:
         return <FactorStep factor="authentication_score" label="Authentication"
           description="How strong is the authentication protecting this resource? (5 = no auth, 1 = strong MFA)"
-          value={form.authentication_score} onChange={(v) => set("authentication_score", v)} />;
+          value={form.authentication_score} onChange={(v) => set("authentication_score", v)}
+          rationale={rationales.authentication} />;
       case 5:
         return <FactorStep factor="repeatability" label="Repeatability"
           description="If the vulnerability is exploited, can the attack be repeated reliably?"
-          value={form.repeatability} onChange={(v) => set("repeatability", v)} />;
+          value={form.repeatability} onChange={(v) => set("repeatability", v)}
+          rationale={rationales.repeatability} />;
       case 6:
         return <FactorStep factor="consequence" label="Consequence"
           description="What is the business impact if this risk materialises?"
-          value={form.consequence} onChange={(v) => set("consequence", v)} />;
+          value={form.consequence} onChange={(v) => set("consequence", v)}
+          rationale={rationales.consequence} />;
       case 7:
+        return (
+          <MeasuresStep
+            measures={measures}
+            onMeasureChange={handleMeasureChange}
+            workarounds={workarounds}
+            onReassess={handleReassess}
+            reassessing={reassessing}
+          />
+        );
+      case 8:
         return (
           <Box>
             <Grid container spacing={3}>
@@ -437,6 +654,11 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
                     <Chip label={risk_display} size="small"
                       sx={{ bgcolor: MATRIX_COLOURS[risk_label], color: "white", fontWeight: 700 }} />
                   </Box>
+                  {measures.filter((m) => m.status === "in_place").length > 0 && (
+                    <Chip size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />}
+                      label={`${measures.filter((m) => m.status === "in_place").length} controls in place`}
+                      sx={{ mt: 1, bgcolor: "rgba(76,175,80,0.15)", color: "#4CAF50", fontSize: 10 }} />
+                  )}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, md: 7 }}>
@@ -461,36 +683,14 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
                   <TextField label="Mitigation Plan" fullWidth multiline minRows={3}
                     value={form.mitigation_plan}
                     onChange={(e) => set("mitigation_plan", e.target.value)} />
-                  <Button
-                    variant="outlined" startIcon={aiLoading ? <CircularProgress size={16} /> : <AutoAwesome />}
-                    onClick={handleAiAssess} disabled={aiLoading}
-                    sx={{ alignSelf: "flex-start" }}>
-                    AI Assess
-                  </Button>
-                  {aiResult && (
-                    <Accordion>
-                      <AccordionSummary expandIcon={<ExpandMore />}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>AI Assessment Result</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Typography variant="body2" sx={{ mb: 1 }}>{aiResult.summary}</Typography>
-                        {aiResult.key_controls?.length > 0 && (
-                          <Box sx={{ mb: 1 }}>
-                            <Typography variant="caption" sx={{ color: "text.secondary" }}>Key Controls</Typography>
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
-                              {aiResult.key_controls.map((c: string, i: number) => (
-                                <Chip key={i} label={c} size="small" />
-                              ))}
-                            </Box>
-                          </Box>
-                        )}
-                        {aiResult.residual_risk_after_controls && (
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Residual: {aiResult.residual_risk_after_controls}
-                          </Typography>
-                        )}
-                      </AccordionDetails>
-                    </Accordion>
+                  {aiAssessment?.overall_commentary && (
+                    <Box sx={{ p: 1.5, bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1,
+                      border: "1px solid rgba(66,133,244,0.2)" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", display: "flex", gap: 0.5 }}>
+                        <AutoAwesome sx={{ fontSize: 13, mt: 0.1 }} />
+                        {aiAssessment.overall_commentary}
+                      </Typography>
+                    </Box>
                   )}
                 </Box>
               </Grid>
@@ -503,53 +703,53 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md"
-      slotProps={{ paper: { sx: { minHeight: 520 } } }}>
-      <DialogTitle sx={{ pb: 0 }}>
-        <Typography variant="overline" sx={{ color: "text.secondary" }}>
-          Step {step + 1} of {STEPS.length}
-        </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
-          {STEPS[step]}
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={((step + 1) / STEPS.length) * 100}
-          sx={{ mt: 1.5, height: 3, borderRadius: 2 }}
-        />
-      </DialogTitle>
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md"
+        slotProps={{ paper: { sx: { minHeight: 560 } } }}>
+        <DialogTitle sx={{ pb: 0 }}>
+          <Typography variant="overline" sx={{ color: "text.secondary" }}>
+            Step {step + 1} of {STEPS.length}
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+            {STEPS[step]}
+          </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={((step + 1) / STEPS.length) * 100}
+            sx={{ mt: 1.5, height: 3, borderRadius: 2 }} />
+        </DialogTitle>
 
-      <DialogContent sx={{ pt: 3 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {renderStep()}
-      </DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {renderStep()}
+        </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button onClick={onClose} variant="text">Cancel</Button>
-          {!isFirstStep && (
-            <Button onClick={() => setStep((s) => s - 1)} variant="outlined">Back</Button>
-          )}
-        </Box>
-        <Box>
-          {!isLastStep ? (
-            <Button
-              variant="contained"
-              onClick={() => setStep((s) => s + 1)}
-              disabled={!canProceed}>
-              Next
-            </Button>
-          ) : (
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={submitting}
-              startIcon={submitting ? <CircularProgress size={16} /> : undefined}>
-              Submit to Risk Register
-            </Button>
-          )}
-        </Box>
-      </DialogActions>
-    </Dialog>
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
+            <Button onClick={onClose} variant="text">Cancel</Button>
+            {step > 0 && (
+              <Button onClick={() => setStep((s) => s - 1)} variant="outlined">Back</Button>
+            )}
+          </Box>
+          <Box>
+            {!isLastStep ? (
+              <Button variant="contained" onClick={() => setStep((s) => s + 1)}
+                disabled={!canProceed || aiLoading}>
+                Next
+              </Button>
+            ) : (
+              <Button variant="contained" onClick={handleSubmit} disabled={submitting}
+                startIcon={submitting ? <CircularProgress size={16} /> : undefined}>
+                Submit to Risk Register
+              </Button>
+            )}
+          </Box>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={!!snackMsg} autoHideDuration={4000} onClose={() => setSnackMsg("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        message={snackMsg} />
+    </>
   );
 }

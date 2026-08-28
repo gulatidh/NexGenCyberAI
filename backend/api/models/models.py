@@ -415,6 +415,9 @@ class Risk(Base):
     residual_risk_level = Column(String(50), nullable=True)  # low/medium/medium_high/high/critical
     treatment_option = Column(String(50), nullable=True)     # avoid | mitigate | transfer | accept
     proposal_id = Column(String(36), nullable=True)          # source RiskProposal.id
+    wizard_data_json = Column(Text, nullable=True)           # JSON: all 8 wizard step values
+    measures_json = Column(Text, nullable=True)              # JSON: security measures checklist
+    ai_assessment_json = Column(Text, nullable=True)         # JSON: latest AI assessment
 
 
 class RiskProposal(Base):
