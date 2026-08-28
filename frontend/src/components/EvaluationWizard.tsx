@@ -205,13 +205,15 @@ interface WorkaroundMap {
 // ── Measures Step ─────────────────────────────────────────────────────────────
 
 function MeasuresStep({
-  measures, onMeasureChange, workarounds, onReassess, reassessing,
+  measures, onMeasureChange, workarounds, onReassess, reassessing, extraContext, onContextChange,
 }: {
   measures: MeasureItem[];
   onMeasureChange: (id: string, status: "pending" | "in_place" | "not_possible") => void;
   workarounds: WorkaroundMap;
   onReassess: () => void;
   reassessing: boolean;
+  extraContext: string;
+  onContextChange: (v: string) => void;
 }) {
   const STATUS_CONFIG = {
     pending:      { label: "Pending",      icon: <Schedule sx={{ fontSize: 14 }} />,      color: "#9E9E9E" },
@@ -222,11 +224,24 @@ function MeasuresStep({
   return (
     <Box>
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Security Measures</Typography>
-      <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
-        Mark each AI-recommended control as <strong>In Place</strong> (already implemented),{" "}
-        <strong>Not Possible</strong> (cannot implement — AI will suggest workarounds), or{" "}
-        <strong>Pending</strong> (planned).
+      <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
+        Mark each control as <strong>In Place</strong>, <strong>Not Possible</strong> (AI suggests workaround), or <strong>Pending</strong>.
+        Optionally add context so the AI adjusts likelihood scores when re-assessing.
       </Typography>
+
+      {/* Context field */}
+      <Box sx={{ mb: 3, p: 1.5, bgcolor: "rgba(124,58,237,0.06)", borderRadius: 1, border: "1px solid rgba(124,58,237,0.2)" }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: "#9C6AFF", display: "block", mb: 0.75 }}>
+          Additional context for AI re-assessment (optional)
+        </Typography>
+        <TextField
+          fullWidth multiline minRows={2} maxRows={4} size="small"
+          placeholder='E.g. "Frontend and backend run on the same host so network interception is low risk" or "Service is internet-facing with no WAF"'
+          value={extraContext}
+          onChange={(e) => onContextChange(e.target.value)}
+          sx={{ "& .MuiInputBase-root": { fontSize: 12, bgcolor: "transparent" } }}
+        />
+      </Box>
 
       {measures.length === 0 ? (
         <Alert severity="info">No measures generated yet. Go back to trigger the AI assessment.</Alert>
@@ -383,6 +398,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [snackMsg, setSnackMsg] = useState("");
+  const [extraContext, setExtraContext] = useState("");
 
   const set = useCallback(<K extends keyof FormData>(key: K, val: FormData[K]) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -488,7 +504,7 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
         consequence: form.consequence,
         treatment_option: form.treatment_option,
       };
-      const result = await riskProposalsApi.reevaluate(clientId, proposal.id, wizardData, measures);
+      const result = await riskProposalsApi.reevaluate(clientId, proposal.id, wizardData, measures, extraContext);
       _applyAiResult(result);
       setAiAssessment(result);
       setSnackMsg("AI has updated assessment based on your inputs.");
@@ -645,6 +661,8 @@ export default function EvaluationWizard({ open, onClose, proposal, onEvaluated 
             workarounds={workarounds}
             onReassess={handleReassess}
             reassessing={reassessing}
+            extraContext={extraContext}
+            onContextChange={setExtraContext}
           />
         );
       case 8:

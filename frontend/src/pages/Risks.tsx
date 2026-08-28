@@ -6,7 +6,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, Button, Alert, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
   Drawer, Tabs, Tab, Divider, ToggleButton, ToggleButtonGroup, Paper,
-  Snackbar, IconButton, Tooltip,
+  Snackbar, IconButton, Tooltip, Slider, TextField,
 } from "@mui/material";
 import {
   Warning, ChevronRight, PictureAsPdf, Article, Replay,
@@ -120,6 +120,7 @@ function RiskDetailDrawer({
   const [reevalOpen, setReevalOpen] = useState(false);
   const [reevalMeasures, setReevalMeasures] = useState<any[]>([]);
   const [reevalWizard, setReevalWizard] = useState<any>({});
+  const [reevalContext, setReevalContext] = useState("");
   const [reevalLoading, setReevalLoading] = useState(false);
   const [snack, setSnack] = useState("");
 
@@ -159,9 +160,10 @@ function RiskDetailDrawer({
     if (!clientId) return;
     setReevalLoading(true);
     try {
-      await risksApi.reevaluate(clientId, risk.id, reevalWizard, reevalMeasures);
+      await risksApi.reevaluate(clientId, risk.id, reevalWizard, reevalMeasures, reevalContext);
       setSnack("Risk re-evaluated and scores updated.");
       setReevalOpen(false);
+      setReevalContext("");
       onUpdated();
     } catch {
       setSnack("Re-evaluation failed. Please try again.");
@@ -249,15 +251,20 @@ function RiskDetailDrawer({
               </Typography>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
                 {FACTOR_NAMES.map(([key, label]) => {
-                  const val = (lf as any)[key.replace("_score", "")] || (risk as any)[key] || wizardData[key] || 3;
+                  const raw = (lf as any)[key.replace("_score", "")] ?? (risk as any)[key] ?? wizardData[key] ?? null;
+                  const val: number = raw !== null ? Number(raw) : 3;
                   const rationale = (lf as any)[`${key.replace("_score", "")}_rationale`] || "";
+                  const scoreColor = val <= 1 ? "#34A853" : val === 2 ? "#81C784" : val === 3 ? "#FBBC04" : val === 4 ? "#FF7043" : "#EA4335";
                   return (
                     <Box key={key} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1,
                       border: "1px solid", borderColor: "divider" }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: rationale ? 0.5 : 0 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>Likelihood factor</Typography>
+                        </Box>
                         <Chip label={`${val}/5`} size="small"
-                          sx={{ fontWeight: 700, bgcolor: `${LEVEL_COLOR.high}20`, color: LEVEL_COLOR.high }} />
+                          sx={{ fontWeight: 700, bgcolor: `${scoreColor}20`, color: scoreColor }} />
                       </Box>
                       {rationale && (
                         <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
@@ -364,44 +371,98 @@ function RiskDetailDrawer({
       </Drawer>
 
       {/* Re-evaluate dialog */}
-      <Dialog open={reevalOpen} onClose={() => setReevalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Re-evaluate Risk</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-            Update measure statuses then click Re-assess. AI will recalculate likelihood scores
-            and suggest workarounds for any "Not Possible" measures.
-          </Typography>
-          {reevalMeasures.length === 0 ? (
-            <Alert severity="info">No measures to update. Submit through the Evaluation Wizard to add measures.</Alert>
-          ) : (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, maxHeight: 400, overflowY: "auto" }}>
-              {reevalMeasures.map((m: any) => (
-                <Paper key={m.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
-                  <Typography variant="body2" sx={{ mb: 1 }}>{m.text}</Typography>
-                  <ToggleButtonGroup size="small" exclusive value={m.status}
-                    onChange={(_, val) => {
-                      if (!val) return;
-                      setReevalMeasures((prev) => prev.map((x) => x.id === m.id ? { ...x, status: val } : x));
-                    }}>
-                    {["pending","in_place","not_possible"].map((s) => {
-                      const cfg = MEASURE_STATUS_CONFIG[s];
-                      return (
-                        <ToggleButton key={s} value={s}
-                          sx={{ fontSize: 10, py: 0.4, px: 1,
-                            "&.Mui-selected": { bgcolor: `${cfg.color}20`, color: cfg.color, borderColor: `${cfg.color}60` } }}>
-                          {cfg.label}
-                        </ToggleButton>
-                      );
-                    })}
-                  </ToggleButtonGroup>
-                </Paper>
-              ))}
+      <Dialog open={reevalOpen} onClose={() => setReevalOpen(false)} maxWidth="md" fullWidth
+        slotProps={{ paper: { sx: { maxHeight: "90vh" } } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Re-evaluate Risk with AI</DialogTitle>
+        <DialogContent dividers sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+
+          {/* Context field */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Additional Context for AI
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1 }}>
+              Describe any environmental factors, architecture details, or constraints the AI should consider
+              when re-scoring. E.g. "Frontend and backend run on the same host so network interception risk is lower"
+              or "This service is internet-facing with no WAF".
+            </Typography>
+            <TextField
+              fullWidth multiline minRows={2} maxRows={5}
+              placeholder="Optional — leave blank to re-assess based on measures only…"
+              value={reevalContext}
+              onChange={(e) => setReevalContext(e.target.value)}
+              sx={{ "& .MuiInputBase-root": { fontSize: 13 } }}
+            />
+          </Box>
+
+          {/* Likelihood factor sliders */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Likelihood Factors
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+              Adjust any factor scores before re-assessing. AI will factor these in alongside your context.
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {FACTOR_NAMES.map(([key, label]) => {
+                const currentVal = reevalWizard[key] ?? 3;
+                const scoreColor = currentVal <= 1 ? "#34A853" : currentVal === 2 ? "#81C784" : currentVal === 3 ? "#FBBC04" : currentVal === 4 ? "#FF7043" : "#EA4335";
+                return (
+                  <Box key={key} sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{label}</Typography>
+                      <Chip label={`${currentVal}/5`} size="small"
+                        sx={{ fontWeight: 700, bgcolor: `${scoreColor}20`, color: scoreColor }} />
+                    </Box>
+                    <Box sx={{ px: 1 }}>
+                      <Slider size="small" value={currentVal} min={1} max={5} step={1}
+                        marks={[1,2,3,4,5].map((v) => ({ value: v, label: String(v) }))}
+                        onChange={(_, v) => setReevalWizard((prev: any) => ({ ...prev, [key]: v as number }))}
+                        sx={{ color: scoreColor }} />
+                    </Box>
+                  </Box>
+                );
+              })}
             </Box>
-          )}
+          </Box>
+
+          {/* Measures checklist */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+              Security Measures
+            </Typography>
+            {reevalMeasures.length === 0 ? (
+              <Alert severity="info" sx={{ fontSize: 12 }}>No measures recorded yet. Complete the Evaluation Wizard to add measures.</Alert>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {reevalMeasures.map((m: any) => (
+                  <Paper key={m.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>{m.text}</Typography>
+                    <ToggleButtonGroup size="small" exclusive value={m.status}
+                      onChange={(_, val) => {
+                        if (!val) return;
+                        setReevalMeasures((prev) => prev.map((x) => x.id === m.id ? { ...x, status: val } : x));
+                      }}>
+                      {["pending","in_place","not_possible"].map((s) => {
+                        const cfg = MEASURE_STATUS_CONFIG[s];
+                        return (
+                          <ToggleButton key={s} value={s}
+                            sx={{ fontSize: 10, py: 0.4, px: 1,
+                              "&.Mui-selected": { bgcolor: `${cfg.color}20`, color: cfg.color, borderColor: `${cfg.color}60` } }}>
+                            {cfg.label}
+                          </ToggleButton>
+                        );
+                      })}
+                    </ToggleButtonGroup>
+                  </Paper>
+                ))}
+              </Box>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setReevalOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleReeval} disabled={reevalLoading || reevalMeasures.length === 0}
+          <Button onClick={() => { setReevalOpen(false); setReevalContext(""); }}>Cancel</Button>
+          <Button variant="contained" onClick={handleReeval} disabled={reevalLoading}
             startIcon={reevalLoading ? <CircularProgress size={16} /> : <Replay />}
             sx={{ bgcolor: "#7C3AED", "&:hover": { bgcolor: "#6d35d9" } }}>
             Re-assess with AI

@@ -106,6 +106,7 @@ class MeasureItem(BaseModel):
 class ReevaluatePayload(BaseModel):
     wizard_data: Dict[str, Any]
     measures: List[MeasureItem] = []
+    extra_context: str = ""
 
 
 class AnalyseRequest(BaseModel):
@@ -188,7 +189,7 @@ Respond with ONLY valid JSON (no markdown fences):
 
 def _build_reevaluate_prompt(
     title: str, description: str, category: str,
-    wizard_data: dict, measures: list
+    wizard_data: dict, measures: list, extra_context: str = ""
 ) -> str:
     in_place = [m for m in measures if m.get("status") == "in_place"]
     not_possible = [m for m in measures if m.get("status") == "not_possible"]
@@ -197,37 +198,39 @@ def _build_reevaluate_prompt(
     measures_text = "\n".join([
         f"  [{m.get('status','pending').upper()}] {m.get('id')}: {m.get('text')}"
         for m in measures
-    ])
+    ]) or "  (none)"
+
+    context_block = f"\nAdditional context provided by analyst:\n{extra_context.strip()}\n" if extra_context.strip() else ""
 
     return f"""You are a cybersecurity risk analyst specialising in GCC IM8 and ISO 27001 risk assessments.
 
-Re-evaluate a risk that has been partially assessed. The user has adjusted the 8-step wizard values and updated the security measures checklist. Re-assess all factors considering the implemented controls.
+Re-evaluate a risk that has been partially assessed. The user has adjusted the likelihood factor scores and updated the security measures checklist. Re-assess all factors considering the implemented controls and any additional context provided.
 
 Risk: {title}
 Description: {description or '(none)'}
 Category: {category or 'General'}
-
-Current wizard values (user-adjusted):
-- Accessibility: {wizard_data.get('accessibility', 3)}/5
-- Discoverability: {wizard_data.get('discoverability', 3)}/5
-- Exploitability: {wizard_data.get('exploitability', 3)}/5
-- Authentication: {wizard_data.get('authentication_score', 3)}/5
-- Repeatability: {wizard_data.get('repeatability', 3)}/5
-- Consequence: {wizard_data.get('consequence', 3)}/5
-- Treatment: {wizard_data.get('treatment_option', 'mitigate')}
+{context_block}
+Current likelihood factor values (user-adjusted, scale 1-5 where 5 is worst):
+- Accessibility:    {wizard_data.get('accessibility', 3)}/5
+- Discoverability:  {wizard_data.get('discoverability', 3)}/5
+- Exploitability:   {wizard_data.get('exploitability', 3)}/5
+- Authentication:   {wizard_data.get('authentication_score', 3)}/5 (5=no auth, 1=strong MFA)
+- Repeatability:    {wizard_data.get('repeatability', 3)}/5
+- Consequence:      {wizard_data.get('consequence', 3)}/5
+- Treatment intent: {wizard_data.get('treatment_option', 'mitigate')}
 
 Security measures checklist:
 {measures_text}
 
 Summary:
-- {len(in_place)} measures IN PLACE (these reduce risk scores)
-- {len(not_possible)} measures NOT POSSIBLE (suggest workarounds)
+- {len(in_place)} measures IN PLACE (already implemented — these should reduce relevant factor scores)
+- {len(not_possible)} measures NOT POSSIBLE (need workaround alternatives)
 - {len(pending)} measures PENDING (planned but not yet implemented)
 
 Instructions:
-1. Re-score each likelihood factor, taking IN PLACE measures into account (they should reduce scores where applicable)
-2. For each NOT POSSIBLE measure, suggest a specific alternative/workaround control
-3. Provide updated overall commentary reflecting the current state
+1. Re-score each likelihood factor considering IN PLACE measures AND any extra context. If context reveals mitigating factors (e.g. components on same host, air-gapped network), reduce scores accordingly. If it reveals amplifying factors (e.g. internet-facing, shared credentials), increase scores.
+2. For each NOT POSSIBLE measure, suggest a specific, practical alternative control.
+3. Update the overall commentary to reflect the analyst's context and current control state.
 
 Respond with ONLY valid JSON (no markdown fences):
 {{
@@ -488,6 +491,7 @@ async def reevaluate_proposal(
         category=p.category or "",
         wizard_data=payload.wizard_data,
         measures=measures_list,
+        extra_context=payload.extra_context,
     )
 
     fallback = {

@@ -44,6 +44,7 @@ def _matrix_to_level(score: int) -> RiskLevel:
 class ReevaluatePayload(BaseModel):
     wizard_data: Dict[str, Any]
     measures: List[Dict[str, Any]] = []
+    extra_context: str = ""
 
 
 @router.get("/export")
@@ -197,6 +198,7 @@ async def reevaluate_risk(
         category=risk.category or "",
         wizard_data=payload.wizard_data,
         measures=measures_list,
+        extra_context=getattr(payload, "extra_context", ""),
     )
 
     fallback = {

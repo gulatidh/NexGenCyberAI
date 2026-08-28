@@ -204,8 +204,8 @@ export const risksApi = {
   update: (clientId: string, riskId: string, data: any) =>
     apiClient.patch(`/clients/${clientId}/risks/${riskId}`, data).then((r) => r.data),
   delete: (clientId: string, riskId: string) => apiClient.delete(`/clients/${clientId}/risks/${riskId}`),
-  reevaluate: (clientId: string, riskId: string, wizardData: any, measures: any[]) =>
-    apiClient.post(`/clients/${clientId}/risks/${riskId}/reevaluate`, { wizard_data: wizardData, measures }).then((r) => r.data),
+  reevaluate: (clientId: string, riskId: string, wizardData: any, measures: any[], extraContext = "") =>
+    apiClient.post(`/clients/${clientId}/risks/${riskId}/reevaluate`, { wizard_data: wizardData, measures, extra_context: extraContext }).then((r) => r.data),
   exportUrl: (clientId: string, format: "pdf" | "docx") =>
     `${apiClient.defaults.baseURL}/clients/${clientId}/risks/export?format=${format}`,
   exportSingleUrl: (clientId: string, riskId: string, format: "pdf" | "docx") =>
@@ -231,8 +231,8 @@ export const riskProposalsApi = {
     apiClient.post(`/clients/${clientId}/risk-proposals/${id}/evaluate`, data).then((r) => r.data),
   aiDraft: (clientId: string, id: string) =>
     apiClient.post(`/clients/${clientId}/risk-proposals/${id}/ai-draft`).then((r) => r.data),
-  reevaluate: (clientId: string, id: string, wizardData: any, measures: any[]) =>
-    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/reevaluate`, { wizard_data: wizardData, measures }).then((r) => r.data),
+  reevaluate: (clientId: string, id: string, wizardData: any, measures: any[], extraContext = "") =>
+    apiClient.post(`/clients/${clientId}/risk-proposals/${id}/reevaluate`, { wizard_data: wizardData, measures, extra_context: extraContext }).then((r) => r.data),
   analyse: (clientId: string, data: any) =>
     apiClient.post(`/clients/${clientId}/risk-proposals/analyse`, data).then((r) => r.data),
 };
