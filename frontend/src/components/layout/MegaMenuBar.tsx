@@ -17,7 +17,7 @@ import {
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
   Description, AltRoute, FolderZip, AccountTree, BarChart,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
-  Hub as HubIcon, Devices, VpnKey, Webhook, ManageSearch,
+  Hub as HubIcon, Devices, VpnKey, Webhook, ManageSearch, ReportProblem,
 } from "@mui/icons-material";
 
 // ── Phase → route mapping for active highlight ────────────────────────────────
@@ -132,6 +132,7 @@ const MENU: MenuItem[] = [
       {
         heading: "Threat Intelligence",
         items: [
+          { name: "Incidents",           desc: "Case management for security incidents and response tracking.",          route: "/respond/incidents",           Icon: ReportProblem   },
           { name: "Threat Register",     desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",          route: "/respond/threats",             Icon: Radar           },
           { name: "Control Deficiencies",desc: "Framework control gaps identified by the compliance monitor agent.",      route: "/respond/gaps",                Icon: GppBad          },
           { name: "CTEM Programs",       desc: "5-phase exposure management: scope → discover → validate → mobilise.",   route: "/respond/ctem",                Icon: AccountTree     },

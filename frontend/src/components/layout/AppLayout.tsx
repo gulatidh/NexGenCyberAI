@@ -16,7 +16,7 @@ import {
   ExpandLess, ExpandMore, VisibilityOutlined, Engineering,
   Cable, Settings, Radar, GppBad, PlaylistAddCheck, LibraryAdd, GppGood,
   SyncAlt, AccountTree, Psychology, Description, AutoFixHigh,
-  TrendingUp, GridView, CompareArrows, VpnKey, Webhook, Shield,
+  TrendingUp, GridView, CompareArrows, VpnKey, Webhook, Shield, Notifications,
 } from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -725,8 +725,11 @@ export default function AppLayout() {
                 <AccountCircle sx={{ mr: 1 }} /> {userName}
               </MenuItem>
               <Divider />
-              <MenuItem onClick={() => { setAnchorEl(null); navigate("/account"); }}>
-                <AccountCircle sx={{ mr: 1 }} fontSize="small" /> Account &amp; preferences
+              <MenuItem onClick={() => { setAnchorEl(null); navigate("/account/profile"); }}>
+                <AccountCircle sx={{ mr: 1 }} fontSize="small" /> My Profile
+              </MenuItem>
+              <MenuItem onClick={() => { setAnchorEl(null); navigate("/account/notifications"); }}>
+                <Notifications sx={{ mr: 1 }} fontSize="small" /> Notifications
               </MenuItem>
               <Divider />
               <MenuItem onClick={handleLogout}>

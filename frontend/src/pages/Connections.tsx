@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import {
   Add, PlayArrow, CheckCircle, Error, HourglassEmpty, Cable, Edit, Delete,
-  OpenInNew, Psychology, Hub, Cloud, DriveFileMove, ContentCopy, FolderShared,
+  OpenInNew, Psychology, Hub, Cloud, DriveFileMove, ContentCopy, FolderShared, Sync,
 } from "@mui/icons-material";
 import { Cancel } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -465,6 +465,12 @@ export default function Connections() {
     onError: (e: any) => toast.error(e.response?.data?.detail || "Copy failed"),
   });
 
+  const syncAssetsMutation = useMutation({
+    mutationFn: (connId: string) => connectorsApi.syncAssets(selectedClientId, connId),
+    onSuccess: () => toast.success("Asset sync started — platform detail will appear in Asset Inventory shortly"),
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Sync failed"),
+  });
+
   // ── Dialog helpers ───────────────────────────────────────────────────────────
   const closeDialog = () => {
     setOpen(false);
@@ -611,6 +617,15 @@ export default function Connections() {
               sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11 }}
             >
               Test
+            </Button>
+            <Button
+              size="small" variant="outlined" startIcon={<Sync sx={{ fontSize: 14 }} />}
+              onClick={() => syncAssetsMutation.mutate(conn.id)}
+              disabled={syncAssetsMutation.isPending}
+              sx={{ borderColor: "#34A853", color: "#34A853", fontSize: 11,
+                "&:hover": { borderColor: "#34A853", bgcolor: "rgba(52,168,83,0.08)" } }}
+            >
+              Sync Assets
             </Button>
             <Button
               size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}

@@ -108,7 +108,7 @@ export default function RiskAppetite() {
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>Risk Appetite</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
-            Configure organisation risk tolerance bands for the 5×5 GCC IM8 matrix.
+            Configure organisation risk tolerance bands for the 5×5 risk matrix.
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Save />} size="small" onClick={handleSave}

@@ -147,7 +147,7 @@ export default function Dashboard() {
   const [activityFilter, setActivityFilter] = React.useState<string>("all");
   const { data, isLoading } = useQuery<DashboardSummary>({
     queryKey: ["dashboard"],
-    queryFn: dashboardApi.summary,
+    queryFn: () => dashboardApi.summary(),
     refetchInterval: 30_000,
   });
   const { data: activityResp } = useQuery<{ days: number; events: ActivityEvent[] }>({

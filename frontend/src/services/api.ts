@@ -114,6 +114,8 @@ export const connectorsApi = {
     apiClient.patch(`/clients/${clientId}/connectors/${connectorId}/move`, { target_project_id: targetProjectId }).then((r) => r.data),
   copyConnector: (clientId: string, connectorId: string, targetProjectId: string | null, name?: string) =>
     apiClient.post(`/clients/${clientId}/connectors/${connectorId}/copy`, { target_project_id: targetProjectId, name }).then((r) => r.data),
+  syncAssets: (clientId: string, connectorId: string) =>
+    apiClient.post(`/clients/${clientId}/connectors/${connectorId}/sync-assets`).then((r) => r.data),
 };
 
 export const projectsApi = {
@@ -284,7 +286,7 @@ export const ssoApi = {
 };
 
 export const dashboardApi = {
-  summary: () => apiClient.get("/dashboard/").then((r) => r.data),
+  summary: (clientId?: string) => apiClient.get("/dashboard/", { params: clientId ? { client_id: clientId } : {} }).then((r) => r.data),
   activity: (days: number = 3) =>
     apiClient.get(`/dashboard/activity`, { params: { days } }).then((r) => r.data),
 };

@@ -116,7 +116,7 @@ function RiskMatrix({ impact, likelihood }: { impact: number; likelihood: number
   return (
     <Box>
       <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>
-        5×5 Risk Matrix — GCC IM8 / ISO 27001
+        5×5 Risk Matrix
       </Typography>
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
         <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", mr: 0.5 }}>

@@ -159,6 +159,23 @@ async def update_connector(
     return c
 
 
+@router.post("/{connector_id}/sync-assets", status_code=202)
+async def sync_assets(
+    client_id: str,
+    connector_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Manually trigger an asset sync for a connector. Populates AssetPlatformDetail."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
+    c = db.query(Connector).filter(Connector.id == connector_id, Connector.client_id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Connector not found")
+    background_tasks.add_task(sync_connector_assets_bg, c.id)
+    return {"message": "Asset sync started", "connector_id": connector_id}
+
+
 @router.delete("/{connector_id}", status_code=204)
 async def delete_connector(client_id: str, connector_id: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
     require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)

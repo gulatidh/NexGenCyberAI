@@ -34,7 +34,7 @@ export default function ExecutiveSummary() {
 
   const { data: summary, isLoading: loadS } = useQuery({
     queryKey: ["exec-summary", clientId],
-    queryFn: () => dashboardApi.summary(),
+    queryFn: () => dashboardApi.summary(clientId),
     enabled: !!clientId,
   });
 
@@ -49,11 +49,12 @@ export default function ExecutiveSummary() {
   const isLoading = loadS || loadR;
   const s: any = summary ?? {};
 
+  const sev         = s.findings_by_severity ?? {};
   const open        = s.open_findings ?? 0;
-  const critical    = s.critical_findings ?? 0;
-  const high        = s.high_findings ?? 0;
-  const medium      = s.medium_findings ?? 0;
-  const low         = s.low_findings ?? 0;
+  const critical    = s.critical_findings ?? sev.critical ?? 0;
+  const high        = sev.high ?? 0;
+  const medium      = sev.medium ?? 0;
+  const low         = sev.low ?? 0;
   const remediated  = s.remediated_findings ?? 0;
   const total       = open + remediated;
   const remPct      = total > 0 ? Math.round((remediated / total) * 100) : 0;
