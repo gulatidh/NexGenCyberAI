@@ -495,6 +495,43 @@ class Asset(Base):
 
     connector = relationship("Connector", back_populates="assets")
     project = relationship("Project", back_populates="assets")
+    platform_detail = relationship("AssetPlatformDetail", back_populates="asset",
+                                   uselist=False, cascade="all, delete-orphan")
+
+
+class AssetPlatformDetail(Base):
+    """
+    Platform-agnostic extension row — one per Asset.
+    Stores universal promoted fields + full native platform metadata JSON.
+    Supports any connector type: azure, aws, gcp, entraid, okta, servicenow,
+    qualys, cyberark, onprem, containers, web, and any future connector.
+    """
+    __tablename__ = "asset_platform_detail"
+
+    id             = Column(String(36), primary_key=True, default=_uuid)
+    asset_id       = Column(String(36), ForeignKey("assets.id", ondelete="CASCADE"),
+                            nullable=False, unique=True, index=True)
+    connector_type = Column(String(64), nullable=False, index=True)
+
+    # tenant_account_id: Azure=subscription_id, AWS=account_id, GCP=project_id,
+    #                    Okta=org_id, ServiceNow=instance, Qualys=customer_id, CyberArk=safe
+    tenant_account_id   = Column(String(256), nullable=True, index=True)
+    # namespace: Azure=resource_group, AWS=vpc_id, Okta=group, ServiceNow=cmdb_class, CyberArk=folder
+    namespace           = Column(String(256), nullable=True, index=True)
+    # lifecycle_state: running|stopped|terminated|active|inactive|suspended|deprovisioned
+    lifecycle_state     = Column(String(64),  nullable=True, index=True)
+    # owner: Azure/AWS=owner tag, Okta=manager, ServiceNow=assigned_to
+    owner               = Column(String(256), nullable=True)
+    department          = Column(String(256), nullable=True)
+    ip_addresses        = Column(Text, nullable=True)   # JSON array
+    fqdn                = Column(String(512), nullable=True)
+    security_score      = Column(Float,   nullable=True)
+    vulnerability_count = Column(Integer, nullable=True)
+    # Full native platform metadata — all fields from the connector raw response
+    platform_metadata   = Column(Text, nullable=True)   # JSON string
+    synced_at           = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    asset = relationship("Asset", back_populates="platform_detail")
 
 
 class FrameworkControl(Base):

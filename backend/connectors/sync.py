@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from api.models.models import Asset, AssetStatus, Connector, ConnectorType
+from api.models.models import Asset, AssetPlatformDetail, AssetStatus, Connector, ConnectorType
 from connectors.factory import get_connector
 from core.encryption import decrypt
 
@@ -142,6 +142,390 @@ def _parse_generic(resource: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# ── Platform metadata extractors ──────────────────────────────────────────────
+# Each returns (universal_fields, platform_metadata). universal_fields keys
+# map to AssetPlatformDetail columns. platform_metadata is the full native schema.
+
+def _detail_azure(resource: dict) -> Tuple[dict, dict]:
+    rid = resource.get("id", "")
+    props = resource.get("properties") or {}
+    hw   = props.get("hardwareProfile") or {}
+    os_  = (props.get("storageProfile") or {}).get("osDisk") or {}
+    tags = resource.get("tags") or {}
+    rg = sub = ""
+    m = _AZURE_ARM_RE.match(rid)
+    if m:
+        sub = m.group("sub") or ""
+        rg  = m.group("rg")  or ""
+    ips = []
+    if props.get("privateIPAddress"): ips.append(props["privateIPAddress"])
+    if props.get("publicIPAddress"):  ips.append(props["publicIPAddress"])
+    universal = {
+        "tenant_account_id": sub or None,
+        "namespace":         rg or None,
+        "lifecycle_state":   (props.get("powerState") or props.get("provisioningState") or "").lower() or None,
+        "owner":             tags.get("owner") or tags.get("Owner"),
+        "department":        tags.get("department") or tags.get("Department"),
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              (props.get("dnsSettings") or {}).get("fqdn") or resource.get("fqdn"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "subscription_id": sub, "resource_group": rg,
+        "resource_type": resource.get("type", ""), "location": resource.get("location"),
+        "sku": resource.get("sku"), "vm_size": hw.get("vmSize"),
+        "os_type": os_.get("osType"), "power_state": props.get("powerState"),
+        "provisioning_state": props.get("provisioningState"),
+        "managed_identity": resource.get("identity"), "zones": resource.get("zones"),
+        "private_ip": props.get("privateIPAddress"), "public_ip": props.get("publicIPAddress"),
+        "arm_properties": props, "tags": tags,
+    }
+    return universal, metadata
+
+
+def _detail_aws(resource: dict) -> Tuple[dict, dict]:
+    rid  = resource.get("id", "")
+    tags = resource.get("tags") or {}
+    acc = reg = ""
+    if rid.startswith("arn:"):
+        parts = rid.split(":")
+        if len(parts) >= 6:
+            reg = parts[3] or ""
+            acc = parts[4] or ""
+    reg = reg or resource.get("region", "")
+    tag_owner = tags.get("owner") or tags.get("Owner")
+    tag_dept  = tags.get("department") or tags.get("Department") or tags.get("BusinessUnit")
+    ips: List[str] = []
+    for k in ("private_ip", "public_ip", "privateIpAddress", "publicIpAddress"):
+        v = resource.get(k)
+        if v and v not in ips: ips.append(v)
+    state = resource.get("state") or {}
+    state_name = state.get("Name") if isinstance(state, dict) else str(state or "")
+    universal = {
+        "tenant_account_id": acc or None,
+        "namespace":         resource.get("vpc_id") or resource.get("VpcId"),
+        "lifecycle_state":   (state_name or "").lower() or None,
+        "owner":             tag_owner,
+        "department":        tag_dept,
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              resource.get("public_dns") or resource.get("PublicDnsName") or resource.get("privateDnsName"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    placement = resource.get("Placement") or {}
+    metadata = {
+        "account_id": acc, "region": reg,
+        "vpc_id": resource.get("vpc_id") or resource.get("VpcId"),
+        "subnet_id": resource.get("SubnetId"),
+        "availability_zone": placement.get("AvailabilityZone") if isinstance(placement, dict) else None,
+        "instance_type": resource.get("InstanceType"), "ami_id": resource.get("ImageId"),
+        "security_group_ids": [sg.get("GroupId") for sg in (resource.get("SecurityGroups") or []) if isinstance(sg, dict)],
+        "iam_profile": ((resource.get("IamInstanceProfile") or {}).get("Arn") if isinstance(resource.get("IamInstanceProfile"), dict) else None),
+        "key_name": resource.get("KeyName"),
+        "private_ip": resource.get("privateIpAddress") or resource.get("private_ip"),
+        "public_ip": resource.get("publicIpAddress") or resource.get("public_ip"),
+        "public_dns": resource.get("PublicDnsName") or resource.get("public_dns"),
+        "state": state_name, "platform_details": resource.get("PlatformDetails") or resource.get("platform"),
+        "launch_time": str(resource.get("LaunchTime") or resource.get("launch_time") or ""),
+        "tags": tags,
+    }
+    return universal, metadata
+
+
+def _detail_gcp(resource: dict) -> Tuple[dict, dict]:
+    tags = resource.get("labels") or resource.get("tags") or {}
+    proj = resource.get("project") or resource.get("project_id", "")
+    nics = resource.get("networkInterfaces") or []
+    ips: List[str] = []
+    for nic in (nics if isinstance(nics, list) else []):
+        if isinstance(nic, dict):
+            if nic.get("networkIP"): ips.append(nic["networkIP"])
+            for ac in (nic.get("accessConfigs") or []):
+                if isinstance(ac, dict) and ac.get("natIP"): ips.append(ac["natIP"])
+    universal = {
+        "tenant_account_id": proj or None,
+        "namespace":         resource.get("zone") or resource.get("location"),
+        "lifecycle_state":   (resource.get("status") or "").lower() or None,
+        "owner":             tags.get("owner"),
+        "department":        tags.get("department"),
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              None,
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "project_id": proj, "zone": resource.get("zone") or resource.get("location"),
+        "machine_type": (resource.get("machineType") or "").rsplit("/", 1)[-1],
+        "status": resource.get("status"),
+        "network_tags": (resource.get("tags") or {}).get("items"),
+        "network_interfaces": nics,
+        "service_accounts": resource.get("serviceAccounts"),
+        "disks": resource.get("disks"),
+        "metadata_items": (resource.get("metadata") or {}).get("items"),
+        "labels": tags,
+    }
+    return universal, metadata
+
+
+def _detail_entraid(resource: dict) -> Tuple[dict, dict]:
+    profile  = resource.get("profile") or {}
+    sign_in  = resource.get("signInActivity") or {}
+    dept     = profile.get("department") or resource.get("department")
+    enabled  = resource.get("accountEnabled")
+    universal = {
+        "tenant_account_id": resource.get("tenantId"),
+        "namespace":         dept,
+        "lifecycle_state":   "active" if enabled else "inactive",
+        "owner":             None,
+        "department":        dept,
+        "ip_addresses":      None,
+        "fqdn":              resource.get("userPrincipalName"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "object_id": resource.get("id"),
+        "user_principal_name": resource.get("userPrincipalName"),
+        "display_name": resource.get("displayName"),
+        "account_enabled": enabled,
+        "user_type": resource.get("userType"),
+        "job_title": profile.get("title") or resource.get("jobTitle"),
+        "department": dept,
+        "office_location": resource.get("officeLocation"),
+        "assigned_licenses": [l.get("skuId") for l in (resource.get("assignedLicenses") or []) if isinstance(l, dict)],
+        "mfa_methods": resource.get("authenticationMethods"),
+        "last_sign_in": sign_in.get("lastSignInDateTime"),
+        "risk_level": resource.get("riskLevel"),
+        "risk_state": resource.get("riskState"),
+        "groups": resource.get("groups"),
+    }
+    return universal, metadata
+
+
+def _detail_okta(resource: dict) -> Tuple[dict, dict]:
+    profile = resource.get("profile") or {}
+    creds   = resource.get("credentials") or {}
+    groups  = resource.get("groups") or []
+    universal = {
+        "tenant_account_id": resource.get("org_id") or resource.get("orgId"),
+        "namespace":         profile.get("department") or (groups[0] if groups else None),
+        "lifecycle_state":   (resource.get("status") or "").lower() or None,
+        "owner":             profile.get("manager"),
+        "department":        profile.get("department"),
+        "ip_addresses":      None,
+        "fqdn":              profile.get("login") or resource.get("login"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "okta_id": resource.get("id"),
+        "login": profile.get("login") or resource.get("login"),
+        "email": profile.get("email"), "status": resource.get("status"),
+        "first_name": profile.get("firstName"), "last_name": profile.get("lastName"),
+        "job_title": profile.get("title"), "department": profile.get("department"),
+        "manager": profile.get("manager"), "organization": profile.get("organization"),
+        "groups": groups, "app_assignments": resource.get("apps"),
+        "mfa_factors": resource.get("factors"),
+        "last_login": resource.get("lastLogin"), "password_changed": resource.get("passwordChanged"),
+        "created": resource.get("created"), "activated": resource.get("activated"),
+        "provider": (creds.get("provider") or {}).get("name"),
+    }
+    return universal, metadata
+
+
+def _detail_qualys(resource: dict) -> Tuple[dict, dict]:
+    ips_raw = resource.get("ips") or resource.get("address") or []
+    ips: List[str] = [ips_raw] if isinstance(ips_raw, str) else list(ips_raw) if isinstance(ips_raw, list) else []
+    score = resource.get("score")
+    vuln  = resource.get("vuln_count") or resource.get("open_vuln_count")
+    universal = {
+        "tenant_account_id": resource.get("customer_id") or resource.get("customerId"),
+        "namespace":         resource.get("scanner_appliance") or resource.get("scannerAppliance"),
+        "lifecycle_state":   "active",
+        "owner":             resource.get("owner"),
+        "department":        None,
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              resource.get("dns") or resource.get("fqdn") or resource.get("hostname"),
+        "security_score":    float(score) if score is not None else None,
+        "vulnerability_count": int(vuln) if vuln is not None else None,
+    }
+    metadata = {
+        "qualys_id": resource.get("id") or resource.get("qualysId"),
+        "tracking_method": resource.get("tracking_method") or resource.get("trackingMethod"),
+        "scanner_appliance": resource.get("scanner_appliance") or resource.get("scannerAppliance"),
+        "open_vulnerabilities": vuln,
+        "last_scan_date": resource.get("last_scan_date") or resource.get("lastScanDate"),
+        "os_cpe": resource.get("os_cpe") or resource.get("osCpe"),
+        "open_ports": resource.get("open_ports") or resource.get("openPorts"),
+        "software_installed": resource.get("software") or resource.get("softwareInstalled"),
+        "ec2_instance_id": resource.get("ec2_instance_id"),
+        "ips": ips, "dns": resource.get("dns") or resource.get("fqdn"),
+        "netbios": resource.get("netbios"),
+    }
+    return universal, metadata
+
+
+def _detail_servicenow(resource: dict) -> Tuple[dict, dict]:
+    sys_domain = resource.get("sys_domain")
+    tid = None
+    if isinstance(sys_domain, dict):
+        tid = sys_domain.get("value")
+    else:
+        tid = sys_domain or resource.get("instance_url")
+    assigned_to = resource.get("assigned_to")
+    owner = assigned_to.get("display_value") if isinstance(assigned_to, dict) else assigned_to
+    dept = resource.get("department")
+    dept_str = dept.get("display_value") if isinstance(dept, dict) else dept
+    install_status_map = {"1": "active", "2": "on_order", "3": "maintenance",
+                          "6": "in_maintenance", "7": "retired", "8": "stolen"}
+    lifecycle = install_status_map.get(str(resource.get("install_status") or ""), "unknown")
+    ip = resource.get("ip_address")
+    universal = {
+        "tenant_account_id": tid,
+        "namespace":         resource.get("sys_class_name") or resource.get("cmdb_class"),
+        "lifecycle_state":   lifecycle,
+        "owner":             owner,
+        "department":        dept_str,
+        "ip_addresses":      json.dumps([ip]) if ip else None,
+        "fqdn":              resource.get("fqdn") or resource.get("dns_domain") or resource.get("name"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "sys_id": resource.get("sys_id"),
+        "cmdb_class": resource.get("sys_class_name") or resource.get("cmdb_class"),
+        "category": resource.get("category"), "subcategory": resource.get("subcategory"),
+        "install_status": resource.get("install_status"), "environment": resource.get("environment"),
+        "assigned_to": assigned_to, "managed_by": resource.get("managed_by"),
+        "support_group": resource.get("support_group"),
+        "business_service": resource.get("business_service"),
+        "maintenance_schedule": resource.get("maintenance_schedule"),
+        "change_control": resource.get("change_number"),
+        "last_discovered": resource.get("last_discovered"),
+        "ip_address": ip, "fqdn": resource.get("fqdn"),
+        "os": resource.get("os"), "os_version": resource.get("os_version"),
+        "serial_number": resource.get("serial_number"), "model_id": resource.get("model_id"),
+    }
+    return universal, metadata
+
+
+def _detail_cyberark(resource: dict) -> Tuple[dict, dict]:
+    addr = resource.get("address") or resource.get("Address")
+    safe = resource.get("safe") or resource.get("Safe")
+    universal = {
+        "tenant_account_id": safe,
+        "namespace":         resource.get("folder") or resource.get("Folder"),
+        "lifecycle_state":   "active",
+        "owner":             resource.get("username") or resource.get("UserName"),
+        "department":        None,
+        "ip_addresses":      json.dumps([addr]) if addr else None,
+        "fqdn":              addr,
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "account_id": resource.get("id") or resource.get("AccountID"),
+        "safe": safe, "folder": resource.get("folder") or resource.get("Folder"),
+        "username": resource.get("username") or resource.get("UserName"),
+        "address": addr,
+        "platform_id": resource.get("platformId") or resource.get("PlatformID"),
+        "last_modified": resource.get("lastModifiedTime") or resource.get("LastModifiedTime"),
+        "secret_management": resource.get("secretManagement"),
+        "remote_machines": resource.get("remoteMachinesAccess"),
+    }
+    return universal, metadata
+
+
+def _detail_onprem(resource: dict) -> Tuple[dict, dict]:
+    ips_raw = resource.get("ip_addresses") or resource.get("ips") or []
+    ips: List[str] = [ips_raw] if isinstance(ips_raw, str) else list(ips_raw)
+    universal = {
+        "tenant_account_id": resource.get("site_name") or resource.get("site"),
+        "namespace":         resource.get("ou") or resource.get("domain"),
+        "lifecycle_state":   "active" if resource.get("active", True) else "inactive",
+        "owner":             resource.get("owner"),
+        "department":        resource.get("department"),
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              resource.get("fqdn") or resource.get("hostname"),
+        "security_score":    None,
+        "vulnerability_count": None,
+    }
+    metadata = {
+        "hostname": resource.get("hostname"), "os_type": resource.get("os_type"),
+        "os_version": resource.get("os_version"), "ip_addresses": ips,
+        "mac_addresses": resource.get("mac_addresses"),
+        "cpu_count": resource.get("cpu_count"), "memory_gb": resource.get("memory_gb"),
+        "disk_gb": resource.get("disk_gb"), "domain": resource.get("domain"),
+        "agent_version": resource.get("agent_version"),
+        "last_heartbeat": resource.get("last_heartbeat"),
+        "installed_software": resource.get("software"),
+    }
+    return universal, metadata
+
+
+def _detail_generic(resource: dict, connector_type_str: str) -> Tuple[dict, dict]:
+    ips: List[str] = []
+    for k in ("ip_address", "ip", "private_ip", "public_ip", "address"):
+        v = resource.get(k)
+        if v and isinstance(v, str) and v not in ips:
+            ips.append(v)
+    score = resource.get("score")
+    vuln  = resource.get("vuln_count")
+    universal = {
+        "tenant_account_id": resource.get("account_id") or resource.get("tenant_id") or resource.get("org_id"),
+        "namespace":         resource.get("namespace") or resource.get("group") or resource.get("category"),
+        "lifecycle_state":   (str(resource.get("status") or resource.get("state") or "")).lower() or None,
+        "owner":             resource.get("owner"),
+        "department":        resource.get("department"),
+        "ip_addresses":      json.dumps(ips) if ips else None,
+        "fqdn":              resource.get("fqdn") or resource.get("hostname") or resource.get("dns"),
+        "security_score":    float(score) if score is not None else None,
+        "vulnerability_count": int(vuln) if vuln is not None else None,
+    }
+    metadata = dict(resource)  # full pass-through for unknown connectors
+    return universal, metadata
+
+
+def _extract_platform_detail(connector_type_str: str, resource: dict) -> Tuple[dict, dict]:
+    ct = connector_type_str.lower()
+    if ct == "azure":           return _detail_azure(resource)
+    if ct == "aws":             return _detail_aws(resource)
+    if ct == "gcp":             return _detail_gcp(resource)
+    if ct in ("entraid", "entra_id", "entra"): return _detail_entraid(resource)
+    if ct == "okta":            return _detail_okta(resource)
+    if ct == "qualys":          return _detail_qualys(resource)
+    if ct == "servicenow":      return _detail_servicenow(resource)
+    if ct == "cyberark":        return _detail_cyberark(resource)
+    if ct in ("onprem", "on_prem", "on-prem"): return _detail_onprem(resource)
+    return _detail_generic(resource, ct)
+
+
+def _upsert_platform_detail(db: Session, asset_id: str, connector_type: str, raw: dict, now: datetime) -> None:
+    try:
+        universal, platform_meta = _extract_platform_detail(connector_type, raw)
+        detail = db.query(AssetPlatformDetail).filter(AssetPlatformDetail.asset_id == asset_id).first()
+        if detail is None:
+            kwargs = {k: v for k, v in universal.items() if v is not None}
+            detail = AssetPlatformDetail(
+                asset_id=asset_id,
+                connector_type=connector_type,
+                platform_metadata=json.dumps(platform_meta, default=str),
+                synced_at=now,
+                **kwargs,
+            )
+            db.add(detail)
+        else:
+            detail.connector_type = connector_type
+            for k, v in universal.items():
+                if v is not None:
+                    setattr(detail, k, v)
+            detail.platform_metadata = json.dumps(platform_meta, default=str)
+            detail.synced_at = now
+    except Exception as exc:
+        logger.warning("Failed to upsert platform detail for asset %s: %s", asset_id, exc)
+
+
 def _parse_resource(connector_type: ConnectorType, resource: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not resource:
         return None
@@ -221,6 +605,8 @@ async def sync_connector_assets(
                 last_synced_at=now,
             )
             db.add(asset)
+            ct_str = connector_db.connector_type.value if hasattr(connector_db.connector_type, "value") else str(connector_db.connector_type)
+            _upsert_platform_detail(db, asset.id, ct_str, raw, now)
             created += 1
         else:
             current = existing_row.status
@@ -239,6 +625,8 @@ async def sync_connector_assets(
                 existing_row.status = AssetStatus.REAPPEARED
                 existing_row.reappeared_at = now
             # ACTIVE, NEW, REAPPEARED → no status change
+            ct_str = connector_db.connector_type.value if hasattr(connector_db.connector_type, "value") else str(connector_db.connector_type)
+            _upsert_platform_detail(db, existing_row.id, ct_str, raw, now)
             updated += 1
 
     # Mark ACTIVE assets stale when API returned results (non-empty = auth working)

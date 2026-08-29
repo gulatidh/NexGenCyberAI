@@ -35,11 +35,11 @@ const STATUS_COLOR: Record<string, string> = {
 
 const ASSET_TAB_MAP: Record<string, number> = {
   findings: 0, risks: 1, cves: 2, metadata: 3,
-  timeline: 4, attack_path: 5, duplicates: 6, compliance: 7,
+  timeline: 4, attack_path: 5, duplicates: 6, compliance: 7, platform: 8,
 };
 const ASSET_TAB_KEY: Record<number, string> = {
   0: "findings", 1: "risks", 2: "cves", 3: "metadata",
-  4: "timeline", 5: "attack_path", 6: "duplicates", 7: "compliance",
+  4: "timeline", 5: "attack_path", 6: "duplicates", 7: "compliance", 8: "platform",
 };
 
 export default function AssetDetailPage() {
@@ -128,6 +128,7 @@ export default function AssetDetailPage() {
     { id: "compliance",  label: "Compliance",                     Icon: GppGood,      color: "#34A853" },
     { id: "metadata",    label: "Metadata",                       Icon: DataObject,   color: "#757575" },
     { id: "duplicates",  label: "Duplicates",                     Icon: FileCopy,     color: "#607D8B" },
+    { id: "platform",   label: "Platform",                       Icon: DataObject,   color: "#9C27B0" },
     { id: "help",        label: "Help",                           Icon: MenuBook,     color: "#00BCD4" },
   ];
 
@@ -411,6 +412,7 @@ export default function AssetDetailPage() {
         {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
         {tab === 6 && <AssetDuplicates clientId={clientId} assetId={assetId} />}
         {tab === 7 && <AssetComplianceTab clientId={clientId} assetId={assetId} />}
+        {tab === 8 && <PlatformDetailTab detail={(asset as any).platform_detail} />}
       </Box>
     </PageDetailLayout>
   );
@@ -701,6 +703,180 @@ const KNOWN_FRAMEWORKS = [
 ];
 
 const SEV_COLOR_MAP: Record<string, string> = { critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4" };
+
+// ── Platform Detail tab ────────────────────────────────────────────────────────
+
+const CT_COLORS: Record<string, string> = {
+  azure: "#0078D4", aws: "#FF9900", gcp: "#4285F4",
+  entraid: "#00A4EF", okta: "#007DC1", qualys: "#ED1C24",
+  servicenow: "#62D84E", cyberark: "#6759D1", onprem: "#607D8B", containers: "#326CE5",
+};
+const LIFECYCLE_COLOR: Record<string, string> = {
+  running: "#34A853", active: "#34A853",
+  stopped: "#FBBC04", inactive: "#FBBC04", suspended: "#FBBC04", on_order: "#FBBC04",
+  terminated: "#EA4335", deprovisioned: "#EA4335", retired: "#EA4335", stolen: "#EA4335",
+};
+
+function MetadataTree({ data, depth = 0 }: { data: any; depth?: number }) {
+  if (data === null || data === undefined)
+    return <Typography variant="caption" sx={{ color: "text.disabled" }}>null</Typography>;
+  if (typeof data === "boolean")
+    return <Chip label={data ? "true" : "false"} size="small" sx={{ height: 18, fontSize: 10, bgcolor: data ? "rgba(52,168,83,0.12)" : "rgba(234,67,53,0.12)", color: data ? "#34A853" : "#EA4335" }} />;
+  if (typeof data === "number")
+    return <Typography variant="body2" sx={{ fontFamily: "monospace", color: "#FBBC04" }}>{data}</Typography>;
+  if (typeof data === "string")
+    return <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{data || '""'}</Typography>;
+  if (Array.isArray(data)) {
+    if (data.length === 0)
+      return <Typography variant="caption" sx={{ color: "text.disabled" }}>[]</Typography>;
+    if (data.every((i) => typeof i !== "object"))
+      return (
+        <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+          {data.map((v, i) => <Chip key={i} label={String(v)} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)" }} />)}
+        </Box>
+      );
+    return (
+      <Box sx={{ pl: depth > 0 ? 1.5 : 0 }}>
+        {data.map((v, i) => <Box key={i} sx={{ mb: 0.5 }}><MetadataTree data={v} depth={depth + 1} /></Box>)}
+      </Box>
+    );
+  }
+  if (typeof data === "object") {
+    const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== "");
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+        {entries.map(([k, v]) => (
+          <Box key={k} sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
+            <Typography variant="caption" sx={{ color: "text.secondary", minWidth: 160, flexShrink: 0, pt: "2px", fontFamily: "monospace" }}>
+              {k.replace(/_/g, " ")}
+            </Typography>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <MetadataTree data={v} depth={depth + 1} />
+            </Box>
+          </Box>
+        ))}
+      </Box>
+    );
+  }
+  return <Typography variant="body2">{String(data)}</Typography>;
+}
+
+function PlatformDetailTab({ detail }: { detail: any }) {
+  if (!detail) {
+    return (
+      <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          No platform detail synced yet. Trigger a connector sync to populate this tab.
+        </Typography>
+      </Card>
+    );
+  }
+
+  const ctColor = CT_COLORS[detail.connector_type?.toLowerCase()] || "#888";
+  const lcColor = LIFECYCLE_COLOR[detail.lifecycle_state?.toLowerCase()] || "#888";
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Box sx={{ p: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Platform Identity</Typography>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Connector</Typography>
+              <Chip label={detail.connector_type} size="small"
+                sx={{ bgcolor: `${ctColor}20`, color: ctColor, fontWeight: 700, mt: 0.5, textTransform: "uppercase", fontSize: 11 }} />
+            </Grid>
+            {detail.lifecycle_state && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Lifecycle State</Typography>
+                <Chip label={detail.lifecycle_state} size="small"
+                  sx={{ bgcolor: `${lcColor}20`, color: lcColor, fontWeight: 700, mt: 0.5, textTransform: "capitalize" }} />
+              </Grid>
+            )}
+            {detail.tenant_account_id && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Account / Subscription</Typography>
+                <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: 12, mt: 0.5, wordBreak: "break-all" }}>{detail.tenant_account_id}</Typography>
+              </Grid>
+            )}
+            {detail.namespace && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Namespace / Group</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>{detail.namespace}</Typography>
+              </Grid>
+            )}
+            {detail.owner && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Owner</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>{detail.owner}</Typography>
+              </Grid>
+            )}
+            {detail.department && (
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Department</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>{detail.department}</Typography>
+              </Grid>
+            )}
+            {detail.fqdn && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>FQDN / Hostname</Typography>
+                <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: 12, mt: 0.5 }}>{detail.fqdn}</Typography>
+              </Grid>
+            )}
+            {detail.ip_addresses?.length > 0 && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>IP Addresses</Typography>
+                <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
+                  {detail.ip_addresses.map((ip: string) => (
+                    <Chip key={ip} label={ip} size="small" sx={{ fontFamily: "monospace", fontSize: 11, bgcolor: "rgba(255,255,255,0.06)" }} />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {detail.security_score != null && (
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Security Score</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5,
+                  color: detail.security_score >= 80 ? "#34A853" : detail.security_score >= 50 ? "#FBBC04" : "#EA4335" }}>
+                  {Math.round(detail.security_score)}
+                </Typography>
+              </Grid>
+            )}
+            {detail.vulnerability_count != null && (
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>Platform Vulns</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 700, mt: 0.5,
+                  color: detail.vulnerability_count === 0 ? "#34A853" : detail.vulnerability_count < 10 ? "#FBBC04" : "#EA4335" }}>
+                  {detail.vulnerability_count}
+                </Typography>
+              </Grid>
+            )}
+          </Grid>
+        </Box>
+      </Card>
+
+      {detail.platform_metadata && Object.keys(detail.platform_metadata).length > 0 && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>
+              Native Platform Metadata
+              <Typography component="span" variant="caption" sx={{ color: "text.secondary", ml: 1 }}>
+                ({Object.keys(detail.platform_metadata).length} fields · {detail.connector_type})
+              </Typography>
+            </Typography>
+            <MetadataTree data={detail.platform_metadata} />
+          </Box>
+        </Card>
+      )}
+
+      {detail.synced_at && (
+        <Typography variant="caption" sx={{ color: "text.disabled", textAlign: "right" }}>
+          Last synced: {new Date(detail.synced_at).toLocaleString()}
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 function AssetComplianceTab({ clientId, assetId }: { clientId: string; assetId: string }) {
   const [framework, setFramework] = useState("nist_csf");

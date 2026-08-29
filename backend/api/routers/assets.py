@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 
 from api.models.models import (
-    Asset, AssetStatus, Connector, Finding, Risk, Scan, ScanStatus, ScanType, FrameworkControl,
+    Asset, AssetPlatformDetail, AssetStatus, Connector, Finding, Risk, Scan, ScanStatus, ScanType, FrameworkControl,
 )
 from api.schemas.schemas import (
     AssetResponse, AssetDetailResponse, AssetSyncResponse, ScanResponse,
@@ -14,6 +14,38 @@ from api.schemas.schemas import (
 from db.database import get_db
 from core.security import get_current_user
 from connectors.sync import sync_connector_assets_bg
+import json as _json
+
+
+def _detail_to_dict(d) -> Optional[Dict[str, Any]]:
+    if d is None:
+        return None
+    meta: dict = {}
+    try:
+        if d.platform_metadata:
+            meta = _json.loads(d.platform_metadata)
+    except Exception:
+        pass
+    ips: list = []
+    try:
+        if d.ip_addresses:
+            ips = _json.loads(d.ip_addresses)
+    except Exception:
+        pass
+    return {
+        "connector_type":      d.connector_type,
+        "tenant_account_id":   d.tenant_account_id,
+        "namespace":           d.namespace,
+        "lifecycle_state":     d.lifecycle_state,
+        "owner":               d.owner,
+        "department":          d.department,
+        "ip_addresses":        ips,
+        "fqdn":                d.fqdn,
+        "security_score":      d.security_score,
+        "vulnerability_count": d.vulnerability_count,
+        "platform_metadata":   meta,
+        "synced_at":           d.synced_at.isoformat() if d.synced_at else None,
+    }
 
 router = APIRouter(prefix="/clients/{client_id}/assets", tags=["assets"])
 
@@ -92,6 +124,7 @@ def _serialize_asset_row(
         "cve_count": (cve_counts or {}).get(rid, 0),
         "last_scan_date": (last_scan_dates or {}).get(rid),
         "risk_score": _risk_score((severity_breakdown or {}).get(rid, {})),
+        "platform_detail": _detail_to_dict(asset.platform_detail),
     }
 
 
@@ -331,6 +364,7 @@ async def get_asset_detail(
         "last_scan_date": max((f.created_at for f in findings if f.created_at), default=None),
         "risks_count": len(risks),
         "provider_metadata": asset.provider_metadata or {},
+        "platform_detail": _detail_to_dict(asset.platform_detail),
         "findings": findings,
         "risks": risks,
     }
@@ -550,6 +584,29 @@ async def get_asset_compliance(
         "findings_with_control_mapping": sum(len(v) for v in ctrl_findings.values()),
         "failing_controls": failing_controls,
     }
+
+
+@router.get("/by-platform/{connector_type}")
+async def list_assets_by_platform(
+    client_id: str,
+    connector_type: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return assets for a client filtered by connector_type in their platform_detail."""
+    assets = (
+        db.query(Asset)
+        .join(AssetPlatformDetail, Asset.id == AssetPlatformDetail.asset_id)
+        .filter(Asset.client_id == client_id)
+        .filter(AssetPlatformDetail.connector_type == connector_type)
+        .all()
+    )
+    return [
+        {"id": a.id, "name": a.name, "asset_class": a.asset_class, "region": a.region,
+         "status": str(a.status.value if hasattr(a.status, "value") else a.status),
+         "platform_detail": _detail_to_dict(a.platform_detail)}
+        for a in assets
+    ]
 
 
 @router.post("/sync/", response_model=AssetSyncResponse, status_code=202)
