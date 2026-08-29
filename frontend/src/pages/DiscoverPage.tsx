@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  BugReport, FindInPage, SmartToy, TrendingUp, Storage, Devices, Radar,
+  BugReport, FindInPage, SmartToy, TrendingUp, Storage, Devices, Radar, GpsFixed,
 } from "@mui/icons-material";
 
 export const DISCOVER_SECTION: SectionDef = {
@@ -24,6 +24,7 @@ export const DISCOVER_SECTION: SectionDef = {
     { name: "Asset Inventory",      icon: <Storage />,     desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
     { name: "Technology Inventory", icon: <Devices />,     desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
     { name: "CVE Blast Radius",     icon: <Radar />,       desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
+    { name: "Scan Coverage",       icon: <GpsFixed />,    desc: "Assets not scanned within the policy window — identify coverage gaps.",        route: "/discover/coverage",     group: "Assets & CVE" },
   ],
 };
 

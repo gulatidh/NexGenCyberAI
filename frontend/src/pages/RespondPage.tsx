@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  Radar, GppBad, AccountTree, PlaylistAddCheck, AutoFixHigh, Description, MenuBook,
+  Radar, GppBad, AccountTree, PlaylistAddCheck, AutoFixHigh, Description, MenuBook, ReportProblem,
 } from "@mui/icons-material";
 
 export const RESPOND_SECTION: SectionDef = {
@@ -15,6 +15,8 @@ export const RESPOND_SECTION: SectionDef = {
     { label: "Threat Entries",    field: "total_threats",       color: "#7c3aed" },
   ],
   cards: [
+    // Incidents
+    { name: "Incidents",            icon: <ReportProblem />,    desc: "Security incident cases with timelines, owners, SLA tracking, and linked findings.", route: "/respond/incidents", group: "Incidents" },
     // Threat Intelligence
     { name: "Threat Register",      icon: <Radar />,            desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",        route: "/respond/threats",          group: "Threat Intelligence" },
     { name: "Control Deficiencies", icon: <GppBad />,           desc: "Framework control gaps identified by the compliance monitor agent.",    route: "/respond/gaps",             group: "Threat Intelligence" },

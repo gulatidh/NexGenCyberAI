@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  SmartToy, Hub, BugReport, MenuBook, Assessment, Search, Shield, Webhook, VpnKey, RateReview,
+  SmartToy, Hub, BugReport, MenuBook, Assessment, Search, Shield, Webhook, VpnKey, RateReview, BarChart,
 } from "@mui/icons-material";
 
 export const AUTOMATE_SECTION: SectionDef = {
@@ -25,8 +25,9 @@ export const AUTOMATE_SECTION: SectionDef = {
     { name: "Reports",          icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                           route: "/automate/reports",       group: "Knowledge" },
     { name: "Ask Your Data",    icon: <Search />,      desc: "SQL-backed natural language queries over all your data.",                    route: "/automate/nl-query",      group: "Knowledge" },
     { name: "AI Guardrails",    icon: <Shield />,      desc: "AI safety controls, prompt audit logs, and guardrail coverage.",             route: "/automate/ai-guardrails", group: "Knowledge" },
-    { name: "Webhooks",         icon: <Webhook />,     desc: "Event-driven alerts on critical findings and completed scans.",              route: "/automate/webhooks",      group: "Knowledge" },
-    { name: "API Keys",         icon: <VpnKey />,      desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/automate/api-keys",      group: "Knowledge" },
+    { name: "Webhooks",         icon: <Webhook />,     desc: "Event-driven alerts on critical findings and completed scans.",              route: "/platform/integrations?tab=webhooks",  group: "Governance" },
+    { name: "API Keys",         icon: <VpnKey />,      desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/platform/integrations?tab=api-keys",  group: "Governance" },
+    { name: "AI Usage & Cost",  icon: <BarChart />,    desc: "Token consumption and estimated spend per provider and agent.",             route: "/automate/usage",         group: "Governance" },
   ],
 };
 

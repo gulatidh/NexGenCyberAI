@@ -1,7 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   People, Storage, Devices, Cable, SyncAlt,
-  Tune, Shield, DeviceHub, Policy, LibraryAdd, AccountTree,
+  Shield, DeviceHub, Policy, LibraryAdd, AccountTree,
   Settings as SettingsIcon, HelpOutlined, ManageSearch,
 } from "@mui/icons-material";
 
@@ -21,10 +21,9 @@ export const SETUP_SECTION: SectionDef = {
     { name: "Accounts",              icon: <People />,       desc: "Account profiles, contact details, and security posture scoping.",         route: "/platform/clients",              group: "Environment" },
     { name: "Asset Inventory",       icon: <Storage />,      desc: "Discovered assets — servers, apps, containers, and cloud resources.",      route: "/platform/assets",               group: "Environment" },
     { name: "Technology Inventory",  icon: <Devices />,      desc: "Software stack and technology across all discovered assets.",              route: "/platform/assets/technologies",  group: "Environment" },
-    { name: "Connectors",            icon: <Cable />,        desc: "Scanner integrations, enterprise tools, and SIEM connectors.",             route: "/platform/connections",          group: "Environment" },
+    { name: "Integrations",           icon: <Cable />,        desc: "Platform connectors, scanners, AI providers, webhooks, and API keys — all in one hub.", route: "/platform/integrations",         group: "Environment" },
     { name: "Ticket Sync",           icon: <SyncAlt />,      desc: "Bi-directional sync of findings and remediations with your ticket system.", route: "/platform/ticket-sync",          group: "Environment" },
     // Design
-    { name: "AI Settings",           icon: <Tune />,         desc: "AI provider credentials, model selection, and automatic failover config.", route: "/platform/ai-settings",          group: "Design" },
     { name: "AI Guardrails",         icon: <Shield />,       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",           route: "/automate/ai-guardrails",        group: "Design" },
     { name: "Audit Logs",            icon: <ManageSearch />, desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",          route: "/platform/audit-logs",           group: "Design" },
     { name: "Threat Models",         icon: <DeviceHub />,    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models",         group: "Design" },

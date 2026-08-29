@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  Security, Assessment, SmartToy, AltRoute, DeviceHub, Policy, Search,
+  Security, Assessment, SmartToy, AltRoute, DeviceHub, Policy, Search, Tune,
 } from "@mui/icons-material";
 
 export const ANALYSE_SECTION: SectionDef = {
@@ -20,6 +20,7 @@ export const ANALYSE_SECTION: SectionDef = {
     { name: "Risk Overview",          icon: <Assessment />,  desc: "Executive summary of ALE exposure, risk domains, and top risks.",        route: "/analyse/risk-overview",      group: "Risk" },
     { name: "AI Risk Analysis",       icon: <SmartToy />,    desc: "AI-generated risk narrative with actionable recommendations.",           route: "/analyse/ai-analysis",        group: "Risk" },
     { name: "Attack Paths",           icon: <AltRoute />,    desc: "MITRE-phased attack chain graph derived from live findings.",            route: "/analyse/attack-paths",       group: "Risk" },
+    { name: "Risk Appetite",          icon: <Tune />,        desc: "Configure organisation risk tolerance bands for the 5×5 GCC IM8 matrix.", route: "/analyse/risk-appetite",      group: "Risk" },
     // Intelligence
     { name: "AI Threat Intelligence", icon: <DeviceHub />,   desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",    route: "/analyse/threat-models",      group: "Intelligence" },
     { name: "Compliance Heatmap",     icon: <Policy />,      desc: "Control coverage heatmap across all active frameworks.",                route: "/analyse/compliance-heatmap", group: "Intelligence" },

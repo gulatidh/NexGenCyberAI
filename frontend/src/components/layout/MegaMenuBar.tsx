@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import {
   ExpandMore, BugReport, Psychology, Radar, Assessment,
-  GppBad, PlaylistAddCheck, SmartToy, Tune, Policy,
+  GppBad, PlaylistAddCheck, SmartToy, Policy,
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
   Description, AltRoute, FolderZip, AccountTree, BarChart,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
@@ -64,8 +64,7 @@ const MENU: MenuItem[] = [
         items: [
           { name: "Accounts",            desc: "Client profiles, contact details, and security posture scoping.",         route: "/platform/clients",            Icon: People      },
           { name: "Asset Inventory",     desc: "Discovered assets — servers, apps, containers, and cloud resources.",     route: "/platform/assets",             Icon: Storage     },
-          { name: "Connectors",          desc: "Scanner integrations, enterprise tools, and SIEM connectors.",            route: "/platform/connections",        Icon: Cable       },
-          { name: "AI Settings",         desc: "AI provider credentials, model selection, and automatic failover config.",route: "/platform/ai-settings",        Icon: Tune        },
+          { name: "Integrations",        desc: "Platform connectors, scanners, AI providers, webhooks, and API keys — all in one hub.", route: "/platform/integrations", Icon: Cable },
         ],
       },
       {
@@ -189,8 +188,9 @@ const MENU: MenuItem[] = [
           { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/automate/reports",            Icon: Assessment  },
           { name: "Ask Your Data",       desc: "SQL-backed natural language queries over all your data.",                route: "/automate/nl-query",           Icon: Search      },
           { name: "AI Guardrails",       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",         route: "/automate/ai-guardrails",      Icon: Security    },
-          { name: "Webhooks",            desc: "Event-driven alerts on critical findings and completed scans.",          route: "/automate/webhooks",           Icon: Webhook     },
-          { name: "API Keys",            desc: "M2M API keys for CI/CD pipelines and programmatic access.",             route: "/automate/api-keys",           Icon: VpnKey      },
+          { name: "Webhooks",            desc: "Event-driven alerts on critical findings and completed scans.",          route: "/platform/integrations?tab=webhooks",  Icon: Webhook },
+          { name: "API Keys",            desc: "M2M API keys for CI/CD pipelines and programmatic access.",             route: "/platform/integrations?tab=api-keys",  Icon: VpnKey  },
+          { name: "AI Usage & Cost",     desc: "Token consumption and estimated spend per provider and agent.",          route: "/automate/usage",              Icon: BarChart    },
         ],
       },
     ],

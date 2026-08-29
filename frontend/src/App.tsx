@@ -121,6 +121,15 @@ const SampleHub           = React.lazy(() => import("./pages/SampleHub"));
 const SampleHubCmd        = React.lazy(() => import("./pages/SampleHubCmd"));
 const SampleAzure         = React.lazy(() => import("./pages/SampleAzure"));
 const SampleHub4          = React.lazy(() => import("./pages/SampleHub4"));
+const IntegrationsHub     = React.lazy(() => import("./pages/IntegrationsHub"));
+const MyProfile           = React.lazy(() => import("./pages/MyProfile"));
+const NotificationsCenter = React.lazy(() => import("./pages/NotificationsCenter"));
+const Incidents           = React.lazy(() => import("./pages/Incidents"));
+const RiskAppetite        = React.lazy(() => import("./pages/RiskAppetite"));
+const ScanCoverage        = React.lazy(() => import("./pages/ScanCoverage"));
+const ExecutiveSummary    = React.lazy(() => import("./pages/ExecutiveSummary"));
+const ReportScheduler     = React.lazy(() => import("./pages/ReportScheduler"));
+const AIUsageCost         = React.lazy(() => import("./pages/AIUsageCost"));
 
 // Redirect helpers that preserve route params
 function RedirectScanDetail() { const { id } = useParams(); return <Navigate to={`/discover/scans/${id}`} replace />; }
@@ -218,6 +227,7 @@ function ProtectedApp() {
             <Route path="posture"      element={<PostureTrends />} />
             <Route path="ai-scan"      element={<AIAssistedScan />} />
             <Route path="cve-pivot"    element={<CVEPivot />} />
+            <Route path="coverage"     element={<ScanCoverage />} />
           </Route>
 
           {/* ── ANALYSE ──────────────────────────────────────────────────── */}
@@ -233,6 +243,7 @@ function ProtectedApp() {
             <Route path="nl-query"               element={<NLQuery />} />
             <Route path="compliance-heatmap" element={<ComplianceHeatmap />} />
             <Route path="comparison"         element={<ClientComparison />} />
+            <Route path="risk-appetite"      element={<RiskAppetite />} />
           </Route>
 
           {/* ── RESPOND ──────────────────────────────────────────────────── */}
@@ -245,6 +256,7 @@ function ProtectedApp() {
             <Route path="ctem"             element={<CTEMPage />} />
             <Route path="vapt-reports"     element={<VAPTReports />} />
             <Route path="security-docs"    element={<SecurityDocs />} />
+            <Route path="incidents"        element={<Incidents />} />
           </Route>
 
           {/* ── REPORT ───────────────────────────────────────────────────── */}
@@ -257,7 +269,9 @@ function ProtectedApp() {
             <Route path="custom-frameworks" element={<Navigate to="/report/frameworks" replace />} />
             <Route path="evidence"          element={<EvidencePackage />} />
             <Route path="reports"           element={<Reports />} />
-            <Route path="audit"             element={<AuditIntelligence />} />
+            <Route path="audit"              element={<AuditIntelligence />} />
+            <Route path="executive-summary" element={<ExecutiveSummary />} />
+            <Route path="scheduler"         element={<ReportScheduler />} />
           </Route>
 
           {/* ── DETAIL PAGES (full chrome, no product sidebar) ───────────── */}
@@ -280,9 +294,10 @@ function ProtectedApp() {
             <Route path="ai-review"    element={<AIAssistedReview />} />
             <Route path="nl-query"     element={<NLQuery />} />
             <Route path="ai-guardrails" element={<AIGuardrails />} />
-            <Route path="webhooks"     element={<Webhooks />} />
-            <Route path="api-keys"     element={<APIKeysPage />} />
+            <Route path="webhooks"     element={<Navigate to="/platform/integrations?tab=webhooks" replace />} />
+            <Route path="api-keys"     element={<Navigate to="/platform/integrations?tab=api-keys" replace />} />
             <Route path="run-trash"    element={<AgentRunTrash />} />
+            <Route path="usage"        element={<AIUsageCost />} />
           </Route>
 
           {/* ── SETUP / PLATFORM ─────────────────────────────────────────── */}
@@ -293,9 +308,10 @@ function ProtectedApp() {
             <Route path="assets"              element={<Assets />} />
             <Route path="assets/technologies" element={<Technologies />} />
             <Route path="assets/:assetId"     element={<AssetDetail />} />
-            <Route path="connections"         element={<Connections />} />
+            <Route path="integrations"        element={<IntegrationsHub />} />
+            <Route path="connections"         element={<Navigate to="/platform/integrations" replace />} />
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
-            <Route path="ai-settings"         element={<AISettings />} />
+            <Route path="ai-settings"         element={<Navigate to="/platform/integrations" replace />} />
             <Route path="audit-logs"          element={<AuditLogs />} />
             <Route path="settings"            element={<Settings />} />
             <Route path="help"                element={<Help />} />
@@ -359,22 +375,24 @@ function ProtectedApp() {
           <Route path="/reports"               element={<Navigate to="/automate/reports" replace />} />
           <Route path="/frameworks"             element={<Navigate to="/analyse/compliance-heatmap" replace />} />
           <Route path="/custom-frameworks"      element={<Navigate to="/platform/settings" replace />} />
-          <Route path="/webhooks"               element={<Navigate to="/automate/webhooks" replace />} />
-          <Route path="/api-keys"               element={<Navigate to="/automate/api-keys" replace />} />
-          <Route path="/data-model"             element={<Navigate to="/discover/assets" replace />} />
+          <Route path="/webhooks"               element={<Navigate to="/platform/integrations?tab=webhooks" replace />} />
+          <Route path="/api-keys"               element={<Navigate to="/platform/integrations?tab=api-keys" replace />} />
+          <Route path="/data-model"             element={<OntologyPage />} />
           <Route path="/connections"            element={<Navigate to="/platform/connections" replace />} />
           <Route path="/clients"                element={<Navigate to="/platform/clients" replace />} />
           <Route path="/clients/:id"            element={<Navigate to="/platform/clients" replace />} />
           <Route path="/ticket-sync"            element={<Navigate to="/platform/ticket-sync" replace />} />
           <Route path="/settings"               element={<Navigate to="/platform/settings" replace />} />
           <Route path="/help"                   element={<Navigate to="/platform/help" replace />} />
-          <Route path="/ai-settings"            element={<Navigate to="/platform/ai-settings" replace />} />
+          <Route path="/ai-settings"            element={<Navigate to="/platform/integrations" replace />} />
 
           {/* ── Admin-only Shell pages (kept in AppLayout) ───────────────── */}
           <Route element={<Shell />}>
             <Route index element={<Navigate to="/hub" replace />} />
-            <Route path="/dashboard"       element={<Dashboard />} />
-            <Route path="/account"         element={<Account />} />
+            <Route path="/dashboard"          element={<Dashboard />} />
+            <Route path="/account"            element={<Account />} />
+            <Route path="/account/profile"    element={<MyProfile />} />
+            <Route path="/account/notifications" element={<NotificationsCenter />} />
             <Route path="/admin"           element={<Admin />} />
             <Route path="/sync"            element={<SyncPage />} />
             <Route path="/email-settings"  element={<EmailSettings />} />
