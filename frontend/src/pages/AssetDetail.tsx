@@ -400,13 +400,7 @@ export default function AssetDetailPage() {
           );
         })()}
 
-        {tab === 3 && (
-          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
-            <Box component="pre" sx={{ color: "text.secondary", fontSize: 12, m: 0, overflow: "auto", maxHeight: 600 }}>
-              {JSON.stringify(asset.provider_metadata || {}, null, 2)}
-            </Box>
-          </Card>
-        )}
+        {tab === 3 && <ProviderMetadataCard meta={asset.provider_metadata || {}} />}
 
         {tab === 4 && <AssetTimeline clientId={clientId} assetId={assetId} />}
         {tab === 5 && <AssetAttackPath clientId={clientId} assetId={assetId} />}
@@ -716,6 +710,79 @@ const LIFECYCLE_COLOR: Record<string, string> = {
   stopped: "#FBBC04", inactive: "#FBBC04", suspended: "#FBBC04", on_order: "#FBBC04",
   terminated: "#EA4335", deprovisioned: "#EA4335", retired: "#EA4335", stolen: "#EA4335",
 };
+
+// ── Provider metadata — structured card view ───────────────────────────────────
+
+const HEADER_FIELDS = ["id", "name", "type", "location"] as const;
+
+function MetaRow({ label, value }: { label: string; value: any }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, py: 0.5 }}>
+      <Typography variant="caption" sx={{ color: "text.secondary", minWidth: 130, flexShrink: 0, pt: "2px", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: 10 }}>
+        {label}
+      </Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <MetadataTree data={value} depth={1} />
+      </Box>
+    </Box>
+  );
+}
+
+// Named sections lifted out of the flat remaining bucket — keeps cross-cloud shapes clean
+const NAMED_SECTIONS: { key: string; label: string }[] = [
+  { key: "config",      label: "Configuration" },   // Entra ID + AWS connector format
+  { key: "properties",  label: "Properties" },       // Azure ARM format
+  { key: "tags",        label: "Tags" },              // Azure / AWS tags
+  { key: "sku",         label: "SKU" },               // Azure SKU object
+];
+
+function ProviderMetadataCard({ meta }: { meta: Record<string, any> }) {
+  const headerEntries = HEADER_FIELDS.map((k) => [k, meta[k]] as [string, any]).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  const sectionKeys = new Set([...HEADER_FIELDS as readonly string[], ...NAMED_SECTIONS.map((s) => s.key)]);
+  const remaining = Object.entries(meta).filter(([k]) => !sectionKeys.has(k) && meta[k] !== null && meta[k] !== undefined && meta[k] !== "");
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {/* Summary — id, name, type, location */}
+      {headerEntries.length > 0 && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}>Summary</Typography>
+          {headerEntries.map(([k, v]) => <MetaRow key={k} label={k} value={v} />)}
+        </Card>
+      )}
+
+      {/* Named sections: config / properties / tags / sku */}
+      {NAMED_SECTIONS.map(({ key, label }) => {
+        const val = meta[key];
+        if (!val || typeof val !== "object" || Object.keys(val).length === 0) return null;
+        const entries = Object.entries(val).filter(([, v]) => v !== null && v !== undefined && v !== "");
+        if (entries.length === 0) return null;
+        return (
+          <Card key={key} sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}>{label}</Typography>
+            {entries.map(([k, v]) => <MetaRow key={k} label={k.replace(/_/g, " ")} value={v} />)}
+          </Card>
+        );
+      })}
+
+      {/* Remaining flat keys */}
+      {remaining.length > 0 && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, p: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: "text.primary" }}>Additional Metadata</Typography>
+          {remaining.map(([k, v]) => <MetaRow key={k} label={k.replace(/_/g, " ")} value={v} />)}
+        </Card>
+      )}
+
+      {/* Empty state */}
+      {headerEntries.length === 0 && NAMED_SECTIONS.every(({ key }) => !meta[key]) && remaining.length === 0 && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>No metadata available for this asset.</Typography>
+        </Card>
+      )}
+    </Box>
+  );
+}
 
 function MetadataTree({ data, depth = 0 }: { data: any; depth?: number }) {
   if (data === null || data === undefined)

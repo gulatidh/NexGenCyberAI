@@ -32,9 +32,19 @@ _AZURE_TYPE_TO_CLASS = {
     "microsoft.dbformysql": "database",
     "microsoft.documentdb": "database",
     "microsoft.keyvault": "keyvault",
-    "microsoft.web": "vm",
-    "microsoft.containerservice": "vm",
+    "microsoft.web": "application",          # App Services, Functions, Logic App connections
+    "microsoft.containerservice": "vm",      # AKS (manages VM nodes)
     "microsoft.containerregistry": "storage",
+    "microsoft.logic": "application",
+    "microsoft.servicebus": "network",
+    "microsoft.eventhub": "network",
+    "microsoft.apimanagement": "application",
+    "microsoft.signalrservice": "application",
+    "microsoft.insights": "other",
+    "microsoft.operationalinsights": "other",
+    "microsoft.security": "policy",
+    "microsoft.authorization": "policy",
+    "microsoft.managedidentity": "identity",
 }
 
 _AWS_SERVICE_TO_CLASS = {
@@ -122,19 +132,18 @@ def _parse_gcp(resource: Dict[str, Any]) -> Dict[str, Any]:
 def _parse_entraid(resource: Dict[str, Any]) -> Dict[str, Any]:
     rid: str = resource.get("id") or ""
     rtype = (resource.get("type") or "entraid/user").lower()
-    if "user" in rtype or "directoryrole" in rtype or "riskyuser" in rtype:
-        asset_class = "identity"
-    elif "application" in rtype or "serviceprincipal" in rtype or "riskyserviceprincipal" in rtype:
+    if "application" in rtype or "serviceprincipal" in rtype or "riskyserviceprincipal" in rtype:
         asset_class = "application"
-    elif "policy" in rtype or "conditionalaccesspolicy" in rtype:
+    elif "policy" in rtype or "conditionalaccesspolicy" in rtype or "namedlocation" in rtype:
         asset_class = "policy"
     elif "device" in rtype:
         asset_class = "endpoint"
-    elif "group" in rtype or "administrativeunit" in rtype:
-        asset_class = "identity"
     elif "domain" in rtype:
         asset_class = "network"
+    elif "group" in rtype or "administrativeunit" in rtype:
+        asset_class = "identity"
     else:
+        # user, directoryrole, riskyuser, administrativeunit, etc.
         asset_class = "identity"
     return {
         "external_id": rid,
