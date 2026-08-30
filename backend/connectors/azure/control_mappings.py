@@ -8,7 +8,7 @@ status to all of NIST 800-53, NIST CSF 2.0, CIS v8.1, and CIS Azure 5.0.
 Adding a new Azure check: pick a stable check_id, add a row, call
 mappings_for(check_id) when constructing the ConnectorFinding.
 """
-from typing import Dict, List
+from typing import Dict, List, Set
 
 # Per-port mapping for NSG inbound 0.0.0.0/0 findings
 _PORT_TO_CIS_AZURE: Dict[int, List[str]] = {
@@ -144,6 +144,27 @@ _DEFENDER_TITLE_TO_CHECK = {
 }
 
 
+# Maps each check_id to the Azure resource_type it actually inspects.
+# Coverage for a control is only claimed when the client has Asset records
+# of that resource_type — i.e., the scan actually ran against those resources.
+_CHECK_RESOURCE_TYPE: Dict[str, str] = {
+    "storage-https-only":             "microsoft.storage/storageaccounts",
+    "storage-public-blob":            "microsoft.storage/storageaccounts",
+    "storage-tls-version":            "microsoft.storage/storageaccounts",
+    "keyvault-soft-delete":           "microsoft.keyvault/vaults",
+    "keyvault-purge-protection":      "microsoft.keyvault/vaults",
+    "rbac-excess-owners":             "microsoft.authorization/roleassignments",
+    "activity-log-no-diag-settings":  "microsoft.insights/diagnosticsettings",
+    "vm-os-disk-not-encrypted":       "microsoft.compute/virtualmachines",
+    "vm-no-endpoint-protection":      "microsoft.compute/virtualmachines",
+    "defender-mfa-owners":            "microsoft.authorization/roleassignments",
+    "defender-secure-transfer-storage": "microsoft.storage/storageaccounts",
+    "defender-nsg-on-subnets":        "microsoft.network/networksecuritygroups",
+    "defender-jit-vm-access":         "microsoft.compute/virtualmachines",
+    "defender-endpoint-protection":   "microsoft.compute/virtualmachines",
+}
+
+
 def mappings_for(check_id: str) -> Dict[str, List[str]]:
     """Return cross-framework control mapping dict; empty if check_id unknown."""
     return dict(_CHECK_MAP.get(check_id, {}))
@@ -155,16 +176,49 @@ def defender_mappings(title: str) -> Dict[str, List[str]]:
     return mappings_for(check) if check else {}
 
 
+def covered_controls_for_asset_types(
+    framework_value: str,
+    present_resource_types: Set[str],
+) -> List[str]:
+    """Controls that the Azure connector can validate given the resource types
+    actually present (from the Asset table). A control is only marked as covered
+    — and therefore COMPLIANT when no findings are emitted — when the relevant
+    resource type actually exists in the scanned environment.
+
+    Controls that map to resource types not present stay N/A (no evidence either way).
+    Controls from NSG port rules are included only when NSG assets are present.
+    """
+    present_lower = {t.lower() for t in present_resource_types}
+    out: set = set()
+
+    for check_id, mappings in _CHECK_MAP.items():
+        rtype = _CHECK_RESOURCE_TYPE.get(check_id, "").lower()
+        # If we don't know the resource type, or no assets of that type exist, skip
+        if not rtype or rtype not in present_lower:
+            continue
+        for cid in mappings.get(framework_value, []) or []:
+            if cid:
+                out.add(cid)
+
+    # NSG port rules covered when NSG assets exist
+    if "microsoft.network/networksecuritygroups" in present_lower:
+        for port_mappings in _PORT_TO_CIS_AZURE.values():
+            for cid in port_mappings:
+                if framework_value == "cis_azure":
+                    out.add(cid)
+
+    return sorted(out)
+
+
 def all_covered_controls(framework_value: str) -> List[str]:
-    """All control_ids the Azure connector knows how to evaluate for the
-    given framework. Used by compliance recompute to mark covered controls
-    as COMPLIANT when no findings were emitted (= the check passed)."""
+    """DEPRECATED: returns the static universe of controls the connector *can* check
+    regardless of what was actually scanned. Prefer covered_controls_for_asset_types()
+    which gates coverage on actual Asset records."""
     out: set = set()
     for mappings in _CHECK_MAP.values():
         for cid in mappings.get(framework_value, []) or []:
             if cid:
                 out.add(cid)
-    # Also include the parametric NSG-port mapping covers
     for mappings_for_port in _PORT_TO_CIS_AZURE.values():
         for cid in mappings_for_port:
             if framework_value == "cis_azure":

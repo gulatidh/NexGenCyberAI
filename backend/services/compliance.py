@@ -1,14 +1,15 @@
 """Framework compliance derivation — translate findings into per-control statuses."""
 from __future__ import annotations
 
+import json
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List
 
 from sqlalchemy.orm import Session
 
 from api.models.models import (
-    ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
+    Asset, ClientControlStatus, ControlStatus, Finding, FrameworkControl, FrameworkType, Scan,
 )
 
 logger = logging.getLogger(__name__)
@@ -92,17 +93,33 @@ def recompute_client_framework(
         Scan.status == "completed",
     ).first() is not None
 
-    # Build the universe of controls the connectors are *capable* of testing
-    # for this framework. Controls in this set with no open findings are
-    # COMPLIANT (the check ran and passed); controls outside it remain N/A
-    # because we have no signal either way.
+    # Build the universe of controls the connectors *actually* tested for this
+    # framework. Coverage is gated on which Azure resource types are present in
+    # the Asset table — if no storage accounts were discovered, storage controls
+    # are NOT marked covered (and therefore stay N/A rather than fake-Compliant).
     covered_set: set = set()
     if has_completed_scan:
         try:
-            from connectors.azure.control_mappings import all_covered_controls
-            covered_set = {_normalize(c) for c in all_covered_controls(fw_value)}
+            from connectors.azure.control_mappings import covered_controls_for_asset_types
+            # Query which asset types we actually have records for (asset_type is
+            # the provider-native type, e.g. "Microsoft.Compute/virtualMachines")
+            asset_types_rows = (
+                db.query(Asset.asset_type)
+                .filter(Asset.client_id == client_id, Asset.asset_type.isnot(None))
+                .distinct()
+                .all()
+            )
+            present_resource_types = {r[0] for r in asset_types_rows if r[0]}
+            covered_set = {
+                _normalize(c)
+                for c in covered_controls_for_asset_types(fw_value, present_resource_types)
+            }
+            logger.debug(
+                "Coverage for %s client=%s: %d resource types → %d controls covered",
+                fw_value, client_id, len(present_resource_types), len(covered_set),
+            )
         except Exception as exc:
-            logger.warning("all_covered_controls failed for %s: %s", fw_value, exc)
+            logger.warning("covered_controls_for_asset_types failed for %s: %s", fw_value, exc)
 
     # ZAP frameworks: each completed scan of that framework type exercises
     # the entire catalog (every rule runs). So coverage = all catalog
@@ -170,6 +187,8 @@ def recompute_client_framework(
     counts = {"compliant": 0, "non_compliant": 0, "partial": 0, "not_applicable": 0, "overridden": 0, "total": 0}
     now = datetime.now(timezone.utc)
 
+    ai_cutoff = now - timedelta(hours=24)
+
     for ctrl in controls:
         counts["total"] += 1
         key = _normalize(ctrl.control_id)
@@ -187,12 +206,41 @@ def recompute_client_framework(
             )
             continue
 
+        # Check for a recent AI assessment that corrects the auto-derived status.
+        # AI can see actual asset metadata and scan content; its verdict is more
+        # accurate than the coverage-heuristic when they disagree.
+        final_status = derived_status
         ev = _auto_evidence(derived_status.value, len(opens), len(hists), key in covered_set)
+        if existing_row and existing_row.ai_assessment_json:
+            try:
+                ai = json.loads(existing_row.ai_assessment_json)
+                assessed_at_raw = ai.get("assessed_at")
+                ai_conf = (ai.get("confidence") or "").lower()
+                ai_corrected = (ai.get("corrected_status") or "").lower().replace("-", "_")
+                # Apply AI verdict when: recent assessment + high/medium confidence +
+                # AI disagrees with auto-derive (prevents AI from silently locking in wrong answers)
+                if (
+                    assessed_at_raw
+                    and ai_corrected
+                    and ai_conf in ("high", "medium")
+                    and ai_corrected != derived_status.value
+                ):
+                    assessed_at = datetime.fromisoformat(assessed_at_raw.replace("Z", "+00:00"))
+                    if assessed_at > ai_cutoff:
+                        try:
+                            final_status = ControlStatus(ai_corrected)
+                            gap = ai.get("gap_analysis", "")
+                            ev = f"AI Assessment ({ai_conf} confidence): {gap}" if gap else f"AI Assessment ({ai_conf} confidence)."
+                        except ValueError:
+                            pass  # Unknown status string — keep derived
+            except Exception:
+                pass
+
         if existing_row is None:
             existing_row = ClientControlStatus(
                 client_id=client_id,
                 framework_control_id=ctrl.id,
-                status=derived_status,
+                status=final_status,
                 derived=True,
                 derived_finding_ids=hists,
                 evidence=ev,
@@ -200,17 +248,17 @@ def recompute_client_framework(
             )
             db.add(existing_row)
         else:
-            existing_row.status = derived_status
+            existing_row.status = final_status
             existing_row.derived = True
             existing_row.derived_finding_ids = hists
             # Refresh auto-evidence, but never clobber a manual/Defender note.
-            if not existing_row.evidence or str(existing_row.evidence).startswith("Auto:"):
+            if not existing_row.evidence or str(existing_row.evidence).startswith(("Auto:", "AI Assessment")):
                 existing_row.evidence = ev
             existing_row.last_evaluated_at = now
 
         # Skip categories/functions (weight=0) for counting; they're parents
         if ctrl.weight > 0:
-            counts[derived_status.value] = counts.get(derived_status.value, 0) + 1
+            counts[final_status.value] = counts.get(final_status.value, 0) + 1
 
     db.commit()
     logger.info(

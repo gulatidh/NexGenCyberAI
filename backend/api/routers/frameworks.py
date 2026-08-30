@@ -724,6 +724,8 @@ Return JSON exactly:
         }
 
     now = datetime.now(timezone.utc)
+    assessment["assessed_at"] = now.isoformat()
+
     if st is None:
         st = ClientControlStatus(
             client_id=client_id,
@@ -733,8 +735,24 @@ Return JSON exactly:
             last_evaluated_at=now,
         )
         db.add(st)
+
     st.ai_assessment_json = _json.dumps(assessment)
     st.last_evaluated_at = now
+
+    # If AI gives a high/medium confidence corrected_status, write it back immediately
+    # so the status column reflects reality without waiting for a full recompute.
+    ai_corrected = (assessment.get("corrected_status") or "").lower().replace("-", "_")
+    ai_conf = (assessment.get("confidence") or "").lower()
+    if ai_corrected and ai_conf in ("high", "medium") and st.derived:
+        try:
+            from api.models.models import ControlStatus as CS
+            new_status = CS(ai_corrected)
+            gap = assessment.get("gap_analysis", "")
+            st.status = new_status
+            st.evidence = f"AI Assessment ({ai_conf} confidence): {gap}" if gap else f"AI Assessment ({ai_conf} confidence)."
+        except ValueError:
+            pass
+
     db.commit()
 
     return {"assessment": assessment, "control_id": control_id}
@@ -878,6 +896,7 @@ Return only valid JSON — no markdown fences, no commentary."""
             for ctrl, result in zip(batch, results):
                 if not isinstance(result, dict):
                     continue
+                result["assessed_at"] = now.isoformat()
                 st = statuses.get(ctrl.id)
                 if st is None:
                     st = ClientControlStatus(
@@ -890,6 +909,19 @@ Return only valid JSON — no markdown fences, no commentary."""
                     statuses[ctrl.id] = st
                 st.ai_assessment_json = _j.dumps(result)
                 st.last_evaluated_at = now
+
+                # Write corrected_status back immediately when confidence is high/medium
+                ai_corrected = (result.get("corrected_status") or "").lower().replace("-", "_")
+                ai_conf = (result.get("confidence") or "").lower()
+                if ai_corrected and ai_conf in ("high", "medium") and st.derived:
+                    try:
+                        new_status = ControlStatus(ai_corrected)
+                        gap = result.get("gap_analysis", "")
+                        st.status = new_status
+                        st.evidence = f"AI Assessment ({ai_conf} confidence): {gap}" if gap else f"AI Assessment ({ai_conf} confidence)."
+                    except ValueError:
+                        pass
+
                 assessed += 1
 
             db.commit()
