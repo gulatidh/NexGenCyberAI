@@ -87,13 +87,22 @@ class EntraIDConnector(BaseConnector):
         Each resource is stored as an Asset + AssetPlatformDetail so the
         config-compliance engine can evaluate controls from real data rather
         than just from findings.
+
+        Permissions required at minimum (app registration):
+          User.Read.All, Application.Read.All, Policy.Read.All, Directory.Read.All
+        Optional (degrade gracefully when absent):
+          AuditLog.Read.All          → signInActivity, sign-in logs
+          Reports.Read.All            → MFA registration report
+          IdentityRiskyUser.Read.All  → Identity Protection risk levels (P2)
         """
         resources = []
 
         # ── 1. Users ─────────────────────────────────────────────────────────
-        # Collect all users with sign-in activity, MFA registration, and risk.
+        # Base call uses only User.Read.All — always succeeds.
+        # signInActivity needs AuditLog.Read.All; fetch separately so a missing
+        # permission doesn't wipe out all user assets.
         try:
-            # MFA registration detail (beta) — one call for the whole tenant
+            # Optional: MFA registration (Reports.Read.All)
             mfa_map: Dict[str, bool] = {}
             try:
                 mfa_data = await self._graph_get(
@@ -107,7 +116,7 @@ class EntraIDConnector(BaseConnector):
             except Exception:
                 pass  # Needs Reports.Read.All — degrade gracefully
 
-            # Risk levels from Identity Protection (P2 only)
+            # Optional: risk levels (IdentityRiskyUser.Read.All + P2)
             risk_map: Dict[str, str] = {}
             try:
                 risk_data = await self._graph_get(
@@ -117,37 +126,48 @@ class EntraIDConnector(BaseConnector):
                 for row in risk_data.get("value") or []:
                     risk_map[row["id"]] = row.get("riskLevel", "none")
             except Exception:
-                pass  # Needs IdentityRiskEvent.Read.All — degrade gracefully
+                pass  # Needs IdentityRiskyUser.Read.All — degrade gracefully
 
+            # Optional: sign-in activity (AuditLog.Read.All)
+            signin_map: Dict[str, str] = {}
+            try:
+                si_data = await self._graph_get(
+                    "/users?$select=id,signInActivity&$top=500"
+                )
+                for row in si_data.get("value") or []:
+                    si = row.get("signInActivity") or {}
+                    signin_map[row["id"]] = si.get("lastSignInDateTime")
+            except Exception:
+                pass  # Needs AuditLog.Read.All — degrade gracefully
+
+            # Base user list — only fields guaranteed by User.Read.All
             users_data = await self._graph_get(
                 "/users"
                 "?$select=id,displayName,userPrincipalName,userType,accountEnabled"
-                ",signInActivity,assignedLicenses,createdDateTime,mail,onPremisesSyncEnabled"
+                ",assignedLicenses,createdDateTime,mail,onPremisesSyncEnabled"
                 "&$top=500"
             )
             for u in (users_data.get("value") or []):
                 uid = u.get("id", "")
-                si = u.get("signInActivity") or {}
                 resources.append({
                     "id": uid,
                     "name": u.get("displayName") or u.get("userPrincipalName", ""),
                     "type": "Microsoft.AzureAD/User",
                     "location": "",
                     "config": {
-                        "user_type": u.get("userType"),           # Member | Guest
+                        "user_type": u.get("userType"),             # Member | Guest
                         "account_enabled": u.get("accountEnabled"),
-                        "last_sign_in": si.get("lastSignInDateTime"),
-                        "last_non_interactive_sign_in": si.get("lastNonInteractiveSignInDateTime"),
+                        "last_sign_in": signin_map.get(uid),        # None if AuditLog.Read.All absent
                         "has_licenses": bool(u.get("assignedLicenses")),
-                        "is_mfa_registered": mfa_map.get(uid),   # None if data unavailable
-                        "risk_level": risk_map.get(uid, "none"),  # none|low|medium|high
+                        "is_mfa_registered": mfa_map.get(uid),      # None if Reports.Read.All absent
+                        "risk_level": risk_map.get(uid, "none"),     # none/low/medium/high
                         "on_premises_sync": u.get("onPremisesSyncEnabled"),
                         "created_at": u.get("createdDateTime"),
                         "mail": u.get("mail"),
                     },
                 })
         except Exception as exc:
-            logger.debug("EntraID get_resources users failed: %s", exc)
+            logger.warning("EntraID get_resources users failed: %s", exc)
 
         # ── 2. Applications (app registrations) ──────────────────────────────
         try:
@@ -345,36 +365,37 @@ class EntraIDConnector(BaseConnector):
         except Exception as exc:
             logger.debug("EntraID get_resources named locations failed: %s", exc)
 
-        # ── 8. Password Reset Policy (SSPR) ──────────────────────────────────
+        # ── 8. Password Reset Policy (SSPR) — beta, optional ────────────────
         try:
-            sspr = await self._graph_get("/policies/passwordResetPolicies", beta=True)
+            sspr = await self._graph_get("/policies/selfServiceSignUpAuthenticationFlowConfiguration", beta=True)
             resources.append({
                 "id": "passwordResetPolicy",
                 "name": "Password Reset Policy (SSPR)",
                 "type": "Microsoft.AzureAD/PasswordResetPolicy",
                 "location": "",
                 "config": {
-                    "sspr_enabled": sspr.get("enablementType") not in (None, 0, "none"),
-                    "enablement_type": sspr.get("enablementType"),  # 0=none, 1=selected, 2=all
+                    "sspr_enabled": bool(sspr.get("isEnabled")),
                 },
             })
         except Exception as exc:
             logger.debug("EntraID get_resources SSPR policy failed: %s", exc)
 
-        # ── 9. External collaboration settings ───────────────────────────────
+        # ── 9. External collaboration settings (v1.0) ─────────────────────
         try:
-            collab = await self._graph_get("/policies/externalIdentitiesPolicy", beta=True)
-            resources.append({
-                "id": "externalIdentitiesPolicy",
-                "name": "External Collaboration Settings",
-                "type": "Microsoft.AzureAD/ExternalIdentitiesPolicy",
-                "location": "",
-                "config": {
-                    "allow_invitations_from": collab.get("allowInvitationsFrom"),
-                    "allow_external_ids_with_matched_tenant": collab.get("allowExternalIdentitiesToLeave"),
-                    "allow_delete_own_identity": collab.get("allowDeleteOwnIdentityByExternalUser"),
-                },
-            })
+            authz = await self._graph_get("/policies/authorizationPolicy")
+            authz_obj = authz if isinstance(authz, dict) and "allowInvitesFrom" in authz else {}
+            if not authz_obj and isinstance(authz, dict):
+                authz_obj = (authz.get("value") or [{}])[0]
+            if authz_obj.get("allowInvitesFrom"):
+                resources.append({
+                    "id": "externalIdentitiesPolicy",
+                    "name": "External Collaboration Settings",
+                    "type": "Microsoft.AzureAD/ExternalIdentitiesPolicy",
+                    "location": "",
+                    "config": {
+                        "allow_invitations_from": authz_obj.get("allowInvitesFrom"),
+                    },
+                })
         except Exception as exc:
             logger.debug("EntraID get_resources external identities policy failed: %s", exc)
 

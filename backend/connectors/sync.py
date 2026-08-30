@@ -120,11 +120,29 @@ def _parse_gcp(resource: Dict[str, Any]) -> Dict[str, Any]:
 
 def _parse_entraid(resource: Dict[str, Any]) -> Dict[str, Any]:
     rid: str = resource.get("id") or ""
+    rtype = (resource.get("type") or "entraid/user").lower()
+    # Classify asset class based on resource type
+    if "user" in rtype:
+        asset_class = "identity"
+    elif "application" in rtype or "serviceprincipal" in rtype:
+        asset_class = "application"
+    elif "policy" in rtype or "conditionalaccesspolicy" in rtype:
+        asset_class = "policy"
+    elif "directoryrole" in rtype:
+        asset_class = "identity"
+    else:
+        asset_class = "identity"
     return {
         "external_id": rid,
-        "name": resource.get("displayName") or resource.get("userPrincipalName") or rid,
+        # New format uses "name"; legacy Graph API format uses "displayName"/"userPrincipalName"
+        "name": (
+            resource.get("name")
+            or resource.get("displayName")
+            or resource.get("userPrincipalName")
+            or rid
+        ),
         "asset_type": resource.get("type") or "entraid/user",
-        "asset_class": "identity",
+        "asset_class": asset_class,
         "region": None,
         "tags": {},
     }
