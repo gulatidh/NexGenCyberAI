@@ -436,6 +436,207 @@ class EntraIDConnector(BaseConnector):
         except Exception as exc:
             logger.debug("EntraID get_resources service principals failed: %s", exc)
 
+        # ── 11. Devices ───────────────────────────────────────────────────────
+        # Requires Device.Read.All
+        try:
+            dev_data = await self._graph_get(
+                "/devices"
+                "?$select=id,displayName,operatingSystem,operatingSystemVersion"
+                ",isCompliant,isManaged,trustType,registrationDateTime"
+                ",approximateLastSignInDateTime,deviceId,profileType"
+                "&$top=500"
+            )
+            for d in (dev_data.get("value") or []):
+                resources.append({
+                    "id": d.get("id", ""),
+                    "name": d.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/Device",
+                    "location": "",
+                    "config": {
+                        "os": d.get("operatingSystem"),
+                        "os_version": d.get("operatingSystemVersion"),
+                        "is_compliant": d.get("isCompliant"),           # None = no compliance policy
+                        "is_managed": d.get("isManaged"),
+                        "trust_type": d.get("trustType"),               # AzureAD | ServerAD | Workplace
+                        "profile_type": d.get("profileType"),           # RegisteredDevice | SecureVM | Printer | Shared | IoT
+                        "registered_at": d.get("registrationDateTime"),
+                        "last_sign_in": d.get("approximateLastSignInDateTime"),
+                        "device_id": d.get("deviceId"),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources devices failed: %s", exc)
+
+        # ── 12. Security Defaults ─────────────────────────────────────────────
+        # Singleton — requires Policy.Read.All
+        try:
+            sd = await self._graph_get("/policies/identitySecurityDefaultsEnforcementPolicy")
+            resources.append({
+                "id": "identitySecurityDefaultsEnforcementPolicy",
+                "name": "Security Defaults",
+                "type": "Microsoft.AzureAD/SecurityDefaultsPolicy",
+                "location": "",
+                "config": {
+                    "is_enabled": sd.get("isEnabled", False),
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources security defaults failed: %s", exc)
+
+        # ── 13. Device Registration Policy ───────────────────────────────────
+        # Singleton — requires Policy.Read.All
+        try:
+            drp = await self._graph_get("/policies/deviceRegistrationPolicy", beta=True)
+            local_admins = drp.get("localAdmins") or {}
+            resources.append({
+                "id": "deviceRegistrationPolicy",
+                "name": "Device Registration Policy",
+                "type": "Microsoft.AzureAD/DeviceRegistrationPolicy",
+                "location": "",
+                "config": {
+                    "user_device_quota": drp.get("userDeviceQuota"),
+                    "azure_ad_join_enabled": (drp.get("azureADJoin") or {}).get("isAdminConfigurable"),
+                    "azure_ad_register_enabled": (drp.get("azureADRegistration") or {}).get("isAdminConfigurable"),
+                    "local_admin_enabled": local_admins.get("enableGlobalAdmins"),
+                    "local_admin_scope": (local_admins.get("registeringUsers") or {}).get("allowedToJoin"),
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources device registration policy failed: %s", exc)
+
+        # ── 14. Custom Domain Names ───────────────────────────────────────────
+        # Requires Domain.Read.All
+        try:
+            domains_data = await self._graph_get(
+                "/domains?$select=id,isDefault,isVerified,isAdminManaged"
+                ",authenticationType,availabilityStatus,supportedServices"
+            )
+            for dom in (domains_data.get("value") or []):
+                resources.append({
+                    "id": dom.get("id", ""),         # domain name is the id (e.g. contoso.com)
+                    "name": dom.get("id", ""),
+                    "type": "Microsoft.AzureAD/Domain",
+                    "location": "",
+                    "config": {
+                        "is_default": dom.get("isDefault"),
+                        "is_verified": dom.get("isVerified"),
+                        "is_admin_managed": dom.get("isAdminManaged"),
+                        "authentication_type": dom.get("authenticationType"),  # Managed | Federated
+                        "availability_status": dom.get("availabilityStatus"),
+                        "supported_services": dom.get("supportedServices") or [],
+                        "is_federated": dom.get("authenticationType") == "Federated",
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources domains failed: %s", exc)
+
+        # ── 15. Risky Users (P2 — degrades gracefully) ───────────────────────
+        # Requires IdentityRiskyUser.Read.All + Entra P2 licence
+        try:
+            ru_data = await self._graph_get(
+                "/identityProtection/riskyUsers"
+                "?$select=id,userPrincipalName,riskLevel,riskState,riskDetail,riskLastUpdatedDateTime"
+                "&$top=500",
+                beta=True,
+            )
+            for ru in (ru_data.get("value") or []):
+                if ru.get("riskLevel") in ("none", None):
+                    continue  # skip non-risky users — findings already cover them
+                resources.append({
+                    "id": ru.get("id", ""),
+                    "name": ru.get("userPrincipalName") or ru.get("id", ""),
+                    "type": "Microsoft.AzureAD/RiskyUser",
+                    "location": "",
+                    "config": {
+                        "risk_level": ru.get("riskLevel"),      # low | medium | high
+                        "risk_state": ru.get("riskState"),      # atRisk | confirmedCompromised | remediated | dismissed
+                        "risk_detail": ru.get("riskDetail"),
+                        "risk_last_updated": ru.get("riskLastUpdatedDateTime"),
+                    },
+                })
+        except Exception:
+            pass  # P2 licence required — degrade gracefully
+
+        # ── 16. Risky Workload Identities (P2 — degrades gracefully) ─────────
+        # Requires IdentityRiskyServicePrincipal.Read.All + Entra P2
+        try:
+            rwi_data = await self._graph_get(
+                "/identityProtection/riskyServicePrincipals"
+                "?$select=id,displayName,appId,riskLevel,riskState,riskDetail"
+                "&$top=200",
+                beta=True,
+            )
+            for rwi in (rwi_data.get("value") or []):
+                if rwi.get("riskLevel") in ("none", None):
+                    continue
+                resources.append({
+                    "id": rwi.get("id", ""),
+                    "name": rwi.get("displayName") or rwi.get("appId", ""),
+                    "type": "Microsoft.AzureAD/RiskyServicePrincipal",
+                    "location": "",
+                    "config": {
+                        "app_id": rwi.get("appId"),
+                        "risk_level": rwi.get("riskLevel"),
+                        "risk_state": rwi.get("riskState"),
+                        "risk_detail": rwi.get("riskDetail"),
+                    },
+                })
+        except Exception:
+            pass  # P2 licence required — degrade gracefully
+
+        # ── 17. Administrative Units ──────────────────────────────────────────
+        # Requires AdministrativeUnit.Read.All
+        try:
+            au_data = await self._graph_get(
+                "/administrativeUnits"
+                "?$select=id,displayName,description,visibility,membershipType,membershipRule"
+            )
+            for au in (au_data.get("value") or []):
+                resources.append({
+                    "id": au.get("id", ""),
+                    "name": au.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/AdministrativeUnit",
+                    "location": "",
+                    "config": {
+                        "visibility": au.get("visibility"),             # Public | HiddenMembership
+                        "membership_type": au.get("membershipType"),    # Assigned | Dynamic
+                        "membership_rule": au.get("membershipRule"),
+                        "description": au.get("description"),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources administrative units failed: %s", exc)
+
+        # ── 18. Groups (security & M365 — first 500) ─────────────────────────
+        # Requires GroupMember.Read.All
+        try:
+            grp_data = await self._graph_get(
+                "/groups"
+                "?$select=id,displayName,groupTypes,securityEnabled,mailEnabled"
+                ",membershipRule,membershipRuleProcessingState,visibility,createdDateTime"
+                "&$top=500"
+            )
+            for g in (grp_data.get("value") or []):
+                group_types = g.get("groupTypes") or []
+                resources.append({
+                    "id": g.get("id", ""),
+                    "name": g.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/Group",
+                    "location": "",
+                    "config": {
+                        "security_enabled": g.get("securityEnabled"),
+                        "mail_enabled": g.get("mailEnabled"),
+                        "is_dynamic": "DynamicMembership" in group_types,
+                        "is_unified": "Unified" in group_types,         # M365 group
+                        "visibility": g.get("visibility"),              # Public | Private | HiddenMembership
+                        "membership_rule": g.get("membershipRule"),
+                        "membership_rule_state": g.get("membershipRuleProcessingState"),
+                        "created_at": g.get("createdDateTime"),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources groups failed: %s", exc)
+
         return resources
 
     # ------------------------------------------------------------------

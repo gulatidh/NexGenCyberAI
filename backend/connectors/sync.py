@@ -122,15 +122,18 @@ def _parse_gcp(resource: Dict[str, Any]) -> Dict[str, Any]:
 def _parse_entraid(resource: Dict[str, Any]) -> Dict[str, Any]:
     rid: str = resource.get("id") or ""
     rtype = (resource.get("type") or "entraid/user").lower()
-    # Classify asset class based on resource type
-    if "user" in rtype:
+    if "user" in rtype or "directoryrole" in rtype or "riskyuser" in rtype:
         asset_class = "identity"
-    elif "application" in rtype or "serviceprincipal" in rtype:
+    elif "application" in rtype or "serviceprincipal" in rtype or "riskyserviceprincipal" in rtype:
         asset_class = "application"
     elif "policy" in rtype or "conditionalaccesspolicy" in rtype:
         asset_class = "policy"
-    elif "directoryrole" in rtype:
+    elif "device" in rtype:
+        asset_class = "endpoint"
+    elif "group" in rtype or "administrativeunit" in rtype:
         asset_class = "identity"
+    elif "domain" in rtype:
+        asset_class = "network"
     else:
         asset_class = "identity"
     return {

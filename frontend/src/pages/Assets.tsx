@@ -23,6 +23,7 @@ const CLASS_COLOR: Record<string, string> = {
   keyvault: "#ffd54f",
   application: "#ab47bc",
   policy: "#26c6da",
+  endpoint: "#ff7043",
   other: "#9e9e9e",
 };
 
@@ -38,7 +39,7 @@ const STATUS_COLOR: Record<string, string> = {
   reappeared: "#ce93d8",
 };
 
-const ASSET_CLASSES = ["vm", "storage", "network", "database", "identity", "keyvault", "application", "policy", "other"];
+const ASSET_CLASSES = ["vm", "storage", "network", "database", "identity", "keyvault", "application", "policy", "endpoint", "other"];
 
 type ActiveTab = "active" | "new" | "reappeared" | "stale";
 
