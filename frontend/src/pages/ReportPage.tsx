@@ -5,7 +5,7 @@ import {
 } from "@mui/icons-material";
 
 export const REPORT_SECTION: SectionDef = {
-  num: "05", label: "Report", color: "#15803d",
+  num: "05", label: "Audit", color: "#15803d",
   title: "Prove it happened",
   sub: "Close the loop with evidence the auditor — or the client — can actually use.",
   info: "VAPT reports are AI-generated from scan findings. Evidence packages are audit-ready ZIPs of findings, control deficiencies, remediation actions, and agent logs.",

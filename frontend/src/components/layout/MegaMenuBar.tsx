@@ -150,7 +150,7 @@ const MENU: MenuItem[] = [
     ],
   },
   {
-    id: "report", label: "Report", color: "#15803d", overviewPath: "/report",
+    id: "report", label: "Audit", color: "#15803d", overviewPath: "/report",
     columns: [
       {
         heading: "Pen Testing",

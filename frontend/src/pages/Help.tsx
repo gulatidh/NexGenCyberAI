@@ -919,18 +919,20 @@ const GROUPS: Group[] = [
       {
         id: "attack-paths",
         title: "Attack Path Visualisation",
-        summary: "The Attack Paths page renders your open findings as a layered SVG graph, grouping them by MITRE ATT&CK phase to show how individual vulnerabilities chain into realistic multi-stage attack paths from Initial Access to Exfiltration.",
+        summary: "The Attack Paths page renders your open findings as an interactive ReactFlow graph, grouping them by MITRE ATT&CK phase to show how individual vulnerabilities chain into realistic multi-stage attack paths from Initial Access to Exfiltration. The same graph also appears inside every Asset Detail page (Attack Path tab), scoped to findings on that specific asset.",
         steps: [
           { text: "Select your client in the top toolbar. Navigate to Intelligence → Attack Paths." },
           { text: "How the graph is built: the backend reads all open findings for the client, applies rule-based phase classification (pattern matching on title, description, CVE ID, and severity), and returns nodes, edges, and path chains.", detail: "Phases: Initial Access (external-facing vulns, CVE exploits), Execution (code execution weaknesses), Persistence (config gaps, auth issues), Lateral Movement (network/IAM misconfigs), Exfiltration (data exposure, logging gaps). A finding can appear in multiple phases." },
-          { text: "Reading the graph: nodes are colour-coded by phase. Edges connect phases that have correlated findings — a path with edges from Initial Access → Execution → Exfiltration means the platform detected findings enabling all three steps." },
+          { text: "Reading the graph: circular nodes are colour-coded by attack phase; severity badges appear on each node. Edges are amber for standard transitions, red for the critical path (highest-risk chain). Red glow ring = node is on the critical path." },
+          { text: "Click a node to collapse/expand its child nodes — the count bubble on the node shows how many children are hidden." },
           { text: "Use the Scan and Project dropdowns in the page header to scope the graph to a specific assessment or project. Leave both empty to see all open findings across the client." },
-          { text: "Stats panel (right side): summary counts per phase, total nodes, total paths identified." },
+          { text: "Asset Detail → Attack Path tab: same graph but automatically filtered to findings on that specific asset (by resource_id). Scoped exclusively to that asset — no full scan/project data mixed in." },
           { text: "The graph regenerates live — run new scans and refresh the page to see updated paths." },
         ],
         tips: [
           "Focus remediation effort on findings that appear in the highest number of path chains — they are the nodes that enable the most complete attack scenarios.",
           "A long chain (Initial Access → Lateral Movement → Exfiltration) with no gaps is a red flag for a board briefing — it means an attacker has a complete playbook against your environment.",
+          "Use the Asset Detail Attack Path tab for asset-specific evidence during a VAPT engagement — open any scanned asset and show only the attack chains affecting it.",
         ],
         warnings: [
           "Attack path classification is rule-based — it does not run a real exploitation chain. It shows potential paths based on finding characteristics, not confirmed exploitability.",
@@ -1003,8 +1005,8 @@ const GROUPS: Group[] = [
         summary: "The Compliance tab on any Asset Detail page shows which framework controls that specific asset is failing, with an overall compliance score. It gives you an asset-centric compliance view — answering 'is this server PCI DSS compliant?' — rather than navigating the global Control Deficiencies table.",
         steps: [
           { text: "Navigate to Asset Inventory from the left nav. Click any asset to open the Asset Detail page." },
-          { text: "Click the Compliance tab (the last tab in the Asset Detail tab row)." },
-          { text: "Select a framework from the dropdown: NIST CSF 2.0, ISO 27001, PCI DSS, CIS v8, or GDPR." },
+          { text: "Click the Compliance tab in the Asset Detail tab row." },
+          { text: "Select a framework from the dropdown. The dropdown loads all frameworks dynamically — standard (NIST CSF, ISO 27001, PCI DSS, CIS v8, GDPR, SOC 2, GCC IM8, MAS TRM, NIST AI RMF, etc.) and any custom frameworks you have built, which appear with a purple 'Custom' chip." },
           { text: "The compliance overview shows four metrics:", detail: "Compliance Score % — (total_controls − failing) / total × 100. Failing Controls — controls with at least one open finding mapped to them. Total Framework Controls — total control count in the selected framework. Open Findings — count of open findings associated with this asset." },
           { text: "The failing controls table lists each breached control: control ID chip (e.g. PR.DS-1 for NIST CSF, REQ-6 for PCI DSS), domain, control title, worst finding severity, and finding count mapped to that control." },
           { text: "Changing the framework dropdown immediately reloads the compliance data for the new framework — no page reload needed." },
@@ -1013,6 +1015,7 @@ const GROUPS: Group[] = [
           "Use Asset Compliance Posture for targeted questions: 'Is this database server PCI DSS compliant?' or 'Which ISO 27001 controls is this web app failing?'.",
           "Findings are mapped to controls via three fields: Finding.control_id + Finding.framework (direct mapping) and Finding.control_mappings JSON (secondary cross-framework mappings). The Compliance tab checks all three.",
           "Run the Compliance Monitor agent first (AI Buddies) to populate control_mappings on findings. Without agent enrichment, only findings with explicit control_id values are counted.",
+          "Custom frameworks you have built (Custom Standards) appear in the framework dropdown with a purple chip — select one to see asset compliance against your internal policy.",
         ],
         warnings: [
           "Compliance Score measures the absence of found failures, not positive proof of compliance. Unscanned assets may have findings that haven't been discovered yet.",

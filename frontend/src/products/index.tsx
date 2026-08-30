@@ -85,7 +85,7 @@ export const RESPOND_PRODUCT: ProductDef = {
 };
 
 export const REPORT_PRODUCT: ProductDef = {
-  name: "Report",
+  name: "Audit",
   abbrev: "RP",
   icon: <GridView />,
   color: "#15803d",
