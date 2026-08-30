@@ -176,6 +176,14 @@ export default function Frameworks() {
     },
   });
 
+  const aiAssessMutation = useMutation({
+    mutationFn: () => frameworksApi.aiAssessControl(clientId!, framework, selected!.control.control_id),
+    onSuccess: (res) => {
+      setSelected((prev) => prev ? { ...prev, ai_assessment: res.data.assessment } : prev);
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: (file: File) => frameworksApi.importControls(framework, file),
     onSuccess: () => {
@@ -773,6 +781,86 @@ export default function Frameworks() {
               </Typography>
             )}
 
+            {/* AI Assessment */}
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => aiAssessMutation.mutate()}
+              disabled={aiAssessMutation.isPending}
+              startIcon={aiAssessMutation.isPending ? <CircularProgress size={12} /> : undefined}
+              sx={{ mb: 2, fontSize: 11, color: "primary.main", borderColor: "divider" }}
+            >
+              {aiAssessMutation.isPending ? "Assessing…" : "AI Assess this Control"}
+            </Button>
+
+            {selected.ai_assessment && (
+              <Box sx={{ mb: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
+                <Box sx={{ px: 1.5, py: 1, bgcolor: "action.hover", borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 9.5, display: "block" }}>
+                    Platform Translation
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12, mt: 0.5, lineHeight: 1.55 }}>
+                    {selected.ai_assessment.platform_translation}
+                  </Typography>
+                </Box>
+                {([
+                  { label: "What Looked For", key: "what_looked_for" as const, color: "#4285F4" },
+                  { label: "What Found", key: "what_found" as const, color: "#F9AB00" },
+                  { label: "What Expected", key: "what_expected" as const, color: "#34A853" },
+                ] as const).map(({ label, key, color }) =>
+                  selected.ai_assessment![key]?.length ? (
+                    <Box key={key} sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" sx={{ color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 9.5, display: "block" }}>
+                        {label}
+                      </Typography>
+                      <Box component="ul" sx={{ m: 0, pl: 2, mt: 0.5 }}>
+                        {selected.ai_assessment![key]!.map((item, i) => (
+                          <Box component="li" key={i} sx={{ fontSize: 11.5, color: "text.primary", lineHeight: 1.5, mb: 0.25 }}>
+                            {item}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  ) : null
+                )}
+                {selected.ai_assessment.gap_analysis && (
+                  <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                    <Typography variant="caption" sx={{ color: "#EA4335", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", fontSize: 9.5, display: "block" }}>
+                      Gap Analysis
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "text.primary", fontSize: 12, mt: 0.5, lineHeight: 1.55 }}>
+                      {selected.ai_assessment.gap_analysis}
+                    </Typography>
+                  </Box>
+                )}
+                {selected.ai_assessment.corrected_status && (
+                  <Box sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>AI suggests:</Typography>
+                    <Chip
+                      label={selected.ai_assessment.corrected_status.replace(/_/g, " ")}
+                      size="small"
+                      sx={{
+                        fontSize: 9.5, height: 18,
+                        bgcolor: selected.ai_assessment.corrected_status === "compliant" ? "rgba(52,168,83,0.15)"
+                          : selected.ai_assessment.corrected_status === "non_compliant" ? "rgba(234,67,53,0.15)"
+                          : selected.ai_assessment.corrected_status === "partial" ? "rgba(249,171,0,0.15)"
+                          : "rgba(128,128,128,0.15)",
+                        color: selected.ai_assessment.corrected_status === "compliant" ? "#34A853"
+                          : selected.ai_assessment.corrected_status === "non_compliant" ? "#EA4335"
+                          : selected.ai_assessment.corrected_status === "partial" ? "#F9AB00"
+                          : "text.secondary",
+                      }}
+                    />
+                    {selected.ai_assessment.confidence && (
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10 }}>
+                        ({selected.ai_assessment.confidence} confidence)
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {((selected.findings && selected.findings.length) || selected.finding_ids?.length) ? (
               <Box>
                 <Divider sx={{ borderColor: "divider", my: 2 }} />
@@ -794,6 +882,11 @@ export default function Frameworks() {
                             WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                             {f.title}
                           </Typography>
+                          {selected.ai_assessment?.irrelevant_finding_ids?.includes(f.id) && (
+                            <Typography variant="caption" sx={{ color: "#F9AB00", fontSize: 9, display: "block" }}>
+                              ⚠ AI: may be incorrectly mapped to this control
+                            </Typography>
+                          )}
                           {f.asset_id ? (
                             <Typography variant="caption" component="span"
                               onClick={() => navigate(`${assetsBase}/${f.asset_id}`)}

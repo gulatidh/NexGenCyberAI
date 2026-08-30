@@ -548,6 +548,185 @@ async def override_control_status(
     )
 
 
+@router.post("/clients/{client_id}/frameworks/{framework}/controls/{control_id}/ai-assess")
+async def ai_assess_control(
+    client_id: str,
+    framework: str,
+    control_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """AI assessment for a control: translates to platform-specific checks, validates
+    finding linkages, and returns structured what_looked_for/found/expected evidence."""
+    import json as _json
+    from core.ai_providers import get_llm, ProviderUnavailableError
+
+    fw = _coerce_framework(framework)
+    ctrl = (
+        db.query(FrameworkControl)
+        .filter(FrameworkControl.framework == fw, FrameworkControl.control_id == control_id)
+        .first()
+    )
+    if not ctrl:
+        raise HTTPException(status_code=404, detail="Control not found")
+
+    st = (
+        db.query(ClientControlStatus)
+        .filter(
+            ClientControlStatus.client_id == client_id,
+            ClientControlStatus.framework_control_id == ctrl.id,
+        )
+        .first()
+    )
+
+    findings = (
+        db.query(Finding)
+        .join(Scan, Finding.scan_id == Scan.id)
+        .filter(
+            Scan.client_id == client_id,
+            Finding.framework == fw,
+            Finding.control_id.ilike(control_id),
+            Finding.status != "false_positive",
+        )
+        .limit(20)
+        .all()
+    )
+
+    platforms = list({f.resource_type for f in findings if f.resource_type}) or ["unknown"]
+    resources = list({f.resource_id for f in findings if f.resource_id})
+
+    asset_meta_snippets = []
+    try:
+        from api.models.models import AssetPlatformDetail, Asset as AssetModel
+        for rid in resources[:5]:
+            asset = db.query(AssetModel).filter(
+                AssetModel.external_id == rid,
+                AssetModel.client_id == client_id,
+            ).first()
+            if asset and hasattr(asset, "platform_detail") and asset.platform_detail:
+                pd = asset.platform_detail
+                snippet: Dict[str, Any] = {
+                    "resource": rid,
+                    "resource_type": pd.resource_type,
+                    "platform": pd.platform,
+                    "region": pd.region,
+                }
+                if pd.platform_metadata:
+                    try:
+                        meta = _json.loads(pd.platform_metadata) if isinstance(pd.platform_metadata, str) else pd.platform_metadata
+                        snippet["config"] = {k: v for k, v in (meta or {}).items() if not isinstance(v, dict)}
+                    except Exception:
+                        pass
+                asset_meta_snippets.append(snippet)
+    except Exception:
+        pass
+
+    findings_list = [
+        {
+            "id": f.id,
+            "title": f.title,
+            "severity": f.severity,
+            "resource_id": f.resource_id,
+            "resource_type": f.resource_type,
+            "description": (f.description or "")[:300],
+            "remediation": (f.remediation or "")[:200],
+        }
+        for f in findings
+    ]
+
+    system_prompt = (
+        "You are a GRC specialist and platform security architect. "
+        "Translate abstract compliance controls into concrete, platform-specific checks. "
+        "Validate whether security findings are genuinely relevant to a control, or wrongly mapped. "
+        "Respond with valid JSON only — no markdown, no commentary."
+    )
+    user_prompt = f"""Assess the following compliance control.
+
+## Control
+- ID: {ctrl.control_id}
+- Title: {ctrl.title}
+- Description: {ctrl.description or "(no description)"}
+- Domain: {ctrl.domain or "(unspecified)"}
+- Framework: {fw}
+
+## Detected Platforms / Resource Types
+{_json.dumps(platforms)}
+
+## Resources in Scope
+{_json.dumps(resources[:10])}
+
+## Asset Configuration Metadata
+{_json.dumps(asset_meta_snippets) if asset_meta_snippets else "Not available — no asset metadata collected yet."}
+
+## Linked Findings ({len(findings_list)})
+{_json.dumps(findings_list, indent=2)}
+
+## Task
+1. Translate the control to what it specifically requires for these platforms.
+2. List 3-6 specific checks to look for.
+3. Review each finding — RELEVANT or IRRELEVANT to this control.
+4. State what was found vs. what is expected.
+5. Give a corrected compliance status.
+
+Return JSON exactly:
+{{
+  "platform_translation": "what this control means for the detected platforms",
+  "what_looked_for": ["check 1", "check 2"],
+  "what_found": ["observation 1", "observation 2"],
+  "what_expected": ["expected 1", "expected 2"],
+  "relevant_finding_ids": ["id1"],
+  "irrelevant_finding_ids": ["id2"],
+  "gap_analysis": "specific gap and why it matters",
+  "corrected_status": "compliant | non_compliant | partial | not_assessed",
+  "confidence": "high | medium | low"
+}}"""
+
+    try:
+        llm = get_llm()
+        raw = llm.invoke([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ])
+        content = raw.content if hasattr(raw, "content") else str(raw)
+        content = content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        assessment = _json.loads(content)
+    except (ProviderUnavailableError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=f"AI provider unavailable: {exc}")
+    except Exception as exc:
+        logger.warning("ai_assess_control parse error: %s", exc)
+        assessment = {
+            "platform_translation": "AI assessment failed — check AI provider configuration.",
+            "what_looked_for": [],
+            "what_found": [f.title for f in findings],
+            "what_expected": [],
+            "relevant_finding_ids": [f.id for f in findings],
+            "irrelevant_finding_ids": [],
+            "gap_analysis": "Assessment could not be completed.",
+            "corrected_status": "not_assessed",
+            "confidence": "low",
+        }
+
+    now = datetime.now(timezone.utc)
+    if st is None:
+        st = ClientControlStatus(
+            client_id=client_id,
+            framework_control_id=ctrl.id,
+            status=ControlStatus.NOT_APPLICABLE,
+            derived=True,
+            last_evaluated_at=now,
+        )
+        db.add(st)
+    st.ai_assessment_json = _json.dumps(assessment)
+    st.last_evaluated_at = now
+    db.commit()
+
+    return {"assessment": assessment, "control_id": control_id}
+
+
 @router.delete("/clients/{client_id}/frameworks/{framework}/controls/{control_id}/override", status_code=204)
 async def clear_override(
     client_id: str,

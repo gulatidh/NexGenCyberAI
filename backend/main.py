@@ -769,6 +769,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("agent_runs.hidden_at ALTER failed: %s", exc)
 
+        # Add ai_assessment_json to client_control_statuses
+        try:
+            ccs_cols = {c["name"] for c in inspector.get_columns("client_control_statuses")}
+        except Exception:
+            ccs_cols = set()
+        if "ai_assessment_json" not in ccs_cols:
+            ddl = ("ALTER TABLE client_control_statuses ADD ai_assessment_json NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE client_control_statuses ADD COLUMN ai_assessment_json TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added client_control_statuses.ai_assessment_json column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("client_control_statuses.ai_assessment_json ALTER failed: %s", exc)
+
         # Migrate unstructured Risk rows to risk_proposals staging area (one-time, idempotent)
         try:
             import uuid as _uuid_mod

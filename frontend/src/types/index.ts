@@ -241,6 +241,17 @@ export interface ControlStatusEntry {
   overridden_at?: string;
   finding_ids: string[];
   findings?: LinkedFinding[];
+  ai_assessment?: {
+    platform_translation?: string;
+    what_looked_for?: string[];
+    what_found?: string[];
+    what_expected?: string[];
+    relevant_finding_ids?: string[];
+    irrelevant_finding_ids?: string[];
+    gap_analysis?: string;
+    corrected_status?: string;
+    confidence?: string;
+  };
 }
 
 export interface FrameworkSummary {

@@ -633,6 +633,7 @@ class ClientControlStatus(Base):
     last_evaluated_at = Column(DateTime(timezone=True), server_default=func.now())
     overridden_by = Column(String(200))
     overridden_at = Column(DateTime(timezone=True))
+    ai_assessment_json = Column(Text, nullable=True)   # JSON: latest AI control assessment
 
     client = relationship("Client", back_populates="control_statuses")
     control = relationship("FrameworkControl", back_populates="statuses")
