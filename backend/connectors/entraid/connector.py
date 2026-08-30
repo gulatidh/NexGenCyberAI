@@ -4,11 +4,14 @@ Reads identity posture: MFA status, risky users, risky sign-ins,
 conditional access policies, privileged accounts.
 Uses Microsoft Graph API via MSAL client credentials.
 """
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 import httpx
 import msal
 from connectors.base import BaseConnector, ConnectorFinding, ConnectorTestResult, FindingSeverity
+
+logger = logging.getLogger(__name__)
 
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -1028,8 +1031,7 @@ class EntraIDConnector(BaseConnector):
                     ),
                 ))
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_legacy_authentication failed: %s", exc)
+            logger.warning("_check_legacy_authentication failed: %s", exc)
         return findings
 
     async def _check_identity_protection_risky_users(self) -> List[ConnectorFinding]:
@@ -1084,8 +1086,6 @@ class EntraIDConnector(BaseConnector):
                     ),
                 ))
         except httpx.HTTPStatusError as exc:
-            import logging
-            logger = logging.getLogger(__name__)
             if exc.response.status_code == 403:
                 logger.info(
                     "_check_identity_protection_risky_users: 403 Forbidden — "
@@ -1094,8 +1094,7 @@ class EntraIDConnector(BaseConnector):
             else:
                 logger.warning("_check_identity_protection_risky_users failed: %s", exc)
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_identity_protection_risky_users failed: %s", exc)
+            logger.warning("_check_identity_protection_risky_users failed: %s", exc)
         return findings
 
     async def _check_identity_protection_risky_signins(self) -> List[ConnectorFinding]:
@@ -1160,8 +1159,6 @@ class EntraIDConnector(BaseConnector):
                     ),
                 ))
         except httpx.HTTPStatusError as exc:
-            import logging
-            logger = logging.getLogger(__name__)
             if exc.response.status_code == 403:
                 logger.info(
                     "_check_identity_protection_risky_signins: 403 Forbidden — "
@@ -1170,8 +1167,7 @@ class EntraIDConnector(BaseConnector):
             else:
                 logger.warning("_check_identity_protection_risky_signins failed: %s", exc)
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_identity_protection_risky_signins failed: %s", exc)
+            logger.warning("_check_identity_protection_risky_signins failed: %s", exc)
         return findings
 
     async def _check_break_glass_accounts(self) -> List[ConnectorFinding]:
@@ -1255,8 +1251,7 @@ class EntraIDConnector(BaseConnector):
                 except Exception:
                     pass  # CA policy lookup is best-effort
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_break_glass_accounts failed: %s", exc)
+            logger.warning("_check_break_glass_accounts failed: %s", exc)
         return findings
 
     async def _check_admin_consent_policy(self) -> List[ConnectorFinding]:
@@ -1311,8 +1306,7 @@ class EntraIDConnector(BaseConnector):
                         ),
                     ))
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_admin_consent_policy failed: %s", exc)
+            logger.warning("_check_admin_consent_policy failed: %s", exc)
         return findings
 
     async def _check_enterprise_applications(self) -> List[ConnectorFinding]:
@@ -1412,8 +1406,7 @@ class EntraIDConnector(BaseConnector):
                         ),
                     ))
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_enterprise_applications failed: %s", exc)
+            logger.warning("_check_enterprise_applications failed: %s", exc)
         return findings
 
     async def _check_authentication_methods_policy(self) -> List[ConnectorFinding]:
@@ -1499,8 +1492,7 @@ class EntraIDConnector(BaseConnector):
                     ),
                 ))
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_authentication_methods_policy failed: %s", exc)
+            logger.warning("_check_authentication_methods_policy failed: %s", exc)
         return findings
 
     async def _check_app_registration_owners(self) -> List[ConnectorFinding]:
@@ -1569,8 +1561,7 @@ class EntraIDConnector(BaseConnector):
                                 ),
                             ))
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_app_registration_owners failed: %s", exc)
+            logger.warning("_check_app_registration_owners failed: %s", exc)
         return findings
 
     async def _check_sign_in_anomalies(self) -> List[ConnectorFinding]:
@@ -1624,8 +1615,6 @@ class EntraIDConnector(BaseConnector):
                     ),
                 ))
         except httpx.HTTPStatusError as exc:
-            import logging
-            logger = logging.getLogger(__name__)
             if exc.response.status_code == 403:
                 logger.info(
                     "_check_sign_in_anomalies: 403 Forbidden — AuditLog.Read.All permission required."
@@ -1633,8 +1622,7 @@ class EntraIDConnector(BaseConnector):
             else:
                 logger.warning("_check_sign_in_anomalies failed: %s", exc)
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).warning("_check_sign_in_anomalies failed: %s", exc)
+            logger.warning("_check_sign_in_anomalies failed: %s", exc)
         return findings
 
     # ------------------------------------------------------------------
