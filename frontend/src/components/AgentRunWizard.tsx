@@ -303,31 +303,56 @@ export function AgentRunWizard({
             );
           }
 
-          if (field.type === "framework") return (
-            <FormControl key={i} fullWidth size="small">
-              <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
-              <Select value={framework} label={field.label + (field.required ? " *" : "")}
-                onChange={(e) => setFramework(e.target.value)}>
-                {frameworks.map((f: any) => {
-                  // API returns { framework, name, is_custom } — support both shapes
-                  const val = f.value ?? f.framework;
-                  const lbl = f.label ?? f.name;
-                  return (
-                    <MenuItem key={val} value={val}>
+          if (field.type === "framework") {
+            // Build a lookup map so renderValue can show the name instead of the raw key
+            const fwMap: Record<string, { name: string; is_custom: boolean }> = {};
+            frameworks.forEach((f: any) => {
+              const v = f.value ?? f.framework;
+              if (v) fwMap[v] = { name: f.label ?? f.name ?? v, is_custom: !!f.is_custom };
+            });
+            return (
+              <FormControl key={i} fullWidth size="small">
+                <InputLabel>{field.label}{field.required ? " *" : ""}</InputLabel>
+                <Select
+                  value={framework}
+                  label={field.label + (field.required ? " *" : "")}
+                  onChange={(e) => setFramework(e.target.value)}
+                  renderValue={(v) => {
+                    const entry = fwMap[v as string];
+                    return (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        {lbl}
-                        {f.is_custom && <Chip label="Custom" size="small"
-                          sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />}
+                        <Typography variant="body2" sx={{ color: "text.primary" }}>
+                          {entry?.name ?? v}
+                        </Typography>
+                        {entry?.is_custom && (
+                          <Chip label="Custom" size="small"
+                            sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
+                        )}
                       </Box>
-                    </MenuItem>
-                  );
-                })}
-              </Select>
-              {field.description && (
-                <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
-              )}
-            </FormControl>
-          );
+                    );
+                  }}
+                  MenuProps={{ slotProps: { paper: { sx: { bgcolor: "background.paper", maxHeight: 320 } } } }}
+                >
+                  {frameworks.map((f: any) => {
+                    const val = f.value ?? f.framework;
+                    const lbl = f.label ?? f.name ?? val;
+                    return (
+                      <MenuItem key={val} value={val} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: "text.primary", flex: 1 }}>{lbl}</Typography>
+                        {f.is_custom && (
+                          <Chip label="Custom" size="small"
+                            sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
+                        )}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+                {field.description && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5 }}>{field.description}</Typography>
+                )}
+              </FormControl>
+            );
+          }
 
           if (field.type === "text_context") return (
             <TextField key={i} fullWidth size="small" multiline minRows={4}
