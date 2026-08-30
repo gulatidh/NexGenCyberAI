@@ -10,8 +10,9 @@
  *
  * Each report has CSV download and Print (browser PDF).
  */
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
@@ -69,11 +70,14 @@ export default function Reports() {
   const navigate = useNavigate();
   const location = useLocation();
   const vaptBase = location.pathname.startsWith("/intelligence") ? "/vapt/reports" : "/vapt-reports";
-  const [clientId, setClientId] = useState("");
+  const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
   const [reportType, setReportType] = useState<ReportType>("executive");
   const [framework, setFramework] = useState<string>("nist_csf");
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Reset project when global account changes
+  useEffect(() => { setProjectId(""); }, [clientId]);
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["clients"], queryFn: clientsApi.list,
@@ -86,7 +90,7 @@ export default function Reports() {
   const project = projects.find((p) => p.id === projectId);
 
   const { data: catalog = [] } = useQuery<FrameworkCatalogEntry[]>({
-    queryKey: ["framework-catalog"], queryFn: frameworksApi.catalog,
+    queryKey: ["frameworks-all"], queryFn: frameworksApi.catalogAll,
   });
 
   // ── Executive summary feeds off the risk-overview endpoint ─────────────────
@@ -294,21 +298,50 @@ export default function Reports() {
 
   return (
     <Box>
-      {/* VAPT Reports quick-access */}
-      <Card variant="outlined" sx={{ mb: 3, p: 2, display: "flex", alignItems: "center", gap: 2,
-        borderColor: "rgba(66,133,244,0.3)", bgcolor: "rgba(66,133,244,0.04)" }}>
-        <GppGood sx={{ color: "#4285F4", fontSize: 32 }} />
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>VAPT Engagement Reports</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Full penetration test reports with findings, methodology, retest tracking and PDF/DOCX export
-          </Typography>
+      {/* Top bar: VAPT shortcut (left) + export actions (right) */}
+      <Box className="no-print" sx={{ display: "flex", gap: 2, mb: 2, alignItems: "stretch" }}>
+        {/* VAPT shortcut — compact half */}
+        <Card variant="outlined" sx={{
+          flex: "0 0 48%", p: "10px 14px", display: "flex", alignItems: "center", gap: 1.5,
+          borderColor: "rgba(66,133,244,0.25)", bgcolor: "rgba(66,133,244,0.04)",
+        }}>
+          <GppGood sx={{ color: "#4285F4", fontSize: 22, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: 12.5, color: "text.primary", lineHeight: 1.2 }}>
+              VAPT Engagement Reports
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "text.secondary", lineHeight: 1.3, mt: 0.25 }}>
+              Full pen test lifecycle — findings, methodology, retest tracking, PDF/DOCX export
+            </Typography>
+          </Box>
+          <Button variant="outlined" size="small" onClick={() => navigate(vaptBase)}
+            sx={{ borderColor: "#4285F4", color: "#4285F4", whiteSpace: "nowrap", fontSize: 11, py: 0.4 }}>
+            Open
+          </Button>
+        </Card>
+
+        {/* Export actions — right half */}
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+          <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 0.25 }}>Export current report</Typography>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button size="small" variant="outlined" startIcon={<Download />} disabled={exportDisabled}
+              onClick={handleExportCSV}
+              sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)", fontSize: 11, py: 0.4 }}>
+              CSV
+            </Button>
+            <Button size="small" variant="outlined" startIcon={<Email />} disabled={!clientId}
+              onClick={openEmailDialog}
+              sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)", fontSize: 11, py: 0.4 }}>
+              Email
+            </Button>
+            <Button size="small" variant="contained" startIcon={<Print />} disabled={!clientId}
+              onClick={handlePrint}
+              sx={{ bgcolor: "#4285F4", color: "#000", fontSize: 11, py: 0.4, "&:hover": { bgcolor: "#00b8d4" } }}>
+              Print / PDF
+            </Button>
+          </Box>
         </Box>
-        <Button variant="outlined" size="small" onClick={() => navigate(vaptBase)}
-          sx={{ borderColor: "#4285F4", color: "#4285F4", whiteSpace: "nowrap" }}>
-          Open VAPT Reports
-        </Button>
-      </Card>
+      </Box>
 
       {/* Print-only stylesheet — hides chrome, shows ref'd report cleanly */}
       <style>{`
@@ -346,89 +379,54 @@ export default function Reports() {
         }
       `}</style>
 
-      <Box className="no-print" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Box>
-          <Typography variant="h5" sx={{ color: "text.primary", fontWeight: 700 }}>Reports</Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Printable + exportable views over your security posture data
-          </Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button variant="outlined" startIcon={<Download />} disabled={exportDisabled}
-            onClick={handleExportCSV}
-            sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}>
-            Export CSV
-          </Button>
-          <Button variant="outlined" startIcon={<Email />} disabled={!clientId}
-            onClick={openEmailDialog}
-            sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}>
-            Email Report
-          </Button>
-          <Button variant="contained" startIcon={<Print />} disabled={!clientId}
-            onClick={handlePrint}
-            sx={{ bgcolor: "#4285F4", color: "#000", "&:hover": { bgcolor: "#00b8d4" } }}>
-            Print / PDF
-          </Button>
-        </Box>
-      </Box>
+      {/* Compact filter bar — no Account (uses global selector) */}
+      <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2, px: 2, py: 1.25 }}>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel sx={{ color: "text.secondary", fontSize: 12 }}>Report Type</InputLabel>
+            <Select value={reportType} label="Report Type"
+              onChange={(e) => setReportType(e.target.value as ReportType)}
+              sx={{ fontSize: 12, color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value="executive" sx={{ fontSize: 12 }}>Executive Summary</MenuItem>
+              <MenuItem value="compliance" sx={{ fontSize: 12 }}>Compliance Report</MenuItem>
+              <MenuItem value="findings" sx={{ fontSize: 12 }}>Findings Report</MenuItem>
+              <MenuItem value="risks" sx={{ fontSize: 12 }}>Risk Register</MenuItem>
+              <MenuItem value="assets" sx={{ fontSize: 12 }}>Asset Inventory</MenuItem>
+            </Select>
+          </FormControl>
 
-      <Card className="no-print" sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
-        <CardContent>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "text.secondary" }}>Report Type</InputLabel>
-                <Select value={reportType} label="Report Type"
-                  onChange={(e) => setReportType(e.target.value as ReportType)}
-                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                  <MenuItem value="executive">Executive Summary</MenuItem>
-                  <MenuItem value="compliance">Compliance Report</MenuItem>
-                  <MenuItem value="findings">Findings Report</MenuItem>
-                  <MenuItem value="risks">Risk Register</MenuItem>
-                  <MenuItem value="assets">Asset Inventory</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel sx={{ color: "text.secondary" }}>Account</InputLabel>
-                <Select value={clientId} label="Account"
-                  onChange={(e) => { setClientId(e.target.value); setProjectId(""); }}
-                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                  {clients.map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 3 }}>
-              <FormControl fullWidth size="small" disabled={!clientId}>
-                <InputLabel sx={{ color: "text.secondary" }}>Project</InputLabel>
-                <Select value={projectId} label="Project" onChange={(e) => setProjectId(e.target.value)}
-                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                  <MenuItem value="">All projects</MenuItem>
-                  {projects.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-                </Select>
-              </FormControl>
-            </Grid>
-            {reportType === "compliance" && (
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
-                  <Select value={framework} label="Framework" onChange={(e) => setFramework(e.target.value)}
-                    sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-                    {catalog.map((f) => (
-                      <MenuItem key={f.framework} value={f.framework}>{f.name}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            )}
-          </Grid>
-        </CardContent>
+          <FormControl size="small" sx={{ minWidth: 160 }} disabled={!clientId}>
+            <InputLabel sx={{ color: "text.secondary", fontSize: 12 }}>Project</InputLabel>
+            <Select value={projectId} label="Project" onChange={(e) => setProjectId(e.target.value)}
+              sx={{ fontSize: 12, color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+              <MenuItem value="" sx={{ fontSize: 12 }}>All projects</MenuItem>
+              {projects.map((p) => <MenuItem key={p.id} value={p.id} sx={{ fontSize: 12 }}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+
+          {reportType === "compliance" && (
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel sx={{ color: "text.secondary", fontSize: 12 }}>Framework</InputLabel>
+              <Select value={framework} label="Framework" onChange={(e) => setFramework(e.target.value)}
+                sx={{ fontSize: 12, color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                {catalog.map((f: any) => (
+                  <MenuItem key={f.framework} value={f.framework} sx={{ fontSize: 12 }}>{f.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {!clientId && (
+            <Typography sx={{ fontSize: 11, color: "text.secondary", ml: 1 }}>
+              Select an account in the top toolbar to generate a report.
+            </Typography>
+          )}
+        </Box>
       </Card>
 
       {!clientId ? (
         <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>
-          Pick a client to generate a report.
+          Select an account in the top toolbar to generate a report.
         </Alert>
       ) : (
         <>
