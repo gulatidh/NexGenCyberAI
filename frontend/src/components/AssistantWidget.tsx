@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box, Fab, IconButton, InputAdornment, Paper,
   TextField, Tooltip, Typography, CircularProgress,
 } from "@mui/material";
-import { AutoAwesome, Close, Send, SmartToy, Refresh } from "@mui/icons-material";
+import { AutoAwesome, Close, Send, SmartToy, Refresh, DragIndicator } from "@mui/icons-material";
 import { useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { assistantApi } from "../services/api";
@@ -20,13 +20,51 @@ const SUGGESTIONS = [
   "How do I add a cloud connector?",
 ];
 
+const FAB_SIZE = 56;
+const PANEL_W = 400;
+const PANEL_H = 520;
+const GAP = 8;
+
+function defaultPos() {
+  return {
+    x: window.innerWidth - 24 - FAB_SIZE,
+    y: window.innerHeight - 24 - FAB_SIZE,
+  };
+}
+
 export default function AssistantWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ sx: number; sy: number; ix: number; iy: number } | null>(null);
   const location = useLocation();
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const getPos = () => pos ?? defaultPos();
+
+  const onHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    // only drag on left button, ignore clicks on buttons inside header
+    if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    const p = pos ?? defaultPos();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ix: p.x, iy: p.y };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const nx = Math.max(0, Math.min(window.innerWidth - FAB_SIZE, dragRef.current.ix + ev.clientX - dragRef.current.sx));
+      const ny = Math.max(0, Math.min(window.innerHeight - FAB_SIZE, dragRef.current.iy + ev.clientY - dragRef.current.sy));
+      setPos({ x: nx, y: ny });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [pos]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,6 +110,11 @@ export default function AssistantWidget() {
     mutation.mutate(message);
   };
 
+  const p = getPos();
+  // Panel anchors to the Fab — prefer above, clamp to viewport
+  const panelLeft = Math.max(8, Math.min(window.innerWidth - PANEL_W - 8, p.x + FAB_SIZE - PANEL_W));
+  const panelTop  = Math.max(8, p.y - PANEL_H - GAP);
+
   return (
     <>
       <Tooltip title={open ? "" : "Ask Owlet Assistant"} placement="left">
@@ -80,8 +123,8 @@ export default function AssistantWidget() {
           onClick={() => setOpen((o) => !o)}
           sx={{
             position: "fixed",
-            bottom: 24,
-            right: 24,
+            left: p.x,
+            top: p.y,
             zIndex: 1400,
             bgcolor: open ? "#4285F4" : "background.paper",
             color: open ? "#fff" : "#4285F4",
@@ -89,7 +132,7 @@ export default function AssistantWidget() {
             borderColor: open ? "#4285F4" : "rgba(66,133,244,0.5)",
             boxShadow: open ? "0 0 0 4px rgba(66,133,244,0.15)" : 4,
             "&:hover": { bgcolor: "#4285F4", color: "#fff", borderColor: "#4285F4" },
-            transition: "all 0.2s ease",
+            transition: "background-color 0.2s ease, color 0.2s ease",
           }}
         >
           {open ? <Close /> : <AutoAwesome />}
@@ -101,10 +144,10 @@ export default function AssistantWidget() {
           elevation={12}
           sx={{
             position: "fixed",
-            bottom: 88,
-            right: 24,
-            width: 400,
-            height: 520,
+            left: panelLeft,
+            top: panelTop,
+            width: PANEL_W,
+            height: PANEL_H,
             display: "flex",
             flexDirection: "column",
             bgcolor: "background.paper",
@@ -116,8 +159,9 @@ export default function AssistantWidget() {
             boxShadow: 8,
           }}
         >
-          {/* Header */}
+          {/* Header — grab anywhere on the bar (except buttons) to drag */}
           <Box
+            onMouseDown={onHeaderMouseDown}
             sx={{
               px: 2, py: 1.25,
               display: "flex", alignItems: "center", gap: 1,
@@ -125,8 +169,12 @@ export default function AssistantWidget() {
               borderColor: "divider",
               bgcolor: "rgba(66,133,244,0.07)",
               flexShrink: 0,
+              cursor: "grab",
+              userSelect: "none",
+              "&:active": { cursor: "grabbing" },
             }}
           >
+            <DragIndicator sx={{ color: "text.disabled", fontSize: 16, mr: -0.5 }} />
             <SmartToy sx={{ color: "#4285F4", fontSize: 20 }} />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 700, fontSize: 13.5, color: "text.primary", lineHeight: 1.2 }}>
