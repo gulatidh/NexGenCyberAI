@@ -147,23 +147,35 @@ def _collect_scope(
     scope_type: str,
     scope_id: Optional[str],
     scan_ids: Optional[List[str]] = None,
+    connector_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Build the context dict that gets injected into the LLM prompt.
 
     When `scan_ids` is given (scope_type='scans'), findings come from exactly
     those scans and assets are narrowed to the connectors those scans ran
     against — so the model reflects one environment instead of a messy
-    client-wide aggregate."""
+    client-wide aggregate.
+
+    When `connector_ids` is given (scope_type='connectors'), assets are
+    scoped to those connectors directly.  Findings still come from all
+    scans for those connectors — or everything client-wide if no scan
+    filtering is requested."""
     client = db.query(Client).filter(Client.id == client_id).first()
     client_name = client.name if client else "Unknown Client"
 
     scan_ids = [s for s in (scan_ids or []) if s] or None
+    connector_ids = [c for c in (connector_ids or []) if c] or None
+
     # Connectors exercised by the selected scans — used to scope assets.
     scan_connector_ids: List[str] = []
     if scan_ids:
         scan_connector_ids = [
             cid for (cid,) in db.query(Scan.connector_id).filter(Scan.id.in_(scan_ids)).all() if cid
         ]
+
+    # Effective connector filter: explicit connector_ids take priority;
+    # fall back to connectors derived from scan selection.
+    effective_connector_ids = connector_ids or (scan_connector_ids if scan_ids else None)
 
     # ── Assets in scope ────
     assets_q = db.query(Asset).filter(Asset.client_id == client_id)
@@ -177,8 +189,8 @@ def _collect_scope(
         assets_q = assets_q.filter(
             Asset.asset_class.isnot(None), Asset.asset_class != "", Asset.asset_class != "other",
         )
-        if scan_ids and scan_connector_ids:
-            assets_q = assets_q.filter(Asset.connector_id.in_(scan_connector_ids))
+        if effective_connector_ids:
+            assets_q = assets_q.filter(Asset.connector_id.in_(effective_connector_ids))
         elif scope_type == "project" and scope_id:
             assets_q = assets_q.filter(Asset.project_id == scope_id)
     assets = assets_q.limit(120).all()
@@ -1946,7 +1958,8 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
         # Step 2 — context (assets + findings + risk register + connectors)
         _set_step(db, tm, "context", "active")
         scope = _collect_scope(db, tm.client_id, tm.scope_type or "client", tm.scope_id,
-                               scan_ids=tm.scope_scan_ids)
+                               scan_ids=tm.scope_scan_ids,
+                               connector_ids=getattr(tm, "scope_connector_ids", None))
         _set_step(db, tm, "context", "done",
                   f"{scope['asset_count']} assets · {scope['finding_count']} findings · "
                   f"{scope.get('risk_count', 0)} risks")

@@ -733,7 +733,8 @@ class ThreatModel(Base):
     name = Column(String(200))
     scope_type = Column(String(32))   # "client" | "project" | "asset" | "scans"
     scope_id = Column(String(36))     # null for client-wide
-    scope_scan_ids = Column(JSON)     # list of scan IDs when scope_type == "scans"
+    scope_scan_ids = Column(JSON)        # list of scan IDs when scope_type == "scans"
+    scope_connector_ids = Column(JSON)   # list of connector IDs when scope_type == "connectors"
     # Original uploaded diagram image ({mime, b64}) for image uploads, so the
     # threat step can show the AI the actual diagram (vision), not just the
     # extracted component list.

@@ -102,10 +102,11 @@ async def get_library_entry(
 
 class ThreatModelCreate(BaseModel):
     name: Optional[str] = None
-    scope_type: str = "client"   # client | project | asset | scans
+    scope_type: str = "client"   # client | project | asset | scans | connectors
     scope_id: Optional[str] = None
     project_id: Optional[str] = None
-    scan_ids: Optional[List[str]] = None  # when set, model is scoped to these scans
+    scan_ids: Optional[List[str]] = None       # scope findings to specific scans
+    connector_ids: Optional[List[str]] = None  # scope assets to specific connectors
     framework: Optional[FrameworkType] = None
     methodology: Optional[str] = None  # stride | pasta | linddun | mitre_attack | kill_chain
     analyst_notes: Optional[str] = None  # free-text guidance for the model
@@ -318,7 +319,13 @@ async def create_threat_model(
     # Scan-scoped model: narrows the analysis to the environment(s) those
     # scans cover, instead of a messy client-wide aggregate.
     scan_ids = [s for s in (payload.scan_ids or []) if s]
-    scope_type = "scans" if scan_ids else (payload.scope_type or "client")
+    connector_ids = [c for c in (payload.connector_ids or []) if c]
+    if scan_ids:
+        scope_type = "scans"
+    elif connector_ids:
+        scope_type = "connectors"
+    else:
+        scope_type = payload.scope_type or "client"
     curated = payload.components or None
     tm = ThreatModel(
         client_id=client_id,
@@ -327,6 +334,7 @@ async def create_threat_model(
         scope_type=scope_type,
         scope_id=payload.scope_id,
         scope_scan_ids=scan_ids or None,
+        scope_connector_ids=connector_ids or None,
         framework=payload.framework,
         methodology=methodology,
         analyst_notes=(payload.analyst_notes or "").strip() or None,

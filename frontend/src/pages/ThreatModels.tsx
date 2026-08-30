@@ -18,12 +18,12 @@ import {
   DialogContent, DialogActions, TextField, CircularProgress, Alert,
   LinearProgress, Checkbox, ListItemText, Switch, FormControlLabel,
 } from "@mui/material";
-import { Add, Hub, Replay, DeleteOutlined, UploadFile } from "@mui/icons-material";
+import { Add, Hub, Replay, DeleteOutlined, UploadFile, Cable, BugReport, Info } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
-import { threatModelsApi, scansApi } from "../services/api";
-import { Scan } from "../types";
+import { threatModelsApi, scansApi, connectorsApi } from "../services/api";
+import { Scan, Connector } from "../types";
 import { fromNow } from "../utils/datetime";
 
 interface ThreatModelSummary {
@@ -81,6 +81,7 @@ export default function ThreatModels() {
   const [tmName, setTmName] = useState("");
   const [methodology, setMethodology] = useState<string>("stride");
   const [cloudProvider, setCloudProvider] = useState<string>("generic");
+  const [connectorIds, setConnectorIds] = useState<string[]>([]);
   const [scanIds, setScanIds] = useState<string[]>([]);
   const [dataFlowDesc, setDataFlowDesc] = useState("");
   const [notes, setNotes] = useState("");
@@ -104,18 +105,31 @@ export default function ThreatModels() {
       ((q.state.data as any) || []).some((m: any) => m.status === "pending" || m.status === "generating") ? 4000 : false,
   });
 
-  // Completed scans for the selected client — choices for scan-scoped models.
-  const { data: clientScans = [] } = useQuery<Scan[]>({
+  // Platform connectors for asset scoping
+  const { data: clientConnectors = [] } = useQuery<Connector[]>({
+    queryKey: ["tm-connectors", selectedClientId],
+    queryFn: () => connectorsApi.list(selectedClientId),
+    enabled: !!selectedClientId && openCreate,
+  });
+  const platformConnectorTypes = new Set(["azure", "aws", "gcp", "onprem", "entraid", "okta", "cyberark", "servicenow"]);
+  const platformConnectors = (clientConnectors as any[]).filter((c) => platformConnectorTypes.has(c.connector_type));
+
+  // Scans for findings enrichment — filtered to selected connectors when any are chosen
+  const { data: allClientScans = [] } = useQuery<Scan[]>({
     queryKey: ["tm-scans", selectedClientId],
     queryFn: () => scansApi.list(selectedClientId),
     enabled: !!selectedClientId && openCreate,
   });
+  const clientScans = connectorIds.length
+    ? (allClientScans as any[]).filter((s) => !s.connector_id || connectorIds.includes(s.connector_id))
+    : allClientScans as any[];
 
   const createMutation = useMutation({
     mutationFn: () => threatModelsApi.create(selectedClientId, {
       name: tmName || undefined,
-      scope_type: scanIds.length ? "scans" : "client",
+      scope_type: scanIds.length ? "scans" : connectorIds.length ? "connectors" : "client",
       scan_ids: scanIds.length ? scanIds : undefined,
+      connector_ids: connectorIds.length ? connectorIds : undefined,
       methodology,
       cloud_provider: cloudProvider,
       analyst_notes: [
@@ -128,6 +142,7 @@ export default function ThreatModels() {
       qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
       setOpenCreate(false);
       setTmName("");
+      setConnectorIds([]);
       setScanIds([]);
       setDataFlowDesc("");
       setNotes("");
@@ -190,17 +205,23 @@ export default function ThreatModels() {
             On-demand STRIDE / PASTA / LINDDUN / MITRE ATT&CK / Kill Chain models grounded in your asset inventory + findings
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Button variant="outlined" startIcon={<UploadFile />}
-            disabled={!selectedClientId || !canAct}
-            onClick={() => setOpenUpload(true)}
-            sx={{
-              color: "text.secondary",
-              borderColor: "divider",
-              "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" },
-            }}>
-            Upload Diagram
-          </Button>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+          <Tooltip title={!selectedClientId ? "Select an account first" : !canAct ? "Read-only in Executive mode" : "Upload a draw.io / PDF / image diagram"}>
+            <span>
+              <Button variant="outlined" startIcon={<UploadFile />}
+                disabled={!selectedClientId || !canAct}
+                onClick={() => setOpenUpload(true)}
+                sx={{
+                  color: "text.secondary",
+                  borderColor: "divider",
+                  "&:hover": { borderColor: "#9C27B0", color: "#9C27B0", bgcolor: "rgba(156,39,176,0.06)" },
+                  "&:disabled": { opacity: 0.45 },
+                }}>
+                Upload Diagram
+              </Button>
+            </span>
+          </Tooltip>
+          <Box sx={{ width: "1px", height: 24, bgcolor: "divider" }} />
           <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to generate models." : ""}>
             <span>
               <Button variant="contained" startIcon={<Add />}
@@ -403,28 +424,86 @@ export default function ThreatModels() {
               </Typography>
             </Box>
 
+            {/* ── Step 1: Platform Connector (asset source) ── */}
             <Box>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
-                SCOPE (optional)
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
+                <Cable sx={{ fontSize: 14, color: "#4285F4" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                  STEP 1 — ASSET SOURCE
+                </Typography>
+                <Chip label="recommended" size="small"
+                  sx={{ height: 16, fontSize: 9, bgcolor: "rgba(52,168,83,0.15)", color: "#34A853" }} />
+              </Box>
               <FormControl size="small" fullWidth>
-                <InputLabel sx={{ color: "text.secondary" }}>Scans to combine</InputLabel>
+                <InputLabel sx={{ color: "text.secondary" }}>Platform Connector (scopes assets)</InputLabel>
+                <Select
+                  multiple
+                  value={connectorIds}
+                  onChange={(e) => {
+                    const v = typeof e.target.value === "string" ? e.target.value.split(",") : (e.target.value as string[]);
+                    setConnectorIds(v);
+                    setScanIds([]); // reset scan selection when connector changes
+                  }}
+                  label="Platform Connector (scopes assets)"
+                  renderValue={(sel) => (sel as string[]).length
+                    ? platformConnectors.filter((c: any) => (sel as string[]).includes(c.id)).map((c: any) => c.name).join(", ")
+                    : ""}
+                  sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                  MenuProps={{ slotProps: { paper: { sx: { maxHeight: 280, bgcolor: "background.paper" } } } }}
+                >
+                  {platformConnectors.length === 0 && <MenuItem disabled>No platform connectors configured</MenuItem>}
+                  {platformConnectors.map((c: any) => (
+                    <MenuItem key={c.id} value={c.id} sx={{ color: "text.primary" }}>
+                      <Checkbox size="small" checked={connectorIds.includes(c.id)} sx={{ color: "#4285F4" }} />
+                      <ListItemText
+                        primary={c.name}
+                        secondary={`${c.connector_type.toUpperCase()} · ${c.status}`}
+                      />
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                {connectorIds.length
+                  ? `Assets will be pulled from the selected connector${connectorIds.length > 1 ? "s" : ""} only — keeps the diagram focused on one environment.`
+                  : "Leave empty to include all assets across the account (may produce a noisier model)."}
+              </Typography>
+            </Box>
+
+            {/* ── Step 2: Scan Findings (enrichment) ── */}
+            <Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
+                <BugReport sx={{ fontSize: 14, color: "#EA4335" }} />
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                  STEP 2 — FINDINGS ENRICHMENT
+                </Typography>
+                <Chip label="optional" size="small"
+                  sx={{ height: 16, fontSize: 9, bgcolor: "rgba(255,255,255,0.08)", color: "text.disabled" }} />
+              </Box>
+              <FormControl size="small" fullWidth>
+                <InputLabel sx={{ color: "text.secondary" }}>
+                  {connectorIds.length ? "Scans from selected connector(s)" : "Scans to attach findings from"}
+                </InputLabel>
                 <Select
                   multiple
                   value={scanIds}
                   onChange={(e) => setScanIds(typeof e.target.value === "string" ? e.target.value.split(",") : (e.target.value as string[]))}
-                  label="Scans to combine"
+                  label={connectorIds.length ? "Scans from selected connector(s)" : "Scans to attach findings from"}
                   renderValue={(sel) => (sel as string[]).length ? `${(sel as string[]).length} scan(s) selected` : ""}
                   sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-                  MenuProps={{ slotProps: { paper: { sx: { maxHeight: 340, bgcolor: "background.paper" } } } }}
+                  MenuProps={{ slotProps: { paper: { sx: { maxHeight: 320, bgcolor: "background.paper" } } } }}
                 >
-                  {clientScans.length === 0 && <MenuItem disabled>No scans for this account</MenuItem>}
-                  {clientScans.map((s) => {
+                  {clientScans.length === 0 && (
+                    <MenuItem disabled>
+                      {connectorIds.length ? "No scans found for selected connector(s)" : "No scans for this account"}
+                    </MenuItem>
+                  )}
+                  {(clientScans as any[]).map((s) => {
                     const label = s.name || (s.scan_type as any) || s.id.slice(0, 8);
                     const total = s.summary?.total ?? 0;
                     return (
                       <MenuItem key={s.id} value={s.id} sx={{ color: "text.primary" }}>
-                        <Checkbox size="small" checked={scanIds.indexOf(s.id) > -1} sx={{ color: "#4285F4" }} />
+                        <Checkbox size="small" checked={scanIds.indexOf(s.id) > -1} sx={{ color: "#EA4335" }} />
                         <ListItemText
                           primary={`${label} · ${s.status}`}
                           secondary={`${total} finding${total === 1 ? "" : "s"}${s.completed_at ? " · " + fromNow(s.completed_at) : ""}`}
@@ -435,9 +514,23 @@ export default function ThreatModels() {
                 </Select>
               </FormControl>
               <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
-                Leave empty for a client-wide model, or pick one or more scans to scope the model to just those environments — avoids mixing unrelated systems into one messy diagram.
+                {connectorIds.length
+                  ? "Showing scans from selected connector(s). The AI uses these findings to annotate threats with real CVEs and affected resources."
+                  : "Attach scanner findings to enrich the threat model — the AI links each threat to real CVEs, CVSS scores, and affected assets."}
               </Typography>
             </Box>
+
+            {/* Scope summary callout */}
+            {(connectorIds.length > 0 || scanIds.length > 0) && (
+              <Alert severity="info" icon={<Info sx={{ fontSize: 16 }} />}
+                sx={{ bgcolor: "rgba(66,133,244,0.07)", color: "text.secondary", border: "1px solid rgba(66,133,244,0.2)", py: 0.75 }}>
+                <Typography sx={{ fontSize: 12, lineHeight: 1.5 }}>
+                  {connectorIds.length > 0 && `Assets scoped to ${connectorIds.length} connector${connectorIds.length > 1 ? "s" : ""}. `}
+                  {scanIds.length > 0 && `Findings from ${scanIds.length} scan${scanIds.length > 1 ? "s" : ""} will enrich the model. `}
+                  {connectorIds.length === 0 && scanIds.length > 0 && "All account assets included."}
+                </Typography>
+              </Alert>
+            )}
 
             <Box>
               <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mb: 1, display: "block" }}>
