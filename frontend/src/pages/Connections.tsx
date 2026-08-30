@@ -335,17 +335,22 @@ export default function Connections() {
   const location = useLocation();
   const qc = useQueryClient();
 
-  // ── Tab state driven by URL hash ────────────────────────────────────────────
+  // When embedded in IntegrationsHub (/platform/integrations), the component
+  // is a child tab so URL-hash navigation doesn't apply — keep tab as local state.
+  const isEmbedded = location.pathname === "/platform/integrations";
+
   const [activeTab, setActiveTab] = useState(() => hashToTab(location.hash));
 
   useEffect(() => {
-    setActiveTab(hashToTab(location.hash));
-  }, [location.hash]);
+    if (!isEmbedded) setActiveTab(hashToTab(location.hash));
+  }, [location.hash, isEmbedded]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
-    const connBase = location.pathname.startsWith("/platform") ? "/platform/connections" : "/connections";
-    navigate(`${connBase}${tabToHash(newValue)}`, { replace: true });
+    if (!isEmbedded) {
+      const connBase = location.pathname.startsWith("/platform") ? "/platform/connections" : "/connections";
+      navigate(`${connBase}${tabToHash(newValue)}`, { replace: true });
+    }
   };
 
   // ── Client / project selection ──────────────────────────────────────────────
