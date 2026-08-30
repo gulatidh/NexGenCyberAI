@@ -269,36 +269,48 @@ def _detail_gcp(resource: dict) -> Tuple[dict, dict]:
 
 
 def _detail_entraid(resource: dict) -> Tuple[dict, dict]:
+    # New format from get_resources(): structured config dict per asset type.
+    # Legacy format (raw Graph API) also handled via fallback.
+    cfg      = resource.get("config") or {}
     profile  = resource.get("profile") or {}
     sign_in  = resource.get("signInActivity") or {}
     dept     = profile.get("department") or resource.get("department")
-    enabled  = resource.get("accountEnabled")
+    rtype    = (resource.get("type") or "").lower()
+
+    # Lifecycle state: for policy/singleton assets always active; for users use account_enabled
+    if "user" in rtype:
+        enabled = cfg.get("account_enabled") if cfg else resource.get("accountEnabled")
+        lifecycle = "active" if enabled else "inactive"
+        fqdn = cfg.get("mail") or resource.get("userPrincipalName")
+    else:
+        lifecycle = "active"
+        fqdn = resource.get("name") or resource.get("displayName")
+
     universal = {
         "tenant_account_id": resource.get("tenantId"),
-        "namespace":         dept,
-        "lifecycle_state":   "active" if enabled else "inactive",
+        "namespace":         dept or resource.get("type"),
+        "lifecycle_state":   lifecycle,
         "owner":             None,
         "department":        dept,
         "ip_addresses":      None,
-        "fqdn":              resource.get("userPrincipalName"),
+        "fqdn":              fqdn,
         "security_score":    None,
         "vulnerability_count": None,
     }
+    # Store the full resource (including config dict) as platform_metadata so
+    # the config-compliance engine can read config.* paths directly.
     metadata = {
         "object_id": resource.get("id"),
+        "display_name": resource.get("name") or resource.get("displayName"),
+        "resource_type": resource.get("type"),
+        # Config block — all security-relevant properties collected by get_resources()
+        "config": cfg,
+        # Legacy fallbacks for old-format direct Graph API payloads
         "user_principal_name": resource.get("userPrincipalName"),
-        "display_name": resource.get("displayName"),
-        "account_enabled": enabled,
-        "user_type": resource.get("userType"),
-        "job_title": profile.get("title") or resource.get("jobTitle"),
-        "department": dept,
-        "office_location": resource.get("officeLocation"),
-        "assigned_licenses": [l.get("skuId") for l in (resource.get("assignedLicenses") or []) if isinstance(l, dict)],
-        "mfa_methods": resource.get("authenticationMethods"),
-        "last_sign_in": sign_in.get("lastSignInDateTime"),
-        "risk_level": resource.get("riskLevel"),
-        "risk_state": resource.get("riskState"),
-        "groups": resource.get("groups"),
+        "account_enabled": cfg.get("account_enabled") if cfg else resource.get("accountEnabled"),
+        "user_type": cfg.get("user_type") if cfg else resource.get("userType"),
+        "last_sign_in": cfg.get("last_sign_in") if cfg else sign_in.get("lastSignInDateTime"),
+        "risk_level": cfg.get("risk_level") if cfg else resource.get("riskLevel"),
     }
     return universal, metadata
 

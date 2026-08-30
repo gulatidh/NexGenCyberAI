@@ -82,39 +82,99 @@ class EntraIDConnector(BaseConnector):
             return ConnectorTestResult(success=False, message=str(exc))
 
     async def get_resources(self) -> List[Dict[str, Any]]:
+        """Collect all identity security-relevant assets from Entra ID.
+
+        Each resource is stored as an Asset + AssetPlatformDetail so the
+        config-compliance engine can evaluate controls from real data rather
+        than just from findings.
+        """
         resources = []
 
-        # Users with security-relevant properties
+        # ── 1. Users ─────────────────────────────────────────────────────────
+        # Collect all users with sign-in activity, MFA registration, and risk.
         try:
+            # MFA registration detail (beta) — one call for the whole tenant
+            mfa_map: Dict[str, bool] = {}
+            try:
+                mfa_data = await self._graph_get(
+                    "/reports/authenticationMethods/userRegistrationDetails"
+                    "?$select=id,isMfaRegistered,isMfaCapable,isPasswordlessCapable"
+                    "&$top=500",
+                    beta=True,
+                )
+                for row in mfa_data.get("value") or []:
+                    mfa_map[row["id"]] = bool(row.get("isMfaRegistered"))
+            except Exception:
+                pass  # Needs Reports.Read.All — degrade gracefully
+
+            # Risk levels from Identity Protection (P2 only)
+            risk_map: Dict[str, str] = {}
+            try:
+                risk_data = await self._graph_get(
+                    "/identityProtection/riskyUsers?$select=id,riskLevel,riskState&$top=500",
+                    beta=True,
+                )
+                for row in risk_data.get("value") or []:
+                    risk_map[row["id"]] = row.get("riskLevel", "none")
+            except Exception:
+                pass  # Needs IdentityRiskEvent.Read.All — degrade gracefully
+
             users_data = await self._graph_get(
-                "/users?$select=id,displayName,userPrincipalName,userType,accountEnabled,signInActivity,assignedLicenses&$top=200"
+                "/users"
+                "?$select=id,displayName,userPrincipalName,userType,accountEnabled"
+                ",signInActivity,assignedLicenses,createdDateTime,mail,onPremisesSyncEnabled"
+                "&$top=500"
             )
             for u in (users_data.get("value") or []):
+                uid = u.get("id", "")
                 si = u.get("signInActivity") or {}
                 resources.append({
-                    "id": u.get("id", ""),
+                    "id": uid,
                     "name": u.get("displayName") or u.get("userPrincipalName", ""),
                     "type": "Microsoft.AzureAD/User",
                     "location": "",
                     "config": {
-                        "user_type": u.get("userType"),
+                        "user_type": u.get("userType"),           # Member | Guest
                         "account_enabled": u.get("accountEnabled"),
                         "last_sign_in": si.get("lastSignInDateTime"),
+                        "last_non_interactive_sign_in": si.get("lastNonInteractiveSignInDateTime"),
                         "has_licenses": bool(u.get("assignedLicenses")),
+                        "is_mfa_registered": mfa_map.get(uid),   # None if data unavailable
+                        "risk_level": risk_map.get(uid, "none"),  # none|low|medium|high
+                        "on_premises_sync": u.get("onPremisesSyncEnabled"),
+                        "created_at": u.get("createdDateTime"),
+                        "mail": u.get("mail"),
                     },
                 })
         except Exception as exc:
-            import logging as _lg
-            _lg.getLogger(__name__).debug("EntraID get_resources users failed: %s", exc)
+            logger.debug("EntraID get_resources users failed: %s", exc)
 
-        # Applications with security-relevant credential info
+        # ── 2. Applications (app registrations) ──────────────────────────────
         try:
+            now_dt = datetime.now(timezone.utc)
             apps_data = await self._graph_get(
-                "/applications?$select=id,displayName,appId,passwordCredentials,keyCredentials,verifiedPublisher&$top=100"
+                "/applications"
+                "?$select=id,displayName,appId,passwordCredentials,keyCredentials"
+                ",verifiedPublisher,createdDateTime,signInAudience"
+                "&$top=200"
             )
             for a in (apps_data.get("value") or []):
                 pw_creds = a.get("passwordCredentials") or []
+                key_creds = a.get("keyCredentials") or []
                 has_nonexpiring = any(not c.get("endDateTime") for c in pw_creds)
+                has_expired = any(
+                    self._parse_dt(c.get("endDateTime")) and
+                    self._parse_dt(c.get("endDateTime")) < now_dt
+                    for c in pw_creds
+                )
+                longest_secret_days = max(
+                    (
+                        (self._parse_dt(c.get("endDateTime")) - self._parse_dt(c.get("startDateTime"))).days
+                        for c in pw_creds
+                        if self._parse_dt(c.get("endDateTime")) and self._parse_dt(c.get("startDateTime"))
+                    ),
+                    default=0,
+                )
                 resources.append({
                     "id": a.get("id", ""),
                     "name": a.get("displayName", ""),
@@ -122,44 +182,237 @@ class EntraIDConnector(BaseConnector):
                     "location": "",
                     "config": {
                         "app_id": a.get("appId"),
+                        "sign_in_audience": a.get("signInAudience"),  # AzureADMyOrg | AzureADMultipleOrgs | AzureADandPersonalMicrosoftAccount
                         "secret_count": len(pw_creds),
-                        "cert_count": len(a.get("keyCredentials") or []),
+                        "cert_count": len(key_creds),
                         "has_nonexpiring_secret": has_nonexpiring,
+                        "has_expired_secret": has_expired,
+                        "longest_secret_days": longest_secret_days,
+                        "uses_cert_auth": len(key_creds) > 0,
                         "verified_publisher": bool(a.get("verifiedPublisher")),
+                        "created_at": a.get("createdDateTime"),
                     },
                 })
         except Exception as exc:
-            import logging as _lg
-            _lg.getLogger(__name__).debug("EntraID get_resources apps failed: %s", exc)
+            logger.debug("EntraID get_resources apps failed: %s", exc)
 
-        # Conditional Access policies
+        # ── 3. Conditional Access policies ───────────────────────────────────
         try:
             policies_data = await self._graph_get(
-                "/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,grantControls"
+                "/identity/conditionalAccess/policies"
+                "?$select=id,displayName,state,conditions,grantControls,sessionControls"
             )
             for p in (policies_data.get("value") or []):
                 grant = p.get("grantControls") or {}
                 built_in = grant.get("builtInControls") or []
                 conditions = p.get("conditions") or {}
+                users_cond = conditions.get("users") or {}
+                client_app_types = conditions.get("clientAppTypes") or []
                 resources.append({
                     "id": p.get("id", ""),
                     "name": p.get("displayName", ""),
                     "type": "Microsoft.AzureAD/ConditionalAccessPolicy",
                     "location": "",
                     "config": {
-                        "state": p.get("state"),
+                        "state": p.get("state"),                     # enabled | disabled | enabledForReportingButNotEnforced
                         "requires_mfa": "mfa" in built_in,
-                        "blocks_legacy_auth": bool(
-                            "exchangeActiveSync" in (conditions.get("clientAppTypes") or []) and
+                        "blocks_access": "block" in built_in,
+                        "blocks_legacy_auth": (
+                            "exchangeActiveSync" in client_app_types and
+                            "other" in client_app_types and
                             "block" in built_in
+                        ),
+                        "targets_all_users": "All" in (users_cond.get("includeUsers") or []),
+                        "exclude_users": users_cond.get("excludeUsers") or [],
+                        "include_apps": (conditions.get("applications") or {}).get("includeApplications") or [],
+                        "sign_in_frequency_enabled": bool(
+                            (p.get("sessionControls") or {}).get("signInFrequency", {}).get("isEnabled")
                         ),
                     },
                 })
         except Exception as exc:
-            import logging as _lg
-            _lg.getLogger(__name__).debug("EntraID get_resources CA policies failed: %s", exc)
+            logger.debug("EntraID get_resources CA policies failed: %s", exc)
 
-        return resources[:200]
+        # ── 4. Privileged directory roles (with member counts) ───────────────
+        _PRIVILEGED = {
+            "Global Administrator", "Privileged Role Administrator",
+            "Security Administrator", "Exchange Administrator",
+            "SharePoint Administrator", "Teams Administrator",
+            "Application Administrator", "Cloud Application Administrator",
+            "Helpdesk Administrator", "User Administrator",
+        }
+        try:
+            roles_data = await self._graph_get("/directoryRoles")
+            for role in (roles_data.get("value") or []):
+                role_name = role.get("displayName", "")
+                role_id = role.get("id", "")
+                members: List[Dict] = []
+                try:
+                    mem_data = await self._graph_get(f"/directoryRoles/{role_id}/members?$select=id,displayName,userPrincipalName,userType")
+                    members = mem_data.get("value") or []
+                except Exception:
+                    pass
+                guest_members = [m for m in members if m.get("userType") == "Guest"]
+                resources.append({
+                    "id": role_id,
+                    "name": role_name,
+                    "type": "Microsoft.AzureAD/DirectoryRole",
+                    "location": "",
+                    "config": {
+                        "is_privileged": role_name in _PRIVILEGED,
+                        "member_count": len(members),
+                        "guest_member_count": len(guest_members),
+                        "member_upns": [m.get("userPrincipalName") or m.get("displayName") for m in members[:20]],
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources directory roles failed: %s", exc)
+
+        # ── 5. Authentication Methods Policy (tenant-level singleton) ────────
+        try:
+            amp = await self._graph_get("/policies/authenticationMethodsPolicy")
+            configs = amp.get("authenticationMethodConfigurations") or []
+            method_states = {c.get("id"): c.get("state") for c in configs}
+            resources.append({
+                "id": "authenticationMethodsPolicy",
+                "name": "Authentication Methods Policy",
+                "type": "Microsoft.AzureAD/AuthenticationMethodsPolicy",
+                "location": "",
+                "config": {
+                    "authenticator_app_enabled": method_states.get("MicrosoftAuthenticator") == "enabled",
+                    "fido2_enabled": method_states.get("Fido2") == "enabled",
+                    "sms_enabled": method_states.get("Sms") == "enabled",
+                    "voice_enabled": method_states.get("Voice") == "enabled",
+                    "email_otp_enabled": method_states.get("Email") == "enabled",
+                    "temp_access_pass_enabled": method_states.get("TemporaryAccessPass") == "enabled",
+                    "software_oath_enabled": method_states.get("SoftwareOath") == "enabled",
+                    "passkey_enabled": method_states.get("Passkey") == "enabled",
+                    # True when phishable-only methods enabled and no strong method available
+                    "phishable_only": (
+                        (method_states.get("Sms") == "enabled" or method_states.get("Voice") == "enabled") and
+                        method_states.get("MicrosoftAuthenticator") != "enabled" and
+                        method_states.get("Fido2") != "enabled"
+                    ),
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources auth methods policy failed: %s", exc)
+
+        # ── 6. Authorization Policy (user consent, app creation, tenant creation) ──
+        try:
+            authz = await self._graph_get("/policies/authorizationPolicy")
+            # API returns either a single object or {value: [...]}
+            if isinstance(authz, dict) and "value" in authz:
+                authz = (authz["value"] or [{}])[0]
+            default_perms = authz.get("defaultUserRolePermissions") or {}
+            resources.append({
+                "id": "authorizationPolicy",
+                "name": "Authorization Policy",
+                "type": "Microsoft.AzureAD/AuthorizationPolicy",
+                "location": "",
+                "config": {
+                    "users_can_register_apps": default_perms.get("allowedToCreateApps", False),
+                    "users_can_create_tenants": default_perms.get("allowedToCreateTenants", False),
+                    "users_can_create_security_groups": default_perms.get("allowedToCreateSecurityGroups", False),
+                    "users_can_read_other_users": default_perms.get("allowedToReadOtherUsers", True),
+                    "guest_invite_settings": authz.get("allowInvitesFrom"),      # adminsAndGuestInviters | adminsAndGuestInvitersAndAllMembers | everyone | none
+                    "guest_user_role": authz.get("guestUserRoleId"),             # specific GUID maps to Guest, Restricted Guest, or Member
+                    "allow_user_consent_for_risky_apps": authz.get("allowUserConsentForRiskyApps", False),
+                    "permission_grant_policies": authz.get("permissionGrantPolicyIdsAssignedToDefaultUserRole") or [],
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources authorization policy failed: %s", exc)
+
+        # ── 7. Named Locations (trusted IP ranges and countries) ─────────────
+        try:
+            named_locs = await self._graph_get("/identity/conditionalAccess/namedLocations")
+            for loc in (named_locs.get("value") or []):
+                odata_type = loc.get("@odata.type", "")
+                resources.append({
+                    "id": loc.get("id", ""),
+                    "name": loc.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/NamedLocation",
+                    "location": "",
+                    "config": {
+                        "location_type": "ip_range" if "ipNamed" in odata_type else "country",
+                        "is_trusted": loc.get("isTrusted", False),
+                        "ip_ranges": [r.get("cidrAddress") for r in (loc.get("ipRanges") or [])],
+                        "countries": loc.get("countriesAndRegions") or [],
+                        "include_unknown_countries": loc.get("includeUnknownCountriesAndRegions", False),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources named locations failed: %s", exc)
+
+        # ── 8. Password Reset Policy (SSPR) ──────────────────────────────────
+        try:
+            sspr = await self._graph_get("/policies/passwordResetPolicies", beta=True)
+            resources.append({
+                "id": "passwordResetPolicy",
+                "name": "Password Reset Policy (SSPR)",
+                "type": "Microsoft.AzureAD/PasswordResetPolicy",
+                "location": "",
+                "config": {
+                    "sspr_enabled": sspr.get("enablementType") not in (None, 0, "none"),
+                    "enablement_type": sspr.get("enablementType"),  # 0=none, 1=selected, 2=all
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources SSPR policy failed: %s", exc)
+
+        # ── 9. External collaboration settings ───────────────────────────────
+        try:
+            collab = await self._graph_get("/policies/externalIdentitiesPolicy", beta=True)
+            resources.append({
+                "id": "externalIdentitiesPolicy",
+                "name": "External Collaboration Settings",
+                "type": "Microsoft.AzureAD/ExternalIdentitiesPolicy",
+                "location": "",
+                "config": {
+                    "allow_invitations_from": collab.get("allowInvitationsFrom"),
+                    "allow_external_ids_with_matched_tenant": collab.get("allowExternalIdentitiesToLeave"),
+                    "allow_delete_own_identity": collab.get("allowDeleteOwnIdentityByExternalUser"),
+                },
+            })
+        except Exception as exc:
+            logger.debug("EntraID get_resources external identities policy failed: %s", exc)
+
+        # ── 10. Service Principals (enterprise apps — first 200) ─────────────
+        try:
+            sp_data = await self._graph_get(
+                "/servicePrincipals"
+                "?$select=id,displayName,appId,publisherName,verifiedPublisher"
+                ",passwordCredentials,keyCredentials,oauth2PermissionScopes,servicePrincipalType"
+                "&$top=200"
+            )
+            _HIGH_PRIV = {"Directory.Read.All", "Mail.Read", "Files.ReadWrite.All",
+                          "User.ReadWrite.All", "GroupMember.ReadWrite.All"}
+            for sp in (sp_data.get("value") or []):
+                pw_creds = sp.get("passwordCredentials") or []
+                key_creds = sp.get("keyCredentials") or []
+                scopes = {s.get("value", "") for s in (sp.get("oauth2PermissionScopes") or [])}
+                resources.append({
+                    "id": sp.get("id", ""),
+                    "name": sp.get("displayName", ""),
+                    "type": "Microsoft.AzureAD/ServicePrincipal",
+                    "location": "",
+                    "config": {
+                        "app_id": sp.get("appId"),
+                        "sp_type": sp.get("servicePrincipalType"),     # Application | ManagedIdentity | Legacy
+                        "has_nonexpiring_secret": any(not c.get("endDateTime") for c in pw_creds),
+                        "secret_count": len(pw_creds),
+                        "cert_count": len(key_creds),
+                        "verified_publisher": bool((sp.get("verifiedPublisher") or {}).get("displayName")),
+                        "publisher_name": sp.get("publisherName"),
+                        "has_high_priv_scopes": bool(_HIGH_PRIV.intersection(scopes)),
+                        "high_priv_scopes": list(_HIGH_PRIV.intersection(scopes)),
+                    },
+                })
+        except Exception as exc:
+            logger.debug("EntraID get_resources service principals failed: %s", exc)
+
+        return resources
 
     # ------------------------------------------------------------------
     # Configuration review entry point

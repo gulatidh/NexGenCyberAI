@@ -234,6 +234,164 @@ _CHECKS: Dict[Tuple[str, str], List[Dict]] = {
             "requirement": "PR.AA-05: Access permissions managed — disable public blob access on storage accounts",
         },
     ],
+
+    # ── Entra ID / Identity controls ────────────────────────────────────────
+    # These use the asset types collected by the expanded EntraID get_resources().
+
+    # IA-2: MFA for all users — check via CA policy targeting all users
+    ("nist_800_53", "ia-2"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.requires_mfa",
+            "expected": True, "check_type": "truthy",
+            "requirement": "At least one enabled Conditional Access policy must require MFA",
+        },
+    ],
+    ("nist_csf", "pr.aa-01"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.requires_mfa",
+            "expected": True, "check_type": "truthy",
+            "requirement": "PR.AA-01: Identities are managed — MFA must be enforced via Conditional Access",
+        },
+    ],
+
+    # IA-2 / legacy auth — CA policy blocking legacy protocols
+    ("nist_800_53", "ia-2.1"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.blocks_legacy_auth",
+            "expected": True, "check_type": "truthy",
+            "requirement": "A CA policy must block legacy authentication protocols (EAS + other clients)",
+        },
+    ],
+
+    # AC-2: account management — no users with high risk level
+    ("nist_800_53", "ac-2"): [
+        {
+            "resource_types": ["microsoft.azuread/user"],
+            "config_path": "config.risk_level",
+            "expected": "high", "check_type": "not_equals",
+            "requirement": "No user accounts should have a HIGH identity risk level (Identity Protection)",
+        },
+    ],
+
+    # AC-6: least privilege — Global Administrator role should have ≤5 members
+    # (evaluated via DirectoryRole asset; member_count checked as a threshold)
+    ("nist_800_53", "ac-6"): [
+        {
+            "resource_types": ["microsoft.azuread/directoryrole"],
+            "config_path": "config.guest_member_count",
+            "expected": 0, "check_type": "equals",
+            "requirement": "No guest (external) users should hold privileged directory roles",
+        },
+    ],
+    ("nist_csf", "pr.aa-05"): [
+        {
+            "resource_types": ["microsoft.storage/storageaccounts"],
+            "config_path": "config.allow_blob_public_access",
+            "expected": True, "check_type": "not_equals",
+            "requirement": "PR.AA-05: Disable public blob access on storage accounts",
+        },
+        {
+            "resource_types": ["microsoft.azuread/directoryrole"],
+            "config_path": "config.guest_member_count",
+            "expected": 0, "check_type": "equals",
+            "requirement": "PR.AA-05: No guest users in privileged directory roles",
+        },
+    ],
+
+    # IA-5: authenticator management — apps should use cert auth not only secrets
+    ("nist_800_53", "ia-5"): [
+        {
+            "resource_types": ["microsoft.azuread/application"],
+            "config_path": "config.has_expired_secret",
+            "expected": False, "check_type": "equals",
+            "requirement": "App registrations must not have expired client secrets",
+        },
+        {
+            "resource_types": ["microsoft.azuread/application"],
+            "config_path": "config.has_nonexpiring_secret",
+            "expected": False, "check_type": "equals",
+            "requirement": "App registrations must not have non-expiring client secrets",
+        },
+    ],
+
+    # AC-17: remote access — legacy auth must be blocked
+    ("nist_800_53", "ac-17"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.blocks_legacy_auth",
+            "expected": True, "check_type": "truthy",
+            "requirement": "A CA policy must block legacy authentication (EAS + other clients)",
+        },
+    ],
+    ("nist_csf", "pr.aa-04"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.blocks_legacy_auth",
+            "expected": True, "check_type": "truthy",
+            "requirement": "PR.AA-04: Remote access management — block legacy auth protocols",
+        },
+    ],
+
+    # AC-3 / consent policy — users should not be able to consent to risky apps
+    ("nist_800_53", "ac-3"): [
+        {
+            "resource_types": ["microsoft.storage/storageaccounts"],
+            "config_path": "config.allow_blob_public_access",
+            "expected": True, "check_type": "not_equals",
+            "requirement": "Storage accounts must not allow public blob access",
+        },
+        {
+            "resource_types": ["microsoft.azuread/authorizationpolicy"],
+            "config_path": "config.allow_user_consent_for_risky_apps",
+            "expected": False, "check_type": "equals",
+            "requirement": "Users must not be permitted to consent to risky OAuth applications",
+        },
+        {
+            "resource_types": ["microsoft.azuread/authorizationpolicy"],
+            "config_path": "config.users_can_register_apps",
+            "expected": False, "check_type": "equals",
+            "requirement": "Users should not be able to register applications without admin approval",
+        },
+    ],
+
+    # Authentication method strength — phishing-resistant methods must be enabled
+    ("nist_800_53", "ia-2.6"): [
+        {
+            "resource_types": ["microsoft.azuread/authenticationmethodspolicy"],
+            "config_path": "config.phishable_only",
+            "expected": False, "check_type": "equals",
+            "requirement": "Phishing-resistant MFA (Authenticator or FIDO2) must be enabled alongside or instead of SMS/voice",
+        },
+    ],
+
+    # CIS Azure identity controls
+    ("cis_azure", "1.1.2"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.requires_mfa",
+            "expected": True, "check_type": "truthy",
+            "requirement": "CIS 1.1.2: Ensure MFA is enabled via Conditional Access for all users",
+        },
+    ],
+    ("cis_azure", "1.23"): [
+        {
+            "resource_types": ["microsoft.azuread/directoryrole"],
+            "config_path": "config.guest_member_count",
+            "expected": 0, "check_type": "equals",
+            "requirement": "CIS 1.23: Ensure no guest/external users are assigned to privileged roles",
+        },
+    ],
+    ("cis_azure", "1.2"): [
+        {
+            "resource_types": ["microsoft.azuread/conditionalaccesspolicy"],
+            "config_path": "config.blocks_legacy_auth",
+            "expected": True, "check_type": "truthy",
+            "requirement": "CIS 1.2: Ensure legacy authentication is blocked via Conditional Access",
+        },
+    ],
 }
 
 
