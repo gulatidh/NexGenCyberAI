@@ -45,7 +45,7 @@ interface AttackPath {
   nodes: string[];
 }
 
-interface AttackPathData {
+export interface AttackPathData {
   nodes: AttackNode[];
   edges: AttackEdge[];
   paths: AttackPath[];
@@ -244,7 +244,7 @@ const EDGE_TYPES: EdgeTypes = { labeled: LabeledEdge };
 
 // ── Inner graph (must be inside ReactFlowProvider) ────────────────────────────
 
-function AttackGraphInner({ data }: { data: AttackPathData }) {
+export function AttackGraphInner({ data }: { data: AttackPathData }) {
   const { nodes: rawNodes, edges: rawEdges, paths } = data;
   const critSet = useMemo(() => new Set<string>(paths[0]?.nodes ?? []), [paths]);
 

@@ -10,7 +10,7 @@ import {
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, assetsApi, connectorsApi, attackPathApi } from "../services/api";
+import { clientsApi, assetsApi, connectorsApi, attackPathApi, frameworksApi } from "../services/api";
 import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup, AssetCompliance } from "../types";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -18,6 +18,8 @@ import {
 } from "recharts";
 import { fmt, fromNow } from "../utils/datetime";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
+import { AttackGraphInner, AttackPathData } from "./AttackPaths";
+import { ReactFlowProvider } from "@xyflow/react";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -519,7 +521,7 @@ function AssetTimeline({ clientId, assetId }: { clientId: string; assetId: strin
 // ── Attack Path sub-component ──────────────────────────────────────────────────
 
 function AssetAttackPath({ clientId, assetId }: { clientId: string; assetId: string }) {
-  const { data, isLoading, isError } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<AttackPathData>({
     queryKey: ["asset-attack-path", clientId, assetId],
     queryFn: () => attackPathApi.getForAsset(clientId, assetId),
     enabled: !!clientId && !!assetId,
@@ -533,65 +535,36 @@ function AssetAttackPath({ clientId, assetId }: { clientId: string; assetId: str
     );
   }
 
-  const nodes: any[] = data?.nodes || [];
-  const filteredNodes = nodes.filter((n) => n.asset_id === assetId || n.resource_id === assetId || nodes.length > 0);
-
-  if (isError || filteredNodes.length === 0) {
+  if (isError || !data || data.nodes.length === 0) {
     return (
       <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 4, textAlign: "center" }}>
-        <Typography sx={{ color: "text.secondary" }}>No attack path data available for this asset.</Typography>
+        <AccountTree sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+        <Typography sx={{ color: "text.secondary" }}>
+          No attack path data for this asset. Run a scan to populate findings.
+        </Typography>
       </Card>
     );
   }
 
   return (
-    <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
-              <TableCell>PHASE</TableCell>
-              <TableCell>SEVERITY</TableCell>
-              <TableCell>TITLE</TableCell>
-              <TableCell align="right">CVSS</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredNodes.map((node: any, idx: number) => {
-              const phase = node.phase || node.attack_phase || "unknown";
-              const sev = node.severity || "info";
-              const phaseColor = PHASE_COLOR[phase] || "rgba(255,255,255,0.4)";
-              return (
-                <TableRow key={node.id || idx} sx={{ "& td": { borderColor: "divider", py: 1 } }}>
-                  <TableCell>
-                    <Chip
-                      label={phase.replace(/_/g, " ")}
-                      size="small"
-                      sx={{ bgcolor: `${phaseColor}20`, color: phaseColor, fontSize: 10, height: 18, textTransform: "capitalize" }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={sev}
-                      size="small"
-                      sx={{ bgcolor: `${SEV_COLOR[sev] || "#888"}20`, color: SEV_COLOR[sev] || "#888", fontSize: 10, height: 18 }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ color: "text.primary", maxWidth: 400 }}>
-                    <Typography variant="body2" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {node.title || node.label || "—"}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right" sx={{ fontSize: 12, color: node.cvss_score != null ? (node.cvss_score >= 9 ? "#f44336" : node.cvss_score >= 7 ? "#ff9800" : "white") : "rgba(255,255,255,0.3)" }}>
-                    {node.cvss_score != null ? node.cvss_score.toFixed(1) : "—"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Card>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      {/* Stats strip */}
+      <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+        <Chip label={`${data.stats.total_findings} findings`} size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4" }} />
+        {data.stats.critical > 0 && (
+          <Chip label={`${data.stats.critical} critical`} size="small" sx={{ bgcolor: "rgba(234,67,53,0.15)", color: "#EA4335" }} />
+        )}
+        {data.stats.phases_present.map((ph) => (
+          <Chip key={ph} label={ph.replace(/_/g, " ")} size="small"
+            sx={{ fontSize: 10, height: 20, textTransform: "capitalize", bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
+        ))}
+      </Box>
+
+      {/* Graph */}
+      <ReactFlowProvider>
+        <AttackGraphInner data={data} />
+      </ReactFlowProvider>
+    </Box>
   );
 }
 
@@ -688,13 +661,6 @@ function AssetDuplicates({ clientId, assetId }: { clientId: string; assetId: str
 // Tab 7: Compliance Posture
 // ─────────────────────────────────────────────────────────────────────────────
 
-const KNOWN_FRAMEWORKS = [
-  { value: "nist_csf",  label: "NIST CSF 2.0" },
-  { value: "iso_27001", label: "ISO 27001:2022" },
-  { value: "pci_dss",   label: "PCI DSS v4.0" },
-  { value: "cis_v8",    label: "CIS Controls v8" },
-  { value: "gdpr",      label: "GDPR" },
-];
 
 const SEV_COLOR_MAP: Record<string, string> = { critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4" };
 
@@ -948,6 +914,12 @@ function PlatformDetailTab({ detail }: { detail: any }) {
 function AssetComplianceTab({ clientId, assetId }: { clientId: string; assetId: string }) {
   const [framework, setFramework] = useState("nist_csf");
 
+  const { data: catalogData } = useQuery<any[]>({
+    queryKey: ["frameworks-all"],
+    queryFn: frameworksApi.catalogAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data, isLoading, isError } = useQuery<AssetCompliance>({
     queryKey: ["asset-compliance", clientId, assetId, framework],
     queryFn: () => assetsApi.compliance(clientId, assetId, framework),
@@ -962,11 +934,20 @@ function AssetComplianceTab({ clientId, assetId }: { clientId: string; assetId: 
     <Box>
       {/* Framework selector */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
-        <FormControl size="small" sx={{ minWidth: 200 }}>
+        <FormControl size="small" sx={{ minWidth: 240 }}>
           <InputLabel sx={{ color: "text.secondary" }}>Framework</InputLabel>
           <Select value={framework} onChange={(e) => setFramework(e.target.value)} label="Framework"
             sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
-            {KNOWN_FRAMEWORKS.map(f => <MenuItem key={f.value} value={f.value}>{f.label}</MenuItem>)}
+            {(catalogData ?? []).map((f: any) => (
+              <MenuItem key={f.framework} value={f.framework}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {f.name}
+                  {f.is_custom && (
+                    <Chip label="Custom" size="small" sx={{ height: 16, fontSize: 9, bgcolor: "rgba(156,39,176,0.15)", color: "#ce93d8" }} />
+                  )}
+                </Box>
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
         {isLoading && <CircularProgress size={18} />}
