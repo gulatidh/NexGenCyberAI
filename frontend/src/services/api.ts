@@ -464,6 +464,8 @@ export const frameworksApi = {
     apiClient.post("/frameworks/advisor/recommend", { answers }).then((r) => r.data),
   aiAssessControl: (clientId: string, framework: string, controlId: string) =>
     apiClient.post(`/clients/${clientId}/frameworks/${framework}/controls/${encodeURIComponent(controlId)}/ai-assess`),
+  aiAssessAll: (clientId: string, framework: string) =>
+    apiClient.post(`/clients/${clientId}/frameworks/${framework}/ai-assess-all`),
 };
 
 export const assetsApi = {

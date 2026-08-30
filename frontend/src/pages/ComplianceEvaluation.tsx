@@ -152,6 +152,10 @@ export default function ComplianceEvaluation() {
       qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
       qc.invalidateQueries({ queryKey: ["framework-catalog-all"] });
       qc.invalidateQueries({ queryKey: ["scans", clientId] });
+      // Recompute now also triggers batch AI assessment in background — poll for results
+      [10000, 30000, 60000, 120000].forEach((ms) =>
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] }), ms)
+      );
     },
   });
 
@@ -175,8 +179,20 @@ export default function ComplianceEvaluation() {
   const aiAssessMutation = useMutation({
     mutationFn: () => frameworksApi.aiAssessControl(clientId!, framework, selected!.control.control_id),
     onSuccess: (res) => {
+      // Update the drawer immediately with the result
       setSelected((prev) => prev ? { ...prev, ai_assessment: res.data.assessment } : prev);
+      // Invalidate so the persisted result loads next time the drawer opens
       qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+    },
+  });
+
+  const aiAssessAllMutation = useMutation({
+    mutationFn: () => frameworksApi.aiAssessAll(clientId!, framework),
+    onSuccess: () => {
+      // Poll for updates — batch runs in background, refetch a few times
+      [8000, 20000, 45000, 90000].forEach((ms) =>
+        setTimeout(() => qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] }), ms)
+      );
     },
   });
 
@@ -355,12 +371,23 @@ export default function ComplianceEvaluation() {
             sx={{ bgcolor: "#4285F4", color: "#0d1117", "&:hover": { bgcolor: "#00b3cc" } }}>
             Scan
           </Button>
-          <Button variant="outlined" startIcon={<Refresh />}
+          <Button variant="outlined" startIcon={recomputeMutation.isPending ? <CircularProgress size={14} sx={{ color: "#4285F4" }} /> : <Refresh />}
             disabled={!clientId || !framework || recomputeMutation.isPending}
             onClick={() => recomputeMutation.mutate()}
             sx={{ borderColor: "#4285F4", color: "#4285F4" }}>
             Recompute
           </Button>
+          <Tooltip title="AI-assess all controls: translates each control to platform-specific checks and evaluates against your scan data. Runs in background — takes 1-3 minutes.">
+            <span>
+              <Button variant="outlined"
+                disabled={!clientId || !framework || aiAssessAllMutation.isPending}
+                startIcon={aiAssessAllMutation.isPending ? <CircularProgress size={14} sx={{ color: "#7C3AED" }} /> : undefined}
+                onClick={() => aiAssessAllMutation.mutate()}
+                sx={{ borderColor: "#7C3AED", color: "#7C3AED", fontSize: 12 }}>
+                {aiAssessAllMutation.isPending ? "Assessing…" : "✨ Assess All"}
+              </Button>
+            </span>
+          </Tooltip>
           <Tooltip title="Upload CSV/JSON of controls (e.g. CIS XLSX export converted to CSV)">
             <span>
               <Button variant="outlined" startIcon={importMutation.isPending ? <CircularProgress size={14} sx={{ color: "#34A853" }} /> : <UploadFile />}

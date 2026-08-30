@@ -4,7 +4,7 @@ import io
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File
 from typing import Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -27,6 +27,17 @@ from services.compliance import (
 )
 
 router = APIRouter(tags=["frameworks"])
+
+
+def _safe_json(raw):
+    """Safely parse a JSON string; return None on error."""
+    if not raw:
+        return None
+    try:
+        import json as _j
+        return _j.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return None
 
 
 _FRAMEWORK_NAMES = {
@@ -380,6 +391,7 @@ async def client_framework_detail(
             "overridden_at": st.overridden_at if st else None,
             "finding_ids": finding_ids,
             "findings": rich_findings,
+            "ai_assessment": _safe_json(st.ai_assessment_json if st else None),
         })
 
     # Custom frameworks and scan-scoped views: derive summary from items list
@@ -484,6 +496,7 @@ async def client_control_detail(
             }
             for f in findings
         ],
+        "ai_assessment": _safe_json(st.ai_assessment_json if st else None),
     }
 
 
@@ -727,6 +740,184 @@ Return JSON exactly:
     return {"assessment": assessment, "control_id": control_id}
 
 
+def _batch_ai_assess_framework(client_id: str, framework: str, db_factory) -> int:
+    """Background task: AI-assess every control for client+framework.
+
+    Processes controls in batches of 5 (one LLM call per batch).
+    Skips controls whose ai_assessment_json was updated in the last 12 hours.
+    Returns number of controls assessed.
+    """
+    import json as _j
+    from datetime import datetime, timezone, timedelta
+    from core.ai_providers import get_llm
+    from db.database import SessionLocal
+
+    db = db_factory()
+    assessed = 0
+    try:
+        fw = _coerce_framework(framework)
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=12)
+
+        controls = db.query(FrameworkControl).filter(
+            FrameworkControl.framework == fw,
+            FrameworkControl.weight > 0,
+        ).all()
+
+        statuses = {
+            s.framework_control_id: s
+            for s in db.query(ClientControlStatus).filter(
+                ClientControlStatus.client_id == client_id,
+            ).all()
+        }
+
+        # Build finding context per control
+        from sqlalchemy import text
+        finding_rows = db.execute(text(
+            "SELECT f.control_id, f.id, f.title, f.severity, f.resource_type, f.resource_id, f.description "
+            "FROM findings f JOIN scans sc ON f.scan_id = sc.id "
+            "WHERE sc.client_id = :cid AND f.status != 'false_positive' "
+            "LIMIT 500"
+        ), {"cid": client_id}).fetchall()
+
+        findings_by_ctrl: dict = {}
+        for row in finding_rows:
+            ctrl_id = (row[0] or "").strip().upper()
+            if ctrl_id:
+                findings_by_ctrl.setdefault(ctrl_id, []).append({
+                    "id": row[1], "title": row[2], "severity": row[3],
+                    "resource_type": row[4], "resource_id": row[5],
+                    "description": (row[6] or "")[:200],
+                })
+
+        try:
+            llm = get_llm()
+        except Exception:
+            logger.warning("No LLM provider for batch AI assessment — skipping")
+            return 0
+
+        BATCH = 5
+        ctrl_queue = []
+        for ctrl in controls:
+            st = statuses.get(ctrl.id)
+            # Skip if assessed recently (within 12h)
+            if st and st.ai_assessment_json and st.last_evaluated_at:
+                ev_at = st.last_evaluated_at
+                if ev_at.tzinfo is None:
+                    ev_at = ev_at.replace(tzinfo=timezone.utc)
+                if ev_at > cutoff:
+                    continue
+            ctrl_queue.append(ctrl)
+
+        for i in range(0, len(ctrl_queue), BATCH):
+            batch = ctrl_queue[i:i + BATCH]
+            ctrl_data = []
+            for ctrl in batch:
+                cid_norm = ctrl.control_id.strip().upper()
+                flist = findings_by_ctrl.get(cid_norm, [])
+                st = statuses.get(ctrl.id)
+                current_status = "not_applicable"
+                if st:
+                    current_status = st.status.value if hasattr(st.status, "value") else (st.status or "not_applicable")
+                ctrl_data.append({
+                    "control_id": ctrl.control_id,
+                    "title": ctrl.title,
+                    "description": (ctrl.description or "")[:400],
+                    "domain": ctrl.domain or "",
+                    "current_status": current_status,
+                    "findings": flist[:6],
+                })
+
+            prompt = f"""You are a GRC specialist. Assess the following {len(ctrl_data)} compliance controls.
+Framework: {fw}
+
+For each control, evaluate it against its linked findings and return your assessment.
+A control is Compliant if no open findings violate it. Non-compliant if open findings show a gap.
+Partial if partially addressed. Not assessed if there is no evidence either way.
+
+Controls to assess:
+{_j.dumps(ctrl_data, indent=2)}
+
+Return a JSON array with one object per control (same order):
+[
+  {{
+    "control_id": "...",
+    "platform_translation": "What this control means in practice for the detected resource types",
+    "what_looked_for": ["check 1", "check 2"],
+    "what_found": ["observation 1", "observation 2"],
+    "what_expected": ["expected state 1"],
+    "relevant_finding_ids": ["id1"],
+    "irrelevant_finding_ids": ["id2"],
+    "gap_analysis": "Specific gap or confirmation of compliance. For N/A: explain why not applicable.",
+    "corrected_status": "compliant | non_compliant | partial | not_assessed",
+    "confidence": "high | medium | low"
+  }}
+]
+
+Return only valid JSON — no markdown fences, no commentary."""
+
+            try:
+                raw = llm.invoke([
+                    {"role": "system", "content": "You are a precise compliance auditor. Return only valid JSON arrays."},
+                    {"role": "user", "content": prompt},
+                ])
+                content = raw.content if hasattr(raw, "content") else str(raw)
+                content = content.strip()
+                if content.startswith("```"):
+                    parts = content.split("```")
+                    content = parts[1] if len(parts) > 1 else content
+                    if content.startswith("json"):
+                        content = content[4:]
+                results = _j.loads(content)
+                if not isinstance(results, list):
+                    results = [results]
+            except Exception as exc:
+                logger.warning("Batch AI assess parse error (batch %d): %s", i // BATCH, exc)
+                continue
+
+            for ctrl, result in zip(batch, results):
+                if not isinstance(result, dict):
+                    continue
+                st = statuses.get(ctrl.id)
+                if st is None:
+                    st = ClientControlStatus(
+                        client_id=client_id,
+                        framework_control_id=ctrl.id,
+                        status=ControlStatus.NOT_APPLICABLE,
+                        derived=True,
+                    )
+                    db.add(st)
+                    statuses[ctrl.id] = st
+                st.ai_assessment_json = _j.dumps(result)
+                st.last_evaluated_at = now
+                assessed += 1
+
+            db.commit()
+
+    except Exception as exc:
+        logger.error("Batch AI assess failed: %s", exc)
+    finally:
+        db.close()
+
+    logger.info("Batch AI assessed %d controls for client %s fw %s", assessed, client_id, framework)
+    return assessed
+
+
+@router.post("/clients/{client_id}/frameworks/{framework}/ai-assess-all", status_code=202)
+async def ai_assess_all_controls(
+    client_id: str,
+    framework: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Trigger batch AI assessment for all controls in a framework as a background task."""
+    from fastapi import BackgroundTasks as _BT
+    from db.database import SessionLocal
+    background_tasks.add_task(_batch_ai_assess_framework, client_id, framework, SessionLocal)
+    return {"message": "Batch AI assessment started", "framework": framework}
+
+
 @router.delete("/clients/{client_id}/frameworks/{framework}/controls/{control_id}/override", status_code=204)
 async def clear_override(
     client_id: str,
@@ -764,15 +955,19 @@ async def clear_override(
 async def recompute_framework(
     client_id: str,
     framework: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
+    from db.database import SessionLocal
     fw = _coerce_framework(framework)
     try:
         counts = recompute_client_framework(db, client_id, fw)
     except Exception as exc:
         logger.exception("Recompute failed for client=%s framework=%s", client_id, fw.value)
         raise HTTPException(status_code=500, detail=f"Recompute failed: {type(exc).__name__}: {exc}")
+    # Fire batch AI assessment in background after status recompute
+    background_tasks.add_task(_batch_ai_assess_framework, client_id, framework, SessionLocal)
     return {"framework": fw.value, "counts": counts}
 
 
