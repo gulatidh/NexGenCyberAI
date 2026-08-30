@@ -614,9 +614,7 @@ async def sync_connector_assets(
         existing_row = existing.get(ext)
 
         if existing_row is None:
-            # Brand new resource — create as ACTIVE immediately.
-            # Assets from a configured connector are already trusted; the approval
-            # gate adds friction without security benefit for platform syncs.
+            # Brand new resource — create as NEW (pending user approval)
             asset = Asset(
                 client_id=connector_db.client_id,
                 project_id=connector_db.project_id,
@@ -632,7 +630,7 @@ async def sync_connector_assets(
                 cloud_project_id=parsed.get("project_id"),
                 tags=parsed.get("tags") or {},
                 provider_metadata=raw,
-                status=AssetStatus.ACTIVE,
+                status=AssetStatus.NEW,
                 first_seen_at=now,
                 last_synced_at=now,
             )
@@ -653,9 +651,10 @@ async def sync_connector_assets(
             existing_row.tags = parsed.get("tags") or {}
             existing_row.provider_metadata = raw
             existing_row.last_synced_at = now
-            if current in (AssetStatus.STALE, AssetStatus.REAPPEARED, AssetStatus.NEW):
-                existing_row.status = AssetStatus.ACTIVE
-                existing_row.reappeared_at = now if current == AssetStatus.STALE else existing_row.reappeared_at
+            if current == AssetStatus.STALE:
+                existing_row.status = AssetStatus.REAPPEARED
+                existing_row.reappeared_at = now
+            # ACTIVE, NEW, REAPPEARED → no status change
             ct_str = connector_db.connector_type.value if hasattr(connector_db.connector_type, "value") else str(connector_db.connector_type)
             _upsert_platform_detail(db, existing_row.id, ct_str, raw, now)
             updated += 1
