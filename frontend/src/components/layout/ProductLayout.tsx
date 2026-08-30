@@ -1,6 +1,7 @@
 import React from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Box, Typography } from "@mui/material";
+import { M } from "../../theme";
 import AssistantWidget from "../AssistantWidget";
 import OwletLogo from "../OwletLogo";
 import MegaMenuBar from "./MegaMenuBar";
@@ -64,7 +65,7 @@ export default function ProductLayout({ product }: Props) {
           {product.nav.length > 0 && (
             <Box sx={{
               width: 178, flexShrink: 0,
-              bgcolor: (theme) => theme.palette.mode !== "light" ? "#0F1825" : "#F0F4FA",
+              bgcolor: (theme) => theme.palette.mode !== "light" ? "#0F1825" : M.paper2,
               borderRight: "1px solid", borderColor: "divider",
               display: "flex", flexDirection: "column",
               overflowY: "auto",

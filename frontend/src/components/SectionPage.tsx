@@ -4,7 +4,7 @@
  * info callout, HubCard grid.  Used by Discover, Analyse, Respond, Automate pages.
  */
 import React from "react";
-import { alpha, Box, Divider, Typography, useTheme } from "@mui/material";
+import { alpha, Box, Divider, Typography } from "@mui/material";
 import { InfoOutlined, ArrowBack, HelpOutlined } from "@mui/icons-material";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -29,31 +29,31 @@ export interface SectionDef {
 
 function SectionCard({ card, color }: { card: CardDef; color: string }) {
   const navigate = useNavigate();
-  const { palette } = useTheme();
-  const isDark = palette.mode === "dark";
   return (
     <Box
       onClick={() => navigate(card.route)}
       sx={{
         bgcolor: "background.paper",
         border: "1px solid", borderColor: "divider",
+        borderTop: `3px solid ${color}`,
         borderRadius: 2, p: 1.75, cursor: "pointer",
         display: "flex", flexDirection: "column", gap: 0.75, minHeight: 94,
-        transition: "border-color .15s, box-shadow .15s",
+        transition: "box-shadow .15s, transform .12s",
         "&:hover": {
-          borderColor: color,
-          boxShadow: `0 2px 10px ${alpha(color, isDark ? 0.18 : 0.1)}`,
+          transform: "translateY(-1px)",
+          boxShadow: `0 4px 14px rgba(0,0,0,0.08)`,
         },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
-        <Typography sx={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{card.name}</Typography>
-      </Box>
+      <Typography sx={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3, color: "text.primary" }}>
+        {card.name}
+      </Typography>
       <Typography sx={{ fontSize: 11.5, color: "text.secondary", lineHeight: 1.5, flex: 1 }}>
         {card.desc}
       </Typography>
-      <Typography sx={{ fontSize: 11, color, fontWeight: 600, textAlign: "right" }}>Open →</Typography>
+      <Typography sx={{ fontSize: 11, color: "text.secondary", fontWeight: 600, textAlign: "right" }}>
+        Open →
+      </Typography>
     </Box>
   );
 }

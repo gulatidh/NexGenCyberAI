@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, Chip, CircularProgress,
@@ -131,35 +131,81 @@ const STAGE_DEFS: StageDef[] = [
 
 function HubCard({ card, color }: { card: CardDef; color: string }) {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isDark = theme.palette.mode === "dark";
-
   return (
     <Box
       onClick={() => navigate(card.route)}
       sx={{
         bgcolor: "background.paper",
         border: "1px solid", borderColor: "divider",
+        borderTop: `3px solid ${color}`,
         borderRadius: 2, p: 1.75, cursor: "pointer",
         display: "flex", flexDirection: "column", gap: 0.75,
         minHeight: 94,
-        transition: "border-color .15s, box-shadow .15s",
+        transition: "box-shadow .15s, transform .12s",
         "&:hover": {
-          borderColor: color,
-          boxShadow: `0 2px 10px ${alpha(color, isDark ? 0.18 : 0.1)}`,
+          transform: "translateY(-1px)",
+          boxShadow: `0 4px 14px rgba(0,0,0,0.08)`,
         },
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
-        <Typography sx={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{card.name}</Typography>
-      </Box>
+      <Typography sx={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3, color: "text.primary" }}>
+        {card.name}
+      </Typography>
       <Typography sx={{ fontSize: 11.5, color: "text.secondary", lineHeight: 1.5, flex: 1 }}>
         {card.desc}
       </Typography>
-      <Typography sx={{ fontSize: 11, color, fontWeight: 600, textAlign: "right" }}>
+      <Typography sx={{ fontSize: 11, color: "text.secondary", fontWeight: 600, textAlign: "right" }}>
         Manage →
       </Typography>
+    </Box>
+  );
+}
+
+// ── Stage TOC sidebar ─────────────────────────────────────────────────────────
+
+function StageToc({ activeId }: { activeId: string | null }) {
+  return (
+    <Box sx={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 0 }}>
+      {STAGE_DEFS.map((stage, si) => {
+        const isActive = stage.id === activeId;
+        const isLast = si === STAGE_DEFS.length - 1;
+        return (
+          <Box key={stage.id}>
+            <Box
+              onClick={() => {
+                const el = document.getElementById(`stage-${stage.id}`);
+                el?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              sx={{
+                display: "flex", alignItems: "center", gap: 1.25,
+                px: 1.25, py: 0.75, borderRadius: 2, cursor: "pointer",
+                bgcolor: isActive ? "background.paper" : "transparent",
+                boxShadow: isActive ? "0 1px 4px rgba(32,38,31,0.08), 0 4px 12px rgba(32,38,31,0.06)" : "none",
+                transition: "background .15s, box-shadow .15s",
+                "&:hover": { bgcolor: isActive ? "background.paper" : "rgba(32,38,31,0.04)" },
+              }}
+            >
+              <Box sx={{
+                width: 30, height: 30, borderRadius: 1.5, flexShrink: 0,
+                bgcolor: stage.color, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, fontWeight: 700,
+              }}>
+                {parseInt(stage.num, 10)}
+              </Box>
+              <Typography sx={{ fontWeight: 600, fontSize: 13, color: "text.primary", flex: 1, lineHeight: 1 }}>
+                {stage.label}
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 400, minWidth: 20, textAlign: "right" }}>
+                {stage.cards.length}
+              </Typography>
+            </Box>
+            {!isLast && (
+              <Box sx={{ ml: "22px", width: 2, height: 10, borderLeft: "2px dashed", borderColor: "divider" }} />
+            )}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
@@ -560,6 +606,23 @@ export default function Hub() {
 
   const RAIL = "linear-gradient(180deg,#2563eb,#0f766e 25%,#b45309 50%,#b91c1c 65%,#15803d 80%,#4338ca)";
 
+  const [activeTocId, setActiveTocId] = useState<string | null>(STAGE_DEFS[0]?.id ?? null);
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+    STAGE_DEFS.forEach((stage) => {
+      const el = document.getElementById(`stage-${stage.id}`);
+      if (!el) return;
+      const obs = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) setActiveTocId(stage.id); },
+        { rootMargin: "-20% 0px -60% 0px", threshold: 0 }
+      );
+      obs.observe(el);
+      observers.push(obs);
+    });
+    return () => observers.forEach(o => o.disconnect());
+  }, []);
+
   return (
     <>
       <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh", bgcolor: "background.default" }}>
@@ -575,46 +638,58 @@ export default function Hub() {
         </Box>
 
         {/* Main content */}
-        <Box sx={{ flex: 1, overflow: "auto", px: { xs: 2.5, md: 6 }, py: { xs: 4, md: 6 }, pb: 12, maxWidth: 1200, mx: "auto", width: "100%" }}>
+        <Box sx={{ flex: 1, overflow: "auto" }}>
+          <Box sx={{ display: "flex", maxWidth: 1340, mx: "auto", px: { xs: 2, md: 4 }, py: { xs: 4, md: 6 }, gap: 4 }}>
 
-          {/* Hero */}
-          <Box sx={{ mb: 7 }}>
-            <Typography sx={{
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
-              fontSize: { xs: 28, md: 42 }, letterSpacing: "-0.02em", lineHeight: 1.1, mb: 1.5,
-            }}>
-              One{" "}
-              <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
-                signal path
+            {/* Stage TOC sidebar — hidden on small screens */}
+            <Box sx={{ width: 180, flexShrink: 0, display: { xs: "none", lg: "block" } }}>
+              <StageToc activeId={activeTocId} />
+            </Box>
+
+            {/* Main pipeline content */}
+            <Box sx={{ flex: 1, minWidth: 0, pb: 12 }}>
+
+              {/* Hero */}
+              <Box sx={{ mb: 7 }}>
+                <Typography sx={{
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+                  fontSize: { xs: 28, md: 42 }, letterSpacing: "-0.02em", lineHeight: 1.1, mb: 1.5,
+                }}>
+                  One{" "}
+                  <Box component="span" sx={{ background: RAIL, WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
+                    signal path
+                  </Box>
+                  , from setup to evidence.
+                </Typography>
+                <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 560 }}>
+                  Six stages run in order — each hands its output to the next. Hover the nav above to jump anywhere, or click a card below.
+                </Typography>
               </Box>
-              , from setup to evidence.
-            </Typography>
-            <Typography sx={{ color: "text.secondary", fontSize: "0.97rem", maxWidth: 560 }}>
-              Six stages run in order — each hands its output to the next. Hover the nav above to jump anywhere, or click a card below.
-            </Typography>
-          </Box>
 
-          {/* Pipeline */}
-          <Box sx={{ position: "relative" }}>
-            {/* Vertical rail */}
-            <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.35 }} />
+              {/* Pipeline */}
+              <Box sx={{ position: "relative" }}>
+                {/* Vertical rail */}
+                <Box sx={{ position: "absolute", left: 23, top: 14, bottom: 14, width: 2, background: RAIL, opacity: 0.35 }} />
 
-            {STAGE_DEFS.map((stage, si) => (
-              <StageSection key={stage.id} stage={stage} si={si} />
-            ))}
-          </Box>
+                {STAGE_DEFS.map((stage, si) => (
+                  <StageSection key={stage.id} stage={stage} si={si} />
+                ))}
+              </Box>
 
-          {/* Ontology */}
-          <OntologyMini />
+              {/* Ontology */}
+              <OntologyMini />
 
-          {/* Footer */}
-          <Box sx={{ mt: 8, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
-            <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
-              SETUP · DISCOVER · ANALYSE · RESPOND · REPORT · AUTOMATE
-            </Typography>
-            <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
-              Owlet · NexGenAI
-            </Typography>
+              {/* Footer */}
+              <Box sx={{ mt: 8, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+                <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
+                  SETUP · DISCOVER · ANALYSE · RESPOND · REPORT · AUTOMATE
+                </Typography>
+                <Typography sx={{ fontSize: "0.72rem", color: "text.disabled", fontFamily: "monospace" }}>
+                  Owlet · NexGenAI
+                </Typography>
+              </Box>
+
+            </Box>
           </Box>
         </Box>
       </Box>
