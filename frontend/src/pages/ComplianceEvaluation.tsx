@@ -172,6 +172,14 @@ export default function ComplianceEvaluation() {
     },
   });
 
+  const aiAssessMutation = useMutation({
+    mutationFn: () => frameworksApi.aiAssessControl(clientId!, framework, selected!.control.control_id),
+    onSuccess: (res) => {
+      setSelected((prev) => prev ? { ...prev, ai_assessment: res.data.assessment } : prev);
+      qc.invalidateQueries({ queryKey: ["framework-detail", clientId, framework] });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: (file: File) => frameworksApi.importControls(framework, file),
     onSuccess: () => {
@@ -750,6 +758,95 @@ export default function ComplianceEvaluation() {
               </Button>
             )}
 
+            {/* ── AI Assessment ────────────────────────────────────── */}
+            <Button
+              size="small" variant="outlined" fullWidth
+              onClick={() => aiAssessMutation.mutate()}
+              disabled={aiAssessMutation.isPending || !clientId}
+              startIcon={aiAssessMutation.isPending ? <CircularProgress size={12} /> : undefined}
+              sx={{ mb: 1.5, fontSize: 11.5, borderColor: "divider", color: "primary.main" }}
+            >
+              {aiAssessMutation.isPending ? "AI is assessing…" : "✨ AI Assess this Control"}
+            </Button>
+            {aiAssessMutation.isError && (
+              <Alert severity="warning" sx={{ mb: 1.5, fontSize: 11 }}>
+                AI assessment failed — check AI provider settings.
+              </Alert>
+            )}
+
+            {selected.ai_assessment && (
+              <Box sx={{ mb: 2, border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
+                {/* Platform translation */}
+                <Box sx={{ px: 1.5, py: 1.25, bgcolor: "action.hover", borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Typography sx={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "text.secondary", mb: 0.5 }}>
+                    Platform Translation
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.primary", lineHeight: 1.55 }}>
+                    {selected.ai_assessment.platform_translation}
+                  </Typography>
+                </Box>
+
+                {/* What Looked For / What Found / What Expected */}
+                {([
+                  { label: "What Looked For", key: "what_looked_for", color: "#4285F4" },
+                  { label: "What Found",      key: "what_found",      color: "#F9AB00" },
+                  { label: "What Expected",   key: "what_expected",   color: "#34A853" },
+                ] as const).map(({ label, key, color }) => {
+                  const items = selected.ai_assessment?.[key];
+                  return Array.isArray(items) && items.length > 0 && (
+                    <Box key={key} sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                      <Typography sx={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color, mb: 0.5 }}>
+                        {label}
+                      </Typography>
+                      <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                        {(items as string[]).map((item: string, i: number) => (
+                          <Box component="li" key={i} sx={{ fontSize: 11.5, color: "text.primary", lineHeight: 1.55, mb: 0.25 }}>
+                            {item}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  );
+                })}
+
+                {/* Gap analysis */}
+                {selected.ai_assessment.gap_analysis && (
+                  <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                    <Typography sx={{ fontSize: 9.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#f44336", mb: 0.5 }}>
+                      Gap Analysis
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: "text.primary", lineHeight: 1.55 }}>
+                      {selected.ai_assessment.gap_analysis}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Corrected status + confidence */}
+                {selected.ai_assessment.corrected_status && (
+                  <Box sx={{ px: 1.5, py: 1, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                    <Typography sx={{ fontSize: 10, color: "text.secondary" }}>AI suggests:</Typography>
+                    <Chip label={(selected.ai_assessment.corrected_status as string).replace("_", " ")} size="small"
+                      sx={{
+                        fontSize: 9.5, height: 18,
+                        bgcolor: selected.ai_assessment.corrected_status === "compliant" ? "rgba(52,168,83,0.15)"
+                               : selected.ai_assessment.corrected_status === "non_compliant" ? "rgba(244,67,54,0.15)"
+                               : selected.ai_assessment.corrected_status === "partial" ? "rgba(249,171,0,0.15)"
+                               : "rgba(128,128,128,0.15)",
+                        color:  selected.ai_assessment.corrected_status === "compliant" ? "#34A853"
+                               : selected.ai_assessment.corrected_status === "non_compliant" ? "#f44336"
+                               : selected.ai_assessment.corrected_status === "partial" ? "#F9AB00"
+                               : "text.secondary",
+                      }} />
+                    {selected.ai_assessment.confidence && (
+                      <Typography sx={{ fontSize: 10, color: "text.secondary" }}>
+                        ({selected.ai_assessment.confidence} confidence)
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {selected.overridden_by && (
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
                 Overridden by {selected.overridden_by}
@@ -778,6 +875,11 @@ export default function ComplianceEvaluation() {
                             WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                             {f.title}
                           </Typography>
+                          {selected.ai_assessment?.irrelevant_finding_ids?.includes(f.id) && (
+                            <Typography sx={{ fontSize: 9.5, color: "#F9AB00", mt: 0.25 }}>
+                              ⚠ AI: may be incorrectly mapped to this control
+                            </Typography>
+                          )}
                           {f.asset_id ? (
                             <Typography variant="caption" component="span"
                               onClick={() => navigate(`${assetsBase}/${f.asset_id}`)}
