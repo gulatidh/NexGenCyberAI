@@ -52,7 +52,7 @@ async def generate_evidence_package(
         }
         zf.writestr("00_summary.json", json.dumps(summary, indent=2))
 
-        # 2. Open findings CSV
+        # 2. All findings CSV (framework param scopes deficiencies, not raw findings)
         import csv
         import io as _io
         csv_buf = _io.StringIO()
@@ -61,10 +61,7 @@ async def generate_evidence_package(
             "id", "title", "severity", "status", "resource_id",
             "cve_id", "cvss_score", "control_id", "framework", "created_at",
         ])
-        q = findings_q
-        if framework:
-            q = q.filter(Finding.framework == framework)
-        for f in q.order_by(Finding.cvss_score.desc()).limit(5000).all():
+        for f in findings_q.order_by(Finding.cvss_score.desc()).limit(5000).all():
             w.writerow([
                 f.id, f.title,
                 f.severity.value if hasattr(f.severity, "value") else f.severity,
