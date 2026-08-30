@@ -158,7 +158,7 @@ export default function Clients() {
 
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [addProjectClientId, setAddProjectClientId] = useState("");
-  const [addProjectForm, setAddProjectForm] = useState({ name: "", description: "" });
+  const [addProjectForm, setAddProjectForm] = useState({ name: "", description: "", environment: "", cloud_provider: "" });
 
   const { data: clients = [], isLoading, refetch } = useQuery<Client[]>({
     queryKey: ["clients"],
@@ -201,7 +201,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["projects", addProjectClientId] });
       setAddProjectOpen(false);
-      setAddProjectForm({ name: "", description: "" });
+      setAddProjectForm({ name: "", description: "", environment: "", cloud_provider: "" });
       setAddProjectClientId("");
       toast.success("Project created");
     },
@@ -503,7 +503,7 @@ export default function Clients() {
       </Dialog>
 
       {/* ── Add project dialog ─────────────────────────────────────────── */}
-      <Dialog open={addProjectOpen} onClose={() => setAddProjectOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={addProjectOpen} onClose={() => setAddProjectOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Add Project</DialogTitle>
         <DialogContent>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
@@ -525,6 +525,31 @@ export default function Clients() {
             <TextField fullWidth size="small" label="Description" multiline rows={2}
               value={addProjectForm.description}
               onChange={(e) => setAddProjectForm({ ...addProjectForm, description: e.target.value })} />
+            <FormControl fullWidth size="small">
+              <InputLabel>Environment</InputLabel>
+              <Select label="Environment" value={addProjectForm.environment}
+                onChange={(e) => setAddProjectForm({ ...addProjectForm, environment: e.target.value })}>
+                <MenuItem value="">— Not specified —</MenuItem>
+                <MenuItem value="production">Production</MenuItem>
+                <MenuItem value="staging">Staging</MenuItem>
+                <MenuItem value="development">Development</MenuItem>
+                <MenuItem value="dr">DR / Disaster Recovery</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Cloud Provider</InputLabel>
+              <Select label="Cloud Provider" value={addProjectForm.cloud_provider}
+                onChange={(e) => setAddProjectForm({ ...addProjectForm, cloud_provider: e.target.value })}>
+                <MenuItem value="">— Not specified —</MenuItem>
+                <MenuItem value="azure">Azure</MenuItem>
+                <MenuItem value="aws">AWS</MenuItem>
+                <MenuItem value="gcp">GCP</MenuItem>
+                <MenuItem value="multi">Multi-cloud</MenuItem>
+                <MenuItem value="on-premises">On-Premises</MenuItem>
+                <MenuItem value="other">Other</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
