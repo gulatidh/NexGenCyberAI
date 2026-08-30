@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -614,8 +615,12 @@ async def sync_connector_assets(
         existing_row = existing.get(ext)
 
         if existing_row is None:
-            # Brand new resource — create as NEW (pending user approval)
+            # Generate UUID explicitly so asset.id is available immediately —
+            # SQLAlchemy's default=_uuid only fires at flush time, which is too
+            # late for _upsert_platform_detail to receive a non-NULL asset_id.
+            new_asset_id = str(uuid.uuid4())
             asset = Asset(
+                id=new_asset_id,
                 client_id=connector_db.client_id,
                 project_id=connector_db.project_id,
                 connector_id=connector_db.id,
@@ -636,7 +641,7 @@ async def sync_connector_assets(
             )
             db.add(asset)
             ct_str = connector_db.connector_type.value if hasattr(connector_db.connector_type, "value") else str(connector_db.connector_type)
-            _upsert_platform_detail(db, asset.id, ct_str, raw, now)
+            _upsert_platform_detail(db, new_asset_id, ct_str, raw, now)
             created += 1
         else:
             current = existing_row.status
