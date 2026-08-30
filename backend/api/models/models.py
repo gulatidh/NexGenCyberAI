@@ -634,6 +634,7 @@ class ClientControlStatus(Base):
     overridden_by = Column(String(200))
     overridden_at = Column(DateTime(timezone=True))
     ai_assessment_json = Column(Text, nullable=True)   # JSON: latest AI control assessment
+    config_evidence_json = Column(Text, nullable=True) # JSON: config-based compliance evidence
 
     client = relationship("Client", back_populates="control_statuses")
     control = relationship("FrameworkControl", back_populates="statuses")

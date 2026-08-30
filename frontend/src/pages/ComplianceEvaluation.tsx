@@ -785,6 +785,93 @@ export default function ComplianceEvaluation() {
               </Button>
             )}
 
+            {/* ── Configuration Evidence ───────────────────────────── */}
+            {selected.config_evidence && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 1, color: "text.secondary", display: "block", mb: 1 }}>
+                  CONFIGURATION EVIDENCE
+                </Typography>
+                {/* Summary pill */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5, flexWrap: "wrap" }}>
+                  <Chip
+                    size="small"
+                    label={selected.config_evidence.summary}
+                    sx={{
+                      bgcolor:
+                        selected.status === "compliant" ? "rgba(52,168,83,0.12)"
+                        : selected.status === "non_compliant" ? "rgba(244,67,54,0.12)"
+                        : selected.status === "partial" ? "rgba(249,171,0,0.12)"
+                        : "rgba(0,0,0,0.06)",
+                      color:
+                        selected.status === "compliant" ? "#34A853"
+                        : selected.status === "non_compliant" ? "#f44336"
+                        : selected.status === "partial" ? "#E37400"
+                        : "text.secondary",
+                      fontWeight: 600, fontSize: 11,
+                    }}
+                  />
+                </Box>
+                {/* Requirements */}
+                {selected.config_evidence.requirements.length > 0 && (
+                  <Box sx={{ bgcolor: "rgba(66,133,244,0.06)", borderRadius: 1.5, p: 1.5, mb: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: "#4285F4", display: "block", mb: 0.5 }}>
+                      WHAT IS REQUIRED
+                    </Typography>
+                    {selected.config_evidence.requirements.map((req, i) => (
+                      <Typography key={i} variant="caption" sx={{ display: "block", color: "text.primary", mb: 0.25 }}>
+                        • {req.requirement}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+                {/* Per-asset results table */}
+                {selected.config_evidence.assets.length > 0 && (
+                  <Box sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
+                    {/* Header */}
+                    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 120px 80px 80px 36px", gap: 0, bgcolor: "action.hover", px: 1.5, py: 0.75 }}>
+                      {["Asset", "Config Key", "Found", "Expected", ""].map((h, i) => (
+                        <Typography key={i} variant="caption" sx={{ fontWeight: 700, color: "text.secondary", fontSize: 10 }}>{h}</Typography>
+                      ))}
+                    </Box>
+                    {selected.config_evidence.assets.map((asset, i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 120px 80px 80px 36px",
+                          gap: 0,
+                          px: 1.5, py: 0.75,
+                          borderTop: i > 0 ? "1px solid" : "none",
+                          borderColor: "divider",
+                          bgcolor:
+                            asset.result === "pass" ? "rgba(52,168,83,0.04)"
+                            : asset.result === "fail" ? "rgba(244,67,54,0.04)"
+                            : "transparent",
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ color: "text.primary", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={asset.name}>
+                          {asset.name}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace", fontSize: 10 }}>{asset.config_key}</Typography>
+                        <Typography variant="caption" sx={{
+                          color: asset.result === "pass" ? "#34A853" : asset.result === "fail" ? "#f44336" : "text.secondary",
+                          fontFamily: "monospace", fontSize: 10
+                        }}>
+                          {asset.found === null || asset.found === undefined ? "—" : String(asset.found)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace", fontSize: 10 }}>
+                          {String(asset.expected)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: asset.result === "pass" ? "#34A853" : asset.result === "fail" ? "#f44336" : "text.secondary", textAlign: "center" }}>
+                          {asset.result === "pass" ? "✓" : asset.result === "fail" ? "✗" : "?"}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {/* ── AI Assessment ────────────────────────────────────── */}
             <Button
               size="small" variant="outlined" fullWidth

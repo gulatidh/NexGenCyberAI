@@ -784,6 +784,16 @@ def _ensure_added_columns() -> None:
                 logger.info("Added client_control_statuses.ai_assessment_json column (%s)", dialect)
             except Exception as exc:
                 logger.warning("client_control_statuses.ai_assessment_json ALTER failed: %s", exc)
+        if "config_evidence_json" not in ccs_cols:
+            ddl = ("ALTER TABLE client_control_statuses ADD config_evidence_json NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE client_control_statuses ADD COLUMN config_evidence_json TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added client_control_statuses.config_evidence_json column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("client_control_statuses.config_evidence_json ALTER failed: %s", exc)
 
         # Migrate unstructured Risk rows to risk_proposals staging area (one-time, idempotent)
         try:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -206,19 +206,30 @@ def recompute_client_framework(
             )
             continue
 
-        # Check for a recent AI assessment that corrects the auto-derived status.
-        # AI can see actual asset metadata and scan content; its verdict is more
-        # accurate than the coverage-heuristic when they disagree.
+        # Priority 1: config-based evaluation from actual asset configuration data.
+        # This is ground truth — if an asset exists with the wrong setting, the control fails.
+        config_evidence_json_str: Optional[str] = None
         final_status = derived_status
         ev = _auto_evidence(derived_status.value, len(opens), len(hists), key in covered_set)
-        if existing_row and existing_row.ai_assessment_json:
+        try:
+            from services.config_compliance import evaluate_control_from_config
+            config_result = evaluate_control_from_config(db, client_id, fw_value, key)
+            if config_result is not None:
+                final_status = ControlStatus(config_result["status"])
+                ev = config_result["evidence_text"]
+                config_evidence_json_str = json.dumps(config_result["config_evidence"])
+        except Exception as exc:
+            logger.warning("config_compliance check failed for %s/%s: %s", fw_value, key, exc)
+
+        # Priority 2: recent AI assessment (only applied when no config-based result).
+        # AI can see asset metadata and scan content; its verdict is more accurate than
+        # the coverage-heuristic when they disagree.
+        if config_evidence_json_str is None and existing_row and existing_row.ai_assessment_json:
             try:
                 ai = json.loads(existing_row.ai_assessment_json)
                 assessed_at_raw = ai.get("assessed_at")
                 ai_conf = (ai.get("confidence") or "").lower()
                 ai_corrected = (ai.get("corrected_status") or "").lower().replace("-", "_")
-                # Apply AI verdict when: recent assessment + high/medium confidence +
-                # AI disagrees with auto-derive (prevents AI from silently locking in wrong answers)
                 if (
                     assessed_at_raw
                     and ai_corrected
@@ -232,7 +243,7 @@ def recompute_client_framework(
                             gap = ai.get("gap_analysis", "")
                             ev = f"AI Assessment ({ai_conf} confidence): {gap}" if gap else f"AI Assessment ({ai_conf} confidence)."
                         except ValueError:
-                            pass  # Unknown status string — keep derived
+                            pass
             except Exception:
                 pass
 
@@ -245,16 +256,17 @@ def recompute_client_framework(
                 derived_finding_ids=hists,
                 evidence=ev,
                 last_evaluated_at=now,
+                config_evidence_json=config_evidence_json_str,
             )
             db.add(existing_row)
         else:
             existing_row.status = final_status
             existing_row.derived = True
             existing_row.derived_finding_ids = hists
-            # Refresh auto-evidence, but never clobber a manual/Defender note.
-            if not existing_row.evidence or str(existing_row.evidence).startswith(("Auto:", "AI Assessment")):
+            if not existing_row.evidence or str(existing_row.evidence).startswith(("Auto:", "AI Assessment", "Config:")):
                 existing_row.evidence = ev
             existing_row.last_evaluated_at = now
+            existing_row.config_evidence_json = config_evidence_json_str
 
         # Skip categories/functions (weight=0) for counting; they're parents
         if ctrl.weight > 0:

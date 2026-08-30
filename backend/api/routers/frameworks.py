@@ -392,6 +392,7 @@ async def client_framework_detail(
             "finding_ids": finding_ids,
             "findings": rich_findings,
             "ai_assessment": _safe_json(st.ai_assessment_json if st else None),
+            "config_evidence": _safe_json(st.config_evidence_json if st else None),
         })
 
     # Custom frameworks and scan-scoped views: derive summary from items list
@@ -497,6 +498,7 @@ async def client_control_detail(
             for f in findings
         ],
         "ai_assessment": _safe_json(st.ai_assessment_json if st else None),
+        "config_evidence": _safe_json(st.config_evidence_json if st else None),
     }
 
 

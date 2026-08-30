@@ -252,6 +252,18 @@ export interface ControlStatusEntry {
     corrected_status?: string;
     confidence?: string;
   };
+  config_evidence?: {
+    requirements: Array<{ resource_type: string; requirement: string; expected: string }>;
+    assets: Array<{
+      name: string;
+      type: string;
+      config_key: string;
+      found: any;
+      expected: any;
+      result: "pass" | "fail" | "no_data";
+    }>;
+    summary: string;
+  };
 }
 
 export interface FrameworkSummary {
