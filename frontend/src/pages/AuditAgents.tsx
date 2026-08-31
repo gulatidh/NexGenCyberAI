@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Autocomplete, Box, Button, Card, CardContent, Chip, CircularProgress,
+  Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
   Divider, LinearProgress, Paper,
   Step, StepLabel, Stepper, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Tooltip, Typography,
@@ -793,29 +793,44 @@ export default function AuditAgents() {
                   )}
 
                   {currentStep.type === "framework_select" && (
-                    <Autocomplete
-                      size="small"
-                      sx={{ minWidth: 340, mt: 1 }}
-                      loading={fwLoading}
-                      options={frameworkList}
-                      getOptionLabel={(o) => o.label ?? o.value}
-                      isOptionEqualToValue={(o, v) => o.value === v.value}
-                      value={frameworkList.find((f) => f.value === inputs["framework"]) ?? null}
-                      onChange={(_, opt) => setValue("framework", opt?.value ?? "")}
-                      renderOption={(props, o) => (
-                        <Box component="li" {...props} key={o.value}
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          {o.label}
-                          {o.is_custom && (
-                            <Chip label="Custom" size="small"
-                              sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
-                          )}
-                        </Box>
-                      )}
-                      renderInput={(params) => (
-                        <TextField {...params} label="Framework" placeholder="Search frameworks…" />
-                      )}
-                    />
+                    fwLoading ? (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>Loading frameworks…</Typography>
+                      </Box>
+                    ) : (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1, maxHeight: 260, overflowY: "auto" }}>
+                        {frameworkList.map((f) => {
+                          const selected = inputs["framework"] === f.value;
+                          return (
+                            <Chip
+                              key={f.value}
+                              label={
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  {f.label}
+                                  {f.is_custom && (
+                                    <Box component="span" sx={{ fontSize: 9, fontWeight: 700, color: "#9C27B0",
+                                      bgcolor: "#9C27B022", borderRadius: 0.5, px: 0.4, ml: 0.3 }}>
+                                      CUSTOM
+                                    </Box>
+                                  )}
+                                </Box>
+                              }
+                              onClick={() => setValue("framework", selected ? "" : f.value)}
+                              variant={selected ? "filled" : "outlined"}
+                              sx={{
+                                cursor: "pointer", fontSize: 13,
+                                bgcolor: selected ? `${selectedAgent.color}22` : undefined,
+                                borderColor: selected ? selectedAgent.color : undefined,
+                                color: selected ? selectedAgent.color : "text.secondary",
+                                fontWeight: selected ? 700 : 400,
+                                "&:hover": { borderColor: selectedAgent.color, color: selectedAgent.color },
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    )
                   )}
 
                   {currentStep.type === "domain_chips" && (
