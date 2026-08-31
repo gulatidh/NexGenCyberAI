@@ -206,7 +206,10 @@ function AuthError({ error }: { error: any }) {
   );
 }
 
-function ProtectedApp() {
+function MaybeAuth({ children }: { children: React.ReactNode }) {
+  // Guest-link session: JWT is already in sessionStorage — skip MSAL entirely.
+  const isGuest = !!sessionStorage.getItem("aegis-guest-jwt");
+  if (isGuest) return <>{children}</>;
   return (
     <MsalAuthenticationTemplate
       interactionType={InteractionType.Redirect}
@@ -214,6 +217,14 @@ function ProtectedApp() {
       loadingComponent={LoginPage}
       errorComponent={AuthError}
     >
+      {children}
+    </MsalAuthenticationTemplate>
+  );
+}
+
+function ProtectedApp() {
+  return (
+    <MaybeAuth>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* ── Hub ──────────────────────────────────────────────────────── */}
@@ -407,7 +418,7 @@ function ProtectedApp() {
           </Route>
         </Routes>
       </Suspense>
-    </MsalAuthenticationTemplate>
+    </MaybeAuth>
   );
 }
 

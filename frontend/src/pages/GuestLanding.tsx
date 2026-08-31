@@ -44,7 +44,11 @@ export default function GuestLanding() {
         project_id: resp.project_id,
         expires_at: resp.expires_at,
       }));
-      navigate("/guest/portal");
+      // Pre-select the scoped client so the global selector is correct on entry
+      if (resp.client_id) {
+        localStorage.setItem("aegis-active-client", String(resp.client_id));
+      }
+      navigate("/hub");
     } catch (e: any) {
       setError(e?.response?.data?.detail || "Could not redeem link.");
       setEntering(false);
@@ -112,19 +116,19 @@ export default function GuestLanding() {
             </Box>
 
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              <Chip label="Read-only access" size="small"
-                sx={{ bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04", fontSize: 11 }} />
-              <Chip label={`${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining`} size="small"
+              <Chip label="Full access" size="small"
                 sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontSize: 11 }} />
+              <Chip label={`${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining`} size="small"
+                sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 11 }} />
               {info.scope === "project" && (
                 <Chip label="Project-scoped" size="small"
                   sx={{ bgcolor: "rgba(156,39,176,0.12)", color: "#ce93d8", fontSize: 11 }} />
               )}
             </Box>
 
-            <Alert severity="info" sx={{ fontSize: 12, bgcolor: "rgba(66,133,244,0.08)",
-              border: "1px solid rgba(66,133,244,0.2)", color: "rgba(255,255,255,0.7)" }}>
-              This is a read-only portal view. You cannot modify any data, run agents, or access configuration settings.
+            <Alert severity="success" sx={{ fontSize: 12, bgcolor: "rgba(52,168,83,0.08)",
+              border: "1px solid rgba(52,168,83,0.2)", color: "rgba(255,255,255,0.7)" }}>
+              You have full read-write access to this portal. This link expires automatically on the date shown above.
             </Alert>
 
             <Button variant="contained" size="large" onClick={enter} disabled={entering}
