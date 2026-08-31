@@ -2137,6 +2137,13 @@ except Exception as _e:
     logger.warning("ai_assisted_scan router not loaded: %s", _e)
 
 try:
+    from api.routers import audit_agents as _audit_agents
+    app.include_router(_audit_agents.router, prefix="/api/v1")
+    logger.info("audit_agents router loaded")
+except Exception as _e:
+    logger.warning("audit_agents router not loaded: %s", _e)
+
+try:
     from api.routers import risk_proposals as _risk_proposals
     app.include_router(_risk_proposals.router, prefix="/api/v1")
     logger.info("risk_proposals router loaded")

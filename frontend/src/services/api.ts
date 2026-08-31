@@ -865,3 +865,14 @@ export const guestTokensApi = {
   redeem: (token: string) =>
     apiClient.get(`/public/guest/${token}`).then((r) => r.data),
 };
+
+export const auditAgentsApi = {
+  frameworkDomains: (clientId: string, framework: string) =>
+    apiClient.get(`/clients/${clientId}/audit-agents/framework-domains`, { params: { framework } }).then((r) => r.data),
+  run: (clientId: string, body: { agent_type: string; wizard_inputs: Record<string, unknown> }) =>
+    apiClient.post(`/clients/${clientId}/audit-agents/run`, body).then((r) => r.data),
+  getRun: (clientId: string, runId: string) =>
+    apiClient.get(`/clients/${clientId}/audit-agents/runs/${runId}`).then((r) => r.data),
+  listRuns: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/audit-agents/runs`).then((r) => r.data),
+};

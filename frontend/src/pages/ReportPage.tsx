@@ -1,7 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   Description, FolderZip, Assessment, LibraryAdd, GppBad, BarChart, ManageSearch,
-  Summarize, Schedule,
+  Summarize, Schedule, Psychology,
 } from "@mui/icons-material";
 
 export const REPORT_SECTION: SectionDef = {
@@ -21,6 +21,7 @@ export const REPORT_SECTION: SectionDef = {
     { name: "Evidence Package",      icon: <FolderZip />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",           route: "/report/evidence",     group: "Pen Testing" },
     { name: "Reports",               icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",      group: "Pen Testing" },
     { name: "Audit Intelligence",    icon: <ManageSearch />, desc: "ICS Audit & Risk Intelligence — how every audit activity maps to the platform.", route: "/report/audit", group: "Pen Testing" },
+    { name: "Audit Agents",         icon: <Psychology />,   desc: "Wizard-driven AI agents for control testing, readiness reports, evidence curation and interview prep.", route: "/report/audit-agents", group: "Pen Testing" },
     { name: "Executive Summary",    icon: <Summarize />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Pen Testing" },
     { name: "Report Scheduler",     icon: <Schedule />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Pen Testing" },
     // Compliance

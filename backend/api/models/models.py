@@ -1591,3 +1591,19 @@ class PromptAuditLog(Base):
     block_reason = Column(String(200), nullable=True)  # set when status=blocked
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
+
+class AuditAgentRun(Base):
+    """One wizard-driven audit agent execution with structured results."""
+    __tablename__ = "audit_agent_runs"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    agent_type = Column(String(50))   # control_tester | readiness_report | evidence_curator | interview_prep
+    wizard_inputs = Column(JSON)
+    status = Column(String(20), default="running")   # running | completed | failed
+    result = Column(JSON)
+    error_message = Column(Text, nullable=True)
+    created_by = Column(String(200))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
