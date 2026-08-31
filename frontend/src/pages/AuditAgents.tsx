@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Divider, FormControl, InputLabel, LinearProgress, MenuItem, Paper,
-  Select, Step, StepLabel, Stepper, Table, TableBody, TableCell,
+  Alert, Autocomplete, Box, Button, Card, CardContent, Chip, CircularProgress,
+  Divider, LinearProgress, Paper,
+  Step, StepLabel, Stepper, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
@@ -786,26 +786,31 @@ export default function AuditAgents() {
                   )}
 
                   {currentStep.type === "framework_select" && (
-                    <FormControl size="small" sx={{ minWidth: 320, mt: 1 }}>
-                      <InputLabel>Framework</InputLabel>
-                      <Select
-                        label="Framework"
-                        value={String(inputs["framework"] || "")}
-                        onChange={(e) => setValue("framework", e.target.value)}
-                      >
-                        {(frameworkList as { value: string; label: string; is_custom?: boolean }[]).map((f) => (
-                          <MenuItem key={f.value} value={f.value}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              {f.label}
-                              {f.is_custom && (
-                                <Chip label="Custom" size="small"
-                                  sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
-                              )}
-                            </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                    <Autocomplete
+                      size="small"
+                      sx={{ minWidth: 340, mt: 1 }}
+                      options={frameworkList as { value: string; label: string; is_custom?: boolean }[]}
+                      getOptionLabel={(o) => o.label}
+                      isOptionEqualToValue={(o, v) => o.value === v.value}
+                      value={
+                        (frameworkList as { value: string; label: string; is_custom?: boolean }[])
+                          .find((f) => f.value === inputs["framework"]) ?? null
+                      }
+                      onChange={(_, opt) => setValue("framework", opt?.value ?? "")}
+                      renderOption={(props, o) => (
+                        <Box component="li" {...props} key={o.value}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          {o.label}
+                          {o.is_custom && (
+                            <Chip label="Custom" size="small"
+                              sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
+                          )}
+                        </Box>
+                      )}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Framework" placeholder="Search frameworks…" />
+                      )}
+                    />
                   )}
 
                   {currentStep.type === "domain_chips" && (
