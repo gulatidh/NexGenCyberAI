@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Divider, LinearProgress, Paper,
-  Step, StepLabel, Stepper, Table, TableBody, TableCell,
+  Divider, FormControl, InputLabel, LinearProgress, MenuItem, Paper,
+  Select, Step, StepLabel, Stepper, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
@@ -793,44 +793,28 @@ export default function AuditAgents() {
                   )}
 
                   {currentStep.type === "framework_select" && (
-                    fwLoading ? (
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
-                        <CircularProgress size={16} />
-                        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>Loading frameworks…</Typography>
-                      </Box>
-                    ) : (
-                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1, maxHeight: 260, overflowY: "auto" }}>
-                        {frameworkList.map((f) => {
-                          const selected = inputs["framework"] === f.value;
-                          return (
-                            <Chip
-                              key={f.value}
-                              label={
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  {f.label}
-                                  {f.is_custom && (
-                                    <Box component="span" sx={{ fontSize: 9, fontWeight: 700, color: "#9C27B0",
-                                      bgcolor: "#9C27B022", borderRadius: 0.5, px: 0.4, ml: 0.3 }}>
-                                      CUSTOM
-                                    </Box>
-                                  )}
-                                </Box>
-                              }
-                              onClick={() => setValue("framework", selected ? "" : f.value)}
-                              variant={selected ? "filled" : "outlined"}
-                              sx={{
-                                cursor: "pointer", fontSize: 13,
-                                bgcolor: selected ? `${selectedAgent.color}22` : undefined,
-                                borderColor: selected ? selectedAgent.color : undefined,
-                                color: selected ? selectedAgent.color : "text.secondary",
-                                fontWeight: selected ? 700 : 400,
-                                "&:hover": { borderColor: selectedAgent.color, color: selectedAgent.color },
-                              }}
-                            />
-                          );
-                        })}
-                      </Box>
-                    )
+                    <FormControl size="small" sx={{ minWidth: 320, mt: 1 }}>
+                      <InputLabel>Framework</InputLabel>
+                      <Select
+                        label="Framework"
+                        value={String(inputs["framework"] || "")}
+                        onChange={(e) => setValue("framework", e.target.value)}
+                        MenuProps={{ disablePortal: false, style: { zIndex: 9999 } }}
+                      >
+                        <MenuItem value=""><em>Select a framework…</em></MenuItem>
+                        {frameworkList.map((f) => (
+                          <MenuItem key={f.value} value={f.value}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              {f.label}
+                              {f.is_custom && (
+                                <Chip label="Custom" size="small"
+                                  sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
+                              )}
+                            </Box>
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   )}
 
                   {currentStep.type === "domain_chips" && (
