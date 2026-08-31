@@ -553,17 +553,11 @@ export default function AuditAgents() {
   const [viewingRun, setViewingRun] = useState<{ agentType: string; result: Record<string, unknown> } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [frameworkList, setFrameworkList] = useState<{ value: string; label: string; is_custom?: boolean }[]>([]);
-  const [fwLoading, setFwLoading] = useState(true);
-
-  useEffect(() => {
-    frameworksApi.catalogAll()
-      .then((data: unknown) => {
-        setFrameworkList(Array.isArray(data) ? data : []);
-      })
-      .catch(() => setFrameworkList([]))
-      .finally(() => setFwLoading(false));
-  }, []);
+  const { data: frameworkList = [] } = useQuery<{ value: string; label: string; is_custom?: boolean }[]>({
+    queryKey: ["frameworks-all"],
+    queryFn: () => frameworksApi.catalogAll(),
+    enabled: !!clientId,
+  });
 
   const { data: pastRuns = [], refetch: refetchRuns } = useQuery({
     queryKey: ["audit-runs", clientId],
