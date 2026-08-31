@@ -22,7 +22,7 @@ import {
 import {
   Settings as SettingsIcon, MarkEmailRead, Security, Sync as SyncIcon,
   History, AdminPanelSettings, Save, CheckCircle,
-  Visibility, VisibilityOff, LinkOutlined,
+  Visibility, VisibilityOff, LinkOutlined, ContentCopy, Shield,
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
   NewReleases, Psychology, Webhook, VpnKey, MenuBook,
@@ -32,7 +32,7 @@ import Skeleton from "@mui/material/Skeleton";
 import LinearProgress from "@mui/material/LinearProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi } from "../services/api";
+import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi, guestTokensApi } from "../services/api";
 import { MyAccess, AccessRole, AccessScope, Client, Project, UserAccessSummary } from "../types";
 import AISettings from "./AISettings";
 import Webhooks from "./Webhooks";
@@ -1106,6 +1106,205 @@ function WhatsNewTab() {
 }
 
 // ── Main Settings page ───────────────────────────────────────────────────────
+// ── Guest Tokens tab ─────────────────────────────────────────────────────────
+function GuestTokensTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ label: "", client_id: "", project_id: "", days: 7, note: "" });
+  const [selectedClient, setSelectedClient] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
+  const { data: projects = [] } = useQuery<any[]>({
+    queryKey: ["projects", form.client_id],
+    queryFn: () => projectsApi.list(form.client_id),
+    enabled: !!form.client_id,
+  });
+  const { data: tokens = [], isLoading } = useQuery<any[]>({
+    queryKey: ["guest-tokens", selectedClient],
+    queryFn: () => guestTokensApi.list(selectedClient || undefined),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => {
+      const exp = new Date();
+      exp.setDate(exp.getDate() + form.days);
+      return guestTokensApi.create({
+        label: form.label.trim(),
+        client_id: form.client_id,
+        project_id: form.project_id || undefined,
+        expires_at: exp.toISOString(),
+        note: form.note.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["guest-tokens"] });
+      setOpen(false);
+      setForm({ label: "", client_id: "", project_id: "", days: 7, note: "" });
+      toast.success("Guest link created");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to create link"),
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: (id: string) => guestTokensApi.revoke(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["guest-tokens"] }); toast.success("Link revoked"); },
+  });
+
+  const copy = (url: string, id: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const portalBase = window.location.origin;
+
+  return (
+    <Box>
+      <SectionHeader icon={<Shield />} title="Guest Access Links"
+        subtitle="Share time-limited, read-only portal links — no Azure AD required" />
+
+      {!isAdmin && (
+        <Alert severity="warning" sx={{ mb: 2 }}>Admin access required to manage guest links.</Alert>
+      )}
+
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Filter by account</InputLabel>
+          <Select value={selectedClient} label="Filter by account"
+            onChange={(e) => setSelectedClient(e.target.value)}>
+            <MenuItem value="">All accounts</MenuItem>
+            {(clients as Client[]).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Button variant="contained" startIcon={<Add />}
+          disabled={!isAdmin} onClick={() => setOpen(true)}>
+          New Guest Link
+        </Button>
+      </Box>
+
+      {isLoading ? <CircularProgress size={24} /> : (
+        <TableContainer component={Card} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {["Label", "Account", "Project", "Expires", "Last Used", "Status", ""].map((h) => (
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(tokens as any[]).length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ textAlign: "center", color: "text.secondary", py: 4 }}>
+                    No guest links yet. Create one to share read-only access.
+                  </TableCell>
+                </TableRow>
+              )}
+              {(tokens as any[]).map((t) => {
+                const expired = t.is_expired;
+                const revoked = t.is_revoked;
+                const active = !expired && !revoked;
+                const url = `${portalBase}/guest/${t.portal_url.split("/guest/")[1]}`;
+                return (
+                  <TableRow key={t.id} sx={{ opacity: active ? 1 : 0.5 }}>
+                    <TableCell sx={{ fontSize: 12, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <Tooltip title={t.note || t.label}><span>{t.label}</span></Tooltip>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 11 }}>{(clients as Client[]).find((c) => c.id === t.client_id)?.name || t.client_id.slice(0, 8)}</TableCell>
+                    <TableCell sx={{ fontSize: 11 }}>{t.project_id ? "Yes" : "—"}</TableCell>
+                    <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{new Date(t.expires_at).toLocaleDateString()}</TableCell>
+                    <TableCell sx={{ fontSize: 11 }}>{t.last_used_at ? fromNow(t.last_used_at) : "Never"}</TableCell>
+                    <TableCell>
+                      <Chip size="small" label={revoked ? "Revoked" : expired ? "Expired" : "Active"}
+                        sx={{ fontSize: 10, height: 18,
+                          bgcolor: revoked ? "rgba(234,67,53,0.12)" : expired ? "rgba(255,255,255,0.08)" : "rgba(52,168,83,0.12)",
+                          color: revoked ? "#EA4335" : expired ? "text.disabled" : "#34A853" }} />
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {active && (
+                        <Tooltip title={copiedId === t.id ? "Copied!" : "Copy link"}>
+                          <IconButton size="small" onClick={() => copy(url, t.id)}>
+                            <ContentCopy sx={{ fontSize: 14, color: copiedId === t.id ? "#34A853" : "text.secondary" }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {!revoked && isAdmin && (
+                        <Tooltip title="Revoke">
+                          <IconButton size="small" onClick={() => revokeMut.mutate(t.id)} disabled={revokeMut.isPending}>
+                            <Delete sx={{ fontSize: 14, color: "text.secondary" }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Create dialog */}
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>New Guest Access Link</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <TextField fullWidth size="small" required label="Label"
+              placeholder='e.g. "Acme Corp — Q3 Audit Review"'
+              value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
+            <FormControl fullWidth size="small" required>
+              <InputLabel>Account *</InputLabel>
+              <Select label="Account *" value={form.client_id}
+                onChange={(e) => setForm({ ...form, client_id: e.target.value, project_id: "" })}>
+                {(clients as Client[]).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            {form.client_id && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Project (optional — limits view further)</InputLabel>
+                <Select label="Project (optional — limits view further)" value={form.project_id}
+                  onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+                  <MenuItem value="">All projects in account</MenuItem>
+                  {(projects as any[]).map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            )}
+            <FormControl fullWidth size="small" required>
+              <InputLabel>Link expires after</InputLabel>
+              <Select label="Link expires after" value={form.days}
+                onChange={(e) => setForm({ ...form, days: Number(e.target.value) })}>
+                <MenuItem value={1}>1 day</MenuItem>
+                <MenuItem value={3}>3 days</MenuItem>
+                <MenuItem value={7}>7 days</MenuItem>
+                <MenuItem value={14}>14 days</MenuItem>
+                <MenuItem value={30}>30 days</MenuItem>
+                <MenuItem value={90}>90 days</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField fullWidth size="small" label="Note for guest (shown on landing page)"
+              multiline rows={2}
+              placeholder="e.g. This link provides read-only access to your security posture dashboard."
+              value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <Alert severity="info" sx={{ fontSize: 12 }}>
+              The guest can view: Dashboard, Findings, Assets, Risks, Frameworks, VAPT Reports, Posture Trends, Attack Paths.
+              They <strong>cannot</strong> run agents, edit data, or see AI / connector configuration.
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpen(false)} color="inherit">Cancel</Button>
+          <Button variant="contained"
+            disabled={!form.label.trim() || !form.client_id || createMut.isPending}
+            onClick={() => createMut.mutate()}>
+            {createMut.isPending ? <CircularProgress size={18} /> : "Create Link"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 const TABS = [
   { label: "General",          icon: <SettingsIcon fontSize="small" /> },
   { label: "What's New",       icon: <NewReleases fontSize="small" /> },
@@ -1114,6 +1313,7 @@ const TABS = [
   { label: "AI Providers",     icon: <Psychology fontSize="small" /> },
   { label: "Webhooks",         icon: <Webhook fontSize="small" /> },
   { label: "API Keys",         icon: <VpnKey fontSize="small" /> },
+  { label: "Guest Links",      icon: <Shield fontSize="small" />, adminOnly: true },
   { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
   { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
   { label: "Prompt Logs",      icon: <Psychology fontSize="small" />, adminOnly: true },
@@ -1191,11 +1391,12 @@ export default function Settings() {
       <TabPanel value={tab} index={4}><AISettings /></TabPanel>
       <TabPanel value={tab} index={5}><Webhooks /></TabPanel>
       <TabPanel value={tab} index={6}><APIKeysPage /></TabPanel>
-      <TabPanel value={tab} index={7}><SyncTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={8}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={9}><PromptLogsTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={10}><UsersTab isAdmin={isAdmin} /></TabPanel>
-      <TabPanel value={tab} index={11}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={7}><GuestTokensTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={8}><SyncTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={9}><AccessLogsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={10}><PromptLogsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={11}><UsersTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={12}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

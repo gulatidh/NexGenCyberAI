@@ -1415,6 +1415,35 @@ class ScorecardToken(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
 
 
+# ── Guest Access Tokens ────────────────────────────────────────────────────────
+
+class GuestToken(Base):
+    """Time-limited, read-only portal access link — no Azure AD required.
+
+    Scope rules:
+      client_id only  → guest sees that client, all projects
+      client_id + project_id → guest sees only that project's data
+      Both None       → not allowed (admin mistake; validate on create)
+
+    Hidden from guest regardless of scope:
+      AI Settings, Connectors config, AI Buddies run/configure, Settings,
+      other clients' data.
+    """
+    __tablename__ = "guest_tokens"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    label = Column(String(300), nullable=False)          # e.g. "Acme audit review Q3"
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_by = Column(String(200), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    is_revoked = Column(Boolean, default=False)
+    note = Column(Text, nullable=True)                   # optional note shown to guest on landing
+
+
 # ── CTEM Programs ──────────────────────────────────────────────────────────────
 
 class CTEMProgram(Base):

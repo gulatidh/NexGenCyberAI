@@ -81,6 +81,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 logger = logging.getLogger("nexgencyberai")
 
 try:
+    from api.routers import guest_tokens as _guest_tokens
+except ImportError:
+    _guest_tokens = None
+
+try:
     from api.routers.scan_import import router as scan_import_router
     logger.info("scan_import router loaded")
 except Exception as _e:
@@ -2142,7 +2147,7 @@ except Exception as _e:
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _comments, _webhooks, _ctem, _evidence, _documents,
              _compliance_heatmap, _client_comparison, _remediation_jobs, _cve_pivot,
-             _data_model, _guardrails):
+             _data_model, _guardrails, _guest_tokens):
     if _mod is not None and hasattr(_mod, "router"):
         app.include_router(_mod.router, prefix="/api/v1")
 

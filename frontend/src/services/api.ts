@@ -20,6 +20,13 @@ export const apiClient = axios.create({ baseURL: BASE_URL });
 let _redirectInFlight = false;
 
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  // Guest-link session: use the stored guest JWT, skip MSAL entirely
+  const guestJwt = sessionStorage.getItem("aegis-guest-jwt");
+  if (guestJwt) {
+    config.headers.Authorization = `Bearer ${guestJwt}`;
+    return config;
+  }
+
   // Ensure MSAL has finished loading the cache (no-op if already initialized)
   await msalInstance.initialize();
   const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
@@ -844,4 +851,17 @@ export const remediationJobsApi = {
 export const aiReviewApi = {
   scanAdvisory: (clientId: string, scanId: string) =>
     api.post(`/clients/${clientId}/ai-review/scan-advisory`, { scan_id: scanId }).then(r => r.data),
+};
+
+export const guestTokensApi = {
+  list: (clientId?: string) =>
+    apiClient.get(`/guest-tokens/`, { params: clientId ? { client_id: clientId } : {} }).then((r) => r.data),
+  create: (data: { label: string; client_id: string; project_id?: string; expires_at: string; note?: string }) =>
+    apiClient.post(`/guest-tokens/`, data).then((r) => r.data),
+  revoke: (id: string) =>
+    apiClient.delete(`/guest-tokens/${id}`).then((r) => r.data),
+  info: (token: string) =>
+    apiClient.get(`/public/guest/${token}/info`).then((r) => r.data),
+  redeem: (token: string) =>
+    apiClient.get(`/public/guest/${token}`).then((r) => r.data),
 };

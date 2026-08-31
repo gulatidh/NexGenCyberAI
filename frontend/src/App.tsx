@@ -130,6 +130,8 @@ const ScanCoverage        = React.lazy(() => import("./pages/ScanCoverage"));
 const ExecutiveSummary    = React.lazy(() => import("./pages/ExecutiveSummary"));
 const ReportScheduler     = React.lazy(() => import("./pages/ReportScheduler"));
 const AIUsageCost         = React.lazy(() => import("./pages/AIUsageCost"));
+const GuestLanding        = React.lazy(() => import("./pages/GuestLanding"));
+const GuestPortal         = React.lazy(() => import("./pages/GuestPortal"));
 
 // Redirect helpers that preserve route params
 function RedirectScanDetail() { const { id } = useParams(); return <Navigate to={`/discover/scans/${id}`} replace />; }
@@ -378,6 +380,9 @@ function ProtectedApp() {
           <Route path="/webhooks"               element={<Navigate to="/platform/integrations?tab=webhooks" replace />} />
           <Route path="/api-keys"               element={<Navigate to="/platform/integrations?tab=api-keys" replace />} />
           <Route path="/data-model"             element={<OntologyPage />} />
+          {/* ── Guest access (no Azure AD required) ──────────────────── */}
+          <Route path="/guest/:token"           element={<GuestLanding />} />
+          <Route path="/guest/portal/*"         element={<GuestPortal />} />
           <Route path="/connections"            element={<Navigate to="/platform/connections" replace />} />
           <Route path="/clients"                element={<Navigate to="/platform/clients" replace />} />
           <Route path="/clients/:id"            element={<Navigate to="/platform/clients" replace />} />
