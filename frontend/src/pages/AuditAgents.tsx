@@ -13,6 +13,28 @@ import { useQuery } from "@tanstack/react-query";
 import { useActiveClient } from "../contexts/ClientContext";
 import { auditAgentsApi, frameworksApi } from "../services/api";
 
+// Standard frameworks always available — no API dependency
+const STATIC_FRAMEWORKS: { value: string; label: string; is_custom?: boolean }[] = [
+  { value: "nist_csf",          label: "NIST CSF 2.0" },
+  { value: "nist_800_53",       label: "NIST 800-53" },
+  { value: "nist_ai_rmf",       label: "NIST AI RMF 1.0" },
+  { value: "nist_ai_200_1",     label: "NIST AI 200-1" },
+  { value: "nist_ai_200_2",     label: "NIST AI 200-2" },
+  { value: "iso_27001",         label: "ISO 27001:2022" },
+  { value: "pci_dss",           label: "PCI DSS 4.0" },
+  { value: "gdpr",              label: "GDPR" },
+  { value: "soc2",              label: "SOC 2" },
+  { value: "gcc_im8",           label: "GCC IM8 Reform 2025" },
+  { value: "mas_trm",           label: "MAS TRM" },
+  { value: "cis_v8",            label: "CIS Controls v8" },
+  { value: "hipaa",             label: "HIPAA" },
+  { value: "fedramp",           label: "FedRAMP" },
+  { value: "cyber_essentials",  label: "Cyber Essentials" },
+  { value: "cis_azure",         label: "CIS Azure" },
+  { value: "cis_aws",           label: "CIS AWS" },
+  { value: "cis_gcp",           label: "CIS GCP" },
+];
+
 // ── Agent definitions ──────────────────────────────────────────────────────────
 
 type StepType = "chips" | "framework_select" | "domain_chips" | "free_text";
@@ -553,10 +575,14 @@ export default function AuditAgents() {
   const [viewingRun, setViewingRun] = useState<{ agentType: string; result: Record<string, unknown> } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: frameworkList = [] } = useQuery<{ value: string; label: string; is_custom?: boolean }[]>({
+  const { data: apiFrameworks } = useQuery<{ value: string; label: string; is_custom?: boolean }[]>({
     queryKey: ["frameworks-all"],
     queryFn: () => frameworksApi.catalogAll(),
   });
+  // Always show standard frameworks; append any custom ones from API when loaded
+  const frameworkList = apiFrameworks && apiFrameworks.length > 0
+    ? apiFrameworks
+    : STATIC_FRAMEWORKS;
 
   const { data: pastRuns = [], refetch: refetchRuns } = useQuery({
     queryKey: ["audit-runs", clientId],
