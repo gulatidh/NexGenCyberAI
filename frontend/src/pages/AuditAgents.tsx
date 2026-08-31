@@ -553,10 +553,17 @@ export default function AuditAgents() {
   const [viewingRun, setViewingRun] = useState<{ agentType: string; result: Record<string, unknown> } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: frameworkList = [] } = useQuery({
-    queryKey: ["frameworks-all"],
-    queryFn: () => frameworksApi.catalogAll(),
-  });
+  const [frameworkList, setFrameworkList] = useState<{ value: string; label: string; is_custom?: boolean }[]>([]);
+  const [fwLoading, setFwLoading] = useState(true);
+
+  useEffect(() => {
+    frameworksApi.catalogAll()
+      .then((data: unknown) => {
+        setFrameworkList(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setFrameworkList([]))
+      .finally(() => setFwLoading(false));
+  }, []);
 
   const { data: pastRuns = [], refetch: refetchRuns } = useQuery({
     queryKey: ["audit-runs", clientId],
@@ -789,13 +796,11 @@ export default function AuditAgents() {
                     <Autocomplete
                       size="small"
                       sx={{ minWidth: 340, mt: 1 }}
-                      options={frameworkList as { value: string; label: string; is_custom?: boolean }[]}
-                      getOptionLabel={(o) => o.label}
+                      loading={fwLoading}
+                      options={frameworkList}
+                      getOptionLabel={(o) => o.label ?? o.value}
                       isOptionEqualToValue={(o, v) => o.value === v.value}
-                      value={
-                        (frameworkList as { value: string; label: string; is_custom?: boolean }[])
-                          .find((f) => f.value === inputs["framework"]) ?? null
-                      }
+                      value={frameworkList.find((f) => f.value === inputs["framework"]) ?? null}
                       onChange={(_, opt) => setValue("framework", opt?.value ?? "")}
                       renderOption={(props, o) => (
                         <Box component="li" {...props} key={o.value}
