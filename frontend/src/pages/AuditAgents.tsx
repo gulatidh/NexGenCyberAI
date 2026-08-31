@@ -794,20 +794,17 @@ export default function AuditAgents() {
                         value={String(inputs["framework"] || "")}
                         onChange={(e) => setValue("framework", e.target.value)}
                       >
-                        {(frameworkList as { key?: string; id?: string; name: string; is_custom?: boolean }[]).map((f) => {
-                          const key = f.key || f.id || "";
-                          return (
-                            <MenuItem key={key} value={key}>
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                {f.name}
-                                {f.is_custom && (
-                                  <Chip label="Custom" size="small"
-                                    sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
-                                )}
-                              </Box>
-                            </MenuItem>
-                          );
-                        })}
+                        {(frameworkList as { value: string; label: string; is_custom?: boolean }[]).map((f) => (
+                          <MenuItem key={f.value} value={f.value}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              {f.label}
+                              {f.is_custom && (
+                                <Chip label="Custom" size="small"
+                                  sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
+                              )}
+                            </Box>
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                   )}
