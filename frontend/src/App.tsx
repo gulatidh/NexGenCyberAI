@@ -380,9 +380,6 @@ function ProtectedApp() {
           <Route path="/webhooks"               element={<Navigate to="/platform/integrations?tab=webhooks" replace />} />
           <Route path="/api-keys"               element={<Navigate to="/platform/integrations?tab=api-keys" replace />} />
           <Route path="/data-model"             element={<OntologyPage />} />
-          {/* ── Guest access (no Azure AD required) ──────────────────── */}
-          <Route path="/guest/:token"           element={<GuestLanding />} />
-          <Route path="/guest/portal/*"         element={<GuestPortal />} />
           <Route path="/connections"            element={<Navigate to="/platform/connections" replace />} />
           <Route path="/clients"                element={<Navigate to="/platform/clients" replace />} />
           <Route path="/clients/:id"            element={<Navigate to="/platform/clients" replace />} />
@@ -430,6 +427,13 @@ export default function App() {
               <BrowserRouter>
                 <Routes>
                   <Route path="/" element={<LandingV2 />} />
+                  {/* Guest routes — no MSAL auth, token is the credential */}
+                  <Route path="/guest/:token" element={
+                    <Suspense fallback={<PageLoader />}><GuestLanding /></Suspense>
+                  } />
+                  <Route path="/guest/portal/*" element={
+                    <Suspense fallback={<PageLoader />}><GuestPortal /></Suspense>
+                  } />
                   <Route path="/*" element={<ProtectedApp />} />
                 </Routes>
               </BrowserRouter>
