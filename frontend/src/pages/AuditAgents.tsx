@@ -556,7 +556,6 @@ export default function AuditAgents() {
   const { data: frameworkList = [] } = useQuery<{ value: string; label: string; is_custom?: boolean }[]>({
     queryKey: ["frameworks-all"],
     queryFn: () => frameworksApi.catalogAll(),
-    enabled: !!clientId,
   });
 
   const { data: pastRuns = [], refetch: refetchRuns } = useQuery({

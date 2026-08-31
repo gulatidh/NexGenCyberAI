@@ -46,7 +46,7 @@ export default function GuestLanding() {
       }));
       // Pre-select the scoped client so the global selector is correct on entry
       if (resp.client_id) {
-        localStorage.setItem("aegis-active-client", String(resp.client_id));
+        localStorage.setItem("owlet-active-client", String(resp.client_id));
       }
       navigate("/hub");
     } catch (e: any) {
