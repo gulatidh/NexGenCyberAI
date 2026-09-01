@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, Button, Alert, CircularProgress,
@@ -40,6 +41,7 @@ function fmtBytes(n?: number): string {
 export default function SecurityDocs() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const isGuest = useIsGuest();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [question, setQuestion] = useState("");
@@ -108,14 +110,16 @@ export default function SecurityDocs() {
             style={{ display: "none" }}
             onChange={handleFileChange}
           />
-          <Button
-            variant="contained"
-            startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : <Upload />}
-            onClick={() => fileRef.current?.click()}
-            disabled={!clientId || uploading}
-          >
-            {uploading ? "Uploading…" : "Upload Document"}
-          </Button>
+          {!isGuest && (
+            <Button
+              variant="contained"
+              startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : <Upload />}
+              onClick={() => fileRef.current?.click()}
+              disabled={!clientId || uploading}
+            >
+              {uploading ? "Uploading…" : "Upload Document"}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -157,11 +161,13 @@ export default function SecurityDocs() {
                     {doc.uploaded_at ? fmt(doc.uploaded_at) : "—"}
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="Delete">
-                      <IconButton size="small" color="error" onClick={() => deleteMut.mutate(doc.id)}>
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {!isGuest && (
+                      <Tooltip title="Delete">
+                        <IconButton size="small" color="error" onClick={() => deleteMut.mutate(doc.id)}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

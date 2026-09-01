@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress, Grid,
@@ -206,6 +207,7 @@ function CategoryTile({ cat, active, onClick }: {
 
 export default function Findings() {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const { clientId } = useActiveClient();
   const { instance, accounts } = useMsal();
   const [projectId, setProjectId] = useState("");
@@ -943,18 +945,20 @@ export default function Findings() {
                         })()}
                       </TableCell>
                       <TableCell align="right" sx={{ width: 44 }}>
-                        <Tooltip title="Delete finding">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); setPendingDelete(f); }}
-                            sx={{
-                              color: "text.secondary",
-                              "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-                            }}
-                          >
-                            <DeleteOutlined sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
+                        {!isGuest && (
+                          <Tooltip title="Delete finding">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => { e.stopPropagation(); setPendingDelete(f); }}
+                              sx={{
+                                color: "text.secondary",
+                                "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                              }}
+                            >
+                              <DeleteOutlined sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                       {/* Actions: Accept Risk + Suppress + Playbook */}
                       <TableCell align="right" sx={{ width: 260, whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
@@ -989,7 +993,7 @@ export default function Findings() {
                           </Tooltip>
 
                           {/* Accept Risk — only shown when not already accepted/false_positive */}
-                          {f.status !== "accepted" && f.status !== "false_positive" && (
+                          {!isGuest && f.status !== "accepted" && f.status !== "false_positive" && (
                             <Tooltip title="Accept as known risk (won't fix now)">
                               <Button
                                 size="small"
@@ -1009,7 +1013,7 @@ export default function Findings() {
                           )}
 
                           {/* Suppress / Unsuppress */}
-                          {f.status === "false_positive" ? (
+                          {!isGuest && f.status === "false_positive" ? (
                             <Tooltip title="Unsuppress this finding">
                               <Button
                                 size="small"
@@ -1197,29 +1201,35 @@ export default function Findings() {
                   </Box>
                 )}
                 <Box>
-                  <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>Update Status</Typography>
-                  <Box sx={{ display: "flex", gap: 1 }}>
-                    {["open","remediated","accepted","false_positive"].map((s) => (
-                      <Chip key={s} label={s.replace("_", " ")} size="small" clickable
-                        onClick={() => updateMutation.mutate({ id: selected.id, data: { status: s } })}
-                        sx={{ bgcolor: selected.status === s ? `${STATUS_COLOR[s]}40` : `${STATUS_COLOR[s]}15`,
-                          color: STATUS_COLOR[s], border: selected.status === s ? `1px solid ${STATUS_COLOR[s]}` : "none",
-                          cursor: "pointer" }} />
-                    ))}
-                  </Box>
+                  {!isGuest && (
+                    <>
+                      <Typography variant="caption" sx={{ color: "text.secondary", mb: 1, display: "block" }}>Update Status</Typography>
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        {["open","remediated","accepted","false_positive"].map((s) => (
+                          <Chip key={s} label={s.replace("_", " ")} size="small" clickable
+                            onClick={() => updateMutation.mutate({ id: selected.id, data: { status: s } })}
+                            sx={{ bgcolor: selected.status === s ? `${STATUS_COLOR[s]}40` : `${STATUS_COLOR[s]}15`,
+                              color: STATUS_COLOR[s], border: selected.status === s ? `1px solid ${STATUS_COLOR[s]}` : "none",
+                              cursor: "pointer" }} />
+                        ))}
+                      </Box>
+                    </>
+                  )}
                 </Box>
               </DialogContent>
               <DialogActions sx={{ p: 2 }}>
-                <Button
-                  startIcon={<DeleteOutlined />}
-                  onClick={() => setPendingDelete(selected)}
-                  sx={{
-                    color: "#EA4335", textTransform: "none",
-                    "&:hover": { bgcolor: "rgba(234,67,53,0.08)" },
-                  }}
-                >
-                  Delete
-                </Button>
+                {!isGuest && (
+                  <Button
+                    startIcon={<DeleteOutlined />}
+                    onClick={() => setPendingDelete(selected)}
+                    sx={{
+                      color: "#EA4335", textTransform: "none",
+                      "&:hover": { bgcolor: "rgba(234,67,53,0.08)" },
+                    }}
+                  >
+                    Delete
+                  </Button>
+                )}
                 <Box sx={{ flex: 1 }} />
                 <Button onClick={() => setSelected(null)} sx={{ color: "text.secondary" }}>Close</Button>
               </DialogActions>

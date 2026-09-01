@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Avatar, IconButton, TextField, Button,
   Collapse, Divider, CircularProgress, Tooltip,
@@ -41,6 +42,7 @@ function CommentItem({
   onDeleted: () => void;
   onEdited: () => void;
 }) {
+  const isGuest = useIsGuest();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(comment.body);
 
@@ -104,7 +106,7 @@ function CommentItem({
             <Typography variant="body2" sx={{ flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {comment.body}
             </Typography>
-            {isOwn && (
+            {isOwn && !isGuest && (
               <Box sx={{ display: "flex", flexShrink: 0 }}>
                 <Tooltip title="Edit">
                   <IconButton size="small" onClick={() => setEditing(true)}>
@@ -128,6 +130,7 @@ function CommentItem({
 
 export default function CommentThread({ clientId, entityType, entityId }: CommentThreadProps) {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const { accounts } = useMsal();
   const currentEmail = accounts[0]?.username || "";
   const [expanded, setExpanded] = useState(false);
@@ -187,22 +190,24 @@ export default function CommentThread({ clientId, entityType, entityId }: Commen
         ))}
 
         {/* New comment form */}
-        <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-          <TextField
-            fullWidth size="small" multiline minRows={1}
-            placeholder="Add a comment…"
-            value={newBody}
-            onChange={(e) => setNewBody(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) postMut.mutate(); }}
-          />
-          <Button
-            variant="contained" size="small"
-            disabled={!newBody.trim() || postMut.isPending}
-            onClick={() => postMut.mutate()}
-          >
-            {postMut.isPending ? <CircularProgress size={14} color="inherit" /> : "Post"}
-          </Button>
-        </Box>
+        {!isGuest && (
+          <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
+            <TextField
+              fullWidth size="small" multiline minRows={1}
+              placeholder="Add a comment…"
+              value={newBody}
+              onChange={(e) => setNewBody(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) postMut.mutate(); }}
+            />
+            <Button
+              variant="contained" size="small"
+              disabled={!newBody.trim() || postMut.isPending}
+              onClick={() => postMut.mutate()}
+            >
+              {postMut.isPending ? <CircularProgress size={14} color="inherit" /> : "Post"}
+            </Button>
+          </Box>
+        )}
       </Collapse>
     </Box>
   );

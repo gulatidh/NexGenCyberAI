@@ -10,6 +10,7 @@
  * methodology threat table live.
  */
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
@@ -65,6 +66,7 @@ const ACCEPTED_UPLOAD = ".drawio,.xml,.pdf,.jpg,.jpeg,.png";
 export default function ThreatModels() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const isGuest = useIsGuest();
   const location = useLocation();
   const tmBase = location.pathname.startsWith("/threat-intel")
     ? "/threat-intel/threat-models"
@@ -205,33 +207,35 @@ export default function ThreatModels() {
             On-demand STRIDE / PASTA / LINDDUN / MITRE ATT&CK / Kill Chain models grounded in your asset inventory + findings
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
-          <Tooltip title={!selectedClientId ? "Select an account first" : !canAct ? "Read-only in Executive mode" : "Upload a draw.io / PDF / image diagram"}>
-            <span>
-              <Button variant="outlined" startIcon={<UploadFile />}
-                disabled={!selectedClientId || !canAct}
-                onClick={() => setOpenUpload(true)}
-                sx={{
-                  color: "text.secondary",
-                  borderColor: "divider",
-                  "&:hover": { borderColor: "#9C27B0", color: "#9C27B0", bgcolor: "rgba(156,39,176,0.06)" },
-                  "&:disabled": { opacity: 0.45 },
-                }}>
-                Upload Diagram
-              </Button>
-            </span>
-          </Tooltip>
-          <Box sx={{ width: "1px", height: 24, bgcolor: "divider" }} />
-          <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to generate models." : ""}>
-            <span>
-              <Button variant="contained" startIcon={<Add />}
-                disabled={!selectedClientId || !canAct}
-                onClick={() => setOpenCreate(true)}>
-                New Threat Model
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
+        {!isGuest && (
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+            <Tooltip title={!selectedClientId ? "Select an account first" : !canAct ? "Read-only in Executive mode" : "Upload a draw.io / PDF / image diagram"}>
+              <span>
+                <Button variant="outlined" startIcon={<UploadFile />}
+                  disabled={!selectedClientId || !canAct}
+                  onClick={() => setOpenUpload(true)}
+                  sx={{
+                    color: "text.secondary",
+                    borderColor: "divider",
+                    "&:hover": { borderColor: "#9C27B0", color: "#9C27B0", bgcolor: "rgba(156,39,176,0.06)" },
+                    "&:disabled": { opacity: 0.45 },
+                  }}>
+                  Upload Diagram
+                </Button>
+              </span>
+            </Tooltip>
+            <Box sx={{ width: "1px", height: 24, bgcolor: "divider" }} />
+            <Tooltip title={!canAct ? "Read-only in Executive mode — switch to Analyst (top-right) to generate models." : ""}>
+              <span>
+                <Button variant="contained" startIcon={<Add />}
+                  disabled={!selectedClientId || !canAct}
+                  onClick={() => setOpenCreate(true)}>
+                  New Threat Model
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
+        )}
       </Box>
 
       {!selectedClientId ? (
@@ -270,31 +274,33 @@ export default function ThreatModels() {
                     position: "relative",
                   }}
                 >
-                  <Box sx={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 0.25 }}>
-                    <Tooltip title="Delete">
-                      <IconButton size="small"
-                        onClick={(e) => { e.stopPropagation(); setPendingDelete(m); }}
-                        sx={{
-                          color: "text.secondary",
-                          "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-                        }}>
-                        <DeleteOutlined sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={!canAct ? "Read-only in Executive mode" : inFlight ? "Re-model disabled while generation is in progress" : "Re-model (keeps history)"}>
-                      <span>
-                        <IconButton size="small" disabled={inFlight || rescanMutation.isPending || !canAct}
-                          onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(m); }}
+                  {!isGuest && (
+                    <Box sx={{ position: "absolute", top: 6, right: 6, display: "flex", gap: 0.25 }}>
+                      <Tooltip title="Delete">
+                        <IconButton size="small"
+                          onClick={(e) => { e.stopPropagation(); setPendingDelete(m); }}
                           sx={{
                             color: "text.secondary",
-                            "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-                            "&.Mui-disabled": { color: "text.secondary" },
+                            "&:hover": { color: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
                           }}>
-                          <Replay sx={{ fontSize: 16 }} />
+                          <DeleteOutlined sx={{ fontSize: 16 }} />
                         </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Box>
+                      </Tooltip>
+                      <Tooltip title={!canAct ? "Read-only in Executive mode" : inFlight ? "Re-model disabled while generation is in progress" : "Re-model (keeps history)"}>
+                        <span>
+                          <IconButton size="small" disabled={inFlight || rescanMutation.isPending || !canAct}
+                            onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(m); }}
+                            sx={{
+                              color: "text.secondary",
+                              "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
+                              "&.Mui-disabled": { color: "text.secondary" },
+                            }}>
+                            <Replay sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                  )}
                   <CardContent sx={{ pt: 4 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                       <Chip label={methodologyLabel(m.methodology)} size="small"

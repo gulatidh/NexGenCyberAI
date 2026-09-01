@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import { alpha } from "@mui/material/styles";
 import {
   Box, Typography, Button, Card, CardContent, IconButton, Chip,
@@ -444,6 +445,7 @@ function DomainManagerDialog({
 
 export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => void }) {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nativeOpen, setNativeOpen] = useState(false);
   const [domainOpen, setDomainOpen] = useState(false);
@@ -524,29 +526,33 @@ export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => 
           <Chip label={`${cf.domains.length} domains`} size="small" color="primary" variant="outlined" sx={{ mr: 0.5 }} />
         )}
         <Chip label={cf.slug} size="small" variant="outlined" sx={{ fontFamily: "monospace" }} />
-        <Tooltip title="Rename / edit policy">
-          <IconButton size="small" onClick={() => { setEditName(cf.name); setEditDesc(cf.description || ""); setEditOpen(true); }}
-            sx={{ color: "text.secondary" }}>
-            <Edit fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        {!isGuest && (
+          <Tooltip title="Rename / edit policy">
+            <IconButton size="small" onClick={() => { setEditName(cf.name); setEditDesc(cf.description || ""); setEditOpen(true); }}
+              sx={{ color: "text.secondary" }}>
+              <Edit fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* Action buttons */}
-      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
-        <Button variant="contained" startIcon={<LibraryAdd />} size="small"
-          onClick={() => setPickerOpen(true)}>
-          Add from Standards
-        </Button>
-        <Button variant="outlined" startIcon={<Build />} size="small"
-          onClick={() => setNativeOpen(true)}>
-          Add Custom Control
-        </Button>
-        <Button variant="outlined" startIcon={<Category />} size="small"
-          onClick={() => setDomainOpen(true)}>
-          {cf.domains.length > 0 ? `Domains (${cf.domains.length})` : "Add Domains"}
-        </Button>
-      </Box>
+      {!isGuest && (
+        <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+          <Button variant="contained" startIcon={<LibraryAdd />} size="small"
+            onClick={() => setPickerOpen(true)}>
+            Add from Standards
+          </Button>
+          <Button variant="outlined" startIcon={<Build />} size="small"
+            onClick={() => setNativeOpen(true)}>
+            Add Custom Control
+          </Button>
+          <Button variant="outlined" startIcon={<Category />} size="small"
+            onClick={() => setDomainOpen(true)}>
+            {cf.domains.length > 0 ? `Domains (${cf.domains.length})` : "Add Domains"}
+          </Button>
+        </Box>
+      )}
 
       {/* Tabs: Mapped controls | Custom controls */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: "1px solid", borderColor: "divider" }}>
@@ -596,13 +602,15 @@ export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => 
                           <Typography variant="caption" sx={{ color: "text.secondary" }}>{c.description}</Typography>
                         )}
                       </Box>
-                      <Tooltip title="Remove from policy">
-                        <IconButton size="small" onClick={() => removeMut.mutate(c.id)}
-                          disabled={removeMut.isPending}
-                          sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {!isGuest && (
+                        <Tooltip title="Remove from policy">
+                          <IconButton size="small" onClick={() => removeMut.mutate(c.id)}
+                            disabled={removeMut.isPending}
+                            sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </Box>
                 ))}
@@ -653,13 +661,15 @@ export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => 
                           <Typography variant="caption" sx={{ color: "text.secondary" }}>{nc.description}</Typography>
                         )}
                       </Box>
-                      <Tooltip title="Remove control">
-                        <IconButton size="small" onClick={() => removeNativeMut.mutate(nc.id)}
-                          disabled={removeNativeMut.isPending}
-                          sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
-                          <Delete fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {!isGuest && (
+                        <Tooltip title="Remove control">
+                          <IconButton size="small" onClick={() => removeNativeMut.mutate(nc.id)}
+                            disabled={removeNativeMut.isPending}
+                            sx={{ color: "error.main", opacity: 0.6, "&:hover": { opacity: 1 } }}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Box>
                   </Box>
                 ))}
@@ -708,6 +718,7 @@ export function FrameworkDetail({ cfId, onBack }: { cfId: string; onBack: () => 
 
 export default function CustomFrameworks() {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -830,18 +841,22 @@ export default function CustomFrameworks() {
                   <Chip label={cf.slug} size="small" sx={{ fontFamily: "monospace", fontSize: 10 }} />
                 </Box>
               </Box>
-              <Tooltip title="Rename / edit policy">
-                <IconButton size="small" onClick={(e) => handleEditOpen(e, cf)}
-                  sx={{ color: "text.secondary" }}>
-                  <Edit fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete policy">
-                <IconButton size="small" onClick={(e) => handleDelete(e, cf.id, cf.name)}
-                  sx={{ color: "error.main" }}>
-                  <Delete fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              {!isGuest && (
+                <Tooltip title="Rename / edit policy">
+                  <IconButton size="small" onClick={(e) => handleEditOpen(e, cf)}
+                    sx={{ color: "text.secondary" }}>
+                    <Edit fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {!isGuest && (
+                <Tooltip title="Delete policy">
+                  <IconButton size="small" onClick={(e) => handleDelete(e, cf.id, cf.name)}
+                    sx={{ color: "error.main" }}>
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </CardContent>
           </Card>
         ))}

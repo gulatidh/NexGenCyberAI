@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Button, IconButton, Chip, Avatar,
   Table, TableHead, TableRow, TableCell, TableBody,
@@ -39,9 +40,9 @@ function ClientForm({ form, onChange }: { form: typeof EMPTY_FORM; onChange: (f:
   );
 }
 
-function ProjectRows({ clientId, expanded, searchQuery, navigate, clientBase }: {
+function ProjectRows({ clientId, expanded, searchQuery, navigate, clientBase, isGuest }: {
   clientId: string; expanded: boolean; searchQuery: string;
-  navigate: (path: string) => void; clientBase: string;
+  navigate: (path: string) => void; clientBase: string; isGuest: boolean;
 }) {
   const qc = useQueryClient();
   const { data: projects = [], isLoading } = useQuery<Project[]>({
@@ -110,12 +111,14 @@ function ProjectRows({ clientId, expanded, searchQuery, navigate, clientBase }: 
           <TableCell sx={{ fontFamily: "monospace", fontSize: 11, color: "text.disabled" }}>{p.id}</TableCell>
           <TableCell sx={{ color: "text.disabled", fontSize: 12 }}>—</TableCell>
           <TableCell>
-            <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "error.main" } }}
-              onClick={() => {
-                if (window.confirm(`Delete project "${p.name}"?`)) deleteProjectMutation.mutate(p.id);
-              }}>
-              <Delete sx={{ fontSize: 15 }} />
-            </IconButton>
+            {!isGuest && (
+              <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "error.main" } }}
+                onClick={() => {
+                  if (window.confirm(`Delete project "${p.name}"?`)) deleteProjectMutation.mutate(p.id);
+                }}>
+                <Delete sx={{ fontSize: 15 }} />
+              </IconButton>
+            )}
           </TableCell>
         </TableRow>
       ))}
@@ -142,6 +145,7 @@ export default function Clients() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const isGuest = useIsGuest();
   const clientBase = location.pathname.startsWith("/platform") ? "/platform/clients" : "/clients";
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -270,8 +274,10 @@ export default function Clients() {
         py: 0.75, mb: 2, flexWrap: "wrap",
       }}>
         {[
-          { icon: <Add sx={{ fontSize: 15 }} />, label: "Create", onClick: () => setCreateOpen(true) },
-          { icon: <FolderSpecial sx={{ fontSize: 15 }} />, label: "Add project", onClick: () => { setAddProjectOpen(true); setAddProjectClientId(clients[0]?.id || ""); } },
+          ...(!isGuest ? [
+            { icon: <Add sx={{ fontSize: 15 }} />, label: "Create", onClick: () => setCreateOpen(true) },
+            { icon: <FolderSpecial sx={{ fontSize: 15 }} />, label: "Add project", onClick: () => { setAddProjectOpen(true); setAddProjectClientId(clients[0]?.id || ""); } },
+          ] : []),
           { icon: <Refresh sx={{ fontSize: 15 }} />, label: "Refresh", onClick: () => refetch() },
           { icon: expandedIds.size > 0 ? <UnfoldLess sx={{ fontSize: 15 }} /> : <UnfoldMore sx={{ fontSize: 15 }} />,
             label: expandedIds.size > 0 ? "Collapse all" : "Expand all",
@@ -422,16 +428,18 @@ export default function Clients() {
                         <ProjectCountCell clientId={client.id} />
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: "flex", gap: 0.25 }}>
-                          <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "text.secondary" } }}
-                            onClick={() => openEdit(client)}>
-                            <Edit sx={{ fontSize: 15 }} />
-                          </IconButton>
-                          <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "error.main" } }}
-                            onClick={() => setPendingDelete(client)}>
-                            <Delete sx={{ fontSize: 15 }} />
-                          </IconButton>
-                        </Box>
+                        {!isGuest && (
+                          <Box sx={{ display: "flex", gap: 0.25 }}>
+                            <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "text.secondary" } }}
+                              onClick={() => openEdit(client)}>
+                              <Edit sx={{ fontSize: 15 }} />
+                            </IconButton>
+                            <IconButton size="small" sx={{ color: "text.disabled", "&:hover": { color: "error.main" } }}
+                              onClick={() => setPendingDelete(client)}>
+                              <Delete sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Box>
+                        )}
                       </TableCell>
                     </TableRow>
 
@@ -442,6 +450,7 @@ export default function Clients() {
                       searchQuery={searchQuery}
                       navigate={navigate}
                       clientBase={clientBase}
+                      isGuest={isGuest}
                     />
                   </React.Fragment>
                 );

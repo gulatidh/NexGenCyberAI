@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Card, CardContent, Button, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -74,6 +75,7 @@ function DeliveryList({ webhookId }: { webhookId: string }) {
 
 function WebhookCard({ hook, onDelete }: { hook: Webhook; onDelete: () => void }) {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [showDeliveries, setShowDeliveries] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -117,19 +119,23 @@ function WebhookCard({ hook, onDelete }: { hook: Webhook; onDelete: () => void }
             </Box>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
-            <Tooltip title={hook.is_active ? "Pause webhook" : "Activate webhook"}>
-              <Switch
-                size="small"
-                checked={hook.is_active}
-                onChange={(e) => toggleMut.mutate(e.target.checked)}
-              />
-            </Tooltip>
-            <Button size="small" onClick={() => testMut.mutate()} disabled={testMut.isPending}>Test</Button>
-            <Tooltip title="Delete webhook">
-              <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}>
-                <Delete fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {!isGuest && (
+              <>
+                <Tooltip title={hook.is_active ? "Pause webhook" : "Activate webhook"}>
+                  <Switch
+                    size="small"
+                    checked={hook.is_active}
+                    onChange={(e) => toggleMut.mutate(e.target.checked)}
+                  />
+                </Tooltip>
+                <Button size="small" onClick={() => testMut.mutate()} disabled={testMut.isPending}>Test</Button>
+                <Tooltip title="Delete webhook">
+                  <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}>
+                    <Delete fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           </Box>
         </Box>
 
@@ -168,6 +174,7 @@ function WebhookCard({ hook, onDelete }: { hook: Webhook; onDelete: () => void }
 export default function Webhooks() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const isGuest = useIsGuest();
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({ name: "", url: "", secret: "", events: [] as string[] });
 
@@ -218,9 +225,11 @@ export default function Webhooks() {
             Push real-time security events to external systems
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-          Add Webhook
-        </Button>
+        {!isGuest && (
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+            Add Webhook
+          </Button>
+        )}
       </Box>
 
       {isLoading && <CircularProgress size={24} />}

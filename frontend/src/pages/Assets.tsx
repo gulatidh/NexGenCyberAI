@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Card, Chip, CircularProgress,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, TableSortLabel,
@@ -46,6 +47,7 @@ type ActiveTab = "active" | "new" | "reappeared" | "stale";
 export default function Assets() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const isGuest = useIsGuest();
   const location = useLocation();
   const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
 
@@ -332,7 +334,7 @@ export default function Assets() {
           </Box>
 
           {/* Approve action bar — only for new/reappeared tabs */}
-          {showCheckboxes && (
+          {showCheckboxes && !isGuest && (
             <Box sx={{ display: "flex", gap: 1, mb: 2, alignItems: "center" }}>
               <Button
                 variant="contained"

@@ -28,6 +28,7 @@ import { useActiveClient } from "../../contexts/ClientContext";
 import { useThemeMode } from "../../theme/ThemeModeContext";
 import { useViewMode } from "../../theme/ViewModeContext";
 import GlobalSearch from "../GlobalSearch";
+import { useIsGuest } from "../../hooks/useIsGuest";
 
 const DRAWER_WIDTH = 240;
 const DRAWER_RAIL_WIDTH = 64;
@@ -259,6 +260,7 @@ export default function AppLayout() {
   const { mode, setMode, customPalette, setCustomPalette } = useThemeMode();
   const { mode: viewMode, setMode: setViewMode, readOnly, setReadOnly } = useViewMode();
   const { clientId, setClientId } = useActiveClient();
+  const isGuest = useIsGuest();
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   // Default to collapsed (rail mode) — gives pages maximum width. User can
   // pin the expanded mode via the toggle, persisted in localStorage.
@@ -738,6 +740,17 @@ export default function AppLayout() {
             </Menu>
           </Toolbar>
         </AppBar>
+        {isGuest && (
+          <Box sx={{
+            bgcolor: "#12183a", borderBottom: "1px solid rgba(66,133,244,0.3)",
+            px: 3, py: 0.75, display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0,
+          }}>
+            <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "#4285F4", flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+              Guest session — write actions are hidden. Launch scans and run agents freely.
+            </Typography>
+          </Box>
+        )}
         <AppBreadcrumb />
         {/* Section mini-nav + page content */}
         <Box component="main" sx={{ flexGrow: 1, display: "flex", overflow: "hidden" }}>

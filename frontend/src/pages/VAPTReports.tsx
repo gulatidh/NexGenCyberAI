@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Button, Chip, IconButton, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Paper, Dialog,
@@ -83,6 +84,7 @@ const EMPTY_FORM = {
 export default function VAPTReports() {
   const navigate = useNavigate();
   const location = useLocation();
+  const isGuest = useIsGuest();
   const vaptBase = location.pathname.startsWith("/vapt") ? "/vapt/reports" : "/vapt-reports";
   const { clientId } = useActiveClient();
   const qc = useQueryClient();
@@ -187,14 +189,16 @@ export default function VAPTReports() {
             </Typography>
           </Box>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setCreateOpen(true)}
-          sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
-        >
-          New Report
-        </Button>
+        {!isGuest && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setCreateOpen(true)}
+            sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
+          >
+            New Report
+          </Button>
+        )}
       </Box>
 
       {/* Stats */}
@@ -232,9 +236,11 @@ export default function VAPTReports() {
           <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
             Generate a report from a completed scan — Owlet fills in scope, findings, and AI-generated remediation automatically.
           </Typography>
-          <Button variant="outlined" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-            Create First Report
-          </Button>
+          {!isGuest && (
+            <Button variant="outlined" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+              Create First Report
+            </Button>
+          )}
         </Box>
       )}
 
@@ -307,16 +313,18 @@ export default function VAPTReports() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Box sx={{ display: "flex", gap: 0.5 }}>
-                        <Tooltip title="View / Edit">
+                        <Tooltip title="View">
                           <IconButton size="small" onClick={() => navigate(`${vaptBase}/${report.id}`)}>
                             <Visibility fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => setDeleteTarget(report.id)} sx={{ color: "error.main" }}>
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        {!isGuest && (
+                          <Tooltip title="Delete">
+                            <IconButton size="small" onClick={() => setDeleteTarget(report.id)} sx={{ color: "error.main" }}>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Box>
                     </TableCell>
                   </TableRow>

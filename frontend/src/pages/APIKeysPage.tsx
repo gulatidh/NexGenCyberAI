@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Card, Button, Alert, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -41,6 +42,7 @@ interface CreatedKey {
 
 export default function APIKeysPage() {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [createOpen, setCreateOpen] = useState(false);
   const [createdKey, setCreatedKey] = useState<CreatedKey | null>(null);
   const [form, setForm] = useState({
@@ -110,9 +112,11 @@ export default function APIKeysPage() {
             Manage programmatic access tokens for integrations and scripts
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-          Create API Key
-        </Button>
+        {!isGuest && (
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+            Create API Key
+          </Button>
+        )}
       </Box>
 
       {isLoading && <CircularProgress size={24} />}
@@ -169,11 +173,13 @@ export default function APIKeysPage() {
                     {k.expires_at ? fmt(k.expires_at) : "Never"}
                   </TableCell>
                   <TableCell>
-                    <Tooltip title="Revoke key">
-                      <IconButton size="small" color="error" onClick={() => revokeMut.mutate(k.id)}>
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {!isGuest && (
+                      <Tooltip title="Revoke key">
+                        <IconButton size="small" color="error" onClick={() => revokeMut.mutate(k.id)}>
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

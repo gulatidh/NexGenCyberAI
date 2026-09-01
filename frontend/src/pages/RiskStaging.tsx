@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Tabs, Tab, Grid, Card, CardContent, Chip,
   Button, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -57,6 +58,7 @@ function ProposalCard({
   onRestore: (id: string) => void;
 }) {
   const navigate = useNavigate();
+  const isGuest = useIsGuest();
   const src = SOURCE_META[proposal.source] || SOURCE_META.manual;
   const SrcIcon = src.Icon;
 
@@ -107,7 +109,7 @@ function ProposalCard({
 
       <Divider />
       <Box sx={{ px: 2, py: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
-        {proposal.status === "pending" && (
+        {!isGuest && proposal.status === "pending" && (
           <>
             <Button size="small" variant="contained" onClick={() => onEvaluate(proposal)}
               sx={{ fontWeight: 700 }}>
@@ -122,7 +124,7 @@ function ProposalCard({
             </Button>
           </>
         )}
-        {proposal.status === "archived" && (
+        {!isGuest && proposal.status === "archived" && (
           <>
             <Button size="small" variant="outlined" startIcon={<RestoreFromTrash sx={{ fontSize: 14 }} />}
               onClick={() => onRestore(proposal.id)}>
@@ -133,7 +135,7 @@ function ProposalCard({
             </Button>
           </>
         )}
-        {proposal.status === "dismissed" && (
+        {!isGuest && proposal.status === "dismissed" && (
           <>
             <Button size="small" variant="outlined" startIcon={<RestoreFromTrash sx={{ fontSize: 14 }} />}
               onClick={() => onRestore(proposal.id)}>
@@ -248,6 +250,7 @@ function StatPill({ label, count, color }: { label: string; count: number; color
 
 export default function RiskStaging() {
   const { clientId } = useActiveClient();
+  const isGuest = useIsGuest();
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
@@ -301,9 +304,11 @@ export default function RiskStaging() {
           <StatPill label="Archived" count={stats.archived_count ?? 0} color="#6b7280" />
           <StatPill label="Dismissed" count={stats.dismissed_count ?? 0} color="#ef4444" />
           <StatPill label="Evaluated" count={stats.evaluated_count ?? 0} color="#10b981" />
-          <Button variant="contained" startIcon={<Add />} onClick={() => setAddOpen(true)}>
-            Add Proposal
-          </Button>
+          {!isGuest && (
+            <Button variant="contained" startIcon={<Add />} onClick={() => setAddOpen(true)}>
+              Add Proposal
+            </Button>
+          )}
         </Box>
       </Box>
 

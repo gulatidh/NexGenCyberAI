@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect } from "react";
 import { useActiveClient } from "../contexts/ClientContext";
+import { useIsGuest } from "../hooks/useIsGuest";
 import {
   Box, Typography, Button, Card, CardContent, Grid, Chip,
   Dialog, DialogTitle, DialogContent, DialogActions,
@@ -334,6 +335,7 @@ export default function Connections() {
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
 
   // When embedded in IntegrationsHub (/platform/integrations), the component
   // is a child tab so URL-hash navigation doesn't apply — keep tab as local state.
@@ -615,14 +617,16 @@ export default function Connections() {
             </Alert>
           )}
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", mt: 1 }}>
-            <Button
-              size="small" variant="outlined" startIcon={<PlayArrow />}
-              onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
-              disabled={testMutation.isPending}
-              sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11 }}
-            >
-              Test
-            </Button>
+            {!isGuest && (
+              <Button
+                size="small" variant="outlined" startIcon={<PlayArrow />}
+                onClick={() => testMutation.mutate({ clientId: selectedClientId, connId: conn.id })}
+                disabled={testMutation.isPending}
+                sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11 }}
+              >
+                Test
+              </Button>
+            )}
             <Button
               size="small" variant="outlined" startIcon={<Sync sx={{ fontSize: 14 }} />}
               onClick={() => syncAssetsMutation.mutate(conn.id)}
@@ -632,45 +636,53 @@ export default function Connections() {
             >
               Sync Assets
             </Button>
-            <Button
-              size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}
-              onClick={() => openEdit(conn)}
-              sx={{
-                borderColor: "divider", color: "text.secondary", fontSize: 11,
-                "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              size="small" variant="outlined" startIcon={<Delete sx={{ fontSize: 14 }} />}
-              onClick={() => {
-                if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
-                  deleteMutation.mutate(conn.id);
-                }
-              }}
-              disabled={deleteMutation.isPending}
-              sx={{
-                borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
-                "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
-              }}
-            >
-              Delete
-            </Button>
-            <Button
-              size="small" variant="outlined" startIcon={<DriveFileMove sx={{ fontSize: 14 }} />}
-              onClick={() => { setTargetProjectId(conn.project_id || ""); setMoveConn(conn); }}
-              sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#FBBC04", color: "#FBBC04" } }}
-            >
-              Move
-            </Button>
-            <Button
-              size="small" variant="outlined" startIcon={<ContentCopy sx={{ fontSize: 14 }} />}
-              onClick={() => { setTargetProjectId(conn.project_id || ""); setCopyName(`${conn.name} (copy)`); setCopyConn(conn); }}
-              sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#34A853", color: "#34A853" } }}
-            >
-              Copy
-            </Button>
+            {!isGuest && (
+              <Button
+                size="small" variant="outlined" startIcon={<Edit sx={{ fontSize: 14 }} />}
+                onClick={() => openEdit(conn)}
+                sx={{
+                  borderColor: "divider", color: "text.secondary", fontSize: 11,
+                  "&:hover": { borderColor: "#4285F4", color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" },
+                }}
+              >
+                Edit
+              </Button>
+            )}
+            {!isGuest && (
+              <Button
+                size="small" variant="outlined" startIcon={<Delete sx={{ fontSize: 14 }} />}
+                onClick={() => {
+                  if (window.confirm(`Delete connector "${conn.name}"? Linked assets stay but won't be re-synced.`)) {
+                    deleteMutation.mutate(conn.id);
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+                sx={{
+                  borderColor: "rgba(244,67,54,0.4)", color: "#EA4335", fontSize: 11,
+                  "&:hover": { borderColor: "#EA4335", bgcolor: "rgba(234,67,53,0.08)" },
+                }}
+              >
+                Delete
+              </Button>
+            )}
+            {!isGuest && (
+              <Button
+                size="small" variant="outlined" startIcon={<DriveFileMove sx={{ fontSize: 14 }} />}
+                onClick={() => { setTargetProjectId(conn.project_id || ""); setMoveConn(conn); }}
+                sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#FBBC04", color: "#FBBC04" } }}
+              >
+                Move
+              </Button>
+            )}
+            {!isGuest && (
+              <Button
+                size="small" variant="outlined" startIcon={<ContentCopy sx={{ fontSize: 14 }} />}
+                onClick={() => { setTargetProjectId(conn.project_id || ""); setCopyName(`${conn.name} (copy)`); setCopyConn(conn); }}
+                sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11, "&:hover": { borderColor: "#34A853", color: "#34A853" } }}
+              >
+                Copy
+              </Button>
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -761,18 +773,20 @@ export default function Connections() {
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Cloud platforms, identity providers, and SaaS integrations that provide asset data for AI agents.
           </Typography>
-          <Button
-            variant="outlined" size="small" startIcon={<Add />}
-            onClick={() => openAdd("platform")}
-            disabled={!selectedClientId}
-            sx={{
-              borderColor: "#4285F4", color: "#4285F4", fontSize: 12, flexShrink: 0,
-              "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
-              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
-            }}
-          >
-            Add Platform Connector
-          </Button>
+          {!isGuest && (
+            <Button
+              variant="outlined" size="small" startIcon={<Add />}
+              onClick={() => openAdd("platform")}
+              disabled={!selectedClientId}
+              sx={{
+                borderColor: "#4285F4", color: "#4285F4", fontSize: 12, flexShrink: 0,
+                "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
+                "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
+              }}
+            >
+              Add Platform Connector
+            </Button>
+          )}
         </Box>
 
         {!selectedClientId ? (
@@ -821,20 +835,22 @@ export default function Connections() {
           Scanner connectors store credentials for enterprise security tools. Once configured, select them when launching a new assessment from the Assessments page.
         </Alert>
 
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button
-            variant="outlined" size="small" startIcon={<Add />}
-            onClick={() => openAdd("scanner")}
-            disabled={!selectedClientId}
-            sx={{
-              borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12,
-              "&:hover": { bgcolor: "rgba(156,39,176,0.08)" },
-              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
-            }}
-          >
-            Add Scanner Connector
-          </Button>
-        </Box>
+        {!isGuest && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <Button
+              variant="outlined" size="small" startIcon={<Add />}
+              onClick={() => openAdd("scanner")}
+              disabled={!selectedClientId}
+              sx={{
+                borderColor: "#9C27B0", color: "#9C27B0", fontSize: 12,
+                "&:hover": { bgcolor: "rgba(156,39,176,0.08)" },
+                "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.12)", color: "text.disabled" },
+              }}
+            >
+              Add Scanner Connector
+            </Button>
+          </Box>
+        )}
 
         {!selectedClientId ? (
           <Alert severity="info" sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "text.primary" }}>

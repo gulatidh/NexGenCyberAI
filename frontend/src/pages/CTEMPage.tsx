@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { useIsGuest } from "../hooks/useIsGuest";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useActiveClient } from "../contexts/ClientContext";
@@ -858,6 +859,7 @@ function PhaseAccordion({
   onRefresh: () => void;
 }) {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [expanded, setExpanded] = useState(isCurrentPhase);
   const [notes, setNotes] = useState(phaseNote.notes ?? "");
   const done = phaseNote.completed ?? false;
@@ -943,25 +945,27 @@ function PhaseAccordion({
           </Typography>
         )}
 
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Button size="small" variant="outlined"
-            onClick={() => updateMut.mutate({ n: notes })} disabled={updateMut.isPending}>
-            Save Notes
-          </Button>
-          {!done && (
-            <Button size="small" variant="contained"
-              sx={{ bgcolor: ph.color, "&:hover": { filter: "brightness(0.85)" } }}
-              onClick={() => updateMut.mutate({ n: notes, completed: true })} disabled={updateMut.isPending}>
-              Mark Phase Complete
+        {!isGuest && (
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Button size="small" variant="outlined"
+              onClick={() => updateMut.mutate({ n: notes })} disabled={updateMut.isPending}>
+              Save Notes
             </Button>
-          )}
-          {done && (
-            <Button size="small" variant="outlined" color="warning"
-              onClick={() => updateMut.mutate({ n: phaseNote.notes ?? "", completed: false })} disabled={updateMut.isPending}>
-              Reopen Phase
-            </Button>
-          )}
-        </Box>
+            {!done && (
+              <Button size="small" variant="contained"
+                sx={{ bgcolor: ph.color, "&:hover": { filter: "brightness(0.85)" } }}
+                onClick={() => updateMut.mutate({ n: notes, completed: true })} disabled={updateMut.isPending}>
+                Mark Phase Complete
+              </Button>
+            )}
+            {done && (
+              <Button size="small" variant="outlined" color="warning"
+                onClick={() => updateMut.mutate({ n: phaseNote.notes ?? "", completed: false })} disabled={updateMut.isPending}>
+                Reopen Phase
+              </Button>
+            )}
+          </Box>
+        )}
       </AccordionDetails>
     </Accordion>
   );
@@ -992,6 +996,7 @@ function ProgressBar({ phases, currentPhase }: { phases: Record<string, PhaseNot
 
 function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; clientId: string; onDelete: () => void }) {
   const qc = useQueryClient();
+  const isGuest = useIsGuest();
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -1051,9 +1056,11 @@ function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; cl
             <Tooltip title="Download DOCX">
               <IconButton size="small" onClick={() => downloadReport("docx")} sx={{ fontSize: 11 }}>W</IconButton>
             </Tooltip>
-            <Tooltip title="Delete program">
-              <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}><Delete fontSize="small" /></IconButton>
-            </Tooltip>
+            {!isGuest && (
+              <Tooltip title="Delete program">
+                <IconButton size="small" color="error" onClick={() => setConfirmDelete(true)}><Delete fontSize="small" /></IconButton>
+              </Tooltip>
+            )}
           </Box>
         </Box>
 
@@ -1101,6 +1108,7 @@ function ProgramCard({ program, clientId, onDelete }: { program: CTEMProgram; cl
 export default function CTEMPage() {
   const qc = useQueryClient();
   const { clientId } = useActiveClient();
+  const isGuest = useIsGuest();
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -1147,9 +1155,11 @@ export default function CTEMPage() {
             AI-assisted 5-phase program — scope assets, discover exposures, prioritise risk, validate exploitability, mobilise remediation
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} disabled={!clientId}>
-          New Program
-        </Button>
+        {!isGuest && (
+          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)} disabled={!clientId}>
+            New Program
+          </Button>
+        )}
       </Box>
 
       {!clientId && <Alert severity="info">Select a client to manage CTEM programs.</Alert>}
@@ -1164,9 +1174,11 @@ export default function CTEMPage() {
           <Typography variant="body2" sx={{ color: "text.secondary", maxWidth: 400, mx: "auto", mb: 3 }}>
             Create a program to track your Continuous Threat Exposure Management lifecycle: Scope → Discover → Prioritise → Validate → Mobilise.
           </Typography>
-          <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
-            Create Program
-          </Button>
+          {!isGuest && (
+            <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
+              Create Program
+            </Button>
+          )}
         </Box>
       )}
 
