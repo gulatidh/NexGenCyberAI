@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from api.models.models import (
     AccessRole, AccessScope, Client, Project, UserAccess,
     AgentRun, ThreatModel, ScheduledMission,
-    ThreatEntry, ControlDeficiency, RemediationAction,
+    ThreatEntry, ControlDeficiency, RemediationAction, MissionLearning,
 )
 from api.schemas.schemas import (
     GrantCreate, GrantResponse, MyAccessResponse, UserAccessSummary,
@@ -91,7 +91,7 @@ async def permanently_delete_client(client_id: str, db: Session = Depends(get_db
         db.delete(sm)
 
     # Leaf tables — bulk delete is safe (no children).
-    for Model in (RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
+    for Model in (MissionLearning, RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
         db.query(Model).filter(Model.client_id == client_id).delete(synchronize_session=False)
 
     # db.delete(client) cascades via ORM:
@@ -121,7 +121,7 @@ def _purge_expired_deleted_clients(db: Session) -> dict:
         cid = c.id
         for sm in db.query(ScheduledMission).filter(ScheduledMission.client_id == cid).all():
             db.delete(sm)
-        for Model in (RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
+        for Model in (MissionLearning, RemediationAction, ControlDeficiency, ThreatEntry, AgentRun, ThreatModel):
             db.query(Model).filter(Model.client_id == cid).delete(synchronize_session=False)
         db.delete(c)
     if count:
