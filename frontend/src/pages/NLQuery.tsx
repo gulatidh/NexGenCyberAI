@@ -151,7 +151,9 @@ export default function NLQuery() {
       {queryMutation.isError && (
         <Alert severity="error" sx={{ mb: 3 }}>
           {(queryMutation.error as any)?.response?.data?.detail ||
-            (queryMutation.error as Error).message ||
+            ((queryMutation.error as Error).message === "Network Error"
+              ? "Could not reach the server — check that the backend is running and an AI provider is configured in AI Settings."
+              : (queryMutation.error as Error).message) ||
             "Query failed — please try rephrasing."}
         </Alert>
       )}
