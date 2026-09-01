@@ -10,14 +10,16 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Box, Typography, Collapse, useMediaQuery, useTheme, alpha,
+  Drawer, IconButton, List, ListItemButton,
 } from "@mui/material";
 import {
-  ExpandMore, BugReport, Psychology, Radar, Assessment,
+  ExpandMore, ExpandLess, BugReport, Psychology, Radar, Assessment,
   GppBad, PlaylistAddCheck, SmartToy, Policy,
   LibraryAdd, Storage, TrendingUp, Security, FindInPage,
   Description, AltRoute, FolderZip, AccountTree, BarChart,
   DeviceHub, People, Cable, MenuBook, Search, AutoFixHigh,
   Hub as HubIcon, Devices, VpnKey, Webhook, ManageSearch, ReportProblem,
+  Menu as MenuIcon, Close as CloseIcon,
 } from "@mui/icons-material";
 
 // ── Phase → route mapping for active highlight ────────────────────────────────
@@ -153,12 +155,14 @@ const MENU: MenuItem[] = [
     id: "report", label: "Audit", color: "#15803d", overviewPath: "/report",
     columns: [
       {
-        heading: "Pen Testing",
+        heading: "Audit & Reporting",
         items: [
           { name: "VAPT Reports",        desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",  route: "/report/vapt-reports",         Icon: Description  },
           { name: "Evidence Package",    desc: "ZIP of findings, deficiencies, and agent logs for auditors.",            route: "/report/evidence",             Icon: FolderZip    },
-          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",              Icon: Assessment   },
           { name: "Audit Intelligence",  desc: "ICS Audit & Risk — how every audit activity maps to the platform.",      route: "/report/audit",                Icon: ManageSearch },
+          { name: "Audit Agents",        desc: "Wizard-driven AI agents for control testing, readiness reports, and evidence curation.", route: "/report/audit-agents", Icon: Psychology },
+          { name: "Executive Summary",   desc: "Non-technical leadership report — posture score, key risks, remediation progress.", route: "/report/executive-summary", Icon: Assessment },
+          { name: "Reports",             desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",              Icon: Assessment   },
         ],
       },
       {
@@ -300,6 +304,102 @@ function MegaPanel({
   );
 }
 
+// ── Mobile Drawer ─────────────────────────────────────────────────────────────
+
+function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const theme = useTheme();
+  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const go = (route: string) => { onClose(); navigate(route); };
+
+  return (
+    <Drawer
+      anchor="left"
+      variant="temporary"
+      open={open}
+      onClose={onClose}
+      ModalProps={{ keepMounted: true }}
+      sx={{
+        zIndex: 1400,
+        "& .MuiDrawer-paper": {
+          width: 280,
+          bgcolor: "background.paper",
+          border: "none",
+        },
+      }}
+    >
+      {/* Header */}
+      <Box sx={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider",
+      }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 15, color: "text.primary" }}>
+          Navigation
+        </Typography>
+        <IconButton size="small" onClick={onClose} sx={{ color: "text.secondary" }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Nav sections */}
+      <Box sx={{ overflowY: "auto", flex: 1 }}>
+        {MENU.map((item) => {
+          const isExpanded = expanded === item.id;
+          return (
+            <Box key={item.id}>
+              <ListItemButton
+                onClick={() => setExpanded(isExpanded ? null : item.id)}
+                sx={{
+                  px: 2, py: 1,
+                  bgcolor: isExpanded ? alpha(item.color, 0.07) : "transparent",
+                  "&:hover": { bgcolor: alpha(item.color, 0.05) },
+                }}
+              >
+                <Typography sx={{
+                  flex: 1, fontSize: 13, fontWeight: 700, color: isExpanded ? item.color : "text.primary",
+                  textTransform: "uppercase", letterSpacing: "0.06em",
+                }}>
+                  {item.label}
+                </Typography>
+                {isExpanded
+                  ? <ExpandLess sx={{ fontSize: 18, color: item.color }} />
+                  : <ExpandMore sx={{ fontSize: 18, color: "text.secondary" }} />}
+              </ListItemButton>
+              <Collapse in={isExpanded} timeout={160}>
+                <Box sx={{ pb: 0.5 }}>
+                  {item.columns.map((col) => (
+                    <Box key={col.heading}>
+                      <Typography sx={{
+                        fontSize: 10, fontWeight: 700, letterSpacing: "0.1em",
+                        color: item.color, textTransform: "uppercase",
+                        pl: 2.5, pt: 1.25, pb: 0.25,
+                      }}>
+                        {col.heading}
+                      </Typography>
+                      {col.items.map((mi) => (
+                        <ListItemButton
+                          key={mi.name}
+                          onClick={() => go(mi.route)}
+                          sx={{ pl: 3, py: 0.6, "&:hover": { bgcolor: "action.hover" } }}
+                        >
+                          <Typography sx={{ fontSize: 13, color: "text.primary" }}>
+                            {mi.name}
+                          </Typography>
+                        </ListItemButton>
+                      ))}
+                    </Box>
+                  ))}
+                </Box>
+              </Collapse>
+            </Box>
+          );
+        })}
+      </Box>
+    </Drawer>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -313,7 +413,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
-  const [mobileOpen, setMobileOpen] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelLeft, setPanelLeft] = useState(0);
   const barRef = useRef<HTMLDivElement>(null!);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -329,7 +429,6 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
       const rect = el.getBoundingClientRect();
       const vw = window.innerWidth;
       const panelW = Math.min(920, Math.max(560, vw * 0.58));
-      // Align to the button's left edge, clamped so panel stays within viewport
       setPanelLeft(Math.max(8, Math.min(rect.left, vw - panelW - 8)));
     }
   }, []);
@@ -342,7 +441,6 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
     return () => window.removeEventListener("keydown", h);
   }, [closeAll]);
 
-  // close panel on navigation
   useEffect(() => { closeAll(); }, [location.pathname, closeAll]);
 
   const activeItem = MENU.find((m) => m.id === open) ?? null;
@@ -350,7 +448,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
 
   return (
     <>
-      {/* Click-outside backdrop — starts BELOW the bar so it never covers nav buttons */}
+      {/* Click-outside backdrop */}
       {activeItem && (
         <Box onClick={closeAll} sx={{ position: "fixed", top: barBottom, left: 0, right: 0, bottom: 0, zIndex: 1299 }} />
       )}
@@ -358,117 +456,87 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
       {/* Bar row */}
       <Box
         ref={barRef}
-        sx={{ display: "flex", alignItems: "center", height: "100%", px: { xs: 1.5, md: 2 }, gap: 0 }}
+        sx={{ display: "flex", alignItems: "center", height: "100%", px: { xs: 1, md: 2 }, gap: 0 }}
       >
-        {/* Brand */}
-        {brand && (
-          <Box
-            onClick={() => navigate("/hub")}
-            sx={{ mr: { xs: 1, md: 2 }, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center" }}
-          >
-            {brand}
-          </Box>
-        )}
-
         {isMobile ? (
-          /* ── Mobile: tap accordion ──────────────────────────────────────── */
-          <Box sx={{ display: "flex", gap: 0.25, flexWrap: "wrap", alignItems: "center", flexGrow: 1 }}>
-            {MENU.map((item) => {
-              const expanded = mobileOpen === item.id;
-              return (
-                <Box key={item.id}>
+          /* ── Mobile: hamburger + drawer ─────────────────────────────────── */
+          <>
+            <IconButton
+              size="small"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 1, color: "text.primary" }}
+              aria-label="Open navigation"
+            >
+              <MenuIcon />
+            </IconButton>
+            {brand && (
+              <Box
+                onClick={() => navigate("/hub")}
+                sx={{ flexGrow: 1, cursor: "pointer", display: "flex", alignItems: "center" }}
+              >
+                {brand}
+              </Box>
+            )}
+            <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+          </>
+        ) : (
+          /* ── Desktop: brand + hover mega menu ───────────────────────────── */
+          <>
+            {brand && (
+              <Box
+                onClick={() => navigate("/hub")}
+                sx={{ mr: 2, flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center" }}
+              >
+                {brand}
+              </Box>
+            )}
+            <Box
+              onMouseEnter={clearLeave}
+              onMouseLeave={leave}
+              sx={{ display: "flex", alignItems: "center", height: "100%", flexGrow: 1 }}
+            >
+              {MENU.map((item, idx) => {
+                const isOpen = open === item.id;
+                const isActive = activePhase === item.id;
+                return (
                   <Box
+                    key={item.id}
                     component="button"
                     role="button"
-                    aria-expanded={expanded}
                     aria-haspopup="true"
-                    onClick={() => setMobileOpen(expanded ? null : item.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={`mega-panel-${item.id}`}
+                    onMouseEnter={(e) => enter(item.id, e.currentTarget)}
+                    onFocus={(e) => enter(item.id, e.currentTarget)}
+                    onClick={() => { closeAll(); navigate(item.overviewPath); }}
                     onKeyDown={(e: React.KeyboardEvent) => {
-                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setMobileOpen(expanded ? null : item.id); }
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); closeAll(); navigate(item.overviewPath); }
+                      if (e.key === "Escape") closeAll();
+                      if (e.key === "ArrowRight" && idx < MENU.length - 1) enter(MENU[idx + 1].id);
+                      if (e.key === "ArrowLeft"  && idx > 0)               enter(MENU[idx - 1].id);
                     }}
                     sx={{
-                      display: "flex", alignItems: "center", gap: 0.25, px: 1, py: 0.5,
-                      border: "none", borderRadius: 1, cursor: "pointer",
-                      bgcolor: expanded ? alpha(item.color, 0.1) : "transparent",
-                      color: expanded ? item.color : "text.primary",
-                      fontSize: 12.5, fontWeight: 600,
-                      "&:focus-visible": { outline: `2px solid ${item.color}` },
+                      px: 1.5, height: "100%", border: "none", bgcolor: "transparent",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25,
+                      fontSize: 13, fontWeight: isOpen || isActive ? 700 : 500,
+                      color: isOpen ? item.color : isActive ? item.color : "text.primary",
+                      borderBottom: isOpen ? `2px solid ${item.color}` : isActive ? `2px solid ${alpha(item.color, 0.45)}` : "2px solid transparent",
+                      transition: "color 0.14s, border-color 0.14s",
+                      "&:hover": { color: item.color },
+                      "&:focus-visible": { outline: `2px solid ${item.color}`, outlineOffset: -2 },
                     }}
                   >
                     {item.label}
-                    <ExpandMore sx={{ fontSize: 14, transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+                    <ExpandMore sx={{
+                      fontSize: 13, color: "inherit",
+                      transform: isOpen ? "rotate(180deg)" : "none",
+                      transition: "transform 0.18s",
+                    }} />
                   </Box>
-                  <Collapse in={expanded} timeout={160}>
-                    <Box sx={{ pl: 1, py: 0.5 }}>
-                      {item.columns.flatMap((c) => c.items).map((mi) => (
-                        <Box
-                          key={mi.name}
-                          component="button"
-                          onClick={() => { setMobileOpen(null); navigate(mi.route); }}
-                          sx={{
-                            display: "block", width: "100%", textAlign: "left",
-                            px: 1.5, py: 0.6, border: "none", bgcolor: "transparent",
-                            color: "text.primary", cursor: "pointer", fontSize: 12.5, borderRadius: 1,
-                            "&:hover": { bgcolor: "action.hover" },
-                          }}
-                        >
-                          {mi.name}
-                        </Box>
-                      ))}
-                    </Box>
-                  </Collapse>
-                </Box>
-              );
-            })}
-          </Box>
-        ) : (
-          /* ── Desktop: hover mega menu ───────────────────────────────────── */
-          <Box
-            onMouseEnter={clearLeave}
-            onMouseLeave={leave}
-            sx={{ display: "flex", alignItems: "center", height: "100%", flexGrow: 1 }}
-          >
-            {MENU.map((item, idx) => {
-              const isOpen = open === item.id;
-              const isActive = activePhase === item.id;
-              return (
-                <Box
-                  key={item.id}
-                  component="button"
-                  role="button"
-                  aria-haspopup="true"
-                  aria-expanded={isOpen}
-                  aria-controls={`mega-panel-${item.id}`}
-                  onMouseEnter={(e) => enter(item.id, e.currentTarget)}
-                  onFocus={(e) => enter(item.id, e.currentTarget)}
-                  onClick={() => { closeAll(); navigate(item.overviewPath); }}
-                  onKeyDown={(e: React.KeyboardEvent) => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); closeAll(); navigate(item.overviewPath); }
-                    if (e.key === "Escape") closeAll();
-                    if (e.key === "ArrowRight" && idx < MENU.length - 1) enter(MENU[idx + 1].id);
-                    if (e.key === "ArrowLeft"  && idx > 0)               enter(MENU[idx - 1].id);
-                  }}
-                  sx={{
-                    px: 1.5, height: "100%", border: "none", bgcolor: "transparent",
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25,
-                    fontSize: 13, fontWeight: isOpen || isActive ? 700 : 500,
-                    color: isOpen ? item.color : isActive ? item.color : "text.primary",
-                    borderBottom: isOpen ? `2px solid ${item.color}` : isActive ? `2px solid ${alpha(item.color, 0.45)}` : "2px solid transparent",
-                    transition: "color 0.14s, border-color 0.14s",
-                    "&:hover": { color: item.color },
-                    "&:focus-visible": { outline: `2px solid ${item.color}`, outlineOffset: -2 },
-                  }}
-                >
-                  {item.label}
-                  <ExpandMore sx={{
-                    fontSize: 13, color: "inherit",
-                    transform: isOpen ? "rotate(180deg)" : "none",
-                    transition: "transform 0.18s",
-                  }} />
-                </Box>
-              );
-            })}
-          </Box>
+                );
+              })}
+            </Box>
+          </>
         )}
 
         {/* Trailing */}
@@ -477,7 +545,7 @@ export default function MegaMenuBar({ brand, trailing }: Props) {
         )}
       </Box>
 
-      {/* Desktop panel — handlers go directly on the fixed Box inside MegaPanel */}
+      {/* Desktop panel */}
       {!isMobile && activeItem && (
         <MegaPanel
           item={activeItem}

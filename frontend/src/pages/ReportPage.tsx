@@ -16,14 +16,14 @@ export const REPORT_SECTION: SectionDef = {
     { label: "Open Findings",field: "open_findings",       color: "#ea580c" },
   ],
   cards: [
-    // Pen Testing
-    { name: "VAPT Reports",          icon: <Description />,  desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports", group: "Pen Testing" },
-    { name: "Evidence Package",      icon: <FolderZip />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",           route: "/report/evidence",     group: "Pen Testing" },
-    { name: "Reports",               icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",      group: "Pen Testing" },
-    { name: "Audit Intelligence",    icon: <ManageSearch />, desc: "ICS Audit & Risk Intelligence — how every audit activity maps to the platform.", route: "/report/audit", group: "Pen Testing" },
-    { name: "Audit Agents",         icon: <Psychology />,   desc: "Wizard-driven AI agents for control testing, readiness reports, evidence curation and interview prep.", route: "/report/audit-agents", group: "Pen Testing" },
-    { name: "Executive Summary",    icon: <Summarize />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Pen Testing" },
-    { name: "Report Scheduler",     icon: <Schedule />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Pen Testing" },
+    // Audit & Reporting
+    { name: "VAPT Reports",          icon: <Description />,  desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports", group: "Audit & Reporting" },
+    { name: "Evidence Package",      icon: <FolderZip />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",           route: "/report/evidence",     group: "Audit & Reporting" },
+    { name: "Reports",               icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",      group: "Audit & Reporting" },
+    { name: "Audit Intelligence",    icon: <ManageSearch />, desc: "ICS Audit & Risk Intelligence — how every audit activity maps to the platform.", route: "/report/audit", group: "Audit & Reporting" },
+    { name: "Audit Agents",         icon: <Psychology />,   desc: "Wizard-driven AI agents for control testing, readiness reports, evidence curation and interview prep.", route: "/report/audit-agents", group: "Audit & Reporting" },
+    { name: "Executive Summary",    icon: <Summarize />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Audit & Reporting" },
+    { name: "Report Scheduler",     icon: <Schedule />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Audit & Reporting" },
     // Compliance
     { name: "Framework Library",     icon: <LibraryAdd />,  desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",   group: "Compliance" },
     { name: "Compliance Evaluation", icon: <BarChart />,    desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",   group: "Compliance" },

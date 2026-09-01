@@ -508,7 +508,7 @@ export default function Findings() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", alignItems: { xs: "flex-start", md: "center" }, gap: 1.5, mb: 3 }}>
         <Box>
           <PageTitle
             title="Findings"

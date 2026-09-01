@@ -699,13 +699,13 @@ export default function AuditAgents() {
         Wizard-driven AI agents for audit preparation — select an agent, answer a few questions, get structured results.
       </Typography>
 
-      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        {/* Left: agent picker */}
-        <Box sx={{ width: 260, flexShrink: 0 }}>
+      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start", flexDirection: { xs: "column", md: "row" } }}>
+        {/* Left/Top: agent picker */}
+        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1, mb: 1.5 }}>
             Select Agent
           </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Box sx={{ display: "flex", flexDirection: { xs: "row", md: "column" }, gap: 1.5, overflowX: { xs: "auto", md: "visible" }, pb: { xs: 1, md: 0 } }}>
             {AGENTS.map((agent) => {
               const active = selectedAgent?.id === agent.id;
               return (
@@ -720,6 +720,8 @@ export default function AuditAgents() {
                     bgcolor: active ? `${agent.color}0d` : "background.paper",
                     transition: "all 0.15s",
                     "&:hover": { borderColor: agent.color },
+                    minWidth: { xs: 200, md: "auto" },
+                    flexShrink: 0,
                   }}
                 >
                   <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -747,7 +749,7 @@ export default function AuditAgents() {
         </Box>
 
         {/* Right: wizard + results */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, width: { xs: "100%", md: "auto" } }}>
           {!selectedAgent ? (
             <Paper elevation={0} sx={{ border: "1px solid", borderColor: "divider", p: 6, textAlign: "center" }}>
               <ManageSearch sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />

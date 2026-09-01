@@ -87,7 +87,7 @@ const GROUPS: Group[] = [
           { text: "Discover (/discover) — Scanning: Assessments, Findings, AI Assisted Scan, Posture Trends. Assets & CVE: Asset Inventory, Technology Inventory, CVE Blast Radius." },
           { text: "Analyse (/analyse) — Risk: Risk Register, Risk Overview, AI Risk Analysis, Attack Paths. Intelligence: AI Threat Intelligence, Compliance Heatmap, Ask Your Data, Project Comparison." },
           { text: "Respond (/respond) — Threat Intelligence: Threat Register, Control Deficiencies, CTEM Programs. Remediation: Remediation, AI Remediations, VAPT Reports, Security Docs." },
-          { text: "Report (/report) — Pen Testing: VAPT Reports, Evidence Package, Reports. Compliance: Frameworks, Custom Standards, Control Gaps." },
+          { text: "Report (/report) — Audit & Reporting: VAPT Reports, Evidence Package, Audit Intelligence, Audit Agents, Executive Summary, Reports. Compliance: Frameworks, Custom Standards, Control Gaps." },
           { text: "Automate (/automate) — AI Agents: AI Buddies, AI Workflows, AI Assisted Scan. Knowledge: Knowledge Base, Reports, Ask Your Data, AI Guardrails, Webhooks, API Keys." },
         ],
         tips: [

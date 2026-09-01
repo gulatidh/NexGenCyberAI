@@ -81,7 +81,7 @@ const CATEGORIES: Category[] = [
       },
       {
         abbrev: "PT",
-        name: "Pen Testing",
+        name: "Audit & Reporting",
         description: "VAPT reports with retest lifecycle and PDF/DOCX export",
         route: "/vapt",
         icon: <Shield />,
