@@ -183,6 +183,9 @@ export const scansApi = {
   },
   importHistory: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/scans/import/history`).then((r) => r.data),
+  getScanImport: (clientId: string, scanId: string) =>
+    apiClient.get(`/clients/${clientId}/scans/import/imports`, { params: { scan_id: scanId } })
+      .then((r) => (r.data as any[])[0] ?? null),
   getRawFindings: (clientId: string, scannerType: string, importId?: number) =>
     apiClient.get(`/clients/${clientId}/scans/import/raw/${scannerType}`, {
       params: importId !== undefined ? { import_id: importId } : {},

@@ -16,13 +16,158 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
-from api.models.models import Finding, Scan, ScanStatus
+from api.models.models import (
+    AssessmentImport, Connector, Finding, RawNmapFinding, RawTrivyFinding,
+    RawZapFinding, RawSecretFinding, RawGenericFinding, Scan, ScanStatus,
+)
 from db.database import get_db
 from core.scan_tokens import verify_scan_token
 from services.scan_runtime import get_runtime, clear_runtime
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["scans-runner"])
+
+
+# ── Raw storage helpers ───────────────────────────────────────────────────────
+
+def _safe_int(v):
+    try: return int(v) if v is not None else None
+    except: return None
+
+
+def _safe_dt(v):
+    if not v: return None
+    if isinstance(v, datetime): return v
+    try:
+        from dateutil import parser as _dp
+        return _dp.parse(str(v))
+    except: return None
+
+
+def _scanner_type_from_connector(db: Session, scan: Scan) -> str:
+    """Determine scanner type string from scan's connector type."""
+    if not scan.connector_id:
+        return "generic"
+    try:
+        conn = db.query(Connector).filter(Connector.id == scan.connector_id).first()
+        if not conn:
+            return "generic"
+        ct = conn.connector_type.value if hasattr(conn.connector_type, "value") else str(conn.connector_type)
+        _map = {
+            "nmap": "nmap", "web": "zap", "trivy": "trivy",
+            "gitleaks": "gitleaks", "trufflehog": "trufflehog",
+            "semgrep": "sarif", "codeql": "sarif", "sonarqube": "sarif",
+            "owasp_dc": "generic", "nuclei": "generic",
+        }
+        return _map.get(ct, ct)
+    except Exception:
+        return "generic"
+
+
+def _create_ingest_import(db: Session, scan: Scan, scanner_type: str, finding_count: int) -> Optional[int]:
+    """Create an AssessmentImport record for a workflow-ingest scan. Returns import_id or None."""
+    try:
+        from sqlalchemy import func
+        year = datetime.utcnow().year
+        count = db.query(func.count(AssessmentImport.id)).filter(
+            AssessmentImport.client_id == scan.client_id,
+            func.extract("year", AssessmentImport.created_at) == year,
+        ).scalar() or 0
+        ai = AssessmentImport(
+            client_id=scan.client_id,
+            import_name=f"{scanner_type} scan – {scan.name or scan.id}",
+            import_ref=f"IMP-{year}-{count + 1:03d}",
+            scanner_type=scanner_type,
+            detected_format=scanner_type,
+            raw_finding_count=finding_count,
+            normalized_finding_count=finding_count,
+            created_at=datetime.utcnow(),
+            scan_id=scan.id,
+            status="completed",
+        )
+        db.add(ai)
+        db.flush()
+        return ai.id
+    except Exception as exc:
+        logger.warning("Could not create AssessmentImport for scan %s: %s", scan.id, exc)
+        return None
+
+
+def _insert_ingest_raw_row(db: Session, scanner_type: str, import_id: int, client_id: str,
+                            f: "IngestFinding", finding_id: int) -> None:
+    """Insert a raw row for a single ingested finding based on scanner_type."""
+    ev = f.evidence or {}
+    try:
+        if scanner_type == "nmap":
+            db.add(RawNmapFinding(
+                import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+                host=ev.get("ip") or ev.get("hostname"),
+                port=_safe_int(ev.get("port")),
+                protocol=ev.get("protocol"),
+                state=ev.get("state", "open"),
+                service_name=ev.get("service"),
+                service_product=ev.get("product"),
+                service_version=ev.get("version"),
+                os_name=ev.get("os"),
+                cpe=ev.get("cpe"),
+            ))
+        elif scanner_type == "trivy":
+            refs = ev.get("references", [])
+            import json as _json
+            db.add(RawTrivyFinding(
+                import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+                target=f.resource_id,
+                vulnerability_id=f.cve_id,
+                package_name=ev.get("pkg"),
+                installed_version=ev.get("installed"),
+                fixed_version=ev.get("fixed"),
+                primary_url=ev.get("primary_url"),
+                references_json=_json.dumps(refs) if refs else None,
+                severity=f.severity,
+            ))
+        elif scanner_type == "zap":
+            instances = ev.get("instances") or []
+            cwe_val = _safe_int(ev.get("cwe_id"))
+            import json as _json
+            db.add(RawZapFinding(
+                import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+                alert_ref=f.control_id,
+                alert_name=f.title,
+                risk_desc=f.severity,
+                url=instances[0] if instances else f.resource_id,
+                reference=ev.get("reference"),
+                cwe_id=cwe_val,
+                description=f.description,
+                solution=f.remediation,
+                tags_json=_json.dumps(instances) if instances else None,
+            ))
+        elif scanner_type in ("gitleaks", "trufflehog", "secrets"):
+            tool = "gitleaks" if scanner_type == "gitleaks" else "trufflehog"
+            db.add(RawSecretFinding(
+                import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+                tool=tool,
+                rule_id=ev.get("rule") or ev.get("detector"),
+                secret_type=ev.get("detector") or ev.get("rule") or f.title,
+                file_path=ev.get("file"),
+                line_number=_safe_int(ev.get("line")),
+                commit_hash=ev.get("commit"),
+                author=ev.get("author"),
+                commit_date=_safe_dt(ev.get("date")),
+                is_verified=ev.get("verified"),
+            ))
+        else:
+            import json as _json
+            db.add(RawGenericFinding(
+                import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+                source_format=scanner_type,
+                raw_row_json=_json.dumps({
+                    "title": f.title, "severity": f.severity,
+                    "resource_id": f.resource_id, "cve_id": f.cve_id,
+                    "evidence": ev,
+                }),
+            ))
+    except Exception as exc:
+        logger.debug("Raw row insert failed for scanner %s finding %s: %s", scanner_type, finding_id, exc)
 
 
 # ── GET /scans/config/ ───────────────────────────────────────────────────────
@@ -177,6 +322,10 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
         db.commit()
         return {"ok": True, "status": "failed"}
 
+    # Determine scanner type + create AssessmentImport before findings loop
+    scanner_type = _scanner_type_from_connector(db, scan)
+    import_id = _create_ingest_import(db, scan, scanner_type, len(payload.findings))
+
     sev_counts = {s: 0 for s in ["critical", "high", "medium", "low", "info"]}
     for f in payload.findings:
         sev = (f.severity or "info").lower()
@@ -196,8 +345,12 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
             cve_id=f.cve_id,
             cvss_score=f.cvss_score,
             control_mappings=f.control_mappings or {},
+            import_id=import_id,
         )
         db.add(finding)
+        db.flush()  # get finding.id for raw row FK
+        if import_id:
+            _insert_ingest_raw_row(db, scanner_type, import_id, scan.client_id, f, finding.id)
         sev_counts[sev] = sev_counts.get(sev, 0) + 1
 
     scan.summary = {**(scan.summary or {}), **sev_counts, "total": len(payload.findings)}

@@ -350,6 +350,10 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
             <MenuItem value="Qualys">Qualys VMDR</MenuItem>
             <MenuItem value="Checkmarx">Checkmarx</MenuItem>
             <MenuItem value="OWASP ZAP">OWASP ZAP</MenuItem>
+            <MenuItem value="nmap">Nmap</MenuItem>
+            <MenuItem value="trivy">Trivy</MenuItem>
+            <MenuItem value="gitleaks">Gitleaks</MenuItem>
+            <MenuItem value="trufflehog">TruffleHog</MenuItem>
             <MenuItem value="Rapid7">Rapid7 InsightVM</MenuItem>
             <MenuItem value="Other">Other</MenuItem>
           </Select>

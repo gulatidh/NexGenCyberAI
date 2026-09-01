@@ -14,14 +14,27 @@ router = APIRouter(prefix="/clients/{client_id}/query", tags=["nl-query"])
 
 _SCHEMA_HINT = """
 Available tables and key columns (SQL Server / Azure SQL):
-- findings: id, title, severity (critical/high/medium/low/info), status (open/remediated/accepted/false_positive), resource_id, resource_type, cve_id, cvss_score, control_id, framework, description, remediation, created_at, assignee_email, duplicate_of_id
+- findings: id, title, severity (critical/high/medium/low/info), status (open/remediated/accepted/false_positive), resource_id, resource_type, cve_id, cvss_score, control_id, framework, description, remediation, created_at, assignee_email, duplicate_of_id, import_id
 - risks: id, title, description, risk_level (critical/high/medium/low), likelihood, impact, risk_score, category, status, assignee_email, created_at
 - scans: id, scan_type, status (pending/running/completed/failed), created_at, client_id, is_live
 - agent_runs: id, agent_type, status, started_at, completed_at, client_id
 - threat_entries: id, technique_id, technique_name, tactic, confidence, severity, title, created_at
 - control_deficiencies: id, control_id, framework, severity, title, gap_description, remediation, created_at
 - remediation_actions: id, title, action, band, priority, effort, impact, status, assigned_to, due_date
+- assessment_imports: id, import_ref (e.g. IMP-2026-001), scan_id, client_id, scanner_type, assessment_name, finding_count, raw_row_count, created_at
+- raw_nmap: id, import_id, client_id, host, port, protocol, state, service_name, service_product, service_version, os_name, os_family, cpe
+- raw_trivy: id, import_id, client_id, target, vulnerability_id, package_name, installed_version, fixed_version, severity, primary_url, data_source_name
+- raw_zap: id, import_id, client_id, alert_name, risk_desc, confidence_desc, url, method, cwe_id, wasc_id, description, solution
+- raw_secrets: id, import_id, client_id, tool, rule_id, secret_type, file_path, line_number, commit_hash, author, is_verified
+- raw_tenable: id, import_id, client_id, plugin_id, plugin_name, severity, vpr_score, cvss_base_score, host, port, protocol
+- raw_burp: id, import_id, client_id, issue_type_id, issue_name, severity, confidence, host, path
+- raw_nessus: id, import_id, client_id, plugin_id, plugin_name, severity, cvss_base_score, host, port
+- raw_qualys: id, import_id, client_id, qid, title, severity, cvss_base, host, port, category
+- raw_openvas: id, import_id, client_id, oid, name, severity, cvss_base, host, port
+- raw_sarif: id, import_id, client_id, rule_id, rule_name, level, message, uri, start_line, tool_name
 
+Join raw_* tables to assessment_imports on raw_*.import_id = assessment_imports.id.
+Join assessment_imports to findings on findings.import_id = assessment_imports.id.
 Only write SELECT queries. Do NOT use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER.
 Join findings to scans on findings.scan_id = scans.id and filter scans.client_id = '{client_id}'.
 For other tables filter directly on client_id = '{client_id}'.
@@ -118,11 +131,25 @@ Rules:
 - Boolean values are 1/0 not TRUE/FALSE"""
 
     _t1 = time.time()
-    llm = get_llm()
-    resp = await llm.ainvoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=f"<question>{payload.question}</question>"),
-    ])
+    try:
+        llm = get_llm()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No AI provider is configured — please set up an LLM provider in AI Settings. ({exc})",
+        )
+
+    try:
+        resp = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=f"<question>{payload.question}</question>"),
+        ])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI provider error while generating SQL: {exc}",
+        )
+
     raw_sql = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
     _latency = int((time.time() - _t1) * 1000)
     try:

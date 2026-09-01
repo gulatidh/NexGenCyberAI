@@ -1827,3 +1827,110 @@ class RawGenericFinding(Base):
     row_number = Column(Integer, nullable=True)
     raw_row_json = Column(Text, nullable=True)
 
+
+class RawNmapFinding(Base):
+    """Native nmap port/service/OS fields from GitHub Actions workflow ingest."""
+    __tablename__ = "raw_nmap"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    host = Column(String(500), nullable=True)
+    port = Column(Integer, nullable=True)
+    protocol = Column(String(10), nullable=True)
+    state = Column(String(20), nullable=True)
+    service_name = Column(String(100), nullable=True)
+    service_product = Column(String(200), nullable=True)
+    service_version = Column(String(100), nullable=True)
+    service_extrainfo = Column(String(500), nullable=True)
+    service_ostype = Column(String(100), nullable=True)
+    service_conf = Column(Integer, nullable=True)
+    script_id = Column(String(200), nullable=True)
+    script_output = Column(Text, nullable=True)
+    os_name = Column(String(200), nullable=True)
+    os_accuracy = Column(Integer, nullable=True)
+    os_family = Column(String(100), nullable=True)
+    os_vendor = Column(String(100), nullable=True)
+    cpe = Column(String(500), nullable=True)
+
+
+class RawTrivyFinding(Base):
+    """Native Trivy container/filesystem vulnerability fields."""
+    __tablename__ = "raw_trivy"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    target = Column(String(1000), nullable=True)
+    target_type = Column(String(50), nullable=True)
+    vulnerability_id = Column(String(50), nullable=True)
+    package_name = Column(String(500), nullable=True)
+    installed_version = Column(String(100), nullable=True)
+    fixed_version = Column(String(100), nullable=True)
+    severity = Column(String(20), nullable=True)
+    primary_url = Column(String(1000), nullable=True)
+    description = Column(Text, nullable=True)
+    layer_diff_id = Column(String(200), nullable=True)
+    data_source_id = Column(String(100), nullable=True)
+    data_source_name = Column(String(200), nullable=True)
+    pkg_path = Column(String(1000), nullable=True)
+    pkg_class = Column(String(50), nullable=True)
+    pkg_type = Column(String(50), nullable=True)
+    published_date = Column(DateTime, nullable=True)
+    last_modified_date = Column(DateTime, nullable=True)
+    references_json = Column(Text, nullable=True)
+
+
+class RawZapFinding(Base):
+    """Native OWASP ZAP web application scan fields."""
+    __tablename__ = "raw_zap"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    alert_ref = Column(String(50), nullable=True)
+    alert_name = Column(String(500), nullable=True)
+    risk_desc = Column(String(20), nullable=True)
+    confidence_desc = Column(String(20), nullable=True)
+    url = Column(String(2000), nullable=True)
+    method = Column(String(10), nullable=True)
+    parameter = Column(String(500), nullable=True)
+    attack = Column(Text, nullable=True)
+    evidence = Column(Text, nullable=True)
+    solution = Column(Text, nullable=True)
+    other_info = Column(Text, nullable=True)
+    reference = Column(Text, nullable=True)
+    cwe_id = Column(Integer, nullable=True)
+    wasc_id = Column(Integer, nullable=True)
+    description = Column(Text, nullable=True)
+    tags_json = Column(Text, nullable=True)
+
+
+class RawSecretFinding(Base):
+    """Native secret detection fields from gitleaks and trufflehog."""
+    __tablename__ = "raw_secrets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    tool = Column(String(20), nullable=True)
+    rule_id = Column(String(200), nullable=True)
+    secret_type = Column(String(200), nullable=True)
+    match = Column(String(500), nullable=True)
+    file_path = Column(String(1000), nullable=True)
+    line_number = Column(Integer, nullable=True)
+    line_start = Column(Integer, nullable=True)
+    line_end = Column(Integer, nullable=True)
+    commit_hash = Column(String(100), nullable=True)
+    author = Column(String(200), nullable=True)
+    author_email = Column(String(200), nullable=True)
+    branch = Column(String(200), nullable=True)
+    commit_date = Column(DateTime, nullable=True)
+    commit_message = Column(Text, nullable=True)
+    fingerprint = Column(String(200), nullable=True)
+    is_verified = Column(Boolean, nullable=True)
+

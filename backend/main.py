@@ -844,6 +844,32 @@ def _ensure_added_columns() -> None:
         except Exception as exc:
             logger.warning("Risk-to-proposal migration failed: %s", exc)
 
+        # Orphan cleanup — raw scanner rows whose assessment_import was deleted
+        try:
+            _raw_tables = [
+                "raw_tenable", "raw_burp", "raw_nessus", "raw_qualys", "raw_openvas",
+                "raw_sarif", "raw_generic", "raw_nmap", "raw_trivy", "raw_zap", "raw_secrets",
+            ]
+            with engine.begin() as conn:
+                for tbl in _raw_tables:
+                    try:
+                        r = conn.execute(text(
+                            f"DELETE FROM {tbl} WHERE import_id NOT IN (SELECT id FROM assessment_imports)"
+                        ))
+                        if r.rowcount > 0:
+                            logger.info("Cleaned %d orphan rows from %s", r.rowcount, tbl)
+                    except Exception:
+                        pass  # table may not exist yet on first boot
+                r2 = conn.execute(text(
+                    "UPDATE findings SET import_id = NULL "
+                    "WHERE import_id IS NOT NULL "
+                    "AND import_id NOT IN (SELECT id FROM assessment_imports)"
+                ))
+                if r2.rowcount > 0:
+                    logger.info("Nulled %d stale import_id references on findings", r2.rowcount)
+        except Exception as exc:
+            logger.warning("Raw orphan cleanup failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

@@ -21,8 +21,9 @@ from sqlalchemy.orm import Session
 
 from api.models.models import (
     AssessmentImport, ConnectorType, Finding, RawBurpFinding, RawGenericFinding,
-    RawNessusFinding, RawOpenVASFinding, RawQualysFinding, RawSarifFinding,
-    RawTenableFinding, Scan, ScanStatus, ScanType,
+    RawNessusFinding, RawNmapFinding, RawOpenVASFinding, RawQualysFinding,
+    RawSarifFinding, RawSecretFinding, RawTenableFinding, RawTrivyFinding,
+    RawZapFinding, Scan, ScanStatus, ScanType,
 )
 from core.authz import require_editor_anywhere
 from core.security import get_current_user
@@ -79,6 +80,18 @@ def _format_to_scanner_type(fmt: str, tool_hint: str = "") -> str:
     hint = (tool_hint or "").lower()
     if "tenable" in hint:
         return "tenable"
+    if "nmap" in hint:
+        return "nmap"
+    if "trivy" in hint:
+        return "trivy"
+    if "zap" in hint:
+        return "zap"
+    if "gitleaks" in hint:
+        return "gitleaks"
+    if "trufflehog" in hint:
+        return "trufflehog"
+    if "secret" in hint:
+        return "secrets"
     fmt_map = {
         "nessus": "nessus",
         "burp": "burp",
@@ -86,6 +99,11 @@ def _format_to_scanner_type(fmt: str, tool_hint: str = "") -> str:
         "qualys_csv": "qualys",
         "openvas": "openvas",
         "sarif": "sarif",
+        "nmap_xml": "nmap",
+        "trivy_json": "trivy",
+        "zap_json": "zap",
+        "gitleaks_json": "gitleaks",
+        "trufflehog_json": "trufflehog",
         "checkmarx": "generic",
         "csv": "generic",
         "json": "generic",
@@ -274,6 +292,77 @@ def _insert_raw_generic(db, import_id: int, client_id: str, raw: Dict, finding_i
     db.add(row)
 
 
+def _insert_raw_nmap(db, import_id: int, client_id: str, raw: Dict, finding_id: Optional[int]) -> None:
+    ev = raw.get("evidence") or raw
+    row = RawNmapFinding(
+        import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+        host=ev.get("ip") or ev.get("hostname") or raw.get("host"),
+        port=_safe_int(ev.get("port")),
+        protocol=ev.get("protocol"),
+        state=ev.get("state", "open"),
+        service_name=ev.get("service"),
+        service_product=ev.get("product"),
+        service_version=ev.get("version"),
+        os_name=ev.get("os"),
+        cpe=ev.get("cpe"),
+    )
+    db.add(row)
+
+
+def _insert_raw_trivy(db, import_id: int, client_id: str, raw: Dict, finding_id: Optional[int]) -> None:
+    ev = raw.get("evidence") or raw
+    row = RawTrivyFinding(
+        import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+        target=raw.get("resource_id") or ev.get("target"),
+        vulnerability_id=raw.get("cve_id") or ev.get("cve_id"),
+        package_name=ev.get("pkg"),
+        installed_version=ev.get("installed"),
+        fixed_version=ev.get("fixed"),
+        primary_url=ev.get("primary_url"),
+        references_json=json.dumps(ev.get("references", [])) if ev.get("references") else None,
+        severity=raw.get("severity"),
+    )
+    db.add(row)
+
+
+def _insert_raw_zap(db, import_id: int, client_id: str, raw: Dict, finding_id: Optional[int]) -> None:
+    ev = raw.get("evidence") or raw
+    instances = ev.get("instances") or []
+    first_url = instances[0] if instances else None
+    cwe_raw = ev.get("cwe_id")
+    row = RawZapFinding(
+        import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+        alert_ref=raw.get("control_id"),
+        alert_name=raw.get("title"),
+        risk_desc=raw.get("severity"),
+        url=first_url or raw.get("resource_id"),
+        reference=ev.get("reference"),
+        cwe_id=_safe_int(cwe_raw),
+        description=raw.get("description"),
+        solution=raw.get("remediation"),
+        tags_json=json.dumps(instances) if instances else None,
+    )
+    db.add(row)
+
+
+def _insert_raw_secrets(db, import_id: int, client_id: str, raw: Dict, finding_id: Optional[int]) -> None:
+    ev = raw.get("evidence") or raw
+    tool = ev.get("tool") or raw.get("tool") or "unknown"
+    row = RawSecretFinding(
+        import_id=import_id, client_id=client_id, normalized_finding_id=finding_id,
+        tool=tool,
+        rule_id=ev.get("rule") or ev.get("detector") or ev.get("rule_id"),
+        secret_type=ev.get("detector") or ev.get("rule") or raw.get("title"),
+        file_path=ev.get("file"),
+        line_number=_safe_int(ev.get("line")),
+        commit_hash=ev.get("commit"),
+        author=ev.get("author"),
+        commit_date=_safe_dt(ev.get("date") or ev.get("commit_date")),
+        is_verified=ev.get("verified"),
+    )
+    db.add(row)
+
+
 _RAW_INSERTERS = {
     "tenable": _insert_raw_tenable,
     "nessus": _insert_raw_nessus,
@@ -281,6 +370,13 @@ _RAW_INSERTERS = {
     "qualys": _insert_raw_qualys,
     "openvas": _insert_raw_openvas,
     "sarif": _insert_raw_sarif,
+    "nmap": _insert_raw_nmap,
+    "trivy": _insert_raw_trivy,
+    "zap": _insert_raw_zap,
+    "web": _insert_raw_zap,
+    "gitleaks": _insert_raw_secrets,
+    "trufflehog": _insert_raw_secrets,
+    "secrets": _insert_raw_secrets,
 }
 
 
@@ -511,18 +607,16 @@ async def commit_scan_import(
 @router.get("/imports")
 def import_history(
     client_id: str,
+    scan_id: Optional[str] = Query(default=None),
     limit: int = Query(default=50, le=200),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """List previous assessment imports for this client."""
-    rows = (
-        db.query(AssessmentImport)
-        .filter(AssessmentImport.client_id == client_id)
-        .order_by(AssessmentImport.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+    """List previous assessment imports for this client, optionally filtered by scan_id."""
+    q = db.query(AssessmentImport).filter(AssessmentImport.client_id == client_id)
+    if scan_id:
+        q = q.filter(AssessmentImport.scan_id == scan_id)
+    rows = q.order_by(AssessmentImport.created_at.desc()).limit(limit).all()
     return [
         {
             "id": r.id,
@@ -553,6 +647,13 @@ _RAW_TABLE_MAP = {
     "openvas": RawOpenVASFinding,
     "sarif": RawSarifFinding,
     "generic": RawGenericFinding,
+    "nmap": RawNmapFinding,
+    "trivy": RawTrivyFinding,
+    "zap": RawZapFinding,
+    "web": RawZapFinding,
+    "secrets": RawSecretFinding,
+    "gitleaks": RawSecretFinding,
+    "trufflehog": RawSecretFinding,
 }
 
 
@@ -568,7 +669,7 @@ def get_raw_findings(
     """Return raw scanner-native rows for a given scanner type and optional import."""
     model = _RAW_TABLE_MAP.get(scanner_type)
     if not model:
-        raise HTTPException(status_code=400, detail=f"Unknown scanner_type '{scanner_type}'. Valid: {list(_RAW_TABLE_MAP)}")
+        raise HTTPException(status_code=400, detail=f"Unknown scanner_type '{scanner_type}'. Valid: {sorted(set(_RAW_TABLE_MAP))}")
 
     q = db.query(model).filter(model.client_id == client_id)
     if import_id is not None:

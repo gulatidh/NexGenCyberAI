@@ -8,12 +8,12 @@ import {
 } from "@mui/material";
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
-  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close, MenuBook,
+  CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close, MenuBook, Storage,
 } from "@mui/icons-material";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { assessmentsApi, findingsApi, agentsApi } from "../services/api";
+import { assessmentsApi, findingsApi, agentsApi, scansApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "../components/RichOutput";
 import { useActiveClient } from "../contexts/ClientContext";
@@ -447,6 +447,7 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
 const BASE_NAV: DetailNavItem[] = [
   { id: "verdict",  label: "AI Verdict",  Icon: AutoAwesome, color: "#4285F4" },
   { id: "findings", label: "Findings",    Icon: BugReport,   color: "#EA4335" },
+  { id: "raw",      label: "Raw Data",    Icon: Storage,     color: "#00ACC1" },
 ];
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -519,6 +520,18 @@ export default function ScanDetail() {
       qc.invalidateQueries({ queryKey: ["scan-detail", scanId] });
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete finding"),
+  });
+
+  const { data: scanImport } = useQuery<any>({
+    queryKey: ["scan-import", scanId, clientId],
+    queryFn: () => scansApi.getScanImport(clientId!, scanId!),
+    enabled: !!scanId && !!clientId && tab === "raw",
+  });
+
+  const { data: rawRows } = useQuery<any[]>({
+    queryKey: ["raw-findings", scanImport?.id, scanImport?.scanner_type],
+    queryFn: () => scansApi.getRawFindings(clientId!, scanImport!.scanner_type, scanImport!.id),
+    enabled: !!scanImport?.id && !!scanImport?.scanner_type,
   });
 
   const verdict = data?.ai_verdict;
@@ -783,6 +796,69 @@ export default function ScanDetail() {
               findings={data.findings}
               onDelete={printing ? undefined : (f) => setPendingDelete(f)}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Raw Data tab */}
+      {tab === "raw" && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <CardContent>
+            {!scanImport ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Storage sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+                <Typography sx={{ color: "text.secondary" }}>
+                  No raw scanner data available for this scan.
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Raw data is captured for scans run or imported after the assessment store upgrade.
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+                  <Chip label={scanImport.import_ref} size="small" sx={{ bgcolor: "rgba(0,172,193,0.15)", color: "#00ACC1", fontWeight: 700 }} />
+                  <Chip label={scanImport.scanner_type?.toUpperCase()} size="small" sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary" }} />
+                  {scanImport.import_name && (
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>{scanImport.import_name}</Typography>
+                  )}
+                  <Box sx={{ flex: 1 }} />
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {rawRows?.length ?? 0} raw rows · {scanImport.normalized_finding_count ?? 0} normalized findings
+                  </Typography>
+                </Box>
+                {rawRows && rawRows.length > 0 ? (
+                  <TableContainer sx={{ maxHeight: 500, overflowX: "auto" }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          {Object.keys(rawRows[0]).filter(k => !["id", "import_id", "client_id", "normalized_finding_id"].includes(k)).map(k => (
+                            <TableCell key={k} sx={{ bgcolor: "background.paper", color: "text.secondary", fontSize: 11, fontWeight: 700, textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                              {k.replace(/_/g, " ")}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rawRows.map((row, i) => (
+                          <TableRow key={i} hover>
+                            {Object.entries(row).filter(([k]) => !["id", "import_id", "client_id", "normalized_finding_id"].includes(k)).map(([k, v]) => (
+                              <TableCell key={k} sx={{ fontSize: 12, color: "text.primary", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {v == null ? <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span> : String(v)}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography sx={{ color: "text.secondary", textAlign: "center", py: 2 }}>
+                    No raw rows loaded yet.
+                  </Typography>
+                )}
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}

@@ -698,6 +698,23 @@ async def delete_scan(
         {"parent_scan_id": None}, synchronize_session=False
     )
 
+    # Delete raw scanner data + AssessmentImport linked to this scan
+    from api.models.models import (
+        AssessmentImport, RawTenableFinding, RawNessusFinding, RawBurpFinding,
+        RawQualysFinding, RawOpenVASFinding, RawSarifFinding, RawGenericFinding,
+        RawNmapFinding, RawTrivyFinding, RawZapFinding, RawSecretFinding,
+    )
+    ai = db.query(AssessmentImport).filter(AssessmentImport.scan_id == scan_id).first()
+    if ai:
+        for RawModel in [
+            RawTenableFinding, RawNessusFinding, RawBurpFinding, RawQualysFinding,
+            RawOpenVASFinding, RawSarifFinding, RawGenericFinding,
+            RawNmapFinding, RawTrivyFinding, RawZapFinding, RawSecretFinding,
+        ]:
+            db.query(RawModel).filter(RawModel.import_id == ai.id).delete(synchronize_session=False)
+        db.delete(ai)
+        db.flush()
+
     # Delete scan — ORM cascade handles findings via relationship
     db.delete(scan)
     db.commit()
