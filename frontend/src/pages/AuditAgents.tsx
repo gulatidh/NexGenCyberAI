@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Divider, FormControl, InputLabel, LinearProgress, MenuItem, Paper,
-  Select, Step, StepLabel, Stepper, Table, TableBody, TableCell,
+  Divider, LinearProgress, Paper,
+  Step, StepLabel, Stepper, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
@@ -812,28 +812,40 @@ export default function AuditAgents() {
                   )}
 
                   {currentStep.type === "framework_select" && (
-                    <FormControl size="small" sx={{ minWidth: 320, mt: 1 }}>
-                      <InputLabel>Framework</InputLabel>
-                      <Select
-                        label="Framework"
-                        value={String(inputs["framework"] || "")}
-                        onChange={(e) => setValue("framework", e.target.value)}
-                        MenuProps={{ disablePortal: false, style: { zIndex: 9999 } }}
-                      >
-                        <MenuItem value=""><em>Select a framework…</em></MenuItem>
-                        {frameworkList.map((f) => (
-                          <MenuItem key={f.value} value={f.value}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 1 }}>
+                        {frameworkList.length} frameworks available — click one to select
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, maxHeight: 280, overflowY: "auto", pr: 1 }}>
+                        {frameworkList.map((f) => {
+                          const selected = inputs["framework"] === f.value;
+                          return (
+                            <Box
+                              key={f.value}
+                              onClick={() => setValue("framework", selected ? "" : f.value)}
+                              sx={{
+                                px: 1.5, py: 0.75, borderRadius: 1, cursor: "pointer", fontSize: 13,
+                                border: "1px solid",
+                                borderColor: selected ? selectedAgent.color : "divider",
+                                bgcolor: selected ? `${selectedAgent.color}18` : "background.paper",
+                                color: selected ? selectedAgent.color : "text.primary",
+                                fontWeight: selected ? 700 : 400,
+                                userSelect: "none",
+                                "&:hover": { borderColor: selectedAgent.color, color: selectedAgent.color },
+                              }}
+                            >
                               {f.label}
                               {f.is_custom && (
-                                <Chip label="Custom" size="small"
-                                  sx={{ height: 16, fontSize: 10, bgcolor: "#9C27B022", color: "#9C27B0" }} />
+                                <Box component="span" sx={{ ml: 0.75, fontSize: 10, fontWeight: 700,
+                                  color: "#9C27B0", bgcolor: "#9C27B018", px: 0.5, borderRadius: 0.5 }}>
+                                  CUSTOM
+                                </Box>
                               )}
                             </Box>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                          );
+                        })}
+                      </Box>
+                    </Box>
                   )}
 
                   {currentStep.type === "domain_chips" && (
