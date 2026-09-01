@@ -14,25 +14,26 @@ import { useActiveClient } from "../contexts/ClientContext";
 import { auditAgentsApi, frameworksApi } from "../services/api";
 
 // Standard frameworks always available — no API dependency
-const STATIC_FRAMEWORKS: { value: string; label: string; is_custom?: boolean }[] = [
-  { value: "nist_csf",          label: "NIST CSF 2.0" },
-  { value: "nist_800_53",       label: "NIST 800-53" },
-  { value: "nist_ai_rmf",       label: "NIST AI RMF 1.0" },
-  { value: "nist_ai_200_1",     label: "NIST AI 200-1" },
-  { value: "nist_ai_200_2",     label: "NIST AI 200-2" },
-  { value: "iso_27001",         label: "ISO 27001:2022" },
-  { value: "pci_dss",           label: "PCI DSS 4.0" },
-  { value: "gdpr",              label: "GDPR" },
-  { value: "soc2",              label: "SOC 2" },
-  { value: "gcc_im8",           label: "GCC IM8 Reform 2025" },
-  { value: "mas_trm",           label: "MAS TRM" },
-  { value: "cis_v8",            label: "CIS Controls v8" },
-  { value: "hipaa",             label: "HIPAA" },
-  { value: "fedramp",           label: "FedRAMP" },
-  { value: "cyber_essentials",  label: "Cyber Essentials" },
-  { value: "cis_azure",         label: "CIS Azure" },
-  { value: "cis_aws",           label: "CIS AWS" },
-  { value: "cis_gcp",           label: "CIS GCP" },
+// API returns { framework, name } (FrameworkCatalogEntry shape)
+const STATIC_FRAMEWORKS: { framework: string; name: string; is_custom?: boolean }[] = [
+  { framework: "nist_csf",          name: "NIST CSF 2.0" },
+  { framework: "nist_800_53",       name: "NIST 800-53" },
+  { framework: "nist_ai_rmf",       name: "NIST AI RMF 1.0" },
+  { framework: "nist_ai_200_1",     name: "NIST AI 200-1" },
+  { framework: "nist_ai_200_2",     name: "NIST AI 200-2" },
+  { framework: "iso_27001",         name: "ISO 27001:2022" },
+  { framework: "pci_dss",           name: "PCI DSS 4.0" },
+  { framework: "gdpr",              name: "GDPR" },
+  { framework: "soc2",              name: "SOC 2" },
+  { framework: "gcc_im8",           name: "GCC IM8 Reform 2025" },
+  { framework: "mas_trm",           name: "MAS TRM" },
+  { framework: "cis_v8",            name: "CIS Controls v8" },
+  { framework: "hipaa",             name: "HIPAA" },
+  { framework: "fedramp",           name: "FedRAMP" },
+  { framework: "cyber_essentials",  name: "Cyber Essentials" },
+  { framework: "cis_azure",         name: "CIS Azure" },
+  { framework: "cis_aws",           name: "CIS AWS" },
+  { framework: "cis_gcp",           name: "CIS GCP" },
 ];
 
 // ── Agent definitions ──────────────────────────────────────────────────────────
@@ -575,11 +576,10 @@ export default function AuditAgents() {
   const [viewingRun, setViewingRun] = useState<{ agentType: string; result: Record<string, unknown> } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: apiFrameworks } = useQuery<{ value: string; label: string; is_custom?: boolean }[]>({
+  const { data: apiFrameworks } = useQuery<{ framework: string; name: string; is_custom?: boolean }[]>({
     queryKey: ["frameworks-all"],
     queryFn: () => frameworksApi.catalogAll(),
   });
-  // Always show standard frameworks; append any custom ones from API when loaded
   const frameworkList = apiFrameworks && apiFrameworks.length > 0
     ? apiFrameworks
     : STATIC_FRAMEWORKS;
@@ -818,11 +818,11 @@ export default function AuditAgents() {
                       </Typography>
                       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, maxHeight: 280, overflowY: "auto", pr: 1 }}>
                         {frameworkList.map((f) => {
-                          const selected = inputs["framework"] === f.value;
+                          const selected = inputs["framework"] === f.framework;
                           return (
                             <Box
-                              key={f.value}
-                              onClick={() => setValue("framework", selected ? "" : f.value)}
+                              key={f.framework}
+                              onClick={() => setValue("framework", selected ? "" : f.framework)}
                               sx={{
                                 px: 1.5, py: 0.75, borderRadius: 1, cursor: "pointer", fontSize: 13,
                                 border: "1px solid",
@@ -834,7 +834,7 @@ export default function AuditAgents() {
                                 "&:hover": { borderColor: selectedAgent.color, color: selectedAgent.color },
                               }}
                             >
-                              {f.label}
+                              {f.name}
                               {f.is_custom && (
                                 <Box component="span" sx={{ ml: 0.75, fontSize: 10, fontWeight: 700,
                                   color: "#9C27B0", bgcolor: "#9C27B018", px: 0.5, borderRadius: 0.5 }}>
