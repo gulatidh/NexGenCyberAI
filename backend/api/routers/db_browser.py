@@ -6,15 +6,12 @@ from typing import Any
 
 from db.database import get_db, engine
 from core.security import get_current_user
-from core.trial import is_admin
+from core.authz import require_role
+from api.models.models import AccessRole
 
 router = APIRouter(prefix="/admin/db", tags=["db-browser"])
 
-
-def _require_admin(user=Depends(get_current_user)):
-    if not is_admin(user):
-        raise HTTPException(status_code=403, detail="Admin access required.")
-    return user
+_require_admin = require_role(AccessRole.ADMIN)
 
 
 @router.get("/tables")
