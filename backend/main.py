@@ -2191,6 +2191,13 @@ if scan_import_router is not None:
 if ai_review_router is not None:
     app.include_router(ai_review_router, prefix="/api/v1")
 
+try:
+    from api.routers import db_browser as _db_browser
+    app.include_router(_db_browser.router, prefix="/api/v1")
+except Exception as _e:
+    import logging as _logging
+    _logging.getLogger(__name__).warning(f"db_browser router not loaded: {_e}")
+
 
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
 

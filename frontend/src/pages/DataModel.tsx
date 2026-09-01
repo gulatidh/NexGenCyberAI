@@ -16,13 +16,15 @@ import {
   List, ListItemButton, ListItemText,
   Chip, CircularProgress, alpha, useTheme, IconButton,
   Menu, MenuItem, ListItemIcon, Divider,
+  Alert, Table, TableHead, TableRow, TableCell, TableBody,
+  TableContainer, TablePagination, Tabs, Tab, Tooltip,
 } from "@mui/material";
 import {
   Search, Close, OpenInNew, SmartToy, Download,
-  ArrowForward, WarningAmber,
+  ArrowForward, WarningAmber, Storage, Key,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import { dataModelApi } from "../services/api";
+import { dataModelApi, dbBrowserApi, usersApi } from "../services/api";
 import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Static ontology data ──────────────────────────────────────────────────────
@@ -164,6 +166,266 @@ function findPath(startEntity: string, endEntity: string): {nodes: Set<string>; 
   return {nodes: new Set(), edges: new Set()};
 }
 
+// ── Database Browser component ────────────────────────────────────────────────
+
+function DatabaseBrowser() {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === "dark";
+  const [tableFilter, setTableFilter] = useState("");
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedCol, setSelectedCol] = useState<string | null>(null);
+  const [rowPage, setRowPage] = useState(1);
+
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: usersApi.me, staleTime: 60_000 });
+  const isAdmin = !!(me as any)?.is_admin;
+
+  const { data: tables, isLoading: tablesLoading } = useQuery({
+    queryKey: ["db-tables"],
+    queryFn: dbBrowserApi.tables,
+    staleTime: 30_000,
+    enabled: isAdmin,
+  });
+
+  const { data: schema, isLoading: schemaLoading } = useQuery({
+    queryKey: ["db-schema", selectedTable],
+    queryFn: () => dbBrowserApi.schema(selectedTable!),
+    enabled: isAdmin && !!selectedTable,
+  });
+
+  const { data: rowDataRaw, isLoading: rowsLoading } = useQuery({
+    queryKey: ["db-rows", selectedTable, rowPage],
+    queryFn: () => dbBrowserApi.rows(selectedTable!, rowPage),
+    enabled: isAdmin && !!selectedTable,
+  });
+  const rowData = rowDataRaw as { columns: string[]; rows: unknown[][]; page: number; limit: number } | undefined;
+
+  const { data: samples, isLoading: samplesLoading } = useQuery({
+    queryKey: ["db-samples", selectedTable, selectedCol],
+    queryFn: () => dbBrowserApi.samples(selectedTable!, selectedCol!),
+    enabled: isAdmin && !!selectedTable && !!selectedCol,
+  });
+
+  if (!isAdmin) {
+    return (
+      <Alert severity="info" sx={{ mt: 2 }}>
+        Database Browser is available to administrators only.
+      </Alert>
+    );
+  }
+
+  const filtered = (tables ?? []).filter((t) =>
+    t.table.toLowerCase().includes(tableFilter.toLowerCase())
+  );
+
+  function tableGroup(name: string): "raw" | "import" | "system" | "normal" {
+    if (name.startsWith("raw_")) return "raw";
+    if (name.includes("import") || name.includes("assessment")) return "import";
+    if (name === "alembic_version") return "system";
+    return "normal";
+  }
+
+  const dotColor = (g: ReturnType<typeof tableGroup>) =>
+    g === "raw" ? "#4285F4" : g === "import" ? "#FBBC04" : g === "system" ? "#6b7280" : "transparent";
+
+  const truncate = (v: unknown, n: number) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return s.length > n ? s.slice(0, n) + "…" : s;
+  };
+
+  const selectedTableInfo = (tables ?? []).find((t) => t.table === selectedTable);
+
+  return (
+    <Box sx={{ display: "flex", gap: 0, height: 640, border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+
+      {/* Left: table list */}
+      <Box sx={{ width: 260, flexShrink: 0, borderRight: "1px solid", borderColor: "divider", display: "flex", flexDirection: "column", bgcolor: "background.paper" }}>
+        <Box sx={{ p: 1.25, borderBottom: "1px solid", borderColor: "divider" }}>
+          <TextField
+            size="small" fullWidth placeholder="Filter tables…"
+            value={tableFilter} onChange={(e) => setTableFilter(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 15 }} /></InputAdornment> } }}
+            sx={{ "& .MuiInputBase-root": { fontSize: 12 } }}
+          />
+        </Box>
+        <Box sx={{ flex: 1, overflow: "auto" }}>
+          {tablesLoading && <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={20} /></Box>}
+          <List dense disablePadding>
+            {filtered.map((t) => {
+              const g = tableGroup(t.table);
+              const dot = dotColor(g);
+              return (
+                <ListItemButton
+                  key={t.table}
+                  selected={selectedTable === t.table}
+                  onClick={() => { setSelectedTable(t.table); setSelectedCol(null); setRowPage(1); }}
+                  sx={{ py: 0.6, px: 1.5, opacity: g === "system" ? 0.55 : 1 }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, flex: 1, minWidth: 0 }}>
+                    {dot !== "transparent"
+                      ? <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: dot, flexShrink: 0 }} />
+                      : <Box sx={{ width: 6, flexShrink: 0 }} />
+                    }
+                    <Typography sx={{ fontSize: 12, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {t.table}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "text.disabled", flexShrink: 0 }}>
+                      {t.row_count >= 0 ? t.row_count.toLocaleString() : "—"}
+                    </Typography>
+                  </Box>
+                </ListItemButton>
+              );
+            })}
+          </List>
+        </Box>
+      </Box>
+
+      {/* Right: schema + samples + rows */}
+      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {!selectedTable ? (
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "text.disabled" }}>
+            <Typography sx={{ fontSize: 13 }}>Select a table from the list to explore its schema and data.</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+            {/* Schema section */}
+            <Box sx={{ p: 1.5, borderBottom: "1px solid", borderColor: "divider", flexShrink: 0 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                <Typography sx={{ fontFamily: "monospace", fontWeight: 700, fontSize: 14 }}>{selectedTable}</Typography>
+                {selectedTableInfo && (
+                  <Chip label={`${selectedTableInfo.row_count.toLocaleString()} rows`} size="small"
+                    sx={{ fontSize: 10, height: 18 }} />
+                )}
+                {schemaLoading && <CircularProgress size={12} />}
+              </Box>
+              {schema && (
+                <TableContainer sx={{ maxHeight: 180 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {["Column", "Type", "Nullable", "PK"].map((h) => (
+                          <TableCell key={h} sx={{ fontSize: 10, fontWeight: 700, py: 0.4, px: 1, bgcolor: isDark ? "#1e1e2e" : "#f5f5f5" }}>{h}</TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {schema.map((col) => (
+                        <TableRow key={col.name} hover
+                          onClick={() => setSelectedCol(selectedCol === col.name ? null : col.name)}
+                          sx={{ cursor: "pointer", bgcolor: selectedCol === col.name ? alpha("#4285F4", 0.08) : undefined }}
+                        >
+                          <TableCell sx={{ fontSize: 11, fontFamily: "monospace", py: 0.3, px: 1 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                              {col.primary_key && <Key sx={{ fontSize: 11, color: "#FBBC04" }} />}
+                              <Typography sx={{ fontSize: 11, fontFamily: "monospace", fontWeight: col.primary_key ? 700 : 400 }}>{col.name}</Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 10, fontFamily: "monospace", color: "text.secondary", py: 0.3, px: 1 }}>{col.type}</TableCell>
+                          <TableCell sx={{ py: 0.3, px: 1 }}>
+                            {!col.nullable && <Chip label="NOT NULL" size="small" sx={{ fontSize: 9, height: 16, bgcolor: alpha("#EA4335", 0.1), color: "#EA4335" }} />}
+                          </TableCell>
+                          <TableCell sx={{ py: 0.3, px: 1 }}>
+                            {col.primary_key && <Chip label="PK" size="small" sx={{ fontSize: 9, height: 16, bgcolor: alpha("#FBBC04", 0.12), color: "#FBBC04" }} />}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Box>
+
+            {/* Samples section */}
+            {selectedCol && (
+              <Box sx={{ p: 1.5, borderBottom: "1px solid", borderColor: "divider", flexShrink: 0, maxHeight: 200, overflow: "auto" }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.75 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600 }}>
+                    Sample values for <span style={{ fontFamily: "monospace" }}>{selectedCol}</span>
+                  </Typography>
+                  <IconButton size="small" onClick={() => setSelectedCol(null)}><Close sx={{ fontSize: 14 }} /></IconButton>
+                </Box>
+                {samplesLoading && <CircularProgress size={14} />}
+                {samples && (
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontSize: 10, fontWeight: 700, py: 0.3, px: 1 }}>Value</TableCell>
+                        <TableCell sx={{ fontSize: 10, fontWeight: 700, py: 0.3, px: 1 }}>Count</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {samples.map((s, i) => (
+                        <TableRow key={i}>
+                          <TableCell sx={{ fontSize: 11, fontFamily: "monospace", py: 0.25, px: 1 }}>
+                            {s.value === null
+                              ? <Typography component="span" sx={{ fontSize: 11, color: "text.disabled", fontStyle: "italic" }}>&lt;null&gt;</Typography>
+                              : truncate(s.value, 60)
+                            }
+                          </TableCell>
+                          <TableCell sx={{ fontSize: 11, py: 0.25, px: 1 }}>{s.count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </Box>
+            )}
+
+            {/* Row viewer */}
+            <Box sx={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+              <>{rowsLoading && (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={20} /></Box>
+              )}
+              {rowData && (
+                <>
+                  <Box sx={{ overflowX: "auto", flex: 1 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          {rowData.columns.map((col: string) => (
+                            <TableCell key={col} sx={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", py: 0.4, px: 1, bgcolor: isDark ? "#1e1e2e" : "#f5f5f5", whiteSpace: "nowrap" }}>
+                              {col}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {rowData.rows.map((row: unknown[], ri: number) => (
+                          <TableRow key={ri} hover>
+                            {row.map((cell, ci) => (
+                              <TableCell key={ci} sx={{ fontSize: 11, py: 0.3, px: 1, maxWidth: 200, whiteSpace: "nowrap" }}
+                                title={cell === null ? "<null>" : String(cell)}>
+                                {cell === null
+                                  ? <Typography component="span" sx={{ fontSize: 11, color: "text.disabled", fontStyle: "italic" }}>&lt;null&gt;</Typography>
+                                  : truncate(cell, 80)
+                                }
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                  <TablePagination
+                    component="div"
+                    count={selectedTableInfo?.row_count ?? -1}
+                    page={rowPage - 1}
+                    rowsPerPage={50}
+                    rowsPerPageOptions={[50]}
+                    onPageChange={(_, p) => setRowPage(p + 1)}
+                    sx={{ flexShrink: 0, fontSize: 11 }}
+                  />
+                </>
+              )}</>
+            </Box>
+
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function DataModel() {
@@ -171,6 +433,8 @@ export default function DataModel() {
   const isDark = theme.palette.mode === "dark";
   const navigate = useNavigate();
   const { clientId } = useActiveClient();
+
+  const [activeTab, setActiveTab] = useState<"graph" | "database">("graph");
 
   // Existing state
   const [listKey, setListKey]     = useState<string|null>(null);
@@ -537,7 +801,7 @@ export default function DataModel() {
       {/* Header */}
       <Box sx={{display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:1}}>
         <Box>
-          <Typography variant="h5" sx={{fontWeight:700, mb:0.25}}>Relationship Explorer</Typography>
+          <Typography variant="h5" sx={{fontWeight:700, mb:0.25}}>Data Model</Typography>
           <Typography sx={{fontSize:13, color:"text.secondary"}}>
             {pathStart
               ? `Shift-click another node to trace path from "${pathStart}" · Shift-click same to cancel`
@@ -566,6 +830,16 @@ export default function DataModel() {
         </Box>
       </Box>
 
+      {/* Tab bar */}
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ borderBottom: "1px solid", borderColor: "divider", minHeight: 38 }}>
+        <Tab value="graph" label="Ontology Graph" sx={{ fontSize: 12, minHeight: 38, textTransform: "none" }} />
+        <Tab value="database" label="Database Browser" icon={<Storage sx={{ fontSize: 14 }} />} iconPosition="start"
+          sx={{ fontSize: 12, minHeight: 38, textTransform: "none" }} />
+      </Tabs>
+
+      {activeTab === "database" && <DatabaseBrowser />}
+
+      {activeTab === "graph" && <>
       <Box sx={{display:"flex", gap:2, alignItems:"flex-start"}}>
 
         {/* ── Graph ── */}
@@ -896,6 +1170,8 @@ export default function DataModel() {
           </MenuItem>,
         ]}
       </Menu>
+      </>}
+
     </Box>
   );
 }

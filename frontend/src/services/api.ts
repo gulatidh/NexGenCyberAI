@@ -875,6 +875,21 @@ export const guestTokensApi = {
     apiClient.get(`/public/guest/${token}`).then((r) => r.data),
 };
 
+export const dbBrowserApi = {
+  tables: () =>
+    apiClient.get("/admin/db/tables").then((r) => r.data as { table: string; row_count: number }[]),
+  schema: (table: string) =>
+    apiClient.get(`/admin/db/tables/${encodeURIComponent(table)}/schema`).then((r) => r.data as {
+      name: string; type: string; nullable: boolean; primary_key: boolean; default: string | null;
+    }[]),
+  rows: (table: string, page: number, limit = 50) =>
+    apiClient.get(`/admin/db/tables/${encodeURIComponent(table)}/rows`, { params: { page, limit } })
+      .then((r) => r.data as { columns: string[]; rows: any[][]; page: number; limit: number }),
+  samples: (table: string, column: string) =>
+    apiClient.get(`/admin/db/tables/${encodeURIComponent(table)}/columns/${encodeURIComponent(column)}/samples`)
+      .then((r) => r.data as { value: any; count: number }[]),
+};
+
 export const auditAgentsApi = {
   frameworkDomains: (clientId: string, framework: string) =>
     apiClient.get(`/clients/${clientId}/audit-agents/framework-domains`, { params: { framework } }).then((r) => r.data),
