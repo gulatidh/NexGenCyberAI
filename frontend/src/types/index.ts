@@ -783,3 +783,21 @@ export interface RemediationJob {
   created_at: string;
   updated_at?: string | null;
 }
+
+export interface AssessmentImport {
+  id: number;
+  import_name: string;
+  import_ref: string;
+  scanner_type: string;
+  detected_format?: string;
+  raw_finding_count: number;
+  normalized_finding_count: number;
+  source_filename?: string;
+  created_at: string;
+  created_by?: string;
+  scan_id?: string;
+  status: string;
+  /** Legacy compat */
+  scan_name?: string;
+  finding_count?: number;
+}

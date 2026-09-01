@@ -136,6 +136,8 @@ function confidenceColor(pct: number): string {
 // ── ScanImportPanel ───────────────────────────────────────────────────────
 interface ImportPreview {
   detected_format: string;
+  scanner_type?: string;
+  import_ref_preview?: string;
   finding_count: number;
   avg_confidence: number;
   new_count: number;
@@ -152,11 +154,20 @@ interface ImportPreview {
 }
 
 interface ImportHistoryRow {
-  id: string;
-  scan_name: string;
-  detected_format: string;
-  finding_count: number;
-  created_at: string;
+  id: number | string;
+  import_name?: string;
+  import_ref?: string;
+  scanner_type?: string;
+  detected_format?: string;
+  raw_finding_count?: number;
+  normalized_finding_count?: number;
+  created_at?: string;
+  created_by?: string;
+  scan_id?: string;
+  status?: string;
+  /** legacy compat */
+  scan_name?: string;
+  finding_count?: number;
 }
 
 interface ScanImportPanelProps {
@@ -244,9 +255,11 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
     if (!selectedFile || !clientId) return;
     setCommitting(true);
     try {
-      const result: any = await scansApi.commitScanImport(clientId, selectedFile, toolHint, importName);
-      const count = result?.finding_count ?? preview?.finding_count ?? 0;
-      setSuccessSnack(`${count} findings imported`);
+      const result: any = await scansApi.commitScanImport(clientId, selectedFile, toolHint, importName, importName);
+      const count = result?.findings_imported ?? result?.finding_count ?? preview?.finding_count ?? 0;
+      const ref = result?.import_ref ?? "";
+      const name = result?.import_name ?? importName ?? "Assessment";
+      setSuccessSnack(`Assessment "${name}" saved as ${ref} — ${count} findings imported`);
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
       qc.invalidateQueries({ queryKey: ["import-history", clientId] });
       clearPreview();
@@ -373,8 +386,16 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
 
           {/* Header summary */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", mb: 2 }}>
-            <Chip label={`Detected: ${preview.detected_format}`} size="small"
+            <Chip label={`Format: ${preview.detected_format}`} size="small"
               sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+            {preview.scanner_type && (
+              <Chip label={`Scanner: ${preview.scanner_type}`} size="small"
+                sx={{ bgcolor: "rgba(156,39,176,0.15)", color: "#ce93d8", fontWeight: 700 }} />
+            )}
+            {preview.import_ref_preview && (
+              <Chip label={`Ref: ${preview.import_ref_preview}`} size="small"
+                sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontWeight: 600, fontFamily: "monospace" }} />
+            )}
             <Chip label={`${preview.finding_count} findings`} size="small"
               sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary", fontWeight: 700 }} />
             <Chip label={`Avg confidence: ${preview.avg_confidence}%`} size="small"
@@ -476,12 +497,13 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
             <TextField
               size="small"
-              label="Import name (optional)"
-              placeholder="e.g. Nessus scan - July 2026"
+              required
+              label="Assessment name"
+              placeholder={`e.g. ${preview.scanner_type ? preview.scanner_type.charAt(0).toUpperCase() + preview.scanner_type.slice(1) : "Nessus"} scan – ${new Date().toLocaleDateString()}`}
+              helperText="Give this import a memorable name for later reference"
               value={importName}
               onChange={(e) => setImportName(e.target.value)}
               sx={{ flex: 1, minWidth: 240, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-              
             />
             <Button
               variant="contained"
@@ -504,13 +526,15 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
           <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, letterSpacing: 1, display: "block", mb: 1.5 }}>
             RECENT IMPORTS
           </Typography>
-          <Box sx={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, overflow: "hidden" }}>
+          <Box sx={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, overflowX: "auto" }}>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ bgcolor: "rgba(255,255,255,0.04)", "& th": { borderColor: "rgba(255,255,255,0.08)", color: "text.secondary", fontSize: 11, fontWeight: 600, py: 1 } }}>
-                  <TableCell>Import name</TableCell>
-                  <TableCell>Format</TableCell>
-                  <TableCell>Findings</TableCell>
+                  <TableCell sx={{ minWidth: 80 }}>Ref</TableCell>
+                  <TableCell sx={{ minWidth: 180 }}>Assessment name</TableCell>
+                  <TableCell>Scanner</TableCell>
+                  <TableCell sx={{ minWidth: 90 }}>Raw / Norm</TableCell>
+                  <TableCell>Imported by</TableCell>
                   <TableCell>Date</TableCell>
                 </TableRow>
               </TableHead>
@@ -518,16 +542,26 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
                 {historyData.map((row) => (
                   <TableRow key={row.id} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.06)", fontSize: 12, py: 0.75 } }}>
                     <TableCell>
-                      <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 500 }}>
-                        {row.scan_name || "—"}
+                      <Typography variant="caption" sx={{ color: "#34A853", fontFamily: "monospace", fontWeight: 700 }}>
+                        {row.import_ref || "—"}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip label={row.detected_format || "—"} size="small"
+                      <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 500 }}>
+                        {row.import_name || row.scan_name || "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={row.scanner_type || row.detected_format || "—"} size="small"
                         sx={{ bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontSize: 10, height: 18, fontWeight: 700 }} />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="caption" sx={{ color: "text.primary" }}>{row.finding_count}</Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {row.raw_finding_count ?? row.finding_count ?? "—"} / {row.normalized_finding_count ?? row.finding_count ?? "—"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>{row.created_by || "—"}</Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="caption" sx={{ color: "text.secondary" }}>

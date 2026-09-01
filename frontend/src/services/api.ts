@@ -170,17 +170,23 @@ export const scansApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }).then((r) => r.data);
   },
-  commitScanImport: (clientId: string, file: File, toolHint: string, scanName: string) => {
+  commitScanImport: (clientId: string, file: File, toolHint: string, scanName: string, importName?: string, projectId?: string) => {
     const form = new FormData();
     form.append("file", file);
     form.append("tool_hint", toolHint);
     form.append("scan_name", scanName);
+    if (importName) form.append("import_name", importName);
+    if (projectId) form.append("project_id", projectId);
     return apiClient.post(`/clients/${clientId}/scans/import/commit`, form, {
       headers: { "Content-Type": "multipart/form-data" },
     }).then((r) => r.data);
   },
   importHistory: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/scans/import/history`).then((r) => r.data),
+  getRawFindings: (clientId: string, scannerType: string, importId?: number) =>
+    apiClient.get(`/clients/${clientId}/scans/import/raw/${scannerType}`, {
+      params: importId !== undefined ? { import_id: importId } : {},
+    }).then((r) => r.data),
   setLive: (clientId: string, scanId: string) =>
     apiClient.patch(`/clients/${clientId}/scans/${scanId}/set-live`).then((r) => r.data),
   triggerEnrich: (clientId: string, scanId: string) =>

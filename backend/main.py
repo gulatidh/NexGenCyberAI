@@ -584,6 +584,7 @@ def _ensure_added_columns() -> None:
             ("cvss_vector",            "NVARCHAR(100) NULL",  "VARCHAR(100)"),
             ("enrichment_source",      "NVARCHAR(20) NULL",   "VARCHAR(20)"),
             ("cwe_id",                 "NVARCHAR(50) NULL",   "VARCHAR(50)"),
+            ("import_id",              "INT NULL",             "INTEGER"),
         ]
         for col, mssql_type, sqlite_type in _finding_additions:
             if finding_cols and col not in finding_cols:

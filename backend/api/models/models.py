@@ -1607,3 +1607,223 @@ class AuditAgentRun(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+
+# ── Assessment Import Tracking ─────────────────────────────────────────────────
+
+class AssessmentImport(Base):
+    """Named import session — one row per user-initiated scan file import."""
+    __tablename__ = "assessment_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.id"), nullable=True)
+    import_name = Column(String(200), nullable=False)
+    import_ref = Column(String(50), nullable=False)   # e.g. "IMP-2026-001"
+    scanner_type = Column(String(50), nullable=False)  # tenable|nessus|burp|qualys|openvas|sarif|generic
+    detected_format = Column(String(50), nullable=True)
+    source_filename = Column(String(500), nullable=True)
+    raw_finding_count = Column(Integer, default=0)
+    normalized_finding_count = Column(Integer, default=0)
+    created_by = Column(String(200), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    scan_id = Column(String(36), ForeignKey("scans.id"), nullable=True)
+    status = Column(String(20), default="completed")
+    error_message = Column(Text, nullable=True)
+
+
+class RawTenableFinding(Base):
+    """Native Tenable/Nessus fields from .nessus XML exports."""
+    __tablename__ = "raw_tenable"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    plugin_id = Column(String(20))
+    plugin_name = Column(String(500))
+    plugin_family = Column(String(200), nullable=True)
+    risk_factor = Column(String(20), nullable=True)
+    vpr_score = Column(Float, nullable=True)
+    asset_uuid = Column(String(100), nullable=True)
+    asset_hostname = Column(String(500), nullable=True)
+    asset_ip = Column(String(50), nullable=True)
+    asset_criticality_rating = Column(String(20), nullable=True)
+    first_seen = Column(DateTime, nullable=True)
+    last_seen = Column(DateTime, nullable=True)
+    tenable_scan_id = Column(String(100), nullable=True)
+    synopsis = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    solution = Column(Text, nullable=True)
+    see_also = Column(Text, nullable=True)
+    plugin_output = Column(Text, nullable=True)
+    port = Column(Integer, nullable=True)
+    protocol = Column(String(10), nullable=True)
+    cve = Column(String(500), nullable=True)
+    cvss_v3_base_score = Column(Float, nullable=True)
+    cvss_v3_temporal_score = Column(Float, nullable=True)
+    cvss_v3_vector = Column(String(200), nullable=True)
+    stig_severity = Column(String(10), nullable=True)
+    patch_available = Column(Boolean, nullable=True)
+    exploit_available = Column(Boolean, nullable=True)
+    exploit_ease = Column(String(100), nullable=True)
+    metasploit = Column(Boolean, nullable=True)
+
+
+class RawNessusFinding(Base):
+    """Native Nessus fields (community edition .nessus XML)."""
+    __tablename__ = "raw_nessus"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    plugin_id = Column(String(20))
+    plugin_name = Column(String(500))
+    plugin_family = Column(String(200), nullable=True)
+    severity_id = Column(Integer, nullable=True)
+    risk_factor = Column(String(20), nullable=True)
+    description = Column(Text, nullable=True)
+    solution = Column(Text, nullable=True)
+    synopsis = Column(Text, nullable=True)
+    plugin_output = Column(Text, nullable=True)
+    host = Column(String(500), nullable=True)
+    port = Column(Integer, nullable=True)
+    protocol = Column(String(10), nullable=True)
+    cvss_base_score = Column(Float, nullable=True)
+    cvss_temporal_score = Column(Float, nullable=True)
+    cvss_vector = Column(String(200), nullable=True)
+    cvss3_base_score = Column(Float, nullable=True)
+    cvss3_temporal_score = Column(Float, nullable=True)
+    cvss3_vector = Column(String(200), nullable=True)
+    cve = Column(String(500), nullable=True)
+    bid = Column(String(200), nullable=True)
+    see_also = Column(Text, nullable=True)
+    exploit_available = Column(Boolean, nullable=True)
+    exploitability_ease = Column(String(100), nullable=True)
+    metasploit = Column(Boolean, nullable=True)
+    patch_available = Column(Boolean, nullable=True)
+
+
+class RawBurpFinding(Base):
+    """Native Burp Suite fields from XML exports."""
+    __tablename__ = "raw_burp"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    issue_type_id = Column(String(50), nullable=True)
+    issue_name = Column(String(500), nullable=True)
+    issue_detail = Column(Text, nullable=True)
+    issue_background = Column(Text, nullable=True)
+    remediation_detail = Column(Text, nullable=True)
+    remediation_background = Column(Text, nullable=True)
+    path = Column(String(1000), nullable=True)
+    host = Column(String(500), nullable=True)
+    port = Column(Integer, nullable=True)
+    protocol = Column(String(10), nullable=True)
+    confidence = Column(String(20), nullable=True)
+    severity = Column(String(20), nullable=True)
+    vulnerability_classifications = Column(Text, nullable=True)
+    references = Column(Text, nullable=True)
+    cwes = Column(String(200), nullable=True)
+    request_response = Column(Text, nullable=True)
+
+
+class RawQualysFinding(Base):
+    """Native Qualys VMDR fields from XML or CSV exports."""
+    __tablename__ = "raw_qualys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    qid = Column(String(20), nullable=True)
+    title = Column(String(500), nullable=True)
+    type_code = Column(String(20), nullable=True)
+    severity_level = Column(Integer, nullable=True)
+    port = Column(Integer, nullable=True)
+    protocol = Column(String(10), nullable=True)
+    fqdn = Column(String(500), nullable=True)
+    ip = Column(String(50), nullable=True)
+    os = Column(String(200), nullable=True)
+    results = Column(Text, nullable=True)
+    threat = Column(Text, nullable=True)
+    impact = Column(Text, nullable=True)
+    solution = Column(Text, nullable=True)
+    cvss_base = Column(Float, nullable=True)
+    cvss_temporal = Column(Float, nullable=True)
+    cvss3_base = Column(Float, nullable=True)
+    cvss3_temporal = Column(Float, nullable=True)
+    cve_list = Column(String(500), nullable=True)
+    vendor_reference = Column(String(200), nullable=True)
+    category = Column(String(200), nullable=True)
+    is_patchable = Column(Boolean, nullable=True)
+    first_found = Column(DateTime, nullable=True)
+    last_found = Column(DateTime, nullable=True)
+
+
+class RawOpenVASFinding(Base):
+    """Native OpenVAS/Greenbone fields from GMP XML reports."""
+    __tablename__ = "raw_openvas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    nvt_oid = Column(String(100), nullable=True)
+    nvt_name = Column(String(500), nullable=True)
+    nvt_family = Column(String(200), nullable=True)
+    nvt_version = Column(String(50), nullable=True)
+    host = Column(String(500), nullable=True)
+    port = Column(String(50), nullable=True)
+    threat = Column(String(20), nullable=True)
+    severity_score = Column(Float, nullable=True)
+    qod = Column(Integer, nullable=True)
+    description = Column(Text, nullable=True)
+    solution = Column(Text, nullable=True)
+    solution_type = Column(String(50), nullable=True)
+    cve = Column(String(500), nullable=True)
+    bid = Column(String(200), nullable=True)
+    xref = Column(String(500), nullable=True)
+    tags = Column(Text, nullable=True)
+
+
+class RawSarifFinding(Base):
+    """Native SARIF fields (CodeQL, Semgrep, Snyk, Checkmarx SARIF output)."""
+    __tablename__ = "raw_sarif"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    tool_name = Column(String(100), nullable=True)
+    tool_version = Column(String(50), nullable=True)
+    rule_id = Column(String(200), nullable=True)
+    rule_name = Column(String(500), nullable=True)
+    level = Column(String(20), nullable=True)
+    message = Column(Text, nullable=True)
+    artifact_uri = Column(String(1000), nullable=True)
+    region_start_line = Column(Integer, nullable=True)
+    region_end_line = Column(Integer, nullable=True)
+    region_start_column = Column(Integer, nullable=True)
+    logical_location = Column(String(500), nullable=True)
+    fingerprint = Column(String(200), nullable=True)
+    suppressed = Column(Boolean, default=False)
+    rank = Column(Float, nullable=True)
+    tags = Column(String(500), nullable=True)
+    properties_json = Column(Text, nullable=True)
+
+
+class RawGenericFinding(Base):
+    """Catch-all raw store for CSV, JSON, PDF, and unknown formats."""
+    __tablename__ = "raw_generic"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=False, index=True)
+    client_id = Column(String(36), nullable=False)
+    normalized_finding_id = Column(Integer, ForeignKey("findings.id"), nullable=True)
+    source_format = Column(String(50), nullable=True)
+    row_number = Column(Integer, nullable=True)
+    raw_row_json = Column(Text, nullable=True)
+

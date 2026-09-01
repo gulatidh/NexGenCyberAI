@@ -154,6 +154,8 @@ def parse_sarif(content: bytes) -> List[ParsedFinding]:
         for run in data.get("runs", []):
             rules: Dict[str, Any] = {}
             driver = run.get("tool", {}).get("driver", {})
+            tool_name = driver.get("name", "")
+            tool_version = driver.get("version", "")
             for r in driver.get("rules", []):
                 rules[r["id"]] = r
             for result in run.get("results", []):
@@ -162,18 +164,37 @@ def parse_sarif(content: bytes) -> List[ParsedFinding]:
                 msg = result.get("message", {})
                 desc = msg.get("text") or msg.get("markdown") or ""
                 rule_desc = (rule.get("fullDescription") or rule.get("shortDescription") or {}).get("text", "")
-                title = rule.get("name") or rule_id or desc[:80] or "Unknown finding"
+                rule_name = rule.get("name") or ""
+                title = rule_name or rule_id or desc[:80] or "Unknown finding"
                 level = result.get("level", "warning")
                 sev = _normalise_severity(level)
 
                 # Extract location
                 locs = result.get("locations", [])
-                resource = ""
+                artifact_uri = ""
+                region_start_line = None
+                region_end_line = None
+                region_start_col = None
+                logical_loc = ""
                 if locs:
                     pl = locs[0].get("physicalLocation", {})
-                    uri = pl.get("artifactLocation", {}).get("uri", "")
-                    line = pl.get("region", {}).get("startLine", "")
-                    resource = f"{uri}:{line}" if line else uri
+                    artifact_uri = pl.get("artifactLocation", {}).get("uri", "")
+                    reg = pl.get("region", {})
+                    region_start_line = reg.get("startLine")
+                    region_end_line = reg.get("endLine")
+                    region_start_col = reg.get("startColumn")
+                    ll = locs[0].get("logicalLocations", [])
+                    if ll:
+                        logical_loc = ll[0].get("fullyQualifiedName") or ll[0].get("name") or ""
+                resource = f"{artifact_uri}:{region_start_line}" if region_start_line else artifact_uri
+
+                fingerprint = ""
+                fps = result.get("fingerprints") or result.get("partialFingerprints") or {}
+                if fps:
+                    fingerprint = str(list(fps.values())[0])[:200]
+
+                tags = ",".join(rule.get("tags") or [])
+                props = result.get("properties") or {}
 
                 findings.append(ParsedFinding(
                     title=title,
@@ -182,11 +203,43 @@ def parse_sarif(content: bytes) -> List[ParsedFinding]:
                     resource_id=resource,
                     resource_type="file",
                     confidence=0.95,
-                    raw={"ruleId": rule_id, "level": level},
+                    raw={
+                        "_table": "sarif",
+                        "tool_name": tool_name,
+                        "tool_version": tool_version,
+                        "rule_id": rule_id,
+                        "rule_name": rule_name,
+                        "level": level,
+                        "message": desc,
+                        "artifact_uri": artifact_uri,
+                        "region_start_line": region_start_line,
+                        "region_end_line": region_end_line,
+                        "region_start_column": region_start_col,
+                        "logical_location": logical_loc,
+                        "fingerprint": fingerprint,
+                        "suppressed": result.get("suppressions") is not None and len(result.get("suppressions", [])) > 0,
+                        "rank": result.get("rank"),
+                        "tags": tags,
+                        "properties_json": json.dumps(props) if props else None,
+                    },
                 ))
     except Exception as exc:
         logger.warning("SARIF parse error: %s", exc)
     return findings
+
+
+def _el_text(el) -> Optional[str]:
+    return el.text.strip() if el is not None and el.text else None
+
+
+def _el_float(el) -> Optional[float]:
+    t = _el_text(el)
+    if t is None:
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        return None
 
 
 def parse_nessus(content: bytes) -> List[ParsedFinding]:
@@ -199,29 +252,40 @@ def parse_nessus(content: bytes) -> List[ParsedFinding]:
                 sev_num = int(item.get("severity", "0"))
                 sev_map = {0: "info", 1: "low", 2: "medium", 3: "high", 4: "critical"}
                 sev = sev_map.get(sev_num, "info")
+                plugin_id = item.get("pluginID", "")
                 plugin_name = item.get("pluginName", "Unknown Plugin")
-                port = item.get("port", "")
+                plugin_family = item.get("pluginFamily", "")
+                port_str = item.get("port", "")
                 protocol = item.get("protocol", "")
-                resource = f"{hostname}:{port}/{protocol}" if port else hostname
+                resource = f"{hostname}:{port_str}/{protocol}" if port_str else hostname
 
                 cve_el = item.find("cve")
-                cve_id = cve_el.text.strip() if cve_el is not None and cve_el.text else None
+                cve_id = _el_text(cve_el)
 
-                cvss_el = item.find("cvss_base_score") or item.find("cvss3_base_score")
-                cvss = None
-                if cvss_el is not None and cvss_el.text:
-                    try:
-                        cvss = float(cvss_el.text.strip())
-                    except ValueError:
-                        pass
+                cvss_base = _el_float(item.find("cvss_base_score"))
+                cvss3_base = _el_float(item.find("cvss3_base_score"))
+                cvss = cvss3_base or cvss_base
+                cvss_vec = _el_text(item.find("cvss_vector")) or _el_text(item.find("cvss3_vector"))
+                cvss_temporal = _el_float(item.find("cvss_temporal_score"))
+                cvss3_temporal = _el_float(item.find("cvss3_temporal_score"))
+                risk_factor = _el_text(item.find("risk_factor"))
+                desc = _el_text(item.find("description")) or ""
+                synopsis = _el_text(item.find("synopsis"))
+                remediation = _el_text(item.find("solution")) or ""
+                see_also = _el_text(item.find("see_also"))
+                plugin_output = _el_text(item.find("plugin_output"))
+                bid = _el_text(item.find("bid"))
+                exploit_avail = _el_text(item.find("exploit_available"))
+                exploit_ease = _el_text(item.find("exploitability_ease"))
+                msf = _el_text(item.find("metasploit_name"))
 
-                desc_el = item.find("description")
-                desc = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
-                sol_el = item.find("solution")
-                remediation = sol_el.text.strip() if sol_el is not None and sol_el.text else ""
+                try:
+                    port_int = int(port_str) if port_str else None
+                except ValueError:
+                    port_int = None
 
                 if sev == "info" and not cve_id:
-                    continue  # skip pure info items without CVEs
+                    continue
 
                 findings.append(ParsedFinding(
                     title=plugin_name,
@@ -233,7 +297,34 @@ def parse_nessus(content: bytes) -> List[ParsedFinding]:
                     cvss_score=cvss,
                     remediation=remediation,
                     confidence=0.98,
-                    raw={"pluginID": item.get("pluginID"), "port": port},
+                    raw={
+                        "_table": "nessus",
+                        "plugin_id": plugin_id,
+                        "plugin_name": plugin_name,
+                        "plugin_family": plugin_family,
+                        "severity_id": sev_num,
+                        "risk_factor": risk_factor,
+                        "host": hostname,
+                        "port": port_int,
+                        "protocol": protocol,
+                        "cvss_base_score": cvss_base,
+                        "cvss_temporal_score": cvss_temporal,
+                        "cvss_vector": cvss_vec,
+                        "cvss3_base_score": cvss3_base,
+                        "cvss3_temporal_score": cvss3_temporal,
+                        "cvss3_vector": cvss_vec,
+                        "cve": cve_id,
+                        "bid": bid,
+                        "synopsis": synopsis,
+                        "description": desc,
+                        "solution": remediation,
+                        "see_also": see_also,
+                        "plugin_output": plugin_output,
+                        "exploit_available": exploit_avail == "true" if exploit_avail else None,
+                        "exploitability_ease": exploit_ease,
+                        "metasploit": msf is not None,
+                        "patch_available": None,
+                    },
                 ))
     except Exception as exc:
         logger.warning("Nessus parse error: %s", exc)
@@ -247,23 +338,54 @@ def parse_burp(content: bytes) -> List[ParsedFinding]:
         for issue in root.findall(".//issue"):
             name_el = issue.find("name")
             sev_el = issue.find("severity")
-            detail_el = issue.find("issueDetail") or issue.find("issueBackground")
-            url_el = issue.find("url") or issue.find("host")
-            remediation_el = issue.find("remediationDetail") or issue.find("remediationBackground")
+            conf_el = issue.find("confidence")
+            detail_el = issue.find("issueDetail")
+            bg_el = issue.find("issueBackground")
+            url_el = issue.find("url")
+            host_el = issue.find("host")
+            path_el = issue.find("path")
+            port_el = issue.find("port")
+            protocol_el = issue.find("protocol")
+            type_id_el = issue.find("type")
+            rem_detail_el = issue.find("remediationDetail")
+            rem_bg_el = issue.find("remediationBackground")
+            vuln_class_el = issue.find("vulnerabilityClassifications")
+            refs_el = issue.find("references")
+            cwe_el = issue.find("cwes") or issue.find("cwe")
 
-            title = name_el.text.strip() if name_el is not None and name_el.text else "Unknown Issue"
-            sev_raw = sev_el.text.strip() if sev_el is not None and sev_el.text else "Information"
+            title = _el_text(name_el) or "Unknown Issue"
+            sev_raw = _el_text(sev_el) or "Information"
             sev = _normalise_severity(sev_raw)
-            desc = detail_el.text.strip() if detail_el is not None and detail_el.text else ""
-            # Strip HTML tags from Burp descriptions
-            desc = re.sub(r"<[^>]+>", " ", desc).strip()
-            resource = url_el.text.strip() if url_el is not None and url_el.text else ""
-            remediation = ""
-            if remediation_el is not None and remediation_el.text:
-                remediation = re.sub(r"<[^>]+>", " ", remediation_el.text).strip()
+            confidence_str = _el_text(conf_el) or ""
+
+            def _strip_html(s: Optional[str]) -> str:
+                if not s:
+                    return ""
+                return re.sub(r"<[^>]+>", " ", s).strip()
+
+            detail = _strip_html(_el_text(detail_el))
+            background = _strip_html(_el_text(bg_el))
+            desc = detail or background
+            rem_detail = _strip_html(_el_text(rem_detail_el))
+            rem_bg = _strip_html(_el_text(rem_bg_el))
+            remediation = rem_detail or rem_bg
+
+            url = _el_text(url_el) or ""
+            host = _el_text(host_el) or ""
+            path = _el_text(path_el) or ""
+            resource = url or (f"{host}{path}" if path else host)
+            try:
+                port_int = int(_el_text(port_el) or "")
+            except (ValueError, TypeError):
+                port_int = None
 
             if sev == "info":
                 continue
+
+            req_resp = ""
+            rr = issue.find("requestresponse") or issue.find("requestResponse")
+            if rr is not None:
+                req_resp = ET.tostring(rr, encoding="unicode")[:10000]
 
             findings.append(ParsedFinding(
                 title=title,
@@ -273,7 +395,25 @@ def parse_burp(content: bytes) -> List[ParsedFinding]:
                 resource_type="url",
                 remediation=remediation,
                 confidence=0.97,
-                raw={"severity_raw": sev_raw},
+                raw={
+                    "_table": "burp",
+                    "issue_type_id": _el_text(type_id_el),
+                    "issue_name": title,
+                    "issue_detail": detail,
+                    "issue_background": background,
+                    "remediation_detail": rem_detail,
+                    "remediation_background": rem_bg,
+                    "path": path,
+                    "host": host,
+                    "port": port_int,
+                    "protocol": _el_text(protocol_el),
+                    "confidence": confidence_str,
+                    "severity": sev_raw,
+                    "vulnerability_classifications": _strip_html(_el_text(vuln_class_el)),
+                    "references": _strip_html(_el_text(refs_el)),
+                    "cwes": _el_text(cwe_el),
+                    "request_response": req_resp,
+                },
             ))
     except Exception as exc:
         logger.warning("Burp parse error: %s", exc)
@@ -293,26 +433,38 @@ def parse_openvas(content: bytes) -> List[ParsedFinding]:
             severity_el = result.find("severity")
             solution_el = result.find("nvt/solution")
             cve_el = result.find("nvt/cve")
+            nvt_el = result.find("nvt")
+            bid_el = result.find("nvt/bid")
+            xref_el = result.find("nvt/xref")
+            qod_el = result.find("qod/value") or result.find("qod")
+            tags_el = result.find("nvt/tags")
 
-            title = name_el.text.strip() if name_el is not None and name_el.text else "Unknown"
-            desc = desc_el.text.strip() if desc_el is not None and desc_el.text else ""
-            host = host_el.text.strip() if host_el is not None and host_el.text else ""
-            port = port_el.text.strip() if port_el is not None and port_el.text else ""
+            title = _el_text(name_el) or "Unknown"
+            desc = _el_text(desc_el) or ""
+            host = _el_text(host_el) or ""
+            port = _el_text(port_el) or ""
             resource = f"{host}:{port}" if port else host
 
-            sev_raw = threat_el.text.strip() if threat_el is not None and threat_el.text else "Low"
-            sev = _normalise_severity(sev_raw)
-            cvss = None
-            if severity_el is not None and severity_el.text:
-                try:
-                    cvss = float(severity_el.text.strip())
-                    sev = _cvss_to_severity(cvss)
-                except ValueError:
-                    pass
+            nvt_oid = nvt_el.get("oid", "") if nvt_el is not None else ""
+            nvt_name = _el_text(nvt_el.find("name")) if nvt_el is not None else None
+            nvt_family = _el_text(nvt_el.find("family")) if nvt_el is not None else None
+            nvt_version = nvt_el.get("version", "") if nvt_el is not None else None
+            solution_type_el = solution_el.get("type") if solution_el is not None else None
 
-            cve_raw = cve_el.text.strip() if cve_el is not None and cve_el.text else ""
+            sev_raw = _el_text(threat_el) or "Low"
+            sev = _normalise_severity(sev_raw)
+            cvss = _el_float(severity_el)
+            if cvss is not None:
+                sev = _cvss_to_severity(cvss)
+
+            cve_raw = _el_text(cve_el) or ""
             cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
-            remediation = solution_el.text.strip() if solution_el is not None and solution_el.text else ""
+            remediation = _el_text(solution_el) or ""
+
+            try:
+                qod_val = int(_el_text(qod_el) or "")
+            except (ValueError, TypeError):
+                qod_val = None
 
             if sev == "info":
                 continue
@@ -327,7 +479,25 @@ def parse_openvas(content: bytes) -> List[ParsedFinding]:
                 cvss_score=cvss,
                 remediation=remediation,
                 confidence=0.96,
-                raw={"threat": sev_raw},
+                raw={
+                    "_table": "openvas",
+                    "nvt_oid": nvt_oid,
+                    "nvt_name": nvt_name,
+                    "nvt_family": nvt_family,
+                    "nvt_version": nvt_version,
+                    "host": host,
+                    "port": port,
+                    "threat": sev_raw,
+                    "severity_score": cvss,
+                    "qod": qod_val,
+                    "description": desc,
+                    "solution": remediation,
+                    "solution_type": solution_type_el,
+                    "cve": cve_id,
+                    "bid": _el_text(bid_el),
+                    "xref": _el_text(xref_el),
+                    "tags": _el_text(tags_el),
+                },
             ))
     except Exception as exc:
         logger.warning("OpenVAS parse error: %s", exc)
@@ -339,41 +509,70 @@ def parse_qualys_xml(content: bytes) -> List[ParsedFinding]:
     try:
         root = ET.fromstring(content)
         for vuln in root.findall(".//VULN") or root.findall(".//QID"):
-            title_el = vuln.find("TITLE")
-            sev_el = vuln.find("SEVERITY")
-            ip_el = vuln.find("IP") or vuln.find("HOST")
-            cve_el = vuln.find("CVE_ID") or vuln.find("CVE")
-            cvss_el = vuln.find("CVSS_BASE") or vuln.find("CVSS3_BASE")
-            solution_el = vuln.find("SOLUTION")
-            consequence_el = vuln.find("CONSEQUENCE") or vuln.find("DIAGNOSIS")
-
-            title = title_el.text.strip() if title_el is not None and title_el.text else "Unknown"
-            # Qualys severity 1-5
+            title = _el_text(vuln.find("TITLE")) or "Unknown"
             sev_map = {"1": "info", "2": "low", "3": "medium", "4": "high", "5": "critical"}
-            sev_raw = sev_el.text.strip() if sev_el is not None and sev_el.text else "3"
+            sev_raw = _el_text(vuln.find("SEVERITY")) or "3"
             sev = sev_map.get(sev_raw, "medium")
-            resource = ip_el.text.strip() if ip_el is not None and ip_el.text else ""
-            cve_id = cve_el.text.strip() if cve_el is not None and cve_el.text else None
-            cvss = None
-            if cvss_el is not None and cvss_el.text:
-                try:
-                    cvss = float(cvss_el.text.strip())
-                except ValueError:
-                    pass
-            remediation = solution_el.text.strip() if solution_el is not None and solution_el.text else ""
-            desc = consequence_el.text.strip() if consequence_el is not None and consequence_el.text else ""
+            qid = _el_text(vuln.find("QID"))
+            ip = _el_text(vuln.find("IP")) or _el_text(vuln.find("HOST")) or ""
+            fqdn = _el_text(vuln.find("FQDN")) or _el_text(vuln.find("DNS"))
+            os_str = _el_text(vuln.find("OS"))
+            cve_raw = _el_text(vuln.find("CVE_ID")) or _el_text(vuln.find("CVE")) or ""
+            cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
+            cvss_base = _el_float(vuln.find("CVSS_BASE"))
+            cvss3_base = _el_float(vuln.find("CVSS3_BASE"))
+            cvss = cvss3_base or cvss_base
+            cvss_temp = _el_float(vuln.find("CVSS_TEMPORAL"))
+            cvss3_temp = _el_float(vuln.find("CVSS3_TEMPORAL"))
+            remediation = _el_text(vuln.find("SOLUTION")) or ""
+            desc = _el_text(vuln.find("CONSEQUENCE")) or _el_text(vuln.find("DIAGNOSIS")) or ""
+            threat = _el_text(vuln.find("THREAT"))
+            impact = _el_text(vuln.find("IMPACT"))
+            results = _el_text(vuln.find("RESULTS"))
+            vendor_ref = _el_text(vuln.find("VENDOR_REFERENCE"))
+            category = _el_text(vuln.find("CATEGORY"))
+            port_el = vuln.find("PORT") or vuln.find("PROTOCOL")
+            try:
+                port_int = int(_el_text(vuln.find("PORT")) or "")
+            except (ValueError, TypeError):
+                port_int = None
 
             findings.append(ParsedFinding(
                 title=title,
-                description=desc,
+                description=desc or threat or "",
                 severity=sev,
-                resource_id=resource,
+                resource_id=fqdn or ip,
                 resource_type="host",
                 cve_id=cve_id,
                 cvss_score=cvss,
                 remediation=remediation,
                 confidence=0.96,
-                raw={"qualys_severity": sev_raw},
+                raw={
+                    "_table": "qualys",
+                    "qid": qid,
+                    "title": title,
+                    "type_code": None,
+                    "severity_level": int(sev_raw) if sev_raw.isdigit() else None,
+                    "port": port_int,
+                    "protocol": _el_text(vuln.find("PROTOCOL")),
+                    "fqdn": fqdn,
+                    "ip": ip,
+                    "os": os_str,
+                    "results": results,
+                    "threat": threat,
+                    "impact": impact,
+                    "solution": remediation,
+                    "cvss_base": cvss_base,
+                    "cvss_temporal": cvss_temp,
+                    "cvss3_base": cvss3_base,
+                    "cvss3_temporal": cvss3_temp,
+                    "cve_list": cve_raw,
+                    "vendor_reference": vendor_ref,
+                    "category": category,
+                    "is_patchable": None,
+                    "first_found": None,
+                    "last_found": None,
+                },
             ))
     except Exception as exc:
         logger.warning("Qualys XML parse error: %s", exc)
@@ -384,25 +583,42 @@ def parse_qualys_csv(content: bytes) -> List[ParsedFinding]:
     findings = []
     try:
         text = content.decode("utf-8", errors="replace")
-        # Skip Qualys header lines that start with ----
         lines = [l for l in text.splitlines() if not l.startswith("----") and l.strip()]
         reader = csv.DictReader(lines)
         sev_map = {"1": "info", "2": "low", "3": "medium", "4": "high", "5": "critical"}
-        for row in reader:
+        for idx, row in enumerate(reader):
             title = row.get("Title") or row.get("Vulnerability") or row.get("QID", "Unknown")
             sev_raw = str(row.get("Severity") or row.get("SEVERITY") or "3")
             sev = sev_map.get(sev_raw.strip(), "medium")
-            resource = row.get("IP") or row.get("Host") or row.get("DNS") or ""
+            ip = row.get("IP") or row.get("Host") or ""
+            fqdn = row.get("DNS") or row.get("FQDN") or ""
+            resource = fqdn or ip
             cve_raw = row.get("CVE ID") or row.get("CVE") or ""
             cve_id = cve_raw.strip() if re.match(r"CVE-\d{4}-\d+", cve_raw.strip()) else None
-            cvss = None
-            for k in ("CVSS Base", "CVSS3 Base", "CVSS_BASE"):
+            cvss_base = None
+            cvss3_base = None
+            for k in ("CVSS Base", "CVSS_BASE"):
                 if row.get(k):
                     try:
-                        cvss = float(row[k])
-                        break
+                        cvss_base = float(row[k]); break
                     except ValueError:
                         pass
+            for k in ("CVSS3 Base", "CVSS3_BASE"):
+                if row.get(k):
+                    try:
+                        cvss3_base = float(row[k]); break
+                    except ValueError:
+                        pass
+            cvss = cvss3_base or cvss_base
+            try:
+                port_int = int(row.get("Port") or row.get("PORT") or "")
+            except (ValueError, TypeError):
+                port_int = None
+            try:
+                sev_level = int(sev_raw.strip())
+            except (ValueError, TypeError):
+                sev_level = None
+
             findings.append(ParsedFinding(
                 title=title.strip(),
                 description=row.get("Results") or row.get("Description") or "",
@@ -413,7 +629,32 @@ def parse_qualys_csv(content: bytes) -> List[ParsedFinding]:
                 cvss_score=cvss,
                 remediation=row.get("Solution") or row.get("Remediation") or "",
                 confidence=0.93,
-                raw=dict(list(row.items())[:10]),
+                raw={
+                    "_table": "qualys",
+                    "qid": row.get("QID"),
+                    "title": title,
+                    "type_code": row.get("Type"),
+                    "severity_level": sev_level,
+                    "port": port_int,
+                    "protocol": row.get("Protocol"),
+                    "fqdn": fqdn,
+                    "ip": ip,
+                    "os": row.get("OS"),
+                    "results": row.get("Results"),
+                    "threat": row.get("Threat"),
+                    "impact": row.get("Impact"),
+                    "solution": row.get("Solution") or row.get("Remediation") or "",
+                    "cvss_base": cvss_base,
+                    "cvss_temporal": None,
+                    "cvss3_base": cvss3_base,
+                    "cvss3_temporal": None,
+                    "cve_list": cve_raw,
+                    "vendor_reference": row.get("Vendor Reference"),
+                    "category": row.get("Category"),
+                    "is_patchable": None,
+                    "first_found": None,
+                    "last_found": None,
+                },
             ))
     except Exception as exc:
         logger.warning("Qualys CSV parse error: %s", exc)
@@ -440,7 +681,11 @@ def parse_checkmarx(content: bytes) -> List[ParsedFinding]:
                     resource_id=resource,
                     resource_type="file",
                     confidence=0.95,
-                    raw={"query": name, "severity_raw": sev_num},
+                    raw={
+                        "_table": "generic",
+                        "source_format": "checkmarx",
+                        "raw_row_json": json.dumps({"query": name, "severity_raw": sev_num, "filename": filename, "line": line}),
+                    },
                 ))
     except Exception as exc:
         logger.warning("Checkmarx parse error: %s", exc)
@@ -492,7 +737,7 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
                 cve_id=cve_id,
                 remediation=remediation,
                 confidence=confidence,
-                raw={},
+                raw={"_table": "generic", "source_format": "csv", "raw_row_json": json.dumps(dict(row))},
             ))
     except Exception as exc:
         logger.warning("Generic CSV parse error: %s", exc)
@@ -549,7 +794,7 @@ def parse_generic_json(content: bytes) -> Tuple[List[ParsedFinding], float]:
                 cvss_score=cvss,
                 remediation=remediation[:3000],
                 confidence=0.75,
-                raw={},
+                raw={"_table": "generic", "source_format": "json", "raw_row_json": json.dumps(item)},
             ))
     except Exception as exc:
         logger.warning("Generic JSON parse error: %s", exc)
