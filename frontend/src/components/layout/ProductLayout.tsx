@@ -110,11 +110,10 @@ export default function ProductLayout({ product }: Props) {
                         }}
                       >
                         <Box sx={{
-                          width: 24, height: 24, borderRadius: 1.25,
-                          bgcolor: `${product.color}22`,
+                          width: 20,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0, color: product.color,
-                          "& svg": { fontSize: "13px !important" },
+                          flexShrink: 0,
+                          "& svg": { fontSize: "16px !important" },
                         }}>
                           {item.icon}
                         </Box>

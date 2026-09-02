@@ -3,6 +3,7 @@ import {
   Description, FolderZip, Assessment, LibraryAdd, GppBad, BarChart, ManageSearch,
   Summarize, Schedule, Psychology,
 } from "@mui/icons-material";
+const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
 export const REPORT_SECTION: SectionDef = {
   num: "05", label: "Audit", color: "#15803d",
@@ -17,17 +18,17 @@ export const REPORT_SECTION: SectionDef = {
   ],
   cards: [
     // Audit & Reporting
-    { name: "VAPT Reports",          icon: <Description />,  desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports", group: "Audit & Reporting" },
-    { name: "Evidence Package",      icon: <FolderZip />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",           route: "/report/evidence",     group: "Audit & Reporting" },
-    { name: "Reports",               icon: <Assessment />,  desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",      group: "Audit & Reporting" },
-    { name: "Audit Intelligence",    icon: <ManageSearch />, desc: "ICS Audit & Risk Intelligence — how every audit activity maps to the platform.", route: "/report/audit", group: "Audit & Reporting" },
-    { name: "Audit Agents",         icon: <Psychology />,   desc: "Wizard-driven AI agents for control testing, readiness reports, evidence curation and interview prep.", route: "/report/audit-agents", group: "Audit & Reporting" },
-    { name: "Executive Summary",    icon: <Summarize />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Audit & Reporting" },
-    { name: "Report Scheduler",     icon: <Schedule />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Audit & Reporting" },
+    { name: "VAPT Reports",          icon: <Description sx={ic("#FBBC04")} />,  desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.", route: "/report/vapt-reports", group: "Audit & Reporting" },
+    { name: "Evidence Package",      icon: <FolderZip sx={ic("#34A853")} />,   desc: "ZIP of findings, deficiencies, and agent logs for auditors.",           route: "/report/evidence",     group: "Audit & Reporting" },
+    { name: "Reports",               icon: <Assessment sx={ic("#4285F4")} />,  desc: "AI-generated security posture and trend reports.",                       route: "/report/reports",      group: "Audit & Reporting" },
+    { name: "Audit Intelligence",    icon: <ManageSearch sx={ic("#00BCD4")} />, desc: "ICS Audit & Risk Intelligence — how every audit activity maps to the platform.", route: "/report/audit", group: "Audit & Reporting" },
+    { name: "Audit Agents",         icon: <Psychology sx={ic("#9C27B0")} />,   desc: "Wizard-driven AI agents for control testing, readiness reports, evidence curation and interview prep.", route: "/report/audit-agents", group: "Audit & Reporting" },
+    { name: "Executive Summary",    icon: <Summarize sx={ic("#FF6D00")} />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Audit & Reporting" },
+    { name: "Report Scheduler",     icon: <Schedule sx={ic("#607D8B")} />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Audit & Reporting" },
     // Compliance
-    { name: "Framework Library",     icon: <LibraryAdd />,  desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",   group: "Compliance" },
-    { name: "Compliance Evaluation", icon: <BarChart />,    desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",   group: "Compliance" },
-    { name: "Control Gaps",          icon: <GppBad />,      desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",          group: "Compliance" },
+    { name: "Framework Library",     icon: <LibraryAdd sx={ic("#3F51B5")} />,  desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",   group: "Compliance" },
+    { name: "Compliance Evaluation", icon: <BarChart sx={ic("#009688")} />,    desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",   group: "Compliance" },
+    { name: "Control Gaps",          icon: <GppBad sx={ic("#EA4335")} />,      desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",          group: "Compliance" },
   ],
 };
 

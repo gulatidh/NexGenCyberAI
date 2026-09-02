@@ -2,6 +2,7 @@ import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   BugReport, FindInPage, SmartToy, TrendingUp, Storage, Devices, Radar, GpsFixed,
 } from "@mui/icons-material";
+const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
 export const DISCOVER_SECTION: SectionDef = {
   num: "02", label: "Discover", color: "#0f766e",
@@ -16,15 +17,15 @@ export const DISCOVER_SECTION: SectionDef = {
   ],
   cards: [
     // Scanning
-    { name: "Assessments",          icon: <BugReport />,   desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
-    { name: "Findings",             icon: <FindInPage />,  desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },
-    { name: "AI Assisted Scan",     icon: <SmartToy />,    desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
-    { name: "Posture Trends",       icon: <TrendingUp />,  desc: "Time-series charts of open findings and audit readiness score.",              route: "/discover/posture",      group: "Scanning" },
+    { name: "Assessments",          icon: <BugReport sx={ic("#4285F4")} />,   desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
+    { name: "Findings",             icon: <FindInPage sx={ic("#EA4335")} />,  desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },
+    { name: "AI Assisted Scan",     icon: <SmartToy sx={ic("#9C27B0")} />,    desc: "Conversational guided assessment — describe the environment, AI configures.", route: "/discover/ai-scan",      group: "Scanning" },
+    { name: "Posture Trends",       icon: <TrendingUp sx={ic("#34A853")} />,  desc: "Time-series charts of open findings and audit readiness score.",              route: "/discover/posture",      group: "Scanning" },
     // Assets & CVE
-    { name: "Asset Inventory",      icon: <Storage />,     desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
-    { name: "Technology Inventory", icon: <Devices />,     desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
-    { name: "CVE Blast Radius",     icon: <Radar />,       desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
-    { name: "Scan Coverage",       icon: <GpsFixed />,    desc: "Assets not scanned within the policy window — identify coverage gaps.",        route: "/discover/coverage",     group: "Assets & CVE" },
+    { name: "Asset Inventory",      icon: <Storage sx={ic("#00BCD4")} />,     desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & CVE" },
+    { name: "Technology Inventory", icon: <Devices sx={ic("#FF6D00")} />,     desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & CVE" },
+    { name: "CVE Blast Radius",     icon: <Radar sx={ic("#F44336")} />,       desc: "Which assets does a CVE affect? Map the full exposure path.",                 route: "/discover/cve-pivot",    group: "Assets & CVE" },
+    { name: "Scan Coverage",       icon: <GpsFixed sx={ic("#FBBC04")} />,    desc: "Assets not scanned within the policy window — identify coverage gaps.",        route: "/discover/coverage",     group: "Assets & CVE" },
   ],
 };
 

@@ -4,6 +4,7 @@ import {
   Shield, DeviceHub, Policy, LibraryAdd, AccountTree,
   Settings as SettingsIcon, HelpOutlined, ManageSearch,
 } from "@mui/icons-material";
+const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
 export const SETUP_SECTION: SectionDef = {
   num: "01", label: "Setup", color: "#2563eb",
@@ -18,20 +19,20 @@ export const SETUP_SECTION: SectionDef = {
   ],
   cards: [
     // Environment
-    { name: "Accounts",              icon: <People />,       desc: "Account profiles, contact details, and security posture scoping.",         route: "/platform/clients",              group: "Environment" },
-    { name: "Asset Inventory",       icon: <Storage />,      desc: "Discovered assets — servers, apps, containers, and cloud resources.",      route: "/platform/assets",               group: "Environment" },
-    { name: "Technology Inventory",  icon: <Devices />,      desc: "Software stack and technology across all discovered assets.",              route: "/platform/assets/technologies",  group: "Environment" },
-    { name: "Integrations",           icon: <Cable />,        desc: "Platform connectors, scanners, AI providers, webhooks, and API keys — all in one hub.", route: "/platform/integrations",         group: "Environment" },
-    { name: "Ticket Sync",           icon: <SyncAlt />,      desc: "Bi-directional sync of findings and remediations with your ticket system.", route: "/platform/ticket-sync",          group: "Environment" },
+    { name: "Accounts",              icon: <People sx={ic("#4285F4")} />,       desc: "Account profiles, contact details, and security posture scoping.",         route: "/platform/clients",              group: "Environment" },
+    { name: "Asset Inventory",       icon: <Storage sx={ic("#34A853")} />,      desc: "Discovered assets — servers, apps, containers, and cloud resources.",      route: "/platform/assets",               group: "Environment" },
+    { name: "Technology Inventory",  icon: <Devices sx={ic("#00BCD4")} />,      desc: "Software stack and technology across all discovered assets.",              route: "/platform/assets/technologies",  group: "Environment" },
+    { name: "Integrations",           icon: <Cable sx={ic("#FF6D00")} />,        desc: "Platform connectors, scanners, AI providers, webhooks, and API keys — all in one hub.", route: "/platform/integrations",         group: "Environment" },
+    { name: "Ticket Sync",           icon: <SyncAlt sx={ic("#9C27B0")} />,      desc: "Bi-directional sync of findings and remediations with your ticket system.", route: "/platform/ticket-sync",          group: "Environment" },
     // Design
-    { name: "AI Guardrails",         icon: <Shield />,       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",           route: "/automate/ai-guardrails",        group: "Design" },
-    { name: "Audit Logs",            icon: <ManageSearch />, desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",          route: "/platform/audit-logs",           group: "Design" },
-    { name: "Threat Models",         icon: <DeviceHub />,    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models",         group: "Design" },
-    { name: "Frameworks",            icon: <Policy />,       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",          route: "/report/frameworks",             group: "Design" },
-    { name: "Custom Standards",      icon: <LibraryAdd />,   desc: "Build your own control framework from existing platform controls.",         route: "/report/custom-frameworks",      group: "Design" },
-    { name: "Data Model",            icon: <AccountTree />,  desc: "Platform ontology — eleven entities, one interactive graph.",              route: "/data-model",                    group: "Design" },
-    { name: "Settings",              icon: <SettingsIcon />, desc: "User preferences, deleted accounts, and platform configuration.",          route: "/platform/settings",             group: "Design" },
-    { name: "Help",                  icon: <HelpOutlined />, desc: "Documentation, setup guides, and platform support resources.",             route: "/platform/help",                 group: "Design" },
+    { name: "AI Guardrails",         icon: <Shield sx={ic("#FBBC04")} />,       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",           route: "/automate/ai-guardrails",        group: "Design" },
+    { name: "Audit Logs",            icon: <ManageSearch sx={ic("#607D8B")} />, desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",          route: "/platform/audit-logs",           group: "Design" },
+    { name: "Threat Models",         icon: <DeviceHub sx={ic("#EA4335")} />,    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models",         group: "Design" },
+    { name: "Frameworks",            icon: <Policy sx={ic("#3F51B5")} />,       desc: "NIST CSF, CIS v8, ISO 27001, PCI DSS, GDPR compliance mapping.",          route: "/report/frameworks",             group: "Design" },
+    { name: "Custom Standards",      icon: <LibraryAdd sx={ic("#009688")} />,   desc: "Build your own control framework from existing platform controls.",         route: "/report/custom-frameworks",      group: "Design" },
+    { name: "Data Model",            icon: <AccountTree sx={ic("#FF5722")} />,  desc: "Platform ontology — eleven entities, one interactive graph.",              route: "/data-model",                    group: "Design" },
+    { name: "Settings",              icon: <SettingsIcon sx={ic("#78909C")} />, desc: "User preferences, deleted accounts, and platform configuration.",          route: "/platform/settings",             group: "Design" },
+    { name: "Help",                  icon: <HelpOutlined sx={ic("#4285F4")} />, desc: "Documentation, setup guides, and platform support resources.",             route: "/platform/help",                 group: "Design" },
   ],
 };
 
