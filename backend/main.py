@@ -959,7 +959,11 @@ def _provision_entraid_connector() -> None:
         }))
         name = os.environ.get("ENTRAID_CONNECTOR_CLIENT_NAME", "My Organisation") + " — Entra ID"
 
+        from api.models.models import Client
         with Session(engine) as db:
+            if not db.query(Client).filter(Client.id == db_client_id, Client.deleted_at.is_(None)).first():
+                logger.warning("Entra ID connector provision skipped — client %s not found; update ENTRAID_CONNECTOR_DB_CLIENT_ID", db_client_id)
+                return
             existing = db.query(Connector).filter(
                 Connector.client_id == db_client_id,
                 Connector.connector_type == ConnectorType.ENTRAID,
@@ -1023,7 +1027,11 @@ def _provision_azure_connector() -> None:
         }))
         name = f"{client_name} — Azure"
 
+        from api.models.models import Client
         with Session(engine) as db:
+            if not db.query(Client).filter(Client.id == db_client_id, Client.deleted_at.is_(None)).first():
+                logger.warning("Azure connector provision skipped — client %s not found; update ENTRAID_CONNECTOR_DB_CLIENT_ID", db_client_id)
+                return
             existing = db.query(Connector).filter(
                 Connector.client_id == db_client_id,
                 Connector.connector_type == ConnectorType.AZURE,
