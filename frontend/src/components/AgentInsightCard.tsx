@@ -134,13 +134,10 @@ export default function AgentInsightCard({ run, expanded, onToggle, onDelete }: 
         }}
       >
         {avatarUrl ? (
-          <Avatar src={avatarUrl} sx={{ width: 32, height: 32, bgcolor: `${accent}22`, flexShrink: 0 }} />
+          <Avatar src={avatarUrl} sx={{ width: 32, height: 32, flexShrink: 0 }} />
         ) : (
-          <Box sx={{
-            width: 32, height: 32, borderRadius: 1, bgcolor: `${accent}22`,
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>
-            <SmartToy sx={{ color: accent, fontSize: 18 }} />
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <SmartToy sx={{ color: accent, fontSize: 24 }} />
           </Box>
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>

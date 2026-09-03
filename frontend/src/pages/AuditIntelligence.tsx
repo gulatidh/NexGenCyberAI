@@ -232,11 +232,7 @@ export default function AuditIntelligence() {
               alignItems: "center",
             }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                <Box sx={{
-                  width: 32, height: 32, borderRadius: 1.5, flexShrink: 0,
-                  bgcolor: alpha(row.color, 0.12), border: `1px solid ${alpha(row.color, 0.25)}`,
-                  display: "flex", alignItems: "center", justifyContent: "center", color: row.color,
-                }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: row.color, flexShrink: 0 }}>
                   {row.icon}
                 </Box>
                 <Typography sx={{ fontSize: 13, fontWeight: 700 }}>{row.activity}</Typography>
@@ -282,11 +278,7 @@ export default function AuditIntelligence() {
                 },
               }}>
                 <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 2 }}>
-                  <Box sx={{
-                    width: 44, height: 44, borderRadius: 2,
-                    bgcolor: alpha(card.color, 0.12), border: `1px solid ${alpha(card.color, 0.25)}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", color: card.color,
-                  }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: card.color }}>
                     {card.icon}
                   </Box>
                   <Chip label={card.phase} size="small" sx={{

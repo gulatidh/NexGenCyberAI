@@ -338,9 +338,8 @@ export default function FrameworkLibrary() {
                   "&:hover": { boxShadow: 4, borderColor: fw.color } }}>
                 <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                   <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 1.5, flexShrink: 0,
-                      bgcolor: `${fw.color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <IconComp sx={{ color: fw.color, fontSize: 20 }} />
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <IconComp sx={{ color: fw.color, fontSize: 26 }} />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
@@ -394,9 +393,8 @@ export default function FrameworkLibrary() {
                 "&:hover": { boxShadow: 4, borderColor: "#9C27B0" } }}>
               <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                 <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5 }}>
-                  <Box sx={{ width: 36, height: 36, borderRadius: 1.5, flexShrink: 0,
-                    bgcolor: "rgba(124,77,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <LibraryAdd sx={{ color: "#9C27B0", fontSize: 20 }} />
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <LibraryAdd sx={{ color: "#9C27B0", fontSize: 26 }} />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>

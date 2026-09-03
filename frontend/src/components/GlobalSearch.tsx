@@ -318,15 +318,9 @@ export default function GlobalSearch() {
                             "&.Mui-selected": { bgcolor: alpha(theme.palette.primary.main, 0.1) },
                           }}
                         >
-                          <ListItemIcon sx={{ minWidth: 32 }}>
-                            <Box sx={{
-                              width: 26, height: 26, borderRadius: 0.75,
-                              bgcolor: active
-                                ? alpha(item.color ?? theme.palette.primary.main, 0.18)
-                                : alpha(theme.palette.divider, 0.4),
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <Icon sx={{ fontSize: 14, color: item.color ?? (active ? "primary.main" : "text.secondary") }} />
+                          <ListItemIcon sx={{ minWidth: 28 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <Icon sx={{ fontSize: 16, color: item.color ?? (active ? "primary.main" : "text.secondary") }} />
                             </Box>
                           </ListItemIcon>
                           <ListItemText

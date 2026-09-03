@@ -197,9 +197,8 @@ export function AgentRunWizard({
           {agent.avatar_url ? (
             <Avatar src={agent.avatar_url} sx={{ width: 36, height: 36 }} />
           ) : (
-            <Box sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: `${color}1F`,
-              display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <SmartToy sx={{ color, fontSize: 20 }} />
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <SmartToy sx={{ color, fontSize: 26 }} />
             </Box>
           )}
           <Box>

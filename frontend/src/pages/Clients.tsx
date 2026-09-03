@@ -85,13 +85,8 @@ function ProjectRows({ clientId, expanded, searchQuery, navigate, clientBase, is
           <TableCell sx={{ pl: 7 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Box sx={{ width: 4, height: 4, borderRadius: "50%", bgcolor: "divider", flexShrink: 0 }} />
-              <Box sx={{
-                width: 26, height: 26, borderRadius: 1,
-                bgcolor: "rgba(251,188,4,0.15)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <VpnKey sx={{ fontSize: 13, color: "#F9AB00" }} />
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <VpnKey sx={{ fontSize: 16, color: "#F9AB00" }} />
               </Box>
               <Typography
                 variant="body2"
@@ -386,13 +381,8 @@ export default function Clients() {
                               ? <ExpandMore sx={{ fontSize: 16 }} />
                               : <ChevronRight sx={{ fontSize: 16 }} />}
                           </IconButton>
-                          <Box sx={{
-                            width: 26, height: 26, borderRadius: 1,
-                            bgcolor: "rgba(66,133,244,0.15)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0,
-                          }}>
-                            <People sx={{ fontSize: 14, color: "#4285F4" }} />
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <People sx={{ fontSize: 20, color: "#4285F4" }} />
                           </Box>
                           <Typography
                             variant="body2"

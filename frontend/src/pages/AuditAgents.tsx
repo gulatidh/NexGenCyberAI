@@ -726,10 +726,7 @@ export default function AuditAgents() {
                 >
                   <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
                     <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-                      <Box sx={{
-                        width: 36, height: 36, borderRadius: 1.5, display: "flex", alignItems: "center",
-                        justifyContent: "center", bgcolor: `${agent.color}22`, color: agent.color, flexShrink: 0,
-                      }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: agent.color, flexShrink: 0 }}>
                         {agent.icon}
                       </Box>
                       <Box>
@@ -759,10 +756,7 @@ export default function AuditAgents() {
             <Paper elevation={0} sx={{ border: "1px solid", borderColor: selectedAgent.color, p: 3 }}>
               {/* Agent header */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3 }}>
-                <Box sx={{
-                  width: 40, height: 40, borderRadius: 2, display: "flex", alignItems: "center",
-                  justifyContent: "center", bgcolor: `${selectedAgent.color}22`, color: selectedAgent.color,
-                }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: selectedAgent.color }}>
                   {selectedAgent.icon}
                 </Box>
                 <Box>

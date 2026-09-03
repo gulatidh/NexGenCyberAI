@@ -252,9 +252,8 @@ function KnowledgeCard({ file }: { file: KFile }) {
     <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 1.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", p: 1.5, cursor: "pointer" }}
         onClick={() => setExpanded((v) => !v)}>
-        <Box sx={{ width: 36, height: 36, borderRadius: 1, bgcolor: "rgba(66,133,244,0.1)",
-          display: "flex", alignItems: "center", justifyContent: "center", mr: 1.5 }}>
-          <Storage sx={{ color: "#4285F4", fontSize: 20 }} />
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", mr: 1.5 }}>
+          <Storage sx={{ color: "#4285F4", fontSize: 24 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14 }}>{file.name}</Typography>

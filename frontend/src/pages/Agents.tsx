@@ -750,9 +750,8 @@ export default function Agents() {
                     }}>
                       <CardContent>
                         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 1 }}>
-                          <Box sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: `${color}1F`,
-                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <SmartToy sx={{ color, fontSize: 18 }} />
+                          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <SmartToy sx={{ color, fontSize: 24 }} />
                           </Box>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography sx={{ color: "text.primary", fontWeight: 600, fontSize: 14, lineHeight: 1.2 }}>

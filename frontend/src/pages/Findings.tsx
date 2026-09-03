@@ -187,9 +187,8 @@ function CategoryTile({ cat, active, onClick }: {
       }}>
       <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
-          <Box sx={{ width: 32, height: 32, borderRadius: 1, bgcolor: `${color}20`,
-            display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <CatIcon name={cat.icon} sx={{ fontSize: 18, color }} />
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <CatIcon name={cat.icon} sx={{ fontSize: 22, color }} />
           </Box>
           <Typography sx={{ color: empty ? "text.disabled" : "text.primary",
             fontSize: 26, fontWeight: 700, lineHeight: 1, ml: "auto" }}>

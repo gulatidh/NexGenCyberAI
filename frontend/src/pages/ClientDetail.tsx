@@ -290,13 +290,8 @@ export default function ClientDetail() {
                   transition: "all .12s ease",
                 }}
               >
-                <Box sx={{
-                  width: 28, height: 28, borderRadius: 1.5,
-                  bgcolor: `${color}22`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                }}>
-                  <Icon sx={{ fontSize: 15, color }} />
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon sx={{ fontSize: 18, color }} />
                 </Box>
                 <Typography
                   variant="body2"

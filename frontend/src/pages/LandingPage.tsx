@@ -1258,12 +1258,7 @@ export default function LandingPage() {
                 }}>
                   {/* Activity */}
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Box sx={{
-                      width: 34, height: 34, borderRadius: 1.5, flexShrink: 0,
-                      background: `${row.color}18`, border: `1px solid ${row.color}30`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: row.color,
-                    }}>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: row.color }}>
                       {row.icon}
                     </Box>
                     <Typography sx={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.85)" }}>

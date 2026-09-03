@@ -1674,10 +1674,7 @@ function GroupPanel({ group, query }: { group: Group; query: string }) {
   return (
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2.5 }}>
-        <Box sx={{
-          width: 38, height: 38, borderRadius: 1.5, bgcolor: `${group.color}18`,
-          display: "flex", alignItems: "center", justifyContent: "center", color: group.color,
-        }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", color: group.color }}>
           {group.icon}
         </Box>
         <Box>
