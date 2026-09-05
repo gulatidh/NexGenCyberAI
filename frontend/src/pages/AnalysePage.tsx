@@ -28,7 +28,7 @@ export const ANALYSE_SECTION: SectionDef = {
     { name: "CVE Blast Radius",       icon: <Radar sx={ic("#F44336")} />,       desc: "Which assets does a CVE affect? Map the full exposure path.",             route: "/discover/cve-pivot",         group: "Vulnerability" },
     { name: "Scan Coverage",          icon: <GpsFixed sx={ic("#FBBC04")} />,    desc: "Assets not scanned within the policy window — identify coverage gaps.",   route: "/discover/coverage",          group: "Vulnerability" },
     // Intelligence
-    { name: "AI Threat Intelligence", icon: <DeviceHub sx={ic("#00BCD4")} />,   desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",     route: "/analyse/threat-models",      group: "Intelligence" },
+    { name: "Threat Model",            icon: <DeviceHub sx={ic("#00BCD4")} />,   desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",     route: "/analyse/threat-models",      group: "Intelligence" },
     { name: "Posture Trends",         icon: <TrendingUp sx={ic("#34A853")} />,  desc: "Time-series charts of open findings and audit readiness score.",          route: "/discover/posture",           group: "Intelligence" },
     { name: "Ask Your Data",          icon: <Search sx={ic("#4285F4")} />,      desc: "Natural language SQL queries over findings, risks, and assets.",          route: "/analyse/nl-query",           group: "Intelligence" },
     { name: "Comparison",             icon: <Assessment sx={ic("#34A853")} />,  desc: "Compare security posture side-by-side across multiple accounts.",         route: "/analyse/comparison",         group: "Intelligence" },
