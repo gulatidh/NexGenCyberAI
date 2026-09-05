@@ -26,9 +26,10 @@ export const REPORT_SECTION: SectionDef = {
     { name: "Executive Summary",    icon: <Summarize sx={ic("#FF6D00")} />,    desc: "Non-technical leadership report — posture score, key risks, and remediation progress.", route: "/report/executive-summary", group: "Audit & Reporting" },
     { name: "Report Scheduler",     icon: <Schedule sx={ic("#607D8B")} />,     desc: "Schedule recurring report delivery to stakeholders via email.",               route: "/report/scheduler",         group: "Audit & Reporting" },
     // Compliance
-    { name: "Framework Library",     icon: <LibraryAdd sx={ic("#3F51B5")} />,  desc: "Browse standard frameworks and manage custom compliance policies.",     route: "/report/frameworks",   group: "Compliance" },
-    { name: "Compliance Evaluation", icon: <BarChart sx={ic("#009688")} />,    desc: "Evaluate posture and run targeted scans against any framework.",        route: "/report/compliance",   group: "Compliance" },
-    { name: "Control Gaps",          icon: <GppBad sx={ic("#EA4335")} />,      desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",          group: "Compliance" },
+    { name: "Framework Library",     icon: <LibraryAdd sx={ic("#3F51B5")} />,  desc: "Browse standard frameworks and manage custom compliance policies.",                route: "/report/frameworks",        group: "Compliance" },
+    { name: "Custom Standards",      icon: <LibraryAdd sx={ic("#009688")} />,  desc: "Build your own control framework from existing platform controls.",               route: "/report/custom-frameworks", group: "Compliance" },
+    { name: "Compliance Evaluation", icon: <BarChart sx={ic("#009688")} />,    desc: "Evaluate posture and run targeted scans against any framework.",                   route: "/report/compliance",        group: "Compliance" },
+    { name: "Control Gaps",          icon: <GppBad sx={ic("#EA4335")} />,      desc: "Framework control deficiencies identified by the compliance monitor.",             route: "/report/gaps",              group: "Compliance" },
   ],
 };
 
