@@ -1,6 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   BugReport, FindInPage, SmartToy, Storage, Devices,
+  Memory, BusinessCenter, UploadFile,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -16,6 +17,10 @@ export const DISCOVER_SECTION: SectionDef = {
     { label: "Total Assets",    field: "total_assets",     color: "#0284c7" },
   ],
   cards: [
+    // Assessment
+    { name: "Inbuilt Scanners",         icon: <Memory sx={ic("#4285F4")} />,          desc: "Platform-native scanners — DAST, SAST, network, container, and secret scanning.", route: "/discover/inbuilt",       group: "Assessment" },
+    { name: "Enterprise Integration",   icon: <BusinessCenter sx={ic("#9C27B0")} />,   desc: "Connect enterprise scanners — Tenable, Burp, Snyk, Rapid7, Qualys, Invicti, Acunetix.", route: "/discover/enterprise",    group: "Assessment" },
+    { name: "Import Result",            icon: <UploadFile sx={ic("#34A853")} />,       desc: "Import external scan results from SARIF, Nessus, Burp, OpenVAS, Qualys, and more.", route: "/discover/import-result", group: "Assessment" },
     // Scanning
     { name: "Assessments",          icon: <BugReport sx={ic("#4285F4")} />,   desc: "Launch scans, manage versions, and import external scan results.",            route: "/discover/scans",        group: "Scanning" },
     { name: "Findings",             icon: <FindInPage sx={ic("#EA4335")} />,  desc: "All findings with severity, CVE enrichment, and remediation status.",         route: "/discover/findings",     group: "Scanning" },

@@ -127,7 +127,10 @@ const MyProfile           = React.lazy(() => import("./pages/MyProfile"));
 const NotificationsCenter = React.lazy(() => import("./pages/NotificationsCenter"));
 const Incidents           = React.lazy(() => import("./pages/Incidents"));
 const RiskAppetite        = React.lazy(() => import("./pages/RiskAppetite"));
-const ScanCoverage        = React.lazy(() => import("./pages/ScanCoverage"));
+const ScanCoverage          = React.lazy(() => import("./pages/ScanCoverage"));
+const InbuiltScannersPage   = React.lazy(() => import("./pages/InbuiltScannersPage"));
+const EnterpriseIntegrationPage = React.lazy(() => import("./pages/EnterpriseIntegrationPage"));
+const ImportResultPage      = React.lazy(() => import("./pages/ImportResultPage"));
 const ExecutiveSummary    = React.lazy(() => import("./pages/ExecutiveSummary"));
 const ReportScheduler     = React.lazy(() => import("./pages/ReportScheduler"));
 const AIUsageCost         = React.lazy(() => import("./pages/AIUsageCost"));
@@ -235,6 +238,9 @@ function ProtectedApp() {
           <Route path="/discover" element={<ProductLayout product={DISCOVER_PRODUCT} />}>
             <Route index element={<DiscoverPage />} />
             <Route path="scans"        element={<Scans />} />
+            <Route path="inbuilt"      element={<InbuiltScannersPage />} />
+            <Route path="enterprise"   element={<EnterpriseIntegrationPage />} />
+            <Route path="import-result" element={<ImportResultPage />} />
             <Route path="findings"     element={<Findings />} />
             <Route path="assets"       element={<Assets />} />
             <Route path="technologies" element={<Technologies />} />

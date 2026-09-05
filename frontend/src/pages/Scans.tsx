@@ -736,7 +736,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
 }
 
 // ── Main Scans page ───────────────────────────────────────────────────────
-export default function Scans() {
+export default function Scans({ initialSection }: { initialSection?: "platform" | "enterprise" | "import" } = {}) {
   const { canAct } = useViewMode();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -762,7 +762,7 @@ export default function Scans() {
   const [acrGitToken, setAcrGitToken] = useState("");
   const [codeArchive, setCodeArchive] = useState<File | null>(null);
   // Top-level section accordion state
-  const [sectionExpanded, setSectionExpanded] = useState<"platform" | "enterprise" | "import" | false>("platform");
+  const [sectionExpanded, setSectionExpanded] = useState<"platform" | "enterprise" | "import" | false>(initialSection ?? "platform");
 
   // Enterprise scanner dialog state
   const [enterpriseDialogOpen, setEnterpriseDialogOpen] = useState(false);
