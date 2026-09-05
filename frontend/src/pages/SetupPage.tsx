@@ -1,7 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  People, Cable, SyncAlt,
-  Shield, DeviceHub, AccountTree,
+  People, Cable, SyncAlt, AccountTree,
   Settings as SettingsIcon, HelpOutlined, ManageSearch,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
@@ -23,9 +22,7 @@ export const SETUP_SECTION: SectionDef = {
     { name: "Integrations",           icon: <Cable sx={ic("#FF6D00")} />,        desc: "Platform connectors, scanners, AI providers, webhooks, and API keys — all in one hub.", route: "/platform/integrations",         group: "Environment" },
     { name: "Ticket Sync",           icon: <SyncAlt sx={ic("#9C27B0")} />,      desc: "Bi-directional sync of findings and remediations with your ticket system.", route: "/platform/ticket-sync",          group: "Environment" },
     // Design
-    { name: "AI Guardrails",         icon: <Shield sx={ic("#FBBC04")} />,       desc: "AI safety controls, prompt audit logs, and guardrail coverage.",           route: "/automate/ai-guardrails",        group: "Design" },
     { name: "Audit Logs",            icon: <ManageSearch sx={ic("#607D8B")} />, desc: "LLM prompt audit trail — per-user, per-endpoint, with CSV export.",          route: "/platform/audit-logs",           group: "Design" },
-    { name: "Threat Models",         icon: <DeviceHub sx={ic("#EA4335")} />,    desc: "DFD diagrams, STRIDE analysis, and Sigma detection rule generation.",      route: "/analyse/threat-models",         group: "Design" },
     { name: "Data Model",            icon: <AccountTree sx={ic("#FF5722")} />,  desc: "Platform ontology — eleven entities, one interactive graph.",              route: "/data-model",                    group: "Design" },
     { name: "Settings",              icon: <SettingsIcon sx={ic("#78909C")} />, desc: "User preferences, deleted accounts, and platform configuration.",          route: "/platform/settings",             group: "Design" },
     { name: "Help",                  icon: <HelpOutlined sx={ic("#4285F4")} />, desc: "Documentation, setup guides, and platform support resources.",             route: "/platform/help",                 group: "Design" },
