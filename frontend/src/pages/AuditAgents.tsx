@@ -269,6 +269,9 @@ function ChipSelector({
 function ControlTesterResults({ result }: { result: Record<string, unknown> }) {
   const summary = (result.summary || {}) as Record<string, unknown>;
   const controls = (result.controls || []) as Record<string, unknown>[];
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  const filtered = activeFilter ? controls.filter((c) => c.verdict === activeFilter) : controls;
 
   return (
     <Box>
@@ -276,11 +279,21 @@ function ControlTesterResults({ result }: { result: Record<string, unknown> }) {
         {["pass", "partial", "fail", "no_data"].map((v) => (
           <Chip
             key={v}
+            onClick={() => setActiveFilter(activeFilter === v ? null : v)}
             label={`${String(summary[v] || 0)} ${v.replace("_", " ")}`}
-            sx={{ bgcolor: `${VERDICT_COLORS[v]}22`, color: VERDICT_COLORS[v], fontWeight: 700 }}
+            sx={{
+              cursor: "pointer",
+              bgcolor: activeFilter === v ? `${VERDICT_COLORS[v]}44` : `${VERDICT_COLORS[v]}22`,
+              color: VERDICT_COLORS[v], fontWeight: 700,
+              border: activeFilter === v ? `1px solid ${VERDICT_COLORS[v]}` : "1px solid transparent",
+            }}
           />
         ))}
         <Chip label={`Total: ${String(summary.total || 0)}`} variant="outlined" />
+        {activeFilter && (
+          <Chip label={`Showing: ${filtered.length}`} size="small" variant="outlined"
+            onDelete={() => setActiveFilter(null)} sx={{ fontSize: 11 }} />
+        )}
       </Box>
       <Box sx={{ overflowX: "auto" }}>
         <Table size="small">
@@ -292,7 +305,7 @@ function ControlTesterResults({ result }: { result: Record<string, unknown> }) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {controls.map((c, i) => {
+            {filtered.map((c, i) => {
               const verdict = String(c.verdict || "no_data");
               return (
                 <TableRow key={i} hover>
@@ -779,7 +792,7 @@ export default function AuditAgents() {
 
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start", flexDirection: { xs: "column", md: "row" } }}>
         {/* Left: agent picker */}
-        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
+        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0, position: { md: "sticky" }, top: { md: 24 }, alignSelf: { md: "flex-start" } }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1, mb: 1.5 }}>
             Select Agent
           </Typography>
@@ -1081,7 +1094,7 @@ export default function AuditAgents() {
                     size="small"
                     sx={{ bgcolor: selectedAgent.color, "&:hover": { bgcolor: selectedAgent.color } }}
                   >
-                    {currentStep?.required === false ? "Skip" : "Next"}
+                    {!currentStep?.required && !inputs[currentStep?.key ?? ""] ? "Skip" : "Next"}
                   </Button>
                 ) : (
                   <Button
