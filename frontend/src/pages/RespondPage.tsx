@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  Radar, GppBad, AccountTree, PlaylistAddCheck, AutoFixHigh, Description, MenuBook, ReportProblem,
+  Radar, GppBad, AccountTree, PlaylistAddCheck, AutoFixHigh, MenuBook, ReportProblem,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -25,8 +25,7 @@ export const RESPOND_SECTION: SectionDef = {
     // Remediation
     { name: "Remediation",          icon: <PlaylistAddCheck sx={ic("#34A853")} />, desc: "Priority-banded remediation actions tracked to completion.",           route: "/respond/remediation",      group: "Remediation" },
     { name: "AI Remediations",      icon: <AutoFixHigh sx={ic("#00BCD4")} />,      desc: "AI-generated remediation plans dispatched as automated workflows.",    route: "/respond/remediation-jobs", group: "Remediation" },
-    { name: "VAPT Reports",         icon: <Description sx={ic("#FBBC04")} />,      desc: "Engagement reports with retest versioning and PDF/DOCX export.",       route: "/respond/vapt-reports",     group: "Remediation" },
-    { name: "Security Docs",        icon: <MenuBook sx={ic("#4285F4")} />,         desc: "Upload security policies and query them with AI via RAG.",             route: "/respond/security-docs",    group: "Remediation" },
+{ name: "Security Docs",        icon: <MenuBook sx={ic("#4285F4")} />,         desc: "Upload security policies and query them with AI via RAG.",             route: "/respond/security-docs",    group: "Remediation" },
   ],
 };
 
