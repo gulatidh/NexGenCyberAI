@@ -6,15 +6,13 @@ import {
   TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
-  Assignment, CheckCircle, ContentCopy, FindInPage, ManageSearch,
+  Assignment, Cable, CheckCircle, ContentCopy, FindInPage, ManageSearch,
   PlayArrow, Psychology, VerifiedUser,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useActiveClient } from "../contexts/ClientContext";
 import { auditAgentsApi, frameworksApi } from "../services/api";
 
-// Standard frameworks always available — no API dependency
-// API returns { framework, name } (FrameworkCatalogEntry shape)
 const STATIC_FRAMEWORKS: { framework: string; name: string; is_custom?: boolean }[] = [
   { framework: "nist_csf",          name: "NIST CSF 2.0" },
   { framework: "nist_800_53",       name: "NIST 800-53" },
@@ -38,7 +36,7 @@ const STATIC_FRAMEWORKS: { framework: string; name: string; is_custom?: boolean 
 
 // ── Agent definitions ──────────────────────────────────────────────────────────
 
-type StepType = "chips" | "framework_select" | "domain_chips" | "free_text";
+type StepType = "chips" | "framework_select" | "domain_chips" | "free_text" | "connector_select" | "scan_select";
 
 interface WizardStep {
   label: string;
@@ -59,6 +57,24 @@ interface AgentDef {
   icon: React.ReactNode;
   steps: WizardStep[];
 }
+
+// Prepended to every agent — connector first, then scan filtered by connector
+const PREAMBLE_STEPS: WizardStep[] = [
+  {
+    label: "Connector",
+    question: "Which connector holds the data to audit?",
+    type: "connector_select",
+    key: "connector_id",
+    required: false,
+  },
+  {
+    label: "Scan",
+    question: "Which scan should the agent use?",
+    type: "scan_select",
+    key: "scan_id",
+    required: false,
+  },
+];
 
 const AGENTS: AgentDef[] = [
   {
@@ -561,6 +577,9 @@ const AGENT_TYPE_LABELS: Record<string, string> = {
   interview_prep: "Interview Prep",
 };
 
+type ConnectorItem = { id: string; name: string; connector_type: string };
+type ScanItem = { id: string; name: string; scan_type: string; created_at: string | null; total: number };
+
 export default function AuditAgents() {
   const { clientId } = useActiveClient();
   const [selectedAgent, setSelectedAgent] = useState<AgentDef | null>(null);
@@ -568,6 +587,10 @@ export default function AuditAgents() {
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [domains, setDomains] = useState<string[]>([]);
   const [domainsLoading, setDomainsLoading] = useState(false);
+  const [connectors, setConnectors] = useState<ConnectorItem[]>([]);
+  const [connectorsLoading, setConnectorsLoading] = useState(false);
+  const [scans, setScans] = useState<ScanItem[]>([]);
+  const [scansLoading, setScansLoading] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [runStatus, setRunStatus] = useState<string | null>(null);
   const [runResult, setRunResult] = useState<Record<string, unknown> | null>(null);
@@ -629,20 +652,54 @@ export default function AuditAgents() {
     }
   }, [clientId]);
 
+  const loadConnectors = useCallback(async () => {
+    if (!clientId) return;
+    setConnectorsLoading(true);
+    try {
+      const d = await auditAgentsApi.connectors(clientId);
+      setConnectors(d.connectors || []);
+    } catch {
+      setConnectors([]);
+    } finally {
+      setConnectorsLoading(false);
+    }
+  }, [clientId]);
+
+  const loadScans = useCallback(async (connectorId: string) => {
+    if (!clientId) return;
+    setScansLoading(true);
+    try {
+      const d = await auditAgentsApi.scansForConnector(clientId, connectorId);
+      setScans(d.scans || []);
+    } catch {
+      setScans([]);
+    } finally {
+      setScansLoading(false);
+    }
+  }, [clientId]);
+
+  // The full step list for the current agent includes the preamble
+  const allSteps: WizardStep[] = selectedAgent
+    ? [...PREAMBLE_STEPS, ...selectedAgent.steps]
+    : [];
+
   const selectAgent = (agent: AgentDef) => {
     setSelectedAgent(agent);
     setStep(0);
     setInputs({});
     setDomains([]);
+    setScans([]);
     setRunId(null);
     setRunStatus(null);
     setRunResult(null);
     setRunError(null);
     setViewingRun(null);
     stopPoll();
+    // Load connectors immediately when agent is selected
+    loadConnectors();
   };
 
-  const currentStep = selectedAgent?.steps[step];
+  const currentStep = allSteps[step];
 
   const getValue = (key: string) => inputs[key] ?? (currentStep?.multi ? [] : "");
 
@@ -657,8 +714,14 @@ export default function AuditAgents() {
 
   const handleNext = () => {
     if (!selectedAgent || !currentStep) return;
-    if (step < selectedAgent.steps.length - 1) {
-      const nextStep = selectedAgent.steps[step + 1];
+    if (step < allSteps.length - 1) {
+      const nextStep = allSteps[step + 1];
+      // When leaving connector_select, load scans for chosen connector
+      if (currentStep.type === "connector_select") {
+        const cid = String(inputs["connector_id"] || "");
+        loadScans(cid);
+      }
+      // When leaving scan_select or a step preceding domain_chips, load domains
       if (nextStep.type === "domain_chips") {
         const fw = String(inputs["framework"] || "");
         if (fw) loadDomains(fw);
@@ -690,17 +753,32 @@ export default function AuditAgents() {
     }
   };
 
-  const isLastStep = selectedAgent ? step === selectedAgent.steps.length - 1 : false;
+  const isLastStep = selectedAgent ? step === allSteps.length - 1 : false;
+
+  // Resolve IDs to names for breadcrumb display
+  const resolveBreadcrumbLabel = (s: WizardStep): string => {
+    const v = inputs[s.key];
+    if (s.type === "connector_select") {
+      const found = connectors.find((c) => c.id === v);
+      return found ? found.name : (v ? String(v) : "— skip —");
+    }
+    if (s.type === "scan_select") {
+      const found = scans.find((sc) => sc.id === v);
+      return found ? (found.name || found.scan_type) : (v ? String(v) : "— skip —");
+    }
+    if (Array.isArray(v)) return v.join(", ");
+    return String(v || "");
+  };
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: "auto" }}>
       <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5 }}>Audit Agents</Typography>
       <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 3 }}>
-        Wizard-driven AI agents for audit preparation — select an agent, answer a few questions, get structured results.
+        Wizard-driven AI agents for audit preparation — select an agent, point it at a connector scan, and get structured results.
       </Typography>
 
       <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start", flexDirection: { xs: "column", md: "row" } }}>
-        {/* Left/Top: agent picker */}
+        {/* Left: agent picker */}
         <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 1, mb: 1.5 }}>
             Select Agent
@@ -769,7 +847,7 @@ export default function AuditAgents() {
 
               {/* Stepper */}
               <Stepper activeStep={step} sx={{ mb: 3 }}>
-                {selectedAgent.steps.map((s, i) => (
+                {allSteps.map((s, i) => (
                   <Step key={s.key} completed={i < step}>
                     <StepLabel>
                       <Typography sx={{ fontSize: 12 }}>{s.label}</Typography>
@@ -781,9 +859,8 @@ export default function AuditAgents() {
               {/* Breadcrumb of completed steps */}
               {step > 0 && (
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 2 }}>
-                  {selectedAgent.steps.slice(0, step).map((s) => {
-                    const v = inputs[s.key];
-                    const label = Array.isArray(v) ? v.join(", ") : String(v || "");
+                  {allSteps.slice(0, step).map((s) => {
+                    const label = resolveBreadcrumbLabel(s);
                     return label ? (
                       <Chip key={s.key} size="small" label={`${s.label}: ${label}`}
                         sx={{ fontSize: 11, bgcolor: `${selectedAgent.color}15`, color: selectedAgent.color }} />
@@ -796,6 +873,116 @@ export default function AuditAgents() {
               {currentStep && (
                 <Box sx={{ mb: 3 }}>
                   <Typography sx={{ fontWeight: 700, fontSize: 15, mb: 1.5 }}>{currentStep.question}</Typography>
+
+                  {currentStep.type === "connector_select" && (
+                    connectorsLoading ? (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>Loading connectors…</Typography>
+                      </Box>
+                    ) : (
+                      <Box>
+                        {connectors.length === 0 ? (
+                          <Alert severity="info" sx={{ mb: 1.5 }}>
+                            No connectors with fetched scan data found. You can skip this step — the agent will use all available findings.
+                          </Alert>
+                        ) : (
+                          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 1 }}>
+                            {connectors.map((c) => {
+                              const active = inputs["connector_id"] === c.id;
+                              return (
+                                <Box
+                                  key={c.id}
+                                  onClick={() => setValue("connector_id", active ? "" : c.id)}
+                                  sx={{
+                                    px: 1.5, py: 1, borderRadius: 1, cursor: "pointer",
+                                    border: "1px solid",
+                                    borderColor: active ? selectedAgent.color : "divider",
+                                    bgcolor: active ? `${selectedAgent.color}18` : "background.paper",
+                                    display: "flex", alignItems: "center", gap: 1,
+                                    userSelect: "none",
+                                    "&:hover": { borderColor: selectedAgent.color },
+                                  }}
+                                >
+                                  <Cable sx={{ fontSize: 16, color: active ? selectedAgent.color : "text.secondary" }} />
+                                  <Box>
+                                    <Typography sx={{ fontSize: 13, fontWeight: active ? 700 : 400, color: active ? selectedAgent.color : "text.primary" }}>
+                                      {c.name}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{c.connector_type}</Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                        {/* Live Fetch placeholder */}
+                        <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1 }}>
+                          <Chip
+                            label="Live Fetch (coming soon)"
+                            size="small"
+                            disabled
+                            sx={{ fontSize: 11, opacity: 0.5 }}
+                          />
+                          <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+                            Future: trigger a live connector fetch before running the agent
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )
+                  )}
+
+                  {currentStep.type === "scan_select" && (
+                    scansLoading ? (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
+                        <CircularProgress size={16} />
+                        <Typography sx={{ fontSize: 13, color: "text.secondary" }}>Loading scans…</Typography>
+                      </Box>
+                    ) : (
+                      <Box>
+                        {scans.length === 0 ? (
+                          <Alert severity="info" sx={{ mb: 1.5 }}>
+                            No completed scans with raw connector data found for this connector. Skip to use all available findings.
+                          </Alert>
+                        ) : (
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mt: 1 }}>
+                            {scans.map((sc) => {
+                              const active = inputs["scan_id"] === sc.id;
+                              return (
+                                <Box
+                                  key={sc.id}
+                                  onClick={() => setValue("scan_id", active ? "" : sc.id)}
+                                  sx={{
+                                    px: 1.5, py: 1, borderRadius: 1, cursor: "pointer",
+                                    border: "1px solid",
+                                    borderColor: active ? selectedAgent.color : "divider",
+                                    bgcolor: active ? `${selectedAgent.color}18` : "background.paper",
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    userSelect: "none",
+                                    "&:hover": { borderColor: selectedAgent.color },
+                                  }}
+                                >
+                                  <Box>
+                                    <Typography sx={{ fontSize: 13, fontWeight: active ? 700 : 400, color: active ? selectedAgent.color : "text.primary" }}>
+                                      {sc.name || sc.scan_type}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: 10, color: "text.secondary" }}>
+                                      {sc.created_at ? new Date(sc.created_at).toLocaleString() : ""}
+                                    </Typography>
+                                  </Box>
+                                  <Chip
+                                    label={`${sc.total} findings`}
+                                    size="small"
+                                    sx={{ fontSize: 10, bgcolor: "rgba(255,255,255,0.06)" }}
+                                  />
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                      </Box>
+                    )
+                  )}
 
                   {currentStep.type === "chips" && (
                     <ChipSelector
@@ -894,7 +1081,7 @@ export default function AuditAgents() {
                     size="small"
                     sx={{ bgcolor: selectedAgent.color, "&:hover": { bgcolor: selectedAgent.color } }}
                   >
-                    Next
+                    {currentStep?.required === false ? "Skip" : "Next"}
                   </Button>
                 ) : (
                   <Button

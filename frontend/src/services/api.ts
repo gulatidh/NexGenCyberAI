@@ -899,4 +899,8 @@ export const auditAgentsApi = {
     apiClient.get(`/clients/${clientId}/audit-agents/runs/${runId}`).then((r) => r.data),
   listRuns: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/audit-agents/runs`).then((r) => r.data),
+  connectors: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/audit-agents/connectors`).then((r) => r.data),
+  scansForConnector: (clientId: string, connectorId: string) =>
+    apiClient.get(`/clients/${clientId}/audit-agents/scans`, { params: { connector_id: connectorId } }).then((r) => r.data),
 };

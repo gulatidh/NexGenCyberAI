@@ -108,12 +108,10 @@ export default function PageDetailLayout({
                 }}
               >
                 <Box sx={{
-                  width: 28, height: 28, borderRadius: 1.5,
-                  bgcolor: `${color}22`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   flexShrink: 0,
                 }}>
-                  <Icon sx={{ fontSize: 15, color }} />
+                  <Icon sx={{ fontSize: 17, color }} />
                 </Box>
                 <Typography variant="body2" sx={{
                   flex: 1, fontSize: 13,

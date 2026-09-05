@@ -803,12 +803,10 @@ export default function AppLayout() {
                         }}
                       >
                         <Box sx={{
-                          width: 26, height: 26, borderRadius: 1.25,
-                          bgcolor: `${sectionColor}22`,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           flexShrink: 0,
                           color: sectionColor,
-                          "& svg": { fontSize: "14px !important" },
+                          "& svg": { fontSize: "16px !important" },
                         }}>
                           {item.icon}
                         </Box>

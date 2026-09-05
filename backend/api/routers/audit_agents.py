@@ -62,16 +62,31 @@ def _get_session(db_url: str) -> Session:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _build_evidence_map(db: Session, client_id: str, framework: str) -> Dict[str, List[str]]:
+def _load_raw_context(db: Session, scan_id: str, max_chars: int = 8000) -> str:
+    """Load raw_context from a scan, truncated to fit in an LLM prompt."""
+    if not scan_id:
+        return ""
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan or not scan.raw_context:
+        return ""
+    raw = scan.raw_context
+    if len(raw) > max_chars:
+        raw = raw[:max_chars] + f"\n... [truncated — full context is {len(scan.raw_context)} chars]"
+    return raw
+
+
+def _build_evidence_map(db: Session, client_id: str, framework: str, scan_id: str = "") -> Dict[str, List[str]]:
     """Maps control_id → list of finding title+severity strings for a given framework."""
     evidence: Dict[str, List[str]] = {}
 
-    findings = (
+    findings_q = (
         db.query(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .filter(Scan.client_id == client_id, Finding.status == "open")
-        .all()
     )
+    if scan_id:
+        findings_q = findings_q.filter(Finding.scan_id == scan_id)
+    findings = findings_q.all()
     for f in findings:
         tag = f"{f.title} [{f.severity}]"
         if f.control_id and str(getattr(f, "framework", "") or "") == framework:
@@ -142,6 +157,7 @@ def _run_control_tester(db: Session, client_id: str, inputs: Dict) -> Dict:
     domains: List[str] = inputs.get("domains", [])
     depth = inputs.get("depth", "Standard (all controls)")
     purpose = inputs.get("assessment_purpose", "Internal Audit")
+    scan_id: str = inputs.get("scan_id", "")
 
     q = db.query(FrameworkControl).filter(FrameworkControl.framework == framework)
     if domains:
@@ -152,7 +168,8 @@ def _run_control_tester(db: Session, client_id: str, inputs: Dict) -> Dict:
         return {"controls": [], "summary": {"total": 0, "pass": 0, "partial": 0, "fail": 0, "no_data": 0,
                                              "framework": framework, "domains_tested": domains, "depth": depth}}
 
-    evidence_map = _build_evidence_map(db, client_id, framework)
+    evidence_map = _build_evidence_map(db, client_id, framework, scan_id)
+    raw_ctx = _load_raw_context(db, scan_id)
     llm = get_llm()
 
     all_results: List[Dict] = []
@@ -174,8 +191,12 @@ def _run_control_tester(db: Session, client_id: str, inputs: Dict) -> Dict:
             f"- evidence_summary: 1 sentence on what evidence exists\n"
             f"- gaps: list of specific gaps (empty list if pass)\n"
             f"- recommendation: 1 actionable sentence\n\n"
-            f"Controls and Evidence:\n{controls_text}\n\n"
-            f"Respond ONLY with a JSON array:\n"
+            f"Controls and Evidence:\n{controls_text}\n"
+        )
+        if raw_ctx:
+            prompt += f"\nRaw connector data from selected scan:\n{raw_ctx}\n"
+        prompt += (
+            f"\nRespond ONLY with a JSON array:\n"
             f'[{{"control_id":"...","verdict":"...","confidence":"...","evidence_summary":"...","gaps":[...],"recommendation":"..."}}]'
         )
         try:
@@ -210,21 +231,25 @@ def _run_readiness_report(db: Session, client_id: str, inputs: Dict) -> Dict:
     domains: List[str] = inputs.get("domains", [])
     timeline = inputs.get("timeline", "3–6 months")
     focus = inputs.get("focus", "All gaps with fixes")
+    scan_id: str = inputs.get("scan_id", "")
 
     q = db.query(FrameworkControl).filter(FrameworkControl.framework == framework)
     if domains:
         q = q.filter(FrameworkControl.domain.in_(domains))
     controls = q.all()
 
-    evidence_map = _build_evidence_map(db, client_id, framework)
-    open_findings = (
+    evidence_map = _build_evidence_map(db, client_id, framework, scan_id)
+    raw_ctx = _load_raw_context(db, scan_id)
+
+    open_findings_q = (
         db.query(Finding)
         .join(Scan, Finding.scan_id == Scan.id)
         .filter(Scan.client_id == client_id, Finding.status == "open")
         .order_by(Finding.severity)
-        .limit(20)
-        .all()
     )
+    if scan_id:
+        open_findings_q = open_findings_q.filter(Finding.scan_id == scan_id)
+    open_findings = open_findings_q.limit(20).all()
 
     domain_data: Dict[str, Dict] = {}
     for c in controls:
@@ -246,8 +271,12 @@ def _run_readiness_report(db: Session, client_id: str, inputs: Dict) -> Dict:
         f"Framework: {framework}\nTimeline: {timeline}\nFocus: {focus}\n"
         f"Domains in scope: {', '.join(domains) or 'All'}\n\n"
         f"Domain data:\n{domain_lines}\n\n"
-        f"Sample open findings: {sample_gaps}\n\n"
-        f"Return JSON:\n"
+        f"Sample open findings: {sample_gaps}\n"
+    )
+    if raw_ctx:
+        prompt += f"\nRaw connector data from selected scan:\n{raw_ctx}\n"
+    prompt += (
+        "\nReturn JSON:\n"
         '{"overall_score":0-100,"overall_assessment":"...","timeline_risk":"low|medium|high",'
         '"domains":[{"domain":"...","score":0-100,"status":"on-track|at-risk|critical",'
         '"passing":N,"failing":N,"gaps":["..."],"quick_wins":["..."]}],'
@@ -272,6 +301,7 @@ def _run_evidence_curator(db: Session, client_id: str, inputs: Dict) -> Dict:
     framework = inputs.get("framework", "")
     date_range = inputs.get("date_range", "Last 90 days")
     severities: List[str] = inputs.get("severities", ["critical", "high"])
+    scan_id: str = inputs.get("scan_id", "")
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=_date_range_days(date_range))
     sevs_lower = [s.lower() for s in severities]
@@ -285,11 +315,14 @@ def _run_evidence_curator(db: Session, client_id: str, inputs: Dict) -> Dict:
             Finding.status.in_(["open", "remediated", "accepted"]),
         )
     )
+    if scan_id:
+        findings_q = findings_q.filter(Finding.scan_id == scan_id)
     try:
         findings_q = findings_q.filter(Finding.created_at >= cutoff)
     except Exception:
         pass
     findings = findings_q.all()
+    raw_ctx = _load_raw_context(db, scan_id)
 
     deficiency_count = db.query(ControlDeficiency).filter(
         ControlDeficiency.client_id == client_id,
@@ -320,8 +353,12 @@ def _run_evidence_curator(db: Session, client_id: str, inputs: Dict) -> Dict:
         f"- Open control deficiencies: {deficiency_count}\n"
         f"- Active remediation actions: {remediation_count}\n"
         f"- Open risks: {risk_count}\n\n"
-        f"Findings by domain/control:\n{domain_lines}\n\n"
-        f"Return JSON:\n"
+        f"Findings by domain/control:\n{domain_lines}\n"
+    )
+    if raw_ctx:
+        prompt += f"\nRaw connector data from selected scan:\n{raw_ctx}\n"
+    prompt += (
+        "\nReturn JSON:\n"
         '{"executive_summary":"...","coverage_score":0-100,"domains":['
         '{"domain":"...","coverage_pct":0-100,"finding_count":N,"remediated_count":N,"open_count":N,'
         '"evidence_strength":"strong|adequate|weak|missing","key_evidence":["..."],"gaps":["..."]}],'
@@ -347,6 +384,7 @@ def _run_interview_prep(db: Session, client_id: str, inputs: Dict) -> Dict:
     framework = inputs.get("framework", "")
     question_type = inputs.get("question_type", "")
     focus_aspect = inputs.get("focus_aspect", "")
+    scan_id: str = inputs.get("scan_id", "")
 
     keywords = _DOMAIN_TOPIC_KEYWORDS.get(domain_topic, [])
     findings_q = (
@@ -355,7 +393,10 @@ def _run_interview_prep(db: Session, client_id: str, inputs: Dict) -> Dict:
         .filter(Scan.client_id == client_id, Finding.status == "open")
         .order_by(Finding.severity)
     )
+    if scan_id:
+        findings_q = findings_q.filter(Finding.scan_id == scan_id)
     all_findings = findings_q.limit(100).all()
+    raw_ctx = _load_raw_context(db, scan_id)
     relevant = [
         f for f in all_findings
         if any(kw in (f.title or "").lower() for kw in keywords)
@@ -383,6 +424,10 @@ def _run_interview_prep(db: Session, client_id: str, inputs: Dict) -> Dict:
         f"Specific focus: {focus_aspect or 'General'}\n\n"
         f"Relevant open findings ({len(relevant)} total):\n{findings_text}\n\n"
         f"Relevant control deficiencies:\n{deficiency_text}\n\n"
+    )
+    if raw_ctx:
+        prompt += f"Raw connector data from selected scan:\n{raw_ctx}\n\n"
+    prompt += (
         f"Return JSON:\n"
         '{"situation_briefing":"...","suggested_response":"...","key_evidence_to_cite":['
         '{"item":"...","where":"...","strength":"strong|adequate|weak"}],'
@@ -410,6 +455,67 @@ class RunRequest(BaseModel):
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
+@router.get("/clients/{client_id}/audit-agents/connectors")
+async def list_audit_connectors(
+    client_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return connectors that have at least one completed scan with raw_context."""
+    from ..models.models import Connector
+    connectors = (
+        db.query(Connector)
+        .join(Scan, Scan.connector_id == Connector.id)
+        .filter(
+            Connector.client_id == client_id,
+            Scan.raw_context.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return {
+        "connectors": [
+            {"id": c.id, "name": c.name, "connector_type": str(c.connector_type)}
+            for c in connectors
+        ]
+    }
+
+
+@router.get("/clients/{client_id}/audit-agents/scans")
+async def list_scans_for_connector(
+    client_id: str,
+    connector_id: str = "",
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return completed scans (with raw_context) for a given connector."""
+    from ..models.models import ScanStatus
+    q = (
+        db.query(Scan)
+        .filter(
+            Scan.client_id == client_id,
+            Scan.raw_context.isnot(None),
+            Scan.status == ScanStatus.COMPLETED,
+        )
+        .order_by(Scan.created_at.desc())
+    )
+    if connector_id:
+        q = q.filter(Scan.connector_id == connector_id)
+    scans = q.limit(50).all()
+    return {
+        "scans": [
+            {
+                "id": s.id,
+                "name": s.name or s.scan_type,
+                "scan_type": str(s.scan_type) if s.scan_type else "",
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "total": (s.summary or {}).get("total", 0),
+            }
+            for s in scans
+        ]
+    }
+
 
 @router.get("/clients/{client_id}/audit-agents/framework-domains")
 async def get_framework_domains(
