@@ -302,6 +302,8 @@ function ProtectedApp() {
             <Route path="/discover/assets/:assetId"        element={<AssetDetail />} />
             <Route path="/respond/vapt-reports/:reportId"  element={<VAPTReportDetail />} />
             <Route path="/report/vapt-reports/:reportId"   element={<VAPTReportDetail />} />
+            <Route path="/platform/settings"               element={<Settings />} />
+            <Route path="/platform/help"                   element={<Help />} />
           </Route>
 
           {/* ── AUTOMATE ─────────────────────────────────────────────────── */}
@@ -334,8 +336,6 @@ function ProtectedApp() {
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
             <Route path="ai-settings"         element={<Navigate to="/platform/integrations" replace />} />
             <Route path="audit-logs"          element={<AuditLogs />} />
-            <Route path="settings"            element={<Settings />} />
-            <Route path="help"                element={<Help />} />
           </Route>
 
           {/* ── Samples ──────────────────────────────────────────────────── */}
