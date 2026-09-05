@@ -462,14 +462,14 @@ async def list_audit_connectors(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return connectors that have at least one completed scan with raw_context."""
-    from ..models.models import Connector
+    """Return all connectors for the client that have at least one completed scan."""
+    from ..models.models import Connector, ScanStatus
     connectors = (
         db.query(Connector)
         .join(Scan, Scan.connector_id == Connector.id)
         .filter(
             Connector.client_id == client_id,
-            Scan.raw_context.isnot(None),
+            Scan.status == ScanStatus.COMPLETED,
         )
         .distinct()
         .all()
@@ -489,13 +489,12 @@ async def list_scans_for_connector(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return completed scans (with raw_context) for a given connector."""
+    """Return completed scans for a given connector."""
     from ..models.models import ScanStatus
     q = (
         db.query(Scan)
         .filter(
             Scan.client_id == client_id,
-            Scan.raw_context.isnot(None),
             Scan.status == ScanStatus.COMPLETED,
         )
         .order_by(Scan.created_at.desc())
@@ -511,6 +510,7 @@ async def list_scans_for_connector(
                 "scan_type": str(s.scan_type) if s.scan_type else "",
                 "created_at": s.created_at.isoformat() if s.created_at else None,
                 "total": (s.summary or {}).get("total", 0),
+                "has_raw_context": bool(s.raw_context),
             }
             for s in scans
         ]

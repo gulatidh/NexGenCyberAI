@@ -591,7 +591,7 @@ const AGENT_TYPE_LABELS: Record<string, string> = {
 };
 
 type ConnectorItem = { id: string; name: string; connector_type: string };
-type ScanItem = { id: string; name: string; scan_type: string; created_at: string | null; total: number };
+type ScanItem = { id: string; name: string; scan_type: string; created_at: string | null; total: number; has_raw_context?: boolean };
 
 export default function AuditAgents() {
   const { clientId } = useActiveClient();
@@ -983,11 +983,17 @@ export default function AuditAgents() {
                                       {sc.created_at ? new Date(sc.created_at).toLocaleString() : ""}
                                     </Typography>
                                   </Box>
-                                  <Chip
-                                    label={`${sc.total} findings`}
-                                    size="small"
-                                    sx={{ fontSize: 10, bgcolor: "rgba(255,255,255,0.06)" }}
-                                  />
+                                  <Box sx={{ display: "flex", gap: 0.75, alignItems: "center" }}>
+                                    {sc.has_raw_context && (
+                                      <Chip label="raw data" size="small"
+                                        sx={{ fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", fontWeight: 600 }} />
+                                    )}
+                                    <Chip
+                                      label={`${sc.total} findings`}
+                                      size="small"
+                                      sx={{ fontSize: 10, bgcolor: "rgba(255,255,255,0.06)" }}
+                                    />
+                                  </Box>
                                 </Box>
                               );
                             })}
