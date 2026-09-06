@@ -1306,19 +1306,19 @@ function GuestTokensTab({ isAdmin }: { isAdmin: boolean }) {
 }
 
 const TABS = [
-  { label: "General",          icon: <SettingsIcon fontSize="small" /> },
-  { label: "What's New",       icon: <NewReleases fontSize="small" /> },
-  { label: "Email",            icon: <MarkEmailRead fontSize="small" /> },
-  { label: "SSO / Identity",   icon: <Security fontSize="small" /> },
-  { label: "AI Providers",     icon: <Psychology fontSize="small" /> },
-  { label: "Webhooks",         icon: <Webhook fontSize="small" /> },
-  { label: "API Keys",         icon: <VpnKey fontSize="small" /> },
-  { label: "Guest Links",      icon: <Shield fontSize="small" />, adminOnly: true },
-  { label: "Data Sync",        icon: <SyncIcon fontSize="small" />, adminOnly: true },
-  { label: "Access Logs",      icon: <History fontSize="small" />, adminOnly: true },
-  { label: "Prompt Logs",      icon: <Psychology fontSize="small" />, adminOnly: true },
-  { label: "Users",            icon: <AdminPanelSettings fontSize="small" />, adminOnly: true },
-  { label: "Deleted Accounts",  icon: <DeleteSweep fontSize="small" />, adminOnly: true },
+  { label: "General",          icon: <SettingsIcon fontSize="small" />,        color: "#4285F4" },
+  { label: "What's New",       icon: <NewReleases fontSize="small" />,         color: "#FBBC04" },
+  { label: "Email",            icon: <MarkEmailRead fontSize="small" />,       color: "#34A853" },
+  { label: "SSO / Identity",   icon: <Security fontSize="small" />,            color: "#EA4335" },
+  { label: "AI Providers",     icon: <Psychology fontSize="small" />,          color: "#9C27B0" },
+  { label: "Webhooks",         icon: <Webhook fontSize="small" />,             color: "#FF6D00" },
+  { label: "API Keys",         icon: <VpnKey fontSize="small" />,              color: "#607D8B" },
+  { label: "Guest Links",      icon: <Shield fontSize="small" />,              color: "#00BCD4", adminOnly: true },
+  { label: "Data Sync",        icon: <SyncIcon fontSize="small" />,            color: "#2196F3", adminOnly: true },
+  { label: "Access Logs",      icon: <History fontSize="small" />,             color: "#795548", adminOnly: true },
+  { label: "Prompt Logs",      icon: <Psychology fontSize="small" />,          color: "#9C27B0", adminOnly: true },
+  { label: "Users",            icon: <AdminPanelSettings fontSize="small" />,  color: "#F06292", adminOnly: true },
+  { label: "Deleted Accounts", icon: <DeleteSweep fontSize="small" />,         color: "#9E9E9E", adminOnly: true },
 ];
 
 export default function Settings() {
@@ -1358,7 +1358,7 @@ export default function Settings() {
               key={t.label}
               label={
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  {t.icon}
+                  <Box sx={{ color: t.color, display: "flex", flexShrink: 0 }}>{t.icon}</Box>
                   <span>{t.label}</span>
                   {t.adminOnly && !isAdmin && (
                     <Chip label="Admin" size="small" sx={{ fontSize: 9, height: 16, ml: 0.5, opacity: 0.6 }} />

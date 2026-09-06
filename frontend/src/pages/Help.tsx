@@ -1775,7 +1775,7 @@ export default function Help() {
               key={g.id}
               label={
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
-                  <Box sx={{ color: tab === i ? g.color : "text.secondary", display: "flex" }}>
+                  <Box sx={{ color: g.color, display: "flex" }}>
                     {g.icon}
                   </Box>
                   <Box component="span" sx={{ flexGrow: 1 }}>{g.navLabel}</Box>
