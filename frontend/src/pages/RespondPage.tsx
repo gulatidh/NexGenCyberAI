@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  Radar, AccountTree, PlaylistAddCheck, AutoFixHigh, ReportProblem, DeviceHub,
+  Radar, AccountTree, PlaylistAddCheck, AutoFixHigh, ReportProblem,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -20,7 +20,6 @@ export const RESPOND_SECTION: SectionDef = {
     { name: "Incidents",            icon: <ReportProblem sx={ic("#F44336")} />,    desc: "Security incident cases with timelines, owners, SLA tracking, and linked findings.", route: "/respond/incidents", group: "Incidents" },
     // Threat Intelligence
     { name: "Threat Register",      icon: <Radar sx={ic("#EA4335")} />,            desc: "MITRE ATT&CK–mapped threat entries and IOCs from AI analysis.",        route: "/respond/threats",          group: "Threat Intelligence" },
-    { name: "Threat Model",         icon: <DeviceHub sx={ic("#00BCD4")} />,        desc: "DFD diagrams, STRIDE threats, and Sigma detection rule generation.",    route: "/analyse/threat-models",    group: "Threat Intelligence" },
     { name: "CTEM Programs",        icon: <AccountTree sx={ic("#9C27B0")} />,      desc: "5-phase continuous threat exposure management programs.",               route: "/respond/ctem",             group: "Threat Intelligence" },
     // Remediation
     { name: "Remediation",          icon: <PlaylistAddCheck sx={ic("#34A853")} />, desc: "Priority-banded remediation actions tracked to completion.",           route: "/respond/remediation",      group: "Remediation" },
