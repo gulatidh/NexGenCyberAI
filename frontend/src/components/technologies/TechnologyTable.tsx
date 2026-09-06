@@ -99,7 +99,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
         return (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 110 }}>
             <LinearProgress variant="determinate" value={row.organization_usage_pct}
-              sx={{ flex: 1, height: 5, borderRadius: 2, bgcolor: "rgba(255,255,255,0.06)",
+              sx={{ flex: 1, height: 5, borderRadius: 2, bgcolor: "action.selected",
                 "& .MuiLinearProgress-bar": { bgcolor: "#4285F4", borderRadius: 2 } }} />
             <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 10, minWidth: 28 }}>
               {row.organization_usage_pct}%
@@ -124,7 +124,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
         return (
           <Box sx={{ display: "flex", gap: 0.25, flexWrap: "wrap" }}>
             {(row.environments || []).slice(0, 3).map((e) => (
-              <Chip key={e} label={e} size="small" sx={{ bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary", fontSize: 9, height: 16 }} />
+              <Chip key={e} label={e} size="small" sx={{ bgcolor: "action.selected", color: "text.secondary", fontSize: 9, height: 16 }} />
             ))}
           </Box>
         );
@@ -171,7 +171,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
         </Menu>
 
         {loading ? (
-          <Skeleton variant="rectangular" height={420} sx={{ borderRadius: 1, bgcolor: "rgba(255,255,255,0.04)" }} />
+          <Skeleton variant="rectangular" height={420} sx={{ borderRadius: 1 }} />
         ) : (
           <>
             <TableContainer sx={{ maxHeight: 540 }}>
@@ -181,7 +181,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
                     {visibleColumnDefs.map((c) => (
                       <TableCell key={c.key} align={c.numeric ? "right" : "left"}>
                         <TableSortLabel active={sortKey === c.key} direction={sortDir} onClick={() => setSort(c.key)}
-                          sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>
+                          sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>
                           {c.label.toUpperCase()}
                         </TableSortLabel>
                       </TableCell>
@@ -198,7 +198,7 @@ export default function TechnologyTable({ data, loading, onRowClick }: Props) {
                       onClick={() => onRowClick?.(row)}
                       sx={{ cursor: onRowClick ? "pointer" : "default",
                         "& td": { color: "text.primary", fontSize: 12, borderColor: "divider", py: 0.75 },
-                        "&:hover": { bgcolor: "rgba(255,255,255,0.03)" } }}>
+                        "&:hover": { bgcolor: "action.hover" } }}>
                       {visibleColumnDefs.map((c) => (
                         <TableCell key={c.key} align={c.numeric ? "right" : "left"}>{renderCell(row, c.key)}</TableCell>
                       ))}
