@@ -373,3 +373,110 @@ async def list_entity_records(
                             "detail": rm.band or "", "entity": "remediation"})
 
     return {"items": results}
+
+
+# ── /detail — full fields for a single record ─────────────────────────────────
+
+@router.get("/detail")
+async def get_entity_detail(
+    client_id: str,
+    entity_type: str = Query(...),
+    entity_id: str = Query(...),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return full fields for a single entity record for the drill-down panel."""
+
+    def _fmt_date(dt):
+        try:
+            return dt.strftime("%Y-%m-%d") if dt else ""
+        except Exception:
+            return str(dt) if dt else ""
+
+    if entity_type == "finding":
+        f = (
+            db.query(Finding)
+            .join(Scan, Scan.id == Finding.scan_id)
+            .filter(Finding.id == entity_id, Scan.client_id == client_id)
+            .first()
+        )
+        if not f:
+            return {"error": "not found"}
+        sev = f.severity.value if hasattr(f.severity, "value") else (f.severity or "")
+        st = f.status.value if hasattr(f.status, "value") else (f.status or "")
+        fields = {
+            "severity": sev,
+            "status": st,
+            "resource": f.resource_id or "",
+            "resource_type": f.resource_type or "",
+            "cve": f.cve_id or "",
+            "cvss": str(f.cvss_score) if f.cvss_score else "",
+            "framework": f.framework or "",
+            "control": f.control_id or "",
+            "assignee": f.assignee_email or "",
+            "due_date": str(f.due_date) if f.due_date else "",
+            "created": _fmt_date(getattr(f, "created_at", None)),
+            "description": (f.description or "")[:300],
+        }
+        return {"entity": "finding", "id": f.id, "label": f.title,
+                "fields": {k: v for k, v in fields.items() if v}}
+
+    elif entity_type == "risk":
+        r = db.query(Risk).filter(Risk.id == entity_id, Risk.client_id == client_id).first()
+        if not r:
+            return {"error": "not found"}
+        lvl = r.risk_level.value if hasattr(r.risk_level, "value") else (r.risk_level or "")
+        fields = {
+            "level": lvl,
+            "status": r.status or "",
+            "category": r.category or "",
+            "ale": f"${r.risk_score:,.1f}" if r.risk_score else "",
+            "likelihood": str(r.likelihood) if r.likelihood else "",
+            "consequence": str(r.consequence) if r.consequence else "",
+            "treatment": r.treatment_option or "",
+            "assignee": r.assignee_email or "",
+            "created": _fmt_date(r.created_at),
+            "description": (r.description or "")[:300],
+        }
+        return {"entity": "risk", "id": r.id, "label": r.title,
+                "fields": {k: v for k, v in fields.items() if v}}
+
+    elif entity_type == "asset":
+        a = db.query(Asset).filter(Asset.id == entity_id, Asset.client_id == client_id).first()
+        if not a:
+            return {"error": "not found"}
+        fields = {
+            "class": a.asset_class or "",
+            "type": a.asset_type or "",
+            "region": a.region or "",
+            "status": a.status.value if hasattr(a.status, "value") else (str(a.status) if a.status else ""),
+            "external_id": a.external_id or "",
+            "first_seen": _fmt_date(a.first_seen_at),
+            "last_synced": _fmt_date(a.last_synced_at),
+        }
+        return {"entity": "asset", "id": a.id, "label": a.name,
+                "fields": {k: v for k, v in fields.items() if v}}
+
+    elif entity_type == "remediation":
+        rm = db.query(RemediationAction).filter(
+            RemediationAction.id == entity_id,
+            RemediationAction.client_id == client_id
+        ).first()
+        if not rm:
+            return {"error": "not found"}
+        fields = {
+            "priority": str(rm.priority) if rm.priority else "",
+            "band": rm.band or "",
+            "effort": rm.effort or "",
+            "impact": rm.impact or "",
+            "status": rm.status or "",
+            "assignee": rm.assigned_to or "",
+            "due_date": _fmt_date(rm.due_date),
+            "created": _fmt_date(rm.created_at),
+            "description": (rm.action or "")[:300],
+        }
+        return {"entity": "remediation", "id": rm.id,
+                "label": rm.title or (rm.action or "")[:60],
+                "fields": {k: v for k, v in fields.items() if v}}
+
+    return {"error": "unsupported entity type"}

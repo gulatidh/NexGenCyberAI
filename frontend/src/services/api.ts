@@ -838,6 +838,10 @@ export const dataModelApi = {
     api.get(`/clients/${clientId}/data-model/list`, {
       params: { entity_type: entityType, ...(search ? { search } : {}), ...(limit ? { limit } : {}) },
     }).then(r => r.data),
+  detail: (clientId: string, entityType: string, entityId: string) =>
+    api.get(`/clients/${clientId}/data-model/detail`, {
+      params: { entity_type: entityType, entity_id: entityId },
+    }).then(r => r.data),
 };
 
 export const remediationJobsApi = {

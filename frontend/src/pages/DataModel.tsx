@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import {
   Search, Close, OpenInNew, SmartToy, Download,
-  ArrowForward, WarningAmber, Storage, Key,
+  ArrowForward, ArrowBack, WarningAmber, Storage, Key,
 } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { dataModelApi, dbBrowserApi, usersApi } from "../services/api";
@@ -43,6 +43,11 @@ interface SubNode {
 interface AnchorRecord {
   id: string; label: string; entityKey: string; detail?: string;
 }
+
+type DrillLevel =
+  | { kind: "entity"; entityKey: string }
+  | { kind: "record"; entityKey: string; recordId: string; recordLabel: string; recordDetail?: string }
+  | { kind: "sublist"; entityKey: string; records: SubNode[]; fromLabel: string };
 
 const ONT_NODES: ONode[] = [
   { entity:"Client",      label:"Client",             cx: 70,  cy:300, labelX: 35,   labelW: 70,  color:"#2563eb" },
@@ -455,6 +460,11 @@ export default function DataModel() {
   const [pathNodes, setPathNodes]         = useState<Set<string>>(new Set());
   const [pathEdgeIdxs, setPathEdgeIdxs]   = useState<Set<number>>(new Set());
 
+  // Drill-down panel state
+  const [drillStack, setDrillStack] = useState<DrillLevel[]>([]);
+  const [drillSearch, setDrillSearch] = useState("");
+  const [drillListLimit, setDrillListLimit] = useState(20);
+
   const edgeCol  = isDark ? "#3a4250" : "#c3c9d4";
   const raisedBg = isDark ? "#141b25" : "#f2f4f8";
   const lineBdr  = isDark ? "#232b36" : "#e6e9ef";
@@ -501,6 +511,28 @@ export default function DataModel() {
         : Promise.resolve(null),
     enabled: !!clientId && !!anchor,
     staleTime: 60_000,
+  });
+
+  const drillTop = drillStack[drillStack.length - 1] ?? null;
+
+  const { data: drillListData, isLoading: drillListLoading } = useQuery({
+    queryKey: ["dm-drill-list", clientId, drillTop?.kind === "entity" ? drillTop.entityKey : null, drillSearch, drillListLimit],
+    queryFn: () =>
+      clientId && drillTop?.kind === "entity"
+        ? dataModelApi.list(clientId, drillTop.entityKey, drillSearch || undefined, drillListLimit)
+        : Promise.resolve({ items: [] }),
+    enabled: !!clientId && drillTop?.kind === "entity",
+    staleTime: 30_000,
+  });
+
+  const { data: drillDetailData, isLoading: drillDetailLoading } = useQuery({
+    queryKey: ["dm-drill-detail", clientId, drillTop?.kind === "record" ? drillTop.recordId : null],
+    queryFn: () =>
+      clientId && drillTop?.kind === "record"
+        ? dataModelApi.detail(clientId, drillTop.entityKey, drillTop.recordId)
+        : Promise.resolve(null),
+    enabled: !!clientId && drillTop?.kind === "record",
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -581,7 +613,13 @@ export default function DataModel() {
 
     const key = TO_KEY[entityName];
     if (!anchor) {
-      if (LISTABLE.has(key)) setListKey(k => k === key ? null : key);
+      if (LISTABLE.has(key)) {
+        if (drillStack[0]?.kind === "entity" && drillStack[0].entityKey === key && drillStack.length === 1) {
+          clearDrill();
+        } else {
+          pushEntity(key);
+        }
+      }
       return;
     }
     if (key && key === anchor.entityKey) { clearAll(); return; }
@@ -617,6 +655,55 @@ export default function DataModel() {
   function clearAll() {
     setAnchor(null); setExpanded(new Set()); setConnByKey({}); setListKey(null);
     setPathStart(null); setPathNodes(new Set()); setPathEdgeIdxs(new Set());
+  }
+
+  function pushEntity(entityKey: string) {
+    setDrillStack([{ kind: "entity", entityKey }]);
+    setDrillSearch("");
+    setDrillListLimit(20);
+    setListKey(entityKey);
+    setAnchor(null);
+    setExpanded(new Set());
+    setConnByKey({});
+  }
+
+  function pushRecord(entityKey: string, recordId: string, recordLabel: string, recordDetail?: string) {
+    setDrillStack(prev => {
+      const last = prev[prev.length - 1];
+      if (last?.kind === "record" && last.recordId === recordId) return prev;
+      return [...prev, { kind: "record", entityKey, recordId, recordLabel, recordDetail }];
+    });
+    setAnchor({ id: recordId, label: recordLabel, entityKey, detail: recordDetail });
+    setExpanded(new Set());
+    setConnByKey({});
+    setListKey(null);
+  }
+
+  function pushSublist(entityKey: string, records: SubNode[], fromLabel: string) {
+    setDrillStack(prev => [...prev, { kind: "sublist", entityKey, records, fromLabel }]);
+  }
+
+  function drillBack() {
+    setDrillStack(prev => {
+      const next = prev.slice(0, -1);
+      const newTop = next[next.length - 1];
+      if (newTop?.kind === "record") {
+        setAnchor({ id: newTop.recordId, label: newTop.recordLabel, entityKey: newTop.entityKey, detail: newTop.recordDetail });
+        setExpanded(new Set()); setConnByKey({});
+      } else {
+        setAnchor(null); setExpanded(new Set()); setConnByKey({});
+        if (newTop?.kind === "entity") setListKey(newTop.entityKey);
+        else setListKey(null);
+      }
+      return next;
+    });
+  }
+
+  function clearDrill() {
+    setDrillStack([]);
+    setDrillSearch("");
+    setDrillListLimit(20);
+    clearAll();
   }
 
   // Feature 5: export CSV from list data
@@ -782,18 +869,7 @@ export default function DataModel() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const showList   = !anchor && !!listKey;
-  const showAnchor = !!anchor;
-  const showPanel  = showList || showAnchor;
-  const anchorColor = ONT_NODES.find(n => TO_KEY[n.entity] === anchor?.entityKey)?.color ?? "#6b7280";
-
-  // Feature 3: blast radius — downstream types and gap detection
-  const blastTypes = Object.entries(connByKey).map(([ent, nodes]) => ({
-    ent, count: nodes.length,
-    color: ONT_NODES.find(n => TO_KEY[n.entity] === ent)?.color ?? "#6b7280",
-  }));
-  const expectedDown = anchor ? (EXPECTED_DOWNSTREAM[anchor.entityKey] ?? []) : [];
-  const missingTypes = expectedDown.filter(t => !connByKey[t]?.length);
+  // (old showList/showAnchor/showPanel replaced by drillStack)
 
   return (
     <Box sx={{display:"flex", flexDirection:"column", gap:2.5}}>
@@ -916,167 +992,332 @@ export default function DataModel() {
           </Box>
         </Box>
 
-        {/* ── Right panel ── */}
-        {showPanel && (
-          <Box sx={{
-            width:270, flexShrink:0,
-            border:"1px solid", borderColor:"divider",
-            borderRadius:2, bgcolor:"background.paper",
-            display:"flex", flexDirection:"column",
-            maxHeight:640, overflow:"hidden",
-          }}>
+        {/* ── DrillPanel ── */}
+        {drillStack.length > 0 && (() => {
+          const _topKey = drillTop?.kind === "entity" ? drillTop.entityKey :
+            drillTop?.kind === "record" ? drillTop.entityKey :
+            drillTop?.kind === "sublist" ? drillTop.entityKey : "";
+          void _topKey; // used only for entityColor below
+          return (
+            <Box sx={{
+              width: 280, flexShrink: 0,
+              border: "1px solid", borderColor: "divider",
+              borderRadius: 2, bgcolor: "background.paper",
+              display: "flex", flexDirection: "column",
+              maxHeight: 640, overflow: "hidden",
+            }}>
 
-            {/* LIST PANEL */}
-            {showList && (
-              <>
-                <Box sx={{p:1.5, borderBottom:"1px solid", borderColor:"divider",
-                  display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-                  <Box sx={{display:"flex", alignItems:"center", gap:1}}>
-                    <Box sx={{width:8, height:8, borderRadius:"50%",
-                      bgcolor: ONT_NODES.find(n=>TO_KEY[n.entity]===listKey)?.color ?? "#6b7280"}}/>
-                    <Typography sx={{fontSize:13, fontWeight:700, textTransform:"capitalize"}}>
-                      Select {listKey}
-                    </Typography>
-                  </Box>
-                  <IconButton size="small" onClick={() => setListKey(null)}><Close fontSize="small"/></IconButton>
-                </Box>
-                <Box sx={{p:1.25}}>
-                  <TextField size="small" fullWidth placeholder="Search…"
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    slotProps={{input:{startAdornment:
-                      <InputAdornment position="start"><Search sx={{fontSize:15}}/></InputAdornment>
-                    }}}
-                    sx={{"& .MuiInputBase-root":{fontSize:12}}}
-                  />
-                </Box>
-                <Box sx={{flex:1, overflow:"auto"}}>
-                  {listLoading
-                    ? <Box sx={{display:"flex",justifyContent:"center",py:3}}><CircularProgress size={20}/></Box>
-                    : (listData?.items ?? []).length === 0
-                      ? <Typography sx={{fontSize:12, color:"text.disabled", textAlign:"center", py:3}}>No records found</Typography>
-                      : <List dense disablePadding>
-                          {(listData?.items ?? []).map((item: {id:string; label:string; detail?:string}) => (
-                            <ListItemButton key={item.id} onClick={() => handleSelectRecord(item)} sx={{py:0.75, px:1.5}}>
-                              <ListItemText
-                                primary={<Typography sx={{fontSize:12, fontWeight:500, lineHeight:1.3}}>{item.label}</Typography>}
-                                secondary={item.detail
-                                  ? <Typography sx={{fontSize:10, color:"text.disabled"}}>{item.detail}</Typography>
-                                  : undefined}
-                              />
-                            </ListItemButton>
-                          ))}
-                        </List>
-                  }
-                </Box>
-              </>
-            )}
-
-            {/* ANCHOR PANEL */}
-            {showAnchor && (
-              <>
-                <Box sx={{p:1.5, borderBottom:"1px solid", borderColor:"divider"}}>
-                  <Box sx={{display:"flex", alignItems:"center", justifyContent:"space-between", mb:0.75}}>
-                    <Chip label={anchor!.entityKey} size="small" sx={{
-                      fontSize:10, height:18, textTransform:"capitalize",
-                      bgcolor: alpha(anchorColor, 0.12), color: anchorColor,
-                    }}/>
-                    <IconButton size="small" onClick={clearAll}><Close fontSize="small"/></IconButton>
-                  </Box>
-                  <Typography sx={{fontSize:13, fontWeight:700, lineHeight:1.3}}>{anchor!.label}</Typography>
-                  {anchor!.detail && (
-                    <Typography sx={{fontSize:11, color:"text.secondary", mt:0.25}}>{anchor!.detail}</Typography>
-                  )}
-                </Box>
-
-                {/* Feature 3: Blast radius summary */}
-                {(blastTypes.length > 0 || connLoading) && (
-                  <Box sx={{px:1.5, py:1, borderBottom:"1px solid", borderColor:"divider"}}>
-                    <Typography sx={{
-                      fontSize:10, color:"text.secondary", mb:0.75,
-                      textTransform:"uppercase", letterSpacing:"0.05em", fontWeight:600,
-                    }}>
-                      Blast Radius
-                    </Typography>
-                    {connLoading
-                      ? <CircularProgress size={14}/>
-                      : (
-                        <Box sx={{display:"flex", flexWrap:"wrap", gap:0.5}}>
-                          {blastTypes.map(({ent, color, count}) => (
-                            <Box key={ent} sx={{
-                              display:"flex", alignItems:"center", gap:0.4,
-                              px:0.9, py:0.25, borderRadius:"12px",
-                              bgcolor: alpha(color, 0.1), border:"1px solid", borderColor: alpha(color, 0.25),
-                            }}>
-                              <ArrowForward sx={{fontSize:9, color}}/>
-                              <Typography sx={{fontSize:10, color, fontWeight:700}}>{count}</Typography>
-                              <Typography sx={{fontSize:10, color:"text.secondary"}}>{ent}</Typography>
-                            </Box>
-                          ))}
-                          {missingTypes.map(ent => (
-                            <Box key={`gap-${ent}`} sx={{
-                              display:"flex", alignItems:"center", gap:0.4,
-                              px:0.9, py:0.25, borderRadius:"12px",
-                              bgcolor: alpha("#6b7280", 0.06), border:"1px solid", borderColor: alpha("#6b7280", 0.2),
-                            }}>
-                              <WarningAmber sx={{fontSize:9, color:"text.disabled"}}/>
-                              <Typography sx={{fontSize:10, color:"text.disabled"}}>0 {ent}</Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      )
-                    }
-                  </Box>
+              {/* Breadcrumb header */}
+              <Box sx={{
+                p: 1.25, borderBottom: "1px solid", borderColor: "divider",
+                display: "flex", alignItems: "center", gap: 0.5, minHeight: 44,
+              }}>
+                {drillStack.length > 1 && (
+                  <IconButton size="small" onClick={drillBack} sx={{ flexShrink: 0, mr: 0.25 }}>
+                    <ArrowBack sx={{ fontSize: 15 }} />
+                  </IconButton>
                 )}
-
-                <Box sx={{p:1.5, flex:1, overflow:"auto"}}>
-                  <Typography sx={{
-                    fontSize:10, color:"text.secondary", mb:1,
-                    textTransform:"uppercase", letterSpacing:"0.05em",
-                  }}>
-                    Connections
-                  </Typography>
-
-                  {connLoading && <CircularProgress size={16}/>}
-
-                  {!connLoading && Object.keys(connByKey).length === 0 && (
-                    <Typography sx={{fontSize:12, color:"text.disabled"}}>No connections found</Typography>
-                  )}
-
-                  {Object.entries(connByKey).map(([ent, nodes]) => {
-                    const color = ONT_NODES.find(n => TO_KEY[n.entity] === ent)?.color ?? "#6b7280";
-                    const primName = KEY_TO_NODE[ent];
-                    const isExp = primName ? expanded.has(primName) : false;
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.4, flex: 1, overflow: "hidden" }}>
+                  {drillStack.map((lvl, i) => {
+                    const isLast = i === drillStack.length - 1;
+                    const lvlKey = lvl.entityKey;
+                    const lvlColor = ONT_NODES.find(n => TO_KEY[n.entity] === lvlKey)?.color ?? "#6b7280";
+                    const lvlLabel = lvl.kind === "entity"
+                      ? lvl.entityKey
+                      : lvl.kind === "record"
+                        ? (lvl.recordLabel.length > 12 ? lvl.recordLabel.slice(0, 10) + "…" : lvl.recordLabel)
+                        : `${lvl.records.length} ${lvl.entityKey}`;
                     return (
-                      <Box key={ent}
-                        onClick={() => { if (primName) handleNodeClick(primName, {shiftKey:false} as React.MouseEvent); }}
-                        sx={{
-                          display:"flex", alignItems:"center", justifyContent:"space-between",
-                          py:0.75, px:1, mb:0.5, borderRadius:1, cursor:"pointer",
-                          bgcolor: isExp ? alpha(color, 0.1) : "action.hover",
-                          "&:hover": {bgcolor: alpha(color, 0.14)},
-                          border:"1px solid", borderColor: isExp ? alpha(color, 0.35) : "transparent",
-                        }}
-                      >
-                        <Box sx={{display:"flex", alignItems:"center", gap:1}}>
-                          <Box sx={{width:8, height:8, borderRadius:"50%", bgcolor:color}}/>
-                          <Typography sx={{fontSize:12, textTransform:"capitalize"}}>{ent}</Typography>
-                        </Box>
-                        <Box sx={{display:"flex", alignItems:"center", gap:0.75}}>
-                          <Typography sx={{fontSize:12, fontWeight:700}}>{nodes.length}</Typography>
-                          <Typography sx={{fontSize:10, color:"text.secondary"}}>{isExp?"▾":"▸"}</Typography>
-                        </Box>
+                      <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
+                        {i > 0 && <Typography sx={{ fontSize: 9, color: "text.disabled", flexShrink: 0 }}>›</Typography>}
+                        <Typography
+                          onClick={!isLast ? () => {
+                            const next = drillStack.slice(0, i + 1);
+                            const newTop = next[next.length - 1];
+                            setDrillStack(next);
+                            if (newTop.kind === "record") {
+                              setAnchor({ id: newTop.recordId, label: newTop.recordLabel, entityKey: newTop.entityKey, detail: newTop.recordDetail });
+                              setExpanded(new Set()); setConnByKey({});
+                            } else {
+                              setAnchor(null); setExpanded(new Set()); setConnByKey({});
+                              if (newTop.kind === "entity") setListKey(newTop.entityKey);
+                            }
+                          } : undefined}
+                          sx={{
+                            fontSize: 11, fontWeight: isLast ? 700 : 400,
+                            color: isLast ? lvlColor : "text.secondary",
+                            cursor: isLast ? "default" : "pointer",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            flexShrink: i < drillStack.length - 1 ? 0 : 1,
+                            "&:hover": !isLast ? { textDecoration: "underline" } : {},
+                          }}
+                        >
+                          {lvlLabel}
+                        </Typography>
                       </Box>
                     );
                   })}
-
-                  <Typography sx={{fontSize:10, color:"text.disabled", mt:2, lineHeight:1.6}}>
-                    Click a row (or graph node) to sprout records. Click a sub-node to pivot.
-                  </Typography>
                 </Box>
-              </>
-            )}
-          </Box>
-        )}
+                <IconButton size="small" onClick={clearDrill} sx={{ flexShrink: 0, ml: 0.25 }}>
+                  <Close sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Box>
+
+              {/* ENTITY LEVEL */}
+              {drillTop?.kind === "entity" && (() => {
+                const ek = drillTop.entityKey;
+                const stat = statsData?.[ek];
+                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
+                const items: any[] = (drillListData as any)?.items ?? [];
+                return (
+                  <>
+                    {stat && (
+                      <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                        <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mb: 0.75 }}>
+                          <Typography sx={{ fontSize: 24, fontWeight: 800, color: ec, lineHeight: 1 }}>{stat.total}</Typography>
+                          <Typography sx={{ fontSize: 11, color: "text.secondary" }}>total {ek}s</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {Object.entries(stat.breakdown ?? {})
+                            .filter(([, v]) => (v as number) > 0)
+                            .map(([k, v]) => {
+                              const bc = SEV_COLOR[k] ?? ec;
+                              return (
+                                <Box key={k} sx={{
+                                  display: "flex", alignItems: "center", gap: 0.4, px: 0.75, py: 0.2,
+                                  borderRadius: "10px", bgcolor: alpha(bc, 0.1), border: `1px solid ${alpha(bc, 0.25)}`,
+                                }}>
+                                  <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: bc }} />
+                                  <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{k}</Typography>
+                                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: bc }}>{String(v)}</Typography>
+                                </Box>
+                              );
+                            })}
+                        </Box>
+                      </Box>
+                    )}
+                    <Box sx={{ px: 1, py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
+                      <TextField
+                        size="small" fullWidth placeholder={`Search ${ek}s…`}
+                        value={drillSearch} onChange={e => { setDrillSearch(e.target.value); setDrillListLimit(20); }}
+                        slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 14 }} /></InputAdornment> } }}
+                        sx={{ "& .MuiInputBase-root": { fontSize: 12 } }}
+                      />
+                    </Box>
+                    <Box sx={{ flex: 1, overflow: "auto" }}>
+                      {drillListLoading
+                        ? <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
+                        : items.length === 0
+                          ? <Typography sx={{ fontSize: 12, color: "text.disabled", textAlign: "center", py: 3 }}>
+                              {drillSearch ? "No matches" : `No ${ek}s found`}
+                            </Typography>
+                          : (
+                            <List dense disablePadding>
+                              {items.map((item: any) => {
+                                const sc = item.detail ? SEV_COLOR[item.detail] : undefined;
+                                return (
+                                  <ListItemButton key={item.id} onClick={() => pushRecord(ek, item.id, item.label, item.detail)} sx={{ py: 0.75, px: 1.5 }}>
+                                    <Box sx={{ width: "100%", display: "flex", alignItems: "center", gap: 0.75 }}>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {item.label}
+                                        </Typography>
+                                      </Box>
+                                      {item.detail && (
+                                        <Chip label={item.detail} size="small" sx={{
+                                          fontSize: 9, height: 16, flexShrink: 0,
+                                          bgcolor: sc ? alpha(sc, 0.1) : "action.selected",
+                                          color: sc ?? "text.secondary",
+                                        }} />
+                                      )}
+                                    </Box>
+                                  </ListItemButton>
+                                );
+                              })}
+                              {items.length >= drillListLimit && (
+                                <Box sx={{ p: 1.25, textAlign: "center" }}>
+                                  <Typography
+                                    sx={{ fontSize: 11, color: ec, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                                    onClick={() => setDrillListLimit(l => l + 20)}
+                                  >
+                                    Load more
+                                  </Typography>
+                                </Box>
+                              )}
+                            </List>
+                          )
+                      }
+                    </Box>
+                  </>
+                );
+              })()}
+
+              {/* RECORD LEVEL */}
+              {drillTop?.kind === "record" && (() => {
+                const ek = drillTop.entityKey;
+                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
+                const fields: Record<string, string> = (drillDetailData as any)?.fields ?? {};
+                const connTypes = Object.entries(connByKey).filter(([, nodes]) => nodes.length > 0);
+                const sevColor = drillTop.recordDetail ? SEV_COLOR[drillTop.recordDetail] : undefined;
+                return (
+                  <>
+                    <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: ec }} />
+                        <Typography sx={{ fontSize: 10, color: ec, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{ek}</Typography>
+                        {sevColor && drillTop.recordDetail && (
+                          <Chip label={drillTop.recordDetail} size="small" sx={{
+                            fontSize: 9, height: 16, ml: "auto",
+                            bgcolor: alpha(sevColor, 0.1), color: sevColor,
+                          }} />
+                        )}
+                      </Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{drillTop.recordLabel}</Typography>
+                    </Box>
+
+                    <Box sx={{ flex: 1, overflow: "auto" }}>
+                      {drillDetailLoading ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
+                      ) : (
+                        <Box sx={{ px: 1.5, py: 1 }}>
+                          <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
+                            Fields
+                          </Typography>
+                          {Object.entries(fields)
+                            .filter(([, v]) => v && String(v).trim())
+                            .map(([k, v]) => {
+                              const isDesc = k === "description";
+                              const isColored = k === "severity" || k === "level";
+                              const fc = isColored ? SEV_COLOR[String(v)] : undefined;
+                              return (
+                                <Box key={k} sx={{ mb: isDesc ? 1.25 : 0 }}>
+                                  {isDesc ? (
+                                    <Box sx={{ mb: 0.5, mt: 0.75 }}>
+                                      <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.4 }}>
+                                        Description
+                                      </Typography>
+                                      <Typography sx={{ fontSize: 11, color: "text.secondary", lineHeight: 1.5 }}>
+                                        {String(v).slice(0, 220)}{String(v).length > 220 ? "…" : ""}
+                                      </Typography>
+                                    </Box>
+                                  ) : (
+                                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 0.5, borderBottom: "1px solid", borderColor: "divider" }}>
+                                      <Typography sx={{ fontSize: 10.5, color: "text.secondary", textTransform: "capitalize" }}>
+                                        {k.replace(/_/g, " ")}
+                                      </Typography>
+                                      {fc ? (
+                                        <Chip label={String(v)} size="small" sx={{ fontSize: 9, height: 16, bgcolor: alpha(fc, 0.1), color: fc }} />
+                                      ) : (
+                                        <Typography sx={{ fontSize: 10.5, fontWeight: 500, textAlign: "right", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {String(v)}
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  )}
+                                </Box>
+                              );
+                            })}
+                        </Box>
+                      )}
+
+                      {(connLoading || connTypes.length > 0) && (
+                        <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
+                          <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
+                            Linked entities
+                          </Typography>
+                          {connLoading ? <CircularProgress size={14} /> : (
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                              {connTypes.map(([ent, nodes]) => {
+                                const cc = ONT_NODES.find(n => TO_KEY[n.entity] === ent)?.color ?? "#6b7280";
+                                return (
+                                  <Box
+                                    key={ent}
+                                    onClick={() => pushSublist(ent, nodes, drillTop.recordLabel)}
+                                    sx={{
+                                      display: "flex", alignItems: "center", gap: 0.4,
+                                      px: 0.9, py: 0.35, borderRadius: "12px", cursor: "pointer",
+                                      bgcolor: alpha(cc, 0.08), border: `1px solid ${alpha(cc, 0.25)}`,
+                                      "&:hover": { bgcolor: alpha(cc, 0.18) },
+                                      transition: "background-color .12s",
+                                    }}
+                                  >
+                                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: cc }}>{nodes.length}</Typography>
+                                    <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{ent}</Typography>
+                                    <ArrowForward sx={{ fontSize: 9, color: "text.disabled" }} />
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+
+                    <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider", display: "flex", gap: 1.5, alignItems: "center" }}>
+                      <Typography
+                        sx={{ fontSize: 11, color: ec, cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
+                        onClick={() => { const route = ONT_ROUTES[KEY_TO_NODE[ek]]; if (route) navigate(route); }}
+                      >
+                        View all <OpenInNew sx={{ fontSize: 11 }} />
+                      </Typography>
+                      {AGENT_NODES.has(KEY_TO_NODE[ek]) && (
+                        <Typography
+                          sx={{ fontSize: 11, color: "#9C27B0", cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
+                          onClick={() => navigate("/automate/agents")}
+                        >
+                          <SmartToy sx={{ fontSize: 11 }} /> Agent
+                        </Typography>
+                      )}
+                    </Box>
+                  </>
+                );
+              })()}
+
+              {/* SUBLIST LEVEL */}
+              {drillTop?.kind === "sublist" && (() => {
+                const ek = drillTop.entityKey;
+                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
+                return (
+                  <>
+                    <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                      <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                        <Box component="span" sx={{ fontWeight: 700, color: ec }}>{drillTop.records.length}</Box>
+                        {" "}{ek}{drillTop.records.length !== 1 ? "s" : ""} linked from{" "}
+                        <Box component="em" sx={{ color: "text.primary" }}>
+                          {drillTop.fromLabel.length > 22 ? drillTop.fromLabel.slice(0, 20) + "…" : drillTop.fromLabel}
+                        </Box>
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, overflow: "auto" }}>
+                      <List dense disablePadding>
+                        {drillTop.records.map(sn => {
+                          const sc = sn.severity ? SEV_COLOR[sn.severity] : undefined;
+                          const rawId = sn.id.includes("-") ? sn.id.split("-").slice(1).join("-") : sn.id;
+                          return (
+                            <ListItemButton key={sn.id} onClick={() => pushRecord(ek, rawId, sn.label, sn.severity ?? undefined)} sx={{ py: 0.75, px: 1.5 }}>
+                              <Box sx={{ width: "100%" }}>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.75 }}>
+                                  <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {sn.label}
+                                  </Typography>
+                                  {sc && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: sc, flexShrink: 0 }} />}
+                                </Box>
+                                {sn.detail && (
+                                  <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{sn.detail}</Typography>
+                                )}
+                              </Box>
+                            </ListItemButton>
+                          );
+                        })}
+                      </List>
+                    </Box>
+                  </>
+                );
+              })()}
+
+            </Box>
+          );
+        })()}
       </Box>
 
       {/* Feature 4: Hover preview tooltip */}
@@ -1134,7 +1375,7 @@ export default function DataModel() {
                   </>
                 )}
                 <Typography sx={{fontSize:9, color:"text.disabled", mt:0.75}}>
-                  Right-click for actions · Shift+click to trace path
+                  Click to drill · Shift+click path · Right-click actions
                 </Typography>
               </>
             );
