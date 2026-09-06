@@ -297,7 +297,7 @@ export default function Assets() {
           <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
             <Chip label={`All: ${displayedAssets.length}`} size="small" clickable
               onClick={() => setAssetClass("")}
-              sx={{ bgcolor: assetClass ? "rgba(255,255,255,0.05)" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass ? "none" : "1px solid #4285F4" }} />
+              sx={{ bgcolor: assetClass ? "action.selected" : "rgba(66,133,244,0.2)", color: "text.primary", border: assetClass ? "none" : "1px solid #4285F4" }} />
             {ASSET_CLASSES.filter((c) => classCounts[c]).map((c) => (
               <Chip key={c} label={`${c.charAt(0).toUpperCase() + c.slice(1)}: ${classCounts[c]}`} size="small" clickable
                 onClick={() => setAssetClass(assetClass === c ? "" : c)}
@@ -375,7 +375,7 @@ export default function Assets() {
           <CircularProgress sx={{ color: "#4285F4" }} />
         </Box>
       ) : displayedAssets.length === 0 ? (
-        <Card sx={{ bgcolor: "background.paper", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: 2, p: 6, textAlign: "center" }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px dashed", borderColor: "divider", borderRadius: 2, p: 6, textAlign: "center" }}>
           <Storage sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
           <Typography sx={{ color: "text.secondary" }}>
             {activeTab === "active" && "No active assets. Click Sync Now to pull inventory from your connectors."}
@@ -385,7 +385,7 @@ export default function Assets() {
           </Typography>
         </Card>
       ) : (
-        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -402,40 +402,40 @@ export default function Assets() {
                     </TableCell>
                   )}
                   <TableCell><TableSortLabel active={sortKey === "name"} direction={sortDir} onClick={() => setSort("name")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>NAME</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>NAME</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "asset_type"} direction={sortDir} onClick={() => setSort("asset_type")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>TYPE</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>TYPE</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "asset_class"} direction={sortDir} onClick={() => setSort("asset_class")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CLASS</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>CLASS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "subscription_id"} direction={sortDir} onClick={() => setSort("subscription_id")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SUBSCRIPTION / ACCOUNT</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>SUBSCRIPTION / ACCOUNT</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "resource_group"} direction={sortDir} onClick={() => setSort("resource_group")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>RESOURCE GROUP / REGION</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>RESOURCE GROUP / REGION</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "open_findings_count"} direction={sortDir} onClick={() => setSort("open_findings_count")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SEVERITY</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>SEVERITY</TableSortLabel></TableCell>
                   <TableCell align="right"><TableSortLabel active={sortKey === "cve_count"} direction={sortDir} onClick={() => setSort("cve_count")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>CVEs</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>CVEs</TableSortLabel></TableCell>
                   <TableCell align="right"><TableSortLabel active={sortKey === "risks_count"} direction={sortDir} onClick={() => setSort("risks_count")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>RISKS</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>RISKS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "status"} direction={sortDir} onClick={() => setSort("status")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>STATUS</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>STATUS</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "last_scan_date"} direction={sortDir} onClick={() => setSort("last_scan_date")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>LAST SCAN</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>LAST SCAN</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "last_synced_at"} direction={sortDir} onClick={() => setSort("last_synced_at")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important" }}>SYNCED</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary" }}>SYNCED</TableSortLabel></TableCell>
                   <TableCell><TableSortLabel active={sortKey === "risk_score"} direction={sortDir} onClick={() => setSort("risk_score")}
-                    sx={{ color: "rgba(255,255,255,0.5) !important", "& .MuiTableSortLabel-icon": { color: "rgba(255,255,255,0.5) !important" } }}>RISK SCORE</TableSortLabel></TableCell>
+                    sx={{ color: "text.secondary", "& .MuiTableSortLabel-icon": { color: "text.secondary" } }}>RISK SCORE</TableSortLabel></TableCell>
                   <TableCell align="right">ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {sortedAssets.map((a) => {
                   const klass = a.asset_class || "other";
-                  const riskColor = a.risks_count > 0 ? "#ff9800" : "rgba(255,255,255,0.3)";
+                  const riskColor = a.risks_count > 0 ? "#ff9800" : "text.disabled";
                   const isSelected = selectedIds.includes(a.id);
                   return (
                     <TableRow key={a.id}
-                      sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
+                      sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" },
                         "& td": { borderColor: "divider", py: 1 },
                         ...(isSelected ? { bgcolor: "rgba(0,230,118,0.05)" } : {}),
                       }}
@@ -487,11 +487,11 @@ export default function Assets() {
                             );
                           })}
                           {a.open_findings_count === 0 && (
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.2)" }}>—</Typography>
+                            <Typography variant="caption" sx={{ color: "text.disabled" }}>—</Typography>
                           )}
                         </Box>
                       </TableCell>
-                      <TableCell align="right" sx={{ color: (a.cve_count ?? 0) > 0 ? "#4285F4" : "rgba(255,255,255,0.2)", fontWeight: 600, fontSize: 13 }}>
+                      <TableCell align="right" sx={{ color: (a.cve_count ?? 0) > 0 ? "#4285F4" : "text.disabled", fontWeight: 600, fontSize: 13 }}>
                         {(a.cve_count ?? 0) > 0 ? a.cve_count : "—"}
                       </TableCell>
                       <TableCell align="right" sx={{ color: riskColor, fontWeight: 600 }}>
