@@ -76,6 +76,7 @@ const ComplianceEvaluation = React.lazy(() => import("./pages/ComplianceEvaluati
 const RiskOverviewPage  = React.lazy(() => import("./pages/RiskOverview"));
 const Projects          = React.lazy(() => import("./pages/Projects"));
 const Technologies      = React.lazy(() => import("./pages/Technologies"));
+const TechnologyRegistry = React.lazy(() => import("./pages/TechnologyRegistry"));
 const Admin             = React.lazy(() => import("./pages/Admin"));
 const SyncPage          = React.lazy(() => import("./pages/Sync"));
 const Help              = React.lazy(() => import("./pages/Help"));
@@ -244,6 +245,7 @@ function ProtectedApp() {
             <Route path="findings"     element={<Findings />} />
             <Route path="assets"       element={<Assets />} />
             <Route path="technologies" element={<Technologies />} />
+            <Route path="technologies/registry" element={<TechnologyRegistry />} />
             <Route path="posture"      element={<PostureTrends />} />
             <Route path="ai-scan"      element={<AIAssistedScan />} />
             <Route path="cve-pivot"    element={<CVEPivot />} />

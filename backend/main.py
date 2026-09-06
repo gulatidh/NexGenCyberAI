@@ -844,6 +844,22 @@ def _ensure_added_columns() -> None:
         except Exception as exc:
             logger.warning("Risk-to-proposal migration failed: %s", exc)
 
+        # assets.override_class — user-set technology type override
+        try:
+            asset_cols = {c["name"] for c in inspector.get_columns("assets")}
+        except Exception:
+            asset_cols = set()
+        if asset_cols and "override_class" not in asset_cols:
+            ddl = ("ALTER TABLE assets ADD override_class NVARCHAR(64) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE assets ADD COLUMN override_class VARCHAR(64)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added assets.override_class column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("assets.override_class ALTER failed: %s", exc)
+
         # Orphan cleanup — raw scanner rows whose assessment_import was deleted
         try:
             _raw_tables = [
@@ -1954,6 +1970,123 @@ def _backfill_finding_asset_ids() -> None:
         logger.warning("_backfill_finding_asset_ids failed: %s", exc)
 
 
+def _seed_technology_types() -> None:
+    """Seed built-in TechnologyType taxonomy rows on first boot (idempotent)."""
+    from api.models.models import TechnologyType, AssetTypeMapping
+    from db.database import SessionLocal
+    _BUILTIN = [
+        # (name, category, sub_category, color, description)
+        ("Virtual Machine",     "Compute",      "IaaS",             "#2563eb", "Cloud-hosted virtual servers"),
+        ("Container",           "Compute",      "Container",        "#7c3aed", "Docker/OCI containerised workloads"),
+        ("Serverless Function", "Compute",      "Serverless",       "#0891b2", "FaaS — Lambda, Azure Functions"),
+        ("Web Application",     "Application",  "Web App",          "#059669", "HTTP-served web apps and SaaS"),
+        ("API Service",         "Application",  "API",              "#d97706", "REST/gRPC back-end services"),
+        ("Database",            "Storage",      "Database",         "#dc2626", "Relational and NoSQL databases"),
+        ("Object Storage",      "Storage",      "Blob / S3",        "#6d28d9", "S3, Azure Blob, GCS buckets"),
+        ("File Share",          "Storage",      "NFS / SMB",        "#92400e", "Shared network file systems"),
+        ("Secret Manager",      "Security",     "Secrets",          "#b45309", "Vaults for keys/secrets/certs"),
+        ("Firewall / WAF",      "Network",      "Firewall",         "#1e40af", "Perimeter and web application firewalls"),
+        ("Load Balancer",       "Network",      "Load Balancer",    "#0369a1", "Traffic distribution and L4/L7 routing"),
+        ("VPN / Gateway",       "Network",      "VPN",              "#065f46", "Site-to-site and point-to-site tunnels"),
+        ("DNS Service",         "Network",      "DNS",              "#1d4ed8", "Domain name resolution services"),
+        ("CDN",                 "Network",      "CDN",              "#0f766e", "Content delivery networks"),
+        ("Identity Provider",   "Identity",     "IdP",              "#7e22ce", "SSO, Entra ID, Okta, Google Workspace"),
+        ("Managed Identity",    "Identity",     "Managed Identity", "#9333ea", "Azure MI / AWS IAM roles / workload identity"),
+        ("Policy / Governance", "Security",     "Policy",           "#374151", "Cloud policy definitions and assignments"),
+        ("Endpoint",            "Compute",      "Endpoint",         "#0f172a", "Laptops, workstations, mobile devices"),
+        ("IoT Device",          "Compute",      "IoT",              "#78350f", "Sensors, edge devices, embedded systems"),
+        ("Other",               "Other",        None,               "#6b7280", "Uncategorised or custom resource types"),
+    ]
+    # Provider-type → TechnologyType name mappings (auto-seeded)
+    _MAPPINGS = [
+        ("microsoft.compute/virtualmachines",            "Virtual Machine"),
+        ("microsoft.compute/virtualmachinescalesets",    "Virtual Machine"),
+        ("microsoft.containerservice/managedclusters",   "Container"),
+        ("microsoft.app/containerapps",                  "Container"),
+        ("microsoft.web/sites",                          "Web Application"),
+        ("microsoft.web/functions",                      "Serverless Function"),
+        ("microsoft.logic/workflows",                    "Serverless Function"),
+        ("microsoft.keyvault/vaults",                    "Secret Manager"),
+        ("microsoft.storage/storageaccounts",            "Object Storage"),
+        ("microsoft.sql/servers/databases",              "Database"),
+        ("microsoft.dbforpostgresql/flexibleservers",    "Database"),
+        ("microsoft.dbformysql/flexibleservers",         "Database"),
+        ("microsoft.cosmosdb/databaseaccounts",          "Database"),
+        ("microsoft.network/applicationgateways",        "Firewall / WAF"),
+        ("microsoft.network/firewalls",                  "Firewall / WAF"),
+        ("microsoft.network/loadbalancers",              "Load Balancer"),
+        ("microsoft.network/dnszones",                   "DNS Service"),
+        ("microsoft.network/virtualnetworkgateways",     "VPN / Gateway"),
+        ("microsoft.cdn/profiles",                       "CDN"),
+        ("microsoft.apimanagement/service",              "API Service"),
+        ("microsoft.servicebus/namespaces",              "API Service"),
+        ("microsoft.eventhub/namespaces",                "API Service"),
+        ("microsoft.authorization/policyassignments",    "Policy / Governance"),
+        ("microsoft.authorization/policydefinitions",    "Policy / Governance"),
+        ("microsoft.managedidentity/userassignedidentities", "Managed Identity"),
+        # AWS equivalents
+        ("aws::ec2::instance",                           "Virtual Machine"),
+        ("aws::lambda::function",                        "Serverless Function"),
+        ("aws::s3::bucket",                              "Object Storage"),
+        ("aws::rds::dbinstance",                         "Database"),
+        ("aws::secretsmanager::secret",                  "Secret Manager"),
+        ("aws::wafv2::webacl",                           "Firewall / WAF"),
+        ("aws::elasticloadbalancingv2::loadbalancer",    "Load Balancer"),
+        ("aws::route53::hostedzone",                     "DNS Service"),
+        ("aws::cloudfront::distribution",                "CDN"),
+        ("aws::apigateway::restapi",                     "API Service"),
+        ("aws::iam::role",                               "Managed Identity"),
+        # Generic class names from sync.py _asset_class
+        ("vm",          "Virtual Machine"),
+        ("storage",     "Object Storage"),
+        ("database",    "Database"),
+        ("network",     "Firewall / WAF"),
+        ("identity",    "Identity Provider"),
+        ("keyvault",    "Secret Manager"),
+        ("application", "Web Application"),
+        ("endpoint",    "Endpoint"),
+        ("policy",      "Policy / Governance"),
+    ]
+    try:
+        db = SessionLocal()
+        try:
+            existing = db.query(TechnologyType).filter(TechnologyType.is_builtin == True).count()
+            if existing >= len(_BUILTIN):
+                return
+            name_to_id: dict[str, str] = {}
+            for name, cat, sub, color, desc in _BUILTIN:
+                tt = db.query(TechnologyType).filter(TechnologyType.name == name).first()
+                if not tt:
+                    import uuid as _uuid_mod
+                    tt = TechnologyType(
+                        id=str(_uuid_mod.uuid4()),
+                        name=name, category=cat, sub_category=sub,
+                        color=color, description=desc, is_builtin=True,
+                    )
+                    db.add(tt)
+                    db.flush()
+                name_to_id[name] = tt.id
+            for provider_type, tech_name in _MAPPINGS:
+                if tech_name not in name_to_id:
+                    continue
+                exists = db.query(AssetTypeMapping).filter(
+                    AssetTypeMapping.provider_type == provider_type.lower()
+                ).first()
+                if not exists:
+                    import uuid as _uuid_mod
+                    db.add(AssetTypeMapping(
+                        id=str(_uuid_mod.uuid4()),
+                        provider_type=provider_type.lower(),
+                        technology_type_id=name_to_id[tech_name],
+                    ))
+            db.commit()
+            logger.info("Seeded %d built-in technology types + %d mappings", len(_BUILTIN), len(_MAPPINGS))
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("_seed_technology_types failed: %s", exc)
+
+
 _ensure_added_columns()
 _ensure_projects_schema()
 _backfill_finding_asset_ids()
@@ -1968,6 +2101,7 @@ _bootstrap_initial_admin()
 _fail_stale_threat_models()
 _fail_stale_scans()
 _prune_access_logs()
+_seed_technology_types()
 
 app = FastAPI(
     title="NexGenCyberAI API",
@@ -2198,6 +2332,13 @@ if scan_import_router is not None:
 
 if ai_review_router is not None:
     app.include_router(ai_review_router, prefix="/api/v1")
+
+try:
+    from api.routers import technology_registry as _technology_registry
+    app.include_router(_technology_registry.router, prefix="/api/v1")
+    logger.info("technology_registry router loaded")
+except Exception as _e:
+    logger.warning("technology_registry router not loaded: %s", _e)
 
 try:
     from api.routers import db_browser as _db_browser

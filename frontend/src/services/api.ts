@@ -908,3 +908,24 @@ export const auditAgentsApi = {
   scansForConnector: (clientId: string, connectorId: string) =>
     apiClient.get(`/clients/${clientId}/audit-agents/scans`, { params: { connector_id: connectorId } }).then((r) => r.data),
 };
+
+export const technologyRegistryApi = {
+  listTypes: (clientId?: string) =>
+    apiClient.get("/technology-types/", { params: clientId ? { client_id: clientId } : {} }).then((r) => r.data),
+  createType: (body: { name: string; category?: string; sub_category?: string; color?: string; description?: string }) =>
+    apiClient.post("/technology-types/", body).then((r) => r.data),
+  updateType: (id: string, body: Partial<{ name: string; category: string; sub_category: string; color: string; description: string }>) =>
+    apiClient.patch(`/technology-types/${id}`, body).then((r) => r.data),
+  deleteType: (id: string) =>
+    apiClient.delete(`/technology-types/${id}`).then((r) => r.data),
+
+  listMappings: () =>
+    apiClient.get("/asset-type-mappings/").then((r) => r.data),
+  upsertMapping: (body: { provider_type: string; technology_type_id: string }) =>
+    apiClient.post("/asset-type-mappings/", body).then((r) => r.data),
+  deleteMapping: (id: string) =>
+    apiClient.delete(`/asset-type-mappings/${id}`).then((r) => r.data),
+
+  overrideClass: (clientId: string, assetId: string, overrideClass: string | null) =>
+    apiClient.patch(`/clients/${clientId}/assets/${assetId}/override-class`, { override_class: overrideClass }).then((r) => r.data),
+};

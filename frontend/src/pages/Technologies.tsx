@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Box, Typography, Grid, FormControl, InputLabel, Select, MenuItem, Alert, Button, CircularProgress } from "@mui/material";
-import { Refresh } from "@mui/icons-material";
+import { Refresh, Tune as TuneIcon } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { fmt } from "../utils/datetime";
 
 import { projectsApi, technologiesApi } from "../services/api";
@@ -23,6 +24,7 @@ const EMPTY_FILTERS: FilterState = {
 
 export default function Technologies() {
   const { clientId } = useActiveClient();
+  const navigate = useNavigate();
   const [projectId, setProjectId] = useState("");
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<TechnologyRow | null>(null);
@@ -81,6 +83,11 @@ export default function Technologies() {
             onClick={() => refetch()} disabled={isFetching}
             sx={{ color: "text.secondary", borderColor: "divider" }} variant="outlined">
             Refresh
+          </Button>
+          <Button size="small" startIcon={<TuneIcon />}
+            onClick={() => navigate("registry")}
+            sx={{ color: "text.secondary", borderColor: "divider" }} variant="outlined">
+            Configure Registry
           </Button>
         </Box>
       </Box>

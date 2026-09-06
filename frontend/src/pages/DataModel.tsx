@@ -481,15 +481,7 @@ export default function DataModel() {
     staleTime: 60_000,
   });
 
-  const { data: listData, isLoading: listLoading } = useQuery({
-    queryKey: ["dm-list", clientId, listKey, search],
-    queryFn: () =>
-      clientId && listKey
-        ? dataModelApi.list(clientId, listKey, search || undefined)
-        : Promise.resolve({ items: [] }),
-    enabled: !!clientId && !!listKey && !anchor,
-    staleTime: 30_000,
-  });
+  // listData query removed — list now driven by drillListData (drillStack panel)
 
   // Feature 4: preview data for hover tooltip (limit=3)
   const hoveredKey = hovered ? TO_KEY[hovered] : null;
@@ -867,9 +859,19 @@ export default function DataModel() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render helpers (pre-computed so JSX avoids IIFEs) ─────────────────────
 
-  // (old showList/showAnchor/showPanel replaced by drillStack)
+  const dpEk = drillTop ? drillTop.entityKey : "";
+  const dpEc = dpEk ? (ONT_NODES.find(n => TO_KEY[n.entity] === dpEk)?.color ?? "#6b7280") : "#6b7280";
+  const dpStat = (dpEk && statsData) ? statsData[dpEk] : null;
+  const dpItems: any[] = (drillListData as any)?.items ?? [];
+  const dpFields: Record<string, string> = (drillDetailData as any)?.fields ?? {};
+  const dpConnTypes = Object.entries(connByKey).filter(([, nodes]) => (nodes as SubNode[]).length > 0);
+  const dpRecDetail = drillTop?.kind === "record" ? drillTop.recordDetail : undefined;
+  const dpRecSevColor = dpRecDetail ? SEV_COLOR[dpRecDetail] : undefined;
+  const dpRecLabel = drillTop?.kind === "record" ? drillTop.recordLabel : "";
+  const dpSubRecords: SubNode[] = drillTop?.kind === "sublist" ? drillTop.records : [];
+  const dpSubFrom = drillTop?.kind === "sublist" ? drillTop.fromLabel : "";
 
   return (
     <Box sx={{display:"flex", flexDirection:"column", gap:2.5}}>
@@ -993,331 +995,308 @@ export default function DataModel() {
         </Box>
 
         {/* ── DrillPanel ── */}
-        {drillStack.length > 0 && (() => {
-          const _topKey = drillTop?.kind === "entity" ? drillTop.entityKey :
-            drillTop?.kind === "record" ? drillTop.entityKey :
-            drillTop?.kind === "sublist" ? drillTop.entityKey : "";
-          void _topKey; // used only for entityColor below
-          return (
+        {drillStack.length > 0 && drillTop != null && (
+          <Box sx={{
+            width: 280, flexShrink: 0,
+            border: "1px solid", borderColor: "divider",
+            borderRadius: 2, bgcolor: "background.paper",
+            display: "flex", flexDirection: "column",
+            maxHeight: 640, overflow: "hidden",
+          }}>
+
+            {/* Breadcrumb header */}
             <Box sx={{
-              width: 280, flexShrink: 0,
-              border: "1px solid", borderColor: "divider",
-              borderRadius: 2, bgcolor: "background.paper",
-              display: "flex", flexDirection: "column",
-              maxHeight: 640, overflow: "hidden",
+              p: 1.25, borderBottom: "1px solid", borderColor: "divider",
+              display: "flex", alignItems: "center", gap: 0.5, minHeight: 44,
             }}>
-
-              {/* Breadcrumb header */}
-              <Box sx={{
-                p: 1.25, borderBottom: "1px solid", borderColor: "divider",
-                display: "flex", alignItems: "center", gap: 0.5, minHeight: 44,
-              }}>
-                {drillStack.length > 1 && (
-                  <IconButton size="small" onClick={drillBack} sx={{ flexShrink: 0, mr: 0.25 }}>
-                    <ArrowBack sx={{ fontSize: 15 }} />
-                  </IconButton>
-                )}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.4, flex: 1, overflow: "hidden" }}>
-                  {drillStack.map((lvl, i) => {
-                    const isLast = i === drillStack.length - 1;
-                    const lvlKey = lvl.entityKey;
-                    const lvlColor = ONT_NODES.find(n => TO_KEY[n.entity] === lvlKey)?.color ?? "#6b7280";
-                    const lvlLabel = lvl.kind === "entity"
-                      ? lvl.entityKey
-                      : lvl.kind === "record"
-                        ? (lvl.recordLabel.length > 12 ? lvl.recordLabel.slice(0, 10) + "…" : lvl.recordLabel)
-                        : `${lvl.records.length} ${lvl.entityKey}`;
-                    return (
-                      <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
-                        {i > 0 && <Typography sx={{ fontSize: 9, color: "text.disabled", flexShrink: 0 }}>›</Typography>}
-                        <Typography
-                          onClick={!isLast ? () => {
-                            const next = drillStack.slice(0, i + 1);
-                            const newTop = next[next.length - 1];
-                            setDrillStack(next);
-                            if (newTop.kind === "record") {
-                              setAnchor({ id: newTop.recordId, label: newTop.recordLabel, entityKey: newTop.entityKey, detail: newTop.recordDetail });
-                              setExpanded(new Set()); setConnByKey({});
-                            } else {
-                              setAnchor(null); setExpanded(new Set()); setConnByKey({});
-                              if (newTop.kind === "entity") setListKey(newTop.entityKey);
-                            }
-                          } : undefined}
-                          sx={{
-                            fontSize: 11, fontWeight: isLast ? 700 : 400,
-                            color: isLast ? lvlColor : "text.secondary",
-                            cursor: isLast ? "default" : "pointer",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            flexShrink: i < drillStack.length - 1 ? 0 : 1,
-                            "&:hover": !isLast ? { textDecoration: "underline" } : {},
-                          }}
-                        >
-                          {lvlLabel}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-                </Box>
-                <IconButton size="small" onClick={clearDrill} sx={{ flexShrink: 0, ml: 0.25 }}>
-                  <Close sx={{ fontSize: 15 }} />
+              {drillStack.length > 1 && (
+                <IconButton size="small" onClick={drillBack} sx={{ flexShrink: 0, mr: 0.25 }}>
+                  <ArrowBack sx={{ fontSize: 15 }} />
                 </IconButton>
-              </Box>
-
-              {/* ENTITY LEVEL */}
-              {drillTop?.kind === "entity" && (() => {
-                const ek = drillTop.entityKey;
-                const stat = statsData?.[ek];
-                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
-                const items: any[] = (drillListData as any)?.items ?? [];
-                return (
-                  <>
-                    {stat && (
-                      <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-                        <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mb: 0.75 }}>
-                          <Typography sx={{ fontSize: 24, fontWeight: 800, color: ec, lineHeight: 1 }}>{stat.total}</Typography>
-                          <Typography sx={{ fontSize: 11, color: "text.secondary" }}>total {ek}s</Typography>
-                        </Box>
-                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                          {Object.entries(stat.breakdown ?? {})
-                            .filter(([, v]) => (v as number) > 0)
-                            .map(([k, v]) => {
-                              const bc = SEV_COLOR[k] ?? ec;
-                              return (
-                                <Box key={k} sx={{
-                                  display: "flex", alignItems: "center", gap: 0.4, px: 0.75, py: 0.2,
-                                  borderRadius: "10px", bgcolor: alpha(bc, 0.1), border: `1px solid ${alpha(bc, 0.25)}`,
-                                }}>
-                                  <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: bc }} />
-                                  <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{k}</Typography>
-                                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: bc }}>{String(v)}</Typography>
-                                </Box>
-                              );
-                            })}
-                        </Box>
-                      </Box>
-                    )}
-                    <Box sx={{ px: 1, py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
-                      <TextField
-                        size="small" fullWidth placeholder={`Search ${ek}s…`}
-                        value={drillSearch} onChange={e => { setDrillSearch(e.target.value); setDrillListLimit(20); }}
-                        slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 14 }} /></InputAdornment> } }}
-                        sx={{ "& .MuiInputBase-root": { fontSize: 12 } }}
-                      />
-                    </Box>
-                    <Box sx={{ flex: 1, overflow: "auto" }}>
-                      {drillListLoading
-                        ? <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
-                        : items.length === 0
-                          ? <Typography sx={{ fontSize: 12, color: "text.disabled", textAlign: "center", py: 3 }}>
-                              {drillSearch ? "No matches" : `No ${ek}s found`}
-                            </Typography>
-                          : (
-                            <List dense disablePadding>
-                              {items.map((item: any) => {
-                                const sc = item.detail ? SEV_COLOR[item.detail] : undefined;
-                                return (
-                                  <ListItemButton key={item.id} onClick={() => pushRecord(ek, item.id, item.label, item.detail)} sx={{ py: 0.75, px: 1.5 }}>
-                                    <Box sx={{ width: "100%", display: "flex", alignItems: "center", gap: 0.75 }}>
-                                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          {item.label}
-                                        </Typography>
-                                      </Box>
-                                      {item.detail && (
-                                        <Chip label={item.detail} size="small" sx={{
-                                          fontSize: 9, height: 16, flexShrink: 0,
-                                          bgcolor: sc ? alpha(sc, 0.1) : "action.selected",
-                                          color: sc ?? "text.secondary",
-                                        }} />
-                                      )}
-                                    </Box>
-                                  </ListItemButton>
-                                );
-                              })}
-                              {items.length >= drillListLimit && (
-                                <Box sx={{ p: 1.25, textAlign: "center" }}>
-                                  <Typography
-                                    sx={{ fontSize: 11, color: ec, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
-                                    onClick={() => setDrillListLimit(l => l + 20)}
-                                  >
-                                    Load more
-                                  </Typography>
-                                </Box>
-                              )}
-                            </List>
-                          )
-                      }
-                    </Box>
-                  </>
-                );
-              })()}
-
-              {/* RECORD LEVEL */}
-              {drillTop?.kind === "record" && (() => {
-                const ek = drillTop.entityKey;
-                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
-                const fields: Record<string, string> = (drillDetailData as any)?.fields ?? {};
-                const connTypes = Object.entries(connByKey).filter(([, nodes]) => nodes.length > 0);
-                const sevColor = drillTop.recordDetail ? SEV_COLOR[drillTop.recordDetail] : undefined;
-                return (
-                  <>
-                    <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
-                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: ec }} />
-                        <Typography sx={{ fontSize: 10, color: ec, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{ek}</Typography>
-                        {sevColor && drillTop.recordDetail && (
-                          <Chip label={drillTop.recordDetail} size="small" sx={{
-                            fontSize: 9, height: 16, ml: "auto",
-                            bgcolor: alpha(sevColor, 0.1), color: sevColor,
-                          }} />
-                        )}
-                      </Box>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{drillTop.recordLabel}</Typography>
-                    </Box>
-
-                    <Box sx={{ flex: 1, overflow: "auto" }}>
-                      {drillDetailLoading ? (
-                        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
-                      ) : (
-                        <Box sx={{ px: 1.5, py: 1 }}>
-                          <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
-                            Fields
-                          </Typography>
-                          {Object.entries(fields)
-                            .filter(([, v]) => v && String(v).trim())
-                            .map(([k, v]) => {
-                              const isDesc = k === "description";
-                              const isColored = k === "severity" || k === "level";
-                              const fc = isColored ? SEV_COLOR[String(v)] : undefined;
-                              return (
-                                <Box key={k} sx={{ mb: isDesc ? 1.25 : 0 }}>
-                                  {isDesc ? (
-                                    <Box sx={{ mb: 0.5, mt: 0.75 }}>
-                                      <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.4 }}>
-                                        Description
-                                      </Typography>
-                                      <Typography sx={{ fontSize: 11, color: "text.secondary", lineHeight: 1.5 }}>
-                                        {String(v).slice(0, 220)}{String(v).length > 220 ? "…" : ""}
-                                      </Typography>
-                                    </Box>
-                                  ) : (
-                                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 0.5, borderBottom: "1px solid", borderColor: "divider" }}>
-                                      <Typography sx={{ fontSize: 10.5, color: "text.secondary", textTransform: "capitalize" }}>
-                                        {k.replace(/_/g, " ")}
-                                      </Typography>
-                                      {fc ? (
-                                        <Chip label={String(v)} size="small" sx={{ fontSize: 9, height: 16, bgcolor: alpha(fc, 0.1), color: fc }} />
-                                      ) : (
-                                        <Typography sx={{ fontSize: 10.5, fontWeight: 500, textAlign: "right", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                          {String(v)}
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  )}
-                                </Box>
-                              );
-                            })}
-                        </Box>
-                      )}
-
-                      {(connLoading || connTypes.length > 0) && (
-                        <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
-                          <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
-                            Linked entities
-                          </Typography>
-                          {connLoading ? <CircularProgress size={14} /> : (
-                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                              {connTypes.map(([ent, nodes]) => {
-                                const cc = ONT_NODES.find(n => TO_KEY[n.entity] === ent)?.color ?? "#6b7280";
-                                return (
-                                  <Box
-                                    key={ent}
-                                    onClick={() => pushSublist(ent, nodes, drillTop.recordLabel)}
-                                    sx={{
-                                      display: "flex", alignItems: "center", gap: 0.4,
-                                      px: 0.9, py: 0.35, borderRadius: "12px", cursor: "pointer",
-                                      bgcolor: alpha(cc, 0.08), border: `1px solid ${alpha(cc, 0.25)}`,
-                                      "&:hover": { bgcolor: alpha(cc, 0.18) },
-                                      transition: "background-color .12s",
-                                    }}
-                                  >
-                                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: cc }}>{nodes.length}</Typography>
-                                    <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{ent}</Typography>
-                                    <ArrowForward sx={{ fontSize: 9, color: "text.disabled" }} />
-                                  </Box>
-                                );
-                              })}
-                            </Box>
-                          )}
-                        </Box>
-                      )}
-                    </Box>
-
-                    <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider", display: "flex", gap: 1.5, alignItems: "center" }}>
+              )}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.4, flex: 1, overflow: "hidden" }}>
+                {drillStack.map((lvl, i) => {
+                  const isLast = i === drillStack.length - 1;
+                  const lvlKey = lvl.entityKey;
+                  const lvlColor = ONT_NODES.find(n => TO_KEY[n.entity] === lvlKey)?.color ?? "#6b7280";
+                  const lvlLabel = lvl.kind === "entity"
+                    ? lvl.entityKey
+                    : lvl.kind === "record"
+                      ? (lvl.recordLabel.length > 12 ? lvl.recordLabel.slice(0, 10) + "…" : lvl.recordLabel)
+                      : `${lvl.records.length} ${lvl.entityKey}`;
+                  return (
+                    <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
+                      {i > 0 && <Typography sx={{ fontSize: 9, color: "text.disabled", flexShrink: 0 }}>›</Typography>}
                       <Typography
-                        sx={{ fontSize: 11, color: ec, cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
-                        onClick={() => { const route = ONT_ROUTES[KEY_TO_NODE[ek]]; if (route) navigate(route); }}
+                        onClick={!isLast ? () => {
+                          const next = drillStack.slice(0, i + 1);
+                          const newTop = next[next.length - 1];
+                          setDrillStack(next);
+                          if (newTop.kind === "record") {
+                            setAnchor({ id: newTop.recordId, label: newTop.recordLabel, entityKey: newTop.entityKey, detail: newTop.recordDetail });
+                            setExpanded(new Set()); setConnByKey({});
+                          } else {
+                            setAnchor(null); setExpanded(new Set()); setConnByKey({});
+                            if (newTop.kind === "entity") setListKey(newTop.entityKey);
+                          }
+                        } : undefined}
+                        sx={{
+                          fontSize: 11, fontWeight: isLast ? 700 : 400,
+                          color: isLast ? lvlColor : "text.secondary",
+                          cursor: isLast ? "default" : "pointer",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          flexShrink: i < drillStack.length - 1 ? 0 : 1,
+                          "&:hover": !isLast ? { textDecoration: "underline" } : {},
+                        }}
                       >
-                        View all <OpenInNew sx={{ fontSize: 11 }} />
+                        {lvlLabel}
                       </Typography>
-                      {AGENT_NODES.has(KEY_TO_NODE[ek]) && (
-                        <Typography
-                          sx={{ fontSize: 11, color: "#9C27B0", cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
-                          onClick={() => navigate("/automate/agents")}
-                        >
-                          <SmartToy sx={{ fontSize: 11 }} /> Agent
-                        </Typography>
-                      )}
                     </Box>
-                  </>
-                );
-              })()}
+                  );
+                })}
+              </Box>
+              <IconButton size="small" onClick={clearDrill} sx={{ flexShrink: 0, ml: 0.25 }}>
+                <Close sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Box>
 
-              {/* SUBLIST LEVEL */}
-              {drillTop?.kind === "sublist" && (() => {
-                const ek = drillTop.entityKey;
-                const ec = ONT_NODES.find(n => TO_KEY[n.entity] === ek)?.color ?? "#6b7280";
-                return (
-                  <>
-                    <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-                      <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                        <Box component="span" sx={{ fontWeight: 700, color: ec }}>{drillTop.records.length}</Box>
-                        {" "}{ek}{drillTop.records.length !== 1 ? "s" : ""} linked from{" "}
-                        <Box component="em" sx={{ color: "text.primary" }}>
-                          {drillTop.fromLabel.length > 22 ? drillTop.fromLabel.slice(0, 20) + "…" : drillTop.fromLabel}
-                        </Box>
-                      </Typography>
+            {/* ENTITY LEVEL — list of records */}
+            {drillTop.kind === "entity" && (
+              <>
+                {dpStat && (
+                  <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                    <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.75, mb: 0.75 }}>
+                      <Typography sx={{ fontSize: 24, fontWeight: 800, color: dpEc, lineHeight: 1 }}>{dpStat.total}</Typography>
+                      <Typography sx={{ fontSize: 11, color: "text.secondary" }}>total {dpEk}s</Typography>
                     </Box>
-                    <Box sx={{ flex: 1, overflow: "auto" }}>
-                      <List dense disablePadding>
-                        {drillTop.records.map(sn => {
-                          const sc = sn.severity ? SEV_COLOR[sn.severity] : undefined;
-                          const rawId = sn.id.includes("-") ? sn.id.split("-").slice(1).join("-") : sn.id;
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {Object.entries(dpStat.breakdown ?? {})
+                        .filter(([, v]) => (v as number) > 0)
+                        .map(([k, v]) => {
+                          const bc = SEV_COLOR[k] ?? dpEc;
                           return (
-                            <ListItemButton key={sn.id} onClick={() => pushRecord(ek, rawId, sn.label, sn.severity ?? undefined)} sx={{ py: 0.75, px: 1.5 }}>
-                              <Box sx={{ width: "100%" }}>
-                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.75 }}>
-                                  <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {sn.label}
-                                  </Typography>
-                                  {sc && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: sc, flexShrink: 0 }} />}
-                                </Box>
-                                {sn.detail && (
-                                  <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{sn.detail}</Typography>
-                                )}
-                              </Box>
-                            </ListItemButton>
+                            <Box key={k} sx={{
+                              display: "flex", alignItems: "center", gap: 0.4, px: 0.75, py: 0.2,
+                              borderRadius: "10px", bgcolor: alpha(bc, 0.1), border: `1px solid ${alpha(bc, 0.25)}`,
+                            }}>
+                              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: bc }} />
+                              <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{k}</Typography>
+                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: bc }}>{String(v)}</Typography>
+                            </Box>
                           );
                         })}
-                      </List>
                     </Box>
-                  </>
-                );
-              })()}
+                  </Box>
+                )}
+                <Box sx={{ px: 1, py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <TextField
+                    size="small" fullWidth placeholder={`Search ${dpEk}s…`}
+                    value={drillSearch} onChange={e => { setDrillSearch(e.target.value); setDrillListLimit(20); }}
+                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 14 }} /></InputAdornment> } }}
+                    sx={{ "& .MuiInputBase-root": { fontSize: 12 } }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  {drillListLoading
+                    ? <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
+                    : dpItems.length === 0
+                      ? <Typography sx={{ fontSize: 12, color: "text.disabled", textAlign: "center", py: 3 }}>
+                          {drillSearch ? "No matches" : `No ${dpEk}s found`}
+                        </Typography>
+                      : (
+                        <List dense disablePadding>
+                          {dpItems.map((item: any) => {
+                            const sc = item.detail ? SEV_COLOR[item.detail] : undefined;
+                            return (
+                              <ListItemButton key={item.id} onClick={() => pushRecord(dpEk, item.id, item.label, item.detail)} sx={{ py: 0.75, px: 1.5 }}>
+                                <Box sx={{ width: "100%", display: "flex", alignItems: "center", gap: 0.75 }}>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {item.label}
+                                    </Typography>
+                                  </Box>
+                                  {item.detail && (
+                                    <Chip label={item.detail} size="small" sx={{
+                                      fontSize: 9, height: 16, flexShrink: 0,
+                                      bgcolor: sc ? alpha(sc, 0.1) : "action.selected",
+                                      color: sc ?? "text.secondary",
+                                    }} />
+                                  )}
+                                </Box>
+                              </ListItemButton>
+                            );
+                          })}
+                          {dpItems.length >= drillListLimit && (
+                            <Box sx={{ p: 1.25, textAlign: "center" }}>
+                              <Typography
+                                sx={{ fontSize: 11, color: dpEc, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                                onClick={() => setDrillListLimit(l => l + 20)}
+                              >
+                                Load more
+                              </Typography>
+                            </Box>
+                          )}
+                        </List>
+                      )
+                  }
+                </Box>
+              </>
+            )}
 
-            </Box>
-          );
-        })()}
+            {/* RECORD LEVEL — field detail + linked entities */}
+            {drillTop.kind === "record" && (
+              <>
+                <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.25 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: dpEc }} />
+                    <Typography sx={{ fontSize: 10, color: dpEc, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em" }}>{dpEk}</Typography>
+                    {dpRecSevColor && dpRecDetail && (
+                      <Chip label={dpRecDetail} size="small" sx={{
+                        fontSize: 9, height: 16, ml: "auto",
+                        bgcolor: alpha(dpRecSevColor, 0.1), color: dpRecSevColor,
+                      }} />
+                    )}
+                  </Box>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{dpRecLabel}</Typography>
+                </Box>
+
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  {drillDetailLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress size={18} /></Box>
+                  ) : (
+                    <Box sx={{ px: 1.5, py: 1 }}>
+                      <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
+                        Fields
+                      </Typography>
+                      {Object.entries(dpFields)
+                        .filter(([, v]) => v && String(v).trim())
+                        .map(([k, v]) => {
+                          const isDesc = k === "description";
+                          const isColored = k === "severity" || k === "level";
+                          const fc = isColored ? SEV_COLOR[String(v)] : undefined;
+                          return (
+                            <Box key={k} sx={{ mb: isDesc ? 1.25 : 0 }}>
+                              {isDesc ? (
+                                <Box sx={{ mb: 0.5, mt: 0.75 }}>
+                                  <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.4 }}>
+                                    Description
+                                  </Typography>
+                                  <Typography sx={{ fontSize: 11, color: "text.secondary", lineHeight: 1.5 }}>
+                                    {String(v).slice(0, 220)}{String(v).length > 220 ? "…" : ""}
+                                  </Typography>
+                                </Box>
+                              ) : (
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", py: 0.5, borderBottom: "1px solid", borderColor: "divider" }}>
+                                  <Typography sx={{ fontSize: 10.5, color: "text.secondary", textTransform: "capitalize" }}>
+                                    {k.replace(/_/g, " ")}
+                                  </Typography>
+                                  {fc ? (
+                                    <Chip label={String(v)} size="small" sx={{ fontSize: 9, height: 16, bgcolor: alpha(fc, 0.1), color: fc }} />
+                                  ) : (
+                                    <Typography sx={{ fontSize: 10.5, fontWeight: 500, textAlign: "right", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {String(v)}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          );
+                        })}
+                    </Box>
+                  )}
+
+                  {(connLoading || dpConnTypes.length > 0) && (
+                    <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
+                      <Typography sx={{ fontSize: 9.5, color: "text.disabled", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 700, mb: 0.75 }}>
+                        Linked entities
+                      </Typography>
+                      {connLoading ? <CircularProgress size={14} /> : (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {dpConnTypes.map(([ent, nodes]) => {
+                            const cc = ONT_NODES.find(n => TO_KEY[n.entity] === ent)?.color ?? "#6b7280";
+                            return (
+                              <Box
+                                key={ent}
+                                onClick={() => pushSublist(ent, nodes as SubNode[], dpRecLabel)}
+                                sx={{
+                                  display: "flex", alignItems: "center", gap: 0.4,
+                                  px: 0.9, py: 0.35, borderRadius: "12px", cursor: "pointer",
+                                  bgcolor: alpha(cc, 0.08), border: `1px solid ${alpha(cc, 0.25)}`,
+                                  "&:hover": { bgcolor: alpha(cc, 0.18) },
+                                  transition: "background-color .12s",
+                                }}
+                              >
+                                <Typography sx={{ fontSize: 10, fontWeight: 700, color: cc }}>{(nodes as SubNode[]).length}</Typography>
+                                <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{ent}</Typography>
+                                <ArrowForward sx={{ fontSize: 9, color: "text.disabled" }} />
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+
+                <Box sx={{ px: 1.5, py: 1, borderTop: "1px solid", borderColor: "divider", display: "flex", gap: 1.5, alignItems: "center" }}>
+                  <Typography
+                    sx={{ fontSize: 11, color: dpEc, cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
+                    onClick={() => { const route = ONT_ROUTES[KEY_TO_NODE[dpEk]]; if (route) navigate(route); }}
+                  >
+                    View all <OpenInNew sx={{ fontSize: 11 }} />
+                  </Typography>
+                  {AGENT_NODES.has(KEY_TO_NODE[dpEk]) && (
+                    <Typography
+                      sx={{ fontSize: 11, color: "#9C27B0", cursor: "pointer", display: "flex", alignItems: "center", gap: 0.25, "&:hover": { textDecoration: "underline" } }}
+                      onClick={() => navigate("/automate/agents")}
+                    >
+                      <SmartToy sx={{ fontSize: 11 }} /> Agent
+                    </Typography>
+                  )}
+                </Box>
+              </>
+            )}
+
+            {/* SUBLIST LEVEL — connected records from a parent */}
+            {drillTop.kind === "sublist" && (
+              <>
+                <Box sx={{ px: 1.5, py: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    <Box component="span" sx={{ fontWeight: 700, color: dpEc }}>{dpSubRecords.length}</Box>
+                    {" "}{dpEk}{dpSubRecords.length !== 1 ? "s" : ""} linked from{" "}
+                    <Box component="em" sx={{ color: "text.primary" }}>
+                      {dpSubFrom.length > 22 ? dpSubFrom.slice(0, 20) + "…" : dpSubFrom}
+                    </Box>
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  <List dense disablePadding>
+                    {dpSubRecords.map(sn => {
+                      const sc = sn.severity ? SEV_COLOR[sn.severity] : undefined;
+                      const rawId = sn.id.includes("-") ? sn.id.split("-").slice(1).join("-") : sn.id;
+                      return (
+                        <ListItemButton key={sn.id} onClick={() => pushRecord(dpEk, rawId, sn.label, sn.severity ?? undefined)} sx={{ py: 0.75, px: 1.5 }}>
+                          <Box sx={{ width: "100%" }}>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 0.75 }}>
+                              <Typography sx={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {sn.label}
+                              </Typography>
+                              {sc && <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: sc, flexShrink: 0 }} />}
+                            </Box>
+                            {sn.detail && (
+                              <Typography sx={{ fontSize: 10, color: "text.secondary" }}>{sn.detail}</Typography>
+                            )}
+                          </Box>
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                </Box>
+              </>
+            )}
+
+          </Box>
+        )}
       </Box>
 
       {/* Feature 4: Hover preview tooltip */}

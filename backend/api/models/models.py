@@ -480,6 +480,7 @@ class Asset(Base):
     name = Column(String(255), nullable=False)
     asset_type = Column(String(128))             # provider-native (e.g. Microsoft.Compute/virtualMachines)
     asset_class = Column(String(64), index=True) # vm | storage | network | database | identity | keyvault | other
+    override_class = Column(String(64))          # user-set TechnologyType.name — takes precedence over asset_class
     region = Column(String(64))
     subscription_id = Column(String(64))         # Azure
     resource_group = Column(String(128))         # Azure
@@ -1934,3 +1935,28 @@ class RawSecretFinding(Base):
     fingerprint = Column(String(200), nullable=True)
     is_verified = Column(Boolean, nullable=True)
 
+
+# ── Technology Registry ───────────────────────────────────────────────────────
+
+class TechnologyType(Base):
+    """User-manageable taxonomy entry for asset classification."""
+    __tablename__ = "technology_types"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    name = Column(String(100), nullable=False)
+    category = Column(String(100))       # Compute / Network / Security / Identity / Storage / Application / Other
+    sub_category = Column(String(100))   # e.g. Serverless, Secret Manager, Load Balancer
+    color = Column(String(20))           # hex colour for UI
+    description = Column(Text)
+    is_builtin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AssetTypeMapping(Base):
+    """Maps a raw provider resource-type string to a TechnologyType."""
+    __tablename__ = "asset_type_mappings"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    provider_type = Column(String(200), nullable=False, index=True)  # e.g. "microsoft.keyvault/vaults"
+    technology_type_id = Column(String(36), ForeignKey("technology_types.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

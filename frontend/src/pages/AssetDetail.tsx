@@ -3,14 +3,17 @@ import {
   Box, Typography, Card, Chip, CircularProgress, Button, IconButton,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Grid, Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, LinearProgress,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
 import {
   ArrowBack, PlayArrow, Refresh,
   BugReport, Warning, Timeline, AccountTree, FileCopy, GppGood, MenuBook, DataObject,
+  Tune as TuneIcon,
 } from "@mui/icons-material";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { clientsApi, assetsApi, connectorsApi, attackPathApi, frameworksApi } from "../services/api";
+import { clientsApi, assetsApi, connectorsApi, attackPathApi, frameworksApi, technologyRegistryApi } from "../services/api";
+import { TechnologyType } from "../types";
 import { Client, Connector, AssetDetail, Finding, Risk, AssetTimelinePoint, CveDuplicateGroup, AssetCompliance } from "../types";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -51,6 +54,8 @@ export default function AssetDetailPage() {
   const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
   const qc = useQueryClient();
   const [tab, setTab] = useState(0);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [overrideSel, setOverrideSel] = useState("");
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
 
@@ -93,6 +98,17 @@ export default function AssetDetailPage() {
     onSuccess: () => {
       setTimeout(() => qc.invalidateQueries({ queryKey: ["asset-resolve"] }), 2000);
     },
+  });
+
+  const { data: techTypes = [] } = useQuery<TechnologyType[]>({
+    queryKey: ["tech-types"],
+    queryFn: () => technologyRegistryApi.listTypes(),
+    enabled: overrideOpen,
+  });
+
+  const overrideMut = useMutation({
+    mutationFn: (v: string | null) => technologyRegistryApi.overrideClass(clientId, assetId, v),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["asset-resolve"] }); setOverrideOpen(false); },
   });
 
   if (!asset) {
@@ -167,7 +183,17 @@ export default function AssetDetailPage() {
               {asset.external_id}
             </Typography>
           </Box>
-          <Box sx={{ display: "flex", gap: 1 }}>
+          <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+            <Tooltip title="Override the auto-detected technology type for this asset">
+              <Button
+                startIcon={<TuneIcon />}
+                onClick={() => { setOverrideSel((asset as any).override_class ?? ""); setOverrideOpen(true); }}
+                sx={{ color: "text.secondary", borderColor: "divider" }}
+                variant="outlined"
+              >
+                {(asset as any).override_class ? "Override: " + (asset as any).override_class : "Override Type"}
+              </Button>
+            </Tooltip>
             <Tooltip title="Refresh inventory for this connector">
               <span>
                 <Button startIcon={syncMutation.isPending ? <CircularProgress size={14} sx={{ color: "text.primary" }} /> : <Refresh />}
@@ -410,6 +436,43 @@ export default function AssetDetailPage() {
         {tab === 7 && <AssetComplianceTab clientId={clientId} assetId={assetId} />}
         {tab === 8 && <PlatformDetailTab detail={(asset as any).platform_detail} />}
       </Box>
+
+      {/* Override type dialog */}
+      <Dialog open={overrideOpen} onClose={() => setOverrideOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Override Technology Type</DialogTitle>
+        <DialogContent sx={{ pt: "16px !important" }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Auto-detected: <strong>{(asset as any).asset_class_auto || klass}</strong>. Select a different type to override, or clear to restore auto-detection.
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Technology Type</InputLabel>
+            <Select value={overrideSel} label="Technology Type" onChange={(e) => setOverrideSel(e.target.value)}>
+              <MenuItem value="">
+                <em>Clear override (use auto-detected)</em>
+              </MenuItem>
+              {techTypes.map((t) => (
+                <MenuItem key={t.id} value={t.name}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: t.color ?? "#6b7280" }} />
+                    {t.name}
+                    {t.category && <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>({t.category})</Typography>}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOverrideOpen(false)} disabled={overrideMut.isPending}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={overrideMut.isPending}
+            onClick={() => overrideMut.mutate(overrideSel || null)}
+          >
+            {overrideMut.isPending ? <CircularProgress size={18} /> : "Apply"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageDetailLayout>
   );
 }

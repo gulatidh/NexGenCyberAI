@@ -801,3 +801,23 @@ export interface AssessmentImport {
   scan_name?: string;
   finding_count?: number;
 }
+
+
+export interface TechnologyType {
+  id: string;
+  name: string;
+  category: string | null;
+  sub_category: string | null;
+  color: string | null;
+  description: string | null;
+  is_builtin: boolean;
+  asset_count?: number;
+}
+
+export interface AssetTypeMapping {
+  id: string;
+  provider_type: string;
+  technology_type_id: string;
+  technology_type_name: string | null;
+  technology_type_color: string | null;
+}
