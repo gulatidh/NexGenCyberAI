@@ -49,7 +49,9 @@ export default function Assets() {
   const navigate = useNavigate();
   const isGuest = useIsGuest();
   const location = useLocation();
-  const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets" : "/assets";
+  const assetsBase = location.pathname.startsWith("/platform") ? "/platform/assets"
+    : location.pathname.startsWith("/discover") ? "/discover/assets"
+    : "/assets";
 
   const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");

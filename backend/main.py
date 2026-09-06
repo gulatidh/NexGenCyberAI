@@ -2047,44 +2047,51 @@ def _seed_technology_types() -> None:
         ("endpoint",    "Endpoint"),
         ("policy",      "Policy / Governance"),
     ]
+    import uuid as _uuid_mod
     try:
         db = SessionLocal()
         try:
-            existing = db.query(TechnologyType).filter(TechnologyType.is_builtin == True).count()
-            if existing >= len(_BUILTIN):
-                return
+            # Idempotent by name — skip types that already exist
+            existing_names = {t.name for t in db.query(TechnologyType).all()}
+            existing_providers = {m.provider_type for m in db.query(AssetTypeMapping).all()}
+
             name_to_id: dict[str, str] = {}
+            types_added = 0
             for name, cat, sub, color, desc in _BUILTIN:
-                tt = db.query(TechnologyType).filter(TechnologyType.name == name).first()
-                if not tt:
-                    import uuid as _uuid_mod
-                    tt = TechnologyType(
-                        id=str(_uuid_mod.uuid4()),
-                        name=name, category=cat, sub_category=sub,
-                        color=color, description=desc, is_builtin=True,
-                    )
-                    db.add(tt)
-                    db.flush()
-                name_to_id[name] = tt.id
-            for provider_type, tech_name in _MAPPINGS:
-                if tech_name not in name_to_id:
+                if name in existing_names:
+                    # Still need the ID for mapping step
+                    tt = db.query(TechnologyType).filter(TechnologyType.name == name).first()
+                    if tt:
+                        name_to_id[name] = tt.id
                     continue
-                exists = db.query(AssetTypeMapping).filter(
-                    AssetTypeMapping.provider_type == provider_type.lower()
-                ).first()
-                if not exists:
-                    import uuid as _uuid_mod
-                    db.add(AssetTypeMapping(
-                        id=str(_uuid_mod.uuid4()),
-                        provider_type=provider_type.lower(),
-                        technology_type_id=name_to_id[tech_name],
-                    ))
+                new_id = str(_uuid_mod.uuid4())
+                tt = TechnologyType(
+                    id=new_id, name=name, category=cat, sub_category=sub,
+                    color=color, description=desc, is_builtin=True,
+                )
+                db.add(tt)
+                db.flush()
+                name_to_id[name] = new_id
+                types_added += 1
+
+            mappings_added = 0
+            for provider_type, tech_name in _MAPPINGS:
+                pt = provider_type.lower()
+                if pt in existing_providers or tech_name not in name_to_id:
+                    continue
+                db.add(AssetTypeMapping(
+                    id=str(_uuid_mod.uuid4()),
+                    provider_type=pt,
+                    technology_type_id=name_to_id[tech_name],
+                ))
+                mappings_added += 1
+
             db.commit()
-            logger.info("Seeded %d built-in technology types + %d mappings", len(_BUILTIN), len(_MAPPINGS))
+            logger.info("Technology types seeded: +%d types, +%d mappings", types_added, mappings_added)
         finally:
             db.close()
     except Exception as exc:
-        logger.warning("_seed_technology_types failed: %s", exc)
+        logger.warning("_seed_technology_types failed: %s", exc, exc_info=True)
 
 
 _ensure_added_columns()
