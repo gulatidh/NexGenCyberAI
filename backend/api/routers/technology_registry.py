@@ -9,7 +9,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from db.database import get_db
-from core.auth import get_current_user
+from core.security import get_current_user
 from api.models.models import TechnologyType, AssetTypeMapping, Asset
 
 router = APIRouter(tags=["technology-registry"])
@@ -156,6 +156,24 @@ def delete_technology_type(
     db.delete(tt)
     db.commit()
     return {"ok": True}
+
+
+# ── Manual seed trigger ───────────────────────────────────────────────────────
+
+@router.post("/technology-types/seed")
+def trigger_seed(
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Re-run the built-in technology type seed (idempotent — skips existing names)."""
+    try:
+        from main import _seed_technology_types
+        _seed_technology_types()
+        types = db.query(TechnologyType).count()
+        mappings = db.query(AssetTypeMapping).count()
+        return {"ok": True, "types": types, "mappings": mappings}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ── Asset Type Mappings ───────────────────────────────────────────────────────
