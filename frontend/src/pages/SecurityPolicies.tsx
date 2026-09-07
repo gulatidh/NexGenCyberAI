@@ -71,21 +71,30 @@ function FrameworkPicker({ onSelect, selected, onClear }: FrameworkPickerProps) 
     }));
   }, [catalogRaw]);
 
+  // Fetch ALL controls for the selected framework (no domain/search filter) to populate domain list
+  const { data: allControls = [] } = useQuery<FrameworkControlEntry[]>({
+    queryKey: ["fw-controls-all", fwKey],
+    queryFn: () => controlPoliciesApi.frameworkControls({ framework: fwKey, limit: 2000 }),
+    enabled: !!fwKey,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Filtered list for the visible picker list
   const { data: controls = [], isFetching } = useQuery<FrameworkControlEntry[]>({
     queryKey: ["fw-controls-picker", fwKey, domain, search],
     queryFn: () => controlPoliciesApi.frameworkControls({
       framework: fwKey,
       domain: domain || undefined,
       search: search || undefined,
-      limit: 50,
+      limit: 500,
     }),
     enabled: !!fwKey,
   });
 
   const domains = React.useMemo(() => {
-    const d = new Set(controls.map((c) => c.domain).filter(Boolean) as string[]);
+    const d = new Set(allControls.map((c) => c.domain).filter(Boolean) as string[]);
     return Array.from(d).sort();
-  }, [controls]);
+  }, [allControls]);
 
   if (selected && !expanded) {
     return (
@@ -158,7 +167,12 @@ function FrameworkPicker({ onSelect, selected, onClear }: FrameworkPickerProps) 
               No controls found
             </Typography>
           ) : (
-            <List dense disablePadding sx={{ maxHeight: 220, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+            <>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+                {controls.length} control{controls.length !== 1 ? "s" : ""}
+                {allControls.length > controls.length ? ` (${allControls.length} total — use domain filter or search to narrow)` : ""}
+              </Typography>
+            <List dense disablePadding sx={{ maxHeight: 260, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               {controls.map((ctrl) => (
                 <ListItem key={ctrl.id} disablePadding divider>
                   <ListItemButton
@@ -180,6 +194,7 @@ function FrameworkPicker({ onSelect, selected, onClear }: FrameworkPickerProps) 
                 </ListItem>
               ))}
             </List>
+            </>
           )
         )}
       </Box>

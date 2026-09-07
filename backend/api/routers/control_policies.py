@@ -166,7 +166,7 @@ def browse_framework_controls(
     framework: Optional[str] = Query(None),
     domain: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
-    limit: int = Query(50, le=200),
+    limit: int = Query(500, le=2000),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
