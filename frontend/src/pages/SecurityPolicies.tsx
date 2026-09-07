@@ -280,8 +280,8 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
       description: ctrl.description ?? "",
       framework: ctrl.framework,
       framework_control_id: ctrl.control_id,
-      // Auto-extract a specific keyword so the policy doesn't match every finding
       match_title: extractMatchKeyword(ctrl.title),
+      match_severity: "",   // never filter by severity when derived from a framework control
     }));
   };
 
@@ -311,6 +311,9 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
   const busy = createMut.isPending || updateMut.isPending;
   const hasRule = form.match_title || form.match_severity || form.match_asset_class
     || form.match_cve || form.match_resource_types.length > 0 || form.match_connector_type;
+
+  // Framework-derived: hide fields that cause false 0s (severity mismatch)
+  const isFrameworkDerived = mode === "framework" || (isEdit && !!initial?.framework_control_id);
 
   // Debounced live preview — shows matching finding count while user edits rules
   const [preview, setPreview] = useState<{ issue_count: number; affected_assets: number } | null>(null);
@@ -356,7 +359,13 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
             <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
               Starting point
             </Typography>
-            <ToggleButtonGroup size="small" value={mode} exclusive onChange={(_, v) => v && setMode(v)} fullWidth>
+            <ToggleButtonGroup size="small" value={mode} exclusive
+              onChange={(_, v) => {
+                if (!v) return;
+                setMode(v);
+                // Switching to framework mode — clear severity filter to avoid false 0s
+                if (v === "framework") setForm((f) => ({ ...f, match_severity: "" }));
+              }} fullWidth>
               <ToggleButton value="scratch">
                 From Scratch
               </ToggleButton>
@@ -487,14 +496,22 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
                   </Typography>
                 )}
               </Box>
-              <FormControl size="small">
-                <InputLabel>Finding severity</InputLabel>
-                <Select value={form.match_severity} label="Finding severity"
-                  onChange={(e) => set("match_severity", e.target.value)}>
-                  <MenuItem value=""><em>Any</em></MenuItem>
-                  {options.severities.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                </Select>
-              </FormControl>
+              {isFrameworkDerived ? (
+                <Box sx={{ p: 1.25, borderRadius: 1.5, bgcolor: "rgba(66,133,244,0.06)", border: "1px solid rgba(66,133,244,0.18)" }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.5 }}>
+                    <strong>Severity filter hidden</strong> — framework controls define desired state, not scanner severity. The same misconfiguration can be flagged as medium or high depending on the scanner. Match all severities.
+                  </Typography>
+                </Box>
+              ) : (
+                <FormControl size="small">
+                  <InputLabel>Finding severity</InputLabel>
+                  <Select value={form.match_severity} label="Finding severity"
+                    onChange={(e) => set("match_severity", e.target.value)}>
+                    <MenuItem value=""><em>Any severity</em></MenuItem>
+                    {options.severities.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              )}
               <TextField label="CVE ID contains" value={form.match_cve}
                 onChange={(e) => set("match_cve", e.target.value)} size="small"
                 placeholder="e.g. CVE-2024" />
