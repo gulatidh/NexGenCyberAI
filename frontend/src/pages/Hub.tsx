@@ -114,6 +114,7 @@ const STAGE_DEFS: StageDef[] = [
       { name: "Custom Standards",      desc: "Build your own control framework from existing platform controls.",                   route: "/report/custom-frameworks", group: "Compliance Frameworks" },
       { name: "Compliance Evaluation", desc: "Evaluate posture and run targeted scans against any framework.",                     route: "/report/compliance",        group: "Compliance Frameworks" },
       { name: "Control Gaps",          desc: "Framework control deficiencies identified by the compliance monitor.",               route: "/report/gaps",              group: "Compliance Frameworks" },
+      { name: "Security Policies",     desc: "User-defined security rules with live issue counts and status tracking.",               route: "/report/policies",          group: "Compliance Frameworks" },
     ],
   },
   {

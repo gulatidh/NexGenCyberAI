@@ -844,6 +844,22 @@ def _ensure_added_columns() -> None:
         except Exception as exc:
             logger.warning("Risk-to-proposal migration failed: %s", exc)
 
+        # control_policies.updated_at — added alongside initial model
+        try:
+            cp_cols = {c["name"] for c in inspector.get_columns("control_policies")}
+        except Exception:
+            cp_cols = set()
+        if cp_cols and "updated_at" not in cp_cols:
+            ddl = ("ALTER TABLE control_policies ADD updated_at DATETIME2 NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE control_policies ADD COLUMN updated_at TIMESTAMP")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added control_policies.updated_at column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("control_policies.updated_at ALTER failed: %s", exc)
+
         # assets.override_class — user-set technology type override
         try:
             asset_cols = {c["name"] for c in inspector.get_columns("assets")}
@@ -2346,6 +2362,13 @@ try:
     logger.info("technology_registry router loaded")
 except Exception as _e:
     logger.warning("technology_registry router not loaded: %s", _e)
+
+try:
+    from api.routers import control_policies as _control_policies
+    app.include_router(_control_policies.router, prefix="/api/v1")
+    logger.info("control_policies router loaded")
+except Exception as _e:
+    logger.warning("control_policies router not loaded: %s", _e)
 
 try:
     from api.routers import db_browser as _db_browser

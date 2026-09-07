@@ -1,7 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   Description, FolderZip, Assessment, LibraryAdd, GppBad, BarChart, ManageSearch,
-  Summarize, Schedule, Psychology,
+  Summarize, Schedule, Psychology, Shield,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -32,6 +32,7 @@ export const REPORT_SECTION: SectionDef = {
     { name: "Custom Standards",      icon: <LibraryAdd sx={ic("#009688")} />, desc: "Build your own control framework from existing platform controls.",   route: "/report/custom-frameworks", group: "Compliance Frameworks" },
     { name: "Compliance Evaluation", icon: <BarChart sx={ic("#009688")} />,   desc: "Evaluate posture and run targeted scans against any framework.",      route: "/report/compliance",        group: "Compliance Frameworks" },
     { name: "Control Gaps",          icon: <GppBad sx={ic("#EA4335")} />,     desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",              group: "Compliance Frameworks" },
+    { name: "Security Policies",     icon: <Shield sx={ic("#4285F4")} />,     desc: "User-defined security rules with live issue counts and status tracking.", route: "/report/policies",          group: "Compliance Frameworks" },
   ],
 };
 

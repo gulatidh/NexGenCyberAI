@@ -929,3 +929,20 @@ export const technologyRegistryApi = {
   overrideClass: (clientId: string, assetId: string, overrideClass: string | null) =>
     apiClient.patch(`/clients/${clientId}/assets/${assetId}/override-class`, { override_class: overrideClass }).then((r) => r.data),
 };
+
+export const controlPoliciesApi = {
+  list: (clientId: string, params?: { status?: string; severity?: string; category?: string }) =>
+    apiClient.get(`/clients/${clientId}/control-policies/`, { params }).then((r) => r.data),
+  create: (clientId: string, body: Record<string, unknown>) =>
+    apiClient.post(`/clients/${clientId}/control-policies/`, body).then((r) => r.data),
+  update: (clientId: string, id: string, body: Record<string, unknown>) =>
+    apiClient.patch(`/clients/${clientId}/control-policies/${id}`, body).then((r) => r.data),
+  toggle: (clientId: string, id: string) =>
+    apiClient.post(`/clients/${clientId}/control-policies/${id}/toggle`).then((r) => r.data),
+  delete: (clientId: string, id: string) =>
+    apiClient.delete(`/clients/${clientId}/control-policies/${id}`).then((r) => r.data),
+  issues: (clientId: string, id: string, limit = 50) =>
+    apiClient.get(`/clients/${clientId}/control-policies/${id}/issues`, { params: { limit } }).then((r) => r.data),
+  options: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/control-policies/meta/options`).then((r) => r.data),
+};

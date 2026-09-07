@@ -77,6 +77,7 @@ const RiskOverviewPage  = React.lazy(() => import("./pages/RiskOverview"));
 const Projects          = React.lazy(() => import("./pages/Projects"));
 const Technologies      = React.lazy(() => import("./pages/Technologies"));
 const TechnologyRegistry = React.lazy(() => import("./pages/TechnologyRegistry"));
+const SecurityPolicies  = React.lazy(() => import("./pages/SecurityPolicies"));
 const Admin             = React.lazy(() => import("./pages/Admin"));
 const SyncPage          = React.lazy(() => import("./pages/Sync"));
 const Help              = React.lazy(() => import("./pages/Help"));
@@ -295,6 +296,7 @@ function ProtectedApp() {
             <Route path="audit-agents"      element={<AuditAgents />} />
             <Route path="executive-summary" element={<ExecutiveSummary />} />
             <Route path="scheduler"         element={<ReportScheduler />} />
+            <Route path="policies"          element={<SecurityPolicies />} />
           </Route>
 
           {/* ── DETAIL PAGES (full chrome, no product sidebar) ───────────── */}

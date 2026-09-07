@@ -1960,3 +1960,35 @@ class AssetTypeMapping(Base):
     provider_type = Column(String(200), nullable=False, index=True)  # e.g. "microsoft.keyvault/vaults"
     technology_type_id = Column(String(36), ForeignKey("technology_types.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ControlPolicy(Base):
+    """User-defined security control policy — evaluated live against open findings."""
+    __tablename__ = "control_policies"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(300), nullable=False)
+    description = Column(Text)
+    severity = Column(String(20), default="high")   # critical / high / medium / low
+    category = Column(String(100))                  # Identity / Network / Data / Compute / etc.
+    status = Column(String(20), default="active")   # active / disabled
+
+    # Match rules — all are AND-combined, NULL = ignore that dimension
+    match_title = Column(String(300))       # finding title ilike %value%
+    match_severity = Column(String(20))     # finding.severity ==
+    match_asset_class = Column(String(64))  # asset.asset_class ==
+    match_cve = Column(String(100))         # finding.cve_id ilike %value%
+    match_resource_type = Column(String(200))  # finding.resource_type ==
+    match_connector_type = Column(String(100)) # connector.connector_type ==
+
+    # Optional link to a framework control
+    framework = Column(String(50))
+    framework_control_id = Column(String(100))
+
+    # Descriptive risk tags shown as chips (JSON list of strings)
+    risk_tags = Column(Text)  # e.g. '["lateral_movement","data_exposure"]'
+
+    created_by = Column(String(200))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)

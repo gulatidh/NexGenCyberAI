@@ -821,3 +821,36 @@ export interface AssetTypeMapping {
   technology_type_name: string | null;
   technology_type_color: string | null;
 }
+
+export interface ControlPolicy {
+  id: string;
+  client_id: string;
+  name: string;
+  description?: string | null;
+  severity: "critical" | "high" | "medium" | "low";
+  category?: string | null;
+  status: "active" | "disabled";
+  match_title?: string | null;
+  match_severity?: string | null;
+  match_asset_class?: string | null;
+  match_cve?: string | null;
+  match_resource_type?: string | null;
+  match_connector_type?: string | null;
+  framework?: string | null;
+  framework_control_id?: string | null;
+  risk_tags: string[];
+  created_by?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+  issue_count: number;
+  affected_assets: number;
+}
+
+export interface PolicyOptions {
+  severities: string[];
+  asset_classes: string[];
+  resource_types: string[];
+  connector_types: string[];
+  risk_tags: string[];
+  categories: string[];
+}

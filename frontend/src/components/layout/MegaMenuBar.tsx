@@ -196,6 +196,7 @@ const MENU: MenuItem[] = [
           { name: "Custom Standards",      desc: "Build your own control framework from existing platform controls.",    route: "/report/custom-frameworks", Icon: LibraryAdd },
           { name: "Compliance Evaluation", desc: "Evaluate posture and run targeted scans against any framework.",       route: "/report/compliance",        Icon: BarChart   },
           { name: "Control Gaps",          desc: "Framework control deficiencies identified by the compliance monitor.", route: "/report/gaps",              Icon: GppBad     },
+          { name: "Security Policies",     desc: "User-defined security rules with live issue counts and status tracking.", route: "/report/policies",          Icon: Security   },
         ],
       },
     ],
