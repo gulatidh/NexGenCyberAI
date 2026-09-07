@@ -585,6 +585,12 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
     enabled: open && !!policy,
   });
 
+  const { data: explain } = useQuery({
+    queryKey: ["policy-explain", clientId, policy?.id],
+    queryFn: () => controlPoliciesApi.explain(clientId, policy!.id),
+    enabled: open && !!policy && !isLoading && (data?.total ?? 0) === 0,
+  });
+
   return (
     <Drawer anchor="right" open={open} onClose={onClose} slotProps={{ paper: { sx: { width: 520, p: 0 } } }}>
       <Box sx={{ p: 3, borderBottom: 1, borderColor: "divider", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -640,7 +646,68 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
             </Box>
 
             {(data?.findings ?? []).length === 0 ? (
-              <Alert severity="success">No open findings match this policy.</Alert>
+              <Box>
+                <Alert severity="info" sx={{ mb: 2 }}>No open findings match this policy.</Alert>
+
+                {/* Step-by-step explain — shows WHY it matched 0 */}
+                {explain && (
+                  <Box>
+                    <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                      Why 0 matches — filter trace
+                    </Typography>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+                      {explain.steps.map((step: any, i: number) => (
+                        <Box key={i} sx={{
+                          display: "flex", alignItems: "flex-start", gap: 1.5, p: 1.25,
+                          borderRadius: 1.5,
+                          bgcolor: step.count === 0 && i > 0 ? "rgba(244,67,54,0.06)" : "action.hover",
+                          border: "1px solid",
+                          borderColor: step.count === 0 && i > 0 ? "rgba(244,67,54,0.2)" : "divider",
+                        }}>
+                          <Box sx={{
+                            minWidth: 32, height: 32, borderRadius: "50%", display: "flex",
+                            alignItems: "center", justifyContent: "center", flexShrink: 0,
+                            bgcolor: step.count === 0 && i > 0 ? "#f44336" : "#4285F4",
+                            color: "#fff", fontSize: 13, fontWeight: 700,
+                          }}>
+                            {step.count}
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3 }}>
+                              {step.label}
+                            </Typography>
+                            {step.note && (
+                              <Typography variant="caption" sx={{
+                                display: "block", mt: 0.5,
+                                color: step.count === 0 && i > 0 ? "#f44336" : "text.secondary",
+                                fontWeight: step.count === 0 ? 600 : 400,
+                              }}>
+                                {step.count === 0 && i > 0 ? "⚠ " : ""}{step.note}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                    {explain.active_filters?.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                          Active filters on this policy
+                        </Typography>
+                        {explain.active_filters.map((f: any) => (
+                          <Box key={f.field} sx={{ display: "flex", gap: 1, mb: 0.5, alignItems: "baseline" }}>
+                            <Chip label={f.field} size="small"
+                              sx={{ fontFamily: "monospace", fontSize: 10, height: 18, bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", flexShrink: 0 }} />
+                            <Typography variant="caption" color="text.secondary">
+                              {f.operator}: <strong>{Array.isArray(f.value) ? f.value.join(", ") : f.value}</strong>
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+              </Box>
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                 {data.findings.map((f: any) => (

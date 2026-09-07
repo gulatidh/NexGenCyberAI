@@ -949,4 +949,6 @@ export const controlPoliciesApi = {
     apiClient.get("/control-policies/framework-controls/", { params }).then((r) => r.data),
   preview: (clientId: string, body: Record<string, unknown>) =>
     apiClient.post(`/clients/${clientId}/control-policies/preview`, body).then((r) => r.data),
+  explain: (clientId: string, id: string) =>
+    apiClient.get(`/clients/${clientId}/control-policies/${id}/explain`).then((r) => r.data),
 };

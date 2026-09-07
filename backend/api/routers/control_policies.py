@@ -186,6 +186,97 @@ def preview_policy(
     return {"issue_count": issue_count, "affected_assets": affected_assets}
 
 
+@router.get("/clients/{client_id}/control-policies/{policy_id}/explain")
+def explain_policy(
+    client_id: str,
+    policy_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Show active filters and step-by-step match counts so the user can diagnose 0-result policies."""
+    p = db.query(ControlPolicy).filter(
+        ControlPolicy.id == policy_id, ControlPolicy.client_id == client_id
+    ).first()
+    if not p:
+        raise HTTPException(404, "Policy not found")
+
+    scan_ids = _live_scan_ids(db, client_id)
+    steps = []
+
+    if not scan_ids:
+        return {"steps": [{"label": "Live scans", "count": 0,
+                           "note": "No is_live=True scans found for this client. Run a scan first."}],
+                "active_filters": [], "final_count": 0}
+
+    # Step 0: all open findings from live scans
+    base = db.query(Finding).filter(Finding.scan_id.in_(scan_ids), Finding.status == "open")
+    total_open = base.count()
+    steps.append({"label": "All open findings (live scans)", "count": total_open, "note": None})
+
+    q = base
+    active_filters = []
+
+    if p.match_title:
+        q = q.filter(Finding.title.ilike(f"%{p.match_title}%"))
+        c = q.count()
+        active_filters.append({"field": "match_title", "value": p.match_title,
+                                "operator": "title ILIKE '%…%'"})
+        steps.append({"label": f'After title filter: "{p.match_title}"', "count": c,
+                      "note": "0 means the keyword doesn't appear in any open finding title" if c == 0 else None})
+
+    if p.match_severity:
+        q = q.filter(Finding.severity == p.match_severity)
+        c = q.count()
+        active_filters.append({"field": "match_severity", "value": p.match_severity,
+                                "operator": "severity ="})
+        steps.append({"label": f"After severity filter: {p.match_severity}", "count": c,
+                      "note": "0 means no remaining findings have this severity" if c == 0 else None})
+
+    if p.match_cve:
+        q = q.filter(or_(Finding.cve_id.ilike(f"%{p.match_cve}%"),
+                         Finding.cve_ids.ilike(f"%{p.match_cve}%")))
+        c = q.count()
+        active_filters.append({"field": "match_cve", "value": p.match_cve, "operator": "cve_id ILIKE"})
+        steps.append({"label": f"After CVE filter: {p.match_cve}", "count": c, "note": None})
+
+    resource_types = _get_resource_types(p)
+    if resource_types:
+        q = q.filter(Finding.resource_type.in_(resource_types))
+        c = q.count()
+        active_filters.append({"field": "match_resource_types", "value": resource_types,
+                                "operator": "resource_type IN"})
+        steps.append({"label": f"After resource type filter: {resource_types}", "count": c,
+                      "note": "0 means findings exist but none have these resource types" if c == 0 else None})
+
+    if p.match_asset_class:
+        active_filters.append({"field": "match_asset_class", "value": p.match_asset_class,
+                                "operator": "asset_class (note: asset_class is on Asset not Finding — not currently applied to findings)"})
+        steps.append({"label": f"match_asset_class={p.match_asset_class}",
+                      "count": q.count(), "note": "asset_class filter applies to assets, not directly to findings"})
+
+    if p.match_connector_type:
+        q = q.filter(
+            Finding.scan_id.in_(
+                db.query(Scan.id)
+                .join(Connector, Scan.connector_id == Connector.id)
+                .filter(Connector.client_id == client_id,
+                        Connector.connector_type == p.match_connector_type,
+                        Scan.is_live == True)
+                .scalar_subquery()
+            )
+        )
+        c = q.count()
+        active_filters.append({"field": "match_connector_type", "value": p.match_connector_type,
+                                "operator": "connector_type ="})
+        steps.append({"label": f"After connector filter: {p.match_connector_type}", "count": c, "note": None})
+
+    if not active_filters:
+        steps.append({"label": "No match rules — matches ALL open findings", "count": total_open,
+                      "note": "Add a match_title, match_severity, or resource type to narrow results"})
+
+    return {"steps": steps, "active_filters": active_filters, "final_count": q.count()}
+
+
 # ── Framework controls picker (global — no client_id, must come before {policy_id} routes) ──
 
 @router.get("/control-policies/framework-controls/")
