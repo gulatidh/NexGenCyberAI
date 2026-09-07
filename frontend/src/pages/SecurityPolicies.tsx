@@ -19,6 +19,17 @@ import { controlPoliciesApi, frameworksApi } from "../services/api";
 import { ControlPolicy, PolicyOptions, FrameworkControlEntry } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
 
+/** Extract a specific searchable keyword from an audit-language control title.
+ *  e.g. "Ensure Security Defaults is enabled on Azure AD" → "Security Defaults" */
+function extractMatchKeyword(title: string): string {
+  const stripped = title
+    .replace(/^(ensure\s+that|ensure|verify\s+that|verify|check\s+that|check|configure|enable|disable)\s+/i, "")
+    .trim();
+  // Grab the noun phrase before the first "is/are/has/have/does/should/can"
+  const m = stripped.match(/^(.+?)\s+(is\s|are\s|has\s|have\s|does\s|should\s|can\s)/i);
+  return (m ? m[1] : stripped).trim().slice(0, 120);
+}
+
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
 };
@@ -239,6 +250,8 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
       description: ctrl.description ?? "",
       framework: ctrl.framework,
       framework_control_id: ctrl.control_id,
+      // Auto-extract a specific keyword so the policy doesn't match every finding
+      match_title: extractMatchKeyword(ctrl.title),
     }));
   };
 
@@ -386,9 +399,16 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
-              <TextField label="Title contains" value={form.match_title}
-                onChange={(e) => set("match_title", e.target.value)} size="small"
-                placeholder="e.g. SSH password authentication" />
+              <Box>
+                <TextField label="Title contains" value={form.match_title}
+                  onChange={(e) => set("match_title", e.target.value)} size="small" fullWidth
+                  placeholder="e.g. SSH password authentication" />
+                {selectedCtrl && form.match_title && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    Auto-extracted from control title — edit to refine.
+                  </Typography>
+                )}
+              </Box>
               <FormControl size="small">
                 <InputLabel>Finding severity</InputLabel>
                 <Select value={form.match_severity} label="Finding severity"
@@ -523,6 +543,15 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
       <Box sx={{ p: 3, flex: 1, overflow: "auto" }}>
         {isLoading ? <CircularProgress size={24} /> : (
           <>
+            {/* Warn if this policy has no meaningful match rules — results are unscoped */}
+            {policy && !policy.match_title && !policy.match_severity && !policy.match_cve
+              && !policy.match_asset_class && !policy.match_connector_type
+              && !(policy.match_resource_types ?? []).length && (
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                This policy has no match rules — it matches <strong>all</strong> open findings. Edit the policy to add a title keyword, resource type scope, or other filters so only relevant findings are counted.
+              </Alert>
+            )}
+
             <Box sx={{ display: "flex", gap: 3, mb: 3 }}>
               <Box sx={{ textAlign: "center" }}>
                 <Typography variant="h4" sx={{ fontWeight: 700, color: SEV_COLOR[policy?.severity ?? "high"] }}>
@@ -742,8 +771,13 @@ export default function SecurityPolicies() {
                       </Typography>
                     )}
                     {p.framework_control_id && (
-                      <Chip label={`${p.framework ?? ""} ${p.framework_control_id}`} size="small"
-                        sx={{ mt: 0.5, fontSize: 9, height: 16, bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4" }} />
+                      <Tooltip title={p.framework ? `Framework: ${p.framework.toUpperCase().replace(/_/g, " ")}` : ""}>
+                        <Chip
+                          label={`${p.framework ? p.framework.replace(/_/g, " ").toUpperCase() + " · " : ""}${p.framework_control_id}`}
+                          size="small"
+                          sx={{ mt: 0.5, fontSize: 9, height: 16, bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", maxWidth: 200 }}
+                        />
+                      </Tooltip>
                     )}
                   </TableCell>
 
