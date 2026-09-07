@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box, Typography, Button, Chip, IconButton, Table, TableHead, TableRow,
   TableCell, TableBody, Switch, Tooltip, Dialog, DialogTitle, DialogContent,
@@ -19,15 +19,30 @@ import { controlPoliciesApi, frameworksApi } from "../services/api";
 import { ControlPolicy, PolicyOptions, FrameworkControlEntry } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
 
-/** Extract a specific searchable keyword from an audit-language control title.
- *  e.g. "Ensure Security Defaults is enabled on Azure AD" → "Security Defaults" */
+/** Extract a short, scannable keyword from an audit-language control title.
+ *  CIS/NIST control titles use prescriptive language ("Ensure X is set to Y")
+ *  while scanner findings use descriptive language ("Storage account permits outdated TLS").
+ *  We extract the shortest distinctive noun phrase so at least "TLS" matches "outdated TLS". */
 function extractMatchKeyword(title: string): string {
-  const stripped = title
+  let s = title
     .replace(/^(ensure\s+that|ensure|verify\s+that|verify|check\s+that|check|configure|enable|disable)\s+/i, "")
     .trim();
-  // Grab the noun phrase before the first "is/are/has/have/does/should/can"
-  const m = stripped.match(/^(.+?)\s+(is\s|are\s|has\s|have\s|does\s|should\s|can\s)/i);
-  return (m ? m[1] : stripped).trim().slice(0, 120);
+
+  // Grab noun phrase before the first verb clause ("is set", "are enabled", etc.)
+  const verbM = s.match(/^(.+?)\s+(is\s|are\s|has\s|have\s|does\s|should\s|can\s)/i);
+  if (verbM) s = verbM[1].trim();
+
+  // Strip leading articles
+  s = s.replace(/^(the|a|an|that)\s+/i, "").trim();
+
+  // Strip trailing prepositional phrases ("for storage accounts", "on Azure AD", etc.)
+  s = s.replace(/\s+(for|of|on|in|with|at|from|by)\s+.*/i, "").trim();
+
+  // Remove quotes and backticks — framework controls quote resource names
+  s = s.replace(/[`'"]/g, "").trim();
+
+  // Max 3 words so the keyword is short enough to appear verbatim in scanner titles
+  return s.split(/\s+/).slice(0, 3).join(" ");
 }
 
 const SEV_COLOR: Record<string, string> = {
@@ -297,6 +312,35 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
   const hasRule = form.match_title || form.match_severity || form.match_asset_class
     || form.match_cve || form.match_resource_types.length > 0 || form.match_connector_type;
 
+  // Debounced live preview — shows matching finding count while user edits rules
+  const [preview, setPreview] = useState<{ issue_count: number; affected_assets: number } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!open || !clientId) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setPreviewLoading(true);
+      try {
+        const result = await controlPoliciesApi.preview(clientId, {
+          name: form.name || "_preview_",
+          match_title: form.match_title || null,
+          match_severity: form.match_severity || null,
+          match_asset_class: form.match_asset_class || null,
+          match_cve: form.match_cve || null,
+          match_resource_types: form.match_resource_types,
+          match_connector_type: form.match_connector_type || null,
+        });
+        setPreview(result);
+      } catch { /* ignore */ }
+      finally { setPreviewLoading(false); }
+    }, 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, clientId, form.match_title, form.match_severity, form.match_asset_class,
+      form.match_cve, form.match_resource_types, form.match_connector_type]);
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -380,9 +424,28 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
 
         {/* Match rules */}
         <Box>
-          <Typography variant="overline" color="text.secondary">Match Rules</Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+            <Typography variant="overline" color="text.secondary">Match Rules</Typography>
+            {/* Live preview badge */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+              {previewLoading && <CircularProgress size={12} />}
+              {!previewLoading && preview !== null && (
+                <Chip
+                  label={preview.issue_count === 0
+                    ? "0 findings match"
+                    : `~${preview.issue_count} finding${preview.issue_count !== 1 ? "s" : ""} · ${preview.affected_assets} asset${preview.affected_assets !== 1 ? "s" : ""}`}
+                  size="small"
+                  sx={{
+                    fontSize: 10, height: 20,
+                    bgcolor: preview.issue_count === 0 ? "rgba(52,168,83,0.1)" : "rgba(66,133,244,0.12)",
+                    color: preview.issue_count === 0 ? "#34A853" : "#4285F4",
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-            All non-empty rules are AND-combined. Resource type scoping restricts which findings are evaluated.
+            All non-empty rules are AND-combined. The preview count updates as you type — use it to verify your rules match actual scanner findings.
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
             {/* Resource types — multi-select, prominent at top */}
@@ -418,9 +481,9 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
                 <TextField label="Title contains" value={form.match_title}
                   onChange={(e) => set("match_title", e.target.value)} size="small" fullWidth
                   placeholder="e.g. SSH password authentication" />
-                {selectedCtrl && form.match_title && (
+                {selectedCtrl && (
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                    Auto-extracted from control title — edit to refine.
+                    Auto-suggested from control title. Framework controls use prescriptive language ("Ensure X is set") but scanner findings use descriptive language ("permits outdated TLS"). Shorten to a key term that appears in your findings — check the preview count above.
                   </Typography>
                 )}
               </Box>

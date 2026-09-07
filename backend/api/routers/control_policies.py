@@ -159,6 +159,33 @@ def _policy_to_dict(p: ControlPolicy, issue_count: int = 0, affected_assets: int
     }
 
 
+# ── Preview (dry-run, no DB write) — must come before {policy_id} routes ─────
+
+@router.post("/clients/{client_id}/control-policies/preview")
+def preview_policy(
+    client_id: str,
+    body: PolicyCreate,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Dry-run evaluation: count matching findings without creating a policy."""
+    temp = ControlPolicy(
+        id="__preview__",
+        client_id=client_id,
+        name=body.name or "",
+        status="active",
+        match_title=body.match_title,
+        match_severity=body.match_severity,
+        match_asset_class=body.match_asset_class,
+        match_cve=body.match_cve,
+        match_resource_type=None,
+        match_resource_types=json.dumps(body.match_resource_types or []),
+        match_connector_type=body.match_connector_type,
+    )
+    issue_count, affected_assets = _evaluate_policy(db, temp, client_id)
+    return {"issue_count": issue_count, "affected_assets": affected_assets}
+
+
 # ── Framework controls picker (global — no client_id, must come before {policy_id} routes) ──
 
 @router.get("/control-policies/framework-controls/")
