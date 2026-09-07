@@ -945,4 +945,6 @@ export const controlPoliciesApi = {
     apiClient.get(`/clients/${clientId}/control-policies/${id}/issues`, { params: { limit } }).then((r) => r.data),
   options: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/control-policies/meta/options`).then((r) => r.data),
+  frameworkControls: (params?: { framework?: string; domain?: string; search?: string; limit?: number }) =>
+    apiClient.get("/control-policies/framework-controls/", { params }).then((r) => r.data),
 };

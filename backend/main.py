@@ -859,6 +859,16 @@ def _ensure_added_columns() -> None:
                 logger.info("Added control_policies.updated_at column (%s)", dialect)
             except Exception as exc:
                 logger.warning("control_policies.updated_at ALTER failed: %s", exc)
+        if cp_cols and "match_resource_types" not in cp_cols:
+            ddl = ("ALTER TABLE control_policies ADD match_resource_types NVARCHAR(2000) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE control_policies ADD COLUMN match_resource_types TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added control_policies.match_resource_types column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("control_policies.match_resource_types ALTER failed: %s", exc)
 
         # assets.override_class — user-set technology type override
         try:

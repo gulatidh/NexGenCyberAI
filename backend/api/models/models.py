@@ -1979,8 +1979,9 @@ class ControlPolicy(Base):
     match_severity = Column(String(20))     # finding.severity ==
     match_asset_class = Column(String(64))  # asset.asset_class ==
     match_cve = Column(String(100))         # finding.cve_id ilike %value%
-    match_resource_type = Column(String(200))  # finding.resource_type ==
-    match_connector_type = Column(String(100)) # connector.connector_type ==
+    match_resource_type = Column(String(200))   # legacy single value
+    match_resource_types = Column(Text)          # JSON array e.g. '["VirtualMachine","StorageAccount"]'
+    match_connector_type = Column(String(100))   # connector.connector_type ==
 
     # Optional link to a framework control
     framework = Column(String(50))

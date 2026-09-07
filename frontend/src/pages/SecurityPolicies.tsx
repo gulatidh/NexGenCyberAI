@@ -3,19 +3,21 @@ import {
   Box, Typography, Button, Chip, IconButton, Table, TableHead, TableRow,
   TableCell, TableBody, Switch, Tooltip, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, MenuItem, Select, FormControl, InputLabel,
-  CircularProgress, Drawer, Divider, Stack, Alert, Badge, InputAdornment,
-  ToggleButtonGroup, ToggleButton, Card,
+  CircularProgress, Drawer, Divider, Alert, InputAdornment,
+  ToggleButtonGroup, ToggleButton, Card, Autocomplete, List, ListItem,
+  ListItemButton, ListItemText, Collapse,
 } from "@mui/material";
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
   Search as SearchIcon, Close as CloseIcon, Policy as PolicyIcon,
-  BugReport as BugIcon, FilterList as FilterIcon, Shield as ShieldIcon,
+  BugReport as BugIcon, Shield as ShieldIcon, CheckCircle as CheckCircleIcon,
+  ExpandMore as ExpandMoreIcon, ExpandLess as ExpandLessIcon,
+  AccountTree as AccountTreeIcon,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { controlPoliciesApi } from "../services/api";
-import { ControlPolicy, PolicyOptions } from "../types";
+import { controlPoliciesApi, frameworksApi } from "../services/api";
+import { ControlPolicy, PolicyOptions, FrameworkControlEntry } from "../types";
 import { useActiveClient } from "../contexts/ClientContext";
-import { fromNow } from "../utils/datetime";
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#4285F4",
@@ -31,6 +33,150 @@ const RISK_TAG_LABELS: Record<string, string> = {
   ransomware_path: "Ransomware Path", exfiltration: "Exfiltration",
 };
 
+// ── Framework control picker ──────────────────────────────────────────────────
+
+interface FrameworkPickerProps {
+  onSelect: (ctrl: FrameworkControlEntry) => void;
+  selected: FrameworkControlEntry | null;
+  onClear: () => void;
+}
+
+function FrameworkPicker({ onSelect, selected, onClear }: FrameworkPickerProps) {
+  const [fwKey, setFwKey] = useState("");
+  const [domain, setDomain] = useState("");
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(true);
+
+  const { data: catalogRaw } = useQuery<any[]>({
+    queryKey: ["fw-catalog-all"],
+    queryFn: () => frameworksApi.catalogAll(),
+  });
+
+  const frameworks = React.useMemo(() => {
+    if (!catalogRaw) return [];
+    return catalogRaw.filter((f: any) => !f.is_custom).map((f: any) => ({
+      key: f.key ?? f.framework ?? f.name,
+      name: f.name ?? f.key,
+    }));
+  }, [catalogRaw]);
+
+  const { data: controls = [], isFetching } = useQuery<FrameworkControlEntry[]>({
+    queryKey: ["fw-controls-picker", fwKey, domain, search],
+    queryFn: () => controlPoliciesApi.frameworkControls({
+      framework: fwKey,
+      domain: domain || undefined,
+      search: search || undefined,
+      limit: 50,
+    }),
+    enabled: !!fwKey,
+  });
+
+  const domains = React.useMemo(() => {
+    const d = new Set(controls.map((c) => c.domain).filter(Boolean) as string[]);
+    return Array.from(d).sort();
+  }, [controls]);
+
+  if (selected && !expanded) {
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, p: 1.5, bgcolor: "rgba(52,168,83,0.08)", borderRadius: 1.5, border: "1px solid rgba(52,168,83,0.3)" }}>
+        <CheckCircleIcon sx={{ color: "#34A853", fontSize: 18 }} />
+        <Box sx={{ flex: 1 }}>
+          <Typography variant="caption" color="text.secondary">Framework control selected</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            [{selected.framework.toUpperCase()}] {selected.control_id} — {selected.title}
+          </Typography>
+        </Box>
+        <IconButton size="small" onClick={() => { onClear(); setExpanded(true); }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5, overflow: "hidden" }}>
+      <Box
+        sx={{ px: 2, py: 1.5, bgcolor: "action.hover", display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
+        onClick={() => selected && setExpanded(!expanded)}
+      >
+        <AccountTreeIcon sx={{ fontSize: 16, color: "#4285F4" }} />
+        <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }}>
+          {selected ? `${selected.framework.toUpperCase()} · ${selected.control_id}` : "Search framework controls"}
+        </Typography>
+        {selected && (expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />)}
+      </Box>
+
+      <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+        {/* Row 1: framework + domain */}
+        <Box sx={{ display: "flex", gap: 1.5 }}>
+          <FormControl size="small" sx={{ flex: 1 }}>
+            <InputLabel>Framework</InputLabel>
+            <Select value={fwKey} label="Framework" onChange={(e) => { setFwKey(e.target.value); setDomain(""); }}>
+              <MenuItem value=""><em>Select…</em></MenuItem>
+              {frameworks.map((f) => (
+                <MenuItem key={f.key} value={f.key}>{f.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ flex: 1 }} disabled={!fwKey || domains.length === 0}>
+            <InputLabel>Domain</InputLabel>
+            <Select value={domain} label="Domain" onChange={(e) => setDomain(e.target.value)}>
+              <MenuItem value=""><em>All domains</em></MenuItem>
+              {domains.map((d) => <MenuItem key={d} value={d}>{d}</MenuItem>)}
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Row 2: search */}
+        {fwKey && (
+          <TextField
+            size="small" fullWidth
+            placeholder="Search control ID or title…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 16, color: "text.secondary" }} /></InputAdornment> } }}
+          />
+        )}
+
+        {/* Control list */}
+        {fwKey && (
+          isFetching ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}><CircularProgress size={20} /></Box>
+          ) : controls.length === 0 ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center", py: 1 }}>
+              No controls found
+            </Typography>
+          ) : (
+            <List dense disablePadding sx={{ maxHeight: 220, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              {controls.map((ctrl) => (
+                <ListItem key={ctrl.id} disablePadding divider>
+                  <ListItemButton
+                    onClick={() => { onSelect(ctrl); setExpanded(false); }}
+                    selected={selected?.id === ctrl.id}
+                    sx={{ py: 0.75, gap: 1 }}
+                  >
+                    <Chip label={ctrl.control_id} size="small"
+                      sx={{ fontSize: 10, height: 18, bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", flexShrink: 0, fontFamily: "monospace" }} />
+                    <ListItemText
+                      primary={ctrl.title}
+                      secondary={ctrl.domain}
+                      slotProps={{
+                        primary: { style: { fontSize: 12, fontWeight: 500 } },
+                        secondary: { style: { fontSize: 11 } },
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          )
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+
 // ── Policy form ───────────────────────────────────────────────────────────────
 
 interface PolicyFormProps {
@@ -44,17 +190,22 @@ interface PolicyFormProps {
 const EMPTY_FORM = {
   name: "", description: "", severity: "high", category: "",
   match_title: "", match_severity: "", match_asset_class: "",
-  match_cve: "", match_resource_type: "", match_connector_type: "",
-  framework: "", framework_control_id: "", risk_tags: [] as string[],
+  match_cve: "", match_resource_types: [] as string[],
+  match_connector_type: "", framework: "", framework_control_id: "",
+  risk_tags: [] as string[],
 };
 
 function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyFormProps) {
   const qc = useQueryClient();
   const isEdit = !!initial?.id;
+  const [mode, setMode] = useState<"scratch" | "framework">("scratch");
+  const [selectedCtrl, setSelectedCtrl] = useState<FrameworkControlEntry | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
   React.useEffect(() => {
     if (open) {
+      setMode("scratch");
+      setSelectedCtrl(null);
       setForm(initial ? {
         name: initial.name ?? "",
         description: initial.description ?? "",
@@ -64,7 +215,7 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
         match_severity: initial.match_severity ?? "",
         match_asset_class: initial.match_asset_class ?? "",
         match_cve: initial.match_cve ?? "",
-        match_resource_type: initial.match_resource_type ?? "",
+        match_resource_types: initial.match_resource_types ?? [],
         match_connector_type: initial.match_connector_type ?? "",
         framework: initial.framework ?? "",
         framework_control_id: initial.framework_control_id ?? "",
@@ -74,46 +225,49 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
   }, [open, initial]);
 
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
   const toggleTag = (tag: string) =>
     set("risk_tags", form.risk_tags.includes(tag)
       ? form.risk_tags.filter((t) => t !== tag)
       : [...form.risk_tags, tag]);
 
+  const handleCtrlSelect = (ctrl: FrameworkControlEntry) => {
+    setSelectedCtrl(ctrl);
+    setForm((f) => ({
+      ...f,
+      name: ctrl.title,
+      description: ctrl.description ?? "",
+      framework: ctrl.framework,
+      framework_control_id: ctrl.control_id,
+    }));
+  };
+
+  const buildBody = () => ({
+    ...form,
+    category: form.category || null,
+    match_title: form.match_title || null,
+    match_severity: form.match_severity || null,
+    match_asset_class: form.match_asset_class || null,
+    match_cve: form.match_cve || null,
+    match_resource_types: form.match_resource_types,
+    match_connector_type: form.match_connector_type || null,
+    framework: form.framework || null,
+    framework_control_id: form.framework_control_id || null,
+  });
+
   const createMut = useMutation({
-    mutationFn: () => controlPoliciesApi.create(clientId, {
-      ...form,
-      category: form.category || null,
-      match_title: form.match_title || null,
-      match_severity: form.match_severity || null,
-      match_asset_class: form.match_asset_class || null,
-      match_cve: form.match_cve || null,
-      match_resource_type: form.match_resource_type || null,
-      match_connector_type: form.match_connector_type || null,
-      framework: form.framework || null,
-      framework_control_id: form.framework_control_id || null,
-    }),
+    mutationFn: () => controlPoliciesApi.create(clientId, buildBody()),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["control-policies", clientId] }); onClose(); },
   });
 
   const updateMut = useMutation({
-    mutationFn: () => controlPoliciesApi.update(clientId, initial!.id, {
-      ...form,
-      category: form.category || null,
-      match_title: form.match_title || null,
-      match_severity: form.match_severity || null,
-      match_asset_class: form.match_asset_class || null,
-      match_cve: form.match_cve || null,
-      match_resource_type: form.match_resource_type || null,
-      match_connector_type: form.match_connector_type || null,
-      framework: form.framework || null,
-      framework_control_id: form.framework_control_id || null,
-    }),
+    mutationFn: () => controlPoliciesApi.update(clientId, initial!.id, buildBody()),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["control-policies", clientId] }); onClose(); },
   });
 
   const busy = createMut.isPending || updateMut.isPending;
   const hasRule = form.match_title || form.match_severity || form.match_asset_class
-    || form.match_cve || form.match_resource_type || form.match_connector_type;
+    || form.match_cve || form.match_resource_types.length > 0 || form.match_connector_type;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -121,14 +275,52 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
         <PolicyIcon sx={{ color: "#4285F4" }} />
         {isEdit ? "Edit Security Policy" : "Create Security Policy"}
       </DialogTitle>
+
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: "16px !important" }}>
 
-        {/* Identity */}
+        {/* Mode toggle (only on create) */}
+        {!isEdit && (
+          <Box>
+            <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              Starting point
+            </Typography>
+            <ToggleButtonGroup size="small" value={mode} exclusive onChange={(_, v) => v && setMode(v)} fullWidth>
+              <ToggleButton value="scratch">
+                From Scratch
+              </ToggleButton>
+              <ToggleButton value="framework">
+                From Framework Control
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+        )}
+
+        {/* Framework picker panel */}
+        {mode === "framework" && !isEdit && (
+          <>
+            <Box>
+              <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Pick a Framework Control
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Selecting a control auto-fills the policy name, description, and framework link. You can edit everything after.
+              </Typography>
+              <FrameworkPicker
+                onSelect={handleCtrlSelect}
+                selected={selectedCtrl}
+                onClear={() => setSelectedCtrl(null)}
+              />
+            </Box>
+            <Divider />
+          </>
+        )}
+
+        {/* Policy identity */}
         <Box>
           <Typography variant="overline" color="text.secondary">Policy Identity</Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mt: 1 }}>
-            <TextField label="Policy Name" value={form.name} onChange={(e) => set("name", e.target.value)} required fullWidth
-              placeholder="e.g. Critical CVEs on internet-facing VMs" />
+            <TextField label="Policy Name" value={form.name} onChange={(e) => set("name", e.target.value)}
+              required fullWidth placeholder="e.g. Critical CVEs on internet-facing VMs" />
             <TextField label="Description" value={form.description} onChange={(e) => set("description", e.target.value)}
               multiline rows={2} fullWidth placeholder="What security condition does this policy enforce?" />
             <Box sx={{ display: "flex", gap: 2 }}>
@@ -162,45 +354,76 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
         <Box>
           <Typography variant="overline" color="text.secondary">Match Rules</Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-            All non-empty rules are AND-combined. Leave blank to match all findings on that dimension.
+            All non-empty rules are AND-combined. Resource type scoping restricts which findings are evaluated.
           </Typography>
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
-            <TextField label="Title contains" value={form.match_title}
-              onChange={(e) => set("match_title", e.target.value)} fullWidth
-              placeholder="e.g. SSH password" size="small" />
-            <FormControl fullWidth size="small">
-              <InputLabel>Finding severity</InputLabel>
-              <Select value={form.match_severity} label="Finding severity" onChange={(e) => set("match_severity", e.target.value)}>
-                <MenuItem value=""><em>Any</em></MenuItem>
-                {options.severities.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <TextField label="CVE ID contains" value={form.match_cve}
-              onChange={(e) => set("match_cve", e.target.value)} fullWidth
-              placeholder="e.g. CVE-2024" size="small" />
-            <FormControl fullWidth size="small">
-              <InputLabel>Asset class</InputLabel>
-              <Select value={form.match_asset_class} label="Asset class" onChange={(e) => set("match_asset_class", e.target.value)}>
-                <MenuItem value=""><em>Any</em></MenuItem>
-                {options.asset_classes.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth size="small">
-              <InputLabel>Connector type</InputLabel>
-              <Select value={form.match_connector_type} label="Connector type" onChange={(e) => set("match_connector_type", e.target.value)}>
-                <MenuItem value=""><em>Any</em></MenuItem>
-                {options.connector_types.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <TextField label="Resource type" value={form.match_resource_type}
-              onChange={(e) => set("match_resource_type", e.target.value)} fullWidth
-              placeholder="e.g. VirtualMachine" size="small" />
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {/* Resource types — multi-select, prominent at top */}
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: "text.secondary", display: "block", mb: 0.5 }}>
+                Resource Types (scope)
+              </Typography>
+              <Autocomplete
+                multiple
+                freeSolo
+                options={options.resource_types}
+                value={form.match_resource_types}
+                onChange={(_, v) => set("match_resource_types", v as string[])}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    size="small"
+                    label="Resource types"
+                    placeholder={form.match_resource_types.length === 0 ? "Type or select resource types…" : ""}
+                  />
+                )}
+                slotProps={{ chip: { size: "small" } } as any}
+              />
+              {form.match_resource_types.length === 0 && (
+                <Alert severity="warning" sx={{ mt: 0.75, py: 0.5 }}>
+                  No resource type scoping — this policy evaluates findings across all resource types.
+                </Alert>
+              )}
+            </Box>
+
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+              <TextField label="Title contains" value={form.match_title}
+                onChange={(e) => set("match_title", e.target.value)} size="small"
+                placeholder="e.g. SSH password authentication" />
+              <FormControl size="small">
+                <InputLabel>Finding severity</InputLabel>
+                <Select value={form.match_severity} label="Finding severity"
+                  onChange={(e) => set("match_severity", e.target.value)}>
+                  <MenuItem value=""><em>Any</em></MenuItem>
+                  {options.severities.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="CVE ID contains" value={form.match_cve}
+                onChange={(e) => set("match_cve", e.target.value)} size="small"
+                placeholder="e.g. CVE-2024" />
+              <FormControl size="small">
+                <InputLabel>Asset class</InputLabel>
+                <Select value={form.match_asset_class} label="Asset class"
+                  onChange={(e) => set("match_asset_class", e.target.value)}>
+                  <MenuItem value=""><em>Any</em></MenuItem>
+                  {options.asset_classes.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <FormControl size="small">
+                <InputLabel>Connector type</InputLabel>
+                <Select value={form.match_connector_type} label="Connector type"
+                  onChange={(e) => set("match_connector_type", e.target.value)}>
+                  <MenuItem value=""><em>Any</em></MenuItem>
+                  {options.connector_types.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Box>
+
+            {!hasRule && (
+              <Alert severity="warning">
+                No match rules set — this policy will match all open findings (within scoped resource types).
+              </Alert>
+            )}
           </Box>
-          {!hasRule && (
-            <Alert severity="warning" sx={{ mt: 1.5 }}>
-              No match rules set — this policy will match all open findings.
-            </Alert>
-          )}
         </Box>
 
         <Divider />
@@ -230,7 +453,7 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
 
         {/* Framework link */}
         <Box>
-          <Typography variant="overline" color="text.secondary">Framework Link (optional)</Typography>
+          <Typography variant="overline" color="text.secondary">Framework Link</Typography>
           <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
             <TextField label="Framework" value={form.framework} onChange={(e) => set("framework", e.target.value)}
               size="small" sx={{ flex: 1 }} placeholder="e.g. nist_csf" />
@@ -252,6 +475,7 @@ function PolicyFormDialog({ open, onClose, initial, clientId, options }: PolicyF
   );
 }
 
+
 // ── Issues drawer ─────────────────────────────────────────────────────────────
 
 function IssuesDrawer({ policy, clientId, open, onClose }: {
@@ -272,10 +496,29 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
             <Chip label={policy?.severity} size="small"
               sx={{ bgcolor: `${SEV_COLOR[policy?.severity ?? "high"]}22`, color: SEV_COLOR[policy?.severity ?? "high"] }} />
             {policy?.category && <Chip label={policy.category} size="small" variant="outlined" />}
+            {(policy?.match_resource_types ?? []).length > 0 && (
+              <Chip
+                label={`${policy!.match_resource_types!.length} resource type${policy!.match_resource_types!.length > 1 ? "s" : ""}`}
+                size="small"
+                sx={{ bgcolor: "rgba(66,133,244,0.1)", color: "#4285F4", fontFamily: "monospace" }}
+              />
+            )}
           </Box>
         </Box>
         <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
       </Box>
+
+      {/* Resource type scope pills */}
+      {(policy?.match_resource_types ?? []).length > 0 && (
+        <Box sx={{ px: 3, pt: 1.5, pb: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>Scoped to resource types</Typography>
+          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+            {policy!.match_resource_types!.map((rt) => (
+              <Chip key={rt} label={rt} size="small" sx={{ fontFamily: "monospace", fontSize: 10, height: 20 }} />
+            ))}
+          </Box>
+        </Box>
+      )}
 
       <Box sx={{ p: 3, flex: 1, overflow: "auto" }}>
         {isLoading ? <CircularProgress size={24} /> : (
@@ -305,8 +548,13 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
                         {f.resource_id}
                       </Typography>
                     )}
+                    {f.resource_type && (
+                      <Chip label={f.resource_type} size="small"
+                        sx={{ mt: 0.5, fontSize: 10, height: 18, bgcolor: "action.selected", fontFamily: "monospace" }} />
+                    )}
                     {f.cve_id && (
-                      <Chip label={f.cve_id} size="small" sx={{ mt: 0.5, fontSize: 10, height: 18, bgcolor: "rgba(244,67,54,0.1)", color: "#f44336" }} />
+                      <Chip label={f.cve_id} size="small"
+                        sx={{ mt: 0.5, ml: 0.5, fontSize: 10, height: 18, bgcolor: "rgba(244,67,54,0.1)", color: "#f44336" }} />
                     )}
                   </Card>
                 ))}
@@ -323,6 +571,7 @@ function IssuesDrawer({ policy, clientId, open, onClose }: {
     </Drawer>
   );
 }
+
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -455,9 +704,10 @@ export default function SecurityPolicies() {
           <PolicyIcon sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
           <Typography variant="h6" color="text.secondary" gutterBottom>No policies yet</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Create your first security policy to start monitoring compliance.
+            Create from scratch or pick a framework control to get started.
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditTarget(undefined); setFormOpen(true); }}>
+          <Button variant="contained" startIcon={<AddIcon />}
+            onClick={() => { setEditTarget(undefined); setFormOpen(true); }}>
             Create Policy
           </Button>
         </Box>
@@ -467,10 +717,11 @@ export default function SecurityPolicies() {
             <TableHead>
               <TableRow sx={{ "& th": { bgcolor: "background.paper", color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                 <TableCell sx={{ pl: 2 }}>POLICY</TableCell>
+                <TableCell sx={{ width: 180 }}>RESOURCE SCOPE</TableCell>
                 <TableCell align="center" sx={{ width: 90 }}>ISSUES</TableCell>
                 <TableCell sx={{ width: 110 }}>SEVERITY</TableCell>
                 <TableCell sx={{ width: 130 }}>CATEGORY</TableCell>
-                <TableCell sx={{ width: 200 }}>RISK TAGS</TableCell>
+                <TableCell sx={{ width: 180 }}>RISK TAGS</TableCell>
                 <TableCell sx={{ width: 70 }}>STATUS</TableCell>
                 <TableCell align="right" sx={{ width: 100, pr: 2 }}>ACTIONS</TableCell>
               </TableRow>
@@ -479,8 +730,8 @@ export default function SecurityPolicies() {
               {sorted.map((p) => (
                 <TableRow key={p.id} hover
                   sx={{ "& td": { borderColor: "divider", py: 1 }, "&:hover": { bgcolor: "action.hover" } }}>
-                  {/* Policy name + description */}
-                  <TableCell sx={{ pl: 2, maxWidth: 340 }}>
+                  {/* Policy name */}
+                  <TableCell sx={{ pl: 2, maxWidth: 280 }}>
                     <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.3 }}>{p.name}</Typography>
                     {p.description && (
                       <Typography variant="caption" color="text.secondary" sx={{
@@ -496,6 +747,23 @@ export default function SecurityPolicies() {
                     )}
                   </TableCell>
 
+                  {/* Resource scope */}
+                  <TableCell>
+                    {(p.match_resource_types ?? []).length > 0 ? (
+                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                        {p.match_resource_types!.slice(0, 2).map((rt) => (
+                          <Chip key={rt} label={rt} size="small"
+                            sx={{ fontSize: 9, height: 16, fontFamily: "monospace", bgcolor: "rgba(66,133,244,0.08)", color: "#4285F4" }} />
+                        ))}
+                        {p.match_resource_types!.length > 2 && (
+                          <Typography variant="caption" color="text.secondary">+{p.match_resource_types!.length - 2}</Typography>
+                        )}
+                      </Box>
+                    ) : (
+                      <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>All types</Typography>
+                    )}
+                  </TableCell>
+
                   {/* Issues count */}
                   <TableCell align="center">
                     {p.status === "disabled" ? (
@@ -506,7 +774,8 @@ export default function SecurityPolicies() {
                           onClick={() => setIssuesPolicy(p)}
                           sx={{
                             display: "inline-flex", alignItems: "center", gap: 0.5,
-                            cursor: "pointer", color: (p.issue_count ?? 0) > 0 ? "#f44336" : "text.secondary",
+                            cursor: "pointer",
+                            color: (p.issue_count ?? 0) > 0 ? "#f44336" : "text.secondary",
                             fontWeight: (p.issue_count ?? 0) > 0 ? 700 : 400,
                           }}
                         >
@@ -533,12 +802,12 @@ export default function SecurityPolicies() {
                   {/* Risk tags */}
                   <TableCell>
                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                      {(p.risk_tags ?? []).slice(0, 3).map((tag) => (
+                      {(p.risk_tags ?? []).slice(0, 2).map((tag) => (
                         <Chip key={tag} label={RISK_TAG_LABELS[tag] ?? tag} size="small"
                           sx={{ fontSize: 9, height: 16, bgcolor: "rgba(66,133,244,0.08)", color: "text.secondary" }} />
                       ))}
-                      {(p.risk_tags ?? []).length > 3 && (
-                        <Typography variant="caption" color="text.secondary">+{p.risk_tags.length - 3}</Typography>
+                      {(p.risk_tags ?? []).length > 2 && (
+                        <Typography variant="caption" color="text.secondary">+{p.risk_tags.length - 2}</Typography>
                       )}
                     </Box>
                   </TableCell>
@@ -550,7 +819,10 @@ export default function SecurityPolicies() {
                         size="small"
                         checked={p.status === "active"}
                         onChange={() => toggleMut.mutate(p.id)}
-                        sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: "#34A853" }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#34A853" } }}
+                        sx={{
+                          "& .MuiSwitch-switchBase.Mui-checked": { color: "#34A853" },
+                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: "#34A853" },
+                        }}
                       />
                     </Tooltip>
                   </TableCell>

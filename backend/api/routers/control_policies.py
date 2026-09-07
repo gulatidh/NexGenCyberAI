@@ -3,7 +3,7 @@ Security Control Policies — user-defined rules evaluated live against open fin
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from typing import Optional, List
 from pydantic import BaseModel
 import json
@@ -11,7 +11,7 @@ import uuid
 
 from db.database import get_db
 from core.security import get_current_user
-from api.models.models import ControlPolicy, Finding, Scan, Connector, Asset, Client
+from api.models.models import ControlPolicy, Finding, Scan, Connector, Asset
 
 router = APIRouter(tags=["control-policies"])
 
@@ -34,7 +34,8 @@ class PolicyCreate(BaseModel):
     match_severity: Optional[str] = None
     match_asset_class: Optional[str] = None
     match_cve: Optional[str] = None
-    match_resource_type: Optional[str] = None
+    match_resource_type: Optional[str] = None   # legacy compat
+    match_resource_types: List[str] = []         # multi-type scoping
     match_connector_type: Optional[str] = None
     framework: Optional[str] = None
     framework_control_id: Optional[str] = None
@@ -50,7 +51,8 @@ class PolicyUpdate(BaseModel):
     match_severity: Optional[str] = None
     match_asset_class: Optional[str] = None
     match_cve: Optional[str] = None
-    match_resource_type: Optional[str] = None
+    match_resource_type: Optional[str] = None   # legacy compat
+    match_resource_types: Optional[List[str]] = None  # multi-type scoping
     match_connector_type: Optional[str] = None
     framework: Optional[str] = None
     framework_control_id: Optional[str] = None
@@ -60,7 +62,6 @@ class PolicyUpdate(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _live_scan_ids(db: Session, client_id: str) -> List[str]:
-    """Return IDs of is_live=True scans for this client."""
     rows = (
         db.query(Scan.id)
         .join(Connector, Scan.connector_id == Connector.id)
@@ -70,8 +71,27 @@ def _live_scan_ids(db: Session, client_id: str) -> List[str]:
     return [r[0] for r in rows]
 
 
+def _get_resource_types(policy: ControlPolicy) -> List[str]:
+    """Return the effective resource type list for a policy (multi takes precedence)."""
+    if policy.match_resource_types:
+        try:
+            types = json.loads(policy.match_resource_types)
+            if isinstance(types, list) and types:
+                return types
+        except Exception:
+            pass
+    if policy.match_resource_type:
+        return [policy.match_resource_type]
+    return []
+
+
+def _apply_resource_type_filter(q, resource_types: List[str]):
+    if resource_types:
+        q = q.filter(Finding.resource_type.in_(resource_types))
+    return q
+
+
 def _evaluate_policy(db: Session, policy: ControlPolicy, client_id: str):
-    """Count open findings that match this policy's rules."""
     scan_ids = _live_scan_ids(db, client_id)
     if not scan_ids:
         return 0, 0
@@ -91,8 +111,7 @@ def _evaluate_policy(db: Session, policy: ControlPolicy, client_id: str):
                 Finding.cve_ids.ilike(f"%{policy.match_cve}%"),
             )
         )
-    if policy.match_resource_type:
-        q = q.filter(Finding.resource_type == policy.match_resource_type)
+    q = _apply_resource_type_filter(q, _get_resource_types(policy))
     if policy.match_connector_type:
         q = q.filter(
             Finding.scan_id.in_(
@@ -127,6 +146,7 @@ def _policy_to_dict(p: ControlPolicy, issue_count: int = 0, affected_assets: int
         "match_asset_class": p.match_asset_class,
         "match_cve": p.match_cve,
         "match_resource_type": p.match_resource_type,
+        "match_resource_types": json.loads(p.match_resource_types) if p.match_resource_types else [],
         "match_connector_type": p.match_connector_type,
         "framework": p.framework,
         "framework_control_id": p.framework_control_id,
@@ -139,7 +159,46 @@ def _policy_to_dict(p: ControlPolicy, issue_count: int = 0, affected_assets: int
     }
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Framework controls picker (global — no client_id, must come before {policy_id} routes) ──
+
+@router.get("/control-policies/framework-controls/")
+def browse_framework_controls(
+    framework: Optional[str] = Query(None),
+    domain: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return FrameworkControl rows for the policy creation picker."""
+    from api.models.models import FrameworkControl
+    q = db.query(FrameworkControl)
+    if framework:
+        q = q.filter(FrameworkControl.framework == framework)
+    if domain:
+        q = q.filter(FrameworkControl.domain == domain)
+    if search:
+        q = q.filter(
+            or_(
+                FrameworkControl.control_id.ilike(f"%{search}%"),
+                FrameworkControl.title.ilike(f"%{search}%"),
+            )
+        )
+    rows = q.order_by(FrameworkControl.framework, FrameworkControl.control_id).limit(limit).all()
+    return [
+        {
+            "id": r.id,
+            "framework": r.framework.value if hasattr(r.framework, "value") else str(r.framework),
+            "control_id": r.control_id,
+            "domain": r.domain,
+            "title": r.title,
+            "description": r.description,
+        }
+        for r in rows
+    ]
+
+
+# ── Client-scoped endpoints ───────────────────────────────────────────────────
 
 @router.get("/clients/{client_id}/control-policies/")
 def list_policies(
@@ -190,6 +249,7 @@ def create_policy(
         match_asset_class=body.match_asset_class,
         match_cve=body.match_cve,
         match_resource_type=body.match_resource_type,
+        match_resource_types=json.dumps(body.match_resource_types or []),
         match_connector_type=body.match_connector_type,
         framework=body.framework,
         framework_control_id=body.framework_control_id,
@@ -241,6 +301,8 @@ def update_policy(
             setattr(p, field, val)
     if body.risk_tags is not None:
         p.risk_tags = json.dumps(body.risk_tags)
+    if body.match_resource_types is not None:
+        p.match_resource_types = json.dumps(body.match_resource_types)
     from datetime import datetime
     p.updated_at = datetime.utcnow()
     db.commit()
@@ -294,7 +356,6 @@ def get_policy_issues(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return the actual findings that match this policy."""
     p = db.query(ControlPolicy).filter(
         ControlPolicy.id == policy_id, ControlPolicy.client_id == client_id
     ).first()
@@ -322,8 +383,7 @@ def get_policy_issues(
                 Finding.cve_ids.ilike(f"%{p.match_cve}%"),
             )
         )
-    if p.match_resource_type:
-        q = q.filter(Finding.resource_type == p.match_resource_type)
+    q = _apply_resource_type_filter(q, _get_resource_types(p))
     if p.match_connector_type:
         q = q.filter(
             Finding.scan_id.in_(
@@ -361,7 +421,6 @@ def get_policy_options(
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    """Return available filter options for match rule dropdowns."""
     scan_ids = _live_scan_ids(db, client_id)
     severities = ["critical", "high", "medium", "low", "info"]
     asset_classes = [
@@ -372,7 +431,7 @@ def get_policy_options(
     resource_types = [
         r[0] for r in db.query(Finding.resource_type).filter(
             Finding.scan_id.in_(scan_ids), Finding.resource_type.isnot(None)
-        ).distinct().limit(50).all() if r[0]
+        ).distinct().limit(100).all() if r[0]
     ] if scan_ids else []
     connectors = db.query(Connector).filter(Connector.client_id == client_id).all()
 

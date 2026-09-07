@@ -835,6 +835,7 @@ export interface ControlPolicy {
   match_asset_class?: string | null;
   match_cve?: string | null;
   match_resource_type?: string | null;
+  match_resource_types?: string[];
   match_connector_type?: string | null;
   framework?: string | null;
   framework_control_id?: string | null;
@@ -853,4 +854,13 @@ export interface PolicyOptions {
   connector_types: string[];
   risk_tags: string[];
   categories: string[];
+}
+
+export interface FrameworkControlEntry {
+  id: string;
+  framework: string;
+  control_id: string;
+  domain?: string;
+  title: string;
+  description?: string;
 }
