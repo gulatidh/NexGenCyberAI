@@ -1,7 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   FindInPage, SmartToy, Storage, Devices,
-  Memory, BusinessCenter, UploadFile, Radar, GpsFixed, TrendingUp,
+  Memory, BusinessCenter, UploadFile, Radar, GpsFixed, TrendingUp, Tune,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -29,7 +29,8 @@ export const DISCOVER_SECTION: SectionDef = {
     { name: "Posture Trends",     icon: <TrendingUp sx={ic("#34A853")} />,  desc: "Time-series charts of open findings and audit readiness score.",               route: "/discover/posture",   group: "Findings & Coverage" },
     // Assets & Tech
     { name: "Asset Inventory",      icon: <Storage sx={ic("#00BCD4")} />,   desc: "Discovered assets — servers, apps, containers, and cloud resources.",         route: "/discover/assets",       group: "Assets & Tech" },
-    { name: "Technology Inventory", icon: <Devices sx={ic("#FF6D00")} />,   desc: "Software stack and technology across all discovered assets.",                 route: "/discover/technologies", group: "Assets & Tech" },
+    { name: "Technology Inventory", icon: <Devices sx={ic("#FF6D00")} />,   desc: "Software stack and technology across all discovered assets.",                               route: "/discover/technologies",          group: "Assets & Tech" },
+    { name: "Technology Registry",  icon: <Tune sx={ic("#8B5CF6")} />,     desc: "Manage technology taxonomy, provider type mappings, and per-asset class overrides.",          route: "/discover/technologies/registry", group: "Assets & Tech" },
   ],
 };
 

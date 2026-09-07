@@ -106,8 +106,9 @@ const MENU: MenuItem[] = [
       {
         heading: "Assets & Tech",
         items: [
-          { name: "Asset Inventory",      desc: "All discovered assets with compliance and CVE posture.", route: "/discover/assets",       Icon: AccountTree },
-          { name: "Technology Inventory", desc: "Software and technology stack across all assets.",       route: "/discover/technologies", Icon: DeviceHub   },
+          { name: "Asset Inventory",      desc: "All discovered assets with compliance and CVE posture.", route: "/discover/assets",                   Icon: AccountTree },
+          { name: "Technology Inventory", desc: "Software and technology stack across all assets.",       route: "/discover/technologies",             Icon: DeviceHub   },
+          { name: "Technology Registry",  desc: "Manage technology taxonomy, provider mappings, and per-asset type overrides.", route: "/discover/technologies/registry", Icon: Tune        },
         ],
       },
     ],

@@ -61,7 +61,8 @@ const STAGE_DEFS: StageDef[] = [
       { name: "Scan Coverage",          desc: "Assets not scanned within the policy window — identify coverage gaps.",                 route: "/discover/coverage",      group: "Findings & Coverage" },
       { name: "Posture Trends",         desc: "Time-series charts of open findings and audit readiness score.",                        route: "/discover/posture",       group: "Findings & Coverage" },
       { name: "Asset Inventory",        desc: "All discovered assets with compliance and CVE posture.",                                route: "/discover/assets",        group: "Assets & Tech" },
-      { name: "Technology Inventory",   desc: "Software and technology stack across all assets.",                                      route: "/discover/technologies",  group: "Assets & Tech" },
+      { name: "Technology Inventory",   desc: "Software and technology stack across all assets.",                                      route: "/discover/technologies",          group: "Assets & Tech" },
+      { name: "Technology Registry",   desc: "Manage technology taxonomy, provider type mappings, and per-asset class overrides.",    route: "/discover/technologies/registry", group: "Assets & Tech" },
     ],
   },
   {
