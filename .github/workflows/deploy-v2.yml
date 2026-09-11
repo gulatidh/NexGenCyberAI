@@ -1,19 +1,18 @@
 ##############################################################################
-# Monitara v2 — Deploy to monitara-sea App Service (Southeast Asia)
+# Owlet — Deploy to owlet + owlet-api App Services (Southeast Asia, CoreInfraSub)
 #
 # Triggers automatically on every push to main, and on workflow_dispatch.
-# Deploys BOTH frontend (monitara-sea) and backend (nexgencyberai-sea-api)
-# in parallel so a single push ships everything.
+# Deploys BOTH frontend (owlet) and backend (owlet-api) in parallel.
 #
 # Required GitHub Secrets:
-#   AZURE_CREDENTIALS           – az ad sp create-for-rbac output (JSON)
-#   REACT_APP_AZURE_CLIENT_ID   – Frontend Entra App Registration client ID
-#   REACT_APP_AZURE_TENANT_ID
-#   REACT_APP_BACKEND_CLIENT_ID
-#   REACT_APP_API_URL (optional — defaults to backend URL below)
+#   AZURE_CREDENTIALS_OWLET       – SP for CoreInfraSub/Owlet RG (JSON)
+#   REACT_APP_AZURE_CLIENT_ID     – AD app registration client ID (2978ef0b-...)
+#   REACT_APP_AZURE_TENANT_ID     – gretagulati tenant (5e9623cc-...)
+#   REACT_APP_BACKEND_CLIENT_ID   – Same as AZURE_CLIENT_ID
+#   REACT_APP_API_URL_OWLET       – https://owlet-api.azurewebsites.net/api/v1
 ##############################################################################
 
-name: Monitara v2 — Deploy
+name: Owlet — Deploy
 
 on:
   push:
@@ -26,10 +25,10 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  AZ_RESOURCE_GROUP: "nexgencyberai-sea-rg"
-  AZ_FRONTEND_APP: "monitara-sea"
-  AZ_BACKEND_APP: "nexgencyberai-sea-api"
-  AZ_SUBSCRIPTION: "4e6778be-a1f5-4b94-a58d-14a190484c15"
+  AZ_RESOURCE_GROUP: "Owlet"
+  AZ_FRONTEND_APP: "owlet"
+  AZ_BACKEND_APP: "owlet-api"
+  AZ_SUBSCRIPTION: "9931ac63-3ae9-43ba-898d-46fc714a00b6"
 
 jobs:
 
@@ -61,8 +60,8 @@ jobs:
           REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
           REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
           REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
-          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL || 'https://nexgencyberai-sea-api.azurewebsites.net/api/v1' }}
-          REACT_APP_REDIRECT_URI: "https://monitara-sea.azurewebsites.net"
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL_OWLET || 'https://owlet-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: "https://owlet.azurewebsites.net"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v5
@@ -97,7 +96,7 @@ jobs:
 
   # ── 3. Deploy both in parallel ─────────────────────────────────────────────
   deploy-frontend:
-    name: Deploy — Frontend (monitara-sea)
+    name: Deploy — Frontend (owlet)
     needs: frontend-build
     runs-on: ubuntu-latest
     steps:
@@ -106,7 +105,7 @@ jobs:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS_OWLET }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
@@ -121,6 +120,7 @@ jobs:
             az webapp config set \
               --name "$AZ_FRONTEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
               --startup-file "npx --yes serve -s . -l 8080" \
               --output none && { ok=true; break; }
             echo "Attempt $attempt failed, retrying in 20s..."
@@ -139,24 +139,25 @@ jobs:
             az webapp deploy \
               --name "$AZ_FRONTEND_APP" \
               --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
               --src-path frontend.zip \
               --type zip \
               --async true \
-              --timeout 300 && { echo "Frontend deployed → https://monitara-sea.azurewebsites.net"; exit 0; }
+              --timeout 300 && { echo "Frontend deployed → https://owlet.azurewebsites.net"; exit 0; }
             echo "Attempt $attempt failed — waiting 30s before retry"
             sleep 30
           done
           echo "Frontend deploy failed after 5 attempts"; exit 1
 
   deploy-backend:
-    name: Deploy — Backend (nexgencyberai-sea-api)
+    name: Deploy — Backend (owlet-api)
     needs: backend-build
     runs-on: ubuntu-latest
     steps:
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS_OWLET }}
 
       - name: Download backend artifact
         uses: actions/download-artifact@v5
@@ -178,7 +179,7 @@ jobs:
               --src-path backend.zip \
               --type zip \
               --async true \
-              --timeout 300 && { echo "Backend deployed → https://nexgencyberai-sea-api.azurewebsites.net"; exit 0; }
+              --timeout 300 && { echo "Backend deployed → https://owlet-api.azurewebsites.net"; exit 0; }
             echo "Attempt $attempt failed — waiting 30s before retry"
             sleep 30
           done
