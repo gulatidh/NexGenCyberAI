@@ -227,7 +227,10 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
       const result = await (scansApi as any).analyzeScanImport(clientId, selectedFile, toolHint);
       setAnalysis(result);
     } catch (e: any) {
-      setAnalyzeError(e?.response?.data?.detail || e?.message || "Analysis failed");
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      const msg = detail || (status ? `HTTP ${status}: ${e?.message}` : e?.message) || "Analysis failed";
+      setAnalyzeError(msg);
     } finally { setAnalyzing(false); }
   };
 
@@ -340,8 +343,12 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
 
       {/* Analyze error */}
       {analyzeError && (
-        <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 1 }}>
+        <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <Typography variant="body2" sx={{ color: "#EA4335" }}>{analyzeError}</Typography>
+          <Button size="small" variant="outlined" onClick={handleParse} disabled={parsing}
+            sx={{ flexShrink: 0, color: "#EA4335", borderColor: "rgba(234,67,53,0.5)" }}>
+            {parsing ? "Parsing…" : "Skip to Preview"}
+          </Button>
         </Box>
       )}
 
@@ -1675,8 +1682,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   fd.append("file", binaryFile);
                   await apiClient.post(
                     `/clients/${selectedClientId}/scans/${created.id}/upload-binary`,
-                    fd,
-                    { headers: { "Content-Type": "multipart/form-data" } }
+                    fd
                   );
                   qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
                   setOpen(false); setScanName(""); setBinaryFile(null);
@@ -1697,8 +1703,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   fd.append("file", codeArchive);
                   await apiClient.post(
                     `/clients/${selectedClientId}/scans/${created.id}/upload-code/`,
-                    fd,
-                    { headers: { "Content-Type": "multipart/form-data" } }
+                    fd
                   );
                   qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
                   setOpen(false); setScanName(""); setCodeArchive(null); setAcrMode("repo");
