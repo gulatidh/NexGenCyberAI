@@ -626,7 +626,6 @@ async def analyze_scan_file(
     client_id: str,
     file: UploadFile = File(...),
     tool_hint: str = Form(default=""),
-    db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
     """Analyze a scan file: AI auto-detect or schema validation for a specific scanner."""
@@ -639,11 +638,7 @@ async def analyze_scan_file(
     from services.scan_importer import detect_format as _detect_format
     fmt = _detect_format(content, file.filename or "upload")
 
-    year = datetime.utcnow().year
-    count = db.query(func.count(AssessmentImport.id)).filter(
-        AssessmentImport.client_id == client_id,
-    ).scalar() or 0
-    import_ref_preview = f"IMP-{year}-{count + 1:03d}"
+    import_ref_preview = f"IMP-{datetime.utcnow().year}-NNN"
 
     field_mapping = {
         "ID": "Auto-generated UUID",
