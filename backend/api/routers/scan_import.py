@@ -68,9 +68,9 @@ def _safe_dt(v) -> Optional[datetime]:
 
 def _generate_import_ref(db: Session, client_id: str) -> str:
     year = datetime.utcnow().year
+    # Use total count (not year-filtered) to stay compatible with Azure SQL / SQLite
     count = db.query(func.count(AssessmentImport.id)).filter(
         AssessmentImport.client_id == client_id,
-        func.extract("year", AssessmentImport.created_at) == year,
     ).scalar() or 0
     return f"IMP-{year}-{count + 1:03d}"
 
@@ -642,7 +642,6 @@ async def analyze_scan_file(
     year = datetime.utcnow().year
     count = db.query(func.count(AssessmentImport.id)).filter(
         AssessmentImport.client_id == client_id,
-        func.extract("year", AssessmentImport.created_at) == year,
     ).scalar() or 0
     import_ref_preview = f"IMP-{year}-{count + 1:03d}"
 
