@@ -391,6 +391,163 @@ def _insert_raw(db, scanner_type: str, import_id: int, client_id: str, raw: Dict
         _insert_raw_generic(db, import_id, client_id, raw, finding_id, row_num, fmt)
 
 
+# ── scanner schema signatures ──────────────────────────────────────────────
+
+_SCANNER_SCHEMA: Dict[str, Dict] = {
+    "nessus": {
+        "label": "Tenable Nessus",
+        "target_table": "raw_nessus_findings",
+        "indicators": ["ReportItem", "plugin_name", "severity", "description", "solution", "ReportHost"],
+    },
+    "burp": {
+        "label": "Burp Suite Enterprise",
+        "target_table": "raw_burp_findings",
+        "indicators": ["issues", "issue", "severity", "confidence", "host", "path", "name"],
+    },
+    "openvas": {
+        "label": "OpenVAS / Greenbone",
+        "target_table": "raw_openvas_findings",
+        "indicators": ["nvt", "severity", "description", "solution", "result", "host"],
+    },
+    "qualys": {
+        "label": "Qualys VMDR",
+        "target_table": "raw_qualys_findings",
+        "indicators": ["QID", "DETECTION", "SEVERITY", "IP"],
+    },
+    "sarif": {
+        "label": "SARIF (SAST)",
+        "target_table": "raw_sarif_findings",
+        "indicators": ["runs", "tool", "results", "ruleId", "level", "message"],
+    },
+    "tenable": {
+        "label": "Tenable.io",
+        "target_table": "raw_tenable_findings",
+        "indicators": ["plugin_id", "asset", "output", "severity", "cvss"],
+    },
+    "nmap": {
+        "label": "Nmap",
+        "target_table": "raw_nmap_findings",
+        "indicators": ["nmaprun", "host", "port", "state", "service"],
+    },
+    "trivy": {
+        "label": "Trivy",
+        "target_table": "raw_trivy_findings",
+        "indicators": ["VulnerabilityID", "PkgName", "Severity", "InstalledVersion"],
+    },
+    "zap": {
+        "label": "OWASP ZAP",
+        "target_table": "raw_zap_findings",
+        "indicators": ["alerts", "alert", "riskdesc", "confidence", "cweid"],
+    },
+    "gitleaks": {
+        "label": "Gitleaks",
+        "target_table": "raw_secret_findings",
+        "indicators": ["RuleID", "File", "Commit", "Secret", "StartLine"],
+    },
+    "trufflehog": {
+        "label": "TruffleHog",
+        "target_table": "raw_secret_findings",
+        "indicators": ["DetectorType", "Raw", "SourceName"],
+    },
+    "generic": {
+        "label": "Generic CSV/JSON",
+        "target_table": "raw_generic_findings",
+        "indicators": ["title", "severity", "description", "resource"],
+    },
+}
+
+_TOOL_HINT_TO_SCANNER: Dict[str, str] = {
+    "nessus": "nessus",
+    "tenable nessus": "nessus",
+    "burp suite": "burp",
+    "burp": "burp",
+    "openvas": "openvas",
+    "openvas / greenbone": "openvas",
+    "qualys": "qualys",
+    "qualys vmdr": "qualys",
+    "owasp zap": "zap",
+    "zap": "zap",
+    "nmap": "nmap",
+    "trivy": "trivy",
+    "gitleaks": "gitleaks",
+    "trufflehog": "trufflehog",
+    "rapid7": "generic",
+    "rapid7 insightvm": "generic",
+    "other": "generic",
+}
+
+
+def _validate_schema_for_scanner(content: bytes, scanner_type: str) -> Dict:
+    schema = _SCANNER_SCHEMA.get(scanner_type, _SCANNER_SCHEMA["generic"])
+    sample = content[:8000].decode("utf-8", errors="replace")
+    indicators = schema["indicators"]
+    matched = [ind for ind in indicators if ind in sample]
+    missing = [ind for ind in indicators if ind not in sample]
+    match_score = round(len(matched) / len(indicators) * 100) if indicators else 0
+    warnings: List[str] = []
+    if match_score < 40:
+        warnings.append(
+            f"Low schema match ({match_score}%). This file may not be a valid {schema['label']} export. "
+            "Consider switching to Auto-detect mode."
+        )
+    elif match_score < 75:
+        warnings.append(
+            f"Partial schema match ({match_score}%). Some expected {schema['label']} fields were not detected. "
+            "The import may still succeed with partial data."
+        )
+    return {
+        "match_score": match_score,
+        "expected_fields": indicators,
+        "matched_fields": matched,
+        "missing_fields": missing,
+        "warnings": warnings,
+    }
+
+
+async def _ai_analyze_file(content: bytes, filename: str, fmt: str) -> Dict:
+    try:
+        from core.ai_providers import get_llm
+        from langchain_core.messages import HumanMessage
+        import re as _re
+        sample = content[:4000].decode("utf-8", errors="replace")
+        prompt = f"""You are a cybersecurity tool expert. Analyze this scan file sample to identify which scanner produced it.
+
+Filename: {filename}
+Detected file format: {fmt}
+
+File content sample:
+---
+{sample}
+---
+
+Valid scanner_type values: nessus, burp, openvas, qualys, sarif, tenable, nmap, trivy, zap, gitleaks, trufflehog, generic
+
+Respond ONLY with valid JSON (no markdown fences):
+{{
+  "scanner_type": "<from list above>",
+  "scanner_label": "<human-readable name e.g. Tenable Nessus 10.3>",
+  "confidence": <integer 0-100>,
+  "reasoning": "<1-2 sentences>",
+  "key_indicators": ["<indicator 1>", "<indicator 2>"]
+}}"""
+        llm = get_llm()
+        resp = await llm.ainvoke([HumanMessage(content=prompt)])
+        raw = resp.content.strip()
+        raw = _re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = _re.sub(r"\s*```$", "", raw)
+        return json.loads(raw)
+    except Exception as exc:
+        logger.warning("AI file analyze failed: %s", exc)
+        st = _format_to_scanner_type(fmt, "")
+        return {
+            "scanner_type": st,
+            "scanner_label": st,
+            "confidence": 55,
+            "reasoning": f"File format detected as '{fmt}'. AI analysis unavailable — configure an AI provider to enable full analysis.",
+            "key_indicators": [],
+        }
+
+
 # ── endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/parse")
@@ -462,6 +619,73 @@ async def parse_scan_file(
             for f in findings
         ],
     }
+
+
+@router.post("/analyze")
+async def analyze_scan_file(
+    client_id: str,
+    file: UploadFile = File(...),
+    tool_hint: str = Form(default=""),
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Analyze a scan file: AI auto-detect or schema validation for a specific scanner."""
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file")
+
+    from services.scan_importer import detect_format as _detect_format
+    fmt = _detect_format(content, file.filename or "upload")
+
+    year = datetime.utcnow().year
+    count = db.query(func.count(AssessmentImport.id)).filter(
+        AssessmentImport.client_id == client_id,
+        func.extract("year", AssessmentImport.created_at) == year,
+    ).scalar() or 0
+    import_ref_preview = f"IMP-{year}-{count + 1:03d}"
+
+    field_mapping = {
+        "ID": "Auto-generated UUID",
+        "IMPORT_ID": import_ref_preview,
+        "CLIENT_ID": client_id,
+        "NORMALIZED_FINDING_ID": "Auto-linked to Finding row after import",
+    }
+
+    normalized_hint = (tool_hint or "").strip().lower()
+    is_auto = not normalized_hint or normalized_hint in ("", "auto")
+
+    if is_auto:
+        ai_result = await _ai_analyze_file(content, file.filename or "upload", fmt)
+        scanner_type = ai_result.get("scanner_type", _format_to_scanner_type(fmt, ""))
+        schema = _SCANNER_SCHEMA.get(scanner_type, _SCANNER_SCHEMA["generic"])
+        return {
+            "mode": "auto_detect",
+            "detected_format": fmt,
+            "scanner_type": scanner_type,
+            "scanner_label": ai_result.get("scanner_label", schema.get("label", scanner_type)),
+            "target_table": schema.get("target_table", f"raw_{scanner_type}_findings"),
+            "confidence": ai_result.get("confidence", 60),
+            "ai_reasoning": ai_result.get("reasoning", ""),
+            "key_indicators": ai_result.get("key_indicators", []),
+            "field_mapping": field_mapping,
+        }
+    else:
+        scanner_type = _TOOL_HINT_TO_SCANNER.get(normalized_hint, _format_to_scanner_type(fmt, tool_hint))
+        schema = _SCANNER_SCHEMA.get(scanner_type, _SCANNER_SCHEMA["generic"])
+        validation = _validate_schema_for_scanner(content, scanner_type)
+        return {
+            "mode": "specific_scanner",
+            "selected_tool": tool_hint,
+            "detected_format": fmt,
+            "scanner_type": scanner_type,
+            "scanner_label": schema.get("label", tool_hint),
+            "target_table": schema.get("target_table", f"raw_{scanner_type}_findings"),
+            "confidence": validation["match_score"],
+            "schema_validation": validation,
+            "field_mapping": field_mapping,
+        }
 
 
 @router.post("/commit", status_code=201)

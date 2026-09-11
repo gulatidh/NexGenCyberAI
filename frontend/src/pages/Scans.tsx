@@ -14,6 +14,7 @@ import {
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
   ExpandMore, CloudUpload, Upload, Storage, Business, Link as LinkIcon, DriveFileMove,
+  CheckCircle, Cancel, Psychology, InfoOutlined, WarningAmber,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient, projectsApi } from "../services/api";
@@ -144,13 +145,27 @@ interface ImportPreview {
   fixed_count: number;
   persisting_count: number;
   severity_breakdown: { critical: number; high: number; medium: number; low: number; info: number };
-  findings: {
-    confidence: number;
-    severity: string;
-    title: string;
-    resource: string;
-    cve_id?: string;
-  }[];
+  findings: { confidence: number; severity: string; title: string; resource: string; cve_id?: string }[];
+}
+
+interface ImportAnalysis {
+  mode: "auto_detect" | "specific_scanner";
+  selected_tool?: string;
+  detected_format: string;
+  scanner_type: string;
+  scanner_label: string;
+  target_table: string;
+  confidence: number;
+  ai_reasoning?: string;
+  key_indicators?: string[];
+  schema_validation?: {
+    match_score: number;
+    expected_fields: string[];
+    matched_fields: string[];
+    missing_fields: string[];
+    warnings: string[];
+  };
+  field_mapping: { ID: string; IMPORT_ID: string; CLIENT_ID: string; NORMALIZED_FINDING_ID: string };
 }
 
 interface ImportHistoryRow {
@@ -165,30 +180,27 @@ interface ImportHistoryRow {
   created_by?: string;
   scan_id?: string;
   status?: string;
-  /** legacy compat */
   scan_name?: string;
   finding_count?: number;
 }
 
-interface ScanImportPanelProps {
-  clientId: string;
-}
+interface ScanImportPanelProps { clientId: string }
 
 function ScanImportPanel({ clientId }: ScanImportPanelProps) {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [toolHint, setToolHint] = useState("");
-  const [importName, setImportName] = useState("");
-  const [parsing, setParsing] = useState(false);
-  const [committing, setCommitting] = useState(false);
+  const [analysis, setAnalysis] = useState<ImportAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [committing, setCommitting] = useState(false);
+  const [importName, setImportName] = useState("");
   const [successSnack, setSuccessSnack] = useState<string | null>(null);
-
-  // Findings table pagination
   const [page, setPage] = useState(0);
   const ROWS_PER_PAGE = 10;
 
@@ -198,131 +210,94 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
     enabled: !!clientId,
   });
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreview(null);
-      setParseError(null);
-    }
-  }, []);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
-    setPreview(null);
-    setParseError(null);
+  const clearAll = () => {
+    setSelectedFile(null); setAnalysis(null); setPreview(null);
+    setAnalyzeError(null); setParseError(null); setImportName(""); setToolHint(""); setPage(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const clearPreview = () => {
-    setPreview(null);
-    setSelectedFile(null);
-    setImportName("");
-    setToolHint("");
-    setParseError(null);
-    setPage(0);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleFileSet = (f: File) => {
+    setSelectedFile(f); setAnalysis(null); setPreview(null); setAnalyzeError(null); setParseError(null);
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile || !clientId) return;
+    setAnalyzing(true); setAnalyzeError(null); setPreview(null);
+    try {
+      const result = await (scansApi as any).analyzeScanImport(clientId, selectedFile, toolHint);
+      setAnalysis(result);
+    } catch (e: any) {
+      setAnalyzeError(e?.response?.data?.detail || e?.message || "Analysis failed");
+    } finally { setAnalyzing(false); }
   };
 
   const handleParse = async () => {
     if (!selectedFile || !clientId) return;
-    setParsing(true);
-    setParseError(null);
+    setParsing(true); setParseError(null);
+    const hint = analysis?.scanner_type || toolHint;
     try {
-      const result = await scansApi.parseScanImport(clientId, selectedFile, toolHint);
-      setPreview(result as ImportPreview);
-      setPage(0);
+      const result = await scansApi.parseScanImport(clientId, selectedFile, hint);
+      setPreview(result as ImportPreview); setPage(0);
     } catch (e: any) {
       setParseError(e?.response?.data?.detail || e?.message || "Failed to parse file");
-    } finally {
-      setParsing(false);
-    }
+    } finally { setParsing(false); }
   };
 
   const handleCommit = async () => {
     if (!selectedFile || !clientId) return;
     setCommitting(true);
+    const hint = analysis?.scanner_type || toolHint;
     try {
-      const result: any = await scansApi.commitScanImport(clientId, selectedFile, toolHint, importName, importName);
+      const result: any = await scansApi.commitScanImport(clientId, selectedFile, hint, importName, importName);
       const count = result?.findings_imported ?? result?.finding_count ?? preview?.finding_count ?? 0;
       const ref = result?.import_ref ?? "";
       const name = result?.import_name ?? importName ?? "Assessment";
       setSuccessSnack(`Assessment "${name}" saved as ${ref} — ${count} findings imported`);
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
       qc.invalidateQueries({ queryKey: ["import-history", clientId] });
-      clearPreview();
+      clearAll();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || e?.message || "Import failed");
-    } finally {
-      setCommitting(false);
-    }
+    } finally { setCommitting(false); }
   };
 
   const FILE_TYPE_CHIPS = ["SARIF", "Nessus", "Burp", "OpenVAS", "Qualys", "Checkmarx", "CSV", "JSON", "PDF"];
+  const confColor = (pct: number) => pct >= 80 ? "#34A853" : pct >= 50 ? "#FBBC04" : "#EA4335";
 
   return (
     <Box>
-      {/* Drag-and-drop zone */}
+      {/* ── Step 1: Drop zone ── */}
       <Box
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onDragLeave={handleDragLeave}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSet(f); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
         onClick={() => !selectedFile && fileInputRef.current?.click()}
         sx={{
           border: `2px dashed ${dragOver ? "#4285F4" : "rgba(255,255,255,0.2)"}`,
-          borderRadius: 2,
-          p: 4,
-          textAlign: "center",
+          borderRadius: 2, p: 4, textAlign: "center",
           bgcolor: dragOver ? "rgba(66,133,244,0.08)" : "rgba(255,255,255,0.02)",
           cursor: selectedFile ? "default" : "pointer",
           transition: "border-color 0.15s, background-color 0.15s",
           "&:hover": !selectedFile ? { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.04)" } : {},
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          accept=".sarif,.json,.xml,.nessus,.csv,.pdf,.txt"
-          onChange={handleFileChange}
-        />
+        }}>
+        <input ref={fileInputRef} type="file" hidden accept=".sarif,.json,.xml,.nessus,.csv,.pdf,.txt"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSet(f); }} />
         <CloudUpload sx={{ fontSize: 40, color: dragOver ? "#4285F4" : "text.secondary", mb: 1 }} />
         {selectedFile ? (
           <Box>
-            <Typography sx={{ color: "text.primary", fontWeight: 600, mb: 0.5 }}>
-              {selectedFile.name}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              {(selectedFile.size / 1024).toFixed(1)} KB
-            </Typography>
+            <Typography sx={{ color: "text.primary", fontWeight: 600, mb: 0.5 }}>{selectedFile.name}</Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>{(selectedFile.size / 1024).toFixed(1)} KB</Typography>
             <Box sx={{ mt: 1 }}>
-              <Button
-                size="small"
-                variant="outlined"
+              <Button size="small" variant="outlined"
                 sx={{ borderColor: "divider", color: "text.secondary", fontSize: 11 }}
-                onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setPreview(null); setParseError(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-              >
+                onClick={(e) => { e.stopPropagation(); clearAll(); }}>
                 Change file
               </Button>
             </Box>
           </Box>
         ) : (
           <Box>
-            <Typography sx={{ color: "text.secondary", mb: 0.5 }}>
-              Drag and drop a scan file here, or click to browse
-            </Typography>
+            <Typography sx={{ color: "text.secondary", mb: 0.5 }}>Drag and drop a scan file, or click to browse</Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: "center", mt: 1.5 }}>
               {FILE_TYPE_CHIPS.map((t) => (
                 <Chip key={t} label={t} size="small"
@@ -333,17 +308,14 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
         )}
       </Box>
 
-      {/* Tool hint + parse button */}
+      {/* ── Step 1b: Tool selector + Analyze button ── */}
       <Box sx={{ display: "flex", gap: 2, mt: 2, alignItems: "flex-start", flexWrap: "wrap" }}>
         <FormControl size="small" sx={{ minWidth: 240 }}>
-          <InputLabel sx={{ color: "text.secondary" }}>Source tool (optional hint for AI)</InputLabel>
-          <Select
-            value={toolHint}
-            onChange={(e) => setToolHint(e.target.value)}
-            label="Source tool (optional hint for AI)"
-            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-          >
-            <MenuItem value="">Auto-detect</MenuItem>
+          <InputLabel sx={{ color: "text.secondary" }}>Source tool</InputLabel>
+          <Select value={toolHint} onChange={(e) => { setToolHint(e.target.value); setAnalysis(null); setPreview(null); }}
+            label="Source tool"
+            sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+            <MenuItem value=""><em>Auto-detect (AI analysis)</em></MenuItem>
             <MenuItem value="Nessus">Tenable Nessus</MenuItem>
             <MenuItem value="Burp Suite">Burp Suite</MenuItem>
             <MenuItem value="OpenVAS">OpenVAS / Greenbone</MenuItem>
@@ -359,36 +331,175 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
           </Select>
         </FormControl>
 
-        <Button
-          variant="contained"
-          disabled={!selectedFile || parsing || !clientId}
-          onClick={handleParse}
-          startIcon={parsing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Visibility />}
-          sx={{ height: 40 }}
-        >
-          {parsing ? "Parsing…" : "Preview"}
+        <Button variant="contained" disabled={!selectedFile || analyzing || !clientId} onClick={handleAnalyze}
+          startIcon={analyzing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Psychology />}
+          sx={{ height: 40 }}>
+          {analyzing ? "Analyzing…" : "Analyze"}
         </Button>
       </Box>
 
-      {parsing && (
-        <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-          <CircularProgress size={20} sx={{ color: "#4285F4" }} />
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>Parsing your scan file…</Typography>
+      {/* Analyze error */}
+      {analyzeError && (
+        <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 1 }}>
+          <Typography variant="body2" sx={{ color: "#EA4335" }}>{analyzeError}</Typography>
         </Box>
       )}
 
+      {/* ── Step 2: Analysis Result ── */}
+      {analysis && (
+        <Box sx={{ mt: 3 }}>
+          <Divider sx={{ borderColor: "divider", mb: 2 }} />
+
+          {/* Auto-detect result */}
+          {analysis.mode === "auto_detect" && (
+            <Box sx={{ p: 2, bgcolor: "rgba(66,133,244,0.06)", border: "1px solid rgba(66,133,244,0.2)", borderRadius: 1.5, mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+                <Psychology sx={{ color: "#4285F4", fontSize: 20 }} />
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 13 }}>AI Detection Result</Typography>
+              </Box>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1.5 }}>
+                <Chip label={`Scanner: ${analysis.scanner_label}`} size="small"
+                  sx={{ bgcolor: "rgba(66,133,244,0.18)", color: "#4285F4", fontWeight: 700 }} />
+                <Chip label={`Format: ${analysis.detected_format}`} size="small"
+                  sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.secondary", fontWeight: 600 }} />
+                <Chip label={`Target: ${analysis.target_table}`} size="small"
+                  sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontFamily: "monospace", fontSize: 11 }} />
+                <Chip label={`Confidence: ${analysis.confidence}%`} size="small"
+                  sx={{ bgcolor: `${confColor(analysis.confidence)}18`, color: confColor(analysis.confidence), fontWeight: 700 }} />
+              </Box>
+              {analysis.ai_reasoning && (
+                <Typography variant="body2" sx={{ color: "text.secondary", fontSize: 12, lineHeight: 1.6 }}>
+                  {analysis.ai_reasoning}
+                </Typography>
+              )}
+              {(analysis.key_indicators || []).length > 0 && (
+                <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {(analysis.key_indicators || []).map((ind) => (
+                    <Chip key={ind} label={ind} size="small"
+                      sx={{ bgcolor: "rgba(255,255,255,0.05)", color: "text.disabled", fontSize: 10, height: 18, fontFamily: "monospace" }} />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Specific scanner schema validation */}
+          {analysis.mode === "specific_scanner" && analysis.schema_validation && (
+            <Box sx={{ p: 2, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 1.5, mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+                <Typography sx={{ fontWeight: 700, color: "text.primary", fontSize: 13 }}>
+                  Schema Validation — {analysis.scanner_label}
+                </Typography>
+                <Chip
+                  icon={analysis.schema_validation.match_score >= 70
+                    ? <CheckCircle sx={{ fontSize: "14px !important" }} />
+                    : <WarningAmber sx={{ fontSize: "14px !important" }} />}
+                  label={`${analysis.schema_validation.match_score}% match`}
+                  size="small"
+                  sx={{
+                    bgcolor: analysis.schema_validation.match_score >= 70 ? "rgba(52,168,83,0.15)" : "rgba(251,188,4,0.15)",
+                    color: analysis.schema_validation.match_score >= 70 ? "#34A853" : "#FBBC04",
+                    fontWeight: 700,
+                  }} />
+              </Box>
+
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 1.5 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 0.5 }}>
+                    MATCHED FIELDS ({analysis.schema_validation.matched_fields.length})
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {analysis.schema_validation.matched_fields.map((f) => (
+                      <Chip key={f}
+                        icon={<CheckCircle sx={{ fontSize: "12px !important", color: "#34A853 !important" }} />}
+                        label={f} size="small"
+                        sx={{ bgcolor: "rgba(52,168,83,0.1)", color: "#34A853", fontSize: 10, height: 20, fontFamily: "monospace" }} />
+                    ))}
+                    {analysis.schema_validation.matched_fields.length === 0 && (
+                      <Typography variant="caption" sx={{ color: "text.disabled" }}>None</Typography>
+                    )}
+                  </Box>
+                </Box>
+                {analysis.schema_validation.missing_fields.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 0.5 }}>
+                      MISSING FIELDS ({analysis.schema_validation.missing_fields.length})
+                    </Typography>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {analysis.schema_validation.missing_fields.map((f) => (
+                        <Chip key={f}
+                          icon={<Cancel sx={{ fontSize: "12px !important", color: "#EA4335 !important" }} />}
+                          label={f} size="small"
+                          sx={{ bgcolor: "rgba(234,67,53,0.1)", color: "#EA4335", fontSize: 10, height: 20, fontFamily: "monospace" }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+
+              {analysis.schema_validation.warnings.map((w, i) => (
+                <Box key={i} sx={{ display: "flex", gap: 1, alignItems: "flex-start", mt: 1, p: 1, bgcolor: "rgba(251,188,4,0.06)", borderRadius: 1 }}>
+                  <WarningAmber sx={{ color: "#FBBC04", fontSize: 16, flexShrink: 0, mt: 0.1 }} />
+                  <Typography variant="caption" sx={{ color: "#FBBC04", lineHeight: 1.5 }}>{w}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {/* Field mapping info box */}
+          <Box sx={{ p: 2, bgcolor: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1.5, mb: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 1.5 }}>
+              <InfoOutlined sx={{ color: "text.secondary", fontSize: 16 }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, letterSpacing: 0.5 }}>
+                AUTO-ASSIGNED FIELDS ON IMPORT
+              </Typography>
+            </Box>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5 }}>
+              {Object.entries(analysis.field_mapping).map(([key, val]) => (
+                <Box key={key}>
+                  <Typography variant="caption" sx={{ color: "text.disabled", fontWeight: 600, display: "block", mb: 0.3, fontSize: 10 }}>
+                    {key}
+                  </Typography>
+                  <Chip label={val} size="small"
+                    sx={{
+                      bgcolor: key === "CLIENT_ID" ? "rgba(156,39,176,0.12)"
+                        : key === "IMPORT_ID" ? "rgba(66,133,244,0.12)"
+                        : key === "NORMALIZED_FINDING_ID" ? "rgba(0,188,212,0.12)"
+                        : "rgba(52,168,83,0.12)",
+                      color: key === "CLIENT_ID" ? "#ce93d8"
+                        : key === "IMPORT_ID" ? "#4285F4"
+                        : key === "NORMALIZED_FINDING_ID" ? "#00BCD4"
+                        : "#34A853",
+                      fontFamily: "monospace", fontSize: 10, height: 22,
+                    }} />
+                </Box>
+              ))}
+            </Box>
+          </Box>
+
+          {/* Preview Findings button */}
+          <Button variant="outlined"
+            disabled={parsing || !clientId}
+            onClick={handleParse}
+            startIcon={parsing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Visibility />}
+            sx={{ borderColor: "rgba(66,133,244,0.4)", color: "#4285F4" }}>
+            {parsing ? "Parsing…" : "Preview Findings"}
+          </Button>
+        </Box>
+      )}
+
+      {/* Parse error */}
       {parseError && (
         <Box sx={{ mt: 2, p: 1.5, bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 1 }}>
           <Typography variant="body2" sx={{ color: "#EA4335" }}>{parseError}</Typography>
         </Box>
       )}
 
-      {/* Preview results */}
+      {/* ── Step 3: Preview ── */}
       {preview && (
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ borderColor: "divider", mb: 2 }} />
 
-          {/* Header summary */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", mb: 2 }}>
             <Chip label={`Format: ${preview.detected_format}`} size="small"
               sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
@@ -403,20 +514,15 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
             <Chip label={`${preview.finding_count} findings`} size="small"
               sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "text.primary", fontWeight: 700 }} />
             <Chip label={`Avg confidence: ${preview.avg_confidence}%`} size="small"
-              sx={{ bgcolor: `${confidenceColor(preview.avg_confidence)}20`, color: confidenceColor(preview.avg_confidence), fontWeight: 700 }} />
+              sx={{ bgcolor: `${confColor(preview.avg_confidence)}20`, color: confColor(preview.avg_confidence), fontWeight: 700 }} />
           </Box>
 
-          {/* Delta summary chips */}
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-            <Chip label={`New  ${preview.new_count}`} size="small"
-              sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
-            <Chip label={`Fixed  ${preview.fixed_count}`} size="small"
-              sx={{ bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontWeight: 700 }} />
-            <Chip label={`Persisting  ${preview.persisting_count}`} size="small"
-              sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700 }} />
+            <Chip label={`New  ${preview.new_count}`} size="small" sx={{ bgcolor: "rgba(66,133,244,0.15)", color: "#4285F4", fontWeight: 700 }} />
+            <Chip label={`Fixed  ${preview.fixed_count}`} size="small" sx={{ bgcolor: "rgba(52,168,83,0.15)", color: "#34A853", fontWeight: 700 }} />
+            <Chip label={`Persisting  ${preview.persisting_count}`} size="small" sx={{ bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04", fontWeight: 700 }} />
           </Box>
 
-          {/* Severity breakdown bar */}
           <Box sx={{ mb: 2, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid rgba(255,255,255,0.06)" }}>
             <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 1 }}>SEVERITY BREAKDOWN</Typography>
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
@@ -424,25 +530,19 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
                 <Box key={sev} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: SEV_COLOR[sev] }} />
                   <Typography variant="caption" sx={{ color: "text.secondary", textTransform: "capitalize" }}>{sev}:</Typography>
-                  <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 700 }}>
-                    {preview.severity_breakdown[sev] ?? 0}
-                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.primary", fontWeight: 700 }}>{preview.severity_breakdown[sev] ?? 0}</Typography>
                 </Box>
               ))}
             </Box>
-            {/* Visual bar */}
             <Box sx={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", mt: 1.5, bgcolor: "rgba(255,255,255,0.06)" }}>
               {(["critical", "high", "medium", "low", "info"] as const).map((sev) => {
                 const count = preview.severity_breakdown[sev] ?? 0;
                 const pct = preview.finding_count > 0 ? (count / preview.finding_count) * 100 : 0;
-                return pct > 0 ? (
-                  <Box key={sev} sx={{ width: `${pct}%`, bgcolor: SEV_COLOR[sev] }} />
-                ) : null;
+                return pct > 0 ? <Box key={sev} sx={{ width: `${pct}%`, bgcolor: SEV_COLOR[sev] }} /> : null;
               })}
             </Box>
           </Box>
 
-          {/* Findings table */}
           <Box sx={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 1, overflow: "hidden", mb: 2 }}>
             <Table size="small">
               <TableHead>
@@ -455,76 +555,53 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {preview.findings.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE).map((f, i) => {
-                  const confColor = confidenceColor(f.confidence);
-                  return (
-                    <TableRow key={i} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.06)", fontSize: 12, py: 0.75 } }}>
-                      <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: confColor, flexShrink: 0 }} />
-                          <Typography variant="caption" sx={{ color: confColor, fontWeight: 700 }}>{f.confidence}%</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={f.severity} size="small"
-                          sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18, fontWeight: 700 }} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ color: "text.primary", display: "block", fontWeight: 500 }}>
-                          {f.title}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>{f.resource || "—"}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {preview.findings.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE).map((f, i) => (
+                  <TableRow key={i} hover sx={{ "& td": { borderColor: "rgba(255,255,255,0.06)", fontSize: 12, py: 0.75 } }}>
+                    <TableCell>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: confColor(f.confidence), flexShrink: 0 }} />
+                        <Typography variant="caption" sx={{ color: confColor(f.confidence), fontWeight: 700 }}>{f.confidence}%</Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={f.severity} size="small"
+                        sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}20`, color: SEV_COLOR[f.severity] || "#888", fontSize: 10, height: 18, fontWeight: 700 }} />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.primary", display: "block", fontWeight: 500 }}>{f.title}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>{f.resource || "—"}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ color: "#4285F4" }}>{f.cve_id || "—"}</Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
-            <TablePagination
-              component="div"
-              count={preview.findings.length}
-              page={page}
-              onPageChange={(_, p) => setPage(p)}
-              rowsPerPage={ROWS_PER_PAGE}
-              rowsPerPageOptions={[ROWS_PER_PAGE]}
-              sx={{ color: "text.secondary", "& .MuiToolbar-root": { minHeight: 40 }, fontSize: 12,
-                "& .MuiTablePagination-selectIcon": { color: "text.secondary" } }}
-            />
+            <TablePagination component="div" count={preview.findings.length} page={page}
+              onPageChange={(_, p) => setPage(p)} rowsPerPage={ROWS_PER_PAGE} rowsPerPageOptions={[ROWS_PER_PAGE]}
+              sx={{ color: "text.secondary", "& .MuiToolbar-root": { minHeight: 40 }, fontSize: 12 }} />
           </Box>
 
-          {/* Import name + confirm */}
           <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-            <TextField
-              size="small"
-              required
-              label="Assessment name"
-              placeholder={`e.g. ${preview.scanner_type ? preview.scanner_type.charAt(0).toUpperCase() + preview.scanner_type.slice(1) : "Nessus"} scan – ${new Date().toLocaleDateString()}`}
+            <TextField size="small" required label="Assessment name"
+              placeholder={`e.g. ${preview.scanner_type ? preview.scanner_type.charAt(0).toUpperCase() + preview.scanner_type.slice(1) : "Scan"} – ${new Date().toLocaleDateString()}`}
               helperText="Give this import a memorable name for later reference"
-              value={importName}
-              onChange={(e) => setImportName(e.target.value)}
-              sx={{ flex: 1, minWidth: 240, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-            />
-            <Button
-              variant="contained"
-              disabled={committing}
+              value={importName} onChange={(e) => setImportName(e.target.value)}
+              sx={{ flex: 1, minWidth: 240, "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+            <Button variant="contained" disabled={committing || !importName.trim()}
               startIcon={committing ? <CircularProgress size={16} sx={{ color: "inherit" }} /> : <Upload />}
-              onClick={handleCommit}
-            >
+              onClick={handleCommit}>
               {committing ? "Importing…" : "Confirm Import"}
             </Button>
-            <Button variant="outlined" sx={{ borderColor: "divider", color: "text.secondary" }} onClick={clearPreview}>
-              Cancel
-            </Button>
+            <Button variant="outlined" sx={{ borderColor: "divider", color: "text.secondary" }} onClick={clearAll}>Cancel</Button>
           </Box>
         </Box>
       )}
 
-      {/* Recent imports history */}
+      {/* ── Recent imports history ── */}
       {historyData.length > 0 && (
         <Box sx={{ mt: 4 }}>
           <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, letterSpacing: 1, display: "block", mb: 1.5 }}>
@@ -580,15 +657,9 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
         </Box>
       )}
 
-      <Snackbar
-        open={!!successSnack}
-        autoHideDuration={4000}
-        onClose={() => setSuccessSnack(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity="success" onClose={() => setSuccessSnack(null)} sx={{ fontWeight: 600 }}>
-          {successSnack}
-        </Alert>
+      <Snackbar open={!!successSnack} autoHideDuration={4000} onClose={() => setSuccessSnack(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="success" onClose={() => setSuccessSnack(null)} sx={{ fontWeight: 600 }}>{successSnack}</Alert>
       </Snackbar>
     </Box>
   );
