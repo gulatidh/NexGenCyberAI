@@ -1,0 +1,184 @@
+##############################################################################
+# Owlet — Deploy to owlet + owlet-api App Services (Southeast Asia)
+#
+# Triggers on workflow_dispatch only (separate deployment pipeline from monitara-sea).
+# Deploys BOTH frontend (owlet) and backend (owlet-api) in parallel.
+#
+# Required GitHub Secrets:
+#   AZURE_CREDENTIALS_OWLET       – SP for CoreInfraSub/Owlet RG (JSON from az ad sp create-for-rbac)
+#   REACT_APP_AZURE_CLIENT_ID     – Same AD app as monitara-sea (2978ef0b-...)
+#   REACT_APP_AZURE_TENANT_ID     – gretagulati tenant (5e9623cc-...)
+#   REACT_APP_BACKEND_CLIENT_ID   – Same as AZURE_CLIENT_ID
+#   REACT_APP_API_URL_OWLET       – https://owlet-api.azurewebsites.net/api/v1
+##############################################################################
+
+name: Owlet — Deploy
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-owlet-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  AZ_RESOURCE_GROUP: "Owlet"
+  AZ_FRONTEND_APP: "owlet"
+  AZ_BACKEND_APP: "owlet-api"
+  AZ_SUBSCRIPTION: "9931ac63-3ae9-43ba-898d-46fc714a00b6"
+
+jobs:
+
+  # ── 1. Frontend: Type Check + Build ────────────────────────────────────────
+  frontend-build:
+    name: Frontend — Type Check + Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          REACT_APP_AZURE_CLIENT_ID: ${{ secrets.REACT_APP_AZURE_CLIENT_ID }}
+          REACT_APP_AZURE_TENANT_ID: ${{ secrets.REACT_APP_AZURE_TENANT_ID }}
+          REACT_APP_BACKEND_CLIENT_ID: ${{ secrets.REACT_APP_BACKEND_CLIENT_ID }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL_OWLET || 'https://owlet-api.azurewebsites.net/api/v1' }}
+          REACT_APP_REDIRECT_URI: "https://owlet.azurewebsites.net"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: owlet-frontend-build
+          path: frontend/build/
+          retention-days: 1
+
+  # ── 2. Backend: Package ────────────────────────────────────────────────────
+  backend-build:
+    name: Backend — Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Package backend zip
+        run: |
+          cd backend
+          zip -qr ../backend.zip . \
+            --exclude "*.pyc" \
+            --exclude "__pycache__/*" \
+            --exclude "nexgencyberai.db" \
+            --exclude ".env"
+          echo "Backend zip: $(du -sh ../backend.zip | cut -f1)"
+
+      - name: Upload backend artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: owlet-backend-build
+          path: backend.zip
+          retention-days: 1
+
+  # ── 3. Deploy both in parallel ─────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy — Frontend (owlet)
+    needs: frontend-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_OWLET }}
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: owlet-frontend-build
+          path: frontend/build
+
+      - name: Set startup command
+        run: |
+          ok=false
+          for attempt in 1 2 3; do
+            az webapp config set \
+              --name "$AZ_FRONTEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
+              --startup-file "npx --yes serve -s . -l 8080" \
+              --output none && { ok=true; break; }
+            echo "Attempt $attempt failed, retrying in 20s..."
+            sleep 20
+          done
+          $ok || { echo "ERROR: startup-file config failed after 3 attempts"; exit 1; }
+
+      - name: Package and deploy frontend
+        run: |
+          set -euo pipefail
+          cd frontend/build && zip -qr ../../frontend.zip . && cd ../..
+          echo "Frontend zip: $(du -sh frontend.zip | cut -f1)"
+
+          for attempt in $(seq 1 5); do
+            echo "Attempt $attempt — deploying frontend..."
+            az webapp deploy \
+              --name "$AZ_FRONTEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
+              --src-path frontend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Frontend deployed → https://owlet.azurewebsites.net"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30s before retry"
+            sleep 30
+          done
+          echo "Frontend deploy failed after 5 attempts"; exit 1
+
+  deploy-backend:
+    name: Deploy — Backend (owlet-api)
+    needs: backend-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_OWLET }}
+
+      - name: Download backend artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: owlet-backend-build
+          path: .
+
+      - name: Deploy backend
+        run: |
+          set -euo pipefail
+          echo "Backend zip: $(du -sh backend.zip | cut -f1)"
+
+          for attempt in $(seq 1 5); do
+            echo "Attempt $attempt — deploying backend..."
+            az webapp deploy \
+              --name "$AZ_BACKEND_APP" \
+              --resource-group "$AZ_RESOURCE_GROUP" \
+              --subscription "$AZ_SUBSCRIPTION" \
+              --src-path backend.zip \
+              --type zip \
+              --async true \
+              --timeout 300 && { echo "Backend deployed → https://owlet-api.azurewebsites.net"; exit 0; }
+            echo "Attempt $attempt failed — waiting 30s before retry"
+            sleep 30
+          done
+          echo "Backend deploy failed after 5 attempts"; exit 1

@@ -173,9 +173,23 @@ async def get_current_user(
 
 async def require_admin(user: Dict = Depends(get_current_user)) -> Dict:
     roles = user.get("roles", [])
-    if "NexGenAdmin" not in roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
-    return user
+    if "NexGenAdmin" in roles:
+        return user
+    # Also allow emails bootstrapped via INITIAL_ADMIN_EMAILS env var
+    email = (
+        user.get("upn")
+        or user.get("preferred_username")
+        or user.get("email")
+        or user.get("unique_name", "")
+    ).strip().lower()
+    initial_admins = {
+        e.strip().lower()
+        for e in (settings.INITIAL_ADMIN_EMAILS or "").split(",")
+        if e.strip()
+    }
+    if email in initial_admins:
+        return user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
 
 
 async def require_not_guest(user: Dict = Depends(get_current_user)) -> Dict:

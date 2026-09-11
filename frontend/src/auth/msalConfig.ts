@@ -28,14 +28,13 @@ export const msalConfig: Configuration = {
   },
 };
 
-/** Scopes requested when logging in — includes the backend API scope */
+/** Scopes requested when logging in.
+ *  We use openid/profile/email + User.Read so MSAL issues a proper ID token
+ *  (aud = CLIENT_ID). The backend validates the ID token directly — no
+ *  Application ID URI or custom scope registration required in Azure AD.
+ */
 export const loginRequest = {
-  scopes: [
-    "openid",
-    "profile",
-    "email",
-    `api://${import.meta.env.REACT_APP_BACKEND_CLIENT_ID}/NexGenCyberAI.Read`,
-  ],
+  scopes: ["openid", "profile", "email", "User.Read"],
 };
 
 /** Graph API scopes (for optional user profile picture etc.) */

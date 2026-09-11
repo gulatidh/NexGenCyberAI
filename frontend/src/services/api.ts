@@ -36,7 +36,10 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
         ...loginReq,
         account,
       });
-      config.headers.Authorization = `Bearer ${tokenResponse.accessToken}`;
+      // Use the ID token: aud = CLIENT_ID, which the backend accepts directly.
+      // This avoids needing a registered Application ID URI on the Azure AD app.
+      const token = tokenResponse.idToken || tokenResponse.accessToken;
+      config.headers.Authorization = `Bearer ${token}`;
     } catch (err) {
       // Only redirect for errors that actually need interactive login
       // (consent required, MFA, expired refresh token, account changed).
