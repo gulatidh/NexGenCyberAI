@@ -2,7 +2,7 @@ import json
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Union
-from backend.core.ai_providers import get_llm
+from core.ai_providers import get_llm
 
 router = APIRouter(prefix="/frameworks/advisor", tags=["Framework Advisor"])
 
