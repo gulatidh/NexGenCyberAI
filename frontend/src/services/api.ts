@@ -67,6 +67,24 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
 const OPERATION_LABELS: Record<string, string> = {
   post: "Created", patch: "Updated", put: "Updated", delete: "Deleted",
 };
+
+// Retry a request once with a force-refreshed token on 401.
+// The _retry flag prevents infinite loops.
+const _retryRequest = async (originalConfig: InternalAxiosRequestConfig & { _retry?: boolean }) => {
+  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (!account) return Promise.reject(new Error("No account"));
+  const tokenResponse = await msalInstance.acquireTokenSilent({
+    ...loginReq,
+    account,
+    forceRefresh: true,
+  });
+  const token = tokenResponse.idToken || tokenResponse.accessToken;
+  originalConfig.headers = originalConfig.headers ?? {};
+  originalConfig.headers.Authorization = `Bearer ${token}`;
+  originalConfig._retry = true;
+  return apiClient(originalConfig);
+};
+
 apiClient.interceptors.response.use(
   (response) => {
     const method = (response.config.method || "").toLowerCase();
@@ -77,13 +95,37 @@ apiClient.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     // Suppress aborted/cancelled requests — no HTTP response means the request
     // was cancelled by React Query's AbortController or by an MSAL redirect.
     // These are client-side noise, not real server errors.
     if (axios.isCancel(error) || error.code === "ERR_CANCELED" || !error.response) {
       return Promise.reject(error);
     }
+
+    const originalConfig = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // On 401, force-refresh the MSAL token and retry once.
+    // This handles cases where the cached token has expired server-side
+    // but MSAL hasn't invalidated it yet.
+    if (error.response.status === 401 && !originalConfig._retry && !originalConfig.url?.includes("/auth/")) {
+      try {
+        return await _retryRequest(originalConfig);
+      } catch {
+        // Token refresh failed → fall through to error notification and
+        // trigger interactive login if needed
+        if (!_redirectInFlight) {
+          _redirectInFlight = true;
+          try {
+            await msalInstance.acquireTokenRedirect(loginReq);
+          } catch {
+            _redirectInFlight = false;
+          }
+        }
+        return Promise.reject(error);
+      }
+    }
+
     const method = (error.config?.method || "").toUpperCase();
     const url = error.config?.url || "";
     const status = error.response.status;
