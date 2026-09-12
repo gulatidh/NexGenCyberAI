@@ -67,7 +67,7 @@ class DeltaResult:
 # ── Format detection ──────────────────────────────────────────────────────────
 
 def detect_format(content: bytes, filename: str) -> str:
-    """Return one of: sarif, nessus, burp, openvas, qualys_xml, qualys_csv,
+    """Return one of: sarif, nessus, nessus_csv, burp, openvas, qualys_xml, qualys_csv,
     checkmarx, csv, json, pdf, text, unknown."""
     fname = (filename or "").lower()
     if fname.endswith(".sarif") or fname.endswith(".sarif.json"):
@@ -77,10 +77,15 @@ def detect_format(content: bytes, filename: str) -> str:
     if fname.endswith(".pdf"):
         return "pdf"
     if fname.endswith(".csv"):
-        # peek to distinguish Qualys CSV
+        # peek to distinguish Qualys and Nessus/Tenable CSV
         head = content[:2000].decode("utf-8", errors="replace")
         if "QID" in head or "CVSS_BASE" in head:
             return "qualys_csv"
+        first_line = head.split("\n")[0]
+        if "Plugin Name" in first_line and (
+            "Risk Factor" in first_line or "Synopsis" in first_line or "Plugin Output" in first_line
+        ):
+            return "nessus_csv"
         return "csv"
 
     # Try XML sniff
@@ -692,6 +697,108 @@ def parse_checkmarx(content: bytes) -> List[ParsedFinding]:
     return findings
 
 
+def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
+    """Parse Tenable.sc / Nessus CSV exports.
+
+    Deduplicates by Plugin ID — one finding per vulnerability regardless of how
+    many hosts are affected.  Affected host list is stored in raw["affected_hosts"].
+    """
+    findings = []
+    seen: dict = {}  # plugin_id → index in findings list
+    try:
+        import io as _io
+        reader = csv.DictReader(_io.TextIOWrapper(_io.BytesIO(content), encoding="utf-8", errors="replace"))
+        for row in reader:
+            plugin_id = (row.get("Plugin") or row.get("Plugin ID") or "").strip()
+            title = (row.get("Plugin Name") or row.get("Name") or "").strip()
+            if not title:
+                continue
+
+            # Severity mapping (Tenable uses "Critical/High/Medium/Low/Info/None")
+            sev_raw = (row.get("Severity") or row.get("Risk Factor") or "").strip().lower()
+            sev_map = {
+                "critical": "critical",
+                "high": "high",
+                "medium": "medium",
+                "moderate": "medium",
+                "low": "low",
+                "informational": "info",
+                "info": "info",
+                "none": "info",
+                "": "info",
+            }
+            sev = sev_map.get(sev_raw, "medium")
+
+            # CVSS
+            cvss_raw = (row.get("CVSS V3 Base Score") or row.get("CVSS V2 Base Score") or "").strip()
+            try:
+                cvss = float(cvss_raw) if cvss_raw else None
+            except ValueError:
+                cvss = None
+
+            # CVE (may be comma/space separated)
+            cve_raw = (row.get("CVE") or "").strip()
+            cve_id = cve_raw.split()[0] if cve_raw else None
+
+            # Host info
+            ip = (row.get("IP Address") or row.get("Host") or "").strip()
+            dns = (row.get("DNS Name") or "").strip()
+            resource = dns or ip or "unknown"
+
+            # Description — combine synopsis + description
+            synopsis = (row.get("Synopsis") or "").strip()
+            description = (row.get("Description") or "").strip()
+            if synopsis and description:
+                full_desc = f"{synopsis}\n\n{description}"
+            else:
+                full_desc = synopsis or description
+
+            remediation = (row.get("Steps to Remediate") or row.get("Solution") or "").strip()
+            cvss_vector = (row.get("CVSS V3 Vector") or row.get("CVSS V2 Vector") or "").strip() or None
+
+            if plugin_id and plugin_id in seen:
+                # Deduplicate: add host to existing finding's raw data
+                existing_raw = findings[seen[plugin_id]].raw
+                existing_raw.setdefault("affected_hosts", [])
+                host_entry = {"ip": ip, "dns": dns}
+                if host_entry not in existing_raw["affected_hosts"]:
+                    existing_raw["affected_hosts"].append(host_entry)
+            else:
+                pf = ParsedFinding(
+                    title=title,
+                    description=full_desc,
+                    severity=sev,
+                    resource_id=resource,
+                    resource_type="host",
+                    cve_id=cve_id,
+                    cvss_score=cvss,
+                    remediation=remediation,
+                    confidence=0.93,
+                    raw={
+                        "_table": "nessus_csv",
+                        "plugin_id": plugin_id,
+                        "family": row.get("Family") or "",
+                        "risk_factor": sev_raw,
+                        "cvss_vector": cvss_vector,
+                        "cve_list": cve_raw,
+                        "see_also": row.get("See Also") or "",
+                        "stig_severity": row.get("STIG Severity") or "",
+                        "vpr": row.get("Vulnerability Priority Rating") or "",
+                        "exploit_ease": row.get("Exploit Ease") or "",
+                        "exploit_available": (row.get("Exploit?") or "").strip().lower() in ("yes", "true", "1"),
+                        "first_discovered": row.get("First Discovered") or "",
+                        "last_observed": row.get("Last Observed") or "",
+                        "affected_hosts": [{"ip": ip, "dns": dns}],
+                    },
+                )
+                if plugin_id:
+                    seen[plugin_id] = len(findings)
+                findings.append(pf)
+    except Exception as exc:
+        logger.warning("Nessus CSV parse error: %s", exc)
+    return findings
+
+
 def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
     """Best-effort CSV parse. Returns (findings, confidence)."""
     findings = []
@@ -1001,6 +1108,8 @@ async def import_scan_file(
         findings = parse_qualys_xml(content)
     elif fmt == "qualys_csv":
         findings = parse_qualys_csv(content)
+    elif fmt == "nessus_csv":
+        findings = parse_nessus_csv(content)
     elif fmt == "checkmarx":
         findings = parse_checkmarx(content)
     elif fmt == "csv":
