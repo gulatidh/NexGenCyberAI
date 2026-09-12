@@ -37,7 +37,7 @@ export default function EvidencePackage() {
       if (account) {
         try {
           const resp = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
-          token = resp.accessToken;
+          token = resp.idToken || resp.accessToken;
         } catch {
           // proceed; backend will 401 with a clear message
         }

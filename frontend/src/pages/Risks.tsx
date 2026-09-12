@@ -222,7 +222,7 @@ function RiskDetailDrawer({
       const account = accounts[0];
       if (account) {
         const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
-        token = resp.accessToken;
+        token = resp.idToken || resp.accessToken;
       }
     } catch { }
     const url = risksApi.exportSingleUrl(clientId!, risk.id, format);
@@ -697,7 +697,7 @@ export default function Risks() {
       const account = accounts[0];
       if (account) {
         const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
-        token = resp.accessToken;
+        token = resp.idToken || resp.accessToken;
       }
     } catch { }
     const url = risksApi.exportUrl(clientId, format);

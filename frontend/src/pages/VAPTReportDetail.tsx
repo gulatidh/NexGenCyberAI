@@ -414,7 +414,7 @@ export default function VAPTReportDetail() {
       if (account) {
         try {
           const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
-          token = resp.accessToken;
+          token = resp.idToken || resp.accessToken;
         } catch { }
       }
       const url = API_BASE + vaptApi.exportUrl(clientId!, reportId!, format);

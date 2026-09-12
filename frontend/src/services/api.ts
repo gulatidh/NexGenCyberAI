@@ -396,7 +396,7 @@ export const threatModelsApi = {
     if (account) {
       try {
         const resp = await msalInstance.acquireTokenSilent({ ...loginRequest, account });
-        token = resp.accessToken;
+        token = resp.idToken || resp.accessToken;
       } catch {
         // proceed without token; backend will 401
       }

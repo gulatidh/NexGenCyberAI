@@ -236,7 +236,7 @@ export default function Findings() {
     if (account) {
       try {
         const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
-        token = resp.accessToken;
+        token = resp.idToken || resp.accessToken;
       } catch { }
     }
     const params = new URLSearchParams();
