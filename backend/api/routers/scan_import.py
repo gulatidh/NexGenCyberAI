@@ -783,7 +783,6 @@ async def commit_scan_import(
     normalized_count = 0
     for idx, pf in enumerate(findings):
         kwargs = pf.to_finding_kwargs(scan.id, fmt)
-        kwargs["import_id"] = ai_record.id
         finding_obj = Finding(**kwargs)
         db.add(finding_obj)
         db.flush()  # get finding_obj.id
