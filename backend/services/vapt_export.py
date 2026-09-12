@@ -1526,22 +1526,72 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
                 elems.append(Paragraph(f"Why it matters: {_safe(f.get('impact'))[:300]}", styles["normal"]))
             elems.append(Spacer(1, 0.2 * cm))
 
+        # Parse recommendation — may be structured JSON or plain text
+        rec_raw = f.get("recommendation") or ""
+        rec_structured = None
+        if rec_raw.strip().startswith("{"):
+            try:
+                import json as _json
+                rec_structured = _json.loads(rec_raw)
+            except Exception:
+                pass
+
         # Immediate Actions
-        rec = _safe(f.get("recommendation"))
-        if rec and rec != "—":
+        if rec_structured:
+            steps = rec_structured.get("steps") or []
+            code_ex = rec_structured.get("code_example") or ""
+            verification = rec_structured.get("verification") or []
+            references = rec_structured.get("references") or ""
+
+            if steps:
+                elems.append(Paragraph("Immediate Actions", styles["subsection"]))
+                for step_line in steps:
+                    if step_line.strip():
+                        elems.append(Paragraph(step_line.strip(), styles["bullet"]))
+                elems.append(Spacer(1, 0.2 * cm))
+
+            if code_ex and code_ex.strip():
+                code_style = ParagraphStyle(
+                    "code_block", fontName="Courier", fontSize=8,
+                    textColor=HexColor("#1A237E"), backColor=HexColor("#E8EAF6"),
+                    leftIndent=10, rightIndent=10, spaceAfter=4, spaceBefore=4,
+                    leading=12,
+                )
+                elems.append(Paragraph("Code / Configuration", styles["subsection"]))
+                for code_line in code_ex.replace("\r\n", "\n").split("\n"):
+                    elems.append(Paragraph(code_line or " ", code_style))
+                elems.append(Spacer(1, 0.2 * cm))
+
+            if verification:
+                elems.append(Paragraph("Verification Steps", styles["subsection"]))
+                for vi, vstep in enumerate(verification, 1):
+                    if vstep.strip():
+                        elems.append(Paragraph(f"{vi}. {vstep.strip()}", styles["bullet"]))
+                elems.append(Spacer(1, 0.2 * cm))
+            else:
+                elems.append(Paragraph("Verification Steps", styles["subsection"]))
+                elems.append(Paragraph("1. Apply the fix in a test/staging environment.", styles["bullet"]))
+                elems.append(Paragraph("2. Re-run the assessment tool or reproduce the attack scenario to confirm the issue is resolved.", styles["bullet"]))
+                elems.append(Spacer(1, 0.2 * cm))
+
+            if references and references.strip():
+                elems.append(Paragraph(f"References: {references.strip()}", styles["label"]))
+
+        elif rec_raw and rec_raw != "—":
             elems.append(Paragraph("Immediate Actions", styles["subsection"]))
-            for step_i, line in enumerate(rec.split("\n"), 1):
+            for step_i, line in enumerate(rec_raw.split("\n"), 1):
                 if line.strip():
                     elems.append(Paragraph(f"{step_i}. {line.strip()}", styles["bullet"]))
             elems.append(Spacer(1, 0.2 * cm))
-
-        # Verification steps
-        elems.append(Paragraph("Verification Steps", styles["subsection"]))
-        elems.append(Paragraph("1. Apply the recommended fix in a test environment.", styles["bullet"]))
-        elems.append(Paragraph("2. Re-run the relevant test case or scan to confirm the vulnerability is remediated.", styles["bullet"]))
-        elems.append(Paragraph("3. Document evidence of the fix (screenshots, config exports, test results).", styles["bullet"]))
-        elems.append(Paragraph("4. Submit for retest validation by the security team.", styles["bullet"]))
-        elems.append(Spacer(1, 0.2 * cm))
+            elems.append(Paragraph("Verification Steps", styles["subsection"]))
+            elems.append(Paragraph("1. Apply the fix in a test/staging environment.", styles["bullet"]))
+            elems.append(Paragraph("2. Re-run the assessment tool or reproduce the attack scenario to confirm the issue is resolved.", styles["bullet"]))
+            elems.append(Spacer(1, 0.2 * cm))
+        else:
+            elems.append(Paragraph("Verification Steps", styles["subsection"]))
+            elems.append(Paragraph("1. Implement the recommended control in a test environment.", styles["bullet"]))
+            elems.append(Paragraph("2. Confirm the vulnerability is no longer exploitable before promoting to production.", styles["bullet"]))
+            elems.append(Spacer(1, 0.2 * cm))
 
         # Effort
         effort_label = effort_map.get(sev, "Medium")
@@ -1786,23 +1836,62 @@ def generate_remediation_docx(report: Dict, findings: List[Dict], client_name: s
             _add_para("Business Impact:", bold=True, color="C62828")
             _add_para(_safe(f.get("impact"))[:300])
 
-        rec = _safe(f.get("recommendation"))
-        if rec and rec != "—":
+        rec_raw = f.get("recommendation") or ""
+        rec_structured = None
+        if rec_raw.strip().startswith("{"):
+            try:
+                import json as _json
+                rec_structured = _json.loads(rec_raw)
+            except Exception:
+                pass
+
+        if rec_structured:
+            steps = rec_structured.get("steps") or []
+            code_ex = rec_structured.get("code_example") or ""
+            verification = rec_structured.get("verification") or []
+            references = rec_structured.get("references") or ""
+
+            if steps:
+                _add_para("Immediate Actions:", bold=True, color="C62828")
+                for step_line in steps:
+                    if step_line.strip():
+                        p = doc.add_paragraph(style="List Number")
+                        p.add_run(step_line.strip())
+
+            if code_ex and code_ex.strip():
+                _add_para("Code / Configuration:", bold=True, color="C62828")
+                code_p = doc.add_paragraph()
+                code_r = code_p.add_run(code_ex.strip())
+                code_r.font.name = "Courier New"
+                code_r.font.size = Pt(8)
+
+            if verification:
+                _add_para("Verification Steps:", bold=True, color="C62828")
+                for vstep in verification:
+                    if vstep.strip():
+                        p = doc.add_paragraph(style="List Number")
+                        p.add_run(vstep.strip())
+            else:
+                _add_para("Verification Steps:", bold=True, color="C62828")
+                for step in ["Apply the fix in a test/staging environment.",
+                             "Re-run the assessment or reproduce the attack scenario to confirm resolution."]:
+                    p = doc.add_paragraph(style="List Number")
+                    p.add_run(step)
+
+            if references and references.strip():
+                _add_para(f"References: {references.strip()}", color="546E7A")
+
+        elif rec_raw and rec_raw != "—":
             _add_para("Immediate Actions:", bold=True, color="C62828")
-            for step_i, line in enumerate(rec.split("\n"), 1):
+            for step_i, line in enumerate(rec_raw.split("\n"), 1):
                 if line.strip():
                     p = doc.add_paragraph(style="List Number")
                     p.add_run(line.strip())
-
-        _add_para("Verification Steps:", bold=True, color="C62828")
-        for step in [
-            "Apply the recommended fix in a test environment.",
-            "Re-run the relevant test case or scan.",
-            "Document evidence of the fix (screenshots, config exports).",
-            "Submit for retest validation by the security team.",
-        ]:
-            p = doc.add_paragraph(style="List Number")
-            p.add_run(step)
+            _add_para("Verification Steps:", bold=True, color="C62828")
+            for step in ["Apply the fix in a test/staging environment.",
+                         "Re-run the assessment or reproduce the attack scenario to confirm resolution."]:
+                p = doc.add_paragraph(style="List Number")
+                p.add_run(step)
 
         _add_para(f"Effort: {effort_map.get(sev, 'Medium')}  |  Priority: {priority_labels.get(sev, 'P3')}",
                   color="546E7A")

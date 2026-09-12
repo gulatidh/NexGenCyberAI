@@ -401,8 +401,8 @@ async def _ai_generate_report_content(
     scan_type: str,
     findings: List[Dict],
     scope: Dict,
-) -> Dict[str, str]:
-    """Call LLM to generate executive summary, per-finding enhanced remediation, and conclusion."""
+) -> Dict:
+    """Call LLM to generate executive summary, structured per-finding remediation, and conclusion."""
     try:
         from core.ai_providers import get_llm, ProviderUnavailableError
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -413,39 +413,64 @@ async def _ai_generate_report_content(
             if s in sev_counts:
                 sev_counts[s] += 1
 
-        findings_summary = "\n".join(
-            f"- [{f.get('severity','').upper()}] {f.get('title','')}: {(f.get('description') or '')[:200]}"
-            for f in findings[:30]
+        # Send full context — title, description, affected asset, evidence, existing remediation hint
+        findings_detail = "\n\n".join(
+            f"FINDING: {f.get('title','')}\n"
+            f"Severity: {f.get('severity','').upper()}\n"
+            f"Affected: {f.get('resource_id') or 'N/A'}\n"
+            f"Description: {(f.get('description') or '')[:600]}\n"
+            f"Evidence: {(f.get('evidence') or '')[:300]}\n"
+            f"Existing hint: {(f.get('remediation') or '')[:200]}"
+            for f in findings[:35]
         )
 
         system = (
-            "You are a senior penetration tester writing a professional VAPT report. "
-            "Be concise, precise, and business-appropriate. Do not use markdown headers or bullet symbols — "
-            "write in clear prose paragraphs. Output JSON only."
+            "You are a senior penetration tester and security engineer writing a professional VAPT remediation report. "
+            "For each finding produce technically precise, step-by-step remediation that a developer can follow immediately. "
+            "Include specific function names, file types, config settings, or commands wherever relevant. "
+            "Output valid JSON only — no markdown, no prose outside the JSON."
         )
 
-        prompt = f"""
-Client: {client_name}
+        prompt = f"""Client: {client_name}
 Scan type: {scan_type}
 Scope: {json.dumps(scope)}
-Findings ({len(findings)} total — Critical:{sev_counts['critical']} High:{sev_counts['high']} Medium:{sev_counts['medium']} Low:{sev_counts['low']}):
-{findings_summary}
+Total findings: {len(findings)} (Critical:{sev_counts['critical']} High:{sev_counts['high']} Medium:{sev_counts['medium']} Low:{sev_counts['low']})
 
-Return a JSON object with exactly these keys:
+FINDINGS:
+{findings_detail}
+
+Return a single JSON object with exactly these top-level keys:
+
 {{
-  "executive_summary": "3-4 paragraph executive summary suitable for a CISO/board audience. Explain the engagement purpose, overall risk posture, and top concerns.",
-  "conclusion": "2-3 paragraph conclusion covering overall security maturity, critical remediation priorities, and recommended next steps.",
+  "executive_summary": "3-4 paragraph executive summary for a CISO/board audience covering engagement purpose, overall risk posture, most critical findings, and business impact.",
+  "conclusion": "2-3 paragraph conclusion covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
   "finding_remediations": {{
-    "<finding_title>": "Detailed step-by-step remediation for this specific finding — 4-8 concrete technical steps."
+    "<exact finding title>": {{
+      "steps": [
+        "Step 1: <specific action — name exact file, function, config key, or command>",
+        "Step 2: <next specific action with example code or config if applicable>",
+        "Step 3: ...",
+        "Step 4 (if needed): ..."
+      ],
+      "code_example": "<short before/after code snippet or config block — omit key if not applicable>",
+      "verification": [
+        "Verify 1: <specific test — e.g. send request X and confirm response Y, or run command Z and check output>",
+        "Verify 2: <second specific test — e.g. re-run scanner, attempt exploit, review log>"
+      ],
+      "references": "<relevant CWE, CVE, OWASP category, or RFC — e.g. CWE-862, OWASP A01:2021>"
+    }}
   }}
 }}
 
-Include a remediation entry for every finding listed above.
+Rules:
+- steps must be 3-6 numbered items — specific and actionable, not generic.
+- code_example: include ONLY if a code or config change is needed; omit the key otherwise.
+- verification: exactly 2 specific tests relevant to THIS finding, not generic boilerplate.
+- Include a remediation entry for EVERY finding listed above using the exact title string as the key.
 """
         llm = get_llm()
         resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
         raw = str(resp.content).strip()
-        # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("```", 2)[1]
             if raw.startswith("json"):
@@ -551,7 +576,7 @@ async def create_report_from_scan(
     db.flush()
 
     # Import findings
-    ai_remediations: Dict[str, str] = ai.get("finding_remediations", {})
+    ai_remediations: Dict[str, Any] = ai.get("finding_remediations", {})
     sev_order = ["critical", "high", "medium", "low", "informational", "info"]
 
     sorted_findings = sorted(
@@ -563,7 +588,13 @@ async def create_report_from_scan(
         sev = fd["severity"].lower()
         if sev == "info":
             sev = "informational"
-        enhanced_remediation = ai_remediations.get(fd["title"], fd.get("remediation", ""))
+        ai_rem = ai_remediations.get(fd["title"])
+        if isinstance(ai_rem, dict):
+            enhanced_remediation = json.dumps(ai_rem)
+        elif isinstance(ai_rem, str):
+            enhanced_remediation = ai_rem
+        else:
+            enhanced_remediation = fd.get("remediation", "")
         vapt_finding = VAPTFinding(
             report_id=report.id,
             finding_id=f"F-{idx + 1:02d}",
