@@ -13,7 +13,7 @@ import {
 } from "@mui/icons-material";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
 import { useActiveClient } from "../contexts/ClientContext";
@@ -270,6 +270,8 @@ function FindingDialog({
 export default function VAPTReportDetail() {
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const vaptBase = location.pathname.startsWith("/report") ? "/report/vapt-reports" : "/respond/vapt-reports";
   const { clientId } = useActiveClient();
   const qc = useQueryClient();
   const { instance, accounts } = useMsal();
@@ -385,7 +387,7 @@ export default function VAPTReportDetail() {
     onSuccess: (newReport) => {
       qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
       setRetestConfirmOpen(false);
-      navigate(`/vapt-reports/${newReport.id}`);
+      navigate(`${vaptBase}/${newReport.id}`);
     },
   });
 
@@ -462,7 +464,7 @@ export default function VAPTReportDetail() {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">Report not found or access denied.</Alert>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate("/vapt-reports")} sx={{ mt: 2 }}>
+        <Button startIcon={<ArrowBack />} onClick={() => navigate(vaptBase)} sx={{ mt: 2 }}>
           Back to Reports
         </Button>
       </Box>
@@ -489,7 +491,7 @@ export default function VAPTReportDetail() {
         px: 2, py: 1,
         display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap",
       }}>
-        <IconButton onClick={() => navigate("/vapt-reports")} size="small">
+        <IconButton onClick={() => navigate(vaptBase)} size="small">
           <ArrowBack />
         </IconButton>
         <GppGood sx={{ color: "#1565C0" }} />

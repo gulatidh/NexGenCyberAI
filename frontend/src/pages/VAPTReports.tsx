@@ -85,7 +85,7 @@ export default function VAPTReports() {
   const navigate = useNavigate();
   const location = useLocation();
   const isGuest = useIsGuest();
-  const vaptBase = location.pathname.startsWith("/vapt") ? "/vapt/reports" : "/vapt-reports";
+  const vaptBase = location.pathname.startsWith("/report") ? "/report/vapt-reports" : "/respond/vapt-reports";
   const { clientId } = useActiveClient();
   const qc = useQueryClient();
 

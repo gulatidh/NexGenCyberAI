@@ -388,7 +388,7 @@ function ProtectedApp() {
           <Route path="/remediation-jobs"       element={<Navigate to="/respond/remediation-jobs" replace />} />
           <Route path="/ctem"                   element={<Navigate to="/respond/ctem" replace />} />
           <Route path="/vapt-reports"           element={<Navigate to="/respond/vapt-reports" replace />} />
-          <Route path="/vapt-reports/:id"       element={<Navigate to="/respond/vapt-reports" replace />} />
+          <Route path="/vapt-reports/:id"       element={<RedirectWithId to="/respond/vapt-reports" />} />
           <Route path="/security-docs"          element={<Navigate to="/respond/security-docs" replace />} />
           <Route path="/ai-assisted-scan"       element={<Navigate to="/discover/ai-scan" replace />} />
           <Route path="/cve-pivot"              element={<Navigate to="/discover/cve-pivot" replace />} />
