@@ -897,8 +897,8 @@ async def enrich_cves(findings: List[ParsedFinding], nvd_api_key: str = "") -> L
     headers = {"apiKey": nvd_api_key} if nvd_api_key else {}
     cache: Dict[str, Dict] = {}
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for cve_id in list(cve_ids)[:20]:  # cap at 20 NVD calls
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for cve_id in list(cve_ids)[:5]:  # cap at 5 NVD calls (25s max)
             try:
                 resp = await client.get(
                     "https://services.nvd.nist.gov/rest/json/cves/2.0",
@@ -978,11 +978,13 @@ async def import_scan_file(
     filename: str,
     tool_hint: str = "",
     nvd_api_key: str = "",
+    enrich: bool = True,
 ) -> Tuple[str, List[ParsedFinding]]:
     """Parse a scan file and return (detected_format, findings).
 
     Uses structured parsers for known formats; LLM fallback for unknown/PDF.
-    CVE enrichment is applied automatically.
+    Set enrich=False to skip NVD CVE enrichment (avoids blocking serial HTTP calls
+    in request-path code; enrichment runs later via cve_enrichment.py post-scan).
     """
     fmt = detect_format(content, filename)
     logger.info("Importing scan file '%s' detected as format: %s", filename, fmt)
@@ -1016,6 +1018,7 @@ async def import_scan_file(
         findings = await parse_with_llm(content, filename, tool_hint)
         fmt = "llm"
 
-    # CVE enrichment
-    findings = await enrich_cves(findings, nvd_api_key=nvd_api_key)
+    # CVE enrichment (skipped when enrich=False to keep request latency low)
+    if enrich:
+        findings = await enrich_cves(findings, nvd_api_key=nvd_api_key)
     return fmt, findings

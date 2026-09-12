@@ -530,8 +530,9 @@ Respond ONLY with valid JSON (no markdown fences):
   "reasoning": "<1-2 sentences>",
   "key_indicators": ["<indicator 1>", "<indicator 2>"]
 }}"""
+        import asyncio as _asyncio
         llm = get_llm()
-        resp = await llm.ainvoke([HumanMessage(content=prompt)])
+        resp = await _asyncio.wait_for(llm.ainvoke([HumanMessage(content=prompt)]), timeout=25.0)
         raw = resp.content.strip()
         raw = _re.sub(r"^```(?:json)?\s*", "", raw)
         raw = _re.sub(r"\s*```$", "", raw)
@@ -573,6 +574,7 @@ async def parse_scan_file(
         filename=file.filename or "upload",
         tool_hint=tool_hint,
         nvd_api_key=settings.NVD_API_KEY,
+        enrich=False,  # skip NVD calls; CVE enrichment runs post-scan via cve_enrichment.py
     )
 
     existing = (
@@ -708,6 +710,7 @@ async def commit_scan_import(
         filename=file.filename or "upload",
         tool_hint=tool_hint,
         nvd_api_key=settings.NVD_API_KEY,
+        enrich=False,  # skip NVD calls; CVE enrichment runs post-scan via cve_enrichment.py
     )
 
     if not findings:
