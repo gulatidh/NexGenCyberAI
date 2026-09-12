@@ -28,7 +28,8 @@ class ParsedFinding:
     severity: str = "medium"           # critical/high/medium/low/info
     resource_id: str = ""
     resource_type: str = "unknown"     # host/url/file/container/cloud_resource/unknown
-    cve_id: Optional[str] = None
+    cve_id: Optional[str] = None       # single CVE, max 50 chars (DB column limit)
+    cve_ids: Optional[str] = None      # JSON array of all CVEs when there are multiple
     cvss_score: Optional[float] = None
     remediation: str = ""
     control_id: Optional[str] = None
@@ -36,6 +37,8 @@ class ParsedFinding:
     raw: Dict[str, Any] = field(default_factory=dict)
 
     def to_finding_kwargs(self, scan_id: str, source_format: str) -> Dict[str, Any]:
+        # Guard: cve_id column is String(50); truncate defensively
+        safe_cve_id = (self.cve_id or "")[:50] or None
         return {
             "scan_id": scan_id,
             "title": self.title[:500],
@@ -43,7 +46,8 @@ class ParsedFinding:
             "severity": self.severity,
             "resource_id": self.resource_id[:500],
             "resource_type": self.resource_type,
-            "cve_id": self.cve_id,
+            "cve_id": safe_cve_id,
+            "cve_ids": self.cve_ids,
             "cvss_score": self.cvss_score,
             "remediation": self.remediation[:3000],
             "control_id": self.control_id,
@@ -736,9 +740,12 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
             except ValueError:
                 cvss = None
 
-            # CVE (may be comma/space separated)
+            # CVE — Nessus lists multiple CVEs comma-separated, e.g. "CVE-A,CVE-B,CVE-C"
             cve_raw = (row.get("CVE") or "").strip()
-            cve_id = cve_raw.split()[0] if cve_raw else None
+            cve_list = [c.strip() for c in re.split(r"[,\s]+", cve_raw)
+                        if c.strip() and re.match(r"CVE-\d{4}-\d+", c.strip())]
+            cve_id = cve_list[0] if cve_list else None
+            cve_ids_json = json.dumps(cve_list) if len(cve_list) > 1 else None
 
             # Host info
             ip = (row.get("IP Address") or row.get("Host") or "").strip()
@@ -771,6 +778,7 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
                     resource_id=resource,
                     resource_type="host",
                     cve_id=cve_id,
+                    cve_ids=cve_ids_json,
                     cvss_score=cvss,
                     remediation=remediation,
                     confidence=0.93,
