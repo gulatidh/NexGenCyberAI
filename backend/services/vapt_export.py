@@ -2787,3 +2787,233 @@ def generate_remediation_docx(report: Dict, findings: List[Dict], client_name: s
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+# ── Comparison PDF ─────────────────────────────────────────────────────────────
+
+def generate_comparison_pdf(payload: dict, client_name: str) -> bytes:
+    """Generate a comparison PDF between two VAPT reports."""
+    buf = io.BytesIO()
+    styles = _build_pdf_styles()
+    PAGE_W, PAGE_H = A4
+    MARGIN = 2 * cm
+
+    report_a = payload.get("report_a", {})
+    report_b = payload.get("report_b", {})
+    stats = payload.get("stats", {})
+    fixed = payload.get("fixed", [])
+    new_findings = payload.get("new_findings", [])
+    persisting = payload.get("persisting", [])
+
+    title_a = _safe(report_a.get("title"), "Report A")
+    title_b = _safe(report_b.get("title"), "Report B")
+    ver_a = _safe(report_a.get("version"), "")
+    ver_b = _safe(report_b.get("version"), "")
+    score_a = stats.get("score_a", 0)
+    score_b = stats.get("score_b", 0)
+    score_delta = score_b - score_a
+    gen_ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+    def _cover(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(NAVY)
+        canvas.rect(0, PAGE_H - 0.4 * cm, PAGE_W, 0.4 * cm, fill=1, stroke=0)
+        canvas.rect(0, 0, PAGE_W, 0.4 * cm, fill=1, stroke=0)
+        canvas.restoreState()
+
+    def _content(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(NAVY)
+        canvas.rect(MARGIN, PAGE_H - MARGIN + 0.2 * cm, PAGE_W - 2 * MARGIN, 0.05 * cm, fill=1, stroke=0)
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(DARK_TEXT)
+        canvas.drawString(MARGIN, PAGE_H - MARGIN + 0.45 * cm, f"{client_name} — Security Comparison Report")
+        canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - MARGIN + 0.45 * cm, f"Page {doc.page}")
+        canvas.setFillColor(NAVY)
+        canvas.rect(MARGIN, MARGIN - 0.4 * cm, PAGE_W - 2 * MARGIN, 0.05 * cm, fill=1, stroke=0)
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(DARK_TEXT)
+        canvas.drawString(MARGIN, MARGIN - 0.6 * cm, f"Generated {gen_ts}")
+        canvas.restoreState()
+
+    cover_frame = Frame(0, 0, PAGE_W, PAGE_H, leftPadding=3 * cm, rightPadding=1.5 * cm,
+                        topPadding=2 * cm, bottomPadding=2 * cm)
+    content_frame = Frame(MARGIN, MARGIN, PAGE_W - 2 * MARGIN, PAGE_H - 2 * MARGIN,
+                          topPadding=0.8 * cm, bottomPadding=0.8 * cm)
+
+    doc = BaseDocTemplate(buf, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN,
+                          topMargin=MARGIN, bottomMargin=MARGIN)
+    doc.addPageTemplates([
+        PageTemplate(id="Cover", frames=[cover_frame], onPage=_cover),
+        PageTemplate(id="Content", frames=[content_frame], onPage=_content),
+    ])
+
+    story = []
+
+    # ── Cover ─────────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 3 * cm))
+    story.append(Paragraph("Security Assessment", styles["cover_sub"]))
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph("Comparison Report", styles["cover_title"]))
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(Paragraph(client_name, styles["cover_sub"]))
+    story.append(Spacer(1, 2 * cm))
+    story.append(HRFlowable(width="80%", thickness=1, color=NAVY, hAlign="CENTER"))
+    story.append(Spacer(1, 0.8 * cm))
+
+    vs_data = [
+        [Paragraph("<b>Baseline</b>", styles["center_bold"]),
+         Paragraph("vs", styles["center"]),
+         Paragraph("<b>Current</b>", styles["center_bold"])],
+        [Paragraph(title_a, styles["center"]),
+         Paragraph("", styles["center"]),
+         Paragraph(title_b, styles["center"])],
+        [Paragraph(f"Version {ver_a}", styles["small"]),
+         Paragraph("", styles["center"]),
+         Paragraph(f"Version {ver_b}", styles["small"])],
+    ]
+    vs_tbl = Table(vs_data, colWidths=[(PAGE_W - 2 * MARGIN) * 0.45,
+                                        (PAGE_W - 2 * MARGIN) * 0.10,
+                                        (PAGE_W - 2 * MARGIN) * 0.45])
+    vs_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (0, -1), HexColor("#E3F2FD")),
+        ("BACKGROUND", (2, 0), (2, -1), HexColor("#E8F5E9")),
+        ("BOX", (0, 0), (0, -1), 0.5, NAVY),
+        ("BOX", (2, 0), (2, -1), 0.5, HexColor("#2E7D32")),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(vs_tbl)
+    story.append(Spacer(1, 1 * cm))
+    story.append(Paragraph(f"Generated: {gen_ts}", styles["center"]))
+    story.append(PageBreak())
+
+    from reportlab.platypus import NextPageTemplate
+    story.append(NextPageTemplate("Content"))
+
+    # ── Stats summary ──────────────────────────────────────────────────────────
+    story.append(Paragraph("Executive Summary", styles["section"]))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_BG))
+    story.append(Spacer(1, 0.2 * cm))
+
+    delta_sign = "+" if score_delta >= 0 else ""
+    delta_color = "#2E7D32" if score_delta >= 0 else "#C62828"
+    col_w = (PAGE_W - 2 * MARGIN) / 4
+    summary_data = [
+        [Paragraph("<b>Metric</b>", styles["tbl_hdr"]),
+         Paragraph("<b>Baseline</b>", styles["tbl_hdr"]),
+         Paragraph("<b>Current</b>", styles["tbl_hdr"]),
+         Paragraph("<b>Change</b>", styles["tbl_hdr"])],
+        [Paragraph("Total Findings", styles["tbl_cell"]),
+         Paragraph(str(stats.get("total_a", 0)), styles["tbl_cell"]),
+         Paragraph(str(stats.get("total_b", 0)), styles["tbl_cell"]),
+         Paragraph(str(stats.get("total_b", 0) - stats.get("total_a", 0)), styles["tbl_cell"])],
+        [Paragraph("Fixed", styles["tbl_cell"]),
+         Paragraph("—", styles["tbl_cell"]),
+         Paragraph(str(stats.get("fixed_count", 0)), styles["tbl_cell"]),
+         Paragraph(f'<font color="#2E7D32"><b>Fixed: {stats.get("fixed_count", 0)}</b></font>', styles["tbl_cell"])],
+        [Paragraph("New", styles["tbl_cell"]),
+         Paragraph("—", styles["tbl_cell"]),
+         Paragraph(str(stats.get("new_count", 0)), styles["tbl_cell"]),
+         Paragraph(f'<font color="#C62828"><b>New: {stats.get("new_count", 0)}</b></font>', styles["tbl_cell"])],
+        [Paragraph("Persisting", styles["tbl_cell"]),
+         Paragraph("—", styles["tbl_cell"]),
+         Paragraph(str(stats.get("persisting_count", 0)), styles["tbl_cell"]),
+         Paragraph(str(stats.get("persisting_count", 0)), styles["tbl_cell"])],
+        [Paragraph("Security Score", styles["tbl_cell"]),
+         Paragraph(str(score_a), styles["tbl_cell"]),
+         Paragraph(str(score_b), styles["tbl_cell"]),
+         Paragraph(f'<font color="{delta_color}"><b>{delta_sign}{score_delta}</b></font>', styles["tbl_cell"])],
+    ]
+    summary_tbl = Table(summary_data, colWidths=[col_w * 1.4, col_w * 0.867, col_w * 0.867, col_w * 0.867])
+    summary_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
+        ("GRID", (0, 0), (-1, -1), 0.4, HexColor("#B0BEC5")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(summary_tbl)
+    story.append(Spacer(1, 0.5 * cm))
+
+    def _findings_section(sec_title: str, findings_list: list, hdr_color: HexColor, is_persisting: bool = False):
+        if not findings_list:
+            story.append(Paragraph(sec_title, styles["section"]))
+            story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_BG))
+            story.append(Paragraph("No findings in this category.", styles["normal"]))
+            story.append(Spacer(1, 0.4 * cm))
+            return
+
+        story.append(Paragraph(sec_title, styles["section"]))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=GREY_BG))
+        story.append(Spacer(1, 0.2 * cm))
+
+        if is_persisting:
+            hdr = [Paragraph("#", styles["tbl_hdr"]),
+                   Paragraph("Finding", styles["tbl_hdr"]),
+                   Paragraph("Sev (A)", styles["tbl_hdr"]),
+                   Paragraph("Sev (B)", styles["tbl_hdr"]),
+                   Paragraph("Asset", styles["tbl_hdr"])]
+            col_ws = [0.6 * cm, (PAGE_W - 2 * MARGIN) * 0.40,
+                      (PAGE_W - 2 * MARGIN) * 0.14, (PAGE_W - 2 * MARGIN) * 0.14,
+                      (PAGE_W - 2 * MARGIN) * 0.22]
+        else:
+            hdr = [Paragraph("#", styles["tbl_hdr"]),
+                   Paragraph("Finding", styles["tbl_hdr"]),
+                   Paragraph("Severity", styles["tbl_hdr"]),
+                   Paragraph("Affected Asset", styles["tbl_hdr"])]
+            col_ws = [0.6 * cm, (PAGE_W - 2 * MARGIN) * 0.52,
+                      (PAGE_W - 2 * MARGIN) * 0.18, (PAGE_W - 2 * MARGIN) * 0.26]
+
+        rows = [hdr]
+        for i, item in enumerate(findings_list):
+            if is_persisting:
+                fa = item.get("a", {})
+                fb = item.get("b", {})
+                sev_a = (fa.get("severity") or "").lower()
+                sev_b = (fb.get("severity") or "").lower()
+                sev_a_hex = SEV_COLORS.get(sev_a, DARK_TEXT).hexval()
+                sev_b_hex = SEV_COLORS.get(sev_b, DARK_TEXT).hexval()
+                rows.append([
+                    Paragraph(str(i + 1), styles["small"]),
+                    Paragraph(_safe(fa.get("title")), styles["tbl_cell"]),
+                    Paragraph(f'<font color="{sev_a_hex}">{sev_a.upper()}</font>', styles["tbl_cell"]),
+                    Paragraph(f'<font color="{sev_b_hex}">{sev_b.upper()}</font>', styles["tbl_cell"]),
+                    Paragraph(_safe(fa.get("affected_asset")), styles["small"]),
+                ])
+            else:
+                sev = (item.get("severity") or "").lower()
+                sev_hex = SEV_COLORS.get(sev, DARK_TEXT).hexval()
+                rows.append([
+                    Paragraph(str(i + 1), styles["small"]),
+                    Paragraph(_safe(item.get("title")), styles["tbl_cell"]),
+                    Paragraph(f'<font color="{sev_hex}">{sev.upper()}</font>', styles["tbl_cell"]),
+                    Paragraph(_safe(item.get("affected_asset")), styles["small"]),
+                ])
+
+        tbl = Table(rows, colWidths=col_ws, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), hdr_color),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
+            ("GRID", (0, 0), (-1, -1), 0.4, HexColor("#B0BEC5")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        story.append(tbl)
+        story.append(Spacer(1, 0.5 * cm))
+
+    _findings_section(f"Fixed Findings ({len(fixed)})", fixed, HexColor("#2E7D32"))
+    _findings_section(f"New Findings ({len(new_findings)})", new_findings, HexColor("#C62828"))
+    _findings_section(f"Persisting Findings ({len(persisting)})", persisting, HexColor("#E65100"), is_persisting=True)
+
+    doc.build(story)
+    return buf.getvalue()

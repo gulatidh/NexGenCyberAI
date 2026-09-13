@@ -94,6 +94,7 @@ const RemediationTracker  = React.lazy(() => import("./pages/RemediationTracker"
 const CustomFrameworks    = React.lazy(() => import("./pages/CustomFrameworks"));
 const VAPTReports         = React.lazy(() => import("./pages/VAPTReports"));
 const VAPTReportDetail    = React.lazy(() => import("./pages/VAPTReportDetail"));
+const VAPTCompare         = React.lazy(() => import("./pages/VAPTCompare"));
 const TicketSyncPage      = React.lazy(() => import("./pages/TicketSync"));
 const CTEMPage            = React.lazy(() => import("./pages/CTEMPage"));
 const SecurityDocs        = React.lazy(() => import("./pages/SecurityDocs"));
@@ -304,6 +305,8 @@ function ProtectedApp() {
             <Route path="/discover/scans/:scanId"          element={<ScanDetail />} />
             <Route path="/discover/scans/:scanId/diff"     element={<ScanDiff />} />
             <Route path="/discover/assets/:assetId"        element={<AssetDetail />} />
+            <Route path="/respond/vapt-reports/compare"     element={<VAPTCompare />} />
+            <Route path="/report/vapt-reports/compare"      element={<VAPTCompare />} />
             <Route path="/respond/vapt-reports/:reportId"  element={<VAPTReportDetail />} />
             <Route path="/report/vapt-reports/:reportId"   element={<VAPTReportDetail />} />
             <Route path="/platform/settings"               element={<Settings />} />

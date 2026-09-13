@@ -19,6 +19,7 @@ Routes (all under /clients/{cid}/vapt-reports/):
 import io
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
@@ -900,6 +901,92 @@ async def create_report_from_scan(
     d["finding_counts"] = _sev_counts(report.findings)
     d["total_findings"] = len(report.findings)
     return d
+
+
+# ── Compare ───────────────────────────────────────────────────────────────────
+
+def _normalize_title(title: str) -> str:
+    return re.sub(r'[^a-z0-9 ]', '', (title or '').lower()).strip()
+
+
+def _score_from_findings(findings: List[dict]) -> int:
+    c = sum(1 for f in findings if (f.get("severity") or "").lower() == "critical")
+    h = sum(1 for f in findings if (f.get("severity") or "").lower() == "high")
+    other = sum(1 for f in findings if (f.get("severity") or "").lower() in ("medium", "low"))
+    return max(0, 100 - c * 10 - h * 3 - other)
+
+
+def _build_compare_payload(
+    report_a: VAPTReport, report_b: VAPTReport
+) -> dict:
+    findings_a = [_finding_to_dict(f) for f in report_a.findings]
+    findings_b = [_finding_to_dict(f) for f in report_b.findings]
+
+    norm_a: Dict[str, dict] = {_normalize_title(f["title"]): f for f in findings_a}
+    norm_b: Dict[str, dict] = {_normalize_title(f["title"]): f for f in findings_b}
+
+    keys_a = set(norm_a.keys())
+    keys_b = set(norm_b.keys())
+
+    fixed = [norm_a[k] for k in sorted(keys_a - keys_b)]
+    new_findings = [norm_b[k] for k in sorted(keys_b - keys_a)]
+    persisting = [
+        {"a": norm_a[k], "b": norm_b[k]}
+        for k in sorted(keys_a & keys_b)
+    ]
+
+    score_a = _score_from_findings(findings_a)
+    score_b = _score_from_findings(findings_b)
+
+    return {
+        "report_a": _report_to_dict(report_a),
+        "report_b": _report_to_dict(report_b),
+        "fixed": fixed,
+        "new_findings": new_findings,
+        "persisting": persisting,
+        "stats": {
+            "fixed_count": len(fixed),
+            "new_count": len(new_findings),
+            "persisting_count": len(persisting),
+            "total_a": len(findings_a),
+            "total_b": len(findings_b),
+            "score_a": score_a,
+            "score_b": score_b,
+        },
+    }
+
+
+@router.get("/clients/{cid}/vapt-reports/compare")
+async def compare_vapt_reports(
+    cid: str,
+    a: str,
+    b: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    _get_client_or_404(cid, db)
+    report_a = _get_report_or_404(a, cid, db)
+    report_b = _get_report_or_404(b, cid, db)
+    return _build_compare_payload(report_a, report_b)
+
+
+@router.get("/clients/{cid}/vapt-reports/compare/export")
+async def export_compare_pdf(
+    cid: str,
+    a: str,
+    b: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    _get_client_or_404(cid, db)
+    client = _get_client_or_404(cid, db)
+    report_a = _get_report_or_404(a, cid, db)
+    report_b = _get_report_or_404(b, cid, db)
+    payload = _build_compare_payload(report_a, report_b)
+    from services.vapt_export import generate_comparison_pdf
+    pdf_bytes = generate_comparison_pdf(payload, client.name)
+    filename = f"vapt-compare-{a[:8]}-vs-{b[:8]}.pdf"
+    return _export_stream(pdf_bytes, "application/pdf", filename)
 
 
 # ── Get / Update / Delete ─────────────────────────────────────────────────────

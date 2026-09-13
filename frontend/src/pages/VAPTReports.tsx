@@ -10,6 +10,7 @@ import {
 import {
   GppGood, Add, Visibility, Delete, Security, CheckCircle,
   HourglassEmpty, Shield, AutoAwesome, Article, ExpandMore, ExpandLess,
+  CompareArrows,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -104,6 +105,9 @@ export default function VAPTReports() {
   const [selectedScanId, setSelectedScanId] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [slaOpen, setSlaOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareA, setCompareA] = useState("");
+  const [compareB, setCompareB] = useState("");
 
   const { data: reports = [], isLoading, error } = useQuery({
     queryKey: ["vapt-reports", clientId],
@@ -201,16 +205,28 @@ export default function VAPTReports() {
             </Typography>
           </Box>
         </Box>
-        {!isGuest && (
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setCreateOpen(true)}
-            sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
-          >
-            New Report
-          </Button>
-        )}
+        <Box sx={{ display: "flex", gap: 1 }}>
+          {(reports as any[]).length >= 2 && (
+            <Button
+              variant="outlined"
+              startIcon={<CompareArrows />}
+              onClick={() => { setCompareA(""); setCompareB(""); setCompareOpen(true); }}
+              sx={{ borderColor: "#1565C0", color: "#1565C0" }}
+            >
+              Compare
+            </Button>
+          )}
+          {!isGuest && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setCreateOpen(true)}
+              sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
+            >
+              New Report
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {/* Stats */}
@@ -574,6 +590,63 @@ export default function VAPTReports() {
             disabled={deleteMutation.isPending}
           >
             {deleteMutation.isPending ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Compare dialog */}
+      <Dialog open={compareOpen} onClose={() => setCompareOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", gap: 1 }}>
+          <CompareArrows sx={{ color: "#1565C0" }} /> Compare Two Reports
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            Select two reports for this client. The comparison shows which findings were fixed, which are new, and which are persisting between the two reports.
+          </Typography>
+          <FormControl fullWidth size="small">
+            <InputLabel>Baseline (Report A)</InputLabel>
+            <Select
+              value={compareA}
+              label="Baseline (Report A)"
+              onChange={(e) => setCompareA(e.target.value)}
+            >
+              {(reports as any[]).map((r: any) => (
+                <MenuItem key={r.id} value={r.id} disabled={r.id === compareB}>
+                  {r.title} — v{r.version}
+                  {r.report_date ? ` (${r.report_date.slice(0, 10)})` : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth size="small">
+            <InputLabel>Current (Report B)</InputLabel>
+            <Select
+              value={compareB}
+              label="Current (Report B)"
+              onChange={(e) => setCompareB(e.target.value)}
+            >
+              {(reports as any[]).map((r: any) => (
+                <MenuItem key={r.id} value={r.id} disabled={r.id === compareA}>
+                  {r.title} — v{r.version}
+                  {r.report_date ? ` (${r.report_date.slice(0, 10)})` : ""}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCompareOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<CompareArrows />}
+            disabled={!compareA || !compareB || compareA === compareB}
+            onClick={() => {
+              setCompareOpen(false);
+              navigate(`${vaptBase}/compare?a=${compareA}&b=${compareB}`);
+            }}
+            sx={{ bgcolor: "#1565C0", "&:hover": { bgcolor: "#0D47A1" } }}
+          >
+            Compare
           </Button>
         </DialogActions>
       </Dialog>

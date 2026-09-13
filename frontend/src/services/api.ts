@@ -673,6 +673,10 @@ export const vaptApi = {
     `/clients/${clientId}/vapt-reports/${reportId}/export/${format}`,
   createFromScan: (clientId: string, data: { scan_id: string; title?: string; classification?: string; prepared_by?: string }) =>
     apiClient.post(`/clients/${clientId}/vapt-reports/from-scan/`, data).then((r) => r.data),
+  compare: (clientId: string, a: string, b: string) =>
+    apiClient.get(`/clients/${clientId}/vapt-reports/compare?a=${a}&b=${b}`).then((r) => r.data),
+  compareExportUrl: (clientId: string, a: string, b: string) =>
+    `/clients/${clientId}/vapt-reports/compare/export?a=${a}&b=${b}&format=pdf`,
 };
 
 export const changelogApi = {
