@@ -311,6 +311,17 @@ p{margin:6px 0;line-height:1.65;font-size:13px}
 /* ── exec summary ── */
 .exec-summary{line-height:1.8;font-size:14px;color:#37474f;white-space:pre-wrap;word-break:break-word}
 
+/* ── editable mode ── */
+.edit-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.edit-btn:hover{background:rgba(255,255,255,.25)}
+.edit-btn.active{background:#FFA726;border-color:#FFB74D;color:#1a1a1a}
+.save-btn{background:#43A047;border:1px solid #388E3C;color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;display:none;margin-left:6px}
+.save-btn:hover{background:#388E3C}
+.editable-field[contenteditable="true"]{outline:2px solid #2979ff;background:rgba(41,121,255,.04);border-radius:4px;padding:8px;min-height:40px;cursor:text;position:relative}
+.editable-field[contenteditable="true"]:empty:before{content:attr(data-placeholder);color:#9e9e9e;font-style:italic;pointer-events:none}
+.edit-mode-banner{display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:6px;padding:8px 14px;font-size:12px;color:#1565C0;margin-bottom:16px;align-items:center;gap:8px}
+.edit-mode-banner.visible{display:flex}
+
 /* ── print ── */
 @media print{
   #sidebar{display:none}
@@ -381,6 +392,60 @@ function toggleAcc(id) {
 
 function navFinding(idx) {
   showPage('page-finding-'+idx);
+}
+
+/* ── editable mode ── */
+var _editMode = false;
+var _EDITABLE_IDS = ['editable-exec-summary','editable-conclusion','editable-appendices'];
+
+function toggleEditMode() {
+  _editMode = !_editMode;
+  _EDITABLE_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (_editMode) {
+      el.setAttribute('contenteditable', 'true');
+    } else {
+      el.removeAttribute('contenteditable');
+    }
+  });
+  var btn = document.getElementById('edit-toggle-btn');
+  var saveBtn = document.getElementById('save-edit-btn');
+  var banner = document.getElementById('edit-mode-banner');
+  if (btn) {
+    btn.textContent = _editMode ? '✓ Done Editing' : '✏️ Edit';
+    btn.classList.toggle('active', _editMode);
+  }
+  if (saveBtn) saveBtn.style.display = _editMode ? 'inline-block' : 'none';
+  if (banner) banner.classList.toggle('visible', _editMode);
+}
+
+function saveEditedHtml() {
+  /* Snapshot DOM while editable, then strip edit-mode markers before download */
+  var clone = document.documentElement.cloneNode(true);
+  /* remove contenteditable */
+  clone.querySelectorAll('[contenteditable]').forEach(function(el) {
+    el.removeAttribute('contenteditable');
+    el.style.outline = '';
+    el.style.background = '';
+    el.style.padding = '';
+  });
+  /* hide edit UI in clone */
+  var editBtn = clone.querySelector('#edit-toggle-btn');
+  var saveBtn = clone.querySelector('#save-edit-btn');
+  var banner  = clone.querySelector('#edit-mode-banner');
+  if (editBtn) editBtn.style.display = 'none';
+  if (saveBtn) saveBtn.style.display = 'none';
+  if (banner)  banner.style.display  = 'none';
+  var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+  var blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (document.title || 'vapt-report').replace(/[^a-z0-9]/gi,'-').toLowerCase() + '-edited.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
 }
 """
 
@@ -459,6 +524,9 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
     <span>v{_h(version_str)}</span>
     <span style="opacity:.5">|</span>
     <span>{_h(client_name)}</span>
+    <span style="opacity:.5">|</span>
+    <button id="edit-toggle-btn" class="edit-btn" onclick="toggleEditMode()">&#9998; Edit</button>
+    <button id="save-edit-btn" class="save-btn" onclick="saveEditedHtml()">&#8681; Save Edits</button>
   </div>
 </div>
 <div id="shell">
@@ -525,6 +593,7 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
 
     # ── content panel ─────────────────────────────────────────────────────────
     p.append('<div id="content">\n')
+    p.append('<div id="edit-mode-banner" class="edit-mode-banner">&#9998; Edit mode active &mdash; click any highlighted section to edit. Use &ldquo;Save Edits&rdquo; to download the updated file.</div>\n')
 
     # ════════════════════════════════════════════════════════════════════════
     # PAGE: OVERVIEW
@@ -585,11 +654,11 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
     p.append("</div>\n</div>\n</div></div>\n")
 
     # executive summary
-    if exec_summary:
-        p.append('<div class="card"><div class="card-header">Executive Summary</div>'
-                 '<div class="card-body"><div class="exec-summary">')
-        p.append(_h(exec_summary))
-        p.append("</div></div></div>\n")
+    p.append('<div class="card"><div class="card-header">Executive Summary</div>'
+             '<div class="card-body">'
+             '<div class="exec-summary editable-field" id="editable-exec-summary" data-placeholder="Click to edit executive summary...">')
+    p.append(_h(exec_summary) if exec_summary else '<span style="color:#9e9e9e;font-style:italic">No executive summary generated.</span>')
+    p.append("</div></div></div>\n")
 
     p.append("</div>\n")  # end page-overview
 
@@ -844,17 +913,17 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
     p.append('<div class="page" id="page-appendices">\n')
     p.append('<div class="section-title">📎 Appendices</div>\n')
 
-    if conclusion:
-        p.append('<div class="card"><div class="card-header">Conclusion</div>'
-                 '<div class="card-body"><div class="exec-summary">')
-        p.append(_h(conclusion))
-        p.append('</div></div></div>\n')
+    p.append('<div class="card"><div class="card-header">Conclusion</div>'
+             '<div class="card-body">'
+             '<div class="exec-summary editable-field" id="editable-conclusion" data-placeholder="Click to edit conclusion...">')
+    p.append(_h(conclusion) if conclusion else '<span style="color:#9e9e9e;font-style:italic">No conclusion generated.</span>')
+    p.append('</div></div></div>\n')
 
-    if appendices_text:
-        p.append('<div class="card"><div class="card-header">Appendices</div>'
-                 '<div class="card-body"><div class="prose">')
-        p.append(_h(appendices_text))
-        p.append('</div></div></div>\n')
+    p.append('<div class="card"><div class="card-header">Appendices</div>'
+             '<div class="card-body">'
+             '<div class="prose editable-field" id="editable-appendices" data-placeholder="Click to edit appendices...">')
+    p.append(_h(appendices_text) if appendices_text else '<span style="color:#9e9e9e;font-style:italic">No appendices generated.</span>')
+    p.append('</div></div></div>\n')
 
     p.append(f'<div class="card"><div class="card-body" style="text-align:center;color:#9e9e9e;font-size:12px">'
              f'Generated by Owlet · {_h(gen_ts)}</div></div>\n')

@@ -449,6 +449,7 @@ Return a single JSON object with exactly these top-level keys:
 {{
   "executive_summary": "3-4 paragraph executive summary for a CISO/board audience covering engagement purpose, overall risk posture, most critical findings, and business impact.",
   "conclusion": "2-3 paragraph conclusion covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
+  "appendices": "Appendix A — Vulnerability Reference Table: list each finding title with its CVE IDs and CVSS score in a text table. Appendix B — Glossary: define 8-12 key security terms used in this report (e.g. RCE, CVSS, OWASP, lateral movement). Appendix C — Tools & Versions: list the tools and scanner used with version where known. Format as plain readable text with clear Appendix headers, not markdown.",
   "finding_remediations": {{
     "<exact finding title>": {{
       "cves": "CVE-XXXX-YYYYY (short description of what it allows), CVE-XXXX-ZZZZZ (short description) — list every CVE from the description",
@@ -849,6 +850,7 @@ async def create_report_from_scan(
         scope_json=json.dumps(scope),
         methodology_json=json.dumps(methodology),
         conclusion=ai.get("conclusion", ""),
+        appendices=ai.get("appendices", ""),
         sla_config=payload.sla_config,
     )
     db.add(report)
