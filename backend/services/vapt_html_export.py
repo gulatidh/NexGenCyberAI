@@ -938,3 +938,265 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
 """)
 
     return "".join(p).encode("utf-8")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPARISON REPORT HTML
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CMP_CSS = """
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#263238;min-height:100vh}
+#topbar{position:sticky;top:0;z-index:100;background:#1A237E;color:#fff;display:flex;align-items:center;
+  justify-content:space-between;padding:10px 24px;gap:12px}
+#topbar .logo{font-weight:800;font-size:15px;letter-spacing:.5px}
+#topbar .subtitle{font-size:12px;opacity:.75}
+.edit-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:5px;
+  padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.edit-btn:hover{background:rgba(255,255,255,.25)}
+.edit-btn.active{background:#FFA726;border-color:#FFB74D;color:#1a1a1a}
+.save-btn{background:#43A047;border:1px solid #388E3C;color:#fff;border-radius:5px;
+  padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;display:none;margin-left:6px}
+.save-btn:hover{background:#388E3C}
+.container{max-width:1100px;margin:0 auto;padding:24px 16px}
+.vs-header{display:flex;gap:16px;margin-bottom:20px}
+.vs-card{flex:1;background:#fff;border-radius:10px;padding:16px 20px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.vs-card.baseline{border-left:4px solid #1565C0}
+.vs-card.latest{border-left:4px solid #2E7D32}
+.vs-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  margin-bottom:4px;color:#78909c}
+.vs-title{font-size:15px;font-weight:700;color:#1a237e;margin-bottom:2px}
+.vs-meta{font-size:12px;color:#78909c}
+.vs-arrow{display:flex;align-items:center;font-size:28px;color:#9e9e9e;padding:0 4px}
+.stat-row{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.stat-card{flex:1;min-width:140px;background:#fff;border-radius:10px;padding:16px 20px;
+  text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.stat-num{font-size:32px;font-weight:800}
+.stat-label{font-size:12px;color:#78909c;margin-top:4px;font-weight:600}
+.stat-delta{font-size:12px;margin-top:6px;font-weight:700}
+.tabs{display:flex;gap:0;margin-bottom:0;border-bottom:2px solid #e0e0e0}
+.tab{padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;
+  margin-bottom:-2px;transition:all .15s;color:#78909c}
+.tab.active{color:#1A237E;border-bottom-color:#1A237E}
+.tab:hover:not(.active){background:#f5f5f5}
+.panel{display:none;background:#fff;border-radius:0 0 10px 10px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.panel.active{display:block}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  color:#78909c;padding:10px 14px;border-bottom:2px solid #e0e0e0;background:#fafafa}
+td{padding:11px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.fixed-row{border-left:3px solid #2E7D32}
+tr.new-row{border-left:3px solid #C62828}
+tr.persist-row{border-left:3px solid #F57F17}
+tr:hover td{background:#fafafa}
+.sev-chip{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.5px}
+.empty-state{padding:32px;text-align:center;color:#9e9e9e;font-size:14px}
+.arrow-up{color:#C62828;font-weight:700}
+.arrow-down{color:#2E7D32;font-weight:700}
+.edit-mode-banner{display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:6px;
+  padding:8px 14px;font-size:12px;color:#1565C0;margin-bottom:16px;align-items:center;gap:8px}
+.edit-mode-banner.visible{display:flex}
+.editable-field[contenteditable="true"]{outline:2px solid #2979ff;background:rgba(41,121,255,.04);
+  border-radius:4px;padding:8px;min-height:40px;cursor:text}
+.footer{text-align:center;font-size:11px;color:#9e9e9e;margin-top:32px;padding:16px}
+@media(max-width:640px){.vs-header{flex-direction:column}.vs-arrow{display:none}.stat-row{gap:8px}}
+"""
+
+_CMP_JS = r"""
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab===name); });
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('active', p.id==='panel-'+name); });
+}
+var _editMode = false;
+function toggleEditMode() {
+  _editMode = !_editMode;
+  var btn = document.getElementById('edit-toggle-btn');
+  var saveBtn = document.getElementById('save-edit-btn');
+  var banner = document.getElementById('edit-mode-banner');
+  document.querySelectorAll('.editable-field').forEach(function(el) {
+    if (_editMode) { el.setAttribute('contenteditable','true'); }
+    else { el.removeAttribute('contenteditable'); }
+  });
+  if (btn) { btn.textContent = _editMode ? '✓ Done Editing' : '✏️ Edit'; btn.classList.toggle('active', _editMode); }
+  if (saveBtn) saveBtn.style.display = _editMode ? 'inline-block' : 'none';
+  if (banner) banner.classList.toggle('visible', _editMode);
+}
+function saveEditedHtml() {
+  var clone = document.documentElement.cloneNode(true);
+  clone.querySelectorAll('[contenteditable]').forEach(function(el){ el.removeAttribute('contenteditable'); });
+  var editBtn = clone.querySelector('#edit-toggle-btn');
+  var saveBtn = clone.querySelector('#save-edit-btn');
+  var banner  = clone.querySelector('#edit-mode-banner');
+  if (editBtn) editBtn.style.display='none';
+  if (saveBtn) saveBtn.style.display='none';
+  if (banner)  banner.style.display='none';
+  var html = '<!DOCTYPE html>\n' + clone.outerHTML;
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (document.title||'vapt-compare').replace(/[^a-z0-9]/gi,'-').toLowerCase()+'-edited.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+"""
+
+
+def generate_comparison_html(payload: dict, client_name: str) -> bytes:
+    """Generate a self-contained HTML comparison report."""
+    ra = payload.get("report_a", {})
+    rb = payload.get("report_b", {})
+    stats = payload.get("stats", {})
+    fixed = payload.get("fixed", [])
+    new_f = payload.get("new_findings", [])
+    persist = payload.get("persisting", [])
+
+    title_a = ra.get("title") or "Report A"
+    title_b = rb.get("title") or "Report B"
+    ver_a = ra.get("version") or ""
+    ver_b = rb.get("version") or ""
+    date_a = ra.get("report_date") or ra.get("created_at", "")[:10] if ra.get("created_at") else ""
+    date_b = rb.get("report_date") or rb.get("created_at", "")[:10] if rb.get("created_at") else ""
+    score_a = stats.get("score_a", 0)
+    score_b = stats.get("score_b", 0)
+    delta = score_b - score_a
+    gen_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    page_title = f"VAPT Comparison — {_h(client_name)}"
+
+    def sev_chip(sev: str) -> str:
+        s = (sev or "info").lower()
+        bg = _SEV_BG.get(s, "#9e9e9e")
+        fg = _SEV_FG.get(s, "#fff")
+        label = _SEV_LABEL.get(s, s.upper())
+        return f'<span class="sev-chip" style="background:{bg};color:{fg}">{label}</span>'
+
+    def finding_row(f: dict, row_cls: str) -> str:
+        return (f'<tr class="{row_cls}">'
+                f'<td>{_h(f.get("title") or "")}</td>'
+                f'<td>{sev_chip(f.get("severity",""))}</td>'
+                f'<td style="color:#546e7a">{_h(f.get("affected_asset") or "—")}</td>'
+                f'</tr>\n')
+
+    def persist_row(pair: dict) -> str:
+        fa, fb = pair.get("a", {}), pair.get("b", {})
+        sa = (fa.get("severity") or "info").lower()
+        sb = (fb.get("severity") or "info").lower()
+        sev_order = ["critical", "high", "medium", "low", "info", "informational"]
+        ra_idx = sev_order.index(sa) if sa in sev_order else 5
+        rb_idx = sev_order.index(sb) if sb in sev_order else 5
+        if ra_idx < rb_idx:
+            arrow = '<span class="arrow-down">&#8595; Improved</span>'
+        elif ra_idx > rb_idx:
+            arrow = '<span class="arrow-up">&#8593; Worsened</span>'
+        else:
+            arrow = '<span style="color:#78909c">&#8212; Same</span>'
+        change = f'{sev_chip(sa)} &#8594; {sev_chip(sb)} {arrow}' if sa != sb else sev_chip(sb)
+        return (f'<tr class="persist-row">'
+                f'<td>{_h(fb.get("title") or "")}</td>'
+                f'<td>{change}</td>'
+                f'<td style="color:#546e7a">{_h(fb.get("affected_asset") or "—")}</td>'
+                f'</tr>\n')
+
+    def table_wrap(rows: str, empty_msg: str) -> str:
+        if not rows.strip():
+            return f'<div class="empty-state">{empty_msg}</div>'
+        return (f'<table><thead><tr>'
+                f'<th>Finding</th><th>Severity</th><th>Affected Asset</th>'
+                f'</tr></thead><tbody>{rows}</tbody></table>')
+
+    fixed_rows = "".join(finding_row(f, "fixed-row") for f in sorted(fixed, key=lambda x: _SEV_ORDER.index((x.get("severity") or "info").lower()) if (x.get("severity") or "info").lower() in _SEV_ORDER else 9))
+    new_rows = "".join(finding_row(f, "new-row") for f in sorted(new_f, key=lambda x: _SEV_ORDER.index((x.get("severity") or "info").lower()) if (x.get("severity") or "info").lower() in _SEV_ORDER else 9))
+    persist_rows = "".join(persist_row(p) for p in sorted(persist, key=lambda x: _SEV_ORDER.index((x.get("b", {}).get("severity") or "info").lower()) if (x.get("b", {}).get("severity") or "info").lower() in _SEV_ORDER else 9))
+
+    delta_color = "#2E7D32" if delta >= 0 else "#C62828"
+    delta_str = (f'<span style="color:{delta_color}">{"+" if delta >= 0 else ""}{delta}</span>')
+
+    p: List[str] = []
+    p.append(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VAPT Comparison — {_h(client_name)}</title>
+<style>{_CMP_CSS}</style>
+</head>
+<body>
+<div id="topbar">
+  <div>
+    <div class="logo">&#128202; VAPT Comparison &mdash; {_h(client_name)}</div>
+    <div class="subtitle">Generated {gen_ts}</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button id="edit-toggle-btn" class="edit-btn" onclick="toggleEditMode()">&#9998; Edit</button>
+    <button id="save-edit-btn" class="save-btn" onclick="saveEditedHtml()">&#8681; Save Edits</button>
+  </div>
+</div>
+<div class="container">
+<div id="edit-mode-banner" class="edit-mode-banner">&#9998; Edit mode active &mdash; click any highlighted section to edit.</div>
+
+<div class="vs-header">
+  <div class="vs-card baseline">
+    <div class="vs-label">Baseline</div>
+    <div class="vs-title">{_h(title_a)}</div>
+    <div class="vs-meta">{_h(ver_a)}{" &middot; " + _h(date_a) if date_a else ""}</div>
+  </div>
+  <div class="vs-arrow">&#8594;</div>
+  <div class="vs-card latest">
+    <div class="vs-label">Latest</div>
+    <div class="vs-title">{_h(title_b)}</div>
+    <div class="vs-meta">{_h(ver_b)}{" &middot; " + _h(date_b) if date_b else ""}</div>
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="stat-card">
+    <div class="stat-num" style="color:#2E7D32">{stats.get("fixed_count",0)}</div>
+    <div class="stat-label">Fixed</div>
+    <div class="stat-delta" style="color:#2E7D32">&#10003; Resolved</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#C62828">{stats.get("new_count",0)}</div>
+    <div class="stat-label">New</div>
+    <div class="stat-delta" style="color:#C62828">&#9650; Introduced</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#F57F17">{stats.get("persisting_count",0)}</div>
+    <div class="stat-label">Persisting</div>
+    <div class="stat-delta" style="color:#F57F17">&#9646; Unresolved</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{score_a} &#8594; {score_b}</div>
+    <div class="stat-label">Security Score</div>
+    <div class="stat-delta">{delta_str} change</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="fixed" onclick="showTab('fixed')">
+    &#10003; Fixed ({stats.get("fixed_count",0)})
+  </div>
+  <div class="tab" data-tab="new" onclick="showTab('new')">
+    &#9650; New ({stats.get("new_count",0)})
+  </div>
+  <div class="tab" data-tab="persisting" onclick="showTab('persisting')">
+    &#9646; Persisting ({stats.get("persisting_count",0)})
+  </div>
+</div>
+
+<div id="panel-fixed" class="panel active">
+{table_wrap(fixed_rows, "No fixed findings &mdash; no findings from the baseline were resolved.")}
+</div>
+<div id="panel-new" class="panel">
+{table_wrap(new_rows, "No new findings &mdash; no new issues were introduced since the baseline.")}
+</div>
+<div id="panel-persisting" class="panel">
+{table_wrap(persist_rows, "No persisting findings &mdash; all baseline findings have been resolved.")}
+</div>
+
+<div class="footer">Generated by Owlet &middot; {_h(gen_ts)}</div>
+</div>
+<script>{_CMP_JS}</script>
+</body>
+</html>
+""")
+    return "".join(p).encode("utf-8")

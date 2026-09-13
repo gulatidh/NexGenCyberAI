@@ -4,7 +4,7 @@ import {
   TableContainer, TableHead, TableRow, Paper, Skeleton, Alert,
   Tabs, Tab,
 } from "@mui/material";
-import { ArrowBack, PictureAsPdf, CompareArrows } from "@mui/icons-material";
+import { ArrowBack, PictureAsPdf, CompareArrows, Language } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
@@ -78,7 +78,7 @@ export default function VAPTCompare() {
     enabled: !!clientId && !!a && !!b,
   });
 
-  const handleExport = useCallback(async () => {
+  const handleExport = useCallback(async (format: "pdf" | "html" = "pdf") => {
     let token = "";
     if (accounts.length > 0) {
       try {
@@ -86,7 +86,7 @@ export default function VAPTCompare() {
         token = resp.idToken || resp.accessToken;
       } catch { }
     }
-    const url = API_BASE + vaptApi.compareExportUrl(clientId!, a, b);
+    const url = API_BASE + vaptApi.compareExportUrl(clientId!, a, b, format);
     const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
@@ -95,7 +95,7 @@ export default function VAPTCompare() {
     const blobUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = blobUrl;
-    anchor.download = `vapt-compare-${a.slice(0, 8)}-vs-${b.slice(0, 8)}.pdf`;
+    anchor.download = `vapt-compare-${a.slice(0, 8)}-vs-${b.slice(0, 8)}.${format}`;
     anchor.click();
     URL.revokeObjectURL(blobUrl);
   }, [clientId, a, b, instance, accounts]);
@@ -134,15 +134,27 @@ export default function VAPTCompare() {
           <CompareArrows sx={{ color: "#1565C0" }} />
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Comparison Report</Typography>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<PictureAsPdf />}
-          onClick={handleExport}
-          disabled={!data}
-          size="small"
-        >
-          Export PDF
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<PictureAsPdf />}
+            onClick={() => handleExport("pdf")}
+            disabled={!data}
+            size="small"
+          >
+            Export PDF
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<Language />}
+            onClick={() => handleExport("html")}
+            disabled={!data}
+            size="small"
+            sx={{ borderColor: "#00897B", color: "#00897B", "&:hover": { borderColor: "#00695C", bgcolor: "rgba(0,137,123,.04)" } }}
+          >
+            Export HTML
+          </Button>
+        </Box>
       </Box>
 
       <Box sx={{ p: 3, flex: 1 }}>

@@ -971,18 +971,23 @@ async def compare_vapt_reports(
 
 
 @router.get("/clients/{cid}/vapt-reports/compare/export")
-async def export_compare_pdf(
+async def export_compare(
     cid: str,
     a: str,
     b: str,
+    format: str = "pdf",
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
-    _get_client_or_404(cid, db)
     client = _get_client_or_404(cid, db)
     report_a = _get_report_or_404(a, cid, db)
     report_b = _get_report_or_404(b, cid, db)
     payload = _build_compare_payload(report_a, report_b)
+    if format == "html":
+        from services.vapt_html_export import generate_comparison_html
+        data = generate_comparison_html(payload, client.name)
+        filename = f"vapt-compare-{a[:8]}-vs-{b[:8]}.html"
+        return _export_stream(data, "text/html; charset=utf-8", filename)
     from services.vapt_export import generate_comparison_pdf
     pdf_bytes = generate_comparison_pdf(payload, client.name)
     filename = f"vapt-compare-{a[:8]}-vs-{b[:8]}.pdf"
