@@ -11,16 +11,22 @@
  * Each report has CSV download and Print (browser PDF).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useActiveClient } from "../contexts/ClientContext";
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Select, MenuItem, FormControl, InputLabel, CircularProgress, Alert,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Divider,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-  FormControlLabel, Checkbox,
+  FormControlLabel, Checkbox, InputAdornment,
 } from "@mui/material";
-import { Print, Download, Description, Email, Send, GppGood } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
+import {
+  Print, Download, Description, Email, Send, GppGood, GppBad,
+  ArrowBack, Search, Shield, Warning, BugReport, Policy, Inventory2,
+  Build, AccountTree, VerifiedUser, Assessment, FolderZip, LibraryAdd,
+  TrendingUp, TrackChanges, Schedule, ManageSearch,
+} from "@mui/icons-material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import {
@@ -35,6 +41,130 @@ import dayjs from "dayjs";
 import { fmt, fmtDate } from "../utils/datetime";
 
 type ReportType = "executive" | "compliance" | "findings" | "risks" | "assets";
+
+type CatalogItem = {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  color: string;
+  type?: ReportType;
+  href?: string;
+  badge?: string;
+};
+
+const CATALOG_GROUPS: { name: string; items: CatalogItem[] }[] = [
+  {
+    name: "Issues",
+    items: [
+      { title: "Security Posture Summary", desc: "Executive posture overview — security score, open issues by severity, framework compliance.", icon: <Shield />, color: "#4285F4", type: "executive" },
+      { title: "Risk Register", desc: "All evaluated risks with FAIR scoring, likelihood, impact, and treatment status.", icon: <Warning />, color: "#EA4335", href: "/analyse/risks" },
+      { title: "Threat Intelligence", desc: "Threat entries from MITRE ATT&CK–mapped threat intel agent runs.", icon: <BugReport />, color: "#E65100", href: "/respond/threats" },
+    ],
+  },
+  {
+    name: "Findings",
+    items: [
+      { title: "Vulnerability Report", desc: "All findings across scans — severity breakdown, CVE IDs, CVSS scores, and resource mapping.", icon: <GppBad />, color: "#C62828", type: "findings" },
+      { title: "Compliance Gaps", desc: "Framework control deficiencies from the compliance monitor agent.", icon: <Policy />, color: "#6A1B9A", href: "/respond/gaps" },
+      { title: "Asset Inventory", desc: "Full discovered asset list with open finding and risk counts per asset.", icon: <Inventory2 />, color: "#00695C", type: "assets" },
+      { title: "VAPT Reports", desc: "Formal pentest engagement reports with retest versioning, PDF/DOCX/HTML export.", icon: <Description />, color: "#FBBC04", href: "/report/vapt-reports", badge: "New" },
+      { title: "Remediation Tracker", desc: "Priority-banded remediation actions with owner assignment and due dates.", icon: <Build />, color: "#2E7D32", href: "/respond/remediation" },
+      { title: "Attack Surface Analysis", desc: "Attack path graph from findings — Initial Access through Exfiltration phases.", icon: <AccountTree />, color: "#AD1457", href: "/analyse/attack-paths" },
+    ],
+  },
+  {
+    name: "Compliance",
+    items: [
+      { title: "Framework Compliance", desc: "Per-control compliance status against any standard or custom framework.", icon: <VerifiedUser />, color: "#1565C0", type: "compliance" },
+      { title: "Risk Assessment", desc: "Full risk register report with FAIR-lite ALE model scoring.", icon: <Assessment />, color: "#4527A0", type: "risks" },
+      { title: "Evidence Package", desc: "Audit-ready ZIP of findings, control gaps, remediation actions, and agent logs.", icon: <FolderZip />, color: "#34A853", href: "/report/evidence" },
+      { title: "Custom Standards", desc: "Your own compliance framework built from existing platform controls.", icon: <LibraryAdd />, color: "#00838F", href: "/report/custom-frameworks" },
+    ],
+  },
+  {
+    name: "Operational",
+    items: [
+      { title: "Posture Trends", desc: "Time-series charts of open findings, severity distribution, and audit readiness %.", icon: <TrendingUp />, color: "#0277BD", href: "/discover/posture" },
+      { title: "CTEM Programs", desc: "5-phase Continuous Threat Exposure Management: Scope → Discover → Prioritise → Validate → Mobilise.", icon: <TrackChanges />, color: "#558B2F", href: "/respond/ctem" },
+      { title: "Audit Intelligence", desc: "ICS audit activity mapping — how every audit step maps to platform capabilities.", icon: <ManageSearch />, color: "#00BCD4", href: "/report/audit" },
+      { title: "Report Scheduler", desc: "Schedule recurring report delivery to stakeholders via email.", icon: <Schedule />, color: "#607D8B", href: "/report/scheduler" },
+    ],
+  },
+];
+
+function ReportCatalogCard({ item, onSelect }: { item: CatalogItem; onSelect: (item: CatalogItem) => void }) {
+  return (
+    <Box onClick={() => onSelect(item)} sx={{
+      display: "flex", gap: 2, p: 2, borderRadius: 2, cursor: "pointer",
+      border: "1px solid", borderColor: "divider", bgcolor: "background.paper",
+      "&:hover": { bgcolor: "action.hover" }, transition: "background .15s", height: "100%",
+    }}>
+      <Box sx={{
+        width: 52, height: 52, borderRadius: 2, flexShrink: 0,
+        bgcolor: alpha(item.color, 0.12),
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: item.color, fontSize: 26,
+        "& svg": { fontSize: 26, color: item.color },
+      }}>
+        {item.icon}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.25, flexWrap: "wrap" }}>
+          <Typography sx={{ fontWeight: 700, fontSize: 14, color: "text.primary" }}>{item.title}</Typography>
+          {item.badge && (
+            <Chip label={item.badge} size="small" sx={{
+              height: 18, fontSize: 10, fontWeight: 700,
+              bgcolor: item.badge === "New" ? "rgba(52,168,83,0.12)" : "rgba(156,39,176,0.12)",
+              color: item.badge === "New" ? "#34A853" : "#9C27B0",
+            }} />
+          )}
+        </Box>
+        <Typography sx={{ fontSize: 12, color: "text.secondary", lineHeight: 1.4 }}>{item.desc}</Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function ReportCatalog({ onSelect }: { onSelect: (item: CatalogItem) => void }) {
+  const [search, setSearch] = useState("");
+  const q = search.toLowerCase();
+  const filtered = CATALOG_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) =>
+      item.title.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q)
+    ),
+  }));
+  const hasResults = filtered.some((g) => g.items.length > 0);
+  return (
+    <Box>
+      <Typography variant="h5" sx={{ fontWeight: 800, mb: 2.5, color: "text.primary" }}>New Report</Typography>
+      <TextField
+        fullWidth placeholder="Search reports..."
+        value={search} onChange={(e) => setSearch(e.target.value)}
+        slotProps={{ input: { startAdornment: <InputAdornment position="start"><Search sx={{ color: "text.secondary" }} /></InputAdornment> } }}
+        sx={{ mb: 3, "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: "#4285F4" } }}
+        size="small"
+      />
+      {filtered.map((group) => group.items.length === 0 ? null : (
+        <Box key={group.name} sx={{ mb: 3.5 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: 15, color: "text.primary", mb: 1.5 }}>{group.name}</Typography>
+          <Grid container spacing={1.5}>
+            {group.items.map((item) => (
+              <Grid key={item.title} size={{ xs: 12, sm: 6, md: 4 }}>
+                <ReportCatalogCard item={item} onSelect={onSelect} />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      ))}
+      {!hasResults && (
+        <Typography sx={{ color: "text.secondary", textAlign: "center", mt: 6 }}>
+          No reports match &ldquo;{search}&rdquo;
+        </Typography>
+      )}
+    </Box>
+  );
+}
 
 const SEV_COLOR: Record<string, string> = {
   critical: "#f44336", high: "#ff9800", medium: "#ffeb3b", low: "#4caf50", info: "#9e9e9e",
@@ -69,15 +199,24 @@ function downloadCSV(filename: string, rows: Record<string, any>[]) {
 export default function Reports() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const typeParam = searchParams.get("type") as ReportType | null;
   const vaptBase = location.pathname.startsWith("/intelligence") ? "/vapt/reports" : "/vapt-reports";
   const { clientId } = useActiveClient();
   const [projectId, setProjectId] = useState("");
-  const [reportType, setReportType] = useState<ReportType>("executive");
+  const [reportType, setReportType] = useState<ReportType>(typeParam ?? "executive");
   const [framework, setFramework] = useState<string>("nist_csf");
   const printRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { if (typeParam) setReportType(typeParam); }, [typeParam]);
+
   // Reset project when global account changes
   useEffect(() => { setProjectId(""); }, [clientId]);
+
+  const handleCatalogSelect = (item: CatalogItem) => {
+    if (item.type) { setSearchParams({ type: item.type }); }
+    else if (item.href) { navigate(item.href); }
+  };
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["clients"], queryFn: clientsApi.list,
@@ -296,8 +435,21 @@ export default function Reports() {
     return t[reportType];
   }, [reportType, framework, catalog]);
 
+  if (!typeParam) {
+    return <ReportCatalog onSelect={handleCatalogSelect} />;
+  }
+
   return (
     <Box>
+      <Button
+        startIcon={<ArrowBack />}
+        onClick={() => setSearchParams({})}
+        size="small"
+        sx={{ mb: 2, color: "text.secondary" }}
+      >
+        Back to Reports
+      </Button>
+
       {/* Top bar: VAPT shortcut (left) + export actions (right) */}
       <Box className="no-print" sx={{ display: "flex", gap: 2, mb: 2, alignItems: "stretch" }}>
         {/* VAPT shortcut — compact half */}
