@@ -4,8 +4,9 @@ Generates professional PDF and DOCX reports for VAPT engagements.
 """
 import io
 import json
+import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # ── ReportLab imports ──────────────────────────────────────────────────────────
 from reportlab.lib import colors
@@ -95,6 +96,103 @@ def _safe(val: Any, fallback: str = "—") -> str:
     if val is None or (isinstance(val, str) and not val.strip()):
         return fallback
     return str(val)
+
+
+_CVE_PATTERN = re.compile(r"\b(CVE-\d{4}-\d{4,})\b")
+_URL_PATTERN = re.compile(r"https?://\S+")
+
+def _nvd_url(cve_id: str) -> str:
+    return f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+
+
+def _parse_cve_blocks(text: str) -> List[Tuple[str, str]]:
+    """
+    Parse text that contains embedded CVE entries of the form:
+      CVE-XXXX-XXXXX – description text...
+    Returns list of (cve_id, description) tuples; empty list if no CVE blocks found.
+    """
+    blocks = re.split(r"(?=CVE-\d{4}-\d{4,})", text.strip())
+    results = []
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        m = re.match(r"(CVE-\d{4}-\d{4,})\s*[–\-—:]?\s*(.*)", block, re.DOTALL)
+        if m:
+            results.append((m.group(1).strip(), m.group(2).strip()))
+    return results
+
+
+def _linkify_cves_pdf(text: str) -> str:
+    """Replace CVE-XXXX-XXXXX tokens with <a href="...">CVE-XXXX-XXXXX</a> for ReportLab."""
+    def _replace(m):
+        cve = m.group(1)
+        return f'<a href="{_nvd_url(cve)}" color="#1565C0"><u>{cve}</u></a>'
+    return _CVE_PATTERN.sub(_replace, text)
+
+
+def _linkify_urls_pdf(text: str) -> str:
+    """Replace bare URLs with <a href="..."> links for ReportLab."""
+    def _replace(m):
+        url = m.group(0).rstrip(".,;)")
+        return f'<a href="{url}" color="#1565C0"><u>{url}</u></a>'
+    return _URL_PATTERN.sub(_replace, text)
+
+
+def _linkify_pdf(text: str) -> str:
+    text = _linkify_cves_pdf(text)
+    text = _linkify_urls_pdf(text)
+    return text
+
+
+def _add_hyperlink_docx(paragraph, text: str, url: str):
+    """Add a hyperlink run to a python-docx paragraph using oxml."""
+    part = paragraph.part
+    r_id = part.relate_to(
+        url,
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    run_elem = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    color_elem = OxmlElement("w:color")
+    color_elem.set(qn("w:val"), "1565C0")
+    u_elem = OxmlElement("w:u")
+    u_elem.set(qn("w:val"), "single")
+    rPr.append(color_elem)
+    rPr.append(u_elem)
+    run_elem.append(rPr)
+    t_elem = OxmlElement("w:t")
+    t_elem.text = text
+    run_elem.append(t_elem)
+    hyperlink.append(run_elem)
+    paragraph._p.append(hyperlink)
+    return hyperlink
+
+
+def _add_cve_refs_docx(doc, ref_str: str, _add_para_fn):
+    """Add a References paragraph with CVE hyperlinks for the DOCX renderer."""
+    if not ref_str.strip():
+        return
+    p = doc.add_paragraph()
+    run = p.add_run("References: ")
+    run.bold = True
+    run.font.size = Pt(9)
+    parts = re.split(r"(\bCVE-\d{4}-\d{4,}\b|https?://\S+)", ref_str)
+    for part in parts:
+        if not part:
+            continue
+        cve_m = re.match(r"(CVE-\d{4}-\d{4,})", part)
+        url_m = re.match(r"(https?://\S+)", part)
+        if cve_m:
+            _add_hyperlink_docx(p, part, _nvd_url(part.rstrip(".,;)")))
+        elif url_m:
+            clean = part.rstrip(".,;)")
+            _add_hyperlink_docx(p, clean, clean)
+        else:
+            p.add_run(part).font.size = Pt(9)
 
 
 def _sev_counts(findings: List[Dict]) -> Dict[str, int]:
@@ -1517,13 +1615,30 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
         elems.append(fh_tbl)
         elems.append(Spacer(1, 0.2 * cm))
 
-        # Context
+        # Context — render CVE blocks as named subsections if present, else flat text
         if f.get("description") or f.get("impact"):
-            elems.append(Paragraph("Context", styles["subsection"]))
-            if f.get("description"):
-                elems.append(Paragraph(f"What was found: {_safe(f.get('description'))[:400]}", styles["normal"]))
+            elems.append(Paragraph("What Was Found", styles["subsection"]))
+            desc_text = _safe(f.get("description"), "")
+            if desc_text:
+                cve_blocks = _parse_cve_blocks(desc_text)
+                if cve_blocks:
+                    for cve_id, cve_desc in cve_blocks:
+                        nvd_url = _nvd_url(cve_id)
+                        link_style = ParagraphStyle(
+                            f"cve_link_{cve_id}", parent=styles["label"],
+                            textColor=HexColor("#1565C0"),
+                        )
+                        elems.append(Paragraph(
+                            f'<a href="{nvd_url}" color="#1565C0"><u>{cve_id}</u></a>',
+                            link_style,
+                        ))
+                        if cve_desc:
+                            elems.append(Paragraph(cve_desc[:500], styles["normal"]))
+                        elems.append(Spacer(1, 0.1 * cm))
+                else:
+                    elems.append(Paragraph(desc_text[:500], styles["normal"]))
             if f.get("impact"):
-                elems.append(Paragraph(f"Why it matters: {_safe(f.get('impact'))[:300]}", styles["normal"]))
+                elems.append(Paragraph(f"Business Impact: {_safe(f.get('impact'))[:300]}", styles["normal"]))
             elems.append(Spacer(1, 0.2 * cm))
 
         # Parse recommendation — may be structured JSON or plain text
@@ -1536,60 +1651,81 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
             except Exception:
                 pass
 
-        # Immediate Actions
+        # Remediation rendering — structured JSON from AI or plain-text fallback
+        _rem_code_style = ParagraphStyle(
+            "rem_code", fontName="Courier", fontSize=7,
+            textColor=HexColor("#1A237E"), backColor=HexColor("#E8EAF6"),
+            leftIndent=10, rightIndent=10, spaceAfter=2, spaceBefore=2, leading=11,
+        )
+        _link_label_style = ParagraphStyle(
+            "link_label", parent=styles["label"], textColor=HexColor("#1565C0"),
+        )
+
+        def _rem_section(label, items, numbered=True):
+            if not items:
+                return
+            elems.append(Paragraph(label, styles["subsection"]))
+            for i, item in enumerate(items, 1):
+                txt = str(item).strip()
+                if not txt:
+                    continue
+                prefix = f"{i}. " if numbered else "• "
+                elems.append(Paragraph(f"{prefix}{txt}", styles["bullet"]))
+            elems.append(Spacer(1, 0.15 * cm))
+
         if rec_structured:
-            steps = rec_structured.get("steps") or []
-            code_ex = rec_structured.get("code_example") or ""
+            context_txt  = (rec_structured.get("context") or "").strip()
+            identify     = rec_structured.get("identify") or []
+            steps        = rec_structured.get("steps") or []
+            code_ex      = (rec_structured.get("code_example") or "").strip()
+            post_up      = rec_structured.get("post_upgrade") or []
+            comp_ctrl    = rec_structured.get("compensating_controls") or []
             verification = rec_structured.get("verification") or []
-            references = rec_structured.get("references") or ""
+            references   = (rec_structured.get("references") or "").strip()
 
-            if steps:
-                elems.append(Paragraph("Immediate Actions", styles["subsection"]))
-                for step_line in steps:
-                    if step_line.strip():
-                        elems.append(Paragraph(step_line.strip(), styles["bullet"]))
-                elems.append(Spacer(1, 0.2 * cm))
+            if context_txt:
+                elems.append(Paragraph("Technical Context", styles["subsection"]))
+                elems.append(Paragraph(context_txt, styles["normal"]))
+                elems.append(Spacer(1, 0.15 * cm))
 
-            if code_ex and code_ex.strip():
-                code_style = ParagraphStyle(
-                    "code_block", fontName="Courier", fontSize=8,
-                    textColor=HexColor("#1A237E"), backColor=HexColor("#E8EAF6"),
-                    leftIndent=10, rightIndent=10, spaceAfter=4, spaceBefore=4,
-                    leading=12,
-                )
-                elems.append(Paragraph("Code / Configuration", styles["subsection"]))
+            _rem_section("Identifying Affected Components", identify)
+            _rem_section("Remediation Steps", steps)
+
+            if code_ex:
+                elems.append(Paragraph("Commands / Configuration", styles["subsection"]))
                 for code_line in code_ex.replace("\r\n", "\n").split("\n"):
-                    elems.append(Paragraph(code_line or " ", code_style))
-                elems.append(Spacer(1, 0.2 * cm))
+                    elems.append(Paragraph(code_line or " ", _rem_code_style))
+                elems.append(Spacer(1, 0.15 * cm))
+
+            _rem_section("Post-Change Validation", post_up)
+            _rem_section("Compensating Controls (Interim)", comp_ctrl)
 
             if verification:
-                elems.append(Paragraph("Verification Steps", styles["subsection"]))
-                for vi, vstep in enumerate(verification, 1):
-                    if vstep.strip():
-                        elems.append(Paragraph(f"{vi}. {vstep.strip()}", styles["bullet"]))
-                elems.append(Spacer(1, 0.2 * cm))
+                _rem_section("Verification Steps", verification)
             else:
                 elems.append(Paragraph("Verification Steps", styles["subsection"]))
-                elems.append(Paragraph("1. Apply the fix in a test/staging environment.", styles["bullet"]))
-                elems.append(Paragraph("2. Re-run the assessment tool or reproduce the attack scenario to confirm the issue is resolved.", styles["bullet"]))
-                elems.append(Spacer(1, 0.2 * cm))
+                elems.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
+                elems.append(Paragraph("2. Confirm the patched version is running in production via the version check command above.", styles["bullet"]))
+                elems.append(Spacer(1, 0.15 * cm))
 
-            if references and references.strip():
-                elems.append(Paragraph(f"References: {references.strip()}", styles["label"]))
+            if references:
+                # Render CVE IDs as hyperlinks in the references line
+                linkified = _linkify_pdf(references)
+                elems.append(Paragraph(f"References: {linkified}", _link_label_style))
 
         elif rec_raw and rec_raw != "—":
-            elems.append(Paragraph("Immediate Actions", styles["subsection"]))
-            for step_i, line in enumerate(rec_raw.split("\n"), 1):
+            elems.append(Paragraph("Remediation Steps", styles["subsection"]))
+            for line in rec_raw.split("\n"):
                 if line.strip():
-                    elems.append(Paragraph(f"{step_i}. {line.strip()}", styles["bullet"]))
-            elems.append(Spacer(1, 0.2 * cm))
+                    elems.append(Paragraph(f"• {line.strip()}", styles["bullet"]))
+            elems.append(Spacer(1, 0.15 * cm))
             elems.append(Paragraph("Verification Steps", styles["subsection"]))
-            elems.append(Paragraph("1. Apply the fix in a test/staging environment.", styles["bullet"]))
-            elems.append(Paragraph("2. Re-run the assessment tool or reproduce the attack scenario to confirm the issue is resolved.", styles["bullet"]))
-            elems.append(Spacer(1, 0.2 * cm))
+            elems.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
+            elems.append(Paragraph("2. Confirm the patch is applied and the service responds normally.", styles["bullet"]))
+            elems.append(Spacer(1, 0.15 * cm))
         else:
             elems.append(Paragraph("Verification Steps", styles["subsection"]))
-            elems.append(Paragraph("1. Implement the recommended control in a test environment.", styles["bullet"]))
+            elems.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
             elems.append(Paragraph("2. Confirm the vulnerability is no longer exploitable before promoting to production.", styles["bullet"]))
             elems.append(Spacer(1, 0.2 * cm))
 
@@ -1829,9 +1965,19 @@ def generate_remediation_docx(report: Dict, findings: List[Dict], client_name: s
         hr3.font.size = Pt(11)
         hr3.font.color.rgb = RGBColor(255, 255, 255)
 
+        # Context — render CVE blocks as named subsections if present, else flat text
         if f.get("description"):
-            _add_para("Context:", bold=True, color="C62828")
-            _add_para(_safe(f.get("description"))[:400])
+            _add_para("What Was Found:", bold=True, color="C62828")
+            desc_text = _safe(f.get("description"), "")
+            cve_blocks = _parse_cve_blocks(desc_text) if desc_text else []
+            if cve_blocks:
+                for cve_id, cve_desc in cve_blocks:
+                    cve_p = doc.add_paragraph()
+                    _add_hyperlink_docx(cve_p, cve_id, _nvd_url(cve_id))
+                    if cve_desc:
+                        _add_para(cve_desc[:500])
+            else:
+                _add_para(desc_text[:500])
         if f.get("impact"):
             _add_para("Business Impact:", bold=True, color="C62828")
             _add_para(_safe(f.get("impact"))[:300])
@@ -1845,51 +1991,69 @@ def generate_remediation_docx(report: Dict, findings: List[Dict], client_name: s
             except Exception:
                 pass
 
+        def _docx_rem_section(label, items, numbered=True):
+            if not items:
+                return
+            _add_para(f"{label}:", bold=True, color="C62828")
+            for item in items:
+                txt = str(item).strip()
+                if not txt:
+                    continue
+                p = doc.add_paragraph(style="List Number" if numbered else "List Bullet")
+                p.add_run(txt)
+
         if rec_structured:
-            steps = rec_structured.get("steps") or []
-            code_ex = rec_structured.get("code_example") or ""
+            context_txt  = (rec_structured.get("context") or "").strip()
+            identify     = rec_structured.get("identify") or []
+            steps        = rec_structured.get("steps") or []
+            code_ex      = (rec_structured.get("code_example") or "").strip()
+            post_up      = rec_structured.get("post_upgrade") or []
+            comp_ctrl    = rec_structured.get("compensating_controls") or []
             verification = rec_structured.get("verification") or []
-            references = rec_structured.get("references") or ""
+            references   = (rec_structured.get("references") or "").strip()
 
-            if steps:
-                _add_para("Immediate Actions:", bold=True, color="C62828")
-                for step_line in steps:
-                    if step_line.strip():
-                        p = doc.add_paragraph(style="List Number")
-                        p.add_run(step_line.strip())
+            if context_txt:
+                _add_para("Technical Context:", bold=True, color="C62828")
+                _add_para(context_txt)
 
-            if code_ex and code_ex.strip():
-                _add_para("Code / Configuration:", bold=True, color="C62828")
+            _docx_rem_section("Identifying Affected Components", identify)
+            _docx_rem_section("Remediation Steps", steps)
+
+            if code_ex:
+                _add_para("Commands / Configuration:", bold=True, color="C62828")
                 code_p = doc.add_paragraph()
                 code_r = code_p.add_run(code_ex.strip())
                 code_r.font.name = "Courier New"
                 code_r.font.size = Pt(8)
 
+            _docx_rem_section("Post-Change Validation", post_up)
+            _docx_rem_section("Compensating Controls (Interim)", comp_ctrl)
+
             if verification:
-                _add_para("Verification Steps:", bold=True, color="C62828")
-                for vstep in verification:
-                    if vstep.strip():
-                        p = doc.add_paragraph(style="List Number")
-                        p.add_run(vstep.strip())
+                _docx_rem_section("Verification Steps", verification)
             else:
                 _add_para("Verification Steps:", bold=True, color="C62828")
-                for step in ["Apply the fix in a test/staging environment.",
-                             "Re-run the assessment or reproduce the attack scenario to confirm resolution."]:
+                for step in [
+                    "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
+                    "Confirm the patched version is running in production via the version check command above.",
+                ]:
                     p = doc.add_paragraph(style="List Number")
                     p.add_run(step)
 
-            if references and references.strip():
-                _add_para(f"References: {references.strip()}", color="546E7A")
+            if references:
+                _add_cve_refs_docx(doc, references, _add_para)
 
         elif rec_raw and rec_raw != "—":
-            _add_para("Immediate Actions:", bold=True, color="C62828")
-            for step_i, line in enumerate(rec_raw.split("\n"), 1):
+            _add_para("Remediation Steps:", bold=True, color="C62828")
+            for line in rec_raw.split("\n"):
                 if line.strip():
-                    p = doc.add_paragraph(style="List Number")
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run(line.strip())
             _add_para("Verification Steps:", bold=True, color="C62828")
-            for step in ["Apply the fix in a test/staging environment.",
-                         "Re-run the assessment or reproduce the attack scenario to confirm resolution."]:
+            for step in [
+                "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
+                "Confirm the patch is applied and the service responds normally.",
+            ]:
                 p = doc.add_paragraph(style="List Number")
                 p.add_run(step)
 

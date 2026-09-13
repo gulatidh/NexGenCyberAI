@@ -426,9 +426,9 @@ async def _ai_generate_report_content(
 
         system = (
             "You are a senior penetration tester and security engineer writing a professional VAPT remediation report. "
-            "For each finding produce technically precise, step-by-step remediation that a developer can follow immediately. "
-            "Include specific function names, file types, config settings, or commands wherever relevant. "
-            "Output valid JSON only — no markdown, no prose outside the JSON."
+            "For each finding produce technically precise, actionable remediation a developer can execute immediately. "
+            "Include real shell commands, config file paths, version numbers from the finding, package manager syntax, code snippets. "
+            "Output valid JSON only — no markdown fences, no prose outside the JSON."
         )
 
         prompt = f"""Client: {client_name}
@@ -446,27 +446,41 @@ Return a single JSON object with exactly these top-level keys:
   "conclusion": "2-3 paragraph conclusion covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
   "finding_remediations": {{
     "<exact finding title>": {{
+      "context": "2-3 sentences: exactly what was found (include specific versions/CVEs from the description), what an attacker can do with it, and business impact.",
+      "identify": [
+        "Command or file check to confirm the component is present and affected — e.g. 'Run: catalina.sh version | grep version' or 'Check: cat /etc/nginx/nginx.conf | grep ssl_protocols'"
+      ],
       "steps": [
-        "Step 1: <specific action — name exact file, function, config key, or command>",
-        "Step 2: <next specific action with example code or config if applicable>",
-        "Step 3: ...",
-        "Step 4 (if needed): ..."
+        "Step 1: <specific action with exact command, package name, version, or config key>",
+        "Step 2: ...",
+        "Step N: ..."
       ],
-      "code_example": "<short before/after code snippet or config block — omit key if not applicable>",
+      "code_example": "<actual shell command block, config snippet, or before/after code — omit key entirely if not applicable>",
+      "post_upgrade": [
+        "Post-change check 1 — specific command and expected output",
+        "Post-change check 2"
+      ],
+      "compensating_controls": [
+        "Interim control if immediate fix is not possible — specific and actionable"
+      ],
       "verification": [
-        "Verify 1: <specific test — e.g. send request X and confirm response Y, or run command Z and check output>",
-        "Verify 2: <second specific test — e.g. re-run scanner, attempt exploit, review log>"
+        "Verify 1: re-run the scanner/tool and confirm the advisory or plugin no longer triggers",
+        "Verify 2: attempt the specific attack scenario and confirm it fails"
       ],
-      "references": "<relevant CWE, CVE, OWASP category, or RFC — e.g. CWE-862, OWASP A01:2021>"
+      "references": "<CVE IDs from the finding description, CWE number, OWASP category, and any advisory URLs mentioned — e.g. CVE-2024-1234, CWE-79, OWASP A03:2021, https://vendor.com/security/advisory>"
     }}
   }}
 }}
 
 Rules:
-- steps must be 3-6 numbered items — specific and actionable, not generic.
-- code_example: include ONLY if a code or config change is needed; omit the key otherwise.
-- verification: exactly 2 specific tests relevant to THIS finding, not generic boilerplate.
-- Include a remediation entry for EVERY finding listed above using the exact title string as the key.
+- context: MUST reference the exact software name, version range, and CVE IDs found in the Description field. Not generic.
+- identify: 1-2 commands or file checks to confirm the component is present and affected.
+- steps: 3-6 items. MUST include real shell commands, exact package versions, config file paths, or Maven/npm/pip syntax where relevant. No vague "update the dependency" — write the actual command.
+- code_example: ONLY if a shell command sequence, config block, or code change is needed. Real syntax, not pseudocode. Omit the key entirely if not applicable.
+- post_upgrade: 1-3 specific post-change checks with the expected outcome.
+- compensating_controls: 1-2 specific interim mitigations the team can apply right now if patching is delayed.
+- verification: exactly 2 items — first MUST mention re-running the scanner/tool; second MUST describe a specific functional test.
+- Include an entry for EVERY finding listed above using the exact title as the key.
 """
         llm = get_llm()
         resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
