@@ -2743,4 +2743,28 @@ async def health():
 
 @app.get("/")
 async def root():
+    import os as _os_root
+    if _os_root.getenv("SERVE_FRONTEND"):
+        _idx = _os_root.path.join(_os_root.path.dirname(__file__), "frontend_build", "index.html")
+        if _os_root.path.isfile(_idx):
+            from fastapi.responses import FileResponse as _FR
+            return _FR(_idx)
     return {"message": "NexGenCyberAI API — visit /api/docs for documentation"}
+
+
+# ── Local / Docker: serve built React SPA ────────────────────────────────────
+import os as _os
+if _os.getenv("SERVE_FRONTEND"):
+    _frontend_dir = _os.path.join(_os.path.dirname(__file__), "frontend_build")
+    if _os.path.isdir(_frontend_dir):
+        from fastapi.staticfiles import StaticFiles as _StaticFiles
+        from fastapi.responses import FileResponse as _FileResponse
+
+        app.mount("/assets", _StaticFiles(directory=_os.path.join(_frontend_dir, "assets")), name="spa-assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def _serve_spa(full_path: str):
+            _fp = _os.path.join(_frontend_dir, full_path)
+            if _os.path.isfile(_fp):
+                return _FileResponse(_fp)
+            return _FileResponse(_os.path.join(_frontend_dir, "index.html"))

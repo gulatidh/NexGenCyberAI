@@ -1,84 +1,40 @@
-##############################################################################
-# NexGenCyberAI — Docker Compose (local development)
-# Usage:
-#   cp .env.example .env      # fill in your credentials
-#   docker-compose up --build
-##############################################################################
-
 version: "3.9"
 
 services:
-  # ── PostgreSQL / SQLite swap for local dev ──────────────────────────────
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: nexgencyberai
-      POSTGRES_USER: nexgen
-      POSTGRES_PASSWORD: localdevpassword
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-  # ── Redis ────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
-
-  # ── Backend API ──────────────────────────────────────────────────────────
-  backend:
+  aegis:
     build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend
-    restart: unless-stopped
-    depends_on:
-      - db
-      - redis
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: "http://localhost:${PORT:-8080}/api/v1"
+        REACT_APP_CLIENT_ID: "${REACT_APP_CLIENT_ID}"
+        REACT_APP_TENANT_ID: "${REACT_APP_TENANT_ID}"
+        REACT_APP_REDIRECT_URI: "http://localhost:${PORT:-8080}"
+    image: aegis-local:latest
+    container_name: aegis-portal
     ports:
-      - "8000:8000"
-    env_file: .env
-    environment:
-      DATABASE_URL: "postgresql+psycopg2://nexgen:localdevpassword@db:5432/nexgencyberai"
-      REDIS_URL: "redis://redis:6379/0"
-      CELERY_BROKER_URL: "redis://redis:6379/0"
+      - "${PORT:-8080}:8000"
     volumes:
-      - ./backend:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  # ── Celery Worker ────────────────────────────────────────────────────────
-  worker:
-    build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend
-    restart: unless-stopped
-    depends_on:
-      - redis
-    env_file: .env
+      - aegis_data:/app/data
     environment:
-      DATABASE_URL: "postgresql+psycopg2://nexgen:localdevpassword@db:5432/nexgencyberai"
-      REDIS_URL: "redis://redis:6379/0"
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-    command: celery -A tasks.celery_app worker --loglevel=info
-
-  # ── Frontend SPA ─────────────────────────────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
+      DATABASE_URL: "sqlite:////app/data/nexgencyberai.db"
+      SERVE_FRONTEND: "true"
+      ALLOWED_ORIGINS: '["http://localhost:${PORT:-8080}"]'
+      AZURE_TENANT_ID: "${AZURE_TENANT_ID}"
+      AZURE_CLIENT_ID: "${REACT_APP_CLIENT_ID}"
+      INITIAL_ADMIN_EMAILS: "${INITIAL_ADMIN_EMAILS}"
+      # AI Providers — configure at least one
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      AZURE_OPENAI_API_KEY: "${AZURE_OPENAI_API_KEY:-}"
+      AZURE_OPENAI_ENDPOINT: "${AZURE_OPENAI_ENDPOINT:-}"
+      AZURE_OPENAI_DEPLOYMENT: "${AZURE_OPENAI_DEPLOYMENT:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:-}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
     restart: unless-stopped
-    depends_on:
-      - backend
-    ports:
-      - "3000:3000"
-    env_file: .env
-    environment:
-      REACT_APP_API_URL: "http://localhost:8000/api/v1"
-    volumes:
-      - ./frontend/src:/app/src
 
 volumes:
-  pgdata:
+  aegis_data:
+    driver: local
