@@ -512,30 +512,40 @@ def _needs_enrichment(rec_raw: str) -> bool:
 
 
 async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict]:
-    """At export time, enrich any finding with plain-text or old-schema recommendation via AI."""
+    """At export time, enrich any finding with plain-text or old-schema recommendation via AI.
+
+    Processes in batches of 6 to stay within LLM token limits.
+    Uses case-insensitive title matching to handle LLM capitalisation drift.
+    """
     plain = [f for f in findings_dicts if _needs_enrichment(f.get("recommendation") or "")]
     if not plain:
         return findings_dicts
+
     try:
         from core.ai_providers import get_llm, ProviderUnavailableError
         from langchain_core.messages import HumanMessage, SystemMessage
+    except ImportError as exc:
+        logger.warning("Export-time enrichment: import failed — %s", exc)
+        return findings_dicts
 
+    _SYSTEM = (
+        "You are a senior penetration tester and security engineer writing a professional VAPT remediation report. "
+        "For each finding produce technically precise, actionable remediation a developer can execute immediately. "
+        "Include real shell commands, config file paths, version numbers from the finding, package manager syntax, code snippets. "
+        "Output valid JSON only — no markdown fences, no prose outside the JSON."
+    )
+
+    def _prompt_for_batch(batch):
         detail = "\n\n".join(
-            f"FINDING: {f.get('title','')}\n"
-            f"Severity: {f.get('severity','').upper()}\n"
+            f"FINDING: {f.get('title', '')}\n"
+            f"Severity: {f.get('severity', '').upper()}\n"
             f"Affected: {f.get('affected_asset') or 'N/A'}\n"
-            f"Description: {(f.get('description') or '')[:800]}\n"
+            f"Description: {(f.get('description') or '')[:900]}\n"
             f"Evidence: {(f.get('evidence') or '')[:300]}\n"
-            f"Existing hint: {(f.get('recommendation') or '')[:300]}"
-            for f in plain[:20]
+            f"Existing hint: {(f.get('recommendation') or '')[:200]}"
+            for f in batch
         )
-        system = (
-            "You are a senior penetration tester and security engineer writing a professional VAPT remediation report. "
-            "For each finding produce technically precise, actionable remediation a developer can execute immediately. "
-            "Include real shell commands, config file paths, version numbers from the finding, package manager syntax, code snippets. "
-            "Output valid JSON only — no markdown fences, no prose outside the JSON."
-        )
-        prompt = f"""Generate a detailed treatment plan for these findings:
+        return f"""Generate a detailed treatment plan for these findings:
 
 {detail}
 
@@ -570,6 +580,7 @@ Return JSON:
 }}
 
 Rules:
+- Use the EXACT finding title (as given in FINDING:) as the JSON key.
 - cves: every CVE from description with parenthetical of what it allows.
 - immediate_assessment: exact commands for THIS technology (rpm -q for RHEL, dpkg -l for Debian, version.sh for Tomcat, docker inspect for containers).
 - patch_commands: real bash with # comments, correct package manager, includes backup + patch + verify + restart.
@@ -577,27 +588,51 @@ Rules:
 - validation[0]: must name the scanner plugin/advisory ID from description.
 - Include EVERY finding using its exact title as key.
 """
-        llm = get_llm()
-        resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
-        raw = str(resp.content).strip()
-        if raw.startswith("```"):
-            raw = raw.split("```", 2)[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.rsplit("```", 1)[0].strip()
-        remediations = json.loads(raw).get("finding_remediations", {})
-        result = []
-        for f in findings_dicts:
-            if not (f.get("recommendation") or "").strip().startswith("{"):
-                enriched = remediations.get(f.get("title", ""), {})
-                if enriched:
-                    f = dict(f)
-                    f["recommendation"] = json.dumps(enriched)
-            result.append(f)
-        return result
-    except Exception as exc:
-        logger.warning("Export-time remediation enrichment failed: %s", exc)
+
+    # Build a case-insensitive lookup of all enriched remediations across batches
+    all_remediations: Dict[str, Dict] = {}
+    BATCH = 6
+    llm = None
+    for i in range(0, len(plain), BATCH):
+        batch = plain[i:i + BATCH]
+        try:
+            if llm is None:
+                llm = get_llm()
+            resp = await llm.ainvoke([
+                SystemMessage(content=_SYSTEM),
+                HumanMessage(content=_prompt_for_batch(batch)),
+            ])
+            raw = str(resp.content).strip()
+            if raw.startswith("```"):
+                raw = raw.split("```", 2)[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.rsplit("```", 1)[0].strip()
+            batch_remediations = json.loads(raw).get("finding_remediations", {})
+            # Store with lower-case keys for case-insensitive matching
+            for k, v in batch_remediations.items():
+                all_remediations[k.lower().strip()] = v
+        except Exception as exc:
+            logger.warning(
+                "Export-time enrichment batch %d-%d failed: %s",
+                i, i + BATCH, exc,
+            )
+
+    if not all_remediations:
         return findings_dicts
+
+    result = []
+    for f in findings_dicts:
+        if _needs_enrichment(f.get("recommendation") or ""):
+            title_key = (f.get("title") or "").lower().strip()
+            enriched = all_remediations.get(title_key, {})
+            if enriched:
+                f = dict(f)
+                f["recommendation"] = json.dumps(enriched)
+            else:
+                logger.warning("Enrichment: no match for title %r (keys: %s)", f.get("title"), list(all_remediations)[:5])
+        result.append(f)
+    return result
 
 
 # ── From-Scan auto-generate ───────────────────────────────────────────────────
