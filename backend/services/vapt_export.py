@@ -244,7 +244,7 @@ def _retest_counts(findings: List[Dict]) -> Dict[str, int]:
 
 def _build_pdf_styles():
     styles = getSampleStyleSheet()
-    base = dict(fontName="Helvetica", fontSize=10, leading=14, textColor=DARK_TEXT)
+    base = dict(fontName="Helvetica", fontSize=9.5, leading=13.5, textColor=DARK_TEXT)
 
     def _ps(name, **kw):
         merged = {**base, **kw}
@@ -253,20 +253,32 @@ def _build_pdf_styles():
     return {
         "normal":       _ps("vapt_normal"),
         "bold":         _ps("vapt_bold", fontName="Helvetica-Bold"),
-        "small":        _ps("vapt_small", fontSize=8, leading=10),
-        "small_bold":   _ps("vapt_small_bold", fontSize=8, leading=10, fontName="Helvetica-Bold"),
-        "section":      _ps("vapt_section", fontName="Helvetica-Bold", fontSize=14, leading=17, textColor=NAVY),
-        "subsection":   _ps("vapt_subsection", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=BLUE),
-        "finding_hdr":  _ps("vapt_finding_hdr", fontName="Helvetica-Bold", fontSize=12, leading=15, textColor=WHITE),
-        "cover_title":  _ps("vapt_cover_title", fontName="Helvetica-Bold", fontSize=28, leading=34, textColor=NAVY, alignment=TA_CENTER),
-        "cover_sub":    _ps("vapt_cover_sub", fontName="Helvetica", fontSize=13, leading=17, textColor=DARK_TEXT, alignment=TA_CENTER),
+        "small":        _ps("vapt_small", fontSize=8, leading=11),
+        "small_bold":   _ps("vapt_small_bold", fontSize=8, leading=11, fontName="Helvetica-Bold"),
+        "section":      _ps("vapt_section", fontName="Helvetica-Bold", fontSize=13, leading=16,
+                            textColor=NAVY, spaceBefore=14, spaceAfter=4),
+        "subsection":   _ps("vapt_subsection", fontName="Helvetica-Bold", fontSize=10.5,
+                            leading=13, textColor=BLUE, spaceBefore=8, spaceAfter=3),
+        "finding_hdr":  _ps("vapt_finding_hdr", fontName="Helvetica-Bold", fontSize=12,
+                            leading=15, textColor=WHITE),
+        "cover_title":  _ps("vapt_cover_title", fontName="Helvetica-Bold", fontSize=26,
+                            leading=32, textColor=NAVY, alignment=TA_CENTER),
+        "cover_sub":    _ps("vapt_cover_sub", fontName="Helvetica", fontSize=12,
+                            leading=16, textColor=DARK_TEXT, alignment=TA_CENTER),
         "center":       _ps("vapt_center", alignment=TA_CENTER),
         "center_bold":  _ps("vapt_center_bold", fontName="Helvetica-Bold", alignment=TA_CENTER),
         "right":        _ps("vapt_right", alignment=TA_RIGHT),
-        "label":        _ps("vapt_label", fontName="Helvetica-Bold", fontSize=9, textColor=HexColor("#546E7A")),
-        "value":        _ps("vapt_value", fontSize=10),
-        "bullet":       _ps("vapt_bullet", fontSize=10, leftIndent=12, spaceBefore=2),
-        "code":         _ps("vapt_code", fontName="Courier", fontSize=9, leading=12, backColor=HexColor("#F5F5F5"), leftIndent=8, rightIndent=8),
+        "label":        _ps("vapt_label", fontName="Helvetica-Bold", fontSize=8.5,
+                            textColor=HexColor("#546E7A")),
+        "value":        _ps("vapt_value", fontSize=9.5),
+        "bullet":       _ps("vapt_bullet", fontSize=9.5, leftIndent=14, spaceBefore=2,
+                            spaceAfter=1),
+        "code":         _ps("vapt_code", fontName="Courier", fontSize=8, leading=11,
+                            backColor=HexColor("#F5F5F5"), leftIndent=8, rightIndent=8,
+                            spaceBefore=2, spaceAfter=2),
+        "tbl_hdr":      _ps("vapt_tbl_hdr", fontName="Helvetica-Bold", fontSize=8.5,
+                            textColor=NAVY),
+        "tbl_cell":     _ps("vapt_tbl_cell", fontSize=8.5, leading=12),
     }
 
 
@@ -352,14 +364,26 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
     # ── Helper functions ──────────────────────────────────────────────────────
     def section_header(text: str) -> Table:
-        """Left-accented section header — no background fill."""
-        tbl = Table([[Paragraph(text, styles["section"])]], colWidths=[PAGE_W - 2 * MARGIN])
-        tbl.setStyle(TableStyle([
-            ("LINEBELOW", (0, 0), (-1, -1), 1.5, NAVY),
+        """Left accent bar + bold text + bottom rule — professional section divider."""
+        accent = Table([[""]], colWidths=[0.35 * cm])
+        accent.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), NAVY),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ("LEFTPADDING", (0, 0), (-1, -1), 0),
             ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        tbl = Table(
+            [[accent, Paragraph(text, styles["section"])]],
+            colWidths=[0.45 * cm, PAGE_W - 2 * MARGIN - 0.45 * cm],
+        )
+        tbl.setStyle(TableStyle([
+            ("LINEBELOW", (0, 0), (-1, -1), 0.75, NAVY),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]))
         return tbl
 
@@ -389,22 +413,23 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     # ═══════════════════════════════════════════════════════════════════════
     # COVER PAGE
     # ═══════════════════════════════════════════════════════════════════════
-    story.append(Spacer(1, 4 * cm))
+    story.append(Spacer(1, 3.5 * cm))
     story.append(Paragraph("MONITARA AI", ParagraphStyle(
-        "brand", fontName="Helvetica-Bold", fontSize=16, textColor=HexColor("#1565C0"),
-        alignment=TA_CENTER, letterSpacing=4)))
-    story.append(Spacer(1, 0.5 * cm))
+        "brand", fontName="Helvetica-Bold", fontSize=17, textColor=HexColor("#1565C0"),
+        alignment=TA_CENTER, letterSpacing=5)))
+    story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph("Cybersecurity Platform", ParagraphStyle(
-        "brand_sub", fontName="Helvetica", fontSize=11, textColor=HexColor("#546E7A"),
+        "brand_sub", fontName="Helvetica", fontSize=10, textColor=HexColor("#78909C"),
         alignment=TA_CENTER)))
-    story.append(Spacer(1, 2 * cm))
-    story.append(HRFlowable(width="80%", thickness=1, color=HexColor("#1565C0"),
-                            hAlign="CENTER"))
-    story.append(Spacer(1, 1.5 * cm))
-    story.append(Paragraph(report_title.upper(), styles["cover_title"]))
-    story.append(Spacer(1, 0.8 * cm))
+    story.append(Spacer(1, 1.8 * cm))
+    story.append(HRFlowable(width="70%", thickness=1.5, color=HexColor("#1A237E"), hAlign="CENTER"))
+    story.append(Spacer(1, 1.8 * cm))
+    story.append(Paragraph(_xe(report_title).upper(), styles["cover_title"]))
+    story.append(Spacer(1, 0.6 * cm))
     story.append(Paragraph("Vulnerability Assessment &amp; Penetration Testing Report",
                             styles["cover_sub"]))
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(HRFlowable(width="70%", thickness=0.5, color=HexColor("#B0BEC5"), hAlign="CENTER"))
     story.append(Spacer(1, 2 * cm))
 
     cover_data = [
@@ -423,11 +448,13 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     cover_tbl = Table(cover_tbl_data, colWidths=[4 * cm, 10 * cm])
     cover_tbl.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), HexColor("#E8EAF6")),
-        ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor("#CFD8DC")),
-        ("TOPPADDING", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#C5CAE9")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, HexColor("#CFD8DC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, HexColor("#9FA8DA")),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
     ]))
     story.append(cover_tbl)
     story.append(Spacer(1, 2 * cm))
@@ -758,39 +785,74 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
             finding_elements = []
 
-            # Color-coded header
-            hdr_style = ParagraphStyle("fdh", fontName="Helvetica-Bold", fontSize=12,
-                                       textColor=tc, leading=15)
-            fhdr_tbl = Table([[Paragraph(f"{fid}  —  {ftitle}", hdr_style)]],
-                              colWidths=[PAGE_W - 2 * MARGIN])
-            fhdr_tbl.setStyle(TableStyle([
+            # ── Row 1: severity-coloured title bar ──────────────────────────
+            num_style = ParagraphStyle("fnum", fontName="Helvetica-Bold", fontSize=10,
+                                       textColor=tc, leading=13, alignment=TA_CENTER)
+            title_style = ParagraphStyle("ftitle", fontName="Helvetica-Bold", fontSize=12,
+                                         textColor=tc, leading=15)
+            num_cell = Table([[Paragraph(_xe(fid), num_style)]], colWidths=[1.8 * cm])
+            num_cell.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), HexColor("#00000030")),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            title_cell = Table([[Paragraph(_xe(ftitle), title_style)]],
+                                colWidths=[PAGE_W - 2 * MARGIN - 1.8 * cm])
+            title_cell.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), bg),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
                 ("LEFTPADDING", (0, 0), (-1, -1), 10),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 10),
             ]))
+            fhdr_tbl = Table([[num_cell, title_cell]],
+                              colWidths=[1.8 * cm, PAGE_W - 2 * MARGIN - 1.8 * cm])
+            fhdr_tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), bg),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]))
             finding_elements.append(fhdr_tbl)
 
-            # Meta row
-            meta_bold = ParagraphStyle("mb", fontName="Helvetica-Bold", fontSize=9, textColor=DARK_TEXT)
-            meta_val = ParagraphStyle("mv", fontName="Helvetica", fontSize=9, textColor=DARK_TEXT)
+            # ── Row 2: light grey meta strip ────────────────────────────────
+            meta_bold = ParagraphStyle("mb", fontName="Helvetica-Bold", fontSize=8.5,
+                                       textColor=HexColor("#37474F"))
+            meta_val  = ParagraphStyle("mv", fontName="Helvetica", fontSize=8.5,
+                                       textColor=DARK_TEXT)
             rs_display = rs.replace("_", " ").title()
-            meta_tbl = Table([
-                [Paragraph("Severity:", meta_bold), Paragraph(sev.capitalize(), meta_val),
-                 Paragraph("Affected Asset:", meta_bold), Paragraph(_safe(f.get("affected_asset")), meta_val),
-                 Paragraph("Retest Status:", meta_bold), Paragraph(rs_display, meta_val)],
-            ], colWidths=[2.2 * cm, 2.8 * cm, 3 * cm, 4 * cm, 2.5 * cm, 2.5 * cm])
-            meta_tbl.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, -1), GREY_BG),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            sev_col = SEV_COLORS.get(sev, HexColor("#757575"))
+            sev_label_style = ParagraphStyle("svl", fontName="Helvetica-Bold", fontSize=8.5,
+                                             textColor=SEV_TEXT_COLORS.get(sev, WHITE))
+            sev_chip = Table([[Paragraph(_xe(sev.capitalize()), sev_label_style)]],
+                              colWidths=[2.2 * cm])
+            sev_chip.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), sev_col),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#CFD8DC")),
+            ]))
+            meta_tbl = Table([
+                [Paragraph("Severity", meta_bold), sev_chip,
+                 Paragraph("Asset", meta_bold), Paragraph(_xe(f.get("affected_asset")), meta_val),
+                 Paragraph("Retest", meta_bold), Paragraph(_xe(rs_display), meta_val)],
+            ], colWidths=[1.8 * cm, 2.6 * cm, 1.5 * cm, 5 * cm, 1.8 * cm, 4.3 * cm])
+            meta_tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7FA")),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor("#CFD8DC")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]))
             finding_elements.append(meta_tbl)
-            finding_elements.append(Spacer(1, 0.3 * cm))
+            finding_elements.append(Spacer(1, 0.35 * cm))
 
             def field_block(label: str, value: str, code_style: bool = False):
                 if not value or value == "—":
@@ -1036,11 +1098,8 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 finding_elements.append(rn_tbl)
                 finding_elements.append(Spacer(1, 0.2 * cm))
 
-            if fi < len(sorted_findings) - 1:
-                finding_elements.append(HRFlowable(width="100%", thickness=1,
-                                                   color=HexColor("#B0BEC5")))
-                finding_elements.append(Spacer(1, 0.4 * cm))
-
+            if fi > 0:
+                story.append(PageBreak())
             try:
                 story.append(KeepTogether(finding_elements[:8]))
                 for el in finding_elements[8:]:
@@ -2040,18 +2099,71 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
 
         elems = []
 
-        hdr_style = ParagraphStyle("fdh2", fontName="Helvetica-Bold", fontSize=11, textColor=tc2)
-        fh_tbl = Table([[Paragraph(f"{fid}  —  {_safe(f.get('title'))}", hdr_style)]],
-                        colWidths=[PAGE_W - 2 * MARGIN])
-        fh_tbl.setStyle(TableStyle([
+        # ── Two-row finding header ───────────────────────────────────────────
+        r_num_style = ParagraphStyle("rfnum", fontName="Helvetica-Bold", fontSize=10,
+                                     textColor=tc2, leading=13, alignment=TA_CENTER)
+        r_title_style = ParagraphStyle("rftitle", fontName="Helvetica-Bold", fontSize=11,
+                                       textColor=tc2, leading=14)
+        r_num_cell = Table([[Paragraph(_xe(fid), r_num_style)]], colWidths=[1.8 * cm])
+        r_num_cell.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#00000030")),
+            ("TOPPADDING", (0, 0), (-1, -1), 9),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        r_title_cell = Table([[Paragraph(_xe(_safe(f.get("title"))), r_title_style)]],
+                              colWidths=[PAGE_W - 2 * MARGIN - 1.8 * cm])
+        r_title_cell.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), bg),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 9),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
             ("LEFTPADDING", (0, 0), (-1, -1), 10),
             ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ]))
+        fh_tbl = Table([[r_num_cell, r_title_cell]],
+                        colWidths=[1.8 * cm, PAGE_W - 2 * MARGIN - 1.8 * cm])
+        fh_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bg),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        r_sev_col = SEV_COLORS.get(sev, HexColor("#757575"))
+        r_sev_label_style = ParagraphStyle("rsvl", fontName="Helvetica-Bold", fontSize=8.5,
+                                           textColor=SEV_TEXT_COLORS.get(sev, WHITE))
+        r_sev_chip = Table([[Paragraph(_xe(sev.capitalize()), r_sev_label_style)]],
+                            colWidths=[2.2 * cm])
+        r_sev_chip.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), r_sev_col),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        r_rs_display = rs.replace("_", " ").title()
+        r_meta_bold = ParagraphStyle("rmb", fontName="Helvetica-Bold", fontSize=8.5,
+                                     textColor=HexColor("#37474F"))
+        r_meta_val = ParagraphStyle("rmv", fontName="Helvetica", fontSize=8.5, textColor=DARK_TEXT)
+        r_meta_tbl = Table([
+            [Paragraph("Severity", r_meta_bold), r_sev_chip,
+             Paragraph("Asset", r_meta_bold), Paragraph(_xe(f.get("affected_asset")), r_meta_val),
+             Paragraph("Retest", r_meta_bold), Paragraph(_xe(r_rs_display), r_meta_val)],
+        ], colWidths=[1.8 * cm, 2.6 * cm, 1.5 * cm, 5 * cm, 1.8 * cm, 4.3 * cm])
+        r_meta_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F5F7FA")),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor("#CFD8DC")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
         elems.append(fh_tbl)
-        elems.append(Spacer(1, 0.2 * cm))
+        elems.append(r_meta_tbl)
+        elems.append(Spacer(1, 0.3 * cm))
 
         # Context — render CVE blocks as named subsections if present, else flat text
         if f.get("description") or f.get("impact"):
@@ -2239,10 +2351,8 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
         elems.append(Paragraph(f"Estimated Effort: {effort_label}  |  Priority: {priority_labels.get(sev, 'P3')}",
                                styles["label"]))
 
-        if fi < len(sorted_findings) - 1:
-            elems.append(HRFlowable(width="100%", thickness=1, color=HexColor("#CFD8DC")))
-            elems.append(Spacer(1, 0.3 * cm))
-
+        if fi > 0:
+            story.append(PageBreak())
         try:
             story.append(KeepTogether(elems[:6]))
             for el in elems[6:]:
