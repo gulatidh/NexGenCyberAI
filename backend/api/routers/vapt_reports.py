@@ -500,13 +500,29 @@ Rules:
 
 
 def _needs_enrichment(rec_raw: str) -> bool:
-    """Return True if recommendation is plain text OR stored with an old schema (missing patch_commands)."""
+    """Return True if recommendation needs AI enrichment.
+
+    Detects three cases:
+    - Plain text (not JSON)
+    - Old schema (missing patch_commands key)
+    - Low-quality new schema: patch_commands is a one-liner (no newlines) or
+      immediate_assessment is empty — both indicate the AI only produced a stub.
+    """
     rec = (rec_raw or "").strip()
     if not rec.startswith("{"):
         return True
     try:
         parsed = json.loads(rec)
-        return "patch_commands" not in parsed and "immediate_assessment" not in parsed
+        if "patch_commands" not in parsed and "immediate_assessment" not in parsed:
+            return True
+        # Quality check: real bash blocks span multiple lines
+        patch_cmds = (parsed.get("patch_commands") or "").strip()
+        if not patch_cmds or ("\n" not in patch_cmds and "\\n" not in patch_cmds):
+            return True
+        # Must have at least one assessment step
+        if not (parsed.get("immediate_assessment") or []):
+            return True
+        return False
     except Exception:
         return True
 
@@ -986,6 +1002,7 @@ async def export_full_pdf(
     client = _get_client_or_404(cid, db)
     from services.vapt_export import generate_pdf
     findings_dicts = [_finding_to_dict(f) for f in report.findings]
+    findings_dicts = await _enrich_plain_recommendations(findings_dicts)
     pdf_bytes = generate_pdf(_report_to_dict(report), findings_dicts, client.name)
     filename = f"vapt-report-{report.version}-{rid[:8]}.pdf"
     return _export_stream(pdf_bytes, "application/pdf", filename)
@@ -1002,6 +1019,7 @@ async def export_full_docx(
     client = _get_client_or_404(cid, db)
     from services.vapt_export import generate_docx
     findings_dicts = [_finding_to_dict(f) for f in report.findings]
+    findings_dicts = await _enrich_plain_recommendations(findings_dicts)
     docx_bytes = generate_docx(_report_to_dict(report), findings_dicts, client.name)
     filename = f"vapt-report-{report.version}-{rid[:8]}.docx"
     return _export_stream(
