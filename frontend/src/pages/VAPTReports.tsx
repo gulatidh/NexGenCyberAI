@@ -206,16 +206,14 @@ export default function VAPTReports() {
           </Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
-          {(reports as any[]).length >= 2 && (
-            <Button
-              variant="outlined"
-              startIcon={<CompareArrows />}
-              onClick={() => { setCompareA(""); setCompareB(""); setCompareOpen(true); }}
-              sx={{ borderColor: "#1565C0", color: "#1565C0" }}
-            >
-              Compare
-            </Button>
-          )}
+          <Button
+            variant="outlined"
+            startIcon={<CompareArrows />}
+            onClick={() => { setCompareA(""); setCompareB(""); setCompareOpen(true); }}
+            sx={{ borderColor: "#1565C0", color: "#1565C0" }}
+          >
+            Compare
+          </Button>
           {!isGuest && (
             <Button
               variant="contained"
