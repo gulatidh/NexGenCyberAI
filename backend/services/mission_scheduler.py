@@ -90,7 +90,7 @@ def _load_all_active_missions() -> None:
     """Read every active ScheduledMission from the DB and register it."""
     db = SessionLocal()
     try:
-        for mission in db.query(ScheduledMission).filter(ScheduledMission.is_active.is_(True)).all():
+        for mission in db.query(ScheduledMission).filter(ScheduledMission.is_active == True).all():  # noqa: E712 — .is_(True) generates IS 1, invalid on MSSQL
             try:
                 _register(mission)
             except Exception:
