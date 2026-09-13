@@ -605,15 +605,13 @@ Rules:
 - Include EVERY finding using its exact title as key.
 """
 
-    # Build a case-insensitive lookup of all enriched remediations across batches
-    all_remediations: Dict[str, Dict] = {}
+    # Build a case-insensitive lookup — all batches run in parallel
     BATCH = 6
-    llm = None
-    for i in range(0, len(plain), BATCH):
-        batch = plain[i:i + BATCH]
+    llm = get_llm()
+    batches = [plain[i:i + BATCH] for i in range(0, len(plain), BATCH)]
+
+    async def _call_batch(batch):
         try:
-            if llm is None:
-                llm = get_llm()
             resp = await llm.ainvoke([
                 SystemMessage(content=_SYSTEM),
                 HumanMessage(content=_prompt_for_batch(batch)),
@@ -624,15 +622,17 @@ Rules:
                 if raw.startswith("json"):
                     raw = raw[4:]
                 raw = raw.rsplit("```", 1)[0].strip()
-            batch_remediations = json.loads(raw).get("finding_remediations", {})
-            # Store with lower-case keys for case-insensitive matching
-            for k, v in batch_remediations.items():
-                all_remediations[k.lower().strip()] = v
+            return json.loads(raw).get("finding_remediations", {})
         except Exception as exc:
-            logger.warning(
-                "Export-time enrichment batch %d-%d failed: %s",
-                i, i + BATCH, exc,
-            )
+            logger.warning("Export-time enrichment batch failed: %s", exc)
+            return {}
+
+    import asyncio
+    results = await asyncio.gather(*[_call_batch(b) for b in batches])
+    all_remediations: Dict[str, Dict] = {}
+    for batch_result in results:
+        for k, v in batch_result.items():
+            all_remediations[k.lower().strip()] = v
 
     if not all_remediations:
         return findings_dicts
