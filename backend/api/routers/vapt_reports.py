@@ -528,17 +528,26 @@ def _needs_enrichment(rec_raw: str) -> bool:
 
 
 async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict]:
-    """At export time, enrich any finding with plain-text or old-schema recommendation via AI.
+    """At export time, enrich any finding with plain-text or low-quality recommendation via AI.
 
-    Processes in batches of 6 to stay within LLM token limits.
-    Uses case-insensitive title matching to handle LLM capitalisation drift.
+    Uses numeric indices as JSON keys to avoid LLM title-drift matching failures.
+    All batches run in parallel via asyncio.gather so total wait is one LLM round-trip.
     """
-    plain = [f for f in findings_dicts if _needs_enrichment(f.get("recommendation") or "")]
+    import asyncio
+
+    # Track which positions in findings_dicts need enrichment
+    plain_positions: List[int] = []
+    plain: List[Dict] = []
+    for idx, f in enumerate(findings_dicts):
+        if _needs_enrichment(f.get("recommendation") or ""):
+            plain_positions.append(idx)
+            plain.append(f)
+
     if not plain:
         return findings_dicts
 
     try:
-        from core.ai_providers import get_llm, ProviderUnavailableError
+        from core.ai_providers import get_llm
         from langchain_core.messages import HumanMessage, SystemMessage
     except ImportError as exc:
         logger.warning("Export-time enrichment: import failed — %s", exc)
@@ -551,70 +560,74 @@ async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict
         "Output valid JSON only — no markdown fences, no prose outside the JSON."
     )
 
-    def _prompt_for_batch(batch):
+    def _prompt_for_batch(batch_with_indices):
         detail = "\n\n".join(
-            f"FINDING: {f.get('title', '')}\n"
+            f"FINDING [{global_idx}]: {f.get('title', '')}\n"
             f"Severity: {f.get('severity', '').upper()}\n"
             f"Affected: {f.get('affected_asset') or 'N/A'}\n"
             f"Description: {(f.get('description') or '')[:900]}\n"
             f"Evidence: {(f.get('evidence') or '')[:300]}\n"
             f"Existing hint: {(f.get('recommendation') or '')[:200]}"
-            for f in batch
+            for global_idx, f in batch_with_indices
         )
-        return f"""Generate a detailed treatment plan for these findings:
+        return f"""Generate a detailed treatment plan for these security findings.
 
 {detail}
 
-Return JSON:
+Return JSON where each key is the integer index from FINDING [N]:
 {{
   "finding_remediations": {{
-    "<exact finding title>": {{
-      "cves": "CVE-XXXX-YYYYY (short description), CVE-XXXX-ZZZZZ (short description) — all CVEs from description",
+    "0": {{
+      "cves": "CVE-XXXX-YYYYY (what it allows), CVE-XXXX-ZZZZZ (what it allows) — all CVEs from description",
       "immediate_assessment": [
-        "Confirm installed version: <exact command for this technology>",
-        "Confirm whether the vulnerable feature is enabled: <specific check>"
+        "Confirm installed version: rpm -q <package> OR cat /etc/tomcat9/version.txt",
+        "Check if vulnerable feature is enabled: <specific command>"
       ],
-      "patch_commands": "# bash block with comments\\n# backup\\ncp -r ...\\n# patch\\nsudo yum update ...\\n# verify\\nrpm -q ...\\n# restart\\nsudo systemctl restart ...",
-      "patch_notes": "One sentence about deployment context if relevant (Satellite fleet, Maven BOM, Docker, etc.).",
+      "patch_commands": "# Step 1: backup\\ncp -r /opt/tomcat /opt/tomcat.bak\\n# Step 2: apply patch\\nsudo yum update tomcat -y\\n# Step 3: verify\\nrpm -q tomcat\\n# Step 4: restart\\nsudo systemctl restart tomcat",
+      "patch_notes": "One sentence on deployment context (e.g. RHEL Satellite, Maven BOM, Docker image tag).",
       "compensating_controls": [
-        "Specific interim control — exact config key, file path, or firewall rule and command"
+        "Disable the vulnerable endpoint: set <config-key>=false in /etc/app/config.xml",
+        "Block at perimeter: iptables -A INPUT -p tcp --dport 8080 -j DROP"
       ],
       "validation": [
-        "Re-run <scanner> against <asset> — confirm <plugin/advisory ID> no longer triggers",
-        "Functional test: <exact command> — expected: <success output>",
-        "Update finding status Pending → Remediated with patch date and evidence"
+        "Re-run Nessus plugin <plugin_id> against <asset> — confirm no longer triggered",
+        "Functional test: curl -sk https://<asset>:<port>/version | grep <expected_version>",
+        "Update finding status Pending to Remediated with patch date and screenshot"
       ],
       "tracking": {{
-        "priority": "<Critical/High/Medium/Low>",
-        "target_sla": "<48h Critical / 14d High / 30d Medium / 90d Low>",
-        "owner": "<responsible team>",
+        "priority": "Critical",
+        "target_sla": "48 hours",
+        "owner": "Infrastructure / Application Team",
         "verification": "Security Team re-scan post-patch",
-        "rollback_plan": "<backup path and downgrade command specific to this technology>"
+        "rollback_plan": "Restore from backup: cp -r /opt/tomcat.bak /opt/tomcat && systemctl restart tomcat"
       }}
     }}
   }}
 }}
 
 Rules:
-- Use the EXACT finding title (as given in FINDING:) as the JSON key.
-- cves: every CVE from description with parenthetical of what it allows.
-- immediate_assessment: exact commands for THIS technology (rpm -q for RHEL, dpkg -l for Debian, version.sh for Tomcat, docker inspect for containers).
-- patch_commands: real bash with # comments, correct package manager, includes backup + patch + verify + restart.
-- compensating_controls: immediately actionable — name exact config key or rule. Not generic.
-- validation[0]: must name the scanner plugin/advisory ID from description.
-- Include EVERY finding using its exact title as key.
+- Key = the integer from FINDING [N]. Include ALL findings.
+- cves: extract every CVE from description with a brief parenthetical.
+- patch_commands: real bash, multi-line with # comments, includes backup + patch + verify + restart steps.
+- compensating_controls: specific commands or config keys, not generic advice.
+- validation[0]: reference the actual scanner plugin ID or advisory ID from description.
 """
 
-    # Build a case-insensitive lookup — all batches run in parallel
     BATCH = 6
-    llm = get_llm()
-    batches = [plain[i:i + BATCH] for i in range(0, len(plain), BATCH)]
+    indexed_plain = list(enumerate(plain))  # [(0, f0), (1, f1), ...]
+    batches = [indexed_plain[i:i + BATCH] for i in range(0, len(indexed_plain), BATCH)]
 
-    async def _call_batch(batch):
+    try:
+        llm = get_llm()
+    except Exception as exc:
+        logger.warning("Export-time enrichment: could not get LLM — %s", exc)
+        return findings_dicts
+
+    async def _call_batch(batch_with_indices):
         try:
             resp = await llm.ainvoke([
                 SystemMessage(content=_SYSTEM),
-                HumanMessage(content=_prompt_for_batch(batch)),
+                HumanMessage(content=_prompt_for_batch(batch_with_indices)),
             ])
             raw = str(resp.content).strip()
             if raw.startswith("```"):
@@ -622,32 +635,38 @@ Rules:
                 if raw.startswith("json"):
                     raw = raw[4:]
                 raw = raw.rsplit("```", 1)[0].strip()
-            return json.loads(raw).get("finding_remediations", {})
+            raw_map = json.loads(raw).get("finding_remediations", {})
+            # Normalise keys to int
+            result = {}
+            for k, v in raw_map.items():
+                try:
+                    result[int(k)] = v
+                except (ValueError, TypeError):
+                    pass
+            return result
         except Exception as exc:
             logger.warning("Export-time enrichment batch failed: %s", exc)
             return {}
 
-    import asyncio
-    results = await asyncio.gather(*[_call_batch(b) for b in batches])
-    all_remediations: Dict[str, Dict] = {}
-    for batch_result in results:
-        for k, v in batch_result.items():
-            all_remediations[k.lower().strip()] = v
+    batch_results = await asyncio.gather(*[_call_batch(b) for b in batches])
 
-    if not all_remediations:
+    # Merge all int-keyed results
+    all_enriched: Dict[int, Dict] = {}
+    for br in batch_results:
+        all_enriched.update(br)
+
+    if not all_enriched:
         return findings_dicts
 
-    result = []
-    for f in findings_dicts:
-        if _needs_enrichment(f.get("recommendation") or ""):
-            title_key = (f.get("title") or "").lower().strip()
-            enriched = all_remediations.get(title_key, {})
-            if enriched:
-                f = dict(f)
-                f["recommendation"] = json.dumps(enriched)
-            else:
-                logger.warning("Enrichment: no match for title %r (keys: %s)", f.get("title"), list(all_remediations)[:5])
-        result.append(f)
+    result = list(findings_dicts)
+    for plain_idx, fd_idx in enumerate(plain_positions):
+        enriched = all_enriched.get(plain_idx)
+        if enriched:
+            f = dict(result[fd_idx])
+            f["recommendation"] = json.dumps(enriched)
+            result[fd_idx] = f
+        else:
+            logger.warning("Enrichment: no result for plain index %d (title: %r)", plain_idx, plain[plain_idx].get("title"))
     return result
 
 

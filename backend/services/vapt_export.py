@@ -92,10 +92,16 @@ def _fmt_date(val: Any) -> str:
         return str(val)
 
 
+from xml.sax.saxutils import escape as _xml_escape
+
 def _safe(val: Any, fallback: str = "—") -> str:
     if val is None or (isinstance(val, str) and not val.strip()):
         return fallback
     return str(val)
+
+def _xe(val: Any, fallback: str = "—") -> str:
+    """XML-escape plain text so ReportLab Paragraph never sees raw < > & characters."""
+    return _xml_escape(_safe(val, fallback))
 
 
 _CVE_PATTERN = re.compile(r"\b(CVE-\d{4}-\d{4,})\b")
@@ -132,29 +138,34 @@ def _linkify_cves_pdf(text: str) -> str:
 
 
 def _linkify_pdf(text: str) -> str:
-    """Single-pass linkifier: full URLs first, then standalone CVE IDs not inside a URL."""
+    """Single-pass linkifier: full URLs first, then standalone CVE IDs.
+
+    XML-escapes all plain-text segments so < > & never reach the ReportLab
+    paraparser raw — only the <a href> tags we inject are real markup.
+    """
     replacements = []
     url_spans = []
-    # Find all URLs
     for m in re.finditer(r'https?://\S+', text):
         raw_url = m.group(0).rstrip(".,;)>")
         url_spans.append((m.start(), m.start() + len(raw_url)))
         replacements.append((m.start(), m.start() + len(raw_url),
-                             f'<a href="{raw_url}" color="#1565C0"><u>{raw_url}</u></a>'))
-    # Find standalone CVE IDs not inside a URL
+                             f'<a href="{raw_url}" color="#1565C0"><u>{_xml_escape(raw_url)}</u></a>'))
     for m in _CVE_PATTERN.finditer(text):
         ms, me = m.start(), m.end()
         if any(us <= ms < ue for us, ue in url_spans):
-            continue  # skip CVEs embedded in URLs
+            continue
         cve = m.group(1)
         replacements.append((ms, me,
                              f'<a href="{_nvd_url(cve)}" color="#1565C0"><u>{cve}</u></a>'))
-    # Apply in reverse order to preserve offsets
-    replacements.sort(key=lambda x: x[0], reverse=True)
-    result = text
-    for start, end, repl in replacements:
-        result = result[:start] + repl + result[end:]
-    return result
+    replacements.sort(key=lambda x: x[0])
+    parts = []
+    pos = 0
+    for start, end, html in replacements:
+        parts.append(_xml_escape(text[pos:start]))
+        parts.append(html)
+        pos = end
+    parts.append(_xml_escape(text[pos:]))
+    return "".join(parts)
 
 
 def _add_hyperlink_docx(paragraph, text: str, url: str):
@@ -867,7 +878,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                     if not txt:
                         continue
                     prefix = f"{i}. " if numbered else "• "
-                    finding_elements.append(Paragraph(f"{prefix}{txt}", styles["bullet"]))
+                    finding_elements.append(Paragraph(f"{prefix}{_xe(txt)}", styles["bullet"]))
                 finding_elements.append(Spacer(1, 0.1 * cm))
 
             # Treatment plan heading
@@ -876,7 +887,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                                                color=HexColor("#B0BEC5"), hAlign="LEFT"))
             finding_elements.append(Spacer(1, 0.15 * cm))
             finding_elements.append(Paragraph(
-                f"Treatment Plan — F-{fi+1:02d}: {_safe(f.get('title'))}",
+                f"Treatment Plan — F-{fi+1:02d}: {_xe(f.get('title'))}",
                 ParagraphStyle("tp_heading", fontName="Helvetica-Bold", fontSize=11,
                                textColor=HexColor("#1A237E"), spaceBefore=4, spaceAfter=6),
             ))
@@ -891,8 +902,8 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 tracking         = rec_structured.get("tracking") or {}
 
                 # Info header box (asset / severity / CVEs / status)
-                sev_display_txt  = _safe(f.get("severity"), "N/A").upper()
-                asset_txt        = _safe(f.get("affected_asset"), "N/A")
+                sev_display_txt  = _xe(f.get("severity"), "N/A").upper()
+                asset_txt        = _xe(f.get("affected_asset"), "N/A")
                 info_normal      = ParagraphStyle("tp_info", fontName="Helvetica", fontSize=8.5,
                                                   textColor=HexColor("#37474F"), leading=13)
                 info_bold        = ParagraphStyle("tp_info_b", fontName="Helvetica-Bold", fontSize=8.5,
@@ -900,7 +911,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 info_rows = [
                     [Paragraph(f"<b>Asset:</b> {asset_txt}", info_normal),
                      Paragraph(f"<b>Severity:</b> {sev_display_txt}", info_bold),
-                     Paragraph("<b>Status:</b> Pending → Remediate", info_normal)],
+                     Paragraph("<b>Status:</b> Pending &#x2192; Remediate", info_normal)],
                 ]
                 if cves_txt:
                     info_rows.append([Paragraph(f"<b>CVEs:</b> {_linkify_pdf(cves_txt)}", info_normal), "", ""])
@@ -924,18 +935,18 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
                 # 2. Remediation — Patch
                 if patch_cmds:
-                    finding_elements.append(Paragraph("2. Remediation — Patch", _tp_section_style))
+                    finding_elements.append(Paragraph("2. Remediation &#x2014; Patch", _tp_section_style))
                     for code_line in patch_cmds.replace("\\n", "\n").replace("\r\n", "\n").split("\n"):
-                        finding_elements.append(Paragraph(code_line or " ", _tp_code_style))
+                        finding_elements.append(Paragraph(_xe(code_line) or " ", _tp_code_style))
                     finding_elements.append(Spacer(1, 0.1 * cm))
                     if patch_notes:
-                        finding_elements.append(Paragraph(patch_notes, styles["normal"]))
+                        finding_elements.append(Paragraph(_xe(patch_notes), styles["normal"]))
                         finding_elements.append(Spacer(1, 0.1 * cm))
 
                 # 3. Compensating Controls
                 if comp_ctrl:
                     finding_elements.append(Paragraph(
-                        "3. Compensating Controls (if patch can't be applied immediately)",
+                        "3. Compensating Controls (if patch can&#x2019;t be applied immediately)",
                         _tp_section_style))
                     _tp_bullets(comp_ctrl)
 
@@ -944,9 +955,9 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 if validation:
                     _tp_bullets(validation, numbered=False)
                 else:
-                    finding_elements.append(Paragraph("• Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
-                    finding_elements.append(Paragraph("• Functional smoke test — confirm the service responds normally post-patch.", styles["bullet"]))
-                    finding_elements.append(Paragraph("• Update finding status from Pending → Remediated with patch date and evidence.", styles["bullet"]))
+                    finding_elements.append(Paragraph("&#x2022; Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
+                    finding_elements.append(Paragraph("&#x2022; Functional smoke test &#x2014; confirm the service responds normally post-patch.", styles["bullet"]))
+                    finding_elements.append(Paragraph("&#x2022; Update finding status from Pending &#x2192; Remediated with patch date and evidence.", styles["bullet"]))
                     finding_elements.append(Spacer(1, 0.1 * cm))
 
                 # 5. Suggested Tracking Entry
@@ -956,11 +967,11 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 track_rows = [
                     [Paragraph("Field", styles["label"]), Paragraph("Value", styles["label"])],
                     [Paragraph("Finding ID", styles["normal"]), Paragraph(f"F-{fi+1:02d}", styles["normal"])],
-                    [Paragraph("Priority", styles["normal"]), Paragraph(tracking.get("priority") or _safe(f.get("severity"), "—").capitalize(), styles["normal"])],
-                    [Paragraph("Target SLA", styles["normal"]), Paragraph(tracking.get("target_sla") or sla_map.get(sev_key, "—"), styles["normal"])],
-                    [Paragraph("Owner", styles["normal"]), Paragraph(tracking.get("owner") or "—", styles["normal"])],
-                    [Paragraph("Verification", styles["normal"]), Paragraph(tracking.get("verification") or "Security Team re-scan post-patch", styles["normal"])],
-                    [Paragraph("Rollback Plan", styles["normal"]), Paragraph(tracking.get("rollback_plan") or "—", styles["normal"])],
+                    [Paragraph("Priority", styles["normal"]), Paragraph(_xe(tracking.get("priority")) or _xe(f.get("severity"), "&#x2014;").capitalize(), styles["normal"])],
+                    [Paragraph("Target SLA", styles["normal"]), Paragraph(_xe(tracking.get("target_sla") or sla_map.get(sev_key, "&#x2014;")), styles["normal"])],
+                    [Paragraph("Owner", styles["normal"]), Paragraph(_xe(tracking.get("owner"), "&#x2014;"), styles["normal"])],
+                    [Paragraph("Verification", styles["normal"]), Paragraph(_xe(tracking.get("verification"), "Security Team re-scan post-patch"), styles["normal"])],
+                    [Paragraph("Rollback Plan", styles["normal"]), Paragraph(_xe(tracking.get("rollback_plan"), "&#x2014;"), styles["normal"])],
                 ]
                 track_tbl = Table(track_rows, colWidths=[3.5*cm, PAGE_W - 2*MARGIN - 3.5*cm])
                 track_tbl.setStyle(TableStyle([
@@ -979,18 +990,18 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 finding_elements.append(track_tbl)
                 finding_elements.append(Spacer(1, 0.2 * cm))
 
-            elif rec_raw and rec_raw != "—":
+            elif rec_raw and rec_raw != "&#x2014;":
                 # Fallback: plain text
-                asset_txt = _safe(f.get("affected_asset"), "N/A")
-                finding_elements.append(Paragraph(f"<b>Asset:</b> {asset_txt}  |  <b>Severity:</b> {_safe(f.get('severity'),'').upper()}  |  <b>Status:</b> Pending → Remediate", styles["normal"]))
+                asset_txt = _xe(f.get("affected_asset"), "N/A")
+                finding_elements.append(Paragraph(f"<b>Asset:</b> {asset_txt}  |  <b>Severity:</b> {_xe(f.get('severity'),'').upper()}  |  <b>Status:</b> Pending &#x2192; Remediate", styles["normal"]))
                 finding_elements.append(Spacer(1, 0.1 * cm))
-                finding_elements.append(Paragraph("2. Remediation — Patch", _tp_section_style))
+                finding_elements.append(Paragraph("2. Remediation &#x2014; Patch", _tp_section_style))
                 for line in rec_raw.split("\n"):
                     if line.strip():
-                        finding_elements.append(Paragraph(f"• {line.strip()}", styles["bullet"]))
+                        finding_elements.append(Paragraph(f"&#x2022; {_xe(line.strip())}", styles["bullet"]))
                 finding_elements.append(Spacer(1, 0.1 * cm))
                 finding_elements.append(Paragraph("4. Validation", _tp_section_style))
-                finding_elements.append(Paragraph("• Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
+                finding_elements.append(Paragraph("&#x2022; Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
                 finding_elements.append(Paragraph("• Confirm the patch is applied and the service responds normally.", styles["bullet"]))
                 finding_elements.append(Spacer(1, 0.15 * cm))
             else:
@@ -2115,8 +2126,8 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
                 txt = str(item).strip()
                 if not txt:
                     continue
-                prefix = f"{idx2}. " if numbered else "• "
-                elems.append(Paragraph(f"{prefix}{txt}", styles["bullet"]))
+                prefix = f"{idx2}. " if numbered else "&#x2022; "
+                elems.append(Paragraph(f"{prefix}{_xe(txt)}", styles["bullet"]))
             elems.append(Spacer(1, 0.1 * cm))
 
         if rec_structured:
@@ -2129,14 +2140,14 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
             tracking    = rec_structured.get("tracking") or {}
 
             # Info header box
-            sev_txt  = _safe(f.get("severity"), "N/A").upper()
-            asset_txt = _safe(f.get("affected_asset"), "N/A")
+            sev_txt   = _xe(f.get("severity"), "N/A").upper()
+            asset_txt = _xe(f.get("affected_asset"), "N/A")
             info_n = ParagraphStyle("ri_n", fontName="Helvetica", fontSize=8.5, textColor=HexColor("#37474F"), leading=13)
             info_b = ParagraphStyle("ri_b", fontName="Helvetica-Bold", fontSize=8.5, textColor=HexColor("#1A237E"), leading=13)
             info_rows = [
                 [Paragraph(f"<b>Asset:</b> {asset_txt}", info_n),
                  Paragraph(f"<b>Severity:</b> {sev_txt}", info_b),
-                 Paragraph("<b>Status:</b> Pending → Remediate", info_n)],
+                 Paragraph("<b>Status:</b> Pending &#x2192; Remediate", info_n)],
             ]
             PAGE_W_r, _ = A4
             MARGIN_r = 2 * cm
@@ -2160,25 +2171,25 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
                 _tp_bullets(imm_assess)
 
             if patch_cmds:
-                elems.append(Paragraph("2. Remediation — Patch", _tp_section_style))
+                elems.append(Paragraph("2. Remediation &#x2014; Patch", _tp_section_style))
                 for code_line in patch_cmds.replace("\\n", "\n").replace("\r\n", "\n").split("\n"):
-                    elems.append(Paragraph(code_line or " ", _tp_code_style))
+                    elems.append(Paragraph(_xe(code_line) or " ", _tp_code_style))
                 elems.append(Spacer(1, 0.1 * cm))
                 if patch_notes:
-                    elems.append(Paragraph(patch_notes, styles["normal"]))
+                    elems.append(Paragraph(_xe(patch_notes), styles["normal"]))
                     elems.append(Spacer(1, 0.1 * cm))
 
             if comp_ctrl:
-                elems.append(Paragraph("3. Compensating Controls (if patch can't be applied immediately)", _tp_section_style))
+                elems.append(Paragraph("3. Compensating Controls (if patch can&#x2019;t be applied immediately)", _tp_section_style))
                 _tp_bullets(comp_ctrl)
 
             elems.append(Paragraph("4. Validation", _tp_section_style))
             if validation:
                 _tp_bullets(validation)
             else:
-                elems.append(Paragraph("• Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
-                elems.append(Paragraph("• Functional smoke test — confirm the service responds normally post-patch.", styles["bullet"]))
-                elems.append(Paragraph("• Update finding status from Pending → Remediated with patch date and evidence.", styles["bullet"]))
+                elems.append(Paragraph("&#x2022; Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
+                elems.append(Paragraph("&#x2022; Functional smoke test &#x2014; confirm the service responds normally post-patch.", styles["bullet"]))
+                elems.append(Paragraph("&#x2022; Update finding status from Pending &#x2192; Remediated with patch date and evidence.", styles["bullet"]))
                 elems.append(Spacer(1, 0.1 * cm))
 
             elems.append(Paragraph("5. Suggested Tracking Entry", _tp_section_style))
@@ -2187,11 +2198,11 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
             track_rows = [
                 [Paragraph("Field", styles["label"]), Paragraph("Value", styles["label"])],
                 [Paragraph("Finding ID", styles["normal"]), Paragraph(f"F-{fi+1:02d}", styles["normal"])],
-                [Paragraph("Priority", styles["normal"]), Paragraph(tracking.get("priority") or _safe(f.get("severity"), "—").capitalize(), styles["normal"])],
-                [Paragraph("Target SLA", styles["normal"]), Paragraph(tracking.get("target_sla") or sla_map.get(sev_k, "—"), styles["normal"])],
-                [Paragraph("Owner", styles["normal"]), Paragraph(tracking.get("owner") or "—", styles["normal"])],
-                [Paragraph("Verification", styles["normal"]), Paragraph(tracking.get("verification") or "Security Team re-scan post-patch", styles["normal"])],
-                [Paragraph("Rollback Plan", styles["normal"]), Paragraph(tracking.get("rollback_plan") or "—", styles["normal"])],
+                [Paragraph("Priority", styles["normal"]), Paragraph(_xe(tracking.get("priority")) or _xe(f.get("severity"), "—").capitalize(), styles["normal"])],
+                [Paragraph("Target SLA", styles["normal"]), Paragraph(_xe(tracking.get("target_sla") or sla_map.get(sev_k, "—")), styles["normal"])],
+                [Paragraph("Owner", styles["normal"]), Paragraph(_xe(tracking.get("owner"), "—"), styles["normal"])],
+                [Paragraph("Verification", styles["normal"]), Paragraph(_xe(tracking.get("verification"), "Security Team re-scan post-patch"), styles["normal"])],
+                [Paragraph("Rollback Plan", styles["normal"]), Paragraph(_xe(tracking.get("rollback_plan"), "—"), styles["normal"])],
             ]
             track_tbl = Table(track_rows, colWidths=[3.5*cm, PAGE_W_r - 2*MARGIN_r - 3.5*cm])
             track_tbl.setStyle(TableStyle([
