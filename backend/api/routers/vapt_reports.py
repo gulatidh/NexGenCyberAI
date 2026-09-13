@@ -724,6 +724,21 @@ async def create_report_from_scan(
 
     findings = primary_findings
 
+    # Helper: parse Nessus-style affected_hosts from evidence JSON
+    def _nessus_hosts(evidence_obj) -> List[str]:
+        """Return DNS/IP list from evidence raw.affected_hosts if present."""
+        if not evidence_obj:
+            return []
+        try:
+            ev = evidence_obj if isinstance(evidence_obj, dict) else json.loads(evidence_obj)
+            raw = ev.get("raw", {}) if isinstance(ev, dict) else {}
+            ah = raw.get("affected_hosts", [])
+            if ah and isinstance(ah, list):
+                return [h.get("dns") or h.get("ip") for h in ah if isinstance(h, dict) and (h.get("dns") or h.get("ip"))]
+        except Exception:
+            pass
+        return []
+
     # Derive scan type label
     connector_type = ""
     if scan.connector:
@@ -733,10 +748,13 @@ async def create_report_from_scan(
         st = scan.scan_type
         connector_type = st.value if hasattr(st, "value") else str(st)
 
-    # Build scope from ALL unique assets (primary + duplicates)
+    # Build scope from ALL unique assets (primary + duplicates + Nessus affected_hosts)
     all_asset_ids = {f.resource_id for f in findings if f.resource_id}
     for extras in _dup_assets.values():
         all_asset_ids.update(extras)
+    for f in findings:
+        for h in _nessus_hosts(f.evidence):
+            all_asset_ids.add(h)
     assets = sorted(all_asset_ids)
     scope = {
         "in_scope": assets[:50],
@@ -755,10 +773,16 @@ async def create_report_from_scan(
     _title_groups: Dict[str, List[Dict]] = OrderedDict()
     for f in findings:
         sev_val = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
-        # Combine this finding's resource_id with any from its duplicate chain
-        all_assets = list(dict.fromkeys(
-            [f.resource_id] + _dup_assets.get(f.id, [])
-        ))
+        # Combine this finding's resource_id with any from its duplicate chain,
+        # then overlay Nessus affected_hosts from evidence (which contains all
+        # impacted hosts even when only one host is in resource_id)
+        nessus_hosts = _nessus_hosts(f.evidence)
+        if nessus_hosts:
+            all_assets = list(dict.fromkeys(nessus_hosts + _dup_assets.get(f.id, [])))
+        else:
+            all_assets = list(dict.fromkeys(
+                [f.resource_id] + _dup_assets.get(f.id, [])
+            ))
         all_assets = [a for a in all_assets if a]
         resource_id_str = ", ".join(all_assets) if all_assets else (f.resource_id or "")
         # Combine evidence
