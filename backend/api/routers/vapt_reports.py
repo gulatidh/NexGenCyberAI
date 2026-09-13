@@ -499,9 +499,21 @@ Rules:
         return {}
 
 
+def _needs_enrichment(rec_raw: str) -> bool:
+    """Return True if recommendation is plain text OR stored with an old schema (missing patch_commands)."""
+    rec = (rec_raw or "").strip()
+    if not rec.startswith("{"):
+        return True
+    try:
+        parsed = json.loads(rec)
+        return "patch_commands" not in parsed and "immediate_assessment" not in parsed
+    except Exception:
+        return True
+
+
 async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict]:
-    """At export time, enrich any finding with plain-text recommendation via AI."""
-    plain = [f for f in findings_dicts if not (f.get("recommendation") or "").strip().startswith("{")]
+    """At export time, enrich any finding with plain-text or old-schema recommendation via AI."""
+    plain = [f for f in findings_dicts if _needs_enrichment(f.get("recommendation") or "")]
     if not plain:
         return findings_dicts
     try:
