@@ -1176,3 +1176,20 @@ async def export_remediation_docx(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename,
     )
+
+
+@router.get("/clients/{cid}/vapt-reports/{rid}/export/html")
+async def export_full_html(
+    cid: str,
+    rid: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    report = _get_report_or_404(rid, cid, db)
+    client = _get_client_or_404(cid, db)
+    from services.vapt_html_export import generate_html
+    findings_dicts = [_finding_to_dict(f) for f in report.findings]
+    findings_dicts = await _enrich_plain_recommendations(findings_dicts)
+    html_bytes = generate_html(_report_to_dict(report), findings_dicts, client.name)
+    filename = f"vapt-report-{report.version}-{rid[:8]}.html"
+    return _export_stream(html_bytes, "text/html; charset=utf-8", filename)

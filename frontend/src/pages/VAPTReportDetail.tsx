@@ -7,7 +7,7 @@ import {
   Stack, Tooltip, Divider, Card, CardContent, CardActions, Grid,
 } from "@mui/material";
 import {
-  ArrowBack, Save, PictureAsPdf, Description,
+  ArrowBack, Save, PictureAsPdf, Description, Language,
   Add, Edit, Delete, GppGood, CheckCircle, Shield,
   FileDownload, Replay, BugReport, MenuBook, Assignment,
 } from "@mui/icons-material";
@@ -426,7 +426,7 @@ export default function VAPTReportDetail() {
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
-      const ext = format.includes("docx") ? "docx" : "pdf";
+      const ext = format === "html" ? "html" : format.includes("docx") ? "docx" : "pdf";
       a.download = `vapt-${format}-${(reportId || "").slice(0, 8)}.${ext}`;
       a.click();
       URL.revokeObjectURL(blobUrl);
@@ -852,6 +852,12 @@ export default function VAPTReportDetail() {
                   title: "Remediation Plan DOCX",
                   desc: "Editable remediation action plan for technical and management teams",
                 },
+                {
+                  format: "html",
+                  icon: <Language sx={{ fontSize: 40, color: "#00897B" }} />,
+                  title: "Interactive HTML Report",
+                  desc: "Self-contained web page — sidebar navigation, one page per finding with tabs, offline ready",
+                },
               ].map((ex) => (
                 <Grid key={ex.format} size={{ xs: 12, sm: 6 }}>
                   <Card sx={{ bgcolor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", height: "100%" }}>
@@ -871,6 +877,7 @@ export default function VAPTReportDetail() {
                           bgcolor: ex.format === "pdf" ? "#C62828"
                             : ex.format === "docx" ? "#1565C0"
                             : ex.format === "remediation-pdf" ? "#E64A19"
+                            : ex.format === "html" ? "#00897B"
                             : "#2E7D32",
                           "&:hover": { opacity: 0.9 },
                         }}>
