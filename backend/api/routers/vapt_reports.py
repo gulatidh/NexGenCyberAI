@@ -689,7 +689,7 @@ async def create_report_from_scan(
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    findings: List[Finding] = (
+    primary_findings: List[Finding] = (
         db.query(Finding)
         .filter(
             Finding.scan_id == scan.id,
@@ -698,6 +698,31 @@ async def create_report_from_scan(
         )
         .all()
     )
+
+    # Fold duplicate findings: collect all resource_ids/evidence from the duplicate chain
+    # (Tenable/Nessus creates one finding per host, marks N-1 as duplicate_of_id = canonical)
+    primary_ids = [f.id for f in primary_findings]
+    _dup_assets: Dict[str, List[str]] = {}
+    _dup_evidence: Dict[str, List[str]] = {}
+    if primary_ids:
+        dup_findings: List[Finding] = (
+            db.query(Finding)
+            .filter(
+                Finding.scan_id == scan.id,
+                Finding.duplicate_of_id.in_(primary_ids),
+                Finding.status != "false_positive",
+            )
+            .all()
+        )
+        for dup in dup_findings:
+            pid = dup.duplicate_of_id
+            if dup.resource_id:
+                _dup_assets.setdefault(pid, []).append(dup.resource_id)
+            ev = json.dumps(dup.evidence) if dup.evidence else ""
+            if ev:
+                _dup_evidence.setdefault(pid, []).append(ev)
+
+    findings = primary_findings
 
     # Derive scan type label
     connector_type = ""
@@ -708,8 +733,11 @@ async def create_report_from_scan(
         st = scan.scan_type
         connector_type = st.value if hasattr(st, "value") else str(st)
 
-    # Build scope from unique assets
-    assets = sorted({f.resource_id for f in findings if f.resource_id})
+    # Build scope from ALL unique assets (primary + duplicates)
+    all_asset_ids = {f.resource_id for f in findings if f.resource_id}
+    for extras in _dup_assets.values():
+        all_asset_ids.update(extras)
+    assets = sorted(all_asset_ids)
     scope = {
         "in_scope": assets[:50],
         "out_of_scope": [],
@@ -721,12 +749,24 @@ async def create_report_from_scan(
     # Methodology from template
     methodology = _METHODOLOGY.get(connector_type, _DEFAULT_METHODOLOGY)
 
-    # Build findings dicts, then group by title so one vuln on N hosts = one VAPT finding
+    # Build findings dicts: merge duplicate host list into each primary finding,
+    # then group remaining same-title non-duplicate findings together
     from collections import OrderedDict
     _title_groups: Dict[str, List[Dict]] = OrderedDict()
     for f in findings:
         sev_val = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
-        ev_str = json.dumps(f.evidence) if f.evidence else ""
+        # Combine this finding's resource_id with any from its duplicate chain
+        all_assets = list(dict.fromkeys(
+            [f.resource_id] + _dup_assets.get(f.id, [])
+        ))
+        all_assets = [a for a in all_assets if a]
+        resource_id_str = ", ".join(all_assets) if all_assets else (f.resource_id or "")
+        # Combine evidence
+        primary_ev = json.dumps(f.evidence) if f.evidence else ""
+        dup_evs = _dup_evidence.get(f.id, [])
+        all_ev_parts = [e for e in ([primary_ev] + dup_evs) if e]
+        ev_str = "\n---\n".join(all_ev_parts) if all_ev_parts else ""
+
         key = f.title.strip().lower()
         if key not in _title_groups:
             _title_groups[key] = []
@@ -734,14 +774,14 @@ async def create_report_from_scan(
             "title": f.title,
             "severity": sev_val,
             "description": f.description or "",
-            "resource_id": f.resource_id or "",
+            "resource_id": resource_id_str,
             "remediation": f.remediation or "",
             "evidence": ev_str,
             "cve_id": f.cve_id or "",
             "cvss_score": f.cvss_score,
         })
 
-    # Merge each group: combine resource_ids and evidence across hosts
+    # Secondary merge: group any remaining same-title findings (catches non-deduped scanners)
     findings_for_ai: List[Dict] = []
     for group in _title_groups.values():
         base = dict(group[0])
