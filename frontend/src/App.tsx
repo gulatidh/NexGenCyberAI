@@ -338,7 +338,7 @@ function ProtectedApp() {
             <Route path="integrations"        element={<IntegrationsHub />} />
             <Route path="connections"         element={<Navigate to="/platform/integrations" replace />} />
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
-            <Route path="ai-settings"         element={<Navigate to="/platform/integrations" replace />} />
+            <Route path="ai-settings"         element={<AISettings />} />
             <Route path="audit-logs"          element={<AuditLogs />} />
           </Route>
 
@@ -409,7 +409,7 @@ function ProtectedApp() {
           <Route path="/ticket-sync"            element={<Navigate to="/platform/ticket-sync" replace />} />
           <Route path="/settings"               element={<Navigate to="/platform/settings" replace />} />
           <Route path="/help"                   element={<Navigate to="/platform/help" replace />} />
-          <Route path="/ai-settings"            element={<Navigate to="/platform/integrations" replace />} />
+          <Route path="/ai-settings"            element={<Navigate to="/platform/ai-settings" replace />} />
 
           {/* ── Admin-only Shell pages (kept in AppLayout) ───────────────── */}
           <Route element={<Shell />}>
