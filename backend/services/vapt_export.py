@@ -840,14 +840,18 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
             field_block("Evidence", _safe(f.get("evidence")))
             field_block("Reproduction Steps", _safe(f.get("reproduction_steps")), code_style=True)
 
-            # Structured remediation section (replaces flat "Recommendation" field)
-            _rem_code_style = ParagraphStyle(
-                "rem_code_full", fontName="Courier", fontSize=7,
-                textColor=HexColor("#1A237E"), backColor=HexColor("#E8EAF6"),
-                leftIndent=10, rightIndent=10, spaceAfter=2, spaceBefore=2, leading=11,
+            # ── Treatment Plan (5-section format) ────────────────────────────
+            _tp_code_style = ParagraphStyle(
+                "tp_code", fontName="Courier", fontSize=7.5,
+                textColor=HexColor("#1A237E"), backColor=HexColor("#F1F3F9"),
+                leftIndent=12, rightIndent=8, spaceAfter=1, spaceBefore=1, leading=11,
             )
             _link_label_style = ParagraphStyle(
                 "link_label_full", parent=styles["label"], textColor=HexColor("#1565C0"),
+            )
+            _tp_section_style = ParagraphStyle(
+                "tp_section", fontName="Helvetica-Bold", fontSize=10,
+                textColor=HexColor("#1A237E"), spaceBefore=8, spaceAfter=3,
             )
             rec_raw = f.get("recommendation") or ""
             rec_structured = None
@@ -857,69 +861,137 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 except Exception:
                     pass
 
-            def _rem_section_full(label, items, numbered=True):
-                if not items:
-                    return
-                finding_elements.append(Paragraph(label, styles["subsection"]))
+            def _tp_bullets(items, numbered=False):
                 for i, item in enumerate(items, 1):
                     txt = str(item).strip()
                     if not txt:
                         continue
                     prefix = f"{i}. " if numbered else "• "
                     finding_elements.append(Paragraph(f"{prefix}{txt}", styles["bullet"]))
-                finding_elements.append(Spacer(1, 0.15 * cm))
+                finding_elements.append(Spacer(1, 0.1 * cm))
 
-            finding_elements.append(Paragraph("Remediation", styles["subsection"]))
-            finding_elements.append(Spacer(1, 0.1 * cm))
+            # Treatment plan heading
+            finding_elements.append(Spacer(1, 0.2 * cm))
+            finding_elements.append(HRFlowable(width="100%", thickness=0.5,
+                                               color=HexColor("#B0BEC5"), hAlign="LEFT"))
+            finding_elements.append(Spacer(1, 0.15 * cm))
+            finding_elements.append(Paragraph(
+                f"Treatment Plan — F-{fi+1:02d}: {_safe(f.get('title'))}",
+                ParagraphStyle("tp_heading", fontName="Helvetica-Bold", fontSize=11,
+                               textColor=HexColor("#1A237E"), spaceBefore=4, spaceAfter=6),
+            ))
 
             if rec_structured:
-                context_txt  = (rec_structured.get("context") or "").strip()
-                identify     = rec_structured.get("identify") or []
-                steps        = rec_structured.get("steps") or []
-                code_ex      = (rec_structured.get("code_example") or "").strip()
-                post_up      = rec_structured.get("post_upgrade") or []
-                comp_ctrl    = rec_structured.get("compensating_controls") or []
-                verification = rec_structured.get("verification") or []
-                references   = (rec_structured.get("references") or "").strip()
+                cves_txt         = (rec_structured.get("cves") or "").strip()
+                imm_assess       = rec_structured.get("immediate_assessment") or []
+                patch_cmds       = (rec_structured.get("patch_commands") or "").strip()
+                patch_notes      = (rec_structured.get("patch_notes") or "").strip()
+                comp_ctrl        = rec_structured.get("compensating_controls") or []
+                validation       = rec_structured.get("validation") or []
+                tracking         = rec_structured.get("tracking") or {}
 
-                if context_txt:
-                    finding_elements.append(Paragraph("Technical Context", styles["subsection"]))
-                    finding_elements.append(Paragraph(context_txt, styles["normal"]))
-                    finding_elements.append(Spacer(1, 0.15 * cm))
+                # Info header box (asset / severity / CVEs / status)
+                sev_display_txt  = _safe(f.get("severity"), "N/A").upper()
+                asset_txt        = _safe(f.get("affected_asset"), "N/A")
+                info_normal      = ParagraphStyle("tp_info", fontName="Helvetica", fontSize=8.5,
+                                                  textColor=HexColor("#37474F"), leading=13)
+                info_bold        = ParagraphStyle("tp_info_b", fontName="Helvetica-Bold", fontSize=8.5,
+                                                  textColor=HexColor("#1A237E"), leading=13)
+                info_rows = [
+                    [Paragraph(f"<b>Asset:</b> {asset_txt}", info_normal),
+                     Paragraph(f"<b>Severity:</b> {sev_display_txt}", info_bold),
+                     Paragraph("<b>Status:</b> Pending → Remediate", info_normal)],
+                ]
+                if cves_txt:
+                    info_rows.append([Paragraph(f"<b>CVEs:</b> {_linkify_pdf(cves_txt)}", info_normal), "", ""])
+                info_tbl = Table(info_rows, colWidths=[6*cm, 4*cm, PAGE_W - 2*MARGIN - 10*cm])
+                info_tbl.setStyle(TableStyle([
+                    ("BOX",         (0, 0), (-1, -1), 0.5, HexColor("#B0BEC5")),
+                    ("TOPPADDING",  (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING",(0, 0), (-1, -1), 8),
+                    ("SPAN",        (0, 1), (-1, 1)),
+                    ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),
+                ]))
+                finding_elements.append(info_tbl)
+                finding_elements.append(Spacer(1, 0.2 * cm))
 
-                _rem_section_full("Identifying Affected Components", identify)
-                _rem_section_full("Remediation Steps", steps)
+                # 1. Immediate Assessment
+                if imm_assess:
+                    finding_elements.append(Paragraph("1. Immediate Assessment", _tp_section_style))
+                    _tp_bullets(imm_assess)
 
-                if code_ex:
-                    finding_elements.append(Paragraph("Commands / Configuration", styles["subsection"]))
-                    for code_line in code_ex.replace("\r\n", "\n").split("\n"):
-                        finding_elements.append(Paragraph(code_line or " ", _rem_code_style))
-                    finding_elements.append(Spacer(1, 0.15 * cm))
+                # 2. Remediation — Patch
+                if patch_cmds:
+                    finding_elements.append(Paragraph("2. Remediation — Patch", _tp_section_style))
+                    for code_line in patch_cmds.replace("\\n", "\n").replace("\r\n", "\n").split("\n"):
+                        finding_elements.append(Paragraph(code_line or " ", _tp_code_style))
+                    finding_elements.append(Spacer(1, 0.1 * cm))
+                    if patch_notes:
+                        finding_elements.append(Paragraph(patch_notes, styles["normal"]))
+                        finding_elements.append(Spacer(1, 0.1 * cm))
 
-                _rem_section_full("Post-Change Validation", post_up)
-                _rem_section_full("Compensating Controls (Interim)", comp_ctrl)
+                # 3. Compensating Controls
+                if comp_ctrl:
+                    finding_elements.append(Paragraph(
+                        "3. Compensating Controls (if patch can't be applied immediately)",
+                        _tp_section_style))
+                    _tp_bullets(comp_ctrl)
 
-                if verification:
-                    _rem_section_full("Verification Steps", verification)
+                # 4. Validation
+                finding_elements.append(Paragraph("4. Validation", _tp_section_style))
+                if validation:
+                    _tp_bullets(validation, numbered=False)
                 else:
-                    finding_elements.append(Paragraph("Verification Steps", styles["subsection"]))
-                    finding_elements.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
-                    finding_elements.append(Paragraph("2. Confirm the patched version is running in production.", styles["bullet"]))
-                    finding_elements.append(Spacer(1, 0.15 * cm))
-
-                if references:
-                    linkified = _linkify_pdf(references)
-                    finding_elements.append(Paragraph(f"References: {linkified}", _link_label_style))
+                    finding_elements.append(Paragraph("• Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
+                    finding_elements.append(Paragraph("• Functional smoke test — confirm the service responds normally post-patch.", styles["bullet"]))
+                    finding_elements.append(Paragraph("• Update finding status from Pending → Remediated with patch date and evidence.", styles["bullet"]))
                     finding_elements.append(Spacer(1, 0.1 * cm))
 
+                # 5. Suggested Tracking Entry
+                finding_elements.append(Paragraph("5. Suggested Tracking Entry", _tp_section_style))
+                sla_map = {"critical": "48 hours", "high": "14 days", "medium": "30 days", "low": "90 days"}
+                sev_key = _safe(f.get("severity"), "medium").lower()
+                track_rows = [
+                    [Paragraph("Field", styles["label"]), Paragraph("Value", styles["label"])],
+                    [Paragraph("Finding ID", styles["normal"]), Paragraph(f"F-{fi+1:02d}", styles["normal"])],
+                    [Paragraph("Priority", styles["normal"]), Paragraph(tracking.get("priority") or _safe(f.get("severity"), "—").capitalize(), styles["normal"])],
+                    [Paragraph("Target SLA", styles["normal"]), Paragraph(tracking.get("target_sla") or sla_map.get(sev_key, "—"), styles["normal"])],
+                    [Paragraph("Owner", styles["normal"]), Paragraph(tracking.get("owner") or "—", styles["normal"])],
+                    [Paragraph("Verification", styles["normal"]), Paragraph(tracking.get("verification") or "Security Team re-scan post-patch", styles["normal"])],
+                    [Paragraph("Rollback Plan", styles["normal"]), Paragraph(tracking.get("rollback_plan") or "—", styles["normal"])],
+                ]
+                track_tbl = Table(track_rows, colWidths=[3.5*cm, PAGE_W - 2*MARGIN - 3.5*cm])
+                track_tbl.setStyle(TableStyle([
+                    ("BACKGROUND",    (0, 0), (-1, 0),  HexColor("#E8EAF6")),
+                    ("BACKGROUND",    (0, 2), (-1, 2),  HexColor("#F9F9FB")),
+                    ("BACKGROUND",    (0, 4), (-1, 4),  HexColor("#F9F9FB")),
+                    ("BACKGROUND",    (0, 6), (-1, 6),  HexColor("#F9F9FB")),
+                    ("BOX",           (0, 0), (-1, -1), 0.5, HexColor("#B0BEC5")),
+                    ("LINEBELOW",     (0, 0), (-1, -2), 0.3, HexColor("#CFD8DC")),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+                    ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
+                ]))
+                finding_elements.append(track_tbl)
+                finding_elements.append(Spacer(1, 0.2 * cm))
+
             elif rec_raw and rec_raw != "—":
+                # Fallback: plain text
+                asset_txt = _safe(f.get("affected_asset"), "N/A")
+                finding_elements.append(Paragraph(f"<b>Asset:</b> {asset_txt}  |  <b>Severity:</b> {_safe(f.get('severity'),'').upper()}  |  <b>Status:</b> Pending → Remediate", styles["normal"]))
+                finding_elements.append(Spacer(1, 0.1 * cm))
+                finding_elements.append(Paragraph("2. Remediation — Patch", _tp_section_style))
                 for line in rec_raw.split("\n"):
                     if line.strip():
                         finding_elements.append(Paragraph(f"• {line.strip()}", styles["bullet"]))
-                finding_elements.append(Spacer(1, 0.15 * cm))
-                finding_elements.append(Paragraph("Verification Steps", styles["subsection"]))
-                finding_elements.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
-                finding_elements.append(Paragraph("2. Confirm the patch is applied and the service responds normally.", styles["bullet"]))
+                finding_elements.append(Spacer(1, 0.1 * cm))
+                finding_elements.append(Paragraph("4. Validation", _tp_section_style))
+                finding_elements.append(Paragraph("• Re-run the vulnerability scanner and confirm the finding no longer triggers.", styles["bullet"]))
+                finding_elements.append(Paragraph("• Confirm the patch is applied and the service responds normally.", styles["bullet"]))
                 finding_elements.append(Spacer(1, 0.15 * cm))
             else:
                 finding_elements.append(Paragraph("No remediation guidance provided.", styles["normal"]))
@@ -1503,8 +1575,7 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
         _field("Evidence", _safe(f.get("evidence")))
         _field("Reproduction Steps", _safe(f.get("reproduction_steps")))
 
-        # Structured remediation
-        _add_para("Remediation:", bold=True, color="1A237E")
+        # ── Treatment Plan (5-section format) ──────────────────────────────
         rec_raw_df = f.get("recommendation") or ""
         rec_structured_df = None
         if rec_raw_df.strip().startswith("{"):
@@ -1513,70 +1584,136 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
             except Exception:
                 pass
 
-        def _docx_rem_section_df(label, items, numbered=True):
-            if not items:
-                return
-            _add_para(f"{label}:", bold=True, color="1565C0")
-            for item_df in items:
-                txt_df = str(item_df).strip()
-                if not txt_df:
-                    continue
-                p_df = doc.add_paragraph(style="List Number" if numbered else "List Bullet")
-                p_df.add_run(txt_df)
+        def _docx_tp_section(label):
+            ph = doc.add_heading(label, level=3)
+            ph.runs[0].font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
+
+        def _docx_tp_bullets(items):
+            for itm in items:
+                txt = str(itm).strip()
+                if txt:
+                    doc.add_paragraph(txt, style="List Bullet")
+
+        def _docx_code_block(text):
+            cp = doc.add_paragraph()
+            cr = cp.add_run(text.replace("\\n", "\n").strip())
+            cr.font.name = "Courier New"
+            cr.font.size = Pt(8)
+            from docx.oxml.ns import qn as _qn
+            from docx.oxml import OxmlElement as _OE
+            pPr = cp._p.get_or_add_pPr()
+            shd = _OE("w:shd")
+            shd.set(_qn("w:val"), "clear")
+            shd.set(_qn("w:color"), "auto")
+            shd.set(_qn("w:fill"), "F1F3F9")
+            pPr.append(shd)
+
+        # Treatment plan heading
+        doc.add_paragraph()
+        tp_hdr = doc.add_paragraph()
+        tp_run = tp_hdr.add_run(f"Treatment Plan — F-{fi+1:02d}: {ftitle}")
+        tp_run.bold = True
+        tp_run.font.size = Pt(12)
+        tp_run.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
 
         if rec_structured_df:
-            context_df = (rec_structured_df.get("context") or "").strip()
-            identify_df = rec_structured_df.get("identify") or []
-            steps_df = rec_structured_df.get("steps") or []
-            code_ex_df = (rec_structured_df.get("code_example") or "").strip()
-            post_up_df = rec_structured_df.get("post_upgrade") or []
-            comp_ctrl_df = rec_structured_df.get("compensating_controls") or []
-            verification_df = rec_structured_df.get("verification") or []
-            references_df = (rec_structured_df.get("references") or "").strip()
+            cves_df         = (rec_structured_df.get("cves") or "").strip()
+            imm_assess_df   = rec_structured_df.get("immediate_assessment") or []
+            patch_cmds_df   = (rec_structured_df.get("patch_commands") or "").strip()
+            patch_notes_df  = (rec_structured_df.get("patch_notes") or "").strip()
+            comp_ctrl_df    = rec_structured_df.get("compensating_controls") or []
+            validation_df   = rec_structured_df.get("validation") or []
+            tracking_df     = rec_structured_df.get("tracking") or {}
 
-            if context_df:
-                _add_para("Technical Context:", bold=True, color="1565C0")
-                _add_para(context_df)
+            # Info header
+            asset_df = _safe(f.get("affected_asset"), "N/A")
+            info_p = doc.add_paragraph()
+            info_p.add_run("Asset: ").bold = True
+            info_p.add_run(f"{asset_df}   ")
+            b2 = info_p.add_run("Severity: ")
+            b2.bold = True
+            info_p.add_run(f"{sev.upper()}   ")
+            b3 = info_p.add_run("Status: ")
+            b3.bold = True
+            info_p.add_run("Pending → Remediate")
+            if cves_df:
+                cve_p = doc.add_paragraph()
+                bc = cve_p.add_run("CVEs: ")
+                bc.bold = True
+                cve_p.add_run(cves_df)
 
-            _docx_rem_section_df("Identifying Affected Components", identify_df)
-            _docx_rem_section_df("Remediation Steps", steps_df)
+            # 1. Immediate Assessment
+            if imm_assess_df:
+                _docx_tp_section("1. Immediate Assessment")
+                _docx_tp_bullets(imm_assess_df)
 
-            if code_ex_df:
-                _add_para("Commands / Configuration:", bold=True, color="1565C0")
-                code_p_df = doc.add_paragraph()
-                code_r_df = code_p_df.add_run(code_ex_df.strip())
-                code_r_df.font.name = "Courier New"
-                code_r_df.font.size = Pt(8)
+            # 2. Remediation — Patch
+            if patch_cmds_df:
+                _docx_tp_section("2. Remediation — Patch")
+                _docx_code_block(patch_cmds_df)
+                if patch_notes_df:
+                    doc.add_paragraph(patch_notes_df)
 
-            _docx_rem_section_df("Post-Change Validation", post_up_df)
-            _docx_rem_section_df("Compensating Controls (Interim)", comp_ctrl_df)
+            # 3. Compensating Controls
+            if comp_ctrl_df:
+                _docx_tp_section("3. Compensating Controls (if patch can't be applied immediately)")
+                _docx_tp_bullets(comp_ctrl_df)
 
-            if verification_df:
-                _docx_rem_section_df("Verification Steps", verification_df)
+            # 4. Validation
+            _docx_tp_section("4. Validation")
+            if validation_df:
+                _docx_tp_bullets(validation_df)
             else:
-                _add_para("Verification Steps:", bold=True, color="1565C0")
-                for step_df in [
-                    "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
-                    "Confirm the patched version is running in production.",
+                for dflt in [
+                    "Re-run the vulnerability scanner and confirm the finding no longer triggers.",
+                    "Functional smoke test — confirm the service responds normally post-patch.",
+                    "Update finding status from Pending → Remediated with patch date and evidence.",
                 ]:
-                    p_s = doc.add_paragraph(style="List Number")
-                    p_s.add_run(step_df)
+                    doc.add_paragraph(dflt, style="List Bullet")
 
-            if references_df:
-                _add_cve_refs_docx(doc, references_df, _add_para)
+            # 5. Suggested Tracking Entry
+            _docx_tp_section("5. Suggested Tracking Entry")
+            sla_map_df = {"critical": "48 hours", "high": "14 days", "medium": "30 days", "low": "90 days"}
+            track_rows_df = [
+                ("Field", "Value"),
+                ("Finding ID", f"F-{fi+1:02d}"),
+                ("Priority", tracking_df.get("priority") or sev.capitalize()),
+                ("Target SLA", tracking_df.get("target_sla") or sla_map_df.get(sev, "—")),
+                ("Owner", tracking_df.get("owner") or "—"),
+                ("Verification", tracking_df.get("verification") or "Security Team re-scan post-patch"),
+                ("Rollback Plan", tracking_df.get("rollback_plan") or "—"),
+            ]
+            tr_tbl = doc.add_table(rows=len(track_rows_df), cols=2)
+            tr_tbl.style = "Table Grid"
+            for ri_t, (lbl_t, val_t) in enumerate(track_rows_df):
+                lc_t = tr_tbl.cell(ri_t, 0)
+                vc_t = tr_tbl.cell(ri_t, 1)
+                if ri_t == 0:
+                    _set_cell_shading(lc_t, "E8EAF6")
+                    _set_cell_shading(vc_t, "E8EAF6")
+                elif ri_t % 2 == 0:
+                    _set_cell_shading(lc_t, "F9F9FB")
+                    _set_cell_shading(vc_t, "F9F9FB")
+                lr_t = lc_t.paragraphs[0].add_run(lbl_t)
+                lr_t.bold = (ri_t == 0)
+                lr_t.font.size = Pt(9)
+                lr_t.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E) if ri_t == 0 else RGBColor(0x37, 0x47, 0x4F)
+                vr_t = vc_t.paragraphs[0].add_run(val_t)
+                vr_t.font.size = Pt(9)
 
         elif rec_raw_df and rec_raw_df != "—":
+            asset_df = _safe(f.get("affected_asset"), "N/A")
+            doc.add_paragraph(f"Asset: {asset_df}  |  Severity: {sev.upper()}  |  Status: Pending → Remediate")
+            _docx_tp_section("2. Remediation — Patch")
             for line_df in rec_raw_df.split("\n"):
                 if line_df.strip():
-                    p_df2 = doc.add_paragraph(style="List Bullet")
-                    p_df2.add_run(line_df.strip())
-            _add_para("Verification Steps:", bold=True, color="1565C0")
-            for step_df2 in [
-                "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
+                    doc.add_paragraph(line_df.strip(), style="List Bullet")
+            _docx_tp_section("4. Validation")
+            for dflt in [
+                "Re-run the vulnerability scanner and confirm the finding no longer triggers.",
                 "Confirm the patch is applied and the service responds normally.",
             ]:
-                p_v = doc.add_paragraph(style="List Number")
-                p_v.add_run(step_df2)
+                doc.add_paragraph(dflt, style="List Bullet")
         else:
             _add_para("No remediation guidance provided.")
 

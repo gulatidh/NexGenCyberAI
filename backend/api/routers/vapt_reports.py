@@ -446,40 +446,43 @@ Return a single JSON object with exactly these top-level keys:
   "conclusion": "2-3 paragraph conclusion covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
   "finding_remediations": {{
     "<exact finding title>": {{
-      "context": "2-3 sentences: exactly what was found (include specific versions/CVEs from the description), what an attacker can do with it, and business impact.",
-      "identify": [
-        "Command or file check to confirm the component is present and affected — e.g. 'Run: catalina.sh version | grep version' or 'Check: cat /etc/nginx/nginx.conf | grep ssl_protocols'"
+      "cves": "CVE-XXXX-YYYYY (short description of what it allows), CVE-XXXX-ZZZZZ (short description) — list every CVE from the description",
+      "immediate_assessment": [
+        "Confirm installed version: <exact command for this technology — e.g. rpm -q httpd mod_http2, or $CATALINA_HOME/bin/version.sh, or dpkg -l nginx>",
+        "Confirm whether the vulnerable feature/config is enabled: <specific grep or check command>"
       ],
-      "steps": [
-        "Step 1: <specific action with exact command, package name, version, or config key>",
-        "Step 2: ...",
-        "Step N: ..."
-      ],
-      "code_example": "<actual shell command block, config snippet, or before/after code — omit key entirely if not applicable>",
-      "post_upgrade": [
-        "Post-change check 1 — specific command and expected output",
-        "Post-change check 2"
-      ],
+      "patch_commands": "# Full bash block with inline comments\\n# Step 1: backup\\ncp -r /etc/httpd /etc/httpd.bak.$(date +%F)\\n# Step 2: apply patch\\nsudo yum update mod_http2 --security\\n# Step 3: verify and restart\\nrpm -q mod_http2\\nsudo systemctl restart httpd",
+      "patch_notes": "One sentence about deployment context — e.g. if Satellite/Foreman-managed fleet push via errata; if embedded in Maven update the parent BOM version; if Docker update the base image tag.",
       "compensating_controls": [
-        "Interim control if immediate fix is not possible — specific and actionable"
+        "Specific interim control 1 — name the exact config key, file, or firewall rule and the command to apply it",
+        "Specific interim control 2"
       ],
-      "verification": [
-        "Verify 1: re-run the scanner/tool and confirm the advisory or plugin no longer triggers",
-        "Verify 2: attempt the specific attack scenario and confirm it fails"
+      "validation": [
+        "Re-run <scanner name> against <asset> and confirm <plugin ID / advisory ID> no longer triggers",
+        "Functional smoke test: <specific command> — expected output: <what success looks like>",
+        "Update finding status from Pending to Remediated with patch date, version pre/post, and evidence screenshot attached"
       ],
-      "references": "<CVE IDs from the finding description, CWE number, OWASP category, and any advisory URLs mentioned — e.g. CVE-2024-1234, CWE-79, OWASP A03:2021, https://vendor.com/security/advisory>"
+      "tracking": {{
+        "priority": "<Critical/High/Medium/Low>",
+        "target_sla": "<48 hours for Critical / 14 days for High / 30 days for Medium / 90 days for Low>",
+        "owner": "<team responsible — e.g. Infrastructure Team, Application Team, Security Team>",
+        "verification": "Security Team re-scan post-patch",
+        "rollback_plan": "<specific rollback — e.g. restore /etc/httpd.bak.<date> and run yum downgrade mod_http2, or revert to previous Tomcat tarball>"
+      }}
     }}
   }}
 }}
 
 Rules:
-- context: MUST reference the exact software name, version range, and CVE IDs found in the Description field. Not generic.
-- identify: 1-2 commands or file checks to confirm the component is present and affected.
-- steps: 3-6 items. MUST include real shell commands, exact package versions, config file paths, or Maven/npm/pip syntax where relevant. No vague "update the dependency" — write the actual command.
-- code_example: ONLY if a shell command sequence, config block, or code change is needed. Real syntax, not pseudocode. Omit the key entirely if not applicable.
-- post_upgrade: 1-3 specific post-change checks with the expected outcome.
-- compensating_controls: 1-2 specific interim mitigations the team can apply right now if patching is delayed.
-- verification: exactly 2 items — first MUST mention re-running the scanner/tool; second MUST describe a specific functional test.
+- cves: list EVERY CVE from the Description field with a short parenthetical explaining what it allows (RCE, DoS, auth bypass, etc.).
+- immediate_assessment: 2-3 items with exact commands for THIS technology. Use rpm -q for RHEL/CentOS, dpkg -l for Debian/Ubuntu, $CATALINA_HOME/bin/version.sh for Tomcat, docker inspect for containers, Get-ItemProperty for Windows.
+- patch_commands: real bash (or PowerShell) block with # comment before each logical step. Use the correct package manager/deployment method for the technology. Must include backup, patch, verify, and restart steps.
+- patch_notes: one sentence about fleet/deployment context only if relevant. Omit if standalone.
+- compensating_controls: immediately actionable — name the exact config key or firewall rule. Not generic advice.
+- validation[0]: MUST name the scanner plugin ID or advisory ID from the description.
+- validation[1]: MUST include the exact command and expected output.
+- tracking.target_sla: Critical=48 hours, High=14 days, Medium=30 days, Low=90 days.
+- tracking.rollback_plan: technology-specific — name the backup path and downgrade command.
 - Include an entry for EVERY finding listed above using the exact title as the key.
 """
         llm = get_llm()
@@ -520,7 +523,7 @@ async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict
             "Include real shell commands, config file paths, version numbers from the finding, package manager syntax, code snippets. "
             "Output valid JSON only — no markdown fences, no prose outside the JSON."
         )
-        prompt = f"""Generate detailed remediation for these findings:
+        prompt = f"""Generate a detailed treatment plan for these findings:
 
 {detail}
 
@@ -528,26 +531,39 @@ Return JSON:
 {{
   "finding_remediations": {{
     "<exact finding title>": {{
-      "context": "2-3 sentences citing exact software name, version range, CVE IDs from description, attacker impact, business risk.",
-      "identify": ["Command or file check to confirm affected version — e.g. 'Run: catalina.sh version'"],
-      "steps": ["Step 1: exact command or config change", "Step 2: ...", "Step N: ..."],
-      "code_example": "<shell block or config snippet — omit key if not applicable>",
-      "post_upgrade": ["Post-change check 1 — specific command and expected output"],
-      "compensating_controls": ["Interim mitigation if immediate fix is not possible"],
-      "verification": [
-        "Re-run the vulnerability scanner and confirm the finding no longer triggers",
-        "Specific functional test to confirm the fix works"
+      "cves": "CVE-XXXX-YYYYY (short description), CVE-XXXX-ZZZZZ (short description) — all CVEs from description",
+      "immediate_assessment": [
+        "Confirm installed version: <exact command for this technology>",
+        "Confirm whether the vulnerable feature is enabled: <specific check>"
       ],
-      "references": "CVE IDs, CWE, OWASP category, advisory URLs from description"
+      "patch_commands": "# bash block with comments\\n# backup\\ncp -r ...\\n# patch\\nsudo yum update ...\\n# verify\\nrpm -q ...\\n# restart\\nsudo systemctl restart ...",
+      "patch_notes": "One sentence about deployment context if relevant (Satellite fleet, Maven BOM, Docker, etc.).",
+      "compensating_controls": [
+        "Specific interim control — exact config key, file path, or firewall rule and command"
+      ],
+      "validation": [
+        "Re-run <scanner> against <asset> — confirm <plugin/advisory ID> no longer triggers",
+        "Functional test: <exact command> — expected: <success output>",
+        "Update finding status Pending → Remediated with patch date and evidence"
+      ],
+      "tracking": {{
+        "priority": "<Critical/High/Medium/Low>",
+        "target_sla": "<48h Critical / 14d High / 30d Medium / 90d Low>",
+        "owner": "<responsible team>",
+        "verification": "Security Team re-scan post-patch",
+        "rollback_plan": "<backup path and downgrade command specific to this technology>"
+      }}
     }}
   }}
 }}
 
 Rules:
-- context: MUST cite exact software, version, CVE IDs from the Description field. Never generic.
-- steps: real shell commands, exact package versions, config paths — no vague instructions.
-- code_example: real syntax only; omit key entirely if not applicable.
-- Include EVERY finding above using its exact title as the JSON key.
+- cves: every CVE from description with parenthetical of what it allows.
+- immediate_assessment: exact commands for THIS technology (rpm -q for RHEL, dpkg -l for Debian, version.sh for Tomcat, docker inspect for containers).
+- patch_commands: real bash with # comments, correct package manager, includes backup + patch + verify + restart.
+- compensating_controls: immediately actionable — name exact config key or rule. Not generic.
+- validation[0]: must name the scanner plugin/advisory ID from description.
+- Include EVERY finding using its exact title as key.
 """
         llm = get_llm()
         resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
