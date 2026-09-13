@@ -744,11 +744,17 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ]))
+            asset_raw = _safe(f.get("affected_asset"))
+            if "," in asset_raw:
+                asset_count = len([a for a in asset_raw.split(",") if a.strip()])
+                asset_display = f"Multiple hosts ({asset_count})"
+            else:
+                asset_display = asset_raw
             fs_data.append([
-                Paragraph(_safe(f.get("finding_id")), styles["small_bold"]),
-                Paragraph(_safe(f.get("title")), styles["small"]),
+                Paragraph(_xe(f.get("finding_id")), styles["small_bold"]),
+                Paragraph(_xe(f.get("title")), styles["small"]),
                 sev_cell(sev),
-                Paragraph(_safe(f.get("affected_asset")), styles["small"]),
+                Paragraph(_xe(asset_display), styles["small"]),
                 rs_cell,
             ])
         fs_tbl = Table(fs_data, colWidths=[1.5 * cm, 6 * cm, 2.5 * cm, 4.2 * cm, 2.8 * cm])
@@ -837,9 +843,13 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ]))
+            asset_raw_detail = _safe(f.get("affected_asset"))
+            affected_hosts = [h.strip() for h in asset_raw_detail.split(",") if h.strip()] if "," in asset_raw_detail else []
+            asset_meta_display = f"Multiple hosts ({len(affected_hosts)})" if affected_hosts else asset_raw_detail
+
             meta_tbl = Table([
                 [Paragraph("Severity", meta_bold), sev_chip,
-                 Paragraph("Asset", meta_bold), Paragraph(_xe(f.get("affected_asset")), meta_val),
+                 Paragraph("Asset", meta_bold), Paragraph(_xe(asset_meta_display), meta_val),
                  Paragraph("Retest", meta_bold), Paragraph(_xe(rs_display), meta_val)],
             ], colWidths=[1.8 * cm, 2.6 * cm, 1.5 * cm, 5 * cm, 1.8 * cm, 4.3 * cm])
             meta_tbl.setStyle(TableStyle([
@@ -852,6 +862,28 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]))
             finding_elements.append(meta_tbl)
+
+            # Affected hosts table — shown when vuln spans multiple machines
+            if affected_hosts:
+                finding_elements.append(Spacer(1, 0.25 * cm))
+                ah_hdr_s = ParagraphStyle("ahhdr", fontName="Helvetica-Bold", fontSize=8, textColor=NAVY)
+                ah_val_s = ParagraphStyle("ahval", fontName="Courier", fontSize=8, leading=11)
+                ah_data = [[Paragraph("#", ah_hdr_s), Paragraph("Affected Host / Asset", ah_hdr_s)]]
+                for hi, host in enumerate(affected_hosts, 1):
+                    ah_data.append([Paragraph(str(hi), ah_val_s), Paragraph(_xe(host), ah_val_s)])
+                ah_tbl = Table(ah_data, colWidths=[1.2 * cm, PAGE_W - 2 * MARGIN - 1.2 * cm])
+                ah_tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, HexColor("#F9F9FB")]),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#CFD8DC")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]))
+                finding_elements.append(ah_tbl)
+
             finding_elements.append(Spacer(1, 0.35 * cm))
 
             def field_block(label: str, value: str, code_style: bool = False):
@@ -2147,9 +2179,12 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
         r_meta_bold = ParagraphStyle("rmb", fontName="Helvetica-Bold", fontSize=8.5,
                                      textColor=HexColor("#37474F"))
         r_meta_val = ParagraphStyle("rmv", fontName="Helvetica", fontSize=8.5, textColor=DARK_TEXT)
+        r_asset_raw = _safe(f.get("affected_asset"))
+        r_affected_hosts = [h.strip() for h in r_asset_raw.split(",") if h.strip()] if "," in r_asset_raw else []
+        r_asset_display = f"Multiple hosts ({len(r_affected_hosts)})" if r_affected_hosts else r_asset_raw
         r_meta_tbl = Table([
             [Paragraph("Severity", r_meta_bold), r_sev_chip,
-             Paragraph("Asset", r_meta_bold), Paragraph(_xe(f.get("affected_asset")), r_meta_val),
+             Paragraph("Asset", r_meta_bold), Paragraph(_xe(r_asset_display), r_meta_val),
              Paragraph("Retest", r_meta_bold), Paragraph(_xe(r_rs_display), r_meta_val)],
         ], colWidths=[1.8 * cm, 2.6 * cm, 1.5 * cm, 5 * cm, 1.8 * cm, 4.3 * cm])
         r_meta_tbl.setStyle(TableStyle([
@@ -2163,6 +2198,25 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
         ]))
         elems.append(fh_tbl)
         elems.append(r_meta_tbl)
+        if r_affected_hosts:
+            elems.append(Spacer(1, 0.2 * cm))
+            r_ah_hdr_s = ParagraphStyle("rahhdr", fontName="Helvetica-Bold", fontSize=8, textColor=NAVY)
+            r_ah_val_s = ParagraphStyle("rahval", fontName="Courier", fontSize=8, leading=11)
+            r_ah_data = [[Paragraph("#", r_ah_hdr_s), Paragraph("Affected Host / Asset", r_ah_hdr_s)]]
+            for hi, host in enumerate(r_affected_hosts, 1):
+                r_ah_data.append([Paragraph(str(hi), r_ah_val_s), Paragraph(_xe(host), r_ah_val_s)])
+            r_ah_tbl = Table(r_ah_data, colWidths=[1.2 * cm, PAGE_W - 2 * MARGIN - 1.2 * cm])
+            r_ah_tbl.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, HexColor("#F9F9FB")]),
+                ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#CFD8DC")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]))
+            elems.append(r_ah_tbl)
         elems.append(Spacer(1, 0.3 * cm))
 
         # Context — render CVE blocks as named subsections if present, else flat text

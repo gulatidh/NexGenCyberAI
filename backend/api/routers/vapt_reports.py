@@ -721,20 +721,41 @@ async def create_report_from_scan(
     # Methodology from template
     methodology = _METHODOLOGY.get(connector_type, _DEFAULT_METHODOLOGY)
 
-    # Build findings dicts for AI
-    findings_for_ai = [
-        {
+    # Build findings dicts, then group by title so one vuln on N hosts = one VAPT finding
+    from collections import OrderedDict
+    _title_groups: Dict[str, List[Dict]] = OrderedDict()
+    for f in findings:
+        sev_val = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+        ev_str = json.dumps(f.evidence) if f.evidence else ""
+        key = f.title.strip().lower()
+        if key not in _title_groups:
+            _title_groups[key] = []
+        _title_groups[key].append({
             "title": f.title,
-            "severity": f.severity.value if hasattr(f.severity, "value") else str(f.severity),
+            "severity": sev_val,
             "description": f.description or "",
             "resource_id": f.resource_id or "",
             "remediation": f.remediation or "",
-            "evidence": json.dumps(f.evidence) if f.evidence else "",
+            "evidence": ev_str,
             "cve_id": f.cve_id or "",
             "cvss_score": f.cvss_score,
-        }
-        for f in findings
-    ]
+        })
+
+    # Merge each group: combine resource_ids and evidence across hosts
+    findings_for_ai: List[Dict] = []
+    for group in _title_groups.values():
+        base = dict(group[0])
+        if len(group) > 1:
+            unique_assets = list(dict.fromkeys(g["resource_id"] for g in group if g["resource_id"]))
+            base["resource_id"] = ", ".join(unique_assets)
+            ev_parts = [g["evidence"] for g in group if g.get("evidence")]
+            base["evidence"] = "\n---\n".join(ev_parts) if ev_parts else ""
+            # Use highest severity across instances
+            sev_order_merge = ["critical", "high", "medium", "low", "informational", "info"]
+            all_sevs = [g["severity"].lower() for g in group]
+            best_sev = min(all_sevs, key=lambda s: sev_order_merge.index(s) if s in sev_order_merge else 99)
+            base["severity"] = best_sev
+        findings_for_ai.append(base)
 
     # AI generation (gracefully degrades if LLM unavailable)
     ai = await _ai_generate_report_content(
