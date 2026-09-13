@@ -99,7 +99,6 @@ def _safe(val: Any, fallback: str = "—") -> str:
 
 
 _CVE_PATTERN = re.compile(r"\b(CVE-\d{4}-\d{4,})\b")
-_URL_PATTERN = re.compile(r"https?://\S+")
 
 def _nvd_url(cve_id: str) -> str:
     return f"https://nvd.nist.gov/vuln/detail/{cve_id}"
@@ -124,25 +123,38 @@ def _parse_cve_blocks(text: str) -> List[Tuple[str, str]]:
 
 
 def _linkify_cves_pdf(text: str) -> str:
-    """Replace CVE-XXXX-XXXXX tokens with <a href="...">CVE-XXXX-XXXXX</a> for ReportLab."""
+    """Replace standalone CVE-XXXX-XXXXX tokens with <a href="..."> for ReportLab.
+    Note: does NOT check for CVEs embedded inside URLs — use _linkify_pdf() for general text."""
     def _replace(m):
         cve = m.group(1)
         return f'<a href="{_nvd_url(cve)}" color="#1565C0"><u>{cve}</u></a>'
     return _CVE_PATTERN.sub(_replace, text)
 
 
-def _linkify_urls_pdf(text: str) -> str:
-    """Replace bare URLs with <a href="..."> links for ReportLab."""
-    def _replace(m):
-        url = m.group(0).rstrip(".,;)")
-        return f'<a href="{url}" color="#1565C0"><u>{url}</u></a>'
-    return _URL_PATTERN.sub(_replace, text)
-
-
 def _linkify_pdf(text: str) -> str:
-    text = _linkify_cves_pdf(text)
-    text = _linkify_urls_pdf(text)
-    return text
+    """Single-pass linkifier: full URLs first, then standalone CVE IDs not inside a URL."""
+    replacements = []
+    url_spans = []
+    # Find all URLs
+    for m in re.finditer(r'https?://\S+', text):
+        raw_url = m.group(0).rstrip(".,;)>")
+        url_spans.append((m.start(), m.start() + len(raw_url)))
+        replacements.append((m.start(), m.start() + len(raw_url),
+                             f'<a href="{raw_url}" color="#1565C0"><u>{raw_url}</u></a>'))
+    # Find standalone CVE IDs not inside a URL
+    for m in _CVE_PATTERN.finditer(text):
+        ms, me = m.start(), m.end()
+        if any(us <= ms < ue for us, ue in url_spans):
+            continue  # skip CVEs embedded in URLs
+        cve = m.group(1)
+        replacements.append((ms, me,
+                             f'<a href="{_nvd_url(cve)}" color="#1565C0"><u>{cve}</u></a>'))
+    # Apply in reverse order to preserve offsets
+    replacements.sort(key=lambda x: x[0], reverse=True)
+    result = text
+    for start, end, repl in replacements:
+        result = result[:start] + repl + result[end:]
+    return result
 
 
 def _add_hyperlink_docx(paragraph, text: str, url: str):
@@ -232,11 +244,11 @@ def _build_pdf_styles():
         "bold":         _ps("vapt_bold", fontName="Helvetica-Bold"),
         "small":        _ps("vapt_small", fontSize=8, leading=10),
         "small_bold":   _ps("vapt_small_bold", fontSize=8, leading=10, fontName="Helvetica-Bold"),
-        "section":      _ps("vapt_section", fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=WHITE),
+        "section":      _ps("vapt_section", fontName="Helvetica-Bold", fontSize=14, leading=17, textColor=NAVY),
         "subsection":   _ps("vapt_subsection", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=BLUE),
         "finding_hdr":  _ps("vapt_finding_hdr", fontName="Helvetica-Bold", fontSize=12, leading=15, textColor=WHITE),
-        "cover_title":  _ps("vapt_cover_title", fontName="Helvetica-Bold", fontSize=28, leading=34, textColor=WHITE, alignment=TA_CENTER),
-        "cover_sub":    _ps("vapt_cover_sub", fontName="Helvetica", fontSize=13, leading=17, textColor=HexColor("#B0BEC5"), alignment=TA_CENTER),
+        "cover_title":  _ps("vapt_cover_title", fontName="Helvetica-Bold", fontSize=28, leading=34, textColor=NAVY, alignment=TA_CENTER),
+        "cover_sub":    _ps("vapt_cover_sub", fontName="Helvetica", fontSize=13, leading=17, textColor=DARK_TEXT, alignment=TA_CENTER),
         "center":       _ps("vapt_center", alignment=TA_CENTER),
         "center_bold":  _ps("vapt_center_bold", fontName="Helvetica-Bold", alignment=TA_CENTER),
         "right":        _ps("vapt_right", alignment=TA_RIGHT),
@@ -281,18 +293,11 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
     def _cover_template(canvas, doc):
         canvas.saveState()
-        # Dark navy background
-        canvas.setFillColor(HexColor("#0D1B4B"))
-        canvas.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
-        # Top accent bar
-        canvas.setFillColor(HexColor("#1565C0"))
-        canvas.rect(0, PAGE_H - 0.8 * cm, PAGE_W, 0.8 * cm, fill=1, stroke=0)
-        # Bottom bar
-        canvas.setFillColor(HexColor("#1565C0"))
-        canvas.rect(0, 0, PAGE_W, 0.8 * cm, fill=1, stroke=0)
-        # Left accent strip
-        canvas.setFillColor(HexColor("#C62828"))
-        canvas.rect(0, 0.8 * cm, 0.5 * cm, PAGE_H - 1.6 * cm, fill=1, stroke=0)
+        # White background — thin accent bars only
+        canvas.setFillColor(HexColor("#1A237E"))
+        canvas.rect(0, PAGE_H - 0.4 * cm, PAGE_W, 0.4 * cm, fill=1, stroke=0)
+        canvas.setFillColor(HexColor("#1A237E"))
+        canvas.rect(0, 0, PAGE_W, 0.4 * cm, fill=1, stroke=0)
         canvas.restoreState()
 
     def _content_template(canvas, doc):
@@ -336,13 +341,13 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
     # ── Helper functions ──────────────────────────────────────────────────────
     def section_header(text: str) -> Table:
-        """Full-width navy section header table."""
+        """Left-accented section header — no background fill."""
         tbl = Table([[Paragraph(text, styles["section"])]], colWidths=[PAGE_W - 2 * MARGIN])
         tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), NAVY),
-            ("LEFTPADDING", (0, 0), (-1, -1), 10),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("LINEBELOW", (0, 0), (-1, -1), 1.5, NAVY),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
         return tbl
@@ -375,11 +380,11 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     # ═══════════════════════════════════════════════════════════════════════
     story.append(Spacer(1, 4 * cm))
     story.append(Paragraph("MONITARA AI", ParagraphStyle(
-        "brand", fontName="Helvetica-Bold", fontSize=16, textColor=HexColor("#42A5F5"),
+        "brand", fontName="Helvetica-Bold", fontSize=16, textColor=HexColor("#1565C0"),
         alignment=TA_CENTER, letterSpacing=4)))
     story.append(Spacer(1, 0.5 * cm))
     story.append(Paragraph("Cybersecurity Platform", ParagraphStyle(
-        "brand_sub", fontName="Helvetica", fontSize=11, textColor=HexColor("#90CAF9"),
+        "brand_sub", fontName="Helvetica", fontSize=11, textColor=HexColor("#546E7A"),
         alignment=TA_CENTER)))
     story.append(Spacer(1, 2 * cm))
     story.append(HRFlowable(width="80%", thickness=1, color=HexColor("#1565C0"),
@@ -400,14 +405,14 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
         ["Reviewed By", _safe(report.get("reviewed_by"))],
         ["Status", _safe(report.get("status"), "Draft").capitalize()],
     ]
-    cover_style_normal = ParagraphStyle("c_n", fontName="Helvetica", fontSize=10, textColor=WHITE)
-    cover_style_bold = ParagraphStyle("c_b", fontName="Helvetica-Bold", fontSize=10, textColor=HexColor("#90CAF9"))
+    cover_style_normal = ParagraphStyle("c_n", fontName="Helvetica", fontSize=10, textColor=DARK_TEXT)
+    cover_style_bold = ParagraphStyle("c_b", fontName="Helvetica-Bold", fontSize=10, textColor=NAVY)
     cover_tbl_data = [[Paragraph(r[0], cover_style_bold), Paragraph(r[1], cover_style_normal)]
                       for r in cover_data]
     cover_tbl = Table(cover_tbl_data, colWidths=[4 * cm, 10 * cm])
     cover_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#0A1340")),
-        ("LINEBELOW", (0, 0), (-1, -2), 0.5, HexColor("#1E3A8A")),
+        ("BACKGROUND", (0, 0), (0, -1), HexColor("#E8EAF6")),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.5, HexColor("#CFD8DC")),
         ("TOPPADDING", (0, 0), (-1, -1), 7),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
@@ -568,7 +573,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
         story.append(subsection_header("Testing Phases"))
         story.append(Spacer(1, 0.2 * cm))
         phases_header = [Paragraph(h, ParagraphStyle("ph", fontName="Helvetica-Bold",
-                                                      fontSize=9, textColor=WHITE))
+                                                      fontSize=9, textColor=NAVY))
                          for h in ["#", "Phase", "Description"]]
         phases_data = [phases_header]
         for i, phase in enumerate(phases):
@@ -579,7 +584,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
             ])
         phases_tbl = Table(phases_data, colWidths=[0.8 * cm, 4 * cm, 12.2 * cm])
         phases_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
             ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#CFD8DC")),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
@@ -614,7 +619,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     story.append(section_header("4. Severity Rating Matrix"))
     story.append(Spacer(1, 0.4 * cm))
 
-    matrix_hdr_style = ParagraphStyle("mhdr", fontName="Helvetica-Bold", fontSize=9, textColor=WHITE)
+    matrix_hdr_style = ParagraphStyle("mhdr", fontName="Helvetica-Bold", fontSize=9, textColor=NAVY)
     matrix_body_style = styles["small"]
     matrix_hdr = [Paragraph(h, matrix_hdr_style) for h in
                   ["Rating", "CVSS Range", "Description", "Examples", "Response SLA"]]
@@ -656,7 +661,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     matrix_tbl = Table(matrix_data, colWidths=[2.5 * cm, 1.8 * cm, 4 * cm, 5 * cm, 3.7 * cm])
 
     matrix_ts = [
-        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -682,7 +687,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     if not sorted_findings:
         story.append(Paragraph("No findings recorded in this report.", styles["normal"]))
     else:
-        fs_hdr_style = ParagraphStyle("fsh", fontName="Helvetica-Bold", fontSize=9, textColor=WHITE)
+        fs_hdr_style = ParagraphStyle("fsh", fontName="Helvetica-Bold", fontSize=9, textColor=NAVY)
         fs_hdr = [Paragraph(h, fs_hdr_style) for h in
                   ["ID", "Title", "Severity", "Affected Asset", "Retest Status"]]
         fs_data = [fs_hdr]
@@ -710,7 +715,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
             ])
         fs_tbl = Table(fs_data, colWidths=[1.5 * cm, 6 * cm, 2.5 * cm, 4.2 * cm, 2.8 * cm])
         fs_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -789,11 +794,142 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 finding_elements.append(Spacer(1, 0.2 * cm))
 
             field_block("Description", _safe(f.get("description")))
+
+            # CVE Breakdown table — parse CVEs from description
+            desc_raw = f.get("description") or ""
+            cve_blocks = _parse_cve_blocks(desc_raw)
+            all_cves_in_desc = _CVE_PATTERN.findall(desc_raw)
+            if cve_blocks or all_cves_in_desc:
+                finding_elements.append(Paragraph("CVE Breakdown", styles["subsection"]))
+                finding_elements.append(Spacer(1, 0.1 * cm))
+                cve_hdr_s = ParagraphStyle("cvehdr", fontName="Helvetica-Bold", fontSize=8, textColor=NAVY)
+                cve_val_s = ParagraphStyle("cveval", fontName="Helvetica", fontSize=8, leading=11, textColor=DARK_TEXT)
+                cve_tbl_data = [[Paragraph(h, cve_hdr_s) for h in ["CVE ID", "Severity", "Description"]]]
+                if cve_blocks:
+                    for cve_id, cve_desc in cve_blocks:
+                        cve_sev = sev.capitalize()
+                        cve_link = f'<a href="{_nvd_url(cve_id)}" color="#1565C0"><u>{cve_id}</u></a>'
+                        cve_tbl_data.append([
+                            Paragraph(cve_link, cve_val_s),
+                            Paragraph(cve_sev, cve_val_s),
+                            Paragraph((cve_desc[:200] if cve_desc else "—"), cve_val_s),
+                        ])
+                else:
+                    for cve_id in all_cves_in_desc:
+                        cve_link = f'<a href="{_nvd_url(cve_id)}" color="#1565C0"><u>{cve_id}</u></a>'
+                        cve_tbl_data.append([
+                            Paragraph(cve_link, cve_val_s),
+                            Paragraph(sev.capitalize(), cve_val_s),
+                            Paragraph("Refer to NVD for details.", cve_val_s),
+                        ])
+                cve_tbl = Table(cve_tbl_data, colWidths=[3.5 * cm, 2 * cm, 11.5 * cm])
+                cve_tbl.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.3, HexColor("#CFD8DC")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                finding_elements.append(cve_tbl)
+                finding_elements.append(Spacer(1, 0.3 * cm))
+
             field_block("Business Impact", _safe(f.get("impact")))
             field_block("Evidence", _safe(f.get("evidence")))
             field_block("Reproduction Steps", _safe(f.get("reproduction_steps")), code_style=True)
-            field_block("Recommendation", _safe(f.get("recommendation")))
-            field_block("References", _safe(f.get("references")))
+
+            # Structured remediation section (replaces flat "Recommendation" field)
+            _rem_code_style = ParagraphStyle(
+                "rem_code_full", fontName="Courier", fontSize=7,
+                textColor=HexColor("#1A237E"), backColor=HexColor("#E8EAF6"),
+                leftIndent=10, rightIndent=10, spaceAfter=2, spaceBefore=2, leading=11,
+            )
+            _link_label_style = ParagraphStyle(
+                "link_label_full", parent=styles["label"], textColor=HexColor("#1565C0"),
+            )
+            rec_raw = f.get("recommendation") or ""
+            rec_structured = None
+            if rec_raw.strip().startswith("{"):
+                try:
+                    rec_structured = json.loads(rec_raw)
+                except Exception:
+                    pass
+
+            def _rem_section_full(label, items, numbered=True):
+                if not items:
+                    return
+                finding_elements.append(Paragraph(label, styles["subsection"]))
+                for i, item in enumerate(items, 1):
+                    txt = str(item).strip()
+                    if not txt:
+                        continue
+                    prefix = f"{i}. " if numbered else "• "
+                    finding_elements.append(Paragraph(f"{prefix}{txt}", styles["bullet"]))
+                finding_elements.append(Spacer(1, 0.15 * cm))
+
+            finding_elements.append(Paragraph("Remediation", styles["subsection"]))
+            finding_elements.append(Spacer(1, 0.1 * cm))
+
+            if rec_structured:
+                context_txt  = (rec_structured.get("context") or "").strip()
+                identify     = rec_structured.get("identify") or []
+                steps        = rec_structured.get("steps") or []
+                code_ex      = (rec_structured.get("code_example") or "").strip()
+                post_up      = rec_structured.get("post_upgrade") or []
+                comp_ctrl    = rec_structured.get("compensating_controls") or []
+                verification = rec_structured.get("verification") or []
+                references   = (rec_structured.get("references") or "").strip()
+
+                if context_txt:
+                    finding_elements.append(Paragraph("Technical Context", styles["subsection"]))
+                    finding_elements.append(Paragraph(context_txt, styles["normal"]))
+                    finding_elements.append(Spacer(1, 0.15 * cm))
+
+                _rem_section_full("Identifying Affected Components", identify)
+                _rem_section_full("Remediation Steps", steps)
+
+                if code_ex:
+                    finding_elements.append(Paragraph("Commands / Configuration", styles["subsection"]))
+                    for code_line in code_ex.replace("\r\n", "\n").split("\n"):
+                        finding_elements.append(Paragraph(code_line or " ", _rem_code_style))
+                    finding_elements.append(Spacer(1, 0.15 * cm))
+
+                _rem_section_full("Post-Change Validation", post_up)
+                _rem_section_full("Compensating Controls (Interim)", comp_ctrl)
+
+                if verification:
+                    _rem_section_full("Verification Steps", verification)
+                else:
+                    finding_elements.append(Paragraph("Verification Steps", styles["subsection"]))
+                    finding_elements.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
+                    finding_elements.append(Paragraph("2. Confirm the patched version is running in production.", styles["bullet"]))
+                    finding_elements.append(Spacer(1, 0.15 * cm))
+
+                if references:
+                    linkified = _linkify_pdf(references)
+                    finding_elements.append(Paragraph(f"References: {linkified}", _link_label_style))
+                    finding_elements.append(Spacer(1, 0.1 * cm))
+
+            elif rec_raw and rec_raw != "—":
+                for line in rec_raw.split("\n"):
+                    if line.strip():
+                        finding_elements.append(Paragraph(f"• {line.strip()}", styles["bullet"]))
+                finding_elements.append(Spacer(1, 0.15 * cm))
+                finding_elements.append(Paragraph("Verification Steps", styles["subsection"]))
+                finding_elements.append(Paragraph("1. Re-run the vulnerability scanner and confirm the finding is no longer reported.", styles["bullet"]))
+                finding_elements.append(Paragraph("2. Confirm the patch is applied and the service responds normally.", styles["bullet"]))
+                finding_elements.append(Spacer(1, 0.15 * cm))
+            else:
+                finding_elements.append(Paragraph("No remediation guidance provided.", styles["normal"]))
+                finding_elements.append(Spacer(1, 0.15 * cm))
+
+            # References
+            refs_raw = _safe(f.get("references"))
+            if refs_raw and refs_raw != "—":
+                finding_elements.append(Paragraph(f"References: {_linkify_pdf(refs_raw)}", _link_label_style))
+                finding_elements.append(Spacer(1, 0.15 * cm))
 
             # Retest notes box
             rn = f.get("retest_notes")
@@ -835,13 +971,13 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     # ═══════════════════════════════════════════════════════════════════════
     # SECTION 7: REMEDIATION ROADMAP
     # ═══════════════════════════════════════════════════════════════════════
-    story.append(section_header("7. Remediation Roadmap"))
+    story.append(section_header("7. Remediation Priority &amp; Tracking"))
     story.append(Spacer(1, 0.4 * cm))
 
     if sorted_findings:
-        rr_hdr_style = ParagraphStyle("rrh", fontName="Helvetica-Bold", fontSize=9, textColor=WHITE)
+        rr_hdr_style = ParagraphStyle("rrh", fontName="Helvetica-Bold", fontSize=9, textColor=NAVY)
         rr_hdr = [Paragraph(h, rr_hdr_style) for h in
-                  ["Priority", "ID", "Title", "Severity", "Recommended Action"]]
+                  ["ID", "Recommendation", "Priority", "Target SLA", "Owner"]]
         rr_data = [rr_hdr]
         priority_labels = {
             "critical": "P1 — Immediate",
@@ -851,21 +987,49 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
             "informational": "P5 — Best Effort",
             "info":     "P5 — Best Effort",
         }
+        sla_map = {
+            "critical": "48 hours",
+            "high":     "14 days",
+            "medium":   "30 days",
+            "low":      "90 days",
+            "informational": "Best effort",
+            "info":     "Best effort",
+        }
+        owner_map = {
+            "critical": "Security Team + CTO",
+            "high":     "Security Team",
+            "medium":   "Dev/Ops Team",
+            "low":      "Dev Team",
+            "informational": "Dev Team",
+            "info":     "Dev Team",
+        }
         for rank, f in enumerate(sorted_findings, 1):
             sev = (f.get("severity") or "").lower()
             pri = priority_labels.get(sev, "P5 — Best Effort")
-            rec = _safe(f.get("recommendation"), "Review and apply security hardening.")
-            rec_short = rec[:120] + "..." if len(rec) > 120 else rec
+            sla = sla_map.get(sev, "Best effort")
+            owner = owner_map.get(sev, "Dev Team")
+            rec_raw2 = f.get("recommendation") or ""
+            rec_summary = "—"
+            if rec_raw2.strip().startswith("{"):
+                try:
+                    rec_json = json.loads(rec_raw2)
+                    steps2 = rec_json.get("steps") or []
+                    rec_summary = steps2[0][:120] if steps2 else (rec_json.get("context") or "")[:120]
+                except Exception:
+                    rec_summary = rec_raw2[:120]
+            elif rec_raw2.strip():
+                first_line = next((l for l in rec_raw2.split("\n") if l.strip()), "")
+                rec_summary = first_line[:120] + ("..." if len(first_line) > 120 else "")
             rr_data.append([
-                Paragraph(pri, styles["small_bold"]),
                 Paragraph(_safe(f.get("finding_id")), styles["small_bold"]),
-                Paragraph(_safe(f.get("title")), styles["small"]),
-                sev_cell(sev),
-                Paragraph(rec_short, styles["small"]),
+                Paragraph(rec_summary, styles["small"]),
+                Paragraph(pri, styles["small_bold"]),
+                Paragraph(sla, styles["small"]),
+                Paragraph(owner, styles["small"]),
             ])
-        rr_tbl = Table(rr_data, colWidths=[3 * cm, 1.5 * cm, 4.5 * cm, 2.5 * cm, 5.5 * cm])
+        rr_tbl = Table(rr_data, colWidths=[1.5 * cm, 6.5 * cm, 3 * cm, 2.5 * cm, 3.5 * cm])
         rr_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E8EAF6")),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, GREY_BG]),
             ("TOPPADDING", (0, 0), (-1, -1), 5),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
@@ -1002,45 +1166,44 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
         return p
 
     def _add_section_header(text: str):
-        tbl = doc.add_table(rows=1, cols=1)
-        tbl.style = "Table Grid"
-        cell = tbl.cell(0, 0)
-        _set_cell_shading(cell, "1A237E")
-        p = cell.paragraphs[0]
-        run = p.add_run(text)
-        run.bold = True
-        run.font.size = Pt(13)
-        run.font.color.rgb = RGBColor(255, 255, 255)
-        run.font.name = "Calibri"
-        p.paragraph_format.space_before = Pt(4)
-        p.paragraph_format.space_after = Pt(4)
-        doc.add_paragraph()
+        p = doc.add_heading(text, level=1)
+        p.paragraph_format.space_before = Pt(14)
+        p.paragraph_format.space_after = Pt(2)
+        for run in p.runs:
+            run.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
+            run.font.bold = True
+            run.font.name = "Calibri"
+            run.font.size = Pt(14)
+        # Add a thin underline separator
+        pf = doc.add_paragraph()
+        pf.paragraph_format.space_before = Pt(0)
+        pf.paragraph_format.space_after = Pt(6)
 
     # ── Cover page ────────────────────────────────────────────────────────
-    # Title block
+    # Title block — clean white background
     cover_tbl = doc.add_table(rows=1, cols=1)
     cover_tbl.style = "Table Grid"
     cell = cover_tbl.cell(0, 0)
-    _set_cell_shading(cell, "0D1B4B")
+    _set_cell_shading(cell, "E8EAF6")
     p = cell.paragraphs[0]
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run("MONITARA AI\n")
     run.bold = True
     run.font.size = Pt(20)
-    run.font.color.rgb = RGBColor(0x42, 0xA5, 0xF5)
+    run.font.color.rgb = RGBColor(0x15, 0x65, 0xC0)
     run.font.name = "Calibri"
     run2 = p.add_run("Cybersecurity Platform\n\n")
     run2.font.size = Pt(11)
-    run2.font.color.rgb = RGBColor(0x90, 0xCA, 0xF9)
+    run2.font.color.rgb = RGBColor(0x54, 0x6E, 0x7A)
     run2.font.name = "Calibri"
     run3 = p.add_run(report_title.upper() + "\n")
     run3.bold = True
     run3.font.size = Pt(22)
-    run3.font.color.rgb = RGBColor(255, 255, 255)
+    run3.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
     run3.font.name = "Calibri"
     run4 = p.add_run("Vulnerability Assessment & Penetration Testing Report\n")
     run4.font.size = Pt(12)
-    run4.font.color.rgb = RGBColor(0xB0, 0xBE, 0xC5)
+    run4.font.color.rgb = RGBColor(0x37, 0x47, 0x4F)
     run4.font.name = "Calibri"
 
     doc.add_paragraph()
@@ -1164,11 +1327,11 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
         ph_tbl.style = "Table Grid"
         for ci, hdr in enumerate(["#", "Phase", "Description"]):
             c = ph_tbl.cell(0, ci)
-            _set_cell_shading(c, "1A237E")
+            _set_cell_shading(c, "E8EAF6")
             p = c.paragraphs[0]
             r = p.add_run(hdr)
             r.bold = True
-            r.font.color.rgb = RGBColor(255, 255, 255)
+            r.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
         for i, phase in enumerate(phases):
             ph_tbl.cell(i + 1, 0).paragraphs[0].add_run(str(i + 1))
             ph_tbl.cell(i + 1, 1).paragraphs[0].add_run(_safe(phase.get("name")))
@@ -1208,11 +1371,11 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
     m_tbl.style = "Table Grid"
     for ci, hdr in enumerate(["Rating", "CVSS", "Description", "SLA"]):
         c = m_tbl.cell(0, ci)
-        _set_cell_shading(c, "1A237E")
+        _set_cell_shading(c, "E8EAF6")
         p = c.paragraphs[0]
         r = p.add_run(hdr)
         r.bold = True
-        r.font.color.rgb = RGBColor(255, 255, 255)
+        r.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
     for i, (label, cvss, color, desc, sla) in enumerate(matrix_data):
         cells = [m_tbl.cell(i + 1, ci) for ci in range(4)]
         _set_cell_shading(cells[0], color)
@@ -1233,11 +1396,11 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
         fs_tbl.style = "Table Grid"
         for ci, hdr in enumerate(["ID", "Title", "Severity", "Asset", "Retest"]):
             c = fs_tbl.cell(0, ci)
-            _set_cell_shading(c, "1A237E")
+            _set_cell_shading(c, "E8EAF6")
             p = c.paragraphs[0]
             r = p.add_run(hdr)
             r.bold = True
-            r.font.color.rgb = RGBColor(255, 255, 255)
+            r.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
         for i, f in enumerate(sorted_findings):
             sev = (f.get("severity") or "").lower()
             rs = (f.get("retest_status") or "pending").lower()
@@ -1312,11 +1475,114 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
             _add_para(value)
 
         _field("Description", _safe(f.get("description")))
+
+        # CVE Breakdown table
+        desc_raw_d = f.get("description") or ""
+        cve_blocks_d = _parse_cve_blocks(desc_raw_d)
+        all_cves_d = _CVE_PATTERN.findall(desc_raw_d)
+        if cve_blocks_d or all_cves_d:
+            _add_para("CVE Breakdown:", bold=True, color="1565C0")
+            cve_entries_d = cve_blocks_d if cve_blocks_d else [(c, "Refer to NVD for details.") for c in all_cves_d]
+            cve_tbl_d = doc.add_table(rows=len(cve_entries_d) + 1, cols=3)
+            cve_tbl_d.style = "Table Grid"
+            for ci_d, hdr_d in enumerate(["CVE ID", "Severity", "Description"]):
+                c_d = cve_tbl_d.cell(0, ci_d)
+                _set_cell_shading(c_d, "E8EAF6")
+                p_d = c_d.paragraphs[0]
+                r_d = p_d.add_run(hdr_d)
+                r_d.bold = True
+                r_d.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
+                r_d.font.size = Pt(9)
+            for ri_d, (cve_id_d, cve_desc_d) in enumerate(cve_entries_d, 1):
+                cve_tbl_d.cell(ri_d, 0).paragraphs[0].add_run(cve_id_d).font.size = Pt(9)
+                cve_tbl_d.cell(ri_d, 1).paragraphs[0].add_run(sev.capitalize()).font.size = Pt(9)
+                cve_tbl_d.cell(ri_d, 2).paragraphs[0].add_run((cve_desc_d[:200] if cve_desc_d else "—")).font.size = Pt(9)
+            doc.add_paragraph()
+
         _field("Business Impact", _safe(f.get("impact")))
         _field("Evidence", _safe(f.get("evidence")))
         _field("Reproduction Steps", _safe(f.get("reproduction_steps")))
-        _field("Recommendation", _safe(f.get("recommendation")))
-        _field("References", _safe(f.get("references")))
+
+        # Structured remediation
+        _add_para("Remediation:", bold=True, color="1A237E")
+        rec_raw_df = f.get("recommendation") or ""
+        rec_structured_df = None
+        if rec_raw_df.strip().startswith("{"):
+            try:
+                rec_structured_df = json.loads(rec_raw_df)
+            except Exception:
+                pass
+
+        def _docx_rem_section_df(label, items, numbered=True):
+            if not items:
+                return
+            _add_para(f"{label}:", bold=True, color="1565C0")
+            for item_df in items:
+                txt_df = str(item_df).strip()
+                if not txt_df:
+                    continue
+                p_df = doc.add_paragraph(style="List Number" if numbered else "List Bullet")
+                p_df.add_run(txt_df)
+
+        if rec_structured_df:
+            context_df = (rec_structured_df.get("context") or "").strip()
+            identify_df = rec_structured_df.get("identify") or []
+            steps_df = rec_structured_df.get("steps") or []
+            code_ex_df = (rec_structured_df.get("code_example") or "").strip()
+            post_up_df = rec_structured_df.get("post_upgrade") or []
+            comp_ctrl_df = rec_structured_df.get("compensating_controls") or []
+            verification_df = rec_structured_df.get("verification") or []
+            references_df = (rec_structured_df.get("references") or "").strip()
+
+            if context_df:
+                _add_para("Technical Context:", bold=True, color="1565C0")
+                _add_para(context_df)
+
+            _docx_rem_section_df("Identifying Affected Components", identify_df)
+            _docx_rem_section_df("Remediation Steps", steps_df)
+
+            if code_ex_df:
+                _add_para("Commands / Configuration:", bold=True, color="1565C0")
+                code_p_df = doc.add_paragraph()
+                code_r_df = code_p_df.add_run(code_ex_df.strip())
+                code_r_df.font.name = "Courier New"
+                code_r_df.font.size = Pt(8)
+
+            _docx_rem_section_df("Post-Change Validation", post_up_df)
+            _docx_rem_section_df("Compensating Controls (Interim)", comp_ctrl_df)
+
+            if verification_df:
+                _docx_rem_section_df("Verification Steps", verification_df)
+            else:
+                _add_para("Verification Steps:", bold=True, color="1565C0")
+                for step_df in [
+                    "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
+                    "Confirm the patched version is running in production.",
+                ]:
+                    p_s = doc.add_paragraph(style="List Number")
+                    p_s.add_run(step_df)
+
+            if references_df:
+                _add_cve_refs_docx(doc, references_df, _add_para)
+
+        elif rec_raw_df and rec_raw_df != "—":
+            for line_df in rec_raw_df.split("\n"):
+                if line_df.strip():
+                    p_df2 = doc.add_paragraph(style="List Bullet")
+                    p_df2.add_run(line_df.strip())
+            _add_para("Verification Steps:", bold=True, color="1565C0")
+            for step_df2 in [
+                "Re-run the vulnerability scanner and confirm the finding is no longer reported.",
+                "Confirm the patch is applied and the service responds normally.",
+            ]:
+                p_v = doc.add_paragraph(style="List Number")
+                p_v.add_run(step_df2)
+        else:
+            _add_para("No remediation guidance provided.")
+
+        refs_raw_df = _safe(f.get("references"))
+        if refs_raw_df and refs_raw_df != "—":
+            _add_cve_refs_docx(doc, refs_raw_df, _add_para)
 
         rn = f.get("retest_notes")
         if rn and rn.strip():
@@ -1336,20 +1602,20 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
 
         doc.add_paragraph()
 
-    # ── Section 7: Remediation Roadmap ─────────────────────────────────────
-    _add_section_header("7. Remediation Roadmap")
+    # ── Section 7: Remediation Priority & Tracking ─────────────────────────
+    _add_section_header("7. Remediation Priority & Tracking")
 
     if sorted_findings:
-        rr_tbl = doc.add_table(rows=len(sorted_findings) + 1, cols=4)
+        rr_tbl = doc.add_table(rows=len(sorted_findings) + 1, cols=5)
         rr_tbl.style = "Table Grid"
-        for ci, hdr in enumerate(["Priority", "ID", "Title/Severity", "Recommended Action"]):
+        for ci, hdr in enumerate(["ID", "Recommendation", "Priority", "Target SLA", "Owner"]):
             c = rr_tbl.cell(0, ci)
-            _set_cell_shading(c, "1A237E")
+            _set_cell_shading(c, "E8EAF6")
             p = c.paragraphs[0]
             r = p.add_run(hdr)
             r.bold = True
-            r.font.color.rgb = RGBColor(255, 255, 255)
-        priority_labels = {
+            r.font.color.rgb = RGBColor(0x1A, 0x23, 0x7E)
+        priority_labels_d = {
             "critical": "P1 — Immediate",
             "high": "P2 — Urgent",
             "medium": "P3 — Planned",
@@ -1357,21 +1623,45 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
             "informational": "P5 — Best Effort",
             "info": "P5 — Best Effort",
         }
+        sla_map_d = {
+            "critical": "48 hours",
+            "high": "14 days",
+            "medium": "30 days",
+            "low": "90 days",
+            "informational": "Best effort",
+            "info": "Best effort",
+        }
+        owner_map_d = {
+            "critical": "Security Team + CTO",
+            "high": "Security Team",
+            "medium": "Dev/Ops Team",
+            "low": "Dev Team",
+            "informational": "Dev Team",
+            "info": "Dev Team",
+        }
         for rank, f in enumerate(sorted_findings, 1):
             sev = (f.get("severity") or "").lower()
-            pri = priority_labels.get(sev, "P5")
-            rec = _safe(f.get("recommendation"), "Review and apply security hardening.")
-            rec_short = rec[:200] + "..." if len(rec) > 200 else rec
-            row_cells = [rr_tbl.cell(rank, ci) for ci in range(4)]
-            row_cells[0].paragraphs[0].add_run(pri)
-            row_cells[1].paragraphs[0].add_run(_safe(f.get("finding_id")))
-            title_c = row_cells[2]
-            tp = title_c.paragraphs[0]
-            tp.add_run(_safe(f.get("title")) + " ")
-            _set_cell_shading(title_c, SEV_DOCX_COLORS.get(sev, "757575"))
-            tr2 = tp.runs[-1]
-            tr2.font.color.rgb = RGBColor(255, 255, 255)
-            row_cells[3].paragraphs[0].add_run(rec_short)
+            pri = priority_labels_d.get(sev, "P5")
+            sla_d = sla_map_d.get(sev, "Best effort")
+            owner_d = owner_map_d.get(sev, "Dev Team")
+            rec_raw_d = f.get("recommendation") or ""
+            rec_summary_d = "—"
+            if rec_raw_d.strip().startswith("{"):
+                try:
+                    rec_j = json.loads(rec_raw_d)
+                    steps_d = rec_j.get("steps") or []
+                    rec_summary_d = steps_d[0][:160] if steps_d else (rec_j.get("context") or "")[:160]
+                except Exception:
+                    rec_summary_d = rec_raw_d[:160]
+            elif rec_raw_d.strip():
+                first_l = next((l for l in rec_raw_d.split("\n") if l.strip()), "")
+                rec_summary_d = first_l[:160] + ("..." if len(first_l) > 160 else "")
+            row_cells = [rr_tbl.cell(rank, ci) for ci in range(5)]
+            row_cells[0].paragraphs[0].add_run(_safe(f.get("finding_id")))
+            row_cells[1].paragraphs[0].add_run(rec_summary_d)
+            row_cells[2].paragraphs[0].add_run(pri)
+            row_cells[3].paragraphs[0].add_run(sla_d)
+            row_cells[4].paragraphs[0].add_run(owner_d)
         doc.add_paragraph()
     else:
         _add_para("No findings to remediate.")
