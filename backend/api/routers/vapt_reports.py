@@ -496,6 +496,82 @@ Rules:
         return {}
 
 
+async def _enrich_plain_recommendations(findings_dicts: List[Dict]) -> List[Dict]:
+    """At export time, enrich any finding with plain-text recommendation via AI."""
+    plain = [f for f in findings_dicts if not (f.get("recommendation") or "").strip().startswith("{")]
+    if not plain:
+        return findings_dicts
+    try:
+        from core.ai_providers import get_llm, ProviderUnavailableError
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        detail = "\n\n".join(
+            f"FINDING: {f.get('title','')}\n"
+            f"Severity: {f.get('severity','').upper()}\n"
+            f"Affected: {f.get('affected_asset') or 'N/A'}\n"
+            f"Description: {(f.get('description') or '')[:800]}\n"
+            f"Evidence: {(f.get('evidence') or '')[:300]}\n"
+            f"Existing hint: {(f.get('recommendation') or '')[:300]}"
+            for f in plain[:20]
+        )
+        system = (
+            "You are a senior penetration tester and security engineer writing a professional VAPT remediation report. "
+            "For each finding produce technically precise, actionable remediation a developer can execute immediately. "
+            "Include real shell commands, config file paths, version numbers from the finding, package manager syntax, code snippets. "
+            "Output valid JSON only — no markdown fences, no prose outside the JSON."
+        )
+        prompt = f"""Generate detailed remediation for these findings:
+
+{detail}
+
+Return JSON:
+{{
+  "finding_remediations": {{
+    "<exact finding title>": {{
+      "context": "2-3 sentences citing exact software name, version range, CVE IDs from description, attacker impact, business risk.",
+      "identify": ["Command or file check to confirm affected version — e.g. 'Run: catalina.sh version'"],
+      "steps": ["Step 1: exact command or config change", "Step 2: ...", "Step N: ..."],
+      "code_example": "<shell block or config snippet — omit key if not applicable>",
+      "post_upgrade": ["Post-change check 1 — specific command and expected output"],
+      "compensating_controls": ["Interim mitigation if immediate fix is not possible"],
+      "verification": [
+        "Re-run the vulnerability scanner and confirm the finding no longer triggers",
+        "Specific functional test to confirm the fix works"
+      ],
+      "references": "CVE IDs, CWE, OWASP category, advisory URLs from description"
+    }}
+  }}
+}}
+
+Rules:
+- context: MUST cite exact software, version, CVE IDs from the Description field. Never generic.
+- steps: real shell commands, exact package versions, config paths — no vague instructions.
+- code_example: real syntax only; omit key entirely if not applicable.
+- Include EVERY finding above using its exact title as the JSON key.
+"""
+        llm = get_llm()
+        resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        raw = str(resp.content).strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+        remediations = json.loads(raw).get("finding_remediations", {})
+        result = []
+        for f in findings_dicts:
+            if not (f.get("recommendation") or "").strip().startswith("{"):
+                enriched = remediations.get(f.get("title", ""), {})
+                if enriched:
+                    f = dict(f)
+                    f["recommendation"] = json.dumps(enriched)
+            result.append(f)
+        return result
+    except Exception as exc:
+        logger.warning("Export-time remediation enrichment failed: %s", exc)
+        return findings_dicts
+
+
 # ── From-Scan auto-generate ───────────────────────────────────────────────────
 
 @router.post("/clients/{cid}/vapt-reports/from-scan/", status_code=status.HTTP_201_CREATED)
@@ -883,6 +959,7 @@ async def export_remediation_pdf(
     client = _get_client_or_404(cid, db)
     from services.vapt_export import generate_remediation_pdf
     findings_dicts = [_finding_to_dict(f) for f in report.findings]
+    findings_dicts = await _enrich_plain_recommendations(findings_dicts)
     pdf_bytes = generate_remediation_pdf(_report_to_dict(report), findings_dicts, client.name)
     filename = f"vapt-remediation-{report.version}-{rid[:8]}.pdf"
     return _export_stream(pdf_bytes, "application/pdf", filename)
@@ -899,6 +976,7 @@ async def export_remediation_docx(
     client = _get_client_or_404(cid, db)
     from services.vapt_export import generate_remediation_docx
     findings_dicts = [_finding_to_dict(f) for f in report.findings]
+    findings_dicts = await _enrich_plain_recommendations(findings_dicts)
     docx_bytes = generate_remediation_docx(_report_to_dict(report), findings_dicts, client.name)
     filename = f"vapt-remediation-{report.version}-{rid[:8]}.docx"
     return _export_stream(
