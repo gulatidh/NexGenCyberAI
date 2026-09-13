@@ -294,15 +294,23 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
     sev_counts = _sev_counts(findings)
     retest_counts = _retest_counts(findings)
 
-    # Scope / methodology JSON
+    # Scope / methodology / SLA JSON
     scope = {}
     methodology = {}
+    _sla_defaults = {"critical": "24 hours", "high": "72 hours", "medium": "30 days", "low": "90 days", "info": "Best effort"}
+    sla_map: Dict[str, str] = dict(_sla_defaults)
     try:
         scope = json.loads(report.get("scope_json") or "{}")
     except Exception:
         pass
     try:
         methodology = json.loads(report.get("methodology_json") or "{}")
+    except Exception:
+        pass
+    try:
+        _cfg = json.loads(report.get("sla_config") or "{}")
+        if isinstance(_cfg, dict):
+            sla_map.update({k.lower(): v for k, v in _cfg.items() if v})
     except Exception:
         pass
 
@@ -665,23 +673,23 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
         ("CRITICAL", "9.0 – 10.0", HexColor("#C62828"), WHITE,
          "Remote unauthenticated code execution, complete system compromise.",
          "RCE, SQLi (full DB access), Privilege escalation to domain admin",
-         "Immediate — within 24 hours"),
+         sla_map.get("critical", "24 hours")),
         ("HIGH", "7.0 – 8.9", HexColor("#E64A19"), WHITE,
          "Significant risk requiring urgent attention.",
          "SSRF, Stored XSS, Authentication bypass, Exposed credentials",
-         "Urgent — within 72 hours"),
+         sla_map.get("high", "72 hours")),
         ("MEDIUM", "4.0 – 6.9", HexColor("#F9A825"), DARK_TEXT,
          "Moderate risk requiring planned remediation.",
          "Reflected XSS, CSRF, Insecure configuration, Sensitive data in logs",
-         "Planned — within 30 days"),
+         sla_map.get("medium", "30 days")),
         ("LOW", "0.1 – 3.9", HexColor("#2E7D32"), WHITE,
          "Minor risk with limited exposure.",
          "Missing headers, Verbose error messages, Weak cipher suites",
-         "Scheduled — within 90 days"),
+         sla_map.get("low", "90 days")),
         ("INFORMATIONAL", "N/A", HexColor("#1565C0"), WHITE,
          "Best practice observations, no immediate risk.",
          "Documentation gaps, Minor misconfigurations, Improvement areas",
-         "Best effort"),
+         sla_map.get("info", "Best effort")),
     ]
     matrix_data = [matrix_hdr]
     for row in matrix_rows:
@@ -1056,7 +1064,6 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
 
                 # 5. Suggested Tracking Entry
                 finding_elements.append(Paragraph("5. Suggested Tracking Entry", _tp_section_style))
-                sla_map = {"critical": "48 hours", "high": "14 days", "medium": "30 days", "low": "90 days"}
                 sev_key = _safe(f.get("severity"), "medium").lower()
                 track_rows = [
                     [Paragraph("Field", styles["label"]), Paragraph("Value", styles["label"])],
@@ -1161,14 +1168,8 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
             "informational": "P5 — Best Effort",
             "info":     "P5 — Best Effort",
         }
-        sla_map = {
-            "critical": "48 hours",
-            "high":     "14 days",
-            "medium":   "30 days",
-            "low":      "90 days",
-            "informational": "Best effort",
-            "info":     "Best effort",
-        }
+        _sla_ext = dict(sla_map)
+        _sla_ext.update({"informational": sla_map.get("info", "Best effort"), "info": sla_map.get("info", "Best effort")})
         owner_map = {
             "critical": "Security Team + CTO",
             "high":     "Security Team",
@@ -1180,7 +1181,7 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
         for rank, f in enumerate(sorted_findings, 1):
             sev = (f.get("severity") or "").lower()
             pri = priority_labels.get(sev, "P5 — Best Effort")
-            sla = sla_map.get(sev, "Best effort")
+            sla = _sla_ext.get(sev, "Best effort")
             owner = owner_map.get(sev, "Dev Team")
             rec_raw2 = f.get("recommendation") or ""
             rec_summary = "—"
@@ -1775,12 +1776,11 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
 
             # 5. Suggested Tracking Entry
             _docx_tp_section("5. Suggested Tracking Entry")
-            sla_map_df = {"critical": "48 hours", "high": "14 days", "medium": "30 days", "low": "90 days"}
             track_rows_df = [
                 ("Field", "Value"),
                 ("Finding ID", f"F-{fi+1:02d}"),
                 ("Priority", tracking_df.get("priority") or sev.capitalize()),
-                ("Target SLA", tracking_df.get("target_sla") or sla_map_df.get(sev, "—")),
+                ("Target SLA", tracking_df.get("target_sla") or sla_map.get(sev, "—")),
                 ("Owner", tracking_df.get("owner") or "—"),
                 ("Verification", tracking_df.get("verification") or "Security Team re-scan post-patch"),
                 ("Rollback Plan", tracking_df.get("rollback_plan") or "—"),
@@ -1862,14 +1862,8 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
             "informational": "P5 — Best Effort",
             "info": "P5 — Best Effort",
         }
-        sla_map_d = {
-            "critical": "48 hours",
-            "high": "14 days",
-            "medium": "30 days",
-            "low": "90 days",
-            "informational": "Best effort",
-            "info": "Best effort",
-        }
+        _sla_ext_d = dict(sla_map)
+        _sla_ext_d.update({"informational": sla_map.get("info", "Best effort")})
         owner_map_d = {
             "critical": "Security Team + CTO",
             "high": "Security Team",
@@ -1881,7 +1875,7 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
         for rank, f in enumerate(sorted_findings, 1):
             sev = (f.get("severity") or "").lower()
             pri = priority_labels_d.get(sev, "P5")
-            sla_d = sla_map_d.get(sev, "Best effort")
+            sla_d = _sla_ext_d.get(sev, "Best effort")
             owner_d = owner_map_d.get(sev, "Dev Team")
             rec_raw_d = f.get("recommendation") or ""
             rec_summary_d = "—"
@@ -1938,6 +1932,16 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
     report_title = _safe(report.get("title"), "VAPT Report")
     version_str = _safe(report.get("version"), "1.0")
     classification = _safe(report.get("classification"), "Confidential")
+
+    # SLA config from report (falls back to defaults)
+    _sla_defaults_r = {"critical": "24 hours", "high": "72 hours", "medium": "30 days", "low": "90 days", "info": "Best effort"}
+    sla_map: Dict[str, str] = dict(_sla_defaults_r)
+    try:
+        _cfg_r = json.loads(report.get("sla_config") or "{}")
+        if isinstance(_cfg_r, dict):
+            sla_map.update({k.lower(): v for k, v in _cfg_r.items() if v})
+    except Exception:
+        pass
 
     def _cover_template(canvas, doc):
         canvas.saveState()
@@ -2359,7 +2363,6 @@ def generate_remediation_pdf(report: Dict, findings: List[Dict], client_name: st
                 elems.append(Spacer(1, 0.1 * cm))
 
             elems.append(Paragraph("5. Suggested Tracking Entry", _tp_section_style))
-            sla_map = {"critical": "48 hours", "high": "14 days", "medium": "30 days", "low": "90 days"}
             sev_k = _safe(f.get("severity"), "medium").lower()
             track_rows = [
                 [Paragraph("Field", styles["label"]), Paragraph("Value", styles["label"])],

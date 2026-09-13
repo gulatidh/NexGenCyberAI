@@ -526,6 +526,16 @@ def _ensure_added_columns() -> None:
                 logger.info("Added vapt_reports.scan_id column (%s)", dialect)
             except Exception as exc:
                 logger.warning("vapt_reports.scan_id ALTER failed: %s", exc)
+        if vapt_cols and "sla_config" not in vapt_cols:
+            ddl = ("ALTER TABLE vapt_reports ADD sla_config NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE vapt_reports ADD COLUMN sla_config TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added vapt_reports.sla_config column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("vapt_reports.sla_config ALTER failed: %s", exc)
 
         # changelog_entries.flow_id — GitHub Actions run ID captured at deploy time
         try:

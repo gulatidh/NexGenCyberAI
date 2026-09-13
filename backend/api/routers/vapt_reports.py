@@ -104,6 +104,7 @@ def _report_to_dict(report: VAPTReport) -> Dict:
         "methodology_json": report.methodology_json,
         "conclusion": report.conclusion,
         "appendices": report.appendices,
+        "sla_config": report.sla_config,
         "created_at": report.created_at.isoformat() if report.created_at else None,
         "updated_at": report.updated_at.isoformat() if report.updated_at else None,
     }
@@ -140,6 +141,7 @@ class VAPTReportCreate(BaseModel):
     reviewed_by: Optional[str] = None
     report_date: Optional[str] = None   # ISO date string
     retest_date: Optional[str] = None
+    sla_config: Optional[str] = None    # JSON: per-severity target SLA strings
 
 
 class VAPTReportFromScan(BaseModel):
@@ -147,6 +149,7 @@ class VAPTReportFromScan(BaseModel):
     title: Optional[str] = None          # defaults to scan name
     classification: str = "Confidential"
     prepared_by: Optional[str] = None
+    sla_config: Optional[str] = None    # JSON: per-severity target SLA strings
 
 
 class VAPTReportUpdate(BaseModel):
@@ -163,6 +166,7 @@ class VAPTReportUpdate(BaseModel):
     methodology_json: Optional[str] = None
     conclusion: Optional[str] = None
     appendices: Optional[str] = None
+    sla_config: Optional[str] = None
 
 
 class VAPTFindingCreate(BaseModel):
@@ -264,6 +268,7 @@ async def create_vapt_report(
         reviewed_by=payload.reviewed_by,
         report_date=report_date,
         status="draft",
+        sla_config=payload.sla_config,
     )
     db.add(report)
     db.commit()
@@ -844,6 +849,7 @@ async def create_report_from_scan(
         scope_json=json.dumps(scope),
         methodology_json=json.dumps(methodology),
         conclusion=ai.get("conclusion", ""),
+        sla_config=payload.sla_config,
     )
     db.add(report)
     db.flush()
@@ -983,6 +989,7 @@ async def create_retest_version(
         methodology_json=original.methodology_json,
         conclusion=original.conclusion,
         appendices=original.appendices,
+        sla_config=original.sla_config,
     )
     db.add(new_report)
     db.flush()  # get new_report.id without committing

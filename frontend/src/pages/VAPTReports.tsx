@@ -5,11 +5,11 @@ import {
   TableCell, TableContainer, TableHead, TableRow, Paper, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, Select,
   MenuItem, FormControl, InputLabel, Tooltip, Alert, CircularProgress,
-  Stack, Divider, LinearProgress,
+  Stack, Divider, LinearProgress, Collapse,
 } from "@mui/material";
 import {
   GppGood, Add, Visibility, Delete, Security, CheckCircle,
-  HourglassEmpty, Shield, AutoAwesome, Article,
+  HourglassEmpty, Shield, AutoAwesome, Article, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -73,12 +73,21 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
+const DEFAULT_SLA = {
+  critical: "24 hours",
+  high: "72 hours",
+  medium: "30 days",
+  low: "90 days",
+  info: "Best effort",
+};
+
 const EMPTY_FORM = {
   title: "",
   classification: "Confidential",
   version: "1.0",
   prepared_by: "",
   report_date: new Date().toISOString().slice(0, 10),
+  sla: { ...DEFAULT_SLA },
 };
 
 export default function VAPTReports() {
@@ -94,6 +103,7 @@ export default function VAPTReports() {
   const [mode, setMode] = useState<"scan" | "blank">("scan");
   const [selectedScanId, setSelectedScanId] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
+  const [slaOpen, setSlaOpen] = useState(false);
 
   const { data: reports = [], isLoading, error } = useQuery({
     queryKey: ["vapt-reports", clientId],
@@ -142,19 +152,21 @@ export default function VAPTReports() {
     setMode("scan");
     setSelectedScanId("");
     setForm(EMPTY_FORM);
+    setSlaOpen(false);
   };
 
   const handleSubmit = () => {
+    const sla_config = JSON.stringify(form.sla);
     if (mode === "scan") {
-      completedScans.find((s: any) => s.id === selectedScanId);
       createFromScanMutation.mutate({
         scan_id: selectedScanId,
         title: form.title || undefined,
         classification: form.classification,
         prepared_by: form.prepared_by || undefined,
+        sla_config,
       });
     } else {
-      createBlankMutation.mutate(form);
+      createBlankMutation.mutate({ ...form, sla_config } as any);
     }
   };
 
@@ -455,6 +467,58 @@ export default function VAPTReports() {
               />
             )}
           </Stack>
+
+          {/* Remediation SLA targets */}
+          <Box sx={{ mt: 2 }}>
+            <Button
+              size="small"
+              variant="text"
+              endIcon={slaOpen ? <ExpandLess /> : <ExpandMore />}
+              onClick={() => setSlaOpen((o) => !o)}
+              sx={{ color: "text.secondary", textTransform: "none", pl: 0 }}
+            >
+              Remediation SLA Targets
+            </Button>
+            <Collapse in={slaOpen}>
+              <Box sx={{ mt: 1, p: 1.5, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 1, bgcolor: "rgba(255,255,255,0.02)" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                  Define how quickly each severity must be remediated. These appear in the Severity Rating Matrix and per-finding tracking tables in the PDF.
+                </Typography>
+                {(["critical", "high", "medium", "low", "info"] as Array<keyof typeof DEFAULT_SLA>).map((sev) => {
+                  const SEV_BG: Record<keyof typeof DEFAULT_SLA, string> = { critical: "#C62828", high: "#E64A19", medium: "#F9A825", low: "#2E7D32", info: "#1565C0" };
+                  return (
+                    <Stack key={sev} direction="row" spacing={1.5} sx={{ mb: 1, alignItems: "center" }}>
+                      <Chip
+                        label={sev === "info" ? "INFO" : sev.toUpperCase()}
+                        size="small"
+                        sx={{
+                          width: 80, fontWeight: 700, fontSize: "0.68rem", flexShrink: 0,
+                          bgcolor: SEV_BG[sev],
+                          color: sev === "medium" ? "#212121" : "#fff",
+                        }}
+                      />
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={form.sla[sev]}
+                        placeholder={DEFAULT_SLA[sev]}
+                        onChange={(e) => setForm((f) => ({ ...f, sla: { ...f.sla, [sev]: e.target.value } }))}
+                        sx={{ "& input": { fontSize: "0.82rem" } }}
+                      />
+                    </Stack>
+                  );
+                })}
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setForm((f) => ({ ...f, sla: { ...DEFAULT_SLA } }))}
+                  sx={{ color: "text.disabled", textTransform: "none", mt: 0.5, fontSize: "0.75rem" }}
+                >
+                  Reset to defaults
+                </Button>
+              </Box>
+            </Collapse>
+          </Box>
 
           {isPending && (
             <Box sx={{ mt: 2 }}>

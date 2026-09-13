@@ -1256,6 +1256,7 @@ class VAPTReport(Base):
     methodology_json = Column(Text)  # JSON: {phases:[{name,description}], tools:[], standards:[]}
     conclusion = Column(Text)
     appendices = Column(Text)
+    sla_config = Column(Text, nullable=True)  # JSON: {"critical":"24 hours","high":"72 hours","medium":"30 days","low":"90 days","info":"Best effort"}
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
