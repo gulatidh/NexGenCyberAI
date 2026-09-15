@@ -149,13 +149,9 @@ You produce specific, executable steps — not generic advice."""
         control_ids = sorted({f.get("control_id") for f in findings if f.get("control_id")})
 
         # ── Build prompts ──────────────────────────────────────────────────────
-        system = (
-            self.system_prompt()
-            + "\n\n"
-            + self.anti_hallucination_directive()
-            + "\n\n"
-            + self.consulting_packaging_directive()
-        )
+        # _call_llm auto-appends anti_hallucination_directive, consulting_packaging_directive,
+        # extra_context, and resource_inventory — pass only the domain system prompt.
+        system = self.system_prompt()
 
         user = f"""## Remediation Playbook Input: {client_name}
 

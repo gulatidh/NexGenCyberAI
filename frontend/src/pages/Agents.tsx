@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useActiveClient } from "../contexts/ClientContext";
@@ -8,13 +8,15 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField,
   Switch, IconButton, Tooltip, Drawer, Divider, LinearProgress, Collapse,
   Avatar, RadioGroup, FormControlLabel, Radio, FormLabel, Stepper, Step, StepLabel,
-  Paper,
+  Paper, OutlinedInput,
 } from "@mui/material";
 import {
   SmartToy, PlayArrow, Add, Edit, Delete, AutoFixHigh, ExpandMore, ExpandLess,
   CloudUpload, OpenInNew, ArrowBack, ArrowForward, DragIndicator,
-  AddCircle, DoNotDisturb,
+  AddCircle, DoNotDisturb, ThumbUp, EditNote, CheckCircle,
 } from "@mui/icons-material";
+import { useMsal } from "@azure/msal-react";
+import { loginRequest } from "../auth/msalConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentsApi, scansApi, agentCatalogApi, adminApi, customFrameworksApi, assetsApi, connectorsApi } from "../services/api";
 import { Scan, AgentType, MyAccess } from "../types";
@@ -491,6 +493,132 @@ interface AgentRun {
   error_message?: string;
 }
 
+// Per-agent typed intake field (from backend agent_inputs.py)
+interface AgentInputField {
+  name: string;
+  label: string;
+  type: "select" | "text" | "textarea" | "multiselect";
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  hint?: string;
+}
+
+// Dialog shown for legacy agents that have structured inputs
+function LegacyInputsDialog({ open, agent, onClose, onRun }: {
+  open: boolean;
+  agent: Agent | null;
+  onClose: () => void;
+  onRun: (extraInputData: Record<string, any>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, any>>({});
+  useEffect(() => { if (open) setValues({}); }, [open]);
+
+  if (!agent) return null;
+  const inputs: AgentInputField[] = (agent as any).inputs || [];
+
+  const set = (name: string, val: any) => setValues((v) => ({ ...v, [name]: val }));
+  const requiredFilled = inputs.filter((f) => f.required).every((f) => {
+    const v = values[f.name];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
+      <DialogTitle sx={{ pb: 0.5 }}>
+        <Typography sx={{ fontWeight: 700 }}>Run {agent.name}</Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          Provide context to improve analysis quality
+        </Typography>
+      </DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "divider", pt: 2 }}>
+        {inputs.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            No additional context required. Click Run to start.
+          </Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {inputs.map((field) => (
+              <Box key={field.name}>
+                {field.type === "select" && (
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: "text.secondary" }}>
+                      {field.label}{field.required ? " *" : ""}
+                    </InputLabel>
+                    <Select
+                      value={values[field.name] || ""}
+                      label={field.label + (field.required ? " *" : "")}
+                      onChange={(e) => set(field.name, e.target.value)}
+                      sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                      {(field.options || []).map((opt) => (
+                        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+                {field.type === "multiselect" && (
+                  <FormControl fullWidth size="small">
+                    <InputLabel sx={{ color: "text.secondary" }}>
+                      {field.label}{field.required ? " *" : ""}
+                    </InputLabel>
+                    <Select
+                      multiple
+                      value={values[field.name] || []}
+                      label={field.label + (field.required ? " *" : "")}
+                      input={<OutlinedInput label={field.label + (field.required ? " *" : "")} />}
+                      onChange={(e) => set(field.name, e.target.value)}
+                      renderValue={(selected: any[]) => (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {selected.map((v) => <Chip key={v} label={v} size="small" sx={{ height: 20 }} />)}
+                        </Box>
+                      )}
+                      sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}>
+                      {(field.options || []).map((opt) => (
+                        <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+                {field.type === "text" && (
+                  <TextField fullWidth size="small"
+                    label={field.label + (field.required ? " *" : "")}
+                    placeholder={field.placeholder}
+                    value={values[field.name] || ""}
+                    onChange={(e) => set(field.name, e.target.value)}
+                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                )}
+                {field.type === "textarea" && (
+                  <TextField fullWidth size="small" multiline rows={3}
+                    label={field.label + (field.required ? " *" : "")}
+                    placeholder={field.placeholder}
+                    value={values[field.name] || ""}
+                    onChange={(e) => set(field.name, e.target.value)}
+                    slotProps={{ inputLabel: { sx: { color: "text.secondary" } } }}
+                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }} />
+                )}
+                {field.hint && (
+                  <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, display: "block" }}>
+                    {field.hint}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ color: "text.secondary" }}>Cancel</Button>
+        <Button variant="contained" disabled={!requiredFilled}
+          startIcon={<PlayArrow />} onClick={() => onRun(values)}>
+          Run Agent
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 const RUN_STATUS_COLOR: Record<string, string> = {
   completed: "#34A853",
   failed: "#EA4335",
@@ -498,12 +626,25 @@ const RUN_STATUS_COLOR: Record<string, string> = {
   running: "#FBBC04",
 };
 
-function RecentRunRow({ run, onArchive }: {
+function RecentRunRow({ run, clientId, onArchive }: {
   run: AgentRun;
+  clientId: string;
   onArchive: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [feedbackStatus, setFeedbackStatus] = useState<"idle" | "positive" | "correcting" | "saved">("idle");
+  const [correctionText, setCorrectionText] = useState("");
   const hasOutput = run.status === "completed" && run.output_data;
+
+  const handleFeedback = async (type: "positive" | "correction", text?: string) => {
+    try {
+      await agentsApi.submitFeedback(clientId, run.id, type, text);
+      setFeedbackStatus(type === "positive" ? "positive" : "saved");
+    } catch {
+      // silently ignore feedback errors
+    }
+  };
+
   return (
     <Box sx={{ bgcolor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 1.5, p: 1.25, mb: 1 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -540,6 +681,59 @@ function RecentRunRow({ run, onArchive }: {
             <Typography variant="caption" sx={{ color: "text.secondary", whiteSpace: "pre-wrap", fontSize: 11 }}>
               {typeof run.output_data === "string" ? run.output_data : JSON.stringify(run.output_data, null, 2)}
             </Typography>
+            {/* Feedback row */}
+            <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Typography variant="caption" sx={{ color: "text.disabled", fontSize: 10 }}>
+                Was this helpful?
+              </Typography>
+              {feedbackStatus === "idle" && (
+                <>
+                  <Button size="small" startIcon={<ThumbUp sx={{ fontSize: 11 }} />}
+                    onClick={() => handleFeedback("positive")}
+                    sx={{ fontSize: 10, color: "#34A853", borderColor: "rgba(52,168,83,0.3)", minWidth: 0, py: 0.25, px: 0.75 }}
+                    variant="outlined">
+                    Helpful
+                  </Button>
+                  <Button size="small" startIcon={<EditNote sx={{ fontSize: 11 }} />}
+                    onClick={() => setFeedbackStatus("correcting")}
+                    sx={{ fontSize: 10, color: "text.secondary", borderColor: "divider", minWidth: 0, py: 0.25, px: 0.75 }}
+                    variant="outlined">
+                    Suggest Correction
+                  </Button>
+                </>
+              )}
+              {feedbackStatus === "positive" && (
+                <Chip size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />}
+                  label="Thanks for the feedback!"
+                  sx={{ height: 22, fontSize: 10, bgcolor: "rgba(52,168,83,0.12)", color: "#34A853" }} />
+              )}
+              {feedbackStatus === "saved" && (
+                <Chip size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />}
+                  label="Correction saved — applied next run"
+                  sx={{ height: 22, fontSize: 10, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4" }} />
+              )}
+            </Box>
+            <Collapse in={feedbackStatus === "correcting"} unmountOnExit>
+              <Box sx={{ mt: 1, display: "flex", gap: 1, alignItems: "flex-start" }}>
+                <TextField size="small" multiline rows={2} fullWidth
+                  placeholder="Describe what was wrong or how the output should be improved…"
+                  value={correctionText}
+                  onChange={(e) => setCorrectionText(e.target.value)}
+                  sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                  slotProps={{ input: { sx: { fontSize: 12 } } }} />
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, flexShrink: 0 }}>
+                  <Button size="small" variant="contained" disabled={!correctionText.trim()}
+                    onClick={() => handleFeedback("correction", correctionText)}
+                    sx={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                    Submit
+                  </Button>
+                  <Button size="small" onClick={() => setFeedbackStatus("idle")}
+                    sx={{ fontSize: 11, color: "text.secondary" }}>
+                    Cancel
+                  </Button>
+                </Box>
+              </Box>
+            </Collapse>
           </Box>
         </Collapse>
       )}
@@ -551,12 +745,16 @@ export default function Agents() {
   const qc = useQueryClient();
   const { canAct } = useViewMode();
   const { clientId: selectedClientId } = useActiveClient();
+  const { instance, accounts } = useMsal();
   const [configuring, setConfiguring] = useState<Agent | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [wizardAgent, setWizardAgent] = useState<Agent | null>(null);
+  const [legacyInputAgent, setLegacyInputAgent] = useState<Agent | null>(null);
   const [briefingOutput, setBriefingOutput] = useState<{ output: string; provider: string; model?: string; tokens_used: number; duration_ms: number } | null>(null);
   const [briefingError, setBriefingError] = useState<string>("");
   const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+  const [streamMessage, setStreamMessage] = useState<string>("");
+  const streamAbortRef = useRef<AbortController | null>(null);
   const { data: me } = useQuery<MyAccess>({ queryKey: ["my-access"], queryFn: adminApi.me, retry: 0 });
   const isAdmin = !!(me?.is_admin || me?.is_admin_anywhere);
 
@@ -615,6 +813,64 @@ export default function Agents() {
     }
   }, [pollingRun?.status, qc, selectedClientId]);
 
+  // SSE stream: connect when a run is active, show live progress_message
+  useEffect(() => {
+    if (!pollingRunId || !selectedClientId) {
+      setStreamMessage("");
+      return;
+    }
+    const ctrl = new AbortController();
+    streamAbortRef.current = ctrl;
+
+    (async () => {
+      try {
+        let token = "";
+        if (accounts.length > 0) {
+          try {
+            const resp = await instance.acquireTokenSilent({ ...loginRequest, account: accounts[0] });
+            token = resp.idToken || resp.accessToken;
+          } catch { /* use no token */ }
+        }
+        const url = agentsApi.streamUrl(selectedClientId, pollingRunId);
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: ctrl.signal,
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.message) setStreamMessage(event.message);
+              if (event.done) {
+                setPollingRunId(null);
+                setStreamMessage("");
+                qc.invalidateQueries({ queryKey: ["agent-runs-list", selectedClientId] });
+                return;
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+      } catch (e: any) {
+        if (e?.name !== "AbortError") setStreamMessage("");
+      }
+    })();
+
+    return () => {
+      ctrl.abort();
+      streamAbortRef.current = null;
+    };
+  }, [pollingRunId, selectedClientId, instance, accounts, qc]);
+
   // Recent runs list — last 5 for the current client
   const { data: recentRunsData } = useQuery<AgentRun[]>({
     queryKey: ["agent-runs-list", selectedClientId],
@@ -625,11 +881,11 @@ export default function Agents() {
   });
 
   const runMutation = useMutation({
-    mutationFn: ({ agentType, scanId, framework }: { agentType: AgentType; scanId?: string; framework?: string }) =>
+    mutationFn: ({ agentType, scanId, framework, extraInputData }: { agentType: AgentType; scanId?: string; framework?: string; extraInputData?: Record<string, any> }) =>
       agentsApi.run(selectedClientId, {
         agent_type: agentType,
         scan_id: scanId || undefined,
-        input_data: { framework: framework || "nist_csf" },
+        input_data: { framework: framework || "nist_csf", ...(extraInputData || {}) },
       }),
     onSuccess: (run, vars) => {
       if (run?.id) {
@@ -786,7 +1042,14 @@ export default function Agents() {
                             <span>
                               <Button size="small" variant="outlined" startIcon={<PlayArrow sx={{ fontSize: 14 }} />}
                                 disabled={!selectedClientId || !canAct || !agent.is_enabled || (agent.legacy_orchestrator && (runMutation.isPending || !!pollingRunId))}
-                                onClick={() => { setBriefingOutput(null); setBriefingError(""); setWizardAgent(agent); }}
+                                onClick={() => {
+                                  setBriefingOutput(null); setBriefingError("");
+                                  if (agent.legacy_orchestrator && (agent as any).inputs?.length > 0) {
+                                    setLegacyInputAgent(agent);
+                                  } else {
+                                    setWizardAgent(agent);
+                                  }
+                                }}
                                 sx={{ borderColor: color, color, fontSize: 11, "&:hover": { bgcolor: `${color}1A` } }}>
                                 {agent.legacy_orchestrator && pollingRunId ? "Running…" : "Run"}
                               </Button>
@@ -865,9 +1128,9 @@ export default function Agents() {
           {pollingRunId && (
             <>
               <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 0.5 }}>
-                Agent running — waiting for result…
+                {streamMessage || "Agent running — waiting for result…"}
               </Typography>
-              <LinearProgress sx={{ borderRadius: 1 }} />
+              <LinearProgress sx={{ borderRadius: 1, "& .MuiLinearProgress-bar": { bgcolor: "#FBBC04" } }} />
             </>
           )}
           {!pollingRunId && pollingRun?.status === "failed" && (
@@ -896,7 +1159,7 @@ export default function Agents() {
             </Button>
           </Box>
           {(recentRunsData || []).map((run) => (
-            <RecentRunRow key={run.id} run={run} onArchive={() => archiveRunMutation.mutate(run.id)} />
+            <RecentRunRow key={run.id} run={run} clientId={selectedClientId!} onArchive={() => archiveRunMutation.mutate(run.id)} />
           ))}
         </Box>
       )}
@@ -913,6 +1176,19 @@ export default function Agents() {
         onClose={() => setNewOpen(false)}
         onCreate={(data) => createMutation.mutate(data)}
         existingGroups={groupOptions}
+      />
+
+      {/* Legacy agent inputs dialog */}
+      <LegacyInputsDialog
+        open={!!legacyInputAgent}
+        agent={legacyInputAgent}
+        onClose={() => setLegacyInputAgent(null)}
+        onRun={(extraInputData) => {
+          if (legacyInputAgent) {
+            setLegacyInputAgent(null);
+            runMutation.mutate({ agentType: legacyInputAgent.key as AgentType, extraInputData });
+          }
+        }}
       />
 
       {/* Agent Run Wizard */}

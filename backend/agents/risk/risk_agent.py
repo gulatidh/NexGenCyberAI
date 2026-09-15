@@ -132,13 +132,9 @@ You present every risk entry with explicit likelihood and impact justification."
         risk_register = map_to_risk_register_structured(findings)
 
         # ── Build prompts ──────────────────────────────────────────────────────
-        system = (
-            self.system_prompt()
-            + "\n\n"
-            + self.anti_hallucination_directive()
-            + "\n\n"
-            + self.consulting_packaging_directive()
-        )
+        # _call_llm auto-appends anti_hallucination_directive, consulting_packaging_directive,
+        # extra_context, and resource_inventory — pass only the domain system prompt.
+        system = self.system_prompt()
 
         user = f"""## Risk Management Assessment Input: {client_name}
 

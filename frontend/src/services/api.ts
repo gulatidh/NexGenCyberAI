@@ -314,6 +314,13 @@ export const agentsApi = {
     apiClient.post(`/clients/${clientId}/agents/runs/${runId}/restore`).then((r) => r.data),
   permanentDeleteRun: (clientId: string, runId: string) =>
     apiClient.delete(`/clients/${clientId}/agents/runs/${runId}/permanent`).then((r) => r.data),
+  streamUrl: (clientId: string, runId: string) =>
+    `${BASE_URL}/clients/${clientId}/agents/runs/${runId}/stream`,
+  submitFeedback: (clientId: string, runId: string, feedbackType: string, correctionText?: string) =>
+    apiClient.post(`/clients/${clientId}/agents/runs/${runId}/feedback`, {
+      feedback_type: feedbackType,
+      correction_text: correctionText,
+    }).then((r) => r.data),
 };
 
 export const aiApi = {

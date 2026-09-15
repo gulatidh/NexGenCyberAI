@@ -1,10 +1,13 @@
 """AI Agent execution endpoints."""
+import asyncio
+import json as _json
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 from api.models.models import (
-    AgentRun, AgentType, Scan, Finding, Risk, RiskLevel,
+    AgentRun, AgentFeedback, AgentType, Scan, Finding, Risk, RiskLevel,
     ThreatEntry, ControlDeficiency, RemediationAction,
     CustomFramework, CustomFrameworkControl,
 )
@@ -222,6 +225,9 @@ async def _run_config_review_task(run_id: str, client_id: str) -> None:
             )
         assets = asset_query.limit(30).all()
 
+        run.progress_message = f"Reviewing {len(assets)} asset configurations..."
+        db.commit()
+
         if not assets:
             run.status = "failed"
             no_assets_msg = (
@@ -269,6 +275,9 @@ Return ONLY valid JSON (no markdown):
 
 Focus on: overly permissive IAM, unencrypted storage, missing logging, public exposure, weak authentication config.
 Return empty findings array if config looks secure. Max 20 findings."""
+
+        run.progress_message = "Running AI security configuration review..."
+        db.commit()
 
         llm = get_llm()
         response = llm.invoke(prompt)
@@ -328,6 +337,12 @@ Return empty findings array if config looks secure. Max 20 findings."""
         db.close()
 
 
+def _set_progress(db, run, msg: str) -> None:
+    """Update progress_message on an AgentRun and commit so SSE stream picks it up."""
+    run.progress_message = msg
+    db.commit()
+
+
 async def _run_agent_task(
     run_id: str,
     client_id: str,
@@ -352,6 +367,35 @@ async def _run_agent_task(
         run.status = "running"
         db.commit()
 
+        # ── Cross-session learning: inject prior corrections for this client+agent ──
+        from api.models.models import AgentFeedback as _AgentFeedback
+        prior_corrections = (
+            db.query(_AgentFeedback)
+            .filter(
+                _AgentFeedback.client_id == client_id,
+                _AgentFeedback.agent_type == agent_type_val,
+                _AgentFeedback.feedback_type == "correction",
+                _AgentFeedback.correction_text.isnot(None),
+            )
+            .order_by(_AgentFeedback.created_at.desc())
+            .limit(5)
+            .all()
+        )
+        if prior_corrections:
+            corrections_text = "\n".join(
+                f"- {c.correction_text}" for c in prior_corrections if c.correction_text
+            )
+            prior_context = (
+                "## Prior User Corrections for This Client\n"
+                "The user has previously corrected this agent's output for this client. "
+                "Apply these corrections in your current analysis:\n\n"
+                f"{corrections_text}"
+            )
+            existing = custom_context or ""
+            custom_context = (prior_context + "\n\n" + existing).strip() if existing else prior_context
+
+        _set_progress(db, run, f"Loading {len(findings)} findings and building analysis context...")
+
         from agents.orchestrator.orchestrator import AgentOrchestrator
         orchestrator = AgentOrchestrator()
 
@@ -360,6 +404,8 @@ async def _run_agent_task(
             orchestrator.compliance.extra_context = custom_context
 
         orchestrator.set_resource_inventory(raw_context_str)
+
+        _set_progress(db, run, f"Running {agent_type_val.replace('_', ' ')} analysis...")
 
         result = await orchestrator.run_single_agent(
             agent_type_val,
@@ -529,6 +575,97 @@ async def get_agent_run(client_id: str, run_id: str, db: Session = Depends(get_d
     if not run:
         raise HTTPException(status_code=404, detail="Agent run not found")
     return run
+
+
+@router.get("/runs/{run_id}/stream")
+async def stream_agent_run(
+    client_id: str,
+    run_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """SSE endpoint: streams agent run progress messages until completion.
+
+    Clients should connect with EventSource immediately after POSTing to /run/.
+    Events: {status, message} until done=true with full output_data payload.
+    """
+    async def generate():
+        last_msg = ""
+        for _ in range(300):  # max 5 minutes at 1s polling
+            run = db.query(AgentRun).filter(
+                AgentRun.id == run_id, AgentRun.client_id == client_id
+            ).first()
+            if not run:
+                yield f"data: {_json.dumps({'error': 'not_found'})}\n\n"
+                return
+
+            msg = getattr(run, "progress_message", None) or run.status
+            status = run.status
+
+            if msg != last_msg:
+                last_msg = msg
+                yield f"data: {_json.dumps({'status': status, 'message': msg})}\n\n"
+
+            if status in ("completed", "failed"):
+                payload = {
+                    "status": status,
+                    "done": True,
+                    "run_id": run_id,
+                    "output_data": run.output_data,
+                    "error_message": run.error_message,
+                }
+                yield f"data: {_json.dumps(payload)}\n\n"
+                return
+
+            await asyncio.sleep(1)
+        yield f"data: {_json.dumps({'status': 'timeout', 'done': True})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/runs/{run_id}/feedback", dependencies=[Depends(get_current_user)])
+async def submit_agent_feedback(
+    client_id: str,
+    run_id: str,
+    payload: dict,
+    db: Session = Depends(get_db),
+):
+    """Submit thumbs-up or correction feedback on a completed agent run.
+
+    payload: {"feedback_type": "positive"|"correction", "correction_text": "..."}
+    Corrections are injected into subsequent runs of the same agent type for this client.
+    """
+    run = db.query(AgentRun).filter(AgentRun.id == run_id, AgentRun.client_id == client_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    feedback = AgentFeedback(
+        client_id=client_id,
+        agent_type=run.agent_type.value if hasattr(run.agent_type, "value") else str(run.agent_type),
+        run_id=run_id,
+        feedback_type=payload.get("feedback_type", "correction"),
+        correction_text=payload.get("correction_text"),
+    )
+    db.add(feedback)
+    db.commit()
+    return {"saved": True}
+
+
+@router.get("/feedback/")
+async def list_agent_feedback(
+    client_id: str,
+    agent_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """List feedback submitted for this client's agent runs."""
+    q = db.query(AgentFeedback).filter(AgentFeedback.client_id == client_id)
+    if agent_type:
+        q = q.filter(AgentFeedback.agent_type == agent_type)
+    return q.order_by(AgentFeedback.created_at.desc()).limit(50).all()
 
 
 @router.delete("/runs/{run_id}")

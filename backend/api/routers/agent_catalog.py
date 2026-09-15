@@ -21,6 +21,7 @@ from db.database import get_db
 from core.security import get_current_user
 from api.models.models import AIAgent, AgentRun, Risk, RiskLevel
 from core.authz import get_user_grants, is_admin_anywhere
+from core.agent_inputs import get_agent_inputs
 from services.risk_scoring import clamp_scale, compute_risk_score
 
 router = APIRouter(prefix="/agents/catalog", tags=["agent_catalog"])
@@ -142,7 +143,9 @@ async def list_agents(
             continue
         if a.group_key not in grouped:
             grouped[a.group_key] = {"key": a.group_key, "label": a.group_label, "agents": []}
-        grouped[a.group_key]["agents"].append(AgentResponse.model_validate(a).model_dump(mode="json"))
+        agent_dict = AgentResponse.model_validate(a).model_dump(mode="json")
+        agent_dict["inputs"] = get_agent_inputs(a.key)
+        grouped[a.group_key]["agents"].append(agent_dict)
     return {"groups": list(grouped.values())}
 
 

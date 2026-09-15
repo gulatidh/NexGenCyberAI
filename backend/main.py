@@ -922,6 +922,22 @@ def _ensure_added_columns() -> None:
         except Exception as exc:
             logger.warning("Raw orphan cleanup failed: %s", exc)
 
+        # agent_runs.progress_message — live status text streamed to frontend via SSE
+        try:
+            agent_run_cols = {c["name"] for c in inspector.get_columns("agent_runs")}
+        except Exception:
+            agent_run_cols = set()
+        if "progress_message" not in agent_run_cols:
+            ddl = ("ALTER TABLE agent_runs ADD progress_message NVARCHAR(MAX) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE agent_runs ADD COLUMN progress_message TEXT")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added agent_runs.progress_message column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("agent_runs.progress_message ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
@@ -2145,6 +2161,13 @@ _fail_stale_threat_models()
 _fail_stale_scans()
 _prune_access_logs()
 _seed_technology_types()
+
+try:
+    from services.knowledge_loader import get_kev_catalog
+    _kev = get_kev_catalog()
+    logger.info("CISA KEV cache ready: %d entries", len(_kev))
+except Exception as _kev_exc:
+    logger.warning("CISA KEV load skipped: %s", _kev_exc)
 
 app = FastAPI(
     title="NexGenCyberAI API",

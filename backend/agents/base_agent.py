@@ -216,18 +216,26 @@ CRITICAL REMINDERS:
     async def _call_llm(self, system_prompt: str, user_prompt: str) -> Dict:
         """Invoke the LLM with system + user messages and parse JSON response.
 
+        Automatically appends anti-hallucination rules, output format directive,
+        custom framework context, and resource inventory to every system prompt.
         Strips code fences before JSON parsing. On any failure returns a minimal
         structured error dict that matches the expected output schema.
         """
         llm = self._get_llm()
+        full_system = (
+            system_prompt
+            + "\n\n" + self.anti_hallucination_directive()
+            + "\n\n" + self.consulting_packaging_directive()
+        )
+        if self.extra_context:
+            full_system += f"\n\n## Framework Controls Reference\n{self.extra_context}"
         if self.resource_inventory:
-            system_prompt = (
-                system_prompt
-                + f"\n\n## Resource Inventory\nThe following resources were discovered during the scan. "
+            full_system += (
+                f"\n\n## Resource Inventory\nThe following resources were discovered during the scan. "
                 f"Use this to reason about assets that have no findings but may still be relevant to the security posture:\n\n"
                 f"{self.resource_inventory}"
             )
-        messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+        messages = [SystemMessage(content=full_system), HumanMessage(content=user_prompt)]
         try:
             response = await llm.ainvoke(messages)
             raw = response.content if hasattr(response, "content") else str(response)

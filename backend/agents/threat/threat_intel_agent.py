@@ -30,7 +30,8 @@ class ThreatIntelAgent(BaseAgent):
     )
 
     def system_prompt(self) -> str:
-        return """## Role: Senior Threat Intelligence Analyst & SOC Architect
+        from services.knowledge_loader import get_mitre_context, get_kev_context
+        base = """## Role: Senior Threat Intelligence Analyst & SOC Architect
 
 You are a senior threat intelligence analyst with 12 years of experience supporting
 Security Operations Centres at financial sector, government, and critical infrastructure
@@ -92,6 +93,7 @@ You write in a precise, third-person analyst report tone. You ground all threat 
 attributions in evidence from the provided findings. You never speculate beyond what the
 data supports. You distinguish clearly between observed TTPs (high confidence), inferred
 TTPs (medium confidence), and possible TTPs (low confidence)."""
+        return base + "\n\n" + get_mitre_context() + "\n\n" + get_kev_context(max_entries=30)
 
     async def enrich_findings(
         self,
@@ -133,13 +135,9 @@ TTPs (medium confidence), and possible TTPs (low confidence)."""
             })
 
         # ── Build prompts ──────────────────────────────────────────────────────
-        system = (
-            self.system_prompt()
-            + "\n\n"
-            + self.anti_hallucination_directive()
-            + "\n\n"
-            + self.consulting_packaging_directive()
-        )
+        # Note: _call_llm automatically appends anti_hallucination_directive and
+        # consulting_packaging_directive, so we only pass the domain system prompt.
+        system = self.system_prompt()
 
         user = f"""## Threat Intelligence Enrichment Input: {client_name}
 

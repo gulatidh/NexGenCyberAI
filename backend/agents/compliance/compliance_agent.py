@@ -148,15 +148,9 @@ and between required and recommended controls in other frameworks."""
         framework_display = _normalise_framework_name(framework)
 
         # ── Build prompts ──────────────────────────────────────────────────────
-        system = (
-            self.system_prompt()
-            + "\n\n"
-            + self.anti_hallucination_directive()
-            + "\n\n"
-            + self.consulting_packaging_directive()
-        )
-        if self.extra_context:
-            system += f"\n\n## Framework Controls Reference\n{self.extra_context}"
+        # _call_llm auto-appends anti_hallucination_directive, consulting_packaging_directive,
+        # extra_context, and resource_inventory — pass only the domain system prompt.
+        system = self.system_prompt()
 
         user = f"""## Compliance Audit Report Input: {client_name}
 

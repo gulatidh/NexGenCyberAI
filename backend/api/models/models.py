@@ -679,6 +679,23 @@ class AgentRun(Base):
     hidden_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class AgentFeedback(Base):
+    """User feedback on agent runs — drives cross-session learning.
+
+    Corrections are injected into subsequent runs of the same agent type
+    for the same client so the agent improves over time without retraining.
+    """
+    __tablename__ = "agent_feedback"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False)
+    agent_type = Column(String(64), nullable=False, index=True)
+    run_id = Column(String(36), ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=True)
+    feedback_type = Column(String(32), nullable=False)  # "correction" | "positive"
+    correction_text = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ThreatLibrary(Base):
     """Canonical threat-library entries — CAPEC patterns and MITRE ATT&CK
     techniques, ingested via the Sync page. The Threat Modeler service
