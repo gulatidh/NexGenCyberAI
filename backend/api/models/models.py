@@ -718,8 +718,8 @@ class FindingLink(Base):
 
     id = Column(String(36), primary_key=True, default=_uuid)
     client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
-    from_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="CASCADE"), nullable=False)
-    to_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="CASCADE"), nullable=False)
+    from_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="NO ACTION"), nullable=False)
+    to_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="NO ACTION"), nullable=False)
     link_type = Column(String(32), nullable=False)
     created_by = Column(String(64), default="manual")
     notes = Column(Text, nullable=True)
