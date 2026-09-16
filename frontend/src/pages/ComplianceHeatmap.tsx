@@ -11,13 +11,6 @@ import { apiClient } from "../services/api";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface FrameworkSummary {
-  framework: string;
-  overall_score: number;
-  total_controls: number;
-  passed: number;
-}
-
 interface MatrixCell {
   pass_rate: number | null;
   passed: number;
@@ -28,7 +21,7 @@ interface HeatmapData {
   frameworks: string[];
   domains: string[];
   matrix: Record<string, Record<string, MatrixCell>>;
-  summary: FrameworkSummary[];
+  summary: Record<string, { overall_score: number; controls_total: number; controls_passed: number }>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -262,7 +255,7 @@ export default function ComplianceHeatmap() {
                       Overall Score
                     </TableCell>
                     {data.frameworks.map((fw) => {
-                      const summary = data.summary.find((s) => s.framework === fw);
+                      const summary = (data.summary as Record<string, { overall_score?: number }>)[fw];
                       const score = summary?.overall_score ?? null;
                       return (
                         <TableCell key={fw} align="center" sx={{ p: 1 }}>
@@ -291,15 +284,15 @@ export default function ComplianceHeatmap() {
           </Card>
 
           {/* Per-framework summary chips */}
-          {data.summary.length > 0 && (
+          {Object.keys(data.summary).length > 0 && (
             <Box sx={{ display: "flex", gap: 1.5, mt: 2.5, flexWrap: "wrap" }}>
-              {data.summary.map((s) => (
+              {Object.entries(data.summary).map(([fw, s]) => (
                 <Tooltip
-                  key={s.framework}
-                  title={`${s.passed} / ${s.total_controls} controls passed`}
+                  key={fw}
+                  title={`${s.controls_passed} / ${s.controls_total} controls passed`}
                 >
                   <Chip
-                    label={`${fwLabel(s.framework)}: ${Math.round(s.overall_score)}%`}
+                    label={`${fwLabel(fw)}: ${Math.round(s.overall_score)}%`}
                     size="small"
                     sx={{
                       bgcolor: `${scoreColor(s.overall_score)}15`,
