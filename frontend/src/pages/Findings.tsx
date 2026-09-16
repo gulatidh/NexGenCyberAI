@@ -11,13 +11,14 @@ import {
 import {
   BugReport, DeleteOutlined, CleaningServices, FileDownload, CheckCircle, Cancel,
   VisibilityOff, Visibility, AutoAwesome, Refresh, AssignmentTurnedIn, AutoFixHigh,
+  Link as LinkIcon,
 } from "@mui/icons-material";
 import Checkbox from "@mui/material/Checkbox";
 import * as Icons from "@mui/icons-material";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { findingsApi, projectsApi, scansApi, postureApi } from "../services/api";
+import { findingsApi, projectsApi, scansApi, postureApi, findingLinksApi } from "../services/api";
 import { Finding, Project, FindingCategoriesResponse, Scan } from "../types";
 import FixWithAIDialog from "../components/FixWithAIDialog";
 import { fromNow } from "../utils/datetime";
@@ -390,6 +391,9 @@ export default function Findings() {
   const [playbookLoading, setPlaybookLoading] = React.useState(false);
   const [playbookData, setPlaybookData] = React.useState<Record<string, string>>({});
   const [playbookOpen, setPlaybookOpen] = React.useState<Record<string, boolean>>({});
+  const [linksOpen, setLinksOpen] = React.useState<Record<string, boolean>>({});
+  const [linksData, setLinksData] = React.useState<Record<string, any>>({});
+  const [linksLoading, setLinksLoading] = React.useState<Record<string, boolean>>({});
 
   const suppressMutation = useMutation({
     mutationFn: async ({ finding, reason }: { finding: Finding; reason: string }) => {
@@ -471,6 +475,25 @@ export default function Findings() {
         setPlaybookLoading(false);
         setPlaybookFindingId(null);
       }
+    }
+  };
+
+  const handleLoadLinks = async (findingId: string) => {
+    if (linksOpen[findingId]) {
+      setLinksOpen(prev => ({ ...prev, [findingId]: false }));
+      return;
+    }
+    if (!clientId) return;
+    setLinksOpen(prev => ({ ...prev, [findingId]: true }));
+    if (linksData[findingId]) return;
+    setLinksLoading(prev => ({ ...prev, [findingId]: true }));
+    try {
+      const result = await findingLinksApi.getLinks(clientId, findingId);
+      setLinksData(prev => ({ ...prev, [findingId]: result }));
+    } catch {
+      // silent fail — no links available
+    } finally {
+      setLinksLoading(prev => ({ ...prev, [findingId]: false }));
     }
   };
 
@@ -991,6 +1014,32 @@ export default function Findings() {
                             </Button>
                           </Tooltip>
 
+                          {/* Related findings link button */}
+                          <Tooltip title={linksOpen[f.id] ? "Hide relationships" : "Show related findings"}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={
+                                linksLoading[f.id]
+                                  ? <CircularProgress size={12} sx={{ color: "#9C27B0" }} />
+                                  : <LinkIcon sx={{ fontSize: 13 }} />
+                              }
+                              onClick={(e) => { e.stopPropagation(); handleLoadLinks(f.id); }}
+                              sx={{
+                                fontSize: 10,
+                                py: 0.25,
+                                px: 0.75,
+                                color: linksOpen[f.id] ? "#9C27B0" : "rgba(156,39,176,0.6)",
+                                borderColor: linksOpen[f.id] ? "rgba(156,39,176,0.5)" : "rgba(156,39,176,0.2)",
+                                textTransform: "none",
+                                minWidth: 0,
+                                "&:hover": { borderColor: "#9C27B0", bgcolor: "rgba(156,39,176,0.06)" },
+                              }}
+                            >
+                              Related
+                            </Button>
+                          </Tooltip>
+
                           {/* Accept Risk — only shown when not already accepted/false_positive */}
                           {!isGuest && f.status !== "accepted" && f.status !== "false_positive" && (
                             <Tooltip title="Accept as known risk (won't fix now)">
@@ -1088,6 +1137,65 @@ export default function Findings() {
                             >
                               {playbookData[f.id] || f.playbook}
                             </Typography>
+                          </Box>
+                        </Collapse>
+
+                        {/* Related findings expansion panel */}
+                        <Collapse in={!!linksOpen[f.id]} unmountOnExit>
+                          <Box
+                            sx={{
+                              mt: 1, p: 1.25, borderRadius: 1,
+                              bgcolor: "rgba(156,39,176,0.05)",
+                              border: "1px solid rgba(156,39,176,0.2)",
+                              textAlign: "left",
+                              maxWidth: 500,
+                              ml: "auto",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 0.75 }}>
+                              <LinkIcon sx={{ fontSize: 13, color: "#9C27B0" }} />
+                              <Typography variant="caption" sx={{ color: "#9C27B0", fontWeight: 700, fontSize: 10 }}>
+                                RELATED FINDINGS
+                              </Typography>
+                            </Box>
+                            {linksLoading[f.id] ? (
+                              <CircularProgress size={16} sx={{ color: "#9C27B0" }} />
+                            ) : !linksData[f.id]?.links?.length ? (
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                No relationships defined yet.
+                              </Typography>
+                            ) : (
+                              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                                {linksData[f.id].links.map((link: any) => {
+                                  const other = link.other_finding;
+                                  if (!other) return null;
+                                  const sev = String(other.severity?.value ?? other.severity ?? "info");
+                                  return (
+                                    <Box key={link.id} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.25 }}>
+                                      <Chip
+                                        label={link.link_type}
+                                        size="small"
+                                        sx={{ height: 16, fontSize: 9, fontWeight: 700,
+                                          bgcolor: "rgba(156,39,176,0.15)", color: "#9C27B0",
+                                          textTransform: "uppercase" }}
+                                      />
+                                      <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.4)", fontSize: 10 }}>
+                                        {link.direction === "outbound" ? "→" : "←"}
+                                      </Typography>
+                                      <Chip label={sev} size="small"
+                                        sx={{ height: 14, fontSize: 9,
+                                          bgcolor: `${SEV_COLOR[sev] || "#888"}20`,
+                                          color: SEV_COLOR[sev] || "#888" }} />
+                                      <Typography variant="caption" sx={{ color: "text.primary", fontSize: 11, flex: 1,
+                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {other.title}
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            )}
                           </Box>
                         </Collapse>
                       </TableCell>

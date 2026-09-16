@@ -243,6 +243,8 @@ export const scansApi = {
     apiClient.post(`/clients/${clientId}/scans/${scanId}/enrich`).then((r) => r.data),
   move: (clientId: string, scanId: string, targetProjectId: string | null) =>
     apiClient.patch(`/clients/${clientId}/scans/${scanId}/move`, { target_project_id: targetProjectId }).then((r) => r.data),
+  getDelta: (clientId: string, scanId: string, compareTo?: string) =>
+    apiClient.get(`/clients/${clientId}/scans/${scanId}/delta`, { params: compareTo ? { compare_to: compareTo } : {} }).then((r) => r.data),
 };
 
 export const findingsApi = {
@@ -1005,4 +1007,20 @@ export const controlPoliciesApi = {
     apiClient.post(`/clients/${clientId}/control-policies/preview`, body).then((r) => r.data),
   explain: (clientId: string, id: string) =>
     apiClient.get(`/clients/${clientId}/control-policies/${id}/explain`).then((r) => r.data),
+};
+
+export const findingLinksApi = {
+  getLinks: (clientId: string, findingId: string) =>
+    apiClient.get(`/clients/${clientId}/findings/${findingId}/links`).then((r) => r.data),
+  create: (clientId: string, findingId: string, body: { from_finding_id: string; to_finding_id: string; link_type: string; notes?: string }) =>
+    apiClient.post(`/clients/${clientId}/findings/${findingId}/links`, body).then((r) => r.data),
+  delete: (clientId: string, linkId: string) =>
+    apiClient.delete(`/clients/${clientId}/findings/links/${linkId}`).then((r) => r.data),
+};
+
+export const ontologyApi = {
+  getGraph: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/ontology/`).then((r) => r.data),
+  getStats: (clientId: string) =>
+    apiClient.get(`/clients/${clientId}/ontology/stats`).then((r) => r.data),
 };

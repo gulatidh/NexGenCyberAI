@@ -9,6 +9,7 @@ import {
 import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
   CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close, MenuBook, Storage,
+  CompareArrows, TrendingUp, TrendingDown, TrendingFlat, AddCircleOutlined, RemoveCircleOutlined,
 } from "@mui/icons-material";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -445,9 +446,10 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
 // ── Nav ──────────────────────────────────────────────────────────────────────
 
 const BASE_NAV: DetailNavItem[] = [
-  { id: "verdict",  label: "AI Verdict",  Icon: AutoAwesome, color: "#4285F4" },
-  { id: "findings", label: "Findings",    Icon: BugReport,   color: "#EA4335" },
-  { id: "raw",      label: "Raw Data",    Icon: Storage,     color: "#00ACC1" },
+  { id: "verdict",  label: "AI Verdict",  Icon: AutoAwesome,   color: "#4285F4" },
+  { id: "findings", label: "Findings",    Icon: BugReport,     color: "#EA4335" },
+  { id: "changes",  label: "Changes",     Icon: CompareArrows, color: "#34A853" },
+  { id: "raw",      label: "Raw Data",    Icon: Storage,       color: "#00ACC1" },
 ];
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -532,6 +534,12 @@ export default function ScanDetail() {
     queryKey: ["raw-findings", scanImport?.id, scanImport?.scanner_type],
     queryFn: () => scansApi.getRawFindings(clientId!, scanImport!.scanner_type, scanImport!.id),
     enabled: !!scanImport?.id && !!scanImport?.scanner_type,
+  });
+
+  const { data: deltaData } = useQuery<any>({
+    queryKey: ["scan-delta", scanId, clientId],
+    queryFn: () => scansApi.getDelta(clientId!, scanId!),
+    enabled: !!scanId && !!clientId && tab === "changes" && data?.status === "completed",
   });
 
   const verdict = data?.ai_verdict;
@@ -856,6 +864,196 @@ export default function ScanDetail() {
                   <Typography sx={{ color: "text.secondary", textAlign: "center", py: 2 }}>
                     No raw rows loaded yet.
                   </Typography>
+                )}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Changes tab — scan delta vs previous completed scan */}
+      {tab === "changes" && (
+        <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+          <CardContent>
+            {data.status !== "completed" ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <CompareArrows sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+                <Typography sx={{ color: "text.secondary" }}>
+                  Scan must complete before comparing findings.
+                </Typography>
+              </Box>
+            ) : !deltaData ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={28} sx={{ color: "#34A853" }} />
+              </Box>
+            ) : deltaData.no_baseline ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <CompareArrows sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+                <Typography sx={{ color: "text.secondary" }}>
+                  No previous completed scan to compare against.
+                </Typography>
+                <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                  Run a second scan to start tracking changes.
+                </Typography>
+              </Box>
+            ) : (
+              <Box>
+                {/* Trend summary */}
+                <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {deltaData.trend_direction === "improving" ? (
+                      <TrendingUp sx={{ color: "#34A853", fontSize: 28 }} />
+                    ) : deltaData.trend_direction === "declining" ? (
+                      <TrendingDown sx={{ color: "#EA4335", fontSize: 28 }} />
+                    ) : (
+                      <TrendingFlat sx={{ color: "#FBBC04", fontSize: 28 }} />
+                    )}
+                    <Typography variant="h6" sx={{
+                      color: deltaData.trend_direction === "improving" ? "#34A853"
+                        : deltaData.trend_direction === "declining" ? "#EA4335" : "#FBBC04",
+                      fontWeight: 700, textTransform: "capitalize",
+                    }}>
+                      {deltaData.trend_direction}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    icon={<AddCircleOutlined sx={{ fontSize: 14 }} />}
+                    label={`${deltaData.new_count} new`}
+                    size="small"
+                    sx={{ bgcolor: "rgba(234,67,53,0.12)", color: "#EA4335", fontWeight: 700,
+                      "& .MuiChip-icon": { color: "#EA4335" } }}
+                  />
+                  <Chip
+                    icon={<RemoveCircleOutlined sx={{ fontSize: 14 }} />}
+                    label={`${deltaData.resolved_count} resolved`}
+                    size="small"
+                    sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", fontWeight: 700,
+                      "& .MuiChip-icon": { color: "#34A853" } }}
+                  />
+                  {deltaData.changed_count > 0 && (
+                    <Chip
+                      label={`${deltaData.changed_count} severity changed`}
+                      size="small"
+                      sx={{ bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04", fontWeight: 700 }}
+                    />
+                  )}
+                </Box>
+
+                {/* New findings table */}
+                {deltaData.new_findings?.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ color: "#EA4335", fontWeight: 700, mb: 1,
+                      display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <AddCircleOutlined sx={{ fontSize: 16 }} /> New Findings ({deltaData.new_findings.length})
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                            <TableCell>SEVERITY</TableCell>
+                            <TableCell>TITLE</TableCell>
+                            <TableCell>RESOURCE</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {deltaData.new_findings.map((f: any) => (
+                            <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 0.75 } }}>
+                              <TableCell>
+                                <Chip label={f.severity} size="small"
+                                  sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}25`, color: SEV_COLOR[f.severity] || "#888",
+                                    fontSize: 10, height: 18, fontWeight: 700, textTransform: "uppercase" }} />
+                              </TableCell>
+                              <TableCell sx={{ color: "text.primary", fontSize: 13 }}>{f.title}</TableCell>
+                              <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* Resolved findings table */}
+                {deltaData.resolved_findings?.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ color: "#34A853", fontWeight: 700, mb: 1,
+                      display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <RemoveCircleOutlined sx={{ fontSize: 16 }} /> Resolved Findings ({deltaData.resolved_findings.length})
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                            <TableCell>SEVERITY</TableCell>
+                            <TableCell>TITLE</TableCell>
+                            <TableCell>RESOURCE</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {deltaData.resolved_findings.map((f: any) => (
+                            <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 0.75 } }}>
+                              <TableCell>
+                                <Chip label={f.severity} size="small"
+                                  sx={{ bgcolor: `${SEV_COLOR[f.severity] || "#888"}15`, color: SEV_COLOR[f.severity] || "#888",
+                                    fontSize: 10, height: 18, fontWeight: 700, opacity: 0.7 }} />
+                              </TableCell>
+                              <TableCell sx={{ color: "text.secondary", fontSize: 13, textDecoration: "line-through" }}>{f.title}</TableCell>
+                              <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* Severity-changed findings */}
+                {deltaData.changed_findings?.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ color: "#FBBC04", fontWeight: 700, mb: 1 }}>
+                      Severity Changes ({deltaData.changed_findings.length})
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                            <TableCell>TITLE</TableCell>
+                            <TableCell>BEFORE</TableCell>
+                            <TableCell>AFTER</TableCell>
+                            <TableCell>RESOURCE</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {deltaData.changed_findings.map((f: any) => (
+                            <TableRow key={f.id} sx={{ "& td": { borderColor: "divider", py: 0.75 } }}>
+                              <TableCell sx={{ color: "text.primary", fontSize: 13 }}>{f.title}</TableCell>
+                              <TableCell>
+                                <Chip label={f.severity_before} size="small"
+                                  sx={{ bgcolor: `${SEV_COLOR[f.severity_before] || "#888"}25`, color: SEV_COLOR[f.severity_before] || "#888",
+                                    fontSize: 10, height: 18, fontWeight: 700 }} />
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={f.severity_after} size="small"
+                                  sx={{ bgcolor: `${SEV_COLOR[f.severity_after] || "#888"}25`, color: SEV_COLOR[f.severity_after] || "#888",
+                                    fontSize: 10, height: 18, fontWeight: 700 }} />
+                              </TableCell>
+                              <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{f.resource_id || "—"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {deltaData.new_count === 0 && deltaData.resolved_count === 0 && deltaData.changed_count === 0 && (
+                  <Box sx={{ textAlign: "center", py: 4 }}>
+                    <CheckCircle sx={{ fontSize: 48, color: "#34A853", mb: 1 }} />
+                    <Typography sx={{ color: "text.primary", fontWeight: 600 }}>No changes detected</Typography>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 0.5 }}>
+                      Findings are identical to the previous scan.
+                    </Typography>
+                  </Box>
                 )}
               </Box>
             )}
