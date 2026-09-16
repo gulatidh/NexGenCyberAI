@@ -50,64 +50,85 @@ type DrillLevel =
   | { kind: "sublist"; entityKey: string; records: SubNode[]; fromLabel: string };
 
 const ONT_NODES: ONode[] = [
-  { entity:"Client",      label:"Client",             cx: 70,  cy:300, labelX: 35,   labelW: 70,  color:"#2563eb" },
-  { entity:"Asset",       label:"Asset",              cx:250,  cy:190, labelX:215,   labelW: 70,  color:"#2563eb" },
-  { entity:"Control",     label:"Control",            cx:250,  cy:470, labelX:213.5, labelW: 73,  color:"#7c3aed" },
-  { entity:"DataFlow",    label:"Data Flow",          cx:440,  cy: 90, labelX:396.5, labelW: 87,  color:"#7c3aed" },
-  { entity:"Finding",     label:"Finding",            cx:440,  cy:280, labelX:403.5, labelW: 73,  color:"#0f766e" },
-  { entity:"SmartIntel",  label:"Smart Intelligence", cx:440,  cy:560, labelX:365,   labelW:150,  color:"#4338ca" },
-  { entity:"Risk",        label:"Risk",               cx:640,  cy:220, labelX:605,   labelW: 70,  color:"#b45309" },
-  { entity:"Evidence",    label:"Evidence",           cx:640,  cy:470, labelX:600,   labelW: 80,  color:"#15803d" },
-  { entity:"AttackPath",  label:"Attack Path",        cx:830,  cy:130, labelX:779.5, labelW:101,  color:"#b45309" },
-  { entity:"Technique",   label:"MITRE Technique",    cx:830,  cy:300, labelX:765.5, labelW:129,  color:"#b91c1c" },
-  { entity:"Remediation", label:"Remediation",        cx:830,  cy:420, labelX:779.5, labelW:101,  color:"#b91c1c" },
-  { entity:"Report",      label:"Report",             cx:1020, cy:300, labelX:985,   labelW: 70,  color:"#15803d" },
+  // Column 1 — Entry points
+  { entity:"Client",            label:"Client",              cx:  70, cy:300, labelX:  30, labelW: 80,  color:"#2563eb" },
+  // Column 2 — Discovery layer
+  { entity:"Connector",         label:"Connector",           cx: 260, cy:160, labelX: 218, labelW: 84,  color:"#0369a1" },
+  { entity:"Asset",             label:"Asset",               cx: 260, cy:300, labelX: 225, labelW: 70,  color:"#0369a1" },
+  { entity:"CTEMProgram",       label:"CTEM Program",        cx: 260, cy:440, labelX: 208, labelW:104,  color:"#7c3aed" },
+  // Column 3 — Assessment layer
+  { entity:"Scan",              label:"Scan",                cx: 460, cy:160, labelX: 428, labelW: 64,  color:"#0f766e" },
+  { entity:"Finding",           label:"Finding",             cx: 460, cy:300, labelX: 424, labelW: 72,  color:"#0f766e" },
+  { entity:"RiskProposal",      label:"Risk Proposal",       cx: 460, cy:440, labelX: 407, labelW:106,  color:"#b45309" },
+  // Column 4 — Intelligence layer
+  { entity:"AgentRun",          label:"AI Agent Run",        cx: 660, cy:160, labelX: 608, labelW:104,  color:"#4338ca" },
+  { entity:"Risk",              label:"Risk",                cx: 660, cy:300, labelX: 628, labelW: 64,  color:"#b45309" },
+  { entity:"VAPTReport",        label:"VAPT Report",         cx: 660, cy:440, labelX: 611, labelW:100,  color:"#15803d" },
+  // Column 5 — Output layer
+  { entity:"ThreatEntry",       label:"Threat Entry",        cx: 860, cy:120, labelX: 808, labelW:104,  color:"#b91c1c" },
+  { entity:"ControlDeficiency", label:"Control Gap",         cx: 860, cy:270, labelX: 812, labelW: 96,  color:"#7c3aed" },
+  { entity:"Remediation",       label:"Remediation",         cx: 860, cy:420, labelX: 808, labelW:104,  color:"#15803d" },
+  { entity:"FindingLink",       label:"Finding Link",        cx: 860, cy:550, labelX: 808, labelW:104,  color:"#64748b" },
 ];
 
 const ONT_EDGES: OEdge[] = [
-  { from:"Client",      to:"Asset",       x1: 70, y1:300, x2:250,  y2:190 },
-  { from:"Asset",       to:"DataFlow",    x1:250, y1:190, x2:440,  y2: 90 },
-  { from:"Asset",       to:"Finding",     x1:250, y1:190, x2:440,  y2:280 },
-  { from:"Finding",     to:"Risk",        x1:440, y1:280, x2:640,  y2:220 },
-  { from:"Risk",        to:"AttackPath",  x1:640, y1:220, x2:830,  y2:130 },
-  { from:"DataFlow",    to:"Technique",   x1:440, y1: 90, x2:830,  y2:300 },
-  { from:"AttackPath",  to:"Technique",   x1:830, y1:130, x2:830,  y2:300 },
-  { from:"Risk",        to:"Remediation", x1:640, y1:220, x2:830,  y2:420 },
-  { from:"Technique",   to:"Remediation", x1:830, y1:300, x2:830,  y2:420 },
-  { from:"Control",     to:"Evidence",    x1:250, y1:470, x2:640,  y2:470 },
-  { from:"Remediation", to:"Evidence",    x1:830, y1:420, x2:640,  y2:470 },
-  { from:"Finding",     to:"Report",      x1:440, y1:280, x2:1020, y2:300 },
-  { from:"Remediation", to:"Report",      x1:830, y1:420, x2:1020, y2:300 },
-  { from:"Evidence",    to:"Report",      x1:640, y1:470, x2:1020, y2:300 },
-  { from:"SmartIntel",  to:"Asset",       x1:440, y1:560, x2:250,  y2:190, dashed:true },
-  { from:"SmartIntel",  to:"Finding",     x1:440, y1:560, x2:440,  y2:280, dashed:true },
-  { from:"SmartIntel",  to:"Risk",        x1:440, y1:560, x2:640,  y2:220, dashed:true },
-  { from:"SmartIntel",  to:"Control",     x1:440, y1:560, x2:250,  y2:470, dashed:true },
+  // Client → discovery
+  { from:"Client",            to:"Connector",          x1:  70, y1:300, x2: 260, y2:160 },
+  { from:"Client",            to:"Asset",              x1:  70, y1:300, x2: 260, y2:300 },
+  { from:"Client",            to:"CTEMProgram",        x1:  70, y1:300, x2: 260, y2:440 },
+  // Connector → scan + asset
+  { from:"Connector",         to:"Scan",               x1: 260, y1:160, x2: 460, y2:160 },
+  { from:"Connector",         to:"Asset",              x1: 260, y1:160, x2: 260, y2:300 },
+  // Asset → finding
+  { from:"Asset",             to:"Finding",            x1: 260, y1:300, x2: 460, y2:300 },
+  // Scan → finding
+  { from:"Scan",              to:"Finding",            x1: 460, y1:160, x2: 460, y2:300 },
+  // Scan → agent run
+  { from:"Scan",              to:"AgentRun",           x1: 460, y1:160, x2: 660, y2:160 },
+  // Finding → risk / proposal / link
+  { from:"Finding",           to:"Risk",               x1: 460, y1:300, x2: 660, y2:300 },
+  { from:"Finding",           to:"RiskProposal",       x1: 460, y1:300, x2: 460, y2:440 },
+  { from:"Finding",           to:"VAPTReport",         x1: 460, y1:300, x2: 660, y2:440 },
+  { from:"Finding",           to:"FindingLink",        x1: 460, y1:300, x2: 860, y2:550, dashed:true },
+  // Agent run → registers
+  { from:"AgentRun",          to:"ThreatEntry",        x1: 660, y1:160, x2: 860, y2:120 },
+  { from:"AgentRun",          to:"ControlDeficiency",  x1: 660, y1:160, x2: 860, y2:270 },
+  { from:"AgentRun",          to:"Remediation",        x1: 660, y1:160, x2: 860, y2:420 },
+  // Risk → remediation
+  { from:"Risk",              to:"Remediation",        x1: 660, y1:300, x2: 860, y2:420 },
 ];
 
 const TO_KEY: Record<string, string> = {
-  Asset:"asset", Finding:"finding", Risk:"risk", Control:"control",
-  Remediation:"remediation", Technique:"technique", Report:"report",
-  Evidence:"report", AttackPath:"risk", SmartIntel:"finding",
-  DataFlow:"", Client:"",
+  Client:"", Connector:"", CTEMProgram:"",
+  Asset:"asset", Scan:"", Finding:"finding",
+  RiskProposal:"", AgentRun:"", Risk:"risk",
+  VAPTReport:"", ThreatEntry:"", ControlDeficiency:"",
+  Remediation:"remediation", FindingLink:"",
 };
 
 const KEY_TO_NODE: Record<string, string> = {
-  asset:"Asset", finding:"Finding", risk:"Risk", control:"Control",
-  remediation:"Remediation", technique:"Technique", report:"Report",
+  asset:"Asset", finding:"Finding", risk:"Risk", remediation:"Remediation",
 };
 
 const ONT_ROUTES: Record<string, string> = {
-  Client:"/platform/clients", Asset:"/platform/assets",
-  Control:"/compliance/frameworks", DataFlow:"/threat-intel/threat-models",
-  Finding:"/vulnerability/findings", SmartIntel:"/intelligence/nl-query",
-  Risk:"/risk/register", Evidence:"/compliance/evidence",
-  AttackPath:"/threat-intel/attack-paths", Technique:"/threat-intel/register",
-  Remediation:"/governance/remediation", Report:"/vapt/reports",
+  Client:"/platform/clients",
+  Connector:"/platform/connections",
+  Asset:"/platform/assets",
+  CTEMProgram:"/respond/ctem",
+  Scan:"/discover/scans",
+  Finding:"/discover/findings",
+  RiskProposal:"/analyse/risks/staging",
+  AgentRun:"/automate/agents",
+  Risk:"/analyse/risks",
+  VAPTReport:"/respond/vapt-reports",
+  ThreatEntry:"/respond/threats",
+  ControlDeficiency:"/respond/gaps",
+  Remediation:"/respond/remediation",
+  FindingLink:"/discover/findings",
 };
 
 const LISTABLE = new Set(["asset","finding","risk","remediation"]);
-const AGENT_NODES = new Set(["Finding","Risk","Control","Technique","Remediation"]);
+const AGENT_NODES = new Set(["Finding","Risk","ThreatEntry","ControlDeficiency","Remediation"]);
 
 const SEV_COLOR: Record<string,string> = {
   critical:"#b91c1c", high:"#ea580c", medium:"#d97706", low:"#16a34a", info:"#0284c7",
