@@ -10,6 +10,7 @@ from api.models.models import (
     AgentRun, AgentFeedback, AgentType, Scan, Finding, Risk, RiskLevel,
     ThreatEntry, ControlDeficiency, RemediationAction,
     CustomFramework, CustomFrameworkControl,
+    FrameworkAssessment, FrameworkType,
 )
 from api.schemas.schemas import AgentRunRequest, AgentRunResponse
 from db.database import get_db
@@ -54,34 +55,79 @@ def _persist_threat_intel(db, client_id: str, run_id: str, scan_id, threat_resul
     return len(findings_out)
 
 
-def _persist_compliance(db, client_id: str, run_id: str, scan_id, comp_result: dict) -> int:
+_FW_TEXT_TO_ENUM = {
+    "nist": FrameworkType.NIST_CSF,
+    "nist csf": FrameworkType.NIST_CSF,
+    "nist_csf": FrameworkType.NIST_CSF,
+    "nist 800": FrameworkType.NIST_800_53,
+    "nist_800_53": FrameworkType.NIST_800_53,
+    "iso": FrameworkType.ISO_27001,
+    "iso 27001": FrameworkType.ISO_27001,
+    "iso_27001": FrameworkType.ISO_27001,
+    "gdpr": FrameworkType.GDPR,
+    "pci": FrameworkType.PCI_DSS,
+    "pci dss": FrameworkType.PCI_DSS,
+    "pci_dss": FrameworkType.PCI_DSS,
+    "soc2": FrameworkType.SOC2,
+    "soc 2": FrameworkType.SOC2,
+    "cis": FrameworkType.CIS_V8,
+    "cis_v8": FrameworkType.CIS_V8,
+    "gcc": FrameworkType.GCC_IM8,
+    "gcc_im8": FrameworkType.GCC_IM8,
+    "im8": FrameworkType.GCC_IM8,
+    "nist ai rmf": FrameworkType.NIST_AI_RMF,
+    "nist_ai_rmf": FrameworkType.NIST_AI_RMF,
+}
+
+def _text_to_fw_enum(ref_str: str):
+    """Map a free-text framework reference to a FrameworkType enum, or None."""
+    s = ref_str.lower()
+    # Try direct enum value first
+    for ft in FrameworkType:
+        if ft.value in s or s == ft.value:
+            return ft
+    # Keyword matching
+    for key, ft in _FW_TEXT_TO_ENUM.items():
+        if key in s:
+            return ft
+    return None
+
+
+def _persist_compliance(db, client_id: str, run_id: str, scan_id, comp_result: dict, framework_slug: str = "nist_csf") -> int:
     findings_out = comp_result.get("findings") or []
     audit_score = comp_result.get("audit_readiness_score")
+
+    # Track per-framework control results for heatmap
+    fw_control_results: dict = {}  # FrameworkType → {ctrl_id: {status, severity, title}}
+
     for f in findings_out:
         refs = f.get("framework_references") or []
         control_id = refs[0] if refs else None
-        framework = None
+        framework_text = None
+        fw_enum = None
         for ref in refs:
             ref_s = str(ref).upper()
             if "NIST" in ref_s:
-                framework = "NIST CSF 2.0"
+                framework_text = "NIST CSF 2.0"
             elif "ISO" in ref_s:
-                framework = "ISO 27001"
+                framework_text = "ISO 27001"
             elif "GDPR" in ref_s:
-                framework = "GDPR"
+                framework_text = "GDPR"
             elif "PCI" in ref_s:
-                framework = "PCI DSS"
+                framework_text = "PCI DSS"
             elif "HIPAA" in ref_s:
-                framework = "HIPAA"
-            if framework:
+                framework_text = "HIPAA"
+            if framework_text:
+                fw_enum = _text_to_fw_enum(str(ref))
                 break
+
         db.add(ControlDeficiency(
             client_id=client_id,
             agent_run_id=run_id,
             scan_id=scan_id,
             finding_id=f.get("finding_id"),
             control_id=control_id,
-            framework=framework,
+            framework=framework_text,
             severity=(f.get("severity") or "medium").lower(),
             title=f.get("title") or "(untitled)",
             gap_description=f.get("description"),
@@ -89,6 +135,71 @@ def _persist_compliance(db, client_id: str, run_id: str, scan_id, comp_result: d
             remediation=f.get("remediation"),
             audit_readiness_score=audit_score,
         ))
+
+        # Accumulate for FrameworkAssessment
+        if fw_enum and control_id:
+            sev = (f.get("severity") or "medium").lower()
+            fw_control_results.setdefault(fw_enum, {})[control_id] = {
+                "status": "failed",
+                "severity": sev,
+                "title": f.get("title") or "(untitled)",
+            }
+
+    # Ensure the selected framework is always represented in the heatmap,
+    # even if the LLM didn't emit explicit framework_references.
+    for fw_src in [framework_slug, comp_result.get("framework"), comp_result.get("framework_key")]:
+        if not fw_src:
+            continue
+        extra_enum = _text_to_fw_enum(str(fw_src))
+        if extra_enum and extra_enum not in fw_control_results:
+            fw_control_results[extra_enum] = {}
+
+    # Upsert FrameworkAssessment rows so the heatmap has data
+    from datetime import datetime, timezone as tz
+    now = datetime.now(tz.utc)
+    for fw_enum, ctrl_map in fw_control_results.items():
+        passed = sum(1 for v in ctrl_map.values() if v.get("status") == "passed")
+        failed = sum(1 for v in ctrl_map.values() if v.get("status") == "failed")
+        total = len(ctrl_map)
+        score = round((passed / total * 100) if total > 0 else 0.0, 1)
+
+        existing = (
+            db.query(FrameworkAssessment)
+            .filter(
+                FrameworkAssessment.client_id == client_id,
+                FrameworkAssessment.framework == fw_enum,
+            )
+            .order_by(FrameworkAssessment.assessed_at.desc())
+            .first()
+        )
+        if existing:
+            # Merge new failures into existing control_results
+            merged = dict(existing.control_results or {})
+            merged.update(ctrl_map)
+            existing.control_results = merged
+            existing.controls_total = len(merged)
+            existing.controls_failed = sum(1 for v in merged.values() if v.get("status") == "failed")
+            existing.controls_passed = len(merged) - existing.controls_failed
+            existing.overall_score = round(
+                (existing.controls_passed / existing.controls_total * 100)
+                if existing.controls_total > 0 else 0.0, 1
+            )
+            existing.assessed_at = now
+            if scan_id:
+                existing.scan_id = scan_id
+        else:
+            db.add(FrameworkAssessment(
+                client_id=client_id,
+                framework=fw_enum,
+                scan_id=scan_id,
+                overall_score=score,
+                controls_total=total,
+                controls_passed=passed,
+                controls_failed=failed,
+                controls_partial=0,
+                control_results=ctrl_map,
+            ))
+
     return len(findings_out)
 
 
@@ -110,14 +221,14 @@ def _persist_remediation(db, client_id: str, run_id: str, scan_id, rem_result: d
     return len(recs)
 
 
-def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_id, result: dict, raw_findings: list):
+def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_id, result: dict, raw_findings: list, framework_slug: str = "nist_csf"):
     """Route each agent type's output to the correct dedicated register.
 
     Source → Register mapping:
       risk_manager   → Risk table
       orchestrator   → Risk table + ThreatEntry + ControlDeficiency + RemediationAction
       threat_intel   → ThreatEntry table
-      compliance_monitor → ControlDeficiency table
+      compliance_monitor → ControlDeficiency table + FrameworkAssessment (heatmap)
       remediation    → RemediationAction table
       va_scanner / framework_analyst → no register (output_data only)
     """
@@ -142,7 +253,7 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
             result["risks_created"] = len(structured)
         # Sub-agent register rows
         result["threats_created"] = _persist_threat_intel(db, client_id, run_id, scan_id, result.get("threat_intel") or {})
-        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result.get("framework_analysis") or {})
+        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result.get("framework_analysis") or {}, framework_slug=framework_slug)
         result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result.get("remediation") or {})
 
     elif agent_val == "risk_manager" and raw_findings:
@@ -167,7 +278,7 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
         result["threats_created"] = _persist_threat_intel(db, client_id, run_id, scan_id, result)
 
     elif agent_val == "compliance_monitor":
-        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result)
+        result["deficiencies_created"] = _persist_compliance(db, client_id, run_id, scan_id, result, framework_slug=framework_slug)
 
     elif agent_val == "remediation":
         result["actions_created"] = _persist_remediation(db, client_id, run_id, scan_id, result)
@@ -417,7 +528,7 @@ async def _run_agent_task(
         run.status = "completed"
         run.output_data = result
         run.completed_at = datetime.now(timezone.utc)
-        _persist_to_registers(db, agent_type_val, client_id, run_id, run.scan_id, result, findings)
+        _persist_to_registers(db, agent_type_val, client_id, run_id, run.scan_id, result, findings, framework_slug=framework_slug)
         db.commit()
 
     except Exception as exc:
