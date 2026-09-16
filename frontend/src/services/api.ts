@@ -935,6 +935,8 @@ export const guestTokensApi = {
     apiClient.get(`/public/guest/${token}/info`).then((r) => r.data),
   redeem: (token: string) =>
     apiClient.get(`/public/guest/${token}`).then((r) => r.data),
+  accesses: (tokenId: string) =>
+    apiClient.get(`/guest-tokens/${tokenId}/accesses`).then((r) => r.data),
 };
 
 export const dbBrowserApi = {

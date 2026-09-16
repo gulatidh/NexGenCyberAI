@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 import jwt as pyjwt
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -212,9 +212,9 @@ async def guest_token_info(token: str, db: Session = Depends(get_db)):
 
 
 @router.get("/public/guest/{token}")
-async def redeem_guest_token(token: str, db: Session = Depends(get_db)):
+async def redeem_guest_token(token: str, request: Request, db: Session = Depends(get_db)):
     """Validate a raw token and return a short-lived guest JWT for the frontend."""
-    from api.models.models import GuestToken
+    from api.models.models import GuestToken, GuestTokenAccess
     row = db.query(GuestToken).filter(GuestToken.token == token).first()
     if not row:
         raise HTTPException(status_code=404, detail="Invalid or expired guest link")
@@ -229,7 +229,18 @@ async def redeem_guest_token(token: str, db: Session = Depends(get_db)):
     if exp < now:
         raise HTTPException(status_code=403, detail="This guest link has expired")
 
+    # Extract real IP — honour X-Forwarded-For from Azure Front Door / load balancer
+    forwarded = request.headers.get("x-forwarded-for")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else None)
+    ua = request.headers.get("user-agent", "")[:512]
+
     row.last_used_at = now
+    db.add(GuestTokenAccess(
+        guest_token_id=row.id,
+        accessed_at=now,
+        ip_address=ip,
+        user_agent=ua,
+    ))
     db.commit()
 
     return {
@@ -240,3 +251,29 @@ async def redeem_guest_token(token: str, db: Session = Depends(get_db)):
         "project_id": row.project_id,
         "label": row.label,
     }
+
+
+@router.get("/guest-tokens/{token_id}/accesses")
+async def list_guest_accesses(
+    token_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return the access log for a guest token — IP, user agent, timestamp."""
+    from api.models.models import GuestTokenAccess
+    rows = (
+        db.query(GuestTokenAccess)
+        .filter(GuestTokenAccess.guest_token_id == token_id)
+        .order_by(GuestTokenAccess.accessed_at.desc())
+        .limit(200)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "accessed_at": r.accessed_at.isoformat(),
+            "ip_address": r.ip_address or "unknown",
+            "user_agent": r.user_agent or "",
+        }
+        for r in rows
+    ]

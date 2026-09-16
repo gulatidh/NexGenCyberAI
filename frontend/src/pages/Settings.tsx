@@ -17,7 +17,7 @@ import {
   Tooltip, Grid, Select, MenuItem, FormControl, InputLabel,
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
   Dialog, DialogTitle, DialogContent, DialogActions, Pagination,
-  Drawer,
+  Drawer, Collapse,
 } from "@mui/material";
 import {
   Settings as SettingsIcon, MarkEmailRead, Security, Sync as SyncIcon,
@@ -26,6 +26,7 @@ import {
   Refresh, Add, Delete, EditNote, Public, Apartment, FolderOpen,
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
   NewReleases, Psychology, Webhook, VpnKey, MenuBook,
+  ExpandMore, ExpandLess, Language,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Skeleton from "@mui/material/Skeleton";
@@ -1107,12 +1108,56 @@ function WhatsNewTab() {
 
 // ── Main Settings page ───────────────────────────────────────────────────────
 // ── Guest Tokens tab ─────────────────────────────────────────────────────────
+function AccessLog({ tokenId }: { tokenId: string }) {
+  const { data: accesses = [], isLoading } = useQuery<any[]>({
+    queryKey: ["guest-accesses", tokenId],
+    queryFn: () => guestTokensApi.accesses(tokenId),
+  });
+  if (isLoading) return <CircularProgress size={16} sx={{ m: 1 }} />;
+  if (!accesses.length) return (
+    <Box sx={{ px: 2, py: 1.5, color: "text.secondary", fontSize: 12 }}>No access events recorded yet.</Box>
+  );
+  return (
+    <Box sx={{ px: 2, pb: 1.5 }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, mb: 1 }}>
+        Access Log
+      </Typography>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {["Time", "IP Address", "Browser / Device"].map((h) => (
+              <TableCell key={h} sx={{ fontSize: 10, fontWeight: 700, color: "text.secondary", py: 0.5 }}>{h}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {accesses.map((a: any) => (
+            <TableRow key={a.id}>
+              <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap", py: 0.5 }}>{fromNow(a.accessed_at)}</TableCell>
+              <TableCell sx={{ fontSize: 11, fontFamily: "monospace", py: 0.5 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Language sx={{ fontSize: 12, color: "text.secondary" }} />
+                  {a.ip_address}
+                </Box>
+              </TableCell>
+              <TableCell sx={{ fontSize: 11, color: "text.secondary", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", py: 0.5 }}>
+                <Tooltip title={a.user_agent}><span>{a.user_agent || "—"}</span></Tooltip>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
 function GuestTokensTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ label: "", client_id: "", project_id: "", days: 7, note: "" });
   const [selectedClient, setSelectedClient] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: clients = [] } = useQuery<Client[]>({ queryKey: ["clients"], queryFn: clientsApi.list });
   const { data: projects = [] } = useQuery<any[]>({
@@ -1188,7 +1233,7 @@ function GuestTokensTab({ isAdmin }: { isAdmin: boolean }) {
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["Label", "Account", "Project", "Expires", "Last Used", "Status", ""].map((h) => (
+                {["Label", "Account", "Project", "Expires", "Last Used", "Status", "Actions"].map((h) => (
                   <TableCell key={h} sx={{ fontWeight: 700, fontSize: 11 }}>{h}</TableCell>
                 ))}
               </TableRow>
@@ -1206,38 +1251,58 @@ function GuestTokensTab({ isAdmin }: { isAdmin: boolean }) {
                 const revoked = t.is_revoked;
                 const active = !expired && !revoked;
                 const url = `${portalBase}/guest/${t.portal_url.split("/guest/")[1]}`;
+                const isExpanded = expandedId === t.id;
                 return (
-                  <TableRow key={t.id} sx={{ opacity: active ? 1 : 0.5 }}>
-                    <TableCell sx={{ fontSize: 12, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      <Tooltip title={t.note || t.label}><span>{t.label}</span></Tooltip>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 11 }}>{(clients as Client[]).find((c) => c.id === t.client_id)?.name || t.client_id.slice(0, 8)}</TableCell>
-                    <TableCell sx={{ fontSize: 11 }}>{t.project_id ? "Yes" : "—"}</TableCell>
-                    <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{new Date(t.expires_at).toLocaleDateString()}</TableCell>
-                    <TableCell sx={{ fontSize: 11 }}>{t.last_used_at ? fromNow(t.last_used_at) : "Never"}</TableCell>
-                    <TableCell>
-                      <Chip size="small" label={revoked ? "Revoked" : expired ? "Expired" : "Active"}
-                        sx={{ fontSize: 10, height: 18,
-                          bgcolor: revoked ? "rgba(234,67,53,0.12)" : expired ? "rgba(255,255,255,0.08)" : "rgba(52,168,83,0.12)",
-                          color: revoked ? "#EA4335" : expired ? "text.disabled" : "#34A853" }} />
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {active && (
-                        <Tooltip title={copiedId === t.id ? "Copied!" : "Copy link"}>
-                          <IconButton size="small" onClick={() => copy(url, t.id)}>
-                            <ContentCopy sx={{ fontSize: 14, color: copiedId === t.id ? "#34A853" : "text.secondary" }} />
+                  <React.Fragment key={t.id}>
+                    <TableRow sx={{ opacity: active ? 1 : 0.55, cursor: "pointer" }}
+                      onClick={() => setExpandedId(isExpanded ? null : t.id)}>
+                      <TableCell sx={{ fontSize: 12, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <Tooltip title={t.note || t.label}><span>{t.label}</span></Tooltip>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 11 }}>{(clients as Client[]).find((c) => c.id === t.client_id)?.name || t.client_id.slice(0, 8)}</TableCell>
+                      <TableCell sx={{ fontSize: 11 }}>{t.project_id ? "Yes" : "—"}</TableCell>
+                      <TableCell sx={{ fontSize: 11, whiteSpace: "nowrap" }}>{new Date(t.expires_at).toLocaleDateString()}</TableCell>
+                      <TableCell sx={{ fontSize: 11 }}>{t.last_used_at ? fromNow(t.last_used_at) : "Never"}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={revoked ? "Revoked" : expired ? "Expired" : "Active"}
+                          sx={{ fontSize: 10, height: 18,
+                            bgcolor: revoked ? "rgba(234,67,53,0.12)" : expired ? "rgba(255,255,255,0.08)" : "rgba(52,168,83,0.12)",
+                            color: revoked ? "#EA4335" : expired ? "text.disabled" : "#34A853" }} />
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title={isExpanded ? "Hide access log" : "View access log"}>
+                          <IconButton size="small" onClick={() => setExpandedId(isExpanded ? null : t.id)}>
+                            {isExpanded
+                              ? <ExpandLess sx={{ fontSize: 14, color: "text.secondary" }} />
+                              : <ExpandMore sx={{ fontSize: 14, color: "text.secondary" }} />}
                           </IconButton>
                         </Tooltip>
-                      )}
-                      {!revoked && isAdmin && (
-                        <Tooltip title="Revoke">
-                          <IconButton size="small" onClick={() => revokeMut.mutate(t.id)} disabled={revokeMut.isPending}>
-                            <Delete sx={{ fontSize: 14, color: "text.secondary" }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                        {active && (
+                          <Tooltip title={copiedId === t.id ? "Copied!" : "Copy link"}>
+                            <IconButton size="small" onClick={() => copy(url, t.id)}>
+                              <ContentCopy sx={{ fontSize: 14, color: copiedId === t.id ? "#34A853" : "text.secondary" }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {!revoked && isAdmin && (
+                          <Tooltip title="Revoke">
+                            <IconButton size="small" onClick={() => revokeMut.mutate(t.id)} disabled={revokeMut.isPending}>
+                              <Delete sx={{ fontSize: 14, color: "text.secondary" }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ p: 0, borderBottom: isExpanded ? undefined : "none" }}>
+                        <Collapse in={isExpanded} unmountOnExit>
+                          <Box sx={{ bgcolor: "rgba(0,0,0,0.25)", borderLeft: "3px solid rgba(255,255,255,0.08)" }}>
+                            <AccessLog tokenId={t.id} />
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 );
               })}
             </TableBody>

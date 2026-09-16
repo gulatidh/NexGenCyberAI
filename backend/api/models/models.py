@@ -1493,6 +1493,17 @@ class GuestToken(Base):
     note = Column(Text, nullable=True)                   # optional note shown to guest on landing
 
 
+class GuestTokenAccess(Base):
+    """Per-visit access log for guest token links."""
+    __tablename__ = "guest_token_accesses"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    guest_token_id = Column(String(36), ForeignKey("guest_tokens.id"), nullable=False, index=True)
+    accessed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+
+
 # ── CTEM Programs ──────────────────────────────────────────────────────────────
 
 class CTEMProgram(Base):
