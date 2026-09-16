@@ -13,6 +13,7 @@ from core.encryption import decrypt
 from connectors.factory import get_connector
 from connectors.sync import sync_connector_assets
 from services.compliance import recompute_all_frameworks_for_client, recompute_client_framework
+from services.scan_delta import get_or_compute_delta
 
 router = APIRouter(prefix="/clients/{client_id}/scans", tags=["scans"])
 _orchestrator = None
@@ -1084,6 +1085,39 @@ async def get_scan_diff(
         "resolved_findings": [_serialize(f) for f in resolved_findings],
         "persisting_findings": [_serialize(f) for f in persisting_findings],
     }
+
+
+@router.get("/{scan_id}/delta")
+async def get_scan_delta(
+    client_id: str,
+    scan_id: str,
+    compare_to: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Cached finding diff vs previous completed scan.
+
+    Returns new/resolved/changed counts + trend_direction (improving|stable|declining).
+    compare_to: optional scan_id of the baseline; defaults to the most recent completed scan.
+    """
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    result = get_or_compute_delta(scan_id, client_id, db, scan_a_id=compare_to)
+    if result is None:
+        return {
+            "scan_b_id": scan_id,
+            "no_baseline": True,
+            "new_count": 0,
+            "resolved_count": 0,
+            "changed_count": 0,
+            "trend_direction": "stable",
+            "new_findings": [],
+            "resolved_findings": [],
+            "changed_findings": [],
+        }
+    return result
 
 
 @router.patch("/{scan_id}/findings/{finding_id}", response_model=FindingResponse)

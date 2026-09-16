@@ -696,6 +696,36 @@ class AgentFeedback(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class ScanDelta(Base):
+    __tablename__ = "scan_deltas"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    scan_a_id = Column(String(36), ForeignKey("scans.id"), nullable=False)
+    scan_b_id = Column(String(36), ForeignKey("scans.id"), nullable=False)
+    new_findings = Column(JSON, default=[])
+    resolved_findings = Column(JSON, default=[])
+    changed_findings = Column(JSON, default=[])
+    new_count = Column(Integer, default=0)
+    resolved_count = Column(Integer, default=0)
+    changed_count = Column(Integer, default=0)
+    trend_direction = Column(String(20), default="stable")
+    computed_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class FindingLink(Base):
+    __tablename__ = "finding_links"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    client_id = Column(String(36), ForeignKey("clients.id"), nullable=False, index=True)
+    from_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="CASCADE"), nullable=False)
+    to_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="CASCADE"), nullable=False)
+    link_type = Column(String(32), nullable=False)
+    created_by = Column(String(64), default="manual")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class ThreatLibrary(Base):
     """Canonical threat-library entries — CAPEC patterns and MITRE ATT&CK
     techniques, ingested via the Sync page. The Threat Modeler service

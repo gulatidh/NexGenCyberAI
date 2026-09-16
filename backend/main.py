@@ -2421,6 +2421,12 @@ except Exception as _e:
     _logging.getLogger(__name__).warning(f"db_browser router not loaded: {_e}")
 
 
+from api.routers.finding_links import router as finding_links_router
+app.include_router(finding_links_router, prefix="/api/v1")
+
+from api.routers.ontology import router as ontology_router
+app.include_router(ontology_router, prefix="/api/v1")
+
 # ── Background scheduler (APScheduler for ScheduledMissions) ─────────────────
 
 @app.on_event("startup")
