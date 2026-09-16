@@ -25,7 +25,7 @@ import {
   Print, Download, Description, Email, Send, GppGood, GppBad,
   ArrowBack, Search, Shield, Warning, BugReport, Policy, Inventory2,
   Build, AccountTree, VerifiedUser, Assessment, FolderZip, LibraryAdd,
-  TrendingUp, TrackChanges, Schedule, ManageSearch,
+  TrendingUp, TrackChanges, Schedule, ManageSearch, Psychology, SmartToy,
 } from "@mui/icons-material";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -88,6 +88,17 @@ const CATALOG_GROUPS: { name: string; items: CatalogItem[] }[] = [
       { title: "CTEM Programs", desc: "5-phase Continuous Threat Exposure Management: Scope → Discover → Prioritise → Validate → Mobilise.", icon: <TrackChanges />, color: "#558B2F", href: "/respond/ctem" },
       { title: "Audit Intelligence", desc: "ICS audit activity mapping — how every audit step maps to platform capabilities.", icon: <ManageSearch />, color: "#00BCD4", href: "/report/audit" },
       { title: "Report Scheduler", desc: "Schedule recurring report delivery to stakeholders via email.", icon: <Schedule />, color: "#607D8B", href: "/report/scheduler" },
+    ],
+  },
+  {
+    name: "AI Agent Reports",
+    items: [
+      { title: "All Agent Reports", desc: "Browse the full history of AI agent runs — scan analysis, risk intelligence, threat reports, compliance assessments, and more.", icon: <Psychology />, color: "#7C4DFF", href: "/report/reports/agents" },
+      { title: "Scan & Findings Reports", desc: "AI-generated reports from VA Scanner, Code Review, and Configuration Review agents.", icon: <BugReport />, color: "#4285F4", href: "/report/reports/agents?category=scan" },
+      { title: "Risk Intelligence Reports", desc: "Risk Manager and Orchestrator agent reports with FAIR scoring and treatment recommendations.", icon: <Assessment />, color: "#E65100", href: "/report/reports/agents?category=risk" },
+      { title: "Compliance & Framework Reports", desc: "Compliance Monitor and Framework Analyst reports with control gap analysis.", icon: <Policy />, color: "#1565C0", href: "/report/reports/agents?category=compliance" },
+      { title: "Threat Intelligence Reports", desc: "Threat Intel agent reports with MITRE ATT&CK mapping and adversary profiling.", icon: <SmartToy />, color: "#00897B", href: "/report/reports/agents?category=threat" },
+      { title: "Remediation Reports", desc: "AI-generated remediation plans with priority banding, effort estimates, and owner assignment.", icon: <Build />, color: "#2E7D32", href: "/report/reports/agents?category=remediation" },
     ],
   },
 ];

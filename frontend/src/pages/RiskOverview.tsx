@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { riskPortfolioApi } from "../services/api";
 import { useActiveClient } from "../contexts/ClientContext";
+import AgentRunPanel from "../components/AgentRunPanel";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -715,6 +716,15 @@ export default function RiskOverview() {
           </Card>
         </>
       )}
+
+      <Box sx={{ mt: 4 }}>
+        <AgentRunPanel
+          clientId={clientId || ""}
+          agentTypes={["risk_manager", "orchestrator"]}
+          title="AI Risk Analysis Reports"
+          emptyMessage="Run the Risk Manager or Orchestrator agent to generate risk intelligence reports."
+        />
+      </Box>
     </Box>
   );
 }

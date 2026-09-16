@@ -9,6 +9,7 @@ import {
 import { Refresh, CheckCircleOutlined } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { controlDeficienciesApi } from "../services/api";
+import AgentRunPanel from "../components/AgentRunPanel";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -261,6 +262,15 @@ export default function ControlDeficiencies() {
           </Table>
         </TableContainer>
       )}
+
+      <Box sx={{ mt: 4 }}>
+        <AgentRunPanel
+          clientId={clientId || ""}
+          agentTypes={["compliance_monitor", "framework_analyst"]}
+          title="Compliance Agent Reports"
+          emptyMessage="Run the Compliance Monitor agent to generate framework assessment reports."
+        />
+      </Box>
     </Box>
   );
 }

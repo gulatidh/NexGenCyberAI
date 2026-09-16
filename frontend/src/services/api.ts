@@ -323,6 +323,8 @@ export const agentsApi = {
       feedback_type: feedbackType,
       correction_text: correctionText,
     }).then((r) => r.data),
+  filterRuns: (clientId: string, params: { agent_type?: string; scan_id?: string; limit?: number }) =>
+    apiClient.get(`/clients/${clientId}/agents/runs/filter/`, { params }).then((r) => r.data),
 };
 
 export const aiApi = {

@@ -17,6 +17,7 @@ import { toast } from "react-toastify";
 import { assessmentsApi, findingsApi, agentsApi, scansApi } from "../services/api";
 import { fromNow } from "../utils/datetime";
 import RichOutput from "../components/RichOutput";
+import AgentRunPanel from "../components/AgentRunPanel";
 import { useActiveClient } from "../contexts/ClientContext";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -446,10 +447,11 @@ function FindingsTable({ findings, onDelete }: { findings: Finding[]; onDelete?:
 // ── Nav ──────────────────────────────────────────────────────────────────────
 
 const BASE_NAV: DetailNavItem[] = [
-  { id: "verdict",  label: "AI Verdict",  Icon: AutoAwesome,   color: "#4285F4" },
-  { id: "findings", label: "Findings",    Icon: BugReport,     color: "#EA4335" },
-  { id: "changes",  label: "Changes",     Icon: CompareArrows, color: "#34A853" },
-  { id: "raw",      label: "Raw Data",    Icon: Storage,       color: "#00ACC1" },
+  { id: "verdict",    label: "AI Verdict",  Icon: AutoAwesome,   color: "#4285F4" },
+  { id: "findings",   label: "Findings",    Icon: BugReport,     color: "#EA4335" },
+  { id: "changes",    label: "Changes",     Icon: CompareArrows, color: "#34A853" },
+  { id: "raw",        label: "Raw Data",    Icon: Storage,       color: "#00ACC1" },
+  { id: "ai-reports", label: "AI Reports",  Icon: SmartToy,      color: "#7C4DFF" },
 ];
 
 // ── Page ─────────────────────────────────────────────────────────────────────
@@ -1118,6 +1120,20 @@ export default function ScanDetail() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ── AI Reports tab ─────────────────────────────────────────────── */}
+      {tab === "ai-reports" && (
+        <Box sx={{ mt: 2 }}>
+          <AgentRunPanel
+            clientId={clientId || ""}
+            agentTypes={["va_scanner", "ai_code_review", "configuration_review", "orchestrator", "risk_manager", "threat_intel", "compliance_monitor", "framework_analyst", "remediation"]}
+            scanId={scanId}
+            title="Agent Reports for This Scan"
+            emptyMessage="No agent reports for this scan yet. Run an AI agent from the Agents page targeting this scan."
+          />
+        </Box>
+      )}
+
       </PageDetailLayout>
     </Box>
   );

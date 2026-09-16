@@ -11,6 +11,7 @@ import {
 import { Refresh, Assignment, ConfirmationNumber, OpenInNew } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { remediationTrackerApi, ticketsApi } from "../services/api";
+import AgentRunPanel from "../components/AgentRunPanel";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -607,6 +608,15 @@ export default function RemediationTracker() {
           qc.invalidateQueries({ queryKey: ["ticket-syncs", clientId] });
         }}
       />
+
+      <Box sx={{ mt: 4 }}>
+        <AgentRunPanel
+          clientId={clientId || ""}
+          agentTypes={["remediation"]}
+          title="AI Remediation Reports"
+          emptyMessage="Run the Remediation agent to generate prioritised remediation plans."
+        />
+      </Box>
     </Box>
   );
 }

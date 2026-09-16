@@ -657,6 +657,29 @@ async def run_agent(
     return agent_run_db
 
 
+@router.get("/runs/filter/")
+async def filter_agent_runs(
+    client_id: str,
+    agent_type: Optional[str] = None,
+    scan_id: Optional[str] = None,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Filter agent runs by type and/or scan. Used by contextual report panels."""
+    q = db.query(AgentRun).filter(
+        AgentRun.client_id == client_id,
+        AgentRun.hidden_at.is_(None),
+        AgentRun.status == "completed",
+    )
+    if agent_type:
+        types = [t.strip() for t in agent_type.split(",")]
+        q = q.filter(AgentRun.agent_type.in_(types))
+    if scan_id:
+        q = q.filter(AgentRun.scan_id == scan_id)
+    return q.order_by(AgentRun.started_at.desc()).limit(limit).all()
+
+
 @router.get("/runs/", response_model=List[AgentRunResponse])
 async def list_agent_runs(client_id: str, db: Session = Depends(get_db), _=Depends(get_current_user)):
     return (

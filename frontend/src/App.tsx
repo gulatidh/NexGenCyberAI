@@ -137,6 +137,7 @@ const ImportResultPage      = React.lazy(() => import("./pages/ImportResultPage"
 const ExecutiveSummary    = React.lazy(() => import("./pages/ExecutiveSummary"));
 const ReportScheduler     = React.lazy(() => import("./pages/ReportScheduler"));
 const AIUsageCost         = React.lazy(() => import("./pages/AIUsageCost"));
+const AgentReportLibrary  = React.lazy(() => import("./pages/AgentReportLibrary"));
 const GuestLanding        = React.lazy(() => import("./pages/GuestLanding"));
 const GuestPortal         = React.lazy(() => import("./pages/GuestPortal"));
 
@@ -292,7 +293,8 @@ function ProtectedApp() {
             <Route path="compliance"        element={<ComplianceEvaluation />} />
             <Route path="custom-frameworks" element={<Navigate to="/report/frameworks" replace />} />
             <Route path="evidence"          element={<EvidencePackage />} />
-            <Route path="reports"           element={<Reports />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="reports/agents"    element={<AgentReportLibrary />} />
             <Route path="audit"              element={<AuditIntelligence />} />
             <Route path="audit-agents"      element={<AuditAgents />} />
             <Route path="executive-summary" element={<ExecutiveSummary />} />
@@ -319,7 +321,8 @@ function ProtectedApp() {
             <Route path="agents"       element={<Agents />} />
             <Route path="workflows"    element={<Missions />} />
             <Route path="knowledge"    element={<KnowledgeBase />} />
-            <Route path="reports"      element={<Reports />} />
+            <Route path="reports"         element={<Reports />} />
+            <Route path="reports/agents"  element={<AgentReportLibrary />} />
             <Route path="ai-scan"      element={<AIAssistedScan />} />
             <Route path="ai-review"    element={<AIAssistedReview />} />
             <Route path="nl-query"     element={<NLQuery />} />

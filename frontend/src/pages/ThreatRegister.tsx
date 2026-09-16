@@ -9,6 +9,7 @@ import {
 import { Refresh, MoreVert, Security } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatRegisterApi } from "../services/api";
+import AgentRunPanel from "../components/AgentRunPanel";
 import { toast } from "react-toastify";
 import { fmt } from "../utils/datetime";
 
@@ -233,6 +234,15 @@ export default function ThreatRegister() {
           </Table>
         </TableContainer>
       )}
+
+      <Box sx={{ mt: 4 }}>
+        <AgentRunPanel
+          clientId={clientId || ""}
+          agentTypes={["threat_intel"]}
+          title="Threat Intelligence Agent Reports"
+          emptyMessage="No threat intel reports yet. Run the Threat Intelligence agent to populate this section."
+        />
+      </Box>
     </Box>
   );
 }

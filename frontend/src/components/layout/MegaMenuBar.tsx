@@ -177,6 +177,7 @@ const MENU: MenuItem[] = [
           { name: "VAPT Reports",      desc: "Full engagement lifecycle with retest versioning and PDF/DOCX export.",               route: "/report/vapt-reports",      Icon: Description },
           { name: "Evidence Package",  desc: "ZIP of findings, deficiencies, and agent logs for auditors.",                       route: "/report/evidence",          Icon: FolderZip   },
           { name: "Reports",           desc: "AI-generated security posture and trend reports.",                                  route: "/report/reports",           Icon: Assessment  },
+          { name: "Agent Reports",     desc: "Browse all AI agent run reports — intelligence, risk, compliance, and scan analysis.", route: "/report/reports/agents",  Icon: Psychology  },
           { name: "Executive Summary", desc: "Non-technical leadership report — posture score, key risks, remediation progress.", route: "/report/executive-summary", Icon: Assessment  },
           { name: "Report Scheduler",  desc: "Schedule recurring report delivery to stakeholders via email.",                     route: "/report/scheduler",         Icon: Schedule    },
         ],
