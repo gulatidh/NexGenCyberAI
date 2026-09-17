@@ -10,7 +10,7 @@ import time
 
 from core.config import get_settings
 from db.database import Base, engine
-from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog, tickets, users, framework_advisor
+from api.routers import clients, connectors, scans, scans_runner, scans_overview, risks, agents, dashboard, ai_settings, email, findings, assets, frameworks, risk_overview, projects, technologies, admin, missions, knowledge, agent_catalog, risk_portfolio, threat_models, sso, threat_register, control_deficiencies, remediation_tracker, custom_frameworks, assistant, vapt_reports, changelog, tickets, users, framework_advisor, system_kb
 
 # Optional new routers — imported individually so a missing file never breaks boot.
 try:
@@ -1134,6 +1134,380 @@ def _provision_azure_connector() -> None:
         lf.close()
 
 
+def _seed_system_kb() -> None:
+    """Insert default Owlet Reference KB entries if they don't already exist (idempotent)."""
+    from api.models.models import SystemKBEntry
+    from db.database import SessionLocal
+    db = SessionLocal()
+    try:
+        _ENTRIES = [
+            {
+                "section_key": "overview",
+                "section_title": "Owlet Platform Overview",
+                "icon_name": "Hub",
+                "content": """# Owlet Platform Overview
+
+## What is Owlet?
+Owlet is an AI-powered cybersecurity management platform built on FastAPI (Python) + React + TypeScript + MUI v6. It gives security teams a unified control plane across risk management, compliance, threat intelligence, vulnerability assessment, and remediation — all accelerated by AI agents.
+
+## Technical Stack
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI (Python 3.12), SQLAlchemy ORM |
+| Database | Azure SQL (MSSQL via pymssql) — local SQLite for dev |
+| Frontend | React 18, TypeScript, MUI v6, React Query, Recharts |
+| Auth | Azure AD / MSAL (OIDC), JWT validation per request |
+| AI | Multi-provider failover: Azure OpenAI → OpenAI → Google Gemini → AWS Bedrock → Anthropic |
+| Deployment | Azure App Service (B2 plan), GitHub Actions CI/CD |
+
+## Pipeline Stages
+Owlet is organised around 6 pipeline stages:
+1. **Setup** — Accounts, connectors, AI settings, threat models, frameworks
+2. **Discover** — Scanning, findings, AI-assisted scan, asset inventory, CVE enrichment
+3. **Analyse** — Risk register, risk staging, AI risk analysis, attack paths, NL query
+4. **Respond** — Threat register, control deficiencies, CTEM programs, remediation, VAPT reports
+5. **Report** — Frameworks, compliance heatmap, audit intelligence, evidence package
+6. **Automate** — AI Buddies (60+ agents), workflows, webhooks, API keys, this knowledge base
+
+## Multi-Tenancy
+Every data object (findings, risks, assets, scans, etc.) is scoped to a `client_id`. The global client selector in the top bar sets the active client. Soft-delete pattern: `Client.deleted_at` nullable timestamp — deleted clients are excluded from all queries but can be restored within 30 days.
+""",
+            },
+            {
+                "section_key": "risk_management",
+                "section_title": "Risk Management",
+                "icon_name": "Warning",
+                "content": """# Risk Management
+
+## Two-Page Architecture
+Risk management uses a two-page system to enforce a review gate before risks enter the formal register.
+
+### Page 1 — Risk Staging (/analyse/risks/staging)
+AI-generated, finding-linked, and manually created proposals land here. Statuses: pending / archived / dismissed / evaluated. Actions: Evaluate (8-step wizard), Archive, Dismiss, Restore.
+
+**Proposal Sources:**
+- AI-generated (purple) — from Risk Manager agent output
+- Finding-linked (orange) — created from a specific scanner finding
+- Manual (blue) — user-created
+
+### Page 2 — Risk Register (/analyse/risks)
+Only formally evaluated risks appear here. On startup, _migrate_risks_to_staging() moves all pre-existing Risk rows to staging as status=pending proposals.
+
+## Risk Evaluation — 8-Step GCC IM8 / ISO 27001 Wizard
+1. **Basic Info** — Title, area, risk type (Security/Project)
+2. **Accessibility** — How reachable is the asset? (1–5)
+3. **Discoverability** — How easily found by attackers? (1–5)
+4. **Exploitability** — Ease of exploitation? (1–5)
+5. **Authentication** — Strength of auth controls? (5=no auth, 1=strong MFA)
+6. **Repeatability** — Can attack be repeated reliably? (1–5)
+7. **Consequence** — Data, Operational, Financial impact (1–5 each)
+8. **Review & Treatment** — Live 5x5 matrix, treatment option selection
+
+**Risk Matrix Formula:** score = consequence x likelihood_avg. Levels: 1–4 Low, 5–9 Medium, 10–12 Medium-High, 13–20 High, 21–25 Critical.
+
+## FAIR Dollar Quantification
+Every risk in the register can be quantified in dollars using the FAIR-lite model:
+
+- SLE base: $1M critical, $250K high, $50K medium, $10K low
+- Magnitude = SLE base x (impact/10)
+- Frequency = likelihood/10 (annualised event rate)
+- ALE = Magnitude x Frequency
+- Net ALE = ALE x status_factor x (1 - control_effectiveness)
+- ALE range = [ALE x 0.5, ALE x 2.0] (10th–90th percentile band)
+
+**Status Discounts:** transferred=0.20, treatment_planned=0.50, closed/remediated=0.00
+
+**30-day Breach Probability:** Poisson model — P(>=1 event in 30 days) = 1 - e^(-rate x 30/365). Critical risks carry 3x weight.
+
+**Control Effectiveness:** 0.0–1.0 field on each Risk. Set via the FAIR tab in the risk detail drawer.
+
+**Quantify All:** One-click button in Risk Register toolbar persists ALE to all DB rows.
+
+## Risk Statuses
+identified > under_assessment > treatment_planned > accepted / transferred / closed / no_longer_applicable / escalated
+
+## Treatment Options
+avoid | mitigate | transfer | accept
+""",
+            },
+            {
+                "section_key": "compliance",
+                "section_title": "Compliance & Frameworks",
+                "icon_name": "VerifiedUser",
+                "content": """# Compliance & Frameworks
+
+## Standard Framework Library
+11 frameworks seeded from JSON files in backend/data/frameworks/ on every startup:
+
+| Framework | Version | Controls |
+|---|---|---|
+| NIST CSF | 2.0 | — |
+| NIST SP 800-53 | Rev 5 | — |
+| NIST AI RMF | 1.0 (AI 100-1) | 56 |
+| NIST AI 200-1 | Draft | 28 |
+| NIST AI 200-2 | Draft | 41 |
+| CIS Controls | v8 | — |
+| ISO/IEC 27001 | 2022 | 97 |
+| PCI DSS | v4.0 | 92 |
+| GDPR | 2016/679 | 67 |
+| GCC IM8 | Reform 2025 | 137 |
+| SOC 2 | — | — |
+
+## Custom Standards (Junction Table)
+Users can build bespoke compliance frameworks by cherry-picking controls from any standard framework. Architecture: CustomFramework + CustomFrameworkControl models — junction linking to existing FrameworkControl rows.
+
+Build flow: Frameworks > Custom Standards > New Framework > Add Controls (source framework picker, domain filter, keyword search, 100/page, select-all per page).
+
+Evaluation: AI Buddies > select scan > select custom framework > run Compliance Monitor or Orchestrator. Custom frameworks appear with a purple "Custom" chip throughout the UI.
+
+## Compliance Heatmap (/analyse/compliance-heatmap)
+Two-table architecture: FrameworkAssessment (overall scores) and ControlDeficiency (per-control gaps). The Compliance Monitor agent writes both tables. The heatmap reads FrameworkAssessment. Data flow: agent run > _persist_compliance() > ControlDeficiency + FrameworkAssessment upsert.
+
+## Framework Advisor (AI-Powered)
+Multi-step wizard asking: Organisation type, Geography, Industry, Compliance goals, Existing certifications. Recommends up to 5 frameworks. Key rules:
+- gcc_im8: mandatory for Singapore govt/GCC
+- nist_ai_rmf: mandatory for US federal AI
+- mas_trm: mandatory for Singapore financial
+
+## Evidence Package
+GET /clients/{cid}/evidence/package?framework= streams a ZIP containing: findings CSV, control deficiencies JSON, remediation actions JSON, agent run log, framework assessments. For compliance audit evidence collection.
+""",
+            },
+            {
+                "section_key": "ai_agents",
+                "section_title": "AI Buddies & Agents",
+                "icon_name": "SmartToy",
+                "content": """# AI Buddies & Agents
+
+## Agent Architecture
+Owlet's AI agents ("AI Buddies") are LangChain-based agents dispatched as FastAPI BackgroundTasks. Each agent reads scan findings, runs an LLM chain, and writes structured output to register tables.
+
+## Core Agents
+| Agent | Output Register | Description |
+|---|---|---|
+| Risk Manager | risks | Identifies and quantifies risks from findings |
+| Threat Intelligence | threat_entries | Maps findings to MITRE ATT&CK framework |
+| Compliance Monitor | control_deficiencies + framework_assessments | Gaps against selected compliance framework |
+| Remediation Planner | remediation_actions | Priority-banded action plans |
+| Orchestrator | All four registers | Runs all agents in sequence from one trigger |
+
+## AI Provider Failover
+get_llm() in core/ai_providers.py automatically tries providers in order:
+azure_openai > openai > google_gemini > aws_bedrock > anthropic
+
+_is_configured(provider) fast-skips providers with no credentials. Raises ProviderUnavailableError when all providers fail.
+
+## Register Population Pattern
+_persist_to_registers() in agents.py routes agent output:
+- risk_manager/orchestrator > Risk
+- threat_intel > ThreatEntry
+- compliance_monitor > ControlDeficiency + FrameworkAssessment
+- remediation > RemediationAction
+
+## AI-Assisted Scan (/discover/ai-scan)
+Conversational guided assessment wizard. LLM drives a stateless conversation (full history passed each call) and embeds a SCAN_STATE JSON block at the end of every response. _build_env_profile() injects live connector list + recent scans + asset/finding counts into the system prompt.
+
+## AI Code Review
+4-phase LLM pipeline: triage > review > self-critique > cross-file taint tracing. Supports git clone (URL) or archive upload. Risk-scores files before review to prioritise high-risk code.
+
+## CVE Enrichment (LLM-First)
+Runs post-scan (Phase 9 of _execute_scan). Sends finding title + CVE hint in batches of 5 to the LLM. LLM uses training knowledge to return cve_id, cvss_score, cvss_vector, confidence. Only calls the RAG knowledge base when confidence is low. Writes back cve_ids (JSON array), cvss_score, cvss_vector, enrichment_source.
+
+## Aegis Assistant
+Floating sparkle Fab (bottom-right, every authenticated page). Page-aware (sends location.pathname). Loads portal_assistant_context.md plus all System KB entries as system prompt. Supports conversation history (last 12 turns).
+""",
+            },
+            {
+                "section_key": "scanning",
+                "section_title": "Scanning & Assessment",
+                "icon_name": "Search",
+                "content": """# Scanning & Assessment
+
+## Built-in Scanners (GitHub Actions)
+| Type | Category | Tool |
+|---|---|---|
+| web | DAST | OWASP ZAP |
+| semgrep, codeql, sonarqube | SAST | — |
+| nmap, openvas, trivy | Network | — |
+| owasp_dc, gitleaks, trufflehog | Dependency | — |
+
+## Enterprise Scanners (Direct API, Local BackgroundTask)
+| Scanner | Integration |
+|---|---|
+| Tenable.io | pytenable SDK, asyncio.to_thread |
+| Burp Suite Enterprise | httpx async REST API |
+| Snyk | httpx async, org projects (cap 50) |
+| Rapid7 InsightVM | httpx async, Basic auth, CVSS v2/v3 |
+| Qualys VMDR | httpx async, XML parsing, severity scale 1–5 |
+| Invicti (Netsparker) | httpx async, Basic auth base64 |
+| Acunetix Enterprise | httpx async, target+scan creation |
+
+Poll timeout: 2 hours with 30s intervals. All output normalised to critical/high/medium/low/info.
+
+## Scan Import (/import)
+Parsers for: SARIF, Nessus, Burp, OpenVAS, Qualys XML/CSV, Checkmarx, generic CSV/JSON. LLM fallback for PDF/unknown. /import/parse = preview (no DB write), /import/commit = save. Delta diff shows new/fixed/persisting counts.
+
+## Scan Versioning (is_live)
+Scan.is_live boolean — rescan demotes entire chain (is_live=False) and marks new scan live. PATCH /{scan_id}/set-live lets users promote any version. Global findings view only shows findings from is_live=True scans.
+
+## Finding Schema
+Key fields: title, description, severity (critical/high/medium/low/info), resource_id, resource_type, control_id, framework, status, remediation, cve_id, cve_ids (JSON array), cvss_score, cvss_vector, enrichment_source, control_mappings, acceptance_justification, accepted_by
+
+Status values: open, remediated, accepted (known risk), false_positive (suppress flow)
+
+## VAPT Reports
+Full engagement lifecycle: Generate from Scan (primary) — pulls all findings, derives scope from asset list, derives methodology from connector type (10 templates), calls LLM for executive summary + per-finding remediation + conclusion. Retest versioning: minor version bump (1.0 > 1.1). Export: 4 formats (full/remediation plan x PDF/DOCX).
+""",
+            },
+            {
+                "section_key": "asset_management",
+                "section_title": "Asset Management & CTEM",
+                "icon_name": "Devices",
+                "content": """# Asset Management & CTEM
+
+## Asset Inventory
+Assets are auto-discovered by connector syncs. Each asset has: name, asset_class, external_id, platform (azure/aws/entra_id/github), connector_id, provider_metadata (JSON), tags.
+
+Asset Classes: vm, container, database, application, storage, network, identity, policy, secret, code
+
+Azure Sync (sync.py): Pulls from Resource Graph API. Type-to-class mapping: microsoft.web > application, managedidentity > identity, security/authorization > policy.
+
+## Asset Detail (6 Tabs)
+1. Overview — summary metrics
+2. Findings — open findings for this asset
+3. Metadata — provider_metadata rendered by ProviderMetadataCard (sections: Summary/Configuration/Properties/Tags/SKU)
+4. Compliance — framework compliance posture per asset (based on linked findings)
+5. Attack Path — ReactFlow graph filtered to this asset's findings
+6. History — timeline
+
+## Attack Paths
+Rule-based phase classification of findings into MITRE ATT&CK phases: Initial Access / Execution / Persistence / Lateral Movement / Exfiltration. GET /clients/{cid}/attack-paths/ returns {nodes, edges, paths, stats}.
+
+## CTEM (Continuous Threat Exposure Management)
+5-phase workflow: Scope > Discover > Prioritise > Validate > Mobilise
+
+- Scope: Define program with optional connector-scoped asset list
+- Discover: Deduplicates assets by external_id across connectors
+- Prioritise: Crown Jewel weighting — findings on crown jewel assets ranked first. Sort: (-cj_count, -max_severity, -max_cvss)
+- Validate: Confirm exploitability of prioritised exposures
+- Mobilise: Assign remediation owners and track to closure
+
+## Posture Snapshots & Trends
+PostureSnapshot captures daily metrics: open finding counts by severity, risk scores, audit readiness %. GET /clients/{cid}/posture-history/?days=90 returns time series for Recharts charts.
+
+## MTTR (Mean Time to Remediate)
+Computed from Finding.remediated_at - Finding.created_at. SLA targets: Critical 24h, High 168h, Medium 720h.
+""",
+            },
+            {
+                "section_key": "integrations",
+                "section_title": "Integrations & Governance",
+                "icon_name": "Cable",
+                "content": """# Integrations & Governance
+
+## Connectors
+All connectors are defined in ConnectorType string enum in models.py (must match TypeScript ConnectorType union in frontend/src/types/index.ts). CONNECTOR_CATEGORY map drives UI grouping: cloud / dast / sast / network / dependency / enterprise.
+
+Connector Health: GET /clients/{cid}/connectors/health — last scan time, status, finding count. Dashboard shows colour-coded dots: green (<=7 days), yellow (>7 days), red (failed), grey (never).
+
+## Webhooks
+HMAC-SHA256 signed payloads via X-Aegis-Signature header. Supported events: finding.critical, scan.completed, agent.completed. services/webhook_dispatcher.py dispatches as FastAPI BackgroundTask. POST /webhooks/{id}/test sends a test delivery.
+
+## API Keys
+Format: aegis_ prefix + 32-byte hex. Only SHA-256 hash stored — full key shown only at creation. Scopes list controls what the key can access. Use for M2M integrations and CI/CD pipelines.
+
+## Guest Tokens (B2B Access)
+GuestToken model allows external collaborators to access specific client data without an Azure AD account. JWT-based guest sessions. GuestTokenAccess table logs every access with IP (from X-Forwarded-For) and User-Agent. Access log visible in Settings > Guest Tokens tab.
+
+## RAG Security Documents
+SecurityDocument model stores extracted text from uploaded policy/compliance docs (PDF/DOCX/TXT). services/rag_service.py: extract_text(), chunk_text() (800 chars, 100 char overlap), query_documents() (keyword rank + LLM answer). POST /clients/{cid}/documents/query answers natural-language questions.
+
+## Public Scorecard (No-Auth Embed)
+GET /public/scorecard/{token} — no authentication required. Score formula: max(0, 100 - critical*10 - high*3 - other_open). Embed in customer portals or status pages via iframe or API.
+
+## Natural Language Query
+POST /clients/{cid}/query/nl — accepts {question}, LLM generates a SELECT, safety validated (SELECT-only + keyword blocklist: DROP, DELETE, INSERT, UPDATE), executed, returns {sql, columns, rows, summary}.
+
+## Comments & Assignments
+Comment model uses entity_type + entity_id polymorphic pattern — one table covers findings, risks, or any future entity type. assignee_email + due_date fields on Finding and Risk.
+""",
+            },
+            {
+                "section_key": "audit_intelligence",
+                "section_title": "Audit Intelligence",
+                "icon_name": "FactCheck",
+                "content": """# Audit Intelligence
+
+## Audit Intelligence Page (/report/audit)
+Portal-native ICS audit section. Three-panel quote banner (measure/query/automate). 10-row ICS audit activity mapping table (maps OT security activities to Owlet capabilities). 6 risk management lifecycle cards: Identify / Assess / Control / Treat / Monitor / Report.
+
+## VAPT Reports (Vulnerability Assessment & Penetration Testing)
+Full engagement lifecycle management:
+- Generate from Scan (primary path): POST /clients/{cid}/vapt-reports/from-scan/ — takes scan_id, pulls all findings, derives scope from asset list, derives methodology from connector type (10 methodology templates)
+- Blank Report: Manual VAPT report creation
+- Retest Versioning: Minor version bump (1.0 > 1.1), findings copied with retest_status=pending
+- Export: 4 formats — Full Report (PDF/DOCX) and Remediation Plan (PDF/DOCX)
+
+## Evidence Package
+GET /clients/{cid}/evidence/package?framework= streams a ZIP for compliance audit evidence. Contains: findings.csv, control_deficiencies.json, remediation_actions.json, agent_run_log, framework assessments.
+
+## Posture Trends (/discover/posture)
+Recharts area/line charts showing security posture metrics over time (30/60/90 days). Tracks: open findings by severity, audit readiness %, risk score trend.
+
+## Compliance Heatmap (/analyse/compliance-heatmap)
+Visual heatmap showing control coverage across frameworks. Sources data from FrameworkAssessment rows written by the Compliance Monitor agent.
+
+## Framework Library (/report/frameworks)
+Standard frameworks browsable page with: NIST CSF, NIST 800-53, NIST AI RMF, NIST AI 200-1/200-2, CIS v8, ISO 27001, PCI DSS, GDPR, SOC 2, GCC IM8. Framework Advisor AI button in toolbar for recommendation wizard.
+""",
+            },
+            {
+                "section_key": "threat_intelligence",
+                "section_title": "Threat Intelligence & Modelling",
+                "icon_name": "BugReport",
+                "content": """# Threat Intelligence & Modelling
+
+## Threat Register
+MITRE ATT&CK mapped threat entries populated by the Threat Intelligence agent. Each entry links to specific techniques, tactics, and affected assets. GET/PATCH/DELETE /clients/{id}/threat-register/.
+
+## Threat Models (Data Flow Diagrams)
+Three-level React Flow hierarchy in the Threat Model editor:
+1. PlatformNode (solid coloured border) — outer physical boundary: Azure/AWS/GCP/Corporate/Internet/Third-Party
+2. BoundaryNode (dashed inner box) — security tier: DMZ/Web Tier/Application Tier/Data Tier/Management Zone/External
+3. ComponentNode (leaf) — individual system component
+
+AI Detection Rules: suggest_detection_rules_llm() generates Sigma rule stubs per threat. Log sources matched to component platform (Azure activitylogs/signinlogs, Windows Security/Sysmon, AWS CloudTrail). Sigma YAML rendered in GitHub-dark code blocks.
+
+_infer_platform() auto-detects platform from component name/type/notes. Old flat trust_zone values are migrated to the two-level model on load.
+
+## Attack Paths
+Rule-based MITRE ATT&CK phase classification applied to scanner findings. Phases: Initial Access > Execution > Persistence > Lateral Movement > Exfiltration. Visualised as layered SVG/ReactFlow graph. Per-asset attack path view available from Asset Detail tab 5.
+
+## Control Deficiencies
+ControlDeficiency table populated by Compliance Monitor agent. Each row links a framework control to the finding that violates it, with a remediation recommendation.
+
+## AI Risk Analysis (/analyse/ai-analysis)
+On-demand AI analysis of the current risk portfolio — generates threat landscape summary, top risk domains, recommended prioritisation.
+""",
+            },
+        ]
+
+        for entry_data in _ENTRIES:
+            exists = db.query(SystemKBEntry.id).filter(
+                SystemKBEntry.section_key == entry_data["section_key"]
+            ).first()
+            if not exists:
+                entry = SystemKBEntry(**entry_data)
+                db.add(entry)
+        db.commit()
+        logger.info("System KB seeded (%d sections checked)", len(_ENTRIES))
+    except Exception as exc:
+        logger.warning("_seed_system_kb failed: %s", exc)
+        db.rollback()
+    finally:
+        db.close()
+
+
 def _seed_framework_controls() -> None:
     """Idempotent: load JSON files in data/frameworks/, upsert FrameworkControl rows.
 
@@ -2168,6 +2542,7 @@ _fail_stale_threat_models()
 _fail_stale_scans()
 _prune_access_logs()
 _seed_technology_types()
+_seed_system_kb()
 
 try:
     from services.knowledge_loader import get_kev_catalog
@@ -2366,6 +2741,7 @@ app.include_router(remediation_tracker.router, prefix="/api/v1")
 app.include_router(custom_frameworks.router, prefix="/api/v1")
 app.include_router(framework_advisor.router, prefix="/api/v1")
 app.include_router(assistant.router, prefix="/api/v1")
+app.include_router(system_kb.router, prefix="/api/v1")
 app.include_router(vapt_reports.router, prefix="/api/v1")
 app.include_router(changelog.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")

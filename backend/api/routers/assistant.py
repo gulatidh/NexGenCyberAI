@@ -10,6 +10,8 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from core.ai_providers import ProviderUnavailableError, get_llm
 from core.security import get_current_user
+from db.database import SessionLocal
+from api.models.models import SystemKBEntry
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["assistant"])
@@ -22,6 +24,25 @@ def _load_context() -> str:
         return _CONTEXT_PATH.read_text(encoding="utf-8")
     except Exception as exc:
         logger.warning("Could not load assistant context: %s", exc)
+        return ""
+
+
+def _load_system_kb() -> str:
+    """Load all system KB entries from the database and format as a reference block."""
+    try:
+        db = SessionLocal()
+        try:
+            entries = db.query(SystemKBEntry).order_by(SystemKBEntry.section_key).all()
+            if not entries:
+                return ""
+            parts = ["## Owlet Technical Reference\n"]
+            for e in entries:
+                parts.append(f"### {e.section_title}\n\n{e.content}\n")
+            return "\n".join(parts)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Could not load system KB: %s", exc)
         return ""
 
 
@@ -42,8 +63,9 @@ class ChatResponse(BaseModel):
 
 @router.post("/assistant/chat", response_model=ChatResponse)
 async def chat(payload: ChatRequest, user=Depends(get_current_user)):
-    """Answer a platform usage question using injected portal documentation."""
+    """Answer a platform usage question using injected portal documentation and system KB."""
     context = _load_context()
+    system_kb = _load_system_kb()
     page_hint = f"\n\nThe user is currently on page: {payload.current_page}" if payload.current_page else ""
 
     system_content = (
@@ -55,6 +77,7 @@ async def chat(payload: ChatRequest, user=Depends(get_current_user)):
         f"{page_hint}"
         "\n\n--- PLATFORM DOCUMENTATION ---\n\n"
         f"{context}"
+        + (f"\n\n--- TECHNICAL REFERENCE ---\n\n{system_kb}" if system_kb else "")
     )
 
     _t1 = time.time()

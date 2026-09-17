@@ -87,6 +87,7 @@ const Reports           = React.lazy(() => import("./pages/Reports"));
 const Account           = React.lazy(() => import("./pages/Account"));
 const Missions          = React.lazy(() => import("./pages/Missions"));
 const KnowledgeBase     = React.lazy(() => import("./pages/KnowledgeBase"));
+const OwletReference    = React.lazy(() => import("./pages/OwletReference"));
 const Settings          = React.lazy(() => import("./pages/Settings"));
 const ThreatRegister    = React.lazy(() => import("./pages/ThreatRegister"));
 const ControlDeficiencies = React.lazy(() => import("./pages/ControlDeficiencies"));
@@ -320,7 +321,8 @@ function ProtectedApp() {
             <Route index element={<AutomatePage />} />
             <Route path="agents"       element={<Agents />} />
             <Route path="workflows"    element={<Missions />} />
-            <Route path="knowledge"    element={<KnowledgeBase />} />
+            <Route path="knowledge"        element={<KnowledgeBase />} />
+            <Route path="owlet-reference"  element={<OwletReference />} />
             <Route path="reports"         element={<Reports />} />
             <Route path="reports/agents"  element={<AgentReportLibrary />} />
             <Route path="ai-scan"      element={<AIAssistedScan />} />

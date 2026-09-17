@@ -1034,3 +1034,10 @@ export const ontologyApi = {
   getStats: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/ontology/stats`).then((r) => r.data),
 };
+
+export const systemKbApi = {
+  list: () => apiClient.get("/system-kb/").then((r) => r.data),
+  get: (sectionKey: string) => apiClient.get(`/system-kb/${sectionKey}`).then((r) => r.data),
+  update: (sectionKey: string, data: { content: string; section_title?: string }) =>
+    apiClient.patch(`/system-kb/${sectionKey}`, data).then((r) => r.data),
+};

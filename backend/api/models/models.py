@@ -2059,3 +2059,17 @@ class ControlPolicy(Base):
     created_by = Column(String(200))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SystemKBEntry(Base):
+    """Living technical reference for the Owlet ecosystem — admin-editable, assistant-injectable."""
+    __tablename__ = "system_kb_entries"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    section_key = Column(String(100), unique=True, nullable=False, index=True)
+    section_title = Column(String(200), nullable=False)
+    icon_name = Column(String(50), nullable=True)           # MUI icon name hint
+    content = Column(Text, nullable=False, default="")      # Markdown
+    version = Column(Integer, default=1, nullable=False)
+    last_updated_by = Column(String(200), nullable=True)
+    last_updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

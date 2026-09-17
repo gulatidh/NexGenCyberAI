@@ -1,6 +1,6 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
-  SmartToy, Hub, MenuBook, Shield, Webhook, VpnKey, RateReview, BarChart,
+  SmartToy, Hub, MenuBook, Shield, Webhook, VpnKey, RateReview, BarChart, AutoStories,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -21,8 +21,9 @@ export const AUTOMATE_SECTION: SectionDef = {
     { name: "AI Workflows",       icon: <Hub sx={ic("#4285F4")} />,         desc: "Multi-agent workflow missions and automated analysis pipelines.",             route: "/automate/workflows", group: "AI Agents" },
     { name: "AI Assisted Review", icon: <RateReview sx={ic("#FF6D00")} />,  desc: "Select a completed assessment and let AI recommend which agents to run next.", route: "/automate/ai-review", group: "AI Agents" },
     // Knowledge
-    { name: "Knowledge Base", icon: <MenuBook sx={ic("#FF5722")} />, desc: "Platform knowledge base and Aegis reference documentation.", route: "/automate/knowledge",     group: "Knowledge" },
-    { name: "AI Guardrails",  icon: <Shield sx={ic("#EA4335")} />,   desc: "AI safety controls, prompt audit logs, and guardrail coverage.", route: "/automate/ai-guardrails", group: "Knowledge" },
+    { name: "Knowledge Base",  icon: <MenuBook sx={ic("#FF5722")} />,    desc: "Platform knowledge base and Aegis reference documentation.", route: "/automate/knowledge",         group: "Knowledge" },
+    { name: "Owlet Reference", icon: <AutoStories sx={ic("#1565C0")} />, desc: "Technical reference for the Owlet ecosystem — capabilities, logic, and architecture. Admin-editable.", route: "/automate/owlet-reference", group: "Knowledge" },
+    { name: "AI Guardrails",   icon: <Shield sx={ic("#EA4335")} />,      desc: "AI safety controls, prompt audit logs, and guardrail coverage.", route: "/automate/ai-guardrails",  group: "Knowledge" },
     { name: "Webhooks",         icon: <Webhook sx={ic("#607D8B")} />,     desc: "Event-driven alerts on critical findings and completed scans.",              route: "/platform/integrations?tab=webhooks",  group: "Governance" },
     { name: "API Keys",         icon: <VpnKey sx={ic("#78909C")} />,      desc: "M2M API keys for CI/CD pipelines and programmatic access.",                 route: "/platform/integrations?tab=api-keys",  group: "Governance" },
     { name: "AI Usage & Cost",  icon: <BarChart sx={ic("#009688")} />,    desc: "Token consumption and estimated spend per provider and agent.",             route: "/automate/usage",         group: "Governance" },
