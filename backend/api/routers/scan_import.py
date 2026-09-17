@@ -48,6 +48,69 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 _SKIP_RESOURCE_TYPES = {"file", "code_file", "unknown"}
 _SKIP_RESOURCE_IDS = {"", "unknown", "/", "n/a", "none", "null"}
 
+
+def _el_text(el) -> Optional[str]:
+    return el.text.strip() if el is not None and el.text else None
+
+
+def _extract_raw_targets(content: bytes, fmt: str) -> Optional[Dict[str, str]]:
+    """Extract ALL discovered hosts/targets directly from the raw file — BEFORE any
+    severity filter is applied.  Returns {external_id: resource_type} or None when
+    the format doesn't support pre-filter extraction (fall back to findings list)."""
+    try:
+        import xml.etree.ElementTree as ET
+
+        if fmt == "nessus":
+            root = ET.fromstring(content)
+            hosts = {}
+            for rh in root.findall(".//ReportHost"):
+                name = (rh.get("name") or "").strip()
+                if name and name.lower() not in _SKIP_RESOURCE_IDS and len(name) >= 3:
+                    hosts[name] = "host"
+            return hosts or None
+
+        if fmt == "openvas":
+            root = ET.fromstring(content)
+            hosts = {}
+            for result in root.findall(".//result"):
+                host_el = result.find("host")
+                if host_el is not None:
+                    name = (_el_text(host_el) or "").strip()
+                    if name and name.lower() not in _SKIP_RESOURCE_IDS and len(name) >= 3:
+                        hosts[name] = "host"
+            return hosts or None
+
+        if fmt == "nmap_xml":
+            root = ET.fromstring(content)
+            hosts = {}
+            for host_el in root.findall(".//host"):
+                # Prefer hostname, fall back to IP address
+                hn = host_el.find(".//hostname[@type='user']") or host_el.find(".//hostname")
+                addr = host_el.find("address[@addrtype='ipv4']") or host_el.find("address")
+                name = (
+                    (hn.get("name") if hn is not None else None)
+                    or (addr.get("addr") if addr is not None else None)
+                    or ""
+                ).strip()
+                if name and name.lower() not in _SKIP_RESOURCE_IDS and len(name) >= 3:
+                    hosts[name] = "host"
+            return hosts or None
+
+        if fmt == "burp":
+            root = ET.fromstring(content)
+            hosts: Dict[str, str] = {}
+            for issue in root.findall(".//issue"):
+                host_el = issue.find("host")
+                if host_el is not None:
+                    name = (_el_text(host_el) or "").strip()
+                    if name and name.lower() not in _SKIP_RESOURCE_IDS and len(name) >= 3:
+                        hosts[name] = "url"
+            return hosts or None
+
+    except Exception:
+        pass
+    return None
+
 # resource_type → asset_class
 _RESOURCE_TO_CLASS = {
     "host": "vm",
@@ -106,14 +169,33 @@ def _upsert_imported_assets(
     client_id: str,
     scan_id: str,
     project_id: Optional[str],
-    findings,          # List[ParsedFinding]
+    findings,                            # List[ParsedFinding]
+    raw_targets: Optional[Dict[str, str]] = None,  # {external_id: resource_type} pre-filter
 ) -> Dict[str, int]:
     """Extract unique hosts/URLs from imported findings and upsert as assets.
+
+    raw_targets (when provided) contains ALL hosts discovered by the scanner
+    before any severity filter — so hosts with only informational findings are
+    included.  findings-derived targets are merged in for URL/other types.
 
     Returns {"created": N, "updated": M}.
     """
     # Deduplicate: external_id → metadata
     seen: Dict[str, Dict] = {}
+
+    # 1. Seed from raw_targets (pre-severity-filter) — captures all scanned hosts
+    if raw_targets:
+        for raw_id, rtype in raw_targets.items():
+            ext_id, display = _extract_asset_identity(raw_id, rtype)
+            if not ext_id or len(ext_id) < 3:
+                continue
+            seen[ext_id] = {
+                "name": display,
+                "asset_class": _RESOURCE_TO_CLASS.get(rtype, "other"),
+                "asset_type": rtype,
+            }
+
+    # 2. Merge from parsed findings — catches URL/container types not in raw_targets
     for pf in findings:
         if pf.resource_type in _SKIP_RESOURCE_TYPES:
             continue
@@ -918,8 +1000,11 @@ async def commit_scan_import(
     ai_record.normalized_finding_count = normalized_count
     ai_record.status = "completed"
 
-    # Upsert assets discovered from imported findings
-    asset_result = _upsert_imported_assets(db, client_id, scan.id, project_id, findings)
+    # Extract ALL hosts from raw file (before severity filter removed info-only hosts)
+    raw_targets = _extract_raw_targets(content, fmt)
+
+    # Upsert assets — raw_targets (all discovered hosts) merged with findings-derived targets
+    asset_result = _upsert_imported_assets(db, client_id, scan.id, project_id, findings, raw_targets)
 
     # Compute delta
     existing = (
