@@ -103,6 +103,22 @@ def _ale_for(risk: Risk) -> float:
     return round(magnitude * frequency, 2)
 
 
+def _fair_basis(risk: Risk) -> str:
+    base = BASE_PER_SEV.get(_lvl(risk), 50_000)
+    lv = _lvl(risk)
+    impact = max(1, min(10, int(risk.impact or 5)))
+    likelihood = max(1, min(10, int(risk.likelihood or 5)))
+    magnitude = base * (impact / 10.0)
+    frequency = likelihood / 10.0
+    ale = magnitude * frequency
+    ce = getattr(risk, "control_effectiveness", None) or 0.0
+    return (
+        f"{lv.title()} risk · SLE base ${base:,} × impact({impact}/10) = ${magnitude:,.0f} "
+        f"· TEF {likelihood}/10={frequency:.2f}/yr · ALE=${ale:,.0f}/yr"
+        + (f" · Control effectiveness {int(ce*100)}% → net ${ale*(1-ce):,.0f}" if ce else "")
+    )
+
+
 def _status(r: Risk) -> str:
     return (r.status or "open").lower()
 
@@ -137,13 +153,16 @@ async def get_risk_portfolio(
         lv = _lvl(r)
         status = _status(r)
         ale = _ale_for(r)
-        factor = STATUS_FACTOR.get(status, 1.0)
-        net_ale = ale * factor
+        status_factor = STATUS_FACTOR.get(status, 1.0)
+        ce = float(getattr(r, "control_effectiveness", None) or 0.0)
+        # control_effectiveness reduces exposure on top of status discount
+        net_ale = ale * status_factor * (1.0 - ce)
         domain = _normalize_domain(r.category)
 
         total_exposure += ale
         net_exposure += net_ale
         by_domain_exposure[domain] += net_ale
+        factor = status_factor  # keep for breach prob below
         by_domain_count[domain] += 1
         by_domain_severity[domain][lv if lv in ("critical", "high", "medium", "low") else "low"] += 1
 
@@ -181,6 +200,9 @@ async def get_risk_portfolio(
             "risk_matrix_score": int(getattr(r, "risk_matrix_score", None) or 0),
             "treatment_option": getattr(r, "treatment_option", None) or "",
             "status_label": _status(r).replace("_", " ").title(),
+            "control_effectiveness": round(float(getattr(r, "control_effectiveness", None) or 0.0), 2),
+            "risk_owner": getattr(r, "risk_owner", None) or r.owner or "",
+            "fair_basis": getattr(r, "fair_basis", None) or _fair_basis(r),
         })
 
     # 30-day breach probability — Poisson tail: P(>=1 event in 30 days)

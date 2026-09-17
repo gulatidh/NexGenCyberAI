@@ -277,6 +277,10 @@ export const risksApi = {
     `${apiClient.defaults.baseURL}/clients/${clientId}/risks/export?format=${format}`,
   exportSingleUrl: (clientId: string, riskId: string, format: "pdf" | "docx") =>
     `${apiClient.defaults.baseURL}/clients/${clientId}/risks/${riskId}/export?format=${format}`,
+  quantify: (clientId: string) =>
+    apiClient.post(`/clients/${clientId}/risks/quantify`).then((r) => r.data),
+  updateFair: (clientId: string, riskId: string, data: { control_effectiveness?: number; risk_owner?: string }) =>
+    apiClient.patch(`/clients/${clientId}/risks/${riskId}/fair`, data).then((r) => r.data),
 };
 
 export const riskProposalsApi = {

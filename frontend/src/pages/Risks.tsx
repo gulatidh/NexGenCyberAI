@@ -11,12 +11,13 @@ import {
 import {
   Warning, ChevronRight, PictureAsPdf, Article, Replay,
   CheckCircle, Cancel, Schedule, AutoAwesome, Close, FileDownload,
+  AttachMoney, TrendingDown, Bolt,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "../auth/msalConfig";
-import { risksApi, projectsApi } from "../services/api";
+import { risksApi, projectsApi, riskPortfolioApi } from "../services/api";
 import { Risk, Project } from "../types";
 import { fromNow } from "../utils/datetime";
 
@@ -134,6 +135,13 @@ function parseJson(val: any) {
   try { return JSON.parse(val); } catch { return null; }
 }
 
+function formatAle(v: number | undefined | null): string {
+  if (v == null) return "—";
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+  return `$${v.toFixed(0)}`;
+}
+
 // ── Detail Drawer ─────────────────────────────────────────────────────────────
 
 function RiskDetailDrawer({
@@ -151,11 +159,16 @@ function RiskDetailDrawer({
   const [reevalLoading, setReevalLoading] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [snack, setSnack] = useState("");
+  const [fairCe, setFairCe] = useState<number>(0);
+  const [fairOwner, setFairOwner] = useState("");
+  const [fairSaving, setFairSaving] = useState(false);
 
   // Populate re-eval state from risk when opening
   React.useEffect(() => {
     if (open && risk) {
       setTab(0);
+      setFairCe(Math.round(((risk as any).control_effectiveness || 0) * 100));
+      setFairOwner((risk as any).risk_owner || risk.owner || "");
       const measures = parseJson((risk as any).measures_json) || [];
       const wizard = parseJson((risk as any).wizard_data_json) || {
         accessibility: (risk as any).accessibility || 3,
@@ -213,6 +226,23 @@ function RiskDetailDrawer({
       setSnack("Status update failed.");
     } finally {
       setStatusUpdating(false);
+    }
+  };
+
+  const handleSaveFair = async () => {
+    if (!clientId) return;
+    setFairSaving(true);
+    try {
+      await risksApi.updateFair(clientId, risk.id, {
+        control_effectiveness: fairCe / 100,
+        risk_owner: fairOwner || undefined,
+      });
+      setSnack("FAIR settings saved.");
+      onUpdated();
+    } catch {
+      setSnack("Failed to save FAIR settings.");
+    } finally {
+      setFairSaving(false);
     }
   };
 
@@ -307,6 +337,7 @@ function RiskDetailDrawer({
           <Tab label="Assessment" sx={{ fontSize: 12 }} />
           <Tab label="Measures" sx={{ fontSize: 12 }} />
           <Tab label="AI Commentary" sx={{ fontSize: 12 }} />
+          <Tab label="FAIR" sx={{ fontSize: 12, color: tab === 3 ? "#4285F4" : undefined }} />
         </Tabs>
 
         <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
@@ -477,6 +508,101 @@ function RiskDetailDrawer({
               )}
             </Box>
           )}
+
+          {/* FAIR tab */}
+          {tab === 3 && (() => {
+            const ale = (risk as any).ale_annual;
+            const aleLow = (risk as any).ale_low;
+            const aleHigh = (risk as any).ale_high;
+            const fairBasis = (risk as any).fair_basis;
+            const ce = (risk as any).control_effectiveness || 0;
+            const netAle = ale != null ? ale * (1 - ce) : null;
+            return (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                {ale != null ? (
+                  <>
+                    <Box sx={{ display: "flex", gap: 2 }}>
+                      <Box sx={{ flex: 1, p: 2, bgcolor: "rgba(66,133,244,0.08)", borderRadius: 1.5,
+                        border: "1px solid rgba(66,133,244,0.25)", textAlign: "center" }}>
+                        <AttachMoney sx={{ color: "#4285F4", fontSize: 20 }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: 22, color: "#4285F4" }}>{formatAle(ale)}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>Annual Loss Expected</Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, p: 2, bgcolor: "rgba(52,168,83,0.08)", borderRadius: 1.5,
+                        border: "1px solid rgba(52,168,83,0.25)", textAlign: "center" }}>
+                        <TrendingDown sx={{ color: "#34A853", fontSize: 20 }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: 22, color: "#34A853" }}>{formatAle(netAle)}</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>Net ALE (after controls)</Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>10th pct</Typography>
+                        <Typography sx={{ fontWeight: 700, color: "#34A853" }}>{formatAle(aleLow)}</Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>Expected</Typography>
+                        <Typography sx={{ fontWeight: 700 }}>{formatAle(ale)}</Typography>
+                      </Box>
+                      <Box sx={{ flex: 1, p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>90th pct</Typography>
+                        <Typography sx={{ fontWeight: 700, color: "#EA4335" }}>{formatAle(aleHigh)}</Typography>
+                      </Box>
+                    </Box>
+                    {fairBasis && (
+                      <Box sx={{ p: 1.5, bgcolor: "rgba(255,255,255,0.03)", borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, display: "block", mb: 0.5 }}>Calculation Basis</Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary", fontFamily: "monospace" }}>{fairBasis}</Typography>
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <Alert severity="info" icon={<AttachMoney />}>
+                    ALE not yet computed. Click <strong>Quantify All</strong> in the Risk Register toolbar to run FAIR quantification.
+                  </Alert>
+                )}
+
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Control Effectiveness</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 2 }}>
+                    What percentage of the gross ALE is absorbed by your current controls? 0% = no controls, 80% = strong controls with minor residual.
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 0.5 }}>
+                    <Slider
+                      value={fairCe}
+                      onChange={(_, v) => setFairCe(v as number)}
+                      min={0} max={100} step={5}
+                      marks={[0, 25, 50, 75, 100].map((v) => ({ value: v, label: `${v}%` }))}
+                      valueLabelDisplay="auto"
+                      valueLabelFormat={(v) => `${v}%`}
+                      sx={{ color: fairCe >= 75 ? "#34A853" : fairCe >= 50 ? "#FBBC04" : fairCe >= 25 ? "#FF7043" : "#EA4335" }}
+                    />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Net ALE after controls: {ale != null ? formatAle(ale * (1 - fairCe / 100)) : "—"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Risk Owner</Typography>
+                  <TextField
+                    fullWidth size="small"
+                    placeholder="Name or email of accountable owner"
+                    value={fairOwner}
+                    onChange={(e) => setFairOwner(e.target.value)}
+                    sx={{ "& .MuiInputBase-root": { fontSize: 13 } }}
+                  />
+                </Box>
+
+                <Button variant="contained" onClick={handleSaveFair} disabled={fairSaving}
+                  startIcon={fairSaving ? <CircularProgress size={14} /> : <Bolt />}
+                  sx={{ alignSelf: "flex-start", bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367d6" } }}>
+                  Save FAIR Settings
+                </Button>
+              </Box>
+            );
+          })()}
         </Box>
       </Drawer>
 
@@ -632,6 +758,7 @@ export default function Risks() {
   const [levelFilters, setLevelFilters] = useState<Set<string>>(new Set());
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
+  const [quantifying, setQuantifying] = useState(false);
   const toggle = (s: Set<string>, setter: (s: Set<string>) => void, v: string) => {
     const next = new Set(s);
     if (next.has(v)) next.delete(v); else next.add(v);
@@ -646,6 +773,27 @@ export default function Risks() {
     queryFn: () => risksApi.list(clientId, projectId || undefined),
     enabled: !!clientId,
   });
+  const { data: portfolio } = useQuery<any>({
+    queryKey: ["risk-portfolio", clientId],
+    queryFn: () => riskPortfolioApi.get(clientId),
+    enabled: !!clientId && risks.length > 0,
+    staleTime: 30_000,
+  });
+
+  const handleQuantify = async () => {
+    if (!clientId) return;
+    setQuantifying(true);
+    try {
+      await risksApi.quantify(clientId);
+      await qc.invalidateQueries({ queryKey: ["risks"] });
+      await qc.invalidateQueries({ queryKey: ["risk-portfolio"] });
+      setSnack("FAIR ALE computed and saved for all risks.");
+    } catch {
+      setSnack("Quantification failed.");
+    } finally {
+      setQuantifying(false);
+    }
+  };
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => risksApi.update(clientId, id, data),
@@ -743,6 +891,14 @@ export default function Risks() {
           </FormControl>
           {risks.length > 0 && (
             <>
+              <Tooltip title="Compute FAIR ALE for all risks and persist to DB">
+                <Button size="small" variant="outlined" startIcon={quantifying ? <CircularProgress size={12} /> : <AttachMoney />}
+                  onClick={handleQuantify} disabled={quantifying}
+                  sx={{ fontSize: 11, color: "#4285F4", borderColor: "rgba(66,133,244,0.4)",
+                    "&:hover": { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.06)" } }}>
+                  Quantify All
+                </Button>
+              </Tooltip>
               <Tooltip title="Export full register as PDF">
                 <Button size="small" variant="outlined" startIcon={<PictureAsPdf />}
                   onClick={() => downloadRegister("pdf")} sx={{ fontSize: 11 }}>
@@ -778,23 +934,36 @@ export default function Risks() {
         <>
           {/* KPI strip */}
           <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <KpiCard label="Total Risks" value={counts.total} sublabel={`${filtered.length} after filter`} color="#4285F4" />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <KpiCard label="Critical + High" value={criticalHigh}
                 sublabel={`${counts.perLevel.critical} critical · ${counts.perLevel.high} high`}
                 color={criticalHigh > 0 ? "#EA4335" : "#34A853"} />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <KpiCard label="Mitigated" value={`${mitigatedPct}%`}
-                sublabel={`${counts.mitigated} of ${counts.total} closed or mitigated`}
+                sublabel={`${counts.mitigated} of ${counts.total} closed`}
                 color={mitigatedPct >= 50 ? "#34A853" : "#FBBC04"} />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <KpiCard label="Avg Risk Score" value={counts.avgScore.toFixed(1)}
                 sublabel="0 (low) → 10 (critical)"
                 color={counts.avgScore >= 7 ? "#EA4335" : counts.avgScore >= 5 ? "#FF7043" : counts.avgScore >= 3 ? "#FBBC04" : "#34A853"} />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <KpiCard label="Total Exposure (ALE)"
+                value={portfolio ? formatAle(portfolio.total_exposure) : "—"}
+                sublabel={portfolio ? `Net ${formatAle(portfolio.net_exposure)} after controls` : "Click Quantify All"}
+                color="#4285F4" />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <KpiCard label="30-day Breach Prob."
+                value={portfolio ? `${Math.round((portfolio.breach_probability_30d || 0) * 100)}%` : "—"}
+                sublabel={portfolio ? `${portfolio.annual_event_rate?.toFixed(2)} events/yr` : "Run Quantify All"}
+                color={portfolio && portfolio.breach_probability_30d > 0.5 ? "#EA4335"
+                  : portfolio && portfolio.breach_probability_30d > 0.2 ? "#FF7043" : "#34A853"} />
             </Grid>
           </Grid>
 
@@ -895,6 +1064,7 @@ export default function Risks() {
                     <TableCell>LEVEL</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell>SCORE</TableCell>
+                    <TableCell>ALE / YR</TableCell>
                     <TableCell>CATEGORY</TableCell>
                     <TableCell>TREATMENT</TableCell>
                     <TableCell>STATUS</TableCell>
@@ -939,6 +1109,20 @@ export default function Risks() {
                               sx={{ width: 50, height: 4, borderRadius: 2, bgcolor: "rgba(255,255,255,0.1)",
                                 "& .MuiLinearProgress-bar": { bgcolor: LEVEL_COLOR[simpleLevel] || "#888", borderRadius: 2 } }} />
                           </Box>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const ale = (r as any).ale_annual;
+                            const ce = (r as any).control_effectiveness || 0;
+                            if (ale == null) return <Typography variant="caption" sx={{ color: "text.disabled", fontSize: 11 }}>—</Typography>;
+                            const net = ale * (1 - ce);
+                            return (
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#4285F4", fontSize: 12 }}>{formatAle(ale)}</Typography>
+                                {ce > 0 && <Typography variant="caption" sx={{ color: "#34A853", fontSize: 10 }}>net {formatAle(net)}</Typography>}
+                              </Box>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{r.category || "—"}</TableCell>
                         <TableCell sx={{ color: "text.secondary", fontSize: 12, textTransform: "capitalize" }}>

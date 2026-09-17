@@ -276,3 +276,91 @@ async def delete_risk(client_id: str, risk_id: str, db: Session = Depends(get_db
         raise HTTPException(status_code=404, detail="Risk not found")
     db.delete(risk)
     db.commit()
+
+
+# ── FAIR quantification endpoints ────────────────────────────────────────────
+
+class FairUpdateRequest(BaseModel):
+    control_effectiveness: Optional[float] = None   # 0.0 – 1.0
+    risk_owner: Optional[str] = None
+
+
+@router.patch("/{risk_id}/fair")
+async def update_risk_fair(
+    client_id: str,
+    risk_id: str,
+    body: FairUpdateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """Set control effectiveness and/or risk owner for FAIR net-ALE calculation."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
+    risk = db.query(Risk).filter(Risk.id == risk_id, Risk.client_id == client_id).first()
+    if not risk:
+        raise HTTPException(status_code=404, detail="Risk not found")
+    if body.control_effectiveness is not None:
+        if not 0.0 <= body.control_effectiveness <= 1.0:
+            raise HTTPException(status_code=400, detail="control_effectiveness must be 0.0–1.0")
+        risk.control_effectiveness = body.control_effectiveness
+    if body.risk_owner is not None:
+        risk.risk_owner = body.risk_owner
+    db.commit()
+    db.refresh(risk)
+    return {"status": "updated", "risk_id": risk_id,
+            "control_effectiveness": risk.control_effectiveness,
+            "risk_owner": risk.risk_owner}
+
+
+@router.post("/quantify")
+async def quantify_risks(
+    client_id: str,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Compute FAIR ALE for every risk in the register and persist it back to the DB."""
+    require_scoped_role(AccessRole.EDITOR, AccessScope.CLIENT, client_id, db, user)
+
+    _BASE = {"critical": 1_000_000, "high": 250_000, "medium": 50_000, "low": 10_000}
+    _STATUS_FACTOR = {
+        "identified": 1.0, "under_assessment": 0.75, "treatment_planned": 0.50,
+        "accepted": 1.0, "transferred": 0.20, "closed": 0.0,
+        "no_longer_applicable": 0.0, "escalated": 1.0,
+        "open": 1.0, "in_progress": 0.75, "compensating_control": 0.5,
+        "remediated": 0.0, "mitigated": 0.0,
+    }
+
+    risks = db.query(Risk).filter(Risk.client_id == client_id).all()
+    total_ale = 0.0
+    updated = 0
+
+    for r in risks:
+        lv = (r.risk_level.value if hasattr(r.risk_level, "value") else str(r.risk_level)).lower()
+        base = _BASE.get(lv, 50_000)
+        impact = max(1, min(10, int(r.impact or 5)))
+        likelihood = max(1, min(10, int(r.likelihood or 5)))
+        magnitude = base * (impact / 10.0)
+        frequency = likelihood / 10.0
+        ale = magnitude * frequency
+        ce = float(r.control_effectiveness or 0.0)
+        status = (r.status or "identified").lower()
+        net = ale * _STATUS_FACTOR.get(status, 1.0) * (1.0 - ce)
+
+        basis = (
+            f"{lv.title()} · SLE base ${base:,} × impact({impact}/10)=${magnitude:,.0f} "
+            f"· TEF {likelihood}/10={frequency:.2f}/yr · ALE=${ale:,.0f}/yr"
+            + (f" · CE {int(ce*100)}% → net ${net:,.0f}" if ce else "")
+        )
+
+        r.ale_annual = round(ale, 2)
+        r.ale_low = round(ale * 0.5, 2)
+        r.ale_high = round(ale * 2.0, 2)
+        r.fair_basis = basis
+        total_ale += ale
+        updated += 1
+
+    db.commit()
+    return {
+        "risks_quantified": updated,
+        "total_ale_annual": round(total_ale, 2),
+        "message": f"FAIR ALE persisted for {updated} risk(s). Total exposure ${total_ale:,.0f}/yr.",
+    }

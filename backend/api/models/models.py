@@ -423,6 +423,13 @@ class Risk(Base):
     wizard_data_json = Column(Text, nullable=True)           # JSON: all wizard step values
     measures_json = Column(Text, nullable=True)              # JSON: security measures checklist
     ai_assessment_json = Column(Text, nullable=True)         # JSON: latest AI assessment
+    # FAIR quantification — persisted by POST /risks/quantify
+    ale_annual = Column(Float, nullable=True)                # Expected annual loss ($)
+    ale_low = Column(Float, nullable=True)                   # 10th-percentile ALE
+    ale_high = Column(Float, nullable=True)                  # 90th-percentile ALE
+    fair_basis = Column(Text, nullable=True)                 # Human-readable calculation explanation
+    control_effectiveness = Column(Float, nullable=True)     # 0.0–1.0; reduces net ALE
+    risk_owner = Column(String(200), nullable=True)          # Accountable owner (FAIR RO)
 
 
 class RiskProposal(Base):

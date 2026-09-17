@@ -632,6 +632,13 @@ def _ensure_added_columns() -> None:
             ("operational_impact",   "INT NULL",             "INTEGER"),
             ("financial_impact",     "INT NULL",             "INTEGER"),
             ("impact_avg",           "FLOAT NULL",           "FLOAT"),
+            # FAIR quantification columns
+            ("ale_annual",           "FLOAT NULL",           "FLOAT"),
+            ("ale_low",              "FLOAT NULL",           "FLOAT"),
+            ("ale_high",             "FLOAT NULL",           "FLOAT"),
+            ("fair_basis",           "NVARCHAR(MAX) NULL",   "TEXT"),
+            ("control_effectiveness","FLOAT NULL",           "FLOAT"),
+            ("risk_owner",           "NVARCHAR(200) NULL",   "VARCHAR(200)"),
         ]
         for col, mssql_type, sqlite_type in _risk_additions:
             if risk_cols and col not in risk_cols:
