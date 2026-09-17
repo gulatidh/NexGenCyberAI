@@ -306,6 +306,7 @@ def _format_to_scanner_type(fmt: str, tool_hint: str = "") -> str:
         return "secrets"
     fmt_map = {
         "nessus": "nessus",
+        "nessus_csv": "nessus",
         "burp": "burp",
         "qualys_xml": "qualys",
         "qualys_csv": "qualys",
