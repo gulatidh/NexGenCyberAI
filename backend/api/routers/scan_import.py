@@ -1155,6 +1155,12 @@ def delete_import(
 ):
     """Full delete of an import session: raw rows, normalized findings, assets discovered
     by this import, and the scan record itself.  Mirrors the cascade in delete_scan."""
+    from api.models.models import (
+        AgentRun, Comment, ControlDeficiency, Finding as F,
+        FrameworkAssessment, RemediationAction, RemediationJob,
+        ScanBlackboardEntry, ThreatEntry,
+    )
+
     ai = db.query(AssessmentImport).filter(
         AssessmentImport.id == import_id,
         AssessmentImport.client_id == client_id,
@@ -1164,80 +1170,81 @@ def delete_import(
 
     scan_id = ai.scan_id
 
-    # ── Delete assets sourced from this import ──────────────────────────────
-    # Python-level filter: json_extract is SQLite-only; this works on any DB.
-    if scan_id:
-        upload_conn = db.query(Connector).filter(
-            Connector.client_id == client_id,
-            Connector.connector_type == ConnectorType.UPLOAD,
-        ).first()
-        if upload_conn:
-            for asset in db.query(Asset).filter(Asset.connector_id == upload_conn.id).all():
-                meta = asset.provider_metadata or {}
-                if isinstance(meta, dict) and meta.get("scan_id") == scan_id:
-                    db.delete(asset)
+    try:
+        # ── Delete assets sourced from this import ──────────────────────────
+        # Python-level filter: json_extract is SQLite-only; this works on any DB.
+        if scan_id:
+            upload_conn = db.query(Connector).filter(
+                Connector.client_id == client_id,
+                Connector.connector_type == ConnectorType.UPLOAD,
+            ).first()
+            if upload_conn:
+                for asset in db.query(Asset).filter(Asset.connector_id == upload_conn.id).all():
+                    meta = asset.provider_metadata or {}
+                    if isinstance(meta, dict) and meta.get("scan_id") == scan_id:
+                        db.delete(asset)
 
-    # ── Delete raw scanner rows ─────────────────────────────────────────────
-    for RawModel in [
-        RawTenableFinding, RawNessusFinding, RawBurpFinding, RawQualysFinding,
-        RawOpenVASFinding, RawSarifFinding, RawGenericFinding,
-        RawNmapFinding, RawTrivyFinding, RawZapFinding, RawSecretFinding,
-    ]:
-        db.query(RawModel).filter(RawModel.import_id == ai.id).delete(synchronize_session=False)
+        # ── Delete raw scanner rows ─────────────────────────────────────────
+        for RawModel in [
+            RawTenableFinding, RawNessusFinding, RawBurpFinding, RawQualysFinding,
+            RawOpenVASFinding, RawSarifFinding, RawGenericFinding,
+            RawNmapFinding, RawTrivyFinding, RawZapFinding, RawSecretFinding,
+        ]:
+            db.query(RawModel).filter(RawModel.import_id == ai.id).delete(synchronize_session=False)
 
-    # ── Delete AssessmentImport row ─────────────────────────────────────────
-    db.delete(ai)
-    db.flush()
+        # ── Delete AssessmentImport row ─────────────────────────────────────
+        db.delete(ai)
+        db.flush()
 
-    # ── Full scan cascade (findings, comments, agent runs, register nulling) ─
-    if scan_id:
-        from api.models.models import (
-            AgentRun, Comment, ControlDeficiency, Finding as F,
-            FrameworkAssessment, RemediationAction, RemediationJob,
-            ScanBlackboardEntry, ThreatEntry,
-        )
-        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
-        if scan:
-            finding_ids = [r.id for r in db.query(F.id).filter(F.scan_id == scan_id).all()]
-            agent_run_ids = [r.id for r in db.query(AgentRun.id).filter(AgentRun.scan_id == scan_id).all()]
+        # ── Full scan cascade (findings, comments, agent runs, register nulling)
+        if scan_id:
+            scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+            if scan:
+                finding_ids = [r.id for r in db.query(F.id).filter(F.scan_id == scan_id).all()]
+                agent_run_ids = [r.id for r in db.query(AgentRun.id).filter(AgentRun.scan_id == scan_id).all()]
 
-            if finding_ids:
-                db.query(Comment).filter(
-                    Comment.entity_type == "finding",
-                    Comment.entity_id.in_(finding_ids),
-                ).delete(synchronize_session=False)
+                if finding_ids:
+                    db.query(Comment).filter(
+                        Comment.entity_type == "finding",
+                        Comment.entity_id.in_(finding_ids),
+                    ).delete(synchronize_session=False)
 
-            if agent_run_ids:
-                for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
-                    db.query(reg).filter(reg.agent_run_id.in_(agent_run_ids)).update(
-                        {"agent_run_id": None}, synchronize_session=False
-                    )
+                if agent_run_ids:
+                    for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
+                        db.query(reg).filter(reg.agent_run_id.in_(agent_run_ids)).update(
+                            {"agent_run_id": None}, synchronize_session=False
+                        )
+                    db.query(ScanBlackboardEntry).filter(
+                        ScanBlackboardEntry.agent_run_id.in_(agent_run_ids)
+                    ).update({"agent_run_id": None}, synchronize_session=False)
+
                 db.query(ScanBlackboardEntry).filter(
-                    ScanBlackboardEntry.agent_run_id.in_(agent_run_ids)
-                ).update({"agent_run_id": None}, synchronize_session=False)
+                    ScanBlackboardEntry.scan_id == scan_id
+                ).delete(synchronize_session=False)
+                db.query(AgentRun).filter(AgentRun.scan_id == scan_id).delete(synchronize_session=False)
 
-            db.query(ScanBlackboardEntry).filter(
-                ScanBlackboardEntry.scan_id == scan_id
-            ).delete(synchronize_session=False)
-            db.query(AgentRun).filter(AgentRun.scan_id == scan_id).delete(synchronize_session=False)
-
-            db.query(FrameworkAssessment).filter(
-                FrameworkAssessment.scan_id == scan_id
-            ).update({"scan_id": None}, synchronize_session=False)
-            for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
-                db.query(reg).filter(reg.scan_id == scan_id).update(
+                db.query(FrameworkAssessment).filter(
+                    FrameworkAssessment.scan_id == scan_id
+                ).update({"scan_id": None}, synchronize_session=False)
+                for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
+                    db.query(reg).filter(reg.scan_id == scan_id).update(
+                        {"scan_id": None}, synchronize_session=False
+                    )
+                db.query(RemediationJob).filter(RemediationJob.scan_id == scan_id).update(
                     {"scan_id": None}, synchronize_session=False
                 )
-            db.query(RemediationJob).filter(RemediationJob.scan_id == scan_id).update(
-                {"scan_id": None}, synchronize_session=False
-            )
-            db.query(RemediationJob).filter(RemediationJob.verification_scan_id == scan_id).update(
-                {"verification_scan_id": None}, synchronize_session=False
-            )
-            db.query(Scan).filter(Scan.parent_scan_id == scan_id).update(
-                {"parent_scan_id": None}, synchronize_session=False
-            )
-            db.delete(scan)  # ORM cascade handles findings
+                db.query(RemediationJob).filter(RemediationJob.verification_scan_id == scan_id).update(
+                    {"verification_scan_id": None}, synchronize_session=False
+                )
+                db.query(Scan).filter(Scan.parent_scan_id == scan_id).update(
+                    {"parent_scan_id": None}, synchronize_session=False
+                )
+                db.delete(scan)  # ORM cascade handles findings
 
-    db.commit()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception("delete_import %s failed", import_id)
+        raise HTTPException(status_code=500, detail=f"Delete failed: {exc}") from exc
+
     return {"deleted": True, "import_id": import_id, "scan_id": scan_id}
