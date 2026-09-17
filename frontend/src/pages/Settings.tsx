@@ -27,6 +27,7 @@ import {
   Close, Send, RestoreFromTrash, DeleteForever, DeleteSweep,
   NewReleases, Psychology, Webhook, VpnKey, MenuBook,
   ExpandMore, ExpandLess, Language,
+  SystemUpdate, CloudDownload, CheckCircleOutlined, ErrorOutlined, Terminal,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Skeleton from "@mui/material/Skeleton";
@@ -1384,7 +1385,145 @@ const TABS = [
   { label: "Prompt Logs",      icon: <Psychology fontSize="small" />,          color: "#9C27B0", adminOnly: true },
   { label: "Users",            icon: <AdminPanelSettings fontSize="small" />,  color: "#F06292", adminOnly: true },
   { label: "Deleted Accounts", icon: <DeleteSweep fontSize="small" />,         color: "#9E9E9E", adminOnly: true },
+  { label: "Software Update",  icon: <SystemUpdate fontSize="small" />,        color: "#4285F4", adminOnly: true },
 ];
+
+function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
+  const [pulling, setPulling] = useState(false);
+  const [pullResult, setPullResult] = useState<any>(null);
+
+  const { data: status, isLoading, refetch } = useQuery<any>({
+    queryKey: ["update-status"],
+    queryFn: () => adminApi.updateStatus(),
+    refetchOnWindowFocus: false,
+  });
+
+  const handlePull = async () => {
+    setPulling(true);
+    setPullResult(null);
+    try {
+      const res = await adminApi.pullUpdate();
+      setPullResult(res);
+      if (res.success) refetch();
+    } catch (e: any) {
+      setPullResult({ success: false, output: e?.response?.data?.detail || "Pull failed" });
+    } finally {
+      setPulling(false);
+    }
+  };
+
+  return (
+    <Box>
+      <SectionHeader icon={<SystemUpdate />} title="Software Update"
+        subtitle="Pull the latest code from GitHub to update this local instance" />
+
+      {!isAdmin && (
+        <Alert severity="warning" sx={{ mb: 2 }}>Admin access required to manage software updates.</Alert>
+      )}
+
+      {/* Current version card */}
+      <Card variant="outlined" sx={{ mb: 3, bgcolor: "rgba(255,255,255,0.03)" }}>
+        <CardContent>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, mb: 2 }}>
+            Current Version
+          </Typography>
+          {isLoading ? <CircularProgress size={20} /> : status?.error ? (
+            <Alert severity="warning" sx={{ fontSize: 12 }}>{status.error}</Alert>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                <Chip
+                  icon={<Terminal sx={{ fontSize: 14 }} />}
+                  label={status?.current_hash || "unknown"}
+                  size="small"
+                  sx={{ fontFamily: "monospace", fontSize: 12, bgcolor: "rgba(66,133,244,0.12)", color: "#4285F4", border: "1px solid rgba(66,133,244,0.3)" }}
+                />
+                {status?.update_available ? (
+                  <Chip label={`${status.behind_count} update${status.behind_count !== 1 ? "s" : ""} available`} size="small"
+                    sx={{ bgcolor: "rgba(251,188,4,0.12)", color: "#FBBC04", border: "1px solid rgba(251,188,4,0.3)", fontSize: 11 }} />
+                ) : (
+                  <Chip icon={<CheckCircleOutlined sx={{ fontSize: 13 }} />} label="Up to date" size="small"
+                    sx={{ bgcolor: "rgba(52,168,83,0.12)", color: "#34A853", border: "1px solid rgba(52,168,83,0.3)", fontSize: 11 }} />
+                )}
+              </Box>
+              <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                {status?.current_message}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "text.disabled" }}>
+                {status?.current_date}
+              </Typography>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent commits */}
+      {status?.recent_commits && (
+        <Card variant="outlined" sx={{ mb: 3, bgcolor: "rgba(255,255,255,0.03)" }}>
+          <CardContent>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5, mb: 1.5 }}>
+              Latest Commits on origin/main
+            </Typography>
+            <Box sx={{ fontFamily: "monospace", fontSize: 12, color: "text.secondary", whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+              {status.recent_commits.split("\n").map((line: string, i: number) => {
+                const [hash, ...rest] = line.split(" ");
+                return (
+                  <Box key={i} sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+                    <Box component="span" sx={{ color: "#4285F4", minWidth: 60, flexShrink: 0 }}>{hash}</Box>
+                    <Box component="span" sx={{ color: hash === status.current_hash ? "#34A853" : "text.secondary" }}>
+                      {rest.join(" ")}
+                      {hash === status.current_hash && <Chip label="current" size="small" sx={{ ml: 1, height: 16, fontSize: 9, bgcolor: "rgba(52,168,83,0.12)", color: "#34A853" }} />}
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pull result */}
+      {pullResult && (
+        <Card variant="outlined" sx={{ mb: 3, bgcolor: pullResult.success ? "rgba(52,168,83,0.06)" : "rgba(234,67,53,0.06)", border: `1px solid ${pullResult.success ? "rgba(52,168,83,0.3)" : "rgba(234,67,53,0.3)"}` }}>
+          <CardContent>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+              {pullResult.success
+                ? <CheckCircleOutlined sx={{ color: "#34A853", fontSize: 18 }} />
+                : <ErrorOutlined sx={{ color: "#EA4335", fontSize: 18 }} />}
+              <Typography sx={{ fontWeight: 600, fontSize: 13, color: pullResult.success ? "#34A853" : "#EA4335" }}>
+                {pullResult.already_current ? "Already up to date" : pullResult.success ? "Update applied successfully" : "Pull failed"}
+              </Typography>
+            </Box>
+            <Box sx={{ fontFamily: "monospace", fontSize: 12, color: "text.secondary", whiteSpace: "pre-wrap", bgcolor: "rgba(0,0,0,0.3)", p: 1.5, borderRadius: 1 }}>
+              {pullResult.output}
+            </Box>
+            {pullResult.restart_required && (
+              <Alert severity="info" sx={{ mt: 1.5, fontSize: 12 }}>
+                Restart the backend server to apply the updated code.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pull button */}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+        <Button
+          variant="contained"
+          startIcon={pulling ? <CircularProgress size={16} color="inherit" /> : <CloudDownload />}
+          disabled={!isAdmin || pulling}
+          onClick={handlePull}
+          sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
+        >
+          {pulling ? "Pulling..." : "Pull Latest Updates"}
+        </Button>
+        <Button variant="outlined" size="small" onClick={() => refetch()} disabled={isLoading}>
+          Refresh Status
+        </Button>
+      </Box>
+    </Box>
+  );
+}
 
 export default function Settings() {
   const [tab, setTab] = useState(0);
@@ -1462,6 +1601,7 @@ export default function Settings() {
       <TabPanel value={tab} index={10}><PromptLogsTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={11}><UsersTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={12}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={13}><SoftwareUpdateTab isAdmin={isAdmin} /></TabPanel>
     </Box>
   );
 }

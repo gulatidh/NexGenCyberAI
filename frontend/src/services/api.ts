@@ -498,6 +498,8 @@ export const adminApi = {
     apiClient.delete(`/admin/clients/${clientId}/permanent`),
   purgeExpiredClients: () =>
     apiClient.post("/admin/clients/purge-expired").then((r) => r.data),
+  updateStatus: () => apiClient.get("/admin/update/status").then((r) => r.data),
+  pullUpdate: () => apiClient.post("/admin/update/pull").then((r) => r.data),
 };
 
 export const technologiesApi = {

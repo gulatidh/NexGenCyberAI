@@ -538,3 +538,68 @@ def list_prompt_logs(
             for r in rows
         ],
     }
+
+
+# ── Software Update ────────────────────────────────────────────────────────────
+
+import subprocess as _subprocess
+import os as _os
+
+@router.get("/update/status")
+async def update_status(_=Depends(get_current_user)):
+    """Return current git commit info and whether origin/main is ahead."""
+    try:
+        repo = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+        def _git(*args):
+            return _subprocess.check_output(["git"] + list(args), cwd=repo, stderr=_subprocess.STDOUT).decode().strip()
+
+        # Fetch silently so we can compare
+        try:
+            _subprocess.check_output(["git", "fetch", "origin", "main"], cwd=repo, stderr=_subprocess.STDOUT, timeout=15)
+        except Exception:
+            pass
+
+        current_hash   = _git("rev-parse", "HEAD")[:8]
+        current_msg    = _git("log", "-1", "--pretty=%s")
+        current_date   = _git("log", "-1", "--pretty=%ci")
+        remote_hash    = _git("rev-parse", "origin/main")[:8]
+        behind_count   = int(_git("rev-list", "--count", "HEAD..origin/main") or "0")
+        recent_commits = _git("log", "origin/main", "--oneline", "-10")
+
+        return {
+            "current_hash":    current_hash,
+            "current_message": current_msg,
+            "current_date":    current_date,
+            "remote_hash":     remote_hash,
+            "behind_count":    behind_count,
+            "update_available": behind_count > 0,
+            "recent_commits":  recent_commits,
+        }
+    except Exception as exc:
+        return {"error": str(exc), "update_available": False}
+
+
+@router.post("/update/pull")
+async def pull_update(_=Depends(get_current_user)):
+    """Run git pull origin main and return the output."""
+    try:
+        repo = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+        result = _subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        output = (result.stdout + result.stderr).strip()
+        already_current = "Already up to date" in output
+        return {
+            "success":         result.returncode == 0,
+            "output":          output,
+            "already_current": already_current,
+            "restart_required": result.returncode == 0 and not already_current,
+        }
+    except _subprocess.TimeoutExpired:
+        return {"success": False, "output": "git pull timed out after 60 seconds.", "restart_required": False}
+    except Exception as exc:
+        return {"success": False, "output": str(exc), "restart_required": False}
