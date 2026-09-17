@@ -858,6 +858,23 @@ def set_live_version(
     return scan
 
 
+@router.patch("/{scan_id}/rename", response_model=ScanResponse, dependencies=[Depends(require_editor_anywhere)])
+def rename_scan(
+    client_id: str,
+    scan_id: str,
+    name: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+):
+    """Rename a scan's display name. Reflected everywhere: tile card, scan detail, findings list."""
+    scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    scan.name = name.strip() or scan.name
+    db.commit()
+    db.refresh(scan)
+    return scan
+
+
 @router.patch("/{scan_id}/move", response_model=ScanResponse, dependencies=[Depends(require_editor_anywhere)])
 def move_scan_to_project(
     client_id: str,

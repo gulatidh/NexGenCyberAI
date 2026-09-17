@@ -219,13 +219,14 @@ export const scansApi = {
     form.append("tool_hint", toolHint);
     return apiClient.post(`/clients/${clientId}/scans/import/parse`, form).then((r) => r.data);
   },
-  commitScanImport: (clientId: string, file: File, toolHint: string, scanName: string, importName?: string, projectId?: string) => {
+  commitScanImport: (clientId: string, file: File, toolHint: string, scanName: string, importName?: string, projectId?: string, parentScanId?: string) => {
     const form = new FormData();
     form.append("file", file);
     form.append("tool_hint", toolHint);
     form.append("scan_name", scanName);
     if (importName) form.append("import_name", importName);
     if (projectId) form.append("project_id", projectId);
+    if (parentScanId) form.append("parent_scan_id", parentScanId);
     return apiClient.post(`/clients/${clientId}/scans/import/commit`, form).then((r) => r.data);
   },
   importHistory: (clientId: string) =>
@@ -241,6 +242,8 @@ export const scansApi = {
     }).then((r) => r.data),
   setLive: (clientId: string, scanId: string) =>
     apiClient.patch(`/clients/${clientId}/scans/${scanId}/set-live`).then((r) => r.data),
+  rename: (clientId: string, scanId: string, name: string) =>
+    apiClient.patch(`/clients/${clientId}/scans/${scanId}/rename`, { name }).then((r) => r.data),
   triggerEnrich: (clientId: string, scanId: string) =>
     apiClient.post(`/clients/${clientId}/scans/${scanId}/enrich`).then((r) => r.data),
   move: (clientId: string, scanId: string, targetProjectId: string | null) =>

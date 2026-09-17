@@ -14,7 +14,7 @@ import {
 import {
   PlayArrow, Add, Refresh, Visibility, DeleteOutlined, Replay, History, CompareArrows,
   ExpandMore, CloudUpload, Upload, Storage, Business, Link as LinkIcon, DriveFileMove,
-  CheckCircle, Cancel, Psychology, InfoOutlined, WarningAmber,
+  CheckCircle, Cancel, Psychology, InfoOutlined, WarningAmber, EditOutlined, Check,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { scansApi, connectorsApi, clientsApi, frameworksApi, assessmentsApi, findingsApi, apiClient, projectsApi } from "../services/api";
@@ -205,6 +205,8 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
   const [page, setPage] = useState(0);
   const ROWS_PER_PAGE = 10;
   const [pendingDeleteImport, setPendingDeleteImport] = useState<ImportHistoryRow | null>(null);
+  const [linkToBaseline, setLinkToBaseline] = useState(false);
+  const [baselineScanId, setBaselineScanId] = useState<string>("");
 
   const { data: historyData = [] } = useQuery<ImportHistoryRow[]>({
     queryKey: ["import-history", clientId],
@@ -228,6 +230,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
   const clearAll = () => {
     setSelectedFile(null); setAnalysis(null); setPreview(null);
     setAnalyzeError(null); setParseError(null); setImportName(""); setToolHint(""); setPage(0);
+    setLinkToBaseline(false); setBaselineScanId("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -266,7 +269,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
     setCommitting(true);
     const hint = analysis?.scanner_type || toolHint;
     try {
-      const result: any = await scansApi.commitScanImport(clientId, selectedFile, hint, importName, importName);
+      const result: any = await scansApi.commitScanImport(clientId, selectedFile, hint, importName, importName, undefined, linkToBaseline && baselineScanId ? baselineScanId : undefined);
       const count = result?.findings_imported ?? result?.finding_count ?? preview?.finding_count ?? 0;
       const ref = result?.import_ref ?? "";
       const name = result?.import_name ?? importName ?? "Assessment";
@@ -613,7 +616,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
               sx={{ color: "text.secondary", "& .MuiToolbar-root": { minHeight: 40 }, fontSize: 12 }} />
           </Box>
 
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "flex-start" }}>
             <TextField size="small" required label="Assessment name"
               placeholder={`e.g. ${preview.scanner_type ? preview.scanner_type.charAt(0).toUpperCase() + preview.scanner_type.slice(1) : "Scan"} – ${new Date().toLocaleDateString()}`}
               helperText="Give this import a memorable name for later reference"
@@ -626,6 +629,38 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
             </Button>
             <Button variant="outlined" sx={{ borderColor: "divider", color: "text.secondary" }} onClick={clearAll}>Cancel</Button>
           </Box>
+
+          {/* ── Baseline (re-import) picker ── */}
+          {historyData.length > 0 && (
+            <Box sx={{ mt: 2, p: 1.5, borderRadius: 1, border: "1px solid", borderColor: linkToBaseline ? "primary.main" : "divider", bgcolor: "rgba(255,255,255,0.02)" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <input type="checkbox" id="link-baseline" checked={linkToBaseline}
+                  onChange={(e) => { setLinkToBaseline(e.target.checked); if (!e.target.checked) setBaselineScanId(""); }}
+                  style={{ accentColor: "#4285F4", width: 14, height: 14, cursor: "pointer" }} />
+                <label htmlFor="link-baseline" style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", cursor: "pointer", userSelect: "none" }}>
+                  Re-import — link as new version of an existing assessment (enables Changes diff)
+                </label>
+              </Box>
+              {linkToBaseline && (
+                <Box sx={{ mt: 1.5 }}>
+                  <select value={baselineScanId} onChange={(e) => setBaselineScanId(e.target.value)}
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 4, fontSize: 12, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "inherit", cursor: "pointer" }}>
+                    <option value="">— select the baseline assessment —</option>
+                    {historyData.filter(r => r.scan_id).map(r => (
+                      <option key={r.id} value={r.scan_id!}>
+                        {r.import_ref} · {r.import_name || r.scan_name} ({r.normalized_finding_count ?? r.finding_count ?? 0} findings)
+                      </option>
+                    ))}
+                  </select>
+                  {baselineScanId && (
+                    <Typography variant="caption" sx={{ color: "#34A853", display: "block", mt: 0.75 }}>
+                      This import will be saved as a new version. The Changes button will compare it against the baseline.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </Box>
+          )}
         </Box>
       )}
 
@@ -732,6 +767,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
 // ── AssessmentTileCard ────────────────────────────────────────────────────
 interface AssessmentTileCardProps {
   tile: any;
+  clientId: string;
   versionMap: Map<string, any[]>;
   navigate: ReturnType<typeof useNavigate>;
   rescanMutation: any;
@@ -740,10 +776,17 @@ interface AssessmentTileCardProps {
   setMoveScan: (tile: any) => void;
 }
 
-function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot, setMoveScan }: AssessmentTileCardProps) {
+function AssessmentTileCard({ tile, clientId, versionMap, navigate, rescanMutation, setPendingDeleteScan, setHistoryOpenForRoot, setMoveScan }: AssessmentTileCardProps) {
   const location = useLocation();
+  const qc = useQueryClient();
   const scansBase = location.pathname.startsWith("/vulnerability") ? "/vulnerability/scans" : location.pathname.startsWith("/discover") ? "/discover/scans" : "/scans";
   const status = tile.status as string;
+  const [renaming, setRenaming] = React.useState(false);
+  const [renameDraft, setRenameDraft] = React.useState(tile.name || "");
+  const renameMutation = useMutation({
+    mutationFn: (name: string) => scansApi.rename(clientId, tile.id, name),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["assessments-tiles"] }); setRenaming(false); },
+  });
   const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
   const cat = (tile.category as string) || "Other";
   const catColor = CATEGORY_COLOR[cat.toLowerCase() as ScanCategory] || "#4285F4";
@@ -777,9 +820,15 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
             <DeleteOutlined sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
+        <Tooltip title="Rename assessment">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setRenameDraft(tile.name || ""); setRenaming(true); }}
+            sx={{ position: "absolute", top: 6, right: 32, color: "text.secondary", "&:hover": { color: "#FBBC04", bgcolor: "rgba(251,188,4,0.08)" } }}>
+            <EditOutlined sx={{ fontSize: 16 }} />
+          </IconButton>
+        </Tooltip>
         <Tooltip title="Move to a different project">
           <IconButton size="small" onClick={(e) => { e.stopPropagation(); setMoveScan(tile); }}
-            sx={{ position: "absolute", top: 6, right: 32, color: "text.secondary", "&:hover": { color: "#34A853", bgcolor: "rgba(52,168,83,0.08)" } }}>
+            sx={{ position: "absolute", top: 6, right: 58, color: "text.secondary", "&:hover": { color: "#34A853", bgcolor: "rgba(52,168,83,0.08)" } }}>
             <DriveFileMove sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
@@ -787,7 +836,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
           <span>
             <IconButton size="small" disabled={status === "running" || rescanMutation.isPending}
               onClick={(e) => { e.stopPropagation(); rescanMutation.mutate(tile); }}
-              sx={{ position: "absolute", top: 6, right: 58, color: "text.secondary", "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" }, "&.Mui-disabled": { color: "text.secondary" } }}>
+              sx={{ position: "absolute", top: 6, right: 84, color: "text.secondary", "&:hover": { color: "#4285F4", bgcolor: "rgba(66,133,244,0.08)" }, "&.Mui-disabled": { color: "text.secondary" } }}>
               <Replay sx={{ fontSize: 16 }} />
             </IconButton>
           </span>
@@ -795,7 +844,7 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
         {isLive && versionCount > 1 && (
           <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
-              sx={{ position: "absolute", top: 6, right: 84, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
+              sx={{ position: "absolute", top: 6, right: 110, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
               <Badge badgeContent={versionCount}
                 sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}>
                 <History sx={{ fontSize: 16 }} />
@@ -806,13 +855,13 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
         {tile.parent_scan_id && (
           <Tooltip title="View diff — compare with previous scan">
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`${scansBase}/${tile.id}/diff`); }}
-              sx={{ position: "absolute", top: 6, right: 110, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
+              sx={{ position: "absolute", top: 6, right: 136, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
               <CompareArrows sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
         )}
         <Chip label={status} size="small" sx={{
-          position: "absolute", top: 12, right: tile.parent_scan_id ? 136 : 110,
+          position: "absolute", top: 12, right: tile.parent_scan_id ? 162 : 136,
           bgcolor: `${statusColor}20`, color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
           textTransform: "uppercase", letterSpacing: 0.5,
         }} />
@@ -826,13 +875,29 @@ function AssessmentTileCard({ tile, versionMap, navigate, rescanMutation, setPen
           {tile.client_name && " · "}
           {tile.started_at ? fromNow(tile.started_at) : "Not started"} · {dur}
         </Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 28 }}>
-          {tile.name ? tile.name : ""}
-          {tile.findings_count > 0
-            ? `${tile.name ? " · " : ""}${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}`
-            : (tile.name ? "" : "No findings yet")}
-          {tile.framework ? ` · ${tile.framework}` : ""}
-        </Typography>
+        {renaming ? (
+          <Box sx={{ display: "flex", gap: 0.5, mb: 1.25, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+            <input
+              autoFocus value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") renameMutation.mutate(renameDraft); if (e.key === "Escape") setRenaming(false); }}
+              style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(66,133,244,0.6)", borderRadius: 4, padding: "3px 6px", color: "inherit", fontSize: 12, outline: "none" }}
+            />
+            <IconButton size="small" onClick={() => renameMutation.mutate(renameDraft)} sx={{ color: "#34A853", p: 0.25 }}>
+              <Check sx={{ fontSize: 14 }} />
+            </IconButton>
+            <IconButton size="small" onClick={() => setRenaming(false)} sx={{ color: "text.secondary", p: 0.25 }}>
+              <Cancel sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Box>
+        ) : (
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", fontSize: 12, mb: 1.25, minHeight: 28 }}>
+            {tile.name ? tile.name : ""}
+            {tile.findings_count > 0
+              ? `${tile.name ? " · " : ""}${tile.findings_count} finding${tile.findings_count === 1 ? "" : "s"}`
+              : (tile.name ? "" : "No findings yet")}
+            {tile.framework ? ` · ${tile.framework}` : ""}
+          </Typography>
+        )}
         <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap", alignItems: "center" }}>
           {tile.summary?.critical > 0 && <Chip size="small" label={`${tile.summary.critical}C`} sx={{ bgcolor: "rgba(234,67,53,0.18)", color: "#EA4335", height: 18, fontSize: 10, fontWeight: 700 }} />}
           {tile.summary?.high > 0 && <Chip size="small" label={`${tile.summary.high}H`} sx={{ bgcolor: "rgba(255,112,67,0.18)", color: "#FF7043", height: 18, fontSize: 10, fontWeight: 700 }} />}
@@ -1226,7 +1291,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   <Grid container spacing={1.5}>
                     {platformTiles.map((tile) => (
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
-                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                        <AssessmentTileCard tile={tile} clientId={selectedClientId} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
                           setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>
@@ -1316,7 +1381,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   <Grid container spacing={1.5}>
                     {entTiles.map((tile) => (
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
-                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                        <AssessmentTileCard tile={tile} clientId={selectedClientId} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
                           setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>
@@ -1372,7 +1437,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   <Grid container spacing={1.5}>
                     {importTiles.map((tile) => (
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={tile.id}>
-                        <AssessmentTileCard tile={tile} versionMap={versionMap} navigate={navigate}
+                        <AssessmentTileCard tile={tile} clientId={selectedClientId} versionMap={versionMap} navigate={navigate}
                           rescanMutation={rescanMutation} setPendingDeleteScan={setPendingDeleteScan}
                           setHistoryOpenForRoot={setHistoryOpenForRoot} setMoveScan={setMoveScan} />
                       </Grid>

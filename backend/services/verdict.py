@@ -226,6 +226,7 @@ _TOOL_LABELS: dict = {
     "qualys": "Qualys VMDR",
     "invicti": "Invicti",
     "acunetix": "Acunetix Enterprise",
+    "upload": "Imported Scan",
 }
 
 

@@ -172,6 +172,7 @@ def _upsert_imported_assets(
     project_id: Optional[str],
     findings,                            # List[ParsedFinding]
     raw_targets: Optional[Dict[str, str]] = None,  # {external_id: resource_type} pre-filter
+    connector=None,                      # pre-fetched UPLOAD connector (optional)
 ) -> Dict[str, int]:
     """Extract unique hosts/URLs from imported findings and upsert as assets.
 
@@ -218,7 +219,8 @@ def _upsert_imported_assets(
     if not seen:
         return {"created": 0, "updated": 0}
 
-    connector = _get_or_create_import_connector(db, client_id, project_id)
+    if connector is None:
+        connector = _get_or_create_import_connector(db, client_id, project_id)
     now = datetime.now(timezone.utc)
     created = 0
     updated = 0
@@ -906,6 +908,7 @@ async def commit_scan_import(
     scan_name: str = Form(default=""),
     import_name: str = Form(default=""),
     project_id: Optional[str] = Form(default=None),
+    parent_scan_id: Optional[str] = Form(default=None),
     db: Session = Depends(get_db),
     user=Depends(require_editor_anywhere),
 ):
@@ -943,6 +946,9 @@ async def commit_scan_import(
     scanner_type = _format_to_scanner_type(fmt, tool_hint)
     import_ref = _generate_import_ref(db, client_id)
 
+    # Fetch (or create) the UPLOAD sentinel connector early — needed for scan.connector_id
+    connector = _get_or_create_import_connector(db, client_id, project_id)
+
     # Create AssessmentImport record
     ai_record = AssessmentImport(
         client_id=client_id,
@@ -969,10 +975,25 @@ async def commit_scan_import(
         "import_id": ai_record.id,
         "import_ref": import_ref,
     })
+    # Validate parent_scan_id and demote the entire version chain to non-live
+    resolved_parent = None
+    if parent_scan_id:
+        parent = db.query(Scan).filter(
+            Scan.id == parent_scan_id,
+            Scan.client_id == client_id,
+        ).first()
+        if parent:
+            resolved_parent = parent_scan_id
+            root_id = parent.parent_scan_id or parent.id
+            db.query(Scan).filter(
+                (Scan.id == root_id) | (Scan.parent_scan_id == root_id)
+            ).update({"is_live": False}, synchronize_session=False)
+
     scan = Scan(
         id=str(uuid.uuid4()),
         client_id=client_id,
         project_id=project_id or None,
+        connector_id=connector.id,
         scan_type=ScanType.VULNERABILITY,
         status=ScanStatus.COMPLETED,
         name=final_name,
@@ -981,6 +1002,8 @@ async def commit_scan_import(
         completed_at=datetime.now(timezone.utc),
         raw_context=raw_ctx,
         progress_message=f"Imported {len(findings)} findings from {fmt} format",
+        parent_scan_id=resolved_parent,
+        is_live=True,
     )
     db.add(scan)
     db.flush()
@@ -1006,7 +1029,7 @@ async def commit_scan_import(
     raw_targets = _extract_raw_targets(content, fmt)
 
     # Upsert assets — raw_targets (all discovered hosts) merged with findings-derived targets
-    asset_result = _upsert_imported_assets(db, client_id, scan.id, project_id, findings, raw_targets)
+    asset_result = _upsert_imported_assets(db, client_id, scan.id, project_id, findings, raw_targets, connector=connector)
 
     # Compute delta
     existing = (
