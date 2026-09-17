@@ -219,11 +219,14 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
       scansApi.deleteImport(clientId, Number(row.id)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["import-history", clientId] });
-      qc.invalidateQueries({ queryKey: ["scans", clientId] });
+      qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
       qc.invalidateQueries({ queryKey: ["assets", clientId] });
       qc.invalidateQueries({ queryKey: ["findings", clientId] });
       setPendingDeleteImport(null);
       setSuccessSnack("Import deleted — findings and assets removed.");
+    },
+    onError: (e: any) => {
+      toast.error(e?.response?.data?.detail || e?.message || "Delete failed");
     },
   });
 

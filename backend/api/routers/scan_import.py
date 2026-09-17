@@ -1165,11 +1165,17 @@ def delete_import(
     scan_id = ai.scan_id
 
     # ── Delete assets sourced from this import ──────────────────────────────
+    # Python-level filter: json_extract is SQLite-only; this works on any DB.
     if scan_id:
-        db.query(Asset).filter(
-            Asset.client_id == client_id,
-            func.json_extract(Asset.provider_metadata, "$.scan_id") == scan_id,
-        ).delete(synchronize_session=False)
+        upload_conn = db.query(Connector).filter(
+            Connector.client_id == client_id,
+            Connector.connector_type == ConnectorType.UPLOAD,
+        ).first()
+        if upload_conn:
+            for asset in db.query(Asset).filter(Asset.connector_id == upload_conn.id).all():
+                meta = asset.provider_metadata or {}
+                if isinstance(meta, dict) and meta.get("scan_id") == scan_id:
+                    db.delete(asset)
 
     # ── Delete raw scanner rows ─────────────────────────────────────────────
     for RawModel in [
