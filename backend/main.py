@@ -929,6 +929,26 @@ def _ensure_added_columns() -> None:
         except Exception as exc:
             logger.warning("Raw orphan cleanup failed: %s", exc)
 
+        # raw_nessus — CSV-specific columns (Tenable.sc / Nessus Agent exports)
+        try:
+            raw_nessus_cols = {c["name"] for c in inspector.get_columns("raw_nessus")}
+        except Exception:
+            raw_nessus_cols = set()
+        for col, spec in [
+            ("stig_severity", "NVARCHAR(20) NULL" if dialect == "mssql" else "TEXT"),
+            ("vpr_score",     "FLOAT NULL"),
+            ("first_discovered", "NVARCHAR(50) NULL" if dialect == "mssql" else "TEXT"),
+            ("last_observed",    "NVARCHAR(50) NULL" if dialect == "mssql" else "TEXT"),
+            ("repository",       "NVARCHAR(200) NULL" if dialect == "mssql" else "TEXT"),
+        ]:
+            if col not in raw_nessus_cols:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE raw_nessus ADD {col} {spec}"))
+                    logger.info("Added raw_nessus.%s column (%s)", col, dialect)
+                except Exception as exc:
+                    logger.warning("raw_nessus.%s ALTER failed: %s", col, exc)
+
         # agent_runs.progress_message — live status text streamed to frontend via SSE
         try:
             agent_run_cols = {c["name"] for c in inspector.get_columns("agent_runs")}

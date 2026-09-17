@@ -1769,6 +1769,12 @@ class RawNessusFinding(Base):
     exploitability_ease = Column(String(100), nullable=True)
     metasploit = Column(Boolean, nullable=True)
     patch_available = Column(Boolean, nullable=True)
+    # CSV-specific fields (Tenable.sc / Nessus Agent exports)
+    stig_severity = Column(String(20), nullable=True)
+    vpr_score = Column(Float, nullable=True)
+    first_discovered = Column(String(50), nullable=True)
+    last_observed = Column(String(50), nullable=True)
+    repository = Column(String(200), nullable=True)
 
 
 class RawBurpFinding(Base):

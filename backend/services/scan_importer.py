@@ -31,6 +31,7 @@ class ParsedFinding:
     cve_id: Optional[str] = None       # single CVE, max 50 chars (DB column limit)
     cve_ids: Optional[str] = None      # JSON array of all CVEs when there are multiple
     cvss_score: Optional[float] = None
+    cvss_vector: Optional[str] = None
     remediation: str = ""
     control_id: Optional[str] = None
     confidence: float = 1.0            # 0.0-1.0
@@ -49,6 +50,7 @@ class ParsedFinding:
             "cve_id": safe_cve_id,
             "cve_ids": self.cve_ids,
             "cvss_score": self.cvss_score,
+            "cvss_vector": self.cvss_vector,
             "remediation": self.remediation[:3000],
             "control_id": self.control_id,
             "status": "open",
@@ -707,6 +709,14 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
     Deduplicates by Plugin ID — one finding per vulnerability regardless of how
     many hosts are affected.  Affected host list is stored in raw["affected_hosts"].
     """
+    _SEV_ID = {"critical": 4, "high": 3, "medium": 2, "low": 1, "none": 0, "info": 0, "informational": 0}
+    _SEV_MAP = {
+        "critical": "critical", "high": "high",
+        "medium": "medium", "moderate": "medium",
+        "low": "low", "informational": "info", "info": "info",
+        "none": "info", "": "info",
+    }
+
     findings = []
     seen: dict = {}  # plugin_id → index in findings list
     try:
@@ -718,29 +728,42 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
             if not title:
                 continue
 
-            # Severity mapping (Tenable uses "Critical/High/Medium/Low/Info/None")
-            sev_raw = (row.get("Severity") or row.get("Risk Factor") or "").strip().lower()
-            sev_map = {
-                "critical": "critical",
-                "high": "high",
-                "medium": "medium",
-                "moderate": "medium",
-                "low": "low",
-                "informational": "info",
-                "info": "info",
-                "none": "info",
-                "": "info",
-            }
-            sev = sev_map.get(sev_raw, "medium")
+            # Severity — "Severity" column takes precedence; "Risk Factor" is the Nessus native field
+            sev_text = (row.get("Severity") or "").strip().lower()
+            risk_factor_text = (row.get("Risk Factor") or "").strip()
+            sev_raw = sev_text or risk_factor_text.lower()
+            sev = _SEV_MAP.get(sev_raw, "medium")
+            severity_id = _SEV_ID.get(sev_raw, 2)
 
-            # CVSS
-            cvss_raw = (row.get("CVSS V3 Base Score") or row.get("CVSS V2 Base Score") or "").strip()
+            # CVSS — prefer V3, fall back to V2 for the main finding score
+            cvss3_raw = (row.get("CVSS V3 Base Score") or "").strip()
+            cvss2_raw = (row.get("CVSS V2 Base Score") or "").strip()
             try:
-                cvss = float(cvss_raw) if cvss_raw else None
+                cvss = float(cvss3_raw) if cvss3_raw else (float(cvss2_raw) if cvss2_raw else None)
             except ValueError:
                 cvss = None
+            try:
+                cvss3_base = float(cvss3_raw) if cvss3_raw else None
+            except ValueError:
+                cvss3_base = None
+            try:
+                cvss2_base = float(cvss2_raw) if cvss2_raw else None
+            except ValueError:
+                cvss2_base = None
+            try:
+                cvss3_temp = float((row.get("CVSS V3 Temporal Score") or "").strip()) or None
+            except ValueError:
+                cvss3_temp = None
+            try:
+                cvss2_temp = float((row.get("CVSS V2 Temporal Score") or "").strip()) or None
+            except ValueError:
+                cvss2_temp = None
 
-            # CVE — Nessus lists multiple CVEs comma-separated, e.g. "CVE-A,CVE-B,CVE-C"
+            # Vectors (keep V2 and V3 separate to match DB schema)
+            cvss2_vector = (row.get("CVSS V2 Vector") or "").strip() or None
+            cvss3_vector = (row.get("CVSS V3 Vector") or "").strip() or None
+
+            # CVE — Nessus lists multiple CVEs comma-separated
             cve_raw = (row.get("CVE") or "").strip()
             cve_list = [c.strip() for c in re.split(r"[,\s]+", cve_raw)
                         if c.strip() and re.match(r"CVE-\d{4}-\d+", c.strip())]
@@ -751,20 +774,30 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
             ip = (row.get("IP Address") or row.get("Host") or "").strip()
             dns = (row.get("DNS Name") or "").strip()
             resource = dns or ip or "unknown"
+            port_raw = (row.get("Port") or "").strip()
+            protocol_raw = (row.get("Protocol") or "").strip()
 
-            # Description — combine synopsis + description
+            # Text fields
             synopsis = (row.get("Synopsis") or "").strip()
             description = (row.get("Description") or "").strip()
-            if synopsis and description:
-                full_desc = f"{synopsis}\n\n{description}"
-            else:
-                full_desc = synopsis or description
-
+            full_desc = f"{synopsis}\n\n{description}" if synopsis and description else synopsis or description
             remediation = (row.get("Steps to Remediate") or row.get("Solution") or "").strip()
-            cvss_vector = (row.get("CVSS V3 Vector") or row.get("CVSS V2 Vector") or "").strip() or None
+            plugin_output = (row.get("Plugin Output") or "").strip()
+
+            # VPR score
+            vpr_raw = (row.get("Vulnerability Priority Rating") or "").strip()
+            try:
+                vpr = float(vpr_raw) if vpr_raw else None
+            except ValueError:
+                vpr = None
+
+            # Exploit info
+            exploit_avail = (row.get("Exploit?") or "").strip().lower() in ("yes", "true", "1")
+            exploit_frameworks = (row.get("Exploit Frameworks") or "").strip()
+            metasploit = "metasploit" in exploit_frameworks.lower() if exploit_frameworks else None
 
             if plugin_id and plugin_id in seen:
-                # Deduplicate: add host to existing finding's raw data
+                # Deduplicate: accumulate all affected hosts in the first occurrence's raw data
                 existing_raw = findings[seen[plugin_id]].raw
                 existing_raw.setdefault("affected_hosts", [])
                 host_entry = {"ip": ip, "dns": dns}
@@ -780,23 +813,50 @@ def parse_nessus_csv(content: bytes) -> List[ParsedFinding]:
                     cve_id=cve_id,
                     cve_ids=cve_ids_json,
                     cvss_score=cvss,
+                    cvss_vector=cvss3_vector or cvss2_vector,
                     remediation=remediation,
                     confidence=0.93,
                     raw={
                         "_table": "nessus",
-                        "plugin_id": plugin_id,
-                        "plugin_family": row.get("Family") or "",
-                        "risk_factor": sev_raw,
-                        "cvss_vector": cvss_vector,
-                        "cve": cve_raw,
-                        "see_also": row.get("See Also") or "",
-                        "stig_severity": row.get("STIG Severity") or "",
-                        "vpr_score": row.get("Vulnerability Priority Rating") or "",
+                        # Core identity
+                        "plugin_id":         plugin_id,
+                        "plugin_name":        title,
+                        "plugin_family":      row.get("Family") or "",
+                        "severity_id":        severity_id,
+                        "risk_factor":        risk_factor_text or sev_text.capitalize(),
+                        # Text content
+                        "description":        description,
+                        "synopsis":           synopsis,
+                        "solution":           remediation,
+                        "plugin_output":      plugin_output,
+                        # Network location
+                        "host":               ip,
+                        "port":               port_raw,
+                        "protocol":           protocol_raw,
+                        # CVSS V2
+                        "cvss_base_score":    cvss2_base,
+                        "cvss_temporal_score": cvss2_temp,
+                        "cvss_vector":        cvss2_vector,
+                        # CVSS V3
+                        "cvss3_base_score":   cvss3_base,
+                        "cvss3_temporal_score": cvss3_temp,
+                        "cvss3_vector":       cvss3_vector,
+                        # References
+                        "cve":                cve_raw,
+                        "bid":                row.get("BID") or "",
+                        "see_also":           row.get("See Also") or "",
+                        # Exploit info
+                        "exploit_available":  exploit_avail,
                         "exploitability_ease": row.get("Exploit Ease") or "",
-                        "exploit_available": (row.get("Exploit?") or "").strip().lower() in ("yes", "true", "1"),
-                        "first_discovered": row.get("First Discovered") or "",
-                        "last_observed": row.get("Last Observed") or "",
-                        "affected_hosts": [{"ip": ip, "dns": dns}],
+                        "metasploit":         metasploit,
+                        # CSV-specific extras
+                        "stig_severity":      row.get("STIG Severity") or None,
+                        "vpr_score":          vpr,
+                        "first_discovered":   row.get("First Discovered") or None,
+                        "last_observed":      row.get("Last Observed") or None,
+                        "repository":         row.get("Repository") or None,
+                        # All affected hosts (accumulated during dedup pass)
+                        "affected_hosts":     [{"ip": ip, "dns": dns}],
                     },
                 )
                 if plugin_id:

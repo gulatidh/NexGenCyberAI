@@ -395,6 +395,11 @@ def _insert_raw_nessus(db, import_id: int, client_id: str, raw: Dict, finding_id
         exploitability_ease=raw.get("exploitability_ease"),
         metasploit=raw.get("metasploit"),
         patch_available=raw.get("patch_available"),
+        stig_severity=raw.get("stig_severity"),
+        vpr_score=_safe_float(raw.get("vpr_score")),
+        first_discovered=raw.get("first_discovered"),
+        last_observed=raw.get("last_observed"),
+        repository=raw.get("repository"),
     )
     db.add(row)
 
