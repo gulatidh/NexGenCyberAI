@@ -322,6 +322,21 @@ p{margin:6px 0;line-height:1.65;font-size:13px}
 .edit-mode-banner{display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:6px;padding:8px 14px;font-size:12px;color:#1565C0;margin-bottom:16px;align-items:center;gap:8px}
 .edit-mode-banner.visible{display:flex}
 
+/* ── asset view ── */
+.asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:24px}
+.asset-card{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.1);overflow:hidden;display:flex;flex-direction:column}
+.asset-card-header{padding:12px 16px;background:#1A237E;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.asset-card-hostname{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.asset-card-ip{font-size:11px;opacity:.75;flex-shrink:0}
+.asset-risk-bar{display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid #eceff1;flex-wrap:wrap}
+.asset-finding-list{padding:4px 0;flex:1}
+.asset-finding-row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .12s;font-size:12px}
+.asset-finding-row:last-child{border-bottom:none}
+.asset-finding-row:hover{background:#f0f4f8}
+.asset-finding-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#263238}
+.asset-summary-bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.asset-summary-chip{background:#E8EAF6;color:#1A237E;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700}
+
 /* ── print ── */
 @media print{
   #sidebar{display:none}
@@ -542,6 +557,9 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
 <div class="nav-item" data-page="page-scope" onclick="showPage('page-scope')">
   <span>🎯</span><span class="nav-text">Scope &amp; Methodology</span>
 </div>
+<div class="nav-item" data-page="page-assets" onclick="showPage('page-assets')">
+  <span>🖥</span><span class="nav-text">Findings by Asset</span>
+</div>
 <div class="nav-divider"></div>
 """)
 
@@ -724,6 +742,135 @@ def generate_html(report: Dict, findings: List[Dict], client_name: str) -> bytes
     p.append("</tbody></table></div></div>\n")
 
     p.append("</div>\n")  # end page-scope
+
+    # ════════════════════════════════════════════════════════════════════════
+    # PAGE: FINDINGS BY ASSET
+    # ════════════════════════════════════════════════════════════════════════
+    # Build asset → findings map.
+    # Each finding can affect multiple hosts (comma-separated in affected_asset,
+    # or richer {ip,dns} objects in evidence JSON → raw.affected_hosts).
+    import json as _json
+
+    # asset_map: hostname → {"ip": str, "findings": [(fi, finding_dict)]}
+    asset_map: Dict[str, Dict] = {}
+
+    for fi, f in enumerate(sorted_findings):
+        # Try evidence JSON first (Nessus CSV path: raw.affected_hosts)
+        hosts_from_evidence: List[Dict] = []
+        ev_raw = f.get("evidence") or ""
+        if ev_raw:
+            try:
+                ev = _json.loads(ev_raw) if isinstance(ev_raw, str) else ev_raw
+                hosts_from_evidence = (ev.get("raw") or {}).get("affected_hosts") or []
+            except Exception:
+                pass
+
+        if hosts_from_evidence:
+            for h in hosts_from_evidence:
+                dns = (h.get("dns") or "").strip()
+                ip  = (h.get("ip")  or "").strip()
+                key = dns or ip
+                if not key:
+                    continue
+                if key not in asset_map:
+                    asset_map[key] = {"ip": ip if dns else "", "findings": []}
+                asset_map[key]["findings"].append((fi, f))
+        else:
+            # Fallback: affected_asset comma-separated string
+            asset_raw_str = (f.get("affected_asset") or "").strip()
+            if asset_raw_str:
+                for part in asset_raw_str.split(","):
+                    key = part.strip()
+                    if not key:
+                        continue
+                    if key not in asset_map:
+                        asset_map[key] = {"ip": "", "findings": []}
+                    asset_map[key]["findings"].append((fi, f))
+            else:
+                # Single-host finding with no comma
+                key = asset_raw_str or "Unknown"
+                if key not in asset_map:
+                    asset_map[key] = {"ip": "", "findings": []}
+                asset_map[key]["findings"].append((fi, f))
+
+    # Sort assets: most critical findings first
+    def _asset_sort_key(item):
+        counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for _, f2 in item[1]["findings"]:
+            counts[_sev_norm(f2.get("severity", "info"))] += 1
+        return (-counts["critical"], -counts["high"], -counts["medium"], -counts["low"])
+
+    sorted_assets = sorted(asset_map.items(), key=_asset_sort_key)
+
+    p.append('<div class="page" id="page-assets">\n')
+    p.append('<div class="section-title">🖥 Findings by Asset</div>\n')
+
+    # summary bar
+    p.append('<div class="asset-summary-bar">\n')
+    p.append(f'<span class="asset-summary-chip">{len(asset_map)} Asset{"s" if len(asset_map)!=1 else ""}</span>\n')
+    p.append(f'<span class="asset-summary-chip">{total} Finding{"s" if total!=1 else ""}</span>\n')
+    for sev in ["critical", "high", "medium", "low"]:
+        cnt = sev_counts.get(sev, 0)
+        if cnt:
+            p.append(f'<span style="background:{_SEV_BG[sev]};color:{_SEV_FG[sev]};border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700">'
+                     f'{_SEV_LABEL[sev]} {cnt}</span>\n')
+    p.append('</div>\n')
+
+    # asset cards grid
+    p.append('<div class="asset-grid">\n')
+    for hostname, info in sorted_assets:
+        ip_str = info["ip"]
+        a_findings = info["findings"]
+
+        # count severities for this asset
+        ac = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for _, f2 in a_findings:
+            ac[_sev_norm(f2.get("severity", "info"))] += 1
+
+        # header colour = worst severity
+        worst = next((s for s in ["critical","high","medium","low","info"] if ac[s] > 0), "info")
+        hdr_bg = _SEV_BG[worst]
+        hdr_fg = _SEV_FG[worst]
+
+        p.append('<div class="asset-card">\n')
+        # card header
+        p.append(f'<div class="asset-card-header" style="background:{hdr_bg}">\n')
+        p.append(f'  <span class="asset-card-hostname" title="{_h(hostname)}">{_h(hostname)}</span>\n')
+        if ip_str and ip_str != hostname:
+            p.append(f'  <span class="asset-card-ip">{_h(ip_str)}</span>\n')
+        p.append('</div>\n')
+
+        # risk pill bar
+        p.append('<div class="asset-risk-bar">\n')
+        for sev in ["critical", "high", "medium", "low", "info"]:
+            if ac[sev]:
+                p.append(f'<span style="background:{_SEV_BG[sev]};color:{_SEV_FG[sev]};border-radius:4px;'
+                         f'padding:2px 8px;font-size:11px;font-weight:700">'
+                         f'{_SEV_LABEL[sev][:3]} {ac[sev]}</span>\n')
+        p.append('</div>\n')
+
+        # finding rows
+        p.append('<div class="asset-finding-list">\n')
+        for fi2, f2 in sorted(a_findings, key=lambda x: (
+            ["critical","high","medium","low","info"].index(_sev_norm(x[1].get("severity","info"))), x[0]
+        )):
+            sev2 = _sev_norm(f2.get("severity", "info"))
+            bg2  = _SEV_BG[sev2]
+            fg2  = _SEV_FG[sev2]
+            t2   = f2.get("title") or "Untitled"
+            p.append(
+                f'<div class="asset-finding-row" onclick="showPage(\'page-finding-{fi2}\')" title="{_h(t2)}">\n'
+                f'  <span style="background:{bg2};color:{fg2};border-radius:3px;padding:1px 6px;'
+                f'font-size:10px;font-weight:700;flex-shrink:0">{_SEV_LABEL.get(sev2,"?")[:3]}</span>\n'
+                f'  <span style="color:#546e7a;font-size:11px;font-weight:600;flex-shrink:0">F-{fi2+1:02d}</span>\n'
+                f'  <span class="asset-finding-title">{_h(t2)}</span>\n'
+                f'</div>\n'
+            )
+        p.append('</div>\n')  # end finding-list
+        p.append('</div>\n')  # end asset-card
+
+    p.append('</div>\n')  # end asset-grid
+    p.append('</div>\n')  # end page-assets
 
     # ════════════════════════════════════════════════════════════════════════
     # PAGES: PER FINDING
