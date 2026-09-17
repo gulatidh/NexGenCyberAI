@@ -468,131 +468,201 @@ const GRAPH_EDGE_COLORS: Record<string, string> = {
   mitigates: "#2E7D32",
 };
 
-function buildClientGraphLayout(nodes: any[], edges: any[]) {
+const MAX_NODES_PER_TYPE = 20; // cap per type to keep graph legible
+
+function buildClientGraphLayout(nodes: any[], edges: any[], visibleTypes: Set<string>) {
+  // Pentagon cluster centers — one per type
   const TYPE_ORDER = ["asset", "vulnerability", "threat", "gap", "control"];
-  const W = 900, H = 500, CX = W / 2, CY = H / 2, R = 195;
+  const W = 960, H = 560, CX = W / 2, CY = H / 2;
+  const CLUSTER_R = 185; // radius of the pentagon of cluster centers
+
+  // Compute degree per node (for sorting by importance)
+  const degree: Record<string, number> = {};
+  for (const e of edges) {
+    degree[e.from] = (degree[e.from] || 0) + 1;
+    degree[e.to]   = (degree[e.to]   || 0) + 1;
+  }
+
+  // Group nodes by type, filter to visible types, cap per type
   const groups: Record<string, any[]> = {};
   for (const n of nodes) {
     const t = n.type || "asset";
+    if (!visibleTypes.has(t)) continue;
     if (!groups[t]) groups[t] = [];
     groups[t].push(n);
   }
+  for (const t of Object.keys(groups)) {
+    groups[t].sort((a, b) => (degree[b.id] || 0) - (degree[a.id] || 0));
+    groups[t] = groups[t].slice(0, MAX_NODES_PER_TYPE);
+  }
 
-  const positioned: any[] = [];
   const activeTypes = TYPE_ORDER.filter(t => groups[t]?.length);
-  activeTypes.forEach((t, typeIdx) => {
-    const grp = groups[t] || [];
-    const baseAngle = (typeIdx / activeTypes.length) * 2 * Math.PI - Math.PI / 2;
-    const spread = grp.length > 1 ? (Math.PI * 0.28) / grp.length : 0;
-    grp.forEach((n, i) => {
-      const offset = (i - (grp.length - 1) / 2) * spread;
-      const angle = baseAngle + offset;
-      const r = R + (grp.length > 5 ? (i % 2) * 45 : 0);
-      positioned.push({ ...n, x: CX + r * Math.cos(angle), y: CY + r * Math.sin(angle) });
-    });
+  const clusterCenters: Record<string, { cx: number; cy: number }> = {};
+  activeTypes.forEach((t, i) => {
+    const angle = (i / activeTypes.length) * 2 * Math.PI - Math.PI / 2;
+    clusterCenters[t] = { cx: CX + CLUSTER_R * Math.cos(angle), cy: CY + CLUSTER_R * Math.sin(angle) };
   });
+
+  // Place nodes within their cluster in a tight circle
+  const positioned: any[] = [];
+  for (const t of activeTypes) {
+    const grp = groups[t] || [];
+    const { cx, cy } = clusterCenters[t];
+    const innerR = grp.length === 1 ? 0 : Math.min(70, 14 * Math.sqrt(grp.length));
+    grp.forEach((n, i) => {
+      const angle = (i / grp.length) * 2 * Math.PI - Math.PI / 2;
+      positioned.push({
+        ...n,
+        x: cx + (grp.length === 1 ? 0 : innerR * Math.cos(angle)),
+        y: cy + (grp.length === 1 ? 0 : innerR * Math.sin(angle)),
+        degree: degree[n.id] || 0,
+      });
+    });
+  }
 
   const nodeById: Record<string, any> = {};
   for (const n of positioned) nodeById[n.id] = n;
 
   const posEdges = edges
     .filter(e => nodeById[e.from] && nodeById[e.to])
-    .map(e => ({
-      ...e,
-      x1: nodeById[e.from].x, y1: nodeById[e.from].y,
-      x2: nodeById[e.to].x, y2: nodeById[e.to].y,
-    }));
+    .map(e => ({ ...e, x1: nodeById[e.from].x, y1: nodeById[e.from].y, x2: nodeById[e.to].x, y2: nodeById[e.to].y }));
 
-  return { nodes: positioned, edges: posEdges };
+  return { nodes: positioned, edges: posEdges, clusterCenters, activeTypes, truncated: Object.fromEntries(
+    Object.entries(groups).map(([t, g]) => [t, nodes.filter(n => n.type === t).length - g.length])
+  )};
 }
 
-function ClientKnowledgeGraph({
-  data, isLoading, clientId,
-}: {
-  data: any;
-  isLoading: boolean;
-  clientId: string | null;
-}) {
-  const [selected, setSelected] = useState<any>(null);
+function ClientKnowledgeGraph({ data, isLoading, clientId }: { data: any; isLoading: boolean; clientId: string | null }) {
+  const [selected, setSelected]   = useState<any>(null);
+  const [hovered, setHovered]     = useState<string | null>(null);
+  const [visibleTypes, setVisibleTypes] = useState<Set<string>>(
+    new Set(["asset", "vulnerability", "threat", "gap", "control"])
+  );
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
-  if (!clientId) {
-    return (
-      <Box sx={{ textAlign: "center", py: 8 }}>
-        <AccountTree sx={{ fontSize: 52, color: "text.disabled", mb: 1.5 }} />
-        <Typography sx={{ color: "text.secondary" }}>Select an account to view its security graph.</Typography>
-      </Box>
-    );
-  }
-  if (isLoading) {
-    return <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}><CircularProgress /></Box>;
-  }
-  if (!data || !data.nodes?.length) {
-    return (
-      <Box sx={{ textAlign: "center", py: 8 }}>
-        <AccountTree sx={{ fontSize: 52, color: "text.disabled", mb: 1.5 }} />
-        <Typography sx={{ color: "text.secondary", mb: 0.5 }}>No security data yet for this account.</Typography>
-        <Typography variant="caption" sx={{ color: "text.disabled" }}>
-          Run scans and AI agents to populate the graph.
-        </Typography>
-      </Box>
-    );
-  }
+  if (!clientId) return (
+    <Box sx={{ textAlign: "center", py: 8 }}>
+      <AccountTree sx={{ fontSize: 52, color: "text.disabled", mb: 1.5 }} />
+      <Typography sx={{ color: "text.secondary" }}>Select an account to view its security graph.</Typography>
+    </Box>
+  );
+  if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}><CircularProgress /></Box>;
+  if (!data?.nodes?.length) return (
+    <Box sx={{ textAlign: "center", py: 8 }}>
+      <AccountTree sx={{ fontSize: 52, color: "text.disabled", mb: 1.5 }} />
+      <Typography sx={{ color: "text.secondary", mb: 0.5 }}>No security data yet for this account.</Typography>
+      <Typography variant="caption" sx={{ color: "text.disabled" }}>Run scans and AI agents to populate the graph.</Typography>
+    </Box>
+  );
 
-  const layout = buildClientGraphLayout(data.nodes, data.edges);
-  const edgeCol = isDark ? "#3a4250" : "#c3c9d4";
-  const W = 900, H = 500;
+  const layout = buildClientGraphLayout(data.nodes, data.edges, visibleTypes);
+  const W = 960, H = 560;
+  const edgeCol = isDark ? "#2a3240" : "#d0d5e0";
+  const focusId = selected?.id || hovered;
+
+  // Set of node IDs connected to the focused node
+  const connectedIds = new Set<string>();
+  if (focusId) {
+    for (const e of layout.edges) {
+      if (e.from === focusId) connectedIds.add(e.to);
+      if (e.to   === focusId) connectedIds.add(e.from);
+    }
+    connectedIds.add(focusId);
+  }
 
   const sevColor = (s: string) =>
-    s === "critical" ? "#EA4335" : s === "high" ? "#FF7043"
-    : s === "medium" ? "#FBBC04" : s === "low" ? "#34A853" : "#4285F4";
+    s === "critical" ? "#EA4335" : s === "high" ? "#FF7043" : s === "medium" ? "#FBBC04" : "#34A853";
+
+  const toggleType = (t: string) => {
+    setVisibleTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(t) && next.size > 1) next.delete(t); else next.add(t);
+      return next;
+    });
+    setSelected(null);
+  };
 
   return (
     <Box sx={{ mt: 2 }}>
-      {/* Stats chips row */}
-      <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
-        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
-          {data.stats.total_nodes} nodes · {data.stats.total_edges} edges
+      {/* Type filter chips + stats */}
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600, mr: 0.5 }}>
+          {data.stats.total_nodes} total ·
         </Typography>
-        {Object.entries(data.stats.by_type || {}).map(([t, count]) => (
-          <Chip key={t} label={`${t}: ${count}`} size="small"
-            sx={{ bgcolor: `${GRAPH_NODE_COLORS[t] || "#555"}20`, color: GRAPH_NODE_COLORS[t] || "#888",
-              fontSize: 10, height: 20, fontWeight: 700, textTransform: "capitalize" }} />
-        ))}
+        {(["asset", "vulnerability", "threat", "gap", "control"] as const).map(t => {
+          const count = (data.stats.by_type || {})[t] || 0;
+          if (!count) return null;
+          const col = GRAPH_NODE_COLORS[t] || "#555";
+          const active = visibleTypes.has(t);
+          const truncBy = layout.truncated?.[t] || 0;
+          return (
+            <Chip key={t} size="small"
+              label={`${t} ${count}${truncBy > 0 ? ` (showing ${count - truncBy})` : ""}`}
+              onClick={() => toggleType(t)}
+              sx={{
+                fontSize: 10, height: 22, fontWeight: 700, textTransform: "capitalize", cursor: "pointer",
+                bgcolor: active ? `${col}22` : "rgba(255,255,255,0.04)",
+                color: active ? col : "text.disabled",
+                border: `1px solid ${active ? col + "55" : "transparent"}`,
+                opacity: active ? 1 : 0.5,
+              }} />
+          );
+        })}
+        <Typography variant="caption" sx={{ color: "text.disabled", ml: "auto", fontSize: 10 }}>
+          Hover = show connections · Click = inspect · Click chip to hide type
+        </Typography>
       </Box>
 
       <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-        {/* Graph SVG */}
-        <Box
-          sx={{ flex: 1, minWidth: 0, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}
-          onClick={() => setSelected(null)}
-        >
+        {/* SVG graph */}
+        <Box sx={{ flex: 1, minWidth: 0, bgcolor: isDark ? "rgba(10,14,20,0.9)" : "rgba(245,248,255,0.9)",
+          border: "1px solid", borderColor: "divider", borderRadius: 2, overflow: "hidden" }}
+          onClick={() => setSelected(null)}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
             <defs>
               {Object.entries(GRAPH_EDGE_COLORS).map(([type, color]) => (
-                <marker key={type} id={`cg-arr-${type}`} viewBox="0 0 10 10" refX="24" refY="5"
-                  markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <marker key={type} id={`cg2-arr-${type}`} viewBox="0 0 10 10" refX="20" refY="5"
+                  markerWidth="4" markerHeight="4" orient="auto-start-reverse">
                   <path d="M0,0 L10,5 L0,10 z" fill={color} />
                 </marker>
               ))}
-              <marker id="cg-arr-default" viewBox="0 0 10 10" refX="24" refY="5"
-                markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <marker id="cg2-arr-def" viewBox="0 0 10 10" refX="20" refY="5"
+                markerWidth="4" markerHeight="4" orient="auto-start-reverse">
                 <path d="M0,0 L10,5 L0,10 z" fill={edgeCol} />
               </marker>
             </defs>
 
-            {/* Edges */}
+            {/* Cluster label halos */}
+            {layout.activeTypes.map((t: string) => {
+              const cc = layout.clusterCenters[t];
+              if (!cc) return null;
+              const col = GRAPH_NODE_COLORS[t] || "#555";
+              return (
+                <g key={`cl-${t}`}>
+                  <circle cx={cc.cx} cy={cc.cy} r={85}
+                    fill={`${col}08`} stroke={`${col}18`} strokeWidth={1} strokeDasharray="4 4" />
+                  <text x={cc.cx} y={cc.cy - 90} textAnchor="middle"
+                    fill={col} fontSize={10} fontWeight={700} opacity={0.5}
+                    style={{ textTransform: "uppercase", letterSpacing: 1 }}>
+                    {t.toUpperCase()}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Edges — faint normally, highlighted when connected to focus */}
             <g>
               {layout.edges.map((e: any) => {
+                const isActive = focusId && (e.from === focusId || e.to === focusId);
                 const col = GRAPH_EDGE_COLORS[e.edge_type] || edgeCol;
                 return (
                   <line key={e.id}
                     x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                    stroke={col}
-                    strokeWidth={Math.max(1, (e.weight || 0.5) * 2)}
-                    opacity={0.55}
-                    markerEnd={`url(#cg-arr-${e.edge_type in GRAPH_EDGE_COLORS ? e.edge_type : "default"})`}
+                    stroke={isActive ? col : edgeCol}
+                    strokeWidth={isActive ? 1.5 : 0.5}
+                    opacity={focusId ? (isActive ? 0.9 : 0.08) : 0.25}
+                    markerEnd={isActive ? `url(#cg2-arr-${e.edge_type in GRAPH_EDGE_COLORS ? e.edge_type : "def"})` : undefined}
                   />
                 );
               })}
@@ -603,25 +673,45 @@ function ClientKnowledgeGraph({
               {layout.nodes.map((n: any) => {
                 const col = GRAPH_NODE_COLORS[n.type] || "#555";
                 const isSelected = selected?.id === n.id;
+                const isFocused = focusId === n.id;
+                const isConnected = focusId ? connectedIds.has(n.id) : true;
+                const r = Math.max(8, Math.min(16, 8 + (n.degree || 0) * 0.8));
                 return (
                   <g key={n.id} transform={`translate(${n.x},${n.y})`}
                     style={{ cursor: "pointer" }}
-                    onClick={(e) => { e.stopPropagation(); setSelected(n); }}
+                    onMouseEnter={() => setHovered(n.id)}
+                    onMouseLeave={() => setHovered(null)}
+                    onClick={(e) => { e.stopPropagation(); setSelected(isSelected ? null : n); }}
                   >
-                    <circle r={18} fill={`${col}1a`} stroke={col} strokeWidth={isSelected ? 3 : 1.5}
-                      style={{ transition: "stroke-width 0.2s" }} />
-                    {n.severity && (
-                      <circle r={5} cx={13} cy={-13} fill={sevColor(n.severity)} />
+                    {/* Glow ring for selected */}
+                    {(isSelected || isFocused) && (
+                      <circle r={r + 6} fill="none" stroke={col} strokeWidth={1.5} opacity={0.4} />
                     )}
+                    <circle r={r}
+                      fill={isConnected ? `${col}28` : `${col}08`}
+                      stroke={col}
+                      strokeWidth={isSelected ? 2.5 : 1.2}
+                      opacity={focusId && !isConnected ? 0.2 : 1}
+                    />
+                    {/* Severity dot */}
+                    {n.severity && isConnected && (
+                      <circle r={3.5} cx={r - 2} cy={-(r - 2)} fill={sevColor(n.severity)} />
+                    )}
+                    {/* Type abbreviation */}
                     <text textAnchor="middle" dominantBaseline="middle"
-                      fill={col} fontSize={9} fontWeight={700}>
+                      fill={col} fontSize={Math.max(6, r * 0.55)} fontWeight={700}
+                      opacity={focusId && !isConnected ? 0.2 : 0.9}>
                       {n.type.slice(0, 3).toUpperCase()}
                     </text>
-                    <text y={26} textAnchor="middle"
-                      fill={isDark ? "rgba(255,255,255,0.65)" : "rgba(0,0,0,0.65)"}
-                      fontSize={8} style={{ pointerEvents: "none" }}>
-                      {n.label.slice(0, 20)}{n.label.length > 20 ? "…" : ""}
-                    </text>
+                    {/* Label — only on hover or selected */}
+                    {(isSelected || hovered === n.id) && (
+                      <text y={r + 11} textAnchor="middle"
+                        fill={isDark ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.85)"}
+                        fontSize={9} fontWeight={600}
+                        style={{ pointerEvents: "none" }}>
+                        {n.label.slice(0, 24)}{n.label.length > 24 ? "…" : ""}
+                      </text>
+                    )}
                   </g>
                 );
               })}
@@ -629,15 +719,13 @@ function ClientKnowledgeGraph({
           </svg>
         </Box>
 
-        {/* Detail sidebar */}
+        {/* Detail panel */}
         {selected && (
-          <Box sx={{ width: 236, flexShrink: 0, bgcolor: "background.paper",
+          <Box sx={{ width: 220, flexShrink: 0, bgcolor: "background.paper",
             border: "1px solid", borderColor: "divider", borderRadius: 2, p: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
-              <Box sx={{ width: 10, height: 10, borderRadius: "50%",
-                bgcolor: GRAPH_NODE_COLORS[selected.type] || "#555", flexShrink: 0 }} />
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700,
-                textTransform: "uppercase", fontSize: 10 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: GRAPH_NODE_COLORS[selected.type] || "#555" }} />
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", fontSize: 10 }}>
                 {selected.type}
               </Typography>
               <Box sx={{ flex: 1 }} />
@@ -645,21 +733,24 @@ function ClientKnowledgeGraph({
                 <Close sx={{ fontSize: 14 }} />
               </IconButton>
             </Box>
-            <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, mb: 1, wordBreak: "break-word" }}>
+            <Typography variant="body2" sx={{ color: "text.primary", fontWeight: 600, mb: 1, wordBreak: "break-word", fontSize: 12 }}>
               {selected.label}
             </Typography>
             {selected.severity && (
               <Chip label={selected.severity} size="small" sx={{ mb: 1.5, height: 18, fontSize: 10,
                 bgcolor: `${sevColor(selected.severity)}20`, color: sevColor(selected.severity), fontWeight: 700 }} />
             )}
-            {Object.entries(selected.meta || {}).filter(([, v]) => v).map(([k, v]) => (
+            <Typography variant="caption" sx={{ color: "text.disabled", fontSize: 10, display: "block", mb: 1 }}>
+              {connectedIds.size - 1} connection{connectedIds.size !== 2 ? "s" : ""}
+            </Typography>
+            {Object.entries(selected.meta || {}).filter(([, v]) => v).slice(0, 6).map(([k, v]) => (
               <Box key={k} sx={{ mb: 0.75 }}>
-                <Typography variant="caption" sx={{ color: "text.disabled", fontSize: 10,
+                <Typography variant="caption" sx={{ color: "text.disabled", fontSize: 9,
                   textTransform: "uppercase", fontWeight: 600, display: "block" }}>
                   {k.replace(/_/g, " ")}
                 </Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11, wordBreak: "break-all" }}>
-                  {String(v).slice(0, 80)}
+                  {String(v).slice(0, 60)}
                 </Typography>
               </Box>
             ))}
@@ -668,17 +759,13 @@ function ClientKnowledgeGraph({
       </Box>
 
       {/* Edge legend */}
-      <Box sx={{ display: "flex", gap: 2.5, mt: 1.5, pt: 1.5, borderTop: "1px solid",
-        borderColor: "divider", flexWrap: "wrap", alignItems: "center" }}>
+      <Box sx={{ display: "flex", gap: 2, mt: 1.5, pt: 1.5, borderTop: "1px solid", borderColor: "divider", flexWrap: "wrap" }}>
         {Object.entries(GRAPH_EDGE_COLORS).map(([type, col]) => (
           <Box key={type} sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-            <Box sx={{ width: 20, height: 2, bgcolor: col, borderRadius: 1, opacity: 0.8 }} />
+            <Box sx={{ width: 16, height: 2, bgcolor: col, borderRadius: 1 }} />
             <Typography sx={{ fontSize: 10, color: "text.disabled", textTransform: "capitalize" }}>{type}</Typography>
           </Box>
         ))}
-        <Typography sx={{ fontSize: 10, color: "text.disabled", ml: "auto" }}>
-          Click a node to inspect · Click graph to deselect
-        </Typography>
       </Box>
     </Box>
   );
