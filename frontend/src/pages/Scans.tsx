@@ -255,9 +255,15 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
       const count = result?.findings_imported ?? result?.finding_count ?? preview?.finding_count ?? 0;
       const ref = result?.import_ref ?? "";
       const name = result?.import_name ?? importName ?? "Assessment";
-      setSuccessSnack(`Assessment "${name}" saved as ${ref} — ${count} findings imported`);
+      const assetsCreated = result?.assets_created ?? 0;
+      const assetsUpdated = result?.assets_updated ?? 0;
+      const assetMsg = assetsCreated > 0
+        ? ` · ${assetsCreated} asset${assetsCreated !== 1 ? "s" : ""} added to inventory${assetsUpdated > 0 ? `, ${assetsUpdated} updated` : ""}`
+        : assetsUpdated > 0 ? ` · ${assetsUpdated} asset${assetsUpdated !== 1 ? "s" : ""} updated` : "";
+      setSuccessSnack(`Assessment "${name}" saved as ${ref} — ${count} findings imported${assetMsg}`);
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
       qc.invalidateQueries({ queryKey: ["import-history", clientId] });
+      qc.invalidateQueries({ queryKey: ["assets", clientId] });
       clearAll();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || e?.message || "Import failed");

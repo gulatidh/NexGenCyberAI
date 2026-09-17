@@ -23,7 +23,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.models.models import (
-    AssessmentImport, ConnectorType, Finding, RawBurpFinding, RawGenericFinding,
+    Asset, AssetStatus, AssessmentImport, Connector, ConnectorStatus,
+    ConnectorType, Finding, RawBurpFinding, RawGenericFinding,
     RawNessusFinding, RawNmapFinding, RawOpenVASFinding, RawQualysFinding,
     RawSarifFinding, RawSecretFinding, RawTenableFinding, RawTrivyFinding,
     RawZapFinding, Scan, ScanStatus, ScanType,
@@ -42,6 +43,132 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
+
+# Resource types that don't map to infrastructure assets (skip for asset upsert)
+_SKIP_RESOURCE_TYPES = {"file", "code_file", "unknown"}
+_SKIP_RESOURCE_IDS = {"", "unknown", "/", "n/a", "none", "null"}
+
+# resource_type → asset_class
+_RESOURCE_TO_CLASS = {
+    "host": "vm",
+    "url":  "application",
+    "container": "container",
+    "cloud_resource": "other",
+}
+
+
+def _extract_asset_identity(resource_id: str, resource_type: str):
+    """Return (external_id, display_name) for an asset, normalising host:port/protocol."""
+    rid = (resource_id or "").strip()
+    if resource_type == "host":
+        # "192.168.1.1:443/tcp" | "hostname:80" | "hostname" → bare host
+        host = rid.split(":")[0].split("/")[0].strip()
+        return host[:255], host[:255]
+    elif resource_type == "url":
+        try:
+            from urllib.parse import urlparse
+            url = rid if "://" in rid else f"https://{rid}"
+            parsed = urlparse(url)
+            host = (parsed.hostname or parsed.netloc or "").lower()
+            return host[:255], host[:255]
+        except Exception:
+            return rid[:255], rid[:255]
+    return rid[:255], rid[:255]
+
+
+def _get_or_create_import_connector(db, client_id: str, project_id: Optional[str]) -> "Connector":
+    """Find the sentinel UPLOAD connector for this client, or create it."""
+    conn = (
+        db.query(Connector)
+        .filter(
+            Connector.client_id == client_id,
+            Connector.connector_type == ConnectorType.UPLOAD,
+        )
+        .first()
+    )
+    if not conn:
+        conn = Connector(
+            client_id=client_id,
+            project_id=project_id,
+            name="Scan Import",
+            connector_type=ConnectorType.UPLOAD,
+            status=ConnectorStatus.ACTIVE,
+            credentials_enc=None,
+            config={"auto_created": True, "purpose": "import_asset_tracking"},
+        )
+        db.add(conn)
+        db.flush()
+    return conn
+
+
+def _upsert_imported_assets(
+    db,
+    client_id: str,
+    scan_id: str,
+    project_id: Optional[str],
+    findings,          # List[ParsedFinding]
+) -> Dict[str, int]:
+    """Extract unique hosts/URLs from imported findings and upsert as assets.
+
+    Returns {"created": N, "updated": M}.
+    """
+    # Deduplicate: external_id → metadata
+    seen: Dict[str, Dict] = {}
+    for pf in findings:
+        if pf.resource_type in _SKIP_RESOURCE_TYPES:
+            continue
+        rid = (pf.resource_id or "").strip()
+        if rid.lower() in _SKIP_RESOURCE_IDS or len(rid) < 3:
+            continue
+
+        ext_id, display = _extract_asset_identity(rid, pf.resource_type)
+        if not ext_id or len(ext_id) < 3:
+            continue
+
+        if ext_id not in seen:
+            seen[ext_id] = {
+                "name": display,
+                "asset_class": _RESOURCE_TO_CLASS.get(pf.resource_type, "other"),
+                "asset_type": pf.resource_type,
+            }
+
+    if not seen:
+        return {"created": 0, "updated": 0}
+
+    connector = _get_or_create_import_connector(db, client_id, project_id)
+    now = datetime.now(timezone.utc)
+    created = 0
+    updated = 0
+
+    for ext_id, info in seen.items():
+        existing = (
+            db.query(Asset)
+            .filter(Asset.connector_id == connector.id, Asset.external_id == ext_id)
+            .first()
+        )
+        if existing:
+            existing.last_synced_at = now
+            existing.status = AssetStatus.ACTIVE
+            updated += 1
+        else:
+            db.add(Asset(
+                client_id=client_id,
+                project_id=project_id,
+                connector_id=connector.id,
+                external_id=ext_id,
+                name=info["name"],
+                asset_type=info["asset_type"],
+                asset_class=info["asset_class"],
+                tags={},
+                provider_metadata={"source": "scan_import", "scan_id": scan_id},
+                status=AssetStatus.ACTIVE,
+                first_seen_at=now,
+                last_synced_at=now,
+            ))
+            created += 1
+
+    return {"created": created, "updated": updated}
+
 
 def _safe_float(v) -> Optional[float]:
     try:
@@ -791,6 +918,9 @@ async def commit_scan_import(
     ai_record.normalized_finding_count = normalized_count
     ai_record.status = "completed"
 
+    # Upsert assets discovered from imported findings
+    asset_result = _upsert_imported_assets(db, client_id, scan.id, project_id, findings)
+
     # Compute delta
     existing = (
         db.query(Finding)
@@ -816,6 +946,8 @@ async def commit_scan_import(
         "scanner_type": scanner_type,
         "findings_imported": normalized_count,
         "raw_rows_stored": normalized_count,
+        "assets_created": asset_result["created"],
+        "assets_updated": asset_result["updated"],
         "delta": {
             "new": delta.new_count,
             "fixed": delta.fixed_count,
