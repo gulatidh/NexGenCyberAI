@@ -1,230 +1,244 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useMsal, useIsAuthenticated } from "@azure/msal-react";
 import { useNavigate } from "react-router-dom";
 import { loginRequest } from "../auth/msalConfig";
 
+/* ─── CSS ─────────────────────────────────────────────────────────────────── */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-  :root {
-    --ink:#0C1116; --ink-soft:#2A3340; --paper:#EEF1F3; --card:#FFFFFF;
-    --amber:#E8A33D; --amber-deep:#C77F1E;
-    --teal:#2F6F62; --teal-bright:#3E9D89; --teal-soft:#E4EFEC;
-    --violet:#7C6FE0; --coral:#E0716F; --line:#DCE2E5; --muted:#5B6672;
-    --radius:18px; --wrap:1200px;
-  }
-  @property --angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+:root {
+  --ink:#0a0f14; --ink-mid:#1d2730; --ink-soft:#2d3a45;
+  --paper:#f0f2f4; --card:#ffffff;
+  --amber:#e8a33d; --amber-deep:#c77f1e; --amber-pale:#fdf4e3;
+  --teal:#3e9d89; --teal-dark:#2f6f62; --teal-pale:#e6f4f1;
+  --violet:#7c6fe0;
+  --line:#dde2e6; --muted:#5e6d7a;
+  --code-bg:#0d1219; --code-green:#7dd3c0; --code-yellow:#fbbf24;
+  --code-purple:#c084fc; --code-comment:#4b5563; --code-white:#e2e8f0;
+  --wrap:1160px; --r:14px;
+}
 
-  .ol-land *{box-sizing:border-box;}
-  .ol-land{-webkit-font-smoothing:antialiased; font-family:'Inter',sans-serif; color:var(--ink); background:var(--paper); position:relative;}
-  .ol-land h1,.ol-land h2,.ol-land h3{font-family:'Space Grotesk',sans-serif;margin:0;letter-spacing:-0.01em;}
-  .ol-mono{font-family:'IBM Plex Mono',monospace;}
-  .ol-wrap{max-width:var(--wrap);margin:0 auto;padding:0 32px;}
-  .ol-land a{color:inherit;text-decoration:none;}
+.lp *{box-sizing:border-box;}
+.lp{font-family:'Inter',sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased;}
+.lp h1,.lp h2,.lp h3,.lp h4{font-family:'Space Grotesk',sans-serif;margin:0;letter-spacing:-.01em;}
+.lp a{color:inherit;text-decoration:none;}
+.lp p{margin:0;}
+.lp-wrap{max-width:var(--wrap);margin:0 auto;padding:0 28px;}
+.lp-mono{font-family:'IBM Plex Mono',monospace;}
 
-  .ol-grain{position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.035;mix-blend-mode:multiply;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* REVEAL */
+.lp-rv{opacity:0;transform:translateY(18px);transition:opacity .65s cubic-bezier(.16,1,.3,1),transform .65s cubic-bezier(.16,1,.3,1);}
+.lp-rv.in{opacity:1;transform:none;}
+@media(prefers-reduced-motion:reduce){.lp-rv{opacity:1;transform:none;transition:none;}}
 
-  .ol-reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);}
-  .ol-reveal.in{opacity:1;transform:translateY(0);}
-  @media(prefers-reduced-motion:reduce){.ol-reveal{opacity:1;transform:none;transition:none;}}
+/* NAV */
+.lp-nav-wrap{position:sticky;top:0;z-index:100;background:rgba(10,15,20,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.07);}
+.lp-nav{display:flex;align-items:center;justify-content:space-between;height:62px;}
+.lp-nav-links{display:flex;gap:30px;}
+.lp-nav-links a{font-size:14px;font-weight:500;color:rgba(255,255,255,.5);transition:color .15s;}
+.lp-nav-links a:hover{color:#fff;}
+.lp-nav-right{display:flex;align-items:center;gap:12px;}
+@media(max-width:680px){.lp-nav-links{display:none;}}
 
-  /* HEADER */
-  .ol-header{position:sticky;top:0;z-index:50;background:rgba(238,241,243,0.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-bottom:1px solid var(--line);}
-  .ol-nav{display:flex;align-items:center;justify-content:space-between;height:72px;}
-  .ol-nav-links{display:flex;gap:36px;font-size:14.5px;font-weight:500;color:var(--ink-soft);}
-  .ol-nav-links a{position:relative;transition:color .15s ease;}
-  .ol-nav-links a::after{content:"";position:absolute;left:0;bottom:-6px;width:0;height:1.5px;background:var(--amber-deep);transition:width .25s cubic-bezier(.16,1,.3,1);}
-  .ol-nav-links a:hover{color:var(--ink);}
-  .ol-nav-links a:hover::after{width:100%;}
-  .ol-nav-cta{display:flex;align-items:center;gap:20px;}
-  .ol-sign-in{font-size:14.5px;font-weight:500;color:var(--ink-soft);background:none;border:none;cursor:pointer;padding:0;font-family:'Inter',sans-serif;}
-  .ol-sign-in:hover{color:var(--ink);}
-  @media(max-width:860px){.ol-nav-links{display:none;}}
+/* BUTTONS */
+.lp-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;border:1.5px solid transparent;cursor:pointer;font-family:'Inter',sans-serif;transition:all .18s;white-space:nowrap;}
+.lp-btn-lg{padding:13px 26px;font-size:15px;}
+.lp-btn-amber{background:var(--amber);color:var(--ink);border-color:var(--amber);}
+.lp-btn-amber:hover{background:#f5b54a;transform:translateY(-1px);box-shadow:0 8px 22px rgba(232,163,61,.38);}
+.lp-btn-outline{background:transparent;color:#fff;border-color:rgba(255,255,255,.25);}
+.lp-btn-outline:hover{border-color:rgba(255,255,255,.6);transform:translateY(-1px);}
+.lp-btn-ghost{background:transparent;color:var(--ink);border-color:var(--line);}
+.lp-btn-ghost:hover{border-color:var(--ink);transform:translateY(-1px);}
+.lp-btn-dark{background:var(--ink);color:#fff;border-color:var(--ink);}
+.lp-btn-dark:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(10,15,20,.3);}
 
-  /* BUTTONS */
-  .ol-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 22px;border-radius:999px;font-size:14.5px;font-weight:600;border:1px solid transparent;transition:transform .2s cubic-bezier(.16,1,.3,1),box-shadow .2s ease,background .2s ease;white-space:nowrap;position:relative;overflow:hidden;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;}
-  .ol-btn-lg{padding:14px 26px;font-size:15px;}
-  .ol-btn-dark{background:var(--ink);color:#fff;}
-  .ol-btn-dark:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,17,22,0.28);}
-  .ol-btn-ghost{border-color:var(--line);color:var(--ink);background:transparent;}
-  .ol-btn-ghost:hover{border-color:var(--ink);transform:translateY(-2px);}
-  .ol-btn-amber{background:var(--amber);color:var(--ink);}
-  .ol-btn-amber:hover{background:#fff;transform:translateY(-2px);box-shadow:0 10px 24px rgba(232,163,61,0.28);}
-  .ol-btn-ghost-dark{border-color:#3A4552;color:#fff;background:transparent;}
-  .ol-btn-ghost-dark:hover{border-color:#fff;transform:translateY(-2px);}
-  .ol-shine{position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,0.35),transparent);transform:skewX(-20deg);transition:left .6s ease;}
-  .ol-btn:hover .ol-shine{left:130%;}
+/* HERO */
+.lp-hero{background:var(--ink);color:#fff;padding:90px 0 72px;}
+.lp-hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
+@media(max-width:840px){.lp-hero-grid{grid-template-columns:1fr;}}
+.lp-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;letter-spacing:.07em;color:var(--code-green);font-family:'IBM Plex Mono',monospace;margin-bottom:20px;}
+.lp-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:lp-pulse 2s ease-in-out infinite;}
+@keyframes lp-pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+@media(prefers-reduced-motion:reduce){.lp-eyebrow-dot{animation:none;}}
+.lp-h1{font-size:clamp(32px,4vw,54px);line-height:1.07;font-weight:700;color:#fff;}
+.lp-h1 em{font-style:normal;color:var(--amber);}
+.lp-hero-sub{margin-top:18px;font-size:17px;line-height:1.7;color:rgba(255,255,255,.5);max-width:460px;}
+.lp-hero-ctas{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap;}
 
-  /* HERO */
-  .ol-hero{position:relative;padding:96px 0 0;overflow:hidden;}
-  .ol-mesh{position:absolute;inset:-20% -10% auto -10%;height:900px;z-index:0;filter:blur(60px);opacity:.55;pointer-events:none;}
-  .ol-blob{position:absolute;border-radius:50%;animation:ol-float 14s ease-in-out infinite;}
-  .ol-blob1{width:480px;height:480px;top:-140px;left:-80px;background:radial-gradient(circle at 30% 30%,#3E9D89,transparent 70%);}
-  .ol-blob2{width:420px;height:420px;top:60px;right:-100px;background:radial-gradient(circle at 60% 40%,#E8A33D,transparent 70%);animation-delay:-4s;}
-  .ol-blob3{width:360px;height:360px;top:220px;left:40%;background:radial-gradient(circle at 50% 50%,#0C1116,transparent 70%);opacity:.4;animation-delay:-8s;}
-  @keyframes ol-float{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(20px,-30px) scale(1.05);}66%{transform:translate(-25px,15px) scale(0.97);}}
-  @media(prefers-reduced-motion:reduce){.ol-blob{animation:none;}}
-  .ol-spotlight{position:absolute;width:600px;height:600px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(232,163,61,0.12),transparent 65%);transform:translate(-50%,-50%);z-index:0;transition:opacity .3s ease;opacity:0;}
+/* MOCK PANEL */
+.lp-mock{background:#111820;border:1px solid rgba(255,255,255,.1);border-radius:14px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.55);}
+.lp-mock-bar{display:flex;align-items:center;gap:7px;padding:11px 16px;background:#0d1319;border-bottom:1px solid rgba(255,255,255,.07);}
+.lp-dot{width:10px;height:10px;border-radius:50%;}
+.lp-mock-title{flex:1;text-align:center;font-size:11.5px;color:rgba(255,255,255,.25);font-family:'IBM Plex Mono',monospace;}
+.lp-mock-tabs{display:flex;padding:0 14px;border-bottom:1px solid rgba(255,255,255,.07);}
+.lp-mock-tab{font-size:12px;padding:9px 12px;color:rgba(255,255,255,.35);font-family:'IBM Plex Mono',monospace;}
+.lp-mock-tab.on{color:var(--code-green);border-bottom:2px solid var(--teal);margin-bottom:-1px;}
+.lp-mock-body{padding:14px;}
+.lp-mock-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;margin-bottom:3px;background:rgba(255,255,255,.03);cursor:default;transition:background .12s;}
+.lp-mock-row:hover{background:rgba(255,255,255,.06);}
+.lp-sev{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;font-family:'IBM Plex Mono',monospace;flex-shrink:0;letter-spacing:.04em;}
+.sc{background:#3b0f0f;color:#f87171;}.sh{background:#3a1e09;color:#fb923c;}
+.sm{background:#2e270a;color:#fbbf24;}.sl{background:#0a2218;color:#34d399;}
+.lp-mock-fname{flex:1;font-size:12.5px;color:rgba(255,255,255,.82);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lp-mock-asset{font-size:10.5px;color:rgba(255,255,255,.28);font-family:'IBM Plex Mono',monospace;flex-shrink:0;}
+.lp-mock-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 4px;margin-top:4px;border-top:1px solid rgba(255,255,255,.06);}
+.lp-mock-live{display:flex;align-items:center;gap:6px;font-size:11.5px;font-family:'IBM Plex Mono',monospace;color:var(--code-green);}
+.lp-mock-live-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:lp-pulse 1.5s ease-in-out infinite;}
+.lp-mock-counts{display:flex;gap:14px;font-size:11px;color:rgba(255,255,255,.3);font-family:'IBM Plex Mono',monospace;}
 
-  .ol-hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 0.95fr;gap:48px;align-items:center;}
-  @media(max-width:860px){.ol-hero-grid{grid-template-columns:1fr;}}
-  .ol-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.06em;color:var(--teal);background:var(--teal-soft);padding:6px 12px;border-radius:999px;margin-bottom:22px;border:1px solid rgba(47,111,98,.15);}
-  .ol-eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--teal-bright);animation:ol-pulse-dot 2s ease-in-out infinite;}
-  @keyframes ol-pulse-dot{0%,100%{opacity:1;}50%{opacity:.3;}}
-  .ol-h1{font-size:clamp(36px,4.6vw,60px);line-height:1.03;font-weight:700;}
-  .ol-grad{background:linear-gradient(100deg,var(--amber-deep),var(--teal-bright) 60%,var(--amber-deep));background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:ol-grad-shift 6s ease-in-out infinite;}
-  @keyframes ol-grad-shift{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
-  @media(prefers-reduced-motion:reduce){.ol-grad{animation:none;}}
-  .ol-lead{margin-top:22px;font-size:18px;line-height:1.6;color:var(--muted);max-width:520px;}
-  .ol-hero-ctas{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap;}
+/* PIPELINE */
+.lp-pipe{background:#111820;padding:60px 0;}
+.lp-pipe-head{text-align:center;margin-bottom:48px;}
+.lp-pipe-head h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(20px,2.6vw,28px);color:#fff;font-weight:700;letter-spacing:-.01em;}
+.lp-pipe-head p{margin-top:10px;font-size:15px;color:rgba(255,255,255,.38);}
+.lp-pipe-row{display:flex;align-items:flex-start;justify-content:center;gap:0;flex-wrap:wrap;}
+.lp-pipe-stage{display:flex;flex-direction:column;align-items:center;flex:1;min-width:130px;max-width:180px;padding:0 12px;position:relative;}
+.lp-pipe-stage::after{content:'›';position:absolute;right:-6px;top:16px;font-size:20px;color:rgba(255,255,255,.15);}
+.lp-pipe-stage:last-child::after{display:none;}
+.lp-pipe-num{width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.4);font-family:'IBM Plex Mono',monospace;margin-bottom:12px;transition:border-color .25s,color .25s,background .25s;}
+.lp-pipe-stage:hover .lp-pipe-num{border-color:var(--teal);color:var(--code-green);background:rgba(62,157,137,.1);}
+.lp-pipe-label{font-size:13px;font-weight:700;color:rgba(255,255,255,.72);text-align:center;margin-bottom:7px;font-family:'Space Grotesk',sans-serif;}
+.lp-pipe-items{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px;text-align:center;}
+.lp-pipe-items li{font-size:11.5px;color:rgba(255,255,255,.32);line-height:1.4;}
+@media(max-width:700px){.lp-pipe-stage::after{display:none;}.lp-pipe-stage{min-width:110px;}}
 
-  .ol-radar-panel{background:rgba(255,255,255,0.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.6);border-radius:28px;padding:36px;box-shadow:0 20px 60px rgba(12,17,22,.08),inset 0 1px 0 rgba(255,255,255,.8);}
-  .ol-radar-wrap{position:relative;aspect-ratio:1/1;max-width:400px;margin:0 auto;}
-  .ol-ring{position:absolute;inset:0;border-radius:50%;border:1px solid rgba(12,17,22,.12);}
-  .ol-ring.r2{inset:14%;}.ol-ring.r3{inset:28%;}.ol-ring.r4{inset:42%;}
-  .ol-sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(62,157,137,0.4),transparent 30%);animation:ol-spin 5s linear infinite;mix-blend-mode:multiply;}
-  @keyframes ol-spin{to{transform:rotate(360deg);}}
-  .ol-center{position:absolute;left:50%;top:50%;width:8px;height:8px;background:var(--ink);border-radius:50%;transform:translate(-50%,-50%);}
-  .ol-blip{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--teal-bright);box-shadow:0 0 10px rgba(62,157,137,.6);}
-  .ol-blip.crit{background:var(--amber-deep);box-shadow:0 0 0 0 rgba(199,127,30,.6),0 0 12px rgba(199,127,30,.8);animation:ol-blip-pulse 1.8s ease-out infinite;}
-  @keyframes ol-blip-pulse{0%{box-shadow:0 0 0 0 rgba(199,127,30,.5),0 0 12px rgba(199,127,30,.8);}70%{box-shadow:0 0 0 16px rgba(199,127,30,0),0 0 12px rgba(199,127,30,.8);}100%{box-shadow:0 0 0 0 rgba(199,127,30,0),0 0 12px rgba(199,127,30,.8);}}
-  .ol-radar-caption{display:flex;justify-content:space-between;margin-top:18px;font-size:12px;color:var(--muted);}
-  @media(prefers-reduced-motion:reduce){.ol-sweep{animation:none;}.ol-eyebrow::before{animation:none;}.ol-blip.crit{animation:none;}}
+/* SECTION */
+.lp-sec{padding:84px 0;position:relative;}
+.lp-sec-alt{background:#fff;}
+.lp-tag{display:inline-block;font-size:11px;letter-spacing:.08em;font-weight:700;color:var(--teal-dark);background:var(--teal-pale);padding:3px 10px;border-radius:4px;margin-bottom:12px;font-family:'IBM Plex Mono',monospace;}
+.lp-h2{font-size:clamp(28px,3.4vw,42px);line-height:1.1;font-weight:700;}
+.lp-h2 em{font-style:normal;color:var(--teal-dark);}
+.lp-sec-sub{margin-top:16px;font-size:16px;line-height:1.7;color:var(--muted);max-width:480px;}
+.lp-bullets{list-style:none;padding:0;margin:22px 0 0;display:flex;flex-direction:column;gap:9px;}
+.lp-bullets li{display:flex;align-items:flex-start;gap:9px;font-size:14px;color:var(--ink-soft);line-height:1.5;}
+.lp-bullets li::before{content:'→';color:var(--teal);font-size:13px;margin-top:1px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;}
+.lp-chapter-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
+.lp-chapter-grid.flip{direction:rtl;}
+.lp-chapter-grid.flip > *{direction:ltr;}
+@media(max-width:820px){.lp-chapter-grid,.lp-chapter-grid.flip{grid-template-columns:1fr;direction:ltr;gap:36px;}}
 
-  /* TICKER */
-  .ol-ticker-outer{position:relative;z-index:1;margin-top:70px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--ink);overflow:hidden;white-space:nowrap;}
-  .ol-ticker-track{display:inline-flex;padding:14px 0;animation:ol-ticker 32s linear infinite;}
-  @media(prefers-reduced-motion:reduce){.ol-ticker-track{animation:none;}}
-  @keyframes ol-ticker{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-  .ol-tick-item{font-size:13px;color:#C7D0D6;padding:0 32px;border-right:1px solid #2A3340;}
-  .ol-tag{color:var(--amber);margin-right:8px;}
+/* RISK MATRIX VISUAL */
+.lp-matrix-wrap{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;box-shadow:0 8px 32px rgba(10,15,20,.08);}
+.lp-matrix-title{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:16px;}
+.lp-matrix{display:grid;grid-template-columns:20px repeat(5,1fr);grid-template-rows:repeat(5,1fr) 20px;gap:4px;margin-bottom:12px;aspect-ratio:1/1;max-width:280px;}
+.lp-mx-cell{border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+.mx-low{background:#d1fae5;color:#065f46;}
+.mx-med{background:#fef3c7;color:#92400e;}
+.mx-high{background:#fee2e2;color:#991b1b;}
+.mx-crit{background:#7f1d1d;color:#fca5a5;}
+.mx-hl{outline:2.5px solid var(--ink);outline-offset:1px;}
+.lp-mx-axis{display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;writing-mode:initial;}
+.lp-mx-y{writing-mode:vertical-rl;transform:rotate(180deg);}
+.lp-risk-card{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;display:flex;gap:12px;align-items:center;}
+.lp-risk-badge{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;background:#fee2e2;color:#991b1b;font-family:'IBM Plex Mono',monospace;}
+.lp-risk-meta{font-size:12.5px;color:var(--muted);line-height:1.5;}
+.lp-risk-meta strong{color:var(--ink);}
 
-  /* STATS */
-  .ol-stats{padding:64px 0;}
-  .ol-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;}
-  @media(max-width:760px){.ol-stats-grid{grid-template-columns:repeat(2,1fr);}}
-  .ol-stat-card{position:relative;padding:26px 24px;border-radius:18px;background:var(--card);border:1px solid var(--line);overflow:hidden;transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease,border-color .35s ease;}
-  .ol-stat-card::before{content:"";position:absolute;inset:0;background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%),rgba(62,157,137,.16),transparent 60%);opacity:0;transition:opacity .3s ease;}
-  .ol-stat-card:hover::before{opacity:1;}
-  .ol-stat-card:hover{transform:translateY(-6px);box-shadow:0 18px 36px rgba(12,17,22,.08);border-color:rgba(62,157,137,.3);}
-  .ol-stat-num{font-family:'Space Grotesk',sans-serif;font-size:38px;font-weight:700;position:relative;}
-  .ol-stat-label{position:relative;margin-top:6px;font-size:13.5px;color:var(--muted);}
+/* SIGMA CODE VISUAL */
+.lp-code-wrap{border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(10,15,20,.12);}
+.lp-code-bar{background:#1a2230;display:flex;align-items:center;gap:7px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.07);}
+.lp-code-bar-label{flex:1;text-align:center;font-size:11.5px;color:rgba(255,255,255,.28);font-family:'IBM Plex Mono',monospace;}
+.lp-code-body{background:var(--code-bg);padding:20px 22px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.8;overflow-x:auto;}
+.ck{color:var(--code-purple);}
+.cv{color:var(--code-green);}
+.cs{color:#60a5fa;}
+.cc{color:var(--code-comment);}
+.cy{color:var(--code-yellow);}
+.cw{color:var(--code-white);}
 
-  /* SECTION */
-  .ol-section{padding:96px 0;position:relative;}
-  .ol-section-head{max-width:640px;margin:0 auto 56px;text-align:center;}
-  .ol-h2{font-size:clamp(28px,3.4vw,42px);font-weight:700;}
-  .ol-h2-sm{font-size:clamp(26px,3vw,36px);font-weight:700;max-width:520px;}
-  .ol-accent{background:linear-gradient(100deg,var(--teal-bright),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent;}
-  .ol-section-head p{margin-top:16px;font-size:17px;color:var(--muted);line-height:1.6;}
-  .ol-dotfield{position:absolute;inset:0;z-index:-1;background-image:radial-gradient(circle,rgba(12,17,22,.08) 1px,transparent 1px);background-size:26px 26px;-webkit-mask-image:radial-gradient(ellipse 60% 50% at 50% 30%,black 20%,transparent 75%);mask-image:radial-gradient(ellipse 60% 50% at 50% 30%,black 20%,transparent 75%);}
+/* CLIENT SWITCHER VISUAL */
+.lp-clients-wrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(10,15,20,.08);}
+.lp-clients-head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+.lp-clients-head-label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.lp-client-row{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line);cursor:default;transition:background .12s;}
+.lp-client-row:last-child{border-bottom:none;}
+.lp-client-row.active{background:var(--teal-pale);}
+.lp-client-row:hover:not(.active){background:var(--paper);}
+.lp-client-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.lp-client-info{flex:1;}
+.lp-client-name{font-size:13.5px;font-weight:600;color:var(--ink);}
+.lp-client-meta{font-size:11.5px;color:var(--muted);margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+.lp-client-tag{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.ct-ok{background:#d1fae5;color:#065f46;}.ct-warn{background:#fee2e2;color:#991b1b;}.ct-scan{background:#fef3c7;color:#92400e;}
 
-  /* PRODUCT CARDS */
-  .ol-cat-groups{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;perspective:1200px;}
-  @media(max-width:980px){.ol-cat-groups{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:560px){.ol-cat-groups{grid-template-columns:1fr;}}
-  .ol-cat-group{position:relative;background:var(--card);border-radius:var(--radius);padding:2px;transform-style:preserve-3d;will-change:transform;}
-  .ol-glow-border{position:absolute;inset:0;border-radius:var(--radius);padding:1.5px;background:conic-gradient(from var(--angle,0deg),var(--accent1),var(--accent2),var(--accent1));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .35s ease;animation:ol-rot-border 3.5s linear infinite;}
-  .ol-cat-group:hover .ol-glow-border{opacity:1;}
-  @keyframes ol-rot-border{to{--angle:360deg;}}
-  @media(prefers-reduced-motion:reduce){.ol-glow-border{animation:none;}}
-  .ol-cat-inner{position:relative;background:var(--card);border:1px solid var(--line);border-radius:calc(var(--radius) - 2px);padding:26px 22px;height:100%;transition:border-color .3s ease,box-shadow .3s ease;}
-  .ol-cat-group:hover .ol-cat-inner{border-color:transparent;box-shadow:0 24px 48px rgba(12,17,22,.10);}
-  .ol-cat-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--icon-bg);margin-bottom:16px;transition:transform .4s cubic-bezier(.34,1.56,.64,1);}
-  .ol-cat-group:hover .ol-cat-icon{transform:scale(1.12) rotate(-6deg);}
-  .ol-cat-tag{font-size:11px;letter-spacing:.08em;color:var(--teal);margin-bottom:18px;display:block;}
-  .ol-product-item{padding:16px 0;border-top:1px solid var(--line);}
-  .ol-product-item:first-of-type{border-top:none;padding-top:0;}
-  .ol-h3{font-size:16.5px;font-weight:600;margin-bottom:6px;font-family:'Space Grotesk',sans-serif;}
-  .ol-product-item p{font-size:13.5px;color:var(--muted);line-height:1.5;margin:0;}
-  .ol-cg-detect{--accent1:#3E9D89;--accent2:#7C6FE0;--icon-bg:#E4EFEC;}
-  .ol-cg-assess{--accent1:#E8A33D;--accent2:#E0716F;--icon-bg:#FBEBD8;}
-  .ol-cg-respond{--accent1:#7C6FE0;--accent2:#3E9D89;--icon-bg:#EEECFB;}
-  .ol-cg-govern{--accent1:#E0716F;--accent2:#E8A33D;--icon-bg:#FBE4E3;}
+/* COMPLIANCE VISUAL */
+.lp-fw-wrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(10,15,20,.08);}
+.lp-fw-head{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+.lp-fw-head-label{font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.lp-fw-sel{font-size:12px;color:var(--teal-dark);font-weight:600;font-family:'IBM Plex Mono',monospace;background:var(--teal-pale);padding:3px 9px;border-radius:5px;}
+.lp-fw-row{display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);font-size:13px;}
+.lp-fw-row:last-child{border-bottom:none;}
+.lp-fw-id{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);min-width:72px;flex-shrink:0;}
+.lp-fw-name{flex:1;color:var(--ink);}
+.lp-fw-status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace;}
+.fs-pass{background:#d1fae5;color:#065f46;}.fs-fail{background:#fee2e2;color:#991b1b;}.fs-part{background:#fef3c7;color:#92400e;}
+.lp-fw-foot{padding:13px 18px;background:var(--paper);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;}
+.lp-fw-foot-note{font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.lp-fw-dl{font-size:12px;font-weight:700;color:var(--teal-dark);background:var(--teal-pale);padding:5px 12px;border-radius:6px;cursor:default;}
 
-  /* CAROUSEL */
-  .ol-carousel-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;}
-  .ol-carousel-nav{display:flex;gap:10px;}
-  .ol-nav-arrow{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease,transform .2s ease;cursor:pointer;color:var(--ink);}
-  .ol-nav-arrow:hover{background:var(--ink);border-color:var(--ink);transform:scale(1.06);color:#fff;}
-  .ol-carousel-track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 6px 14px;scrollbar-width:none;perspective:1200px;}
-  .ol-carousel-track::-webkit-scrollbar{display:none;}
-  .ol-car-card{flex:0 0 auto;width:300px;scroll-snap-align:start;position:relative;background:rgba(255,255,255,0.65);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:var(--radius);padding:28px 24px 26px;display:flex;flex-direction:column;gap:14px;transition:transform .3s cubic-bezier(.16,1,.3,1),box-shadow .3s ease,border-color .3s ease;transform-style:preserve-3d;will-change:transform;overflow:hidden;}
-  .ol-car-card::after{content:"";position:absolute;inset:0;background:radial-gradient(180px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,0.55),transparent 60%);opacity:0;transition:opacity .3s ease;pointer-events:none;}
-  .ol-car-card:hover::after{opacity:1;}
-  .ol-car-card:hover{box-shadow:0 22px 44px rgba(12,17,22,.12);border-color:rgba(62,157,137,.3);}
-  .ol-car-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--teal-soft),#fff);transition:transform .4s cubic-bezier(.34,1.56,.64,1);}
-  .ol-car-card:hover .ol-car-icon{transform:scale(1.1) rotate(6deg);}
-  .ol-car-card h3{font-size:19px;font-weight:600;font-family:'Space Grotesk',sans-serif;margin:0;}
-  .ol-car-card p{font-size:14px;color:var(--muted);line-height:1.55;margin:0;}
+/* INTEGRATION */
+.lp-integ{padding:60px 0;background:var(--paper);}
+.lp-integ-head{text-align:center;margin-bottom:36px;}
+.lp-integ-head p{font-size:13px;letter-spacing:.06em;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.lp-integ-groups{display:flex;flex-direction:column;gap:18px;}
+.lp-integ-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;}
+.lp-integ-key{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;min-width:88px;text-align:right;flex-shrink:0;}
+.lp-pill{font-size:12.5px;font-weight:500;padding:5px 13px;border-radius:6px;border:1px solid var(--line);color:var(--ink-soft);background:#fff;}
 
-  /* CTA */
-  .ol-cta-banner{position:relative;background:linear-gradient(160deg,#0C1116,#16222A 60%,#10201C);color:#fff;border-radius:28px;padding:72px 48px;text-align:center;overflow:hidden;}
-  .ol-grid-pat{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:36px 36px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 50%,black,transparent 80%);mask-image:radial-gradient(ellipse 70% 60% at 50% 50%,black,transparent 80%);pointer-events:none;}
-  .ol-cta-banner::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 20%,rgba(62,157,137,.25),transparent 55%),radial-gradient(circle at 80% 80%,rgba(232,163,61,.18),transparent 55%);pointer-events:none;}
-  .ol-cta-tagline{position:relative;font-size:15px;letter-spacing:.02em;color:var(--amber);margin-bottom:14px;font-weight:600;font-family:'Space Grotesk',sans-serif;}
-  .ol-h2-cta{position:relative;font-size:clamp(28px,3.6vw,42px);font-weight:700;color:#fff;max-width:600px;margin:0 auto;}
-  .ol-sub{position:relative;color:#A6B0B8;margin-top:14px;font-size:16px;}
+/* CAPABILITY */
+.lp-cap{padding:72px 0;background:#fff;}
+.lp-cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:40px;}
+@media(max-width:820px){.lp-cap-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:520px){.lp-cap-grid{grid-template-columns:1fr;}}
+.lp-cap-group{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px;}
+.lp-cap-group-tag{font-size:10.5px;letter-spacing:.07em;font-weight:700;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:12px;}
+.lp-cap-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink-soft);padding:4px 0;}
+.lp-cap-item::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--teal);flex-shrink:0;}
 
-  /* FOOTER */
-  .ol-footer{margin-top:96px;padding:64px 0 32px;border-top:1px solid var(--line);}
-  .ol-footer-top{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:32px;padding-bottom:48px;}
-  @media(max-width:860px){.ol-footer-top{grid-template-columns:repeat(2,1fr);}}
-  .ol-footer-head{font-size:12.5px;letter-spacing:.06em;color:var(--muted);margin:0 0 16px;font-family:'Space Grotesk',sans-serif;}
-  .ol-footer-col ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:11px;}
-  .ol-footer-col a{font-size:14px;color:var(--ink-soft);transition:color .15s ease;}
-  .ol-footer-col a:hover{color:var(--ink);}
-  .ol-footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:28px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);flex-wrap:wrap;gap:12px;}
-  .ol-footer-bottom-links{display:flex;gap:20px;}
+/* CTA */
+.lp-cta{background:var(--ink);color:#fff;padding:80px 0;text-align:center;}
+.lp-cta h2{font-size:clamp(26px,3.2vw,38px);font-weight:700;color:#fff;}
+.lp-cta p{margin-top:12px;font-size:16px;color:rgba(255,255,255,.45);}
+.lp-cta-actions{display:flex;gap:12px;justify-content:center;margin-top:28px;flex-wrap:wrap;}
+
+/* FOOTER */
+.lp-footer{background:#0d1219;padding:28px 0;border-top:1px solid rgba(255,255,255,.07);}
+.lp-footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.lp-footer-note{font-size:12.5px;color:rgba(255,255,255,.25);}
+.lp-footer-sign{font-size:13px;color:rgba(255,255,255,.45);cursor:pointer;transition:color .15s;}
+.lp-footer-sign:hover{color:#fff;}
 `;
 
-const TICKER_ITEMS = [
-  ["SCAN",  "214 assets scanned — 3 critical findings"],
-  ["CVE",   "New disclosure matched to 2 internet-facing hosts"],
-  ["DRIFT", "Compliance drift detected — ISO 27001 A.12.4"],
-  ["AGENT", "AI Security Advisor closed 12 findings automatically"],
-  ["PATH",  "Attack path identified — public host → domain admin"],
-  ["RISK",  "Financial exposure re-scored for this week"],
-  ["SCAN",  "214 assets scanned — 3 critical findings"],
-  ["CVE",   "New disclosure matched to 2 internet-facing hosts"],
-  ["DRIFT", "Compliance drift detected — ISO 27001 A.12.4"],
-  ["AGENT", "AI Security Advisor closed 12 findings automatically"],
-  ["PATH",  "Attack path identified — public host → domain admin"],
-  ["RISK",  "Financial exposure re-scored — down 8% this week"],
+/* ─── DATA ─────────────────────────────────────────────────────────────────── */
+const PIPELINE = [
+  { n: "01", label: "Discover", items: ["Asset inventory", "Vulnerability scans", "CVE enrichment", "Posture trends"] },
+  { n: "02", label: "Analyse", items: ["Risk assessment", "Attack path graphs", "Threat intelligence", "NL queries"] },
+  { n: "03", label: "Respond", items: ["Threat register", "Control deficiencies", "CTEM programs", "Remediation"] },
+  { n: "04", label: "Report", items: ["VAPT reports", "Evidence packages", "Compliance heatmaps", "Custom frameworks"] },
+  { n: "05", label: "Automate", items: ["60+ AI agents", "Webhook dispatch", "API access", "AI guardrails"] },
+  { n: "06", label: "Manage", items: ["Multi-tenant console", "Client posture", "Connector health", "Soft-delete & audit"] },
 ];
 
-const STATS = [
-  { target: 60, suffix: "+", label: "specialist AI agents" },
-  { target: 8,  suffix: "",  label: "purpose-built products" },
-  { target: 5,  suffix: "-phase", label: "CTEM workflow" },
-  { target: 4,  suffix: "",  label: "frameworks: NIST, ISO 27001, PCI DSS, GDPR" },
+const CAPABILITIES: { tag: string; items: string[] }[] = [
+  { tag: "DISCOVER", items: ["Asset discovery & inventory", "Vulnerability scanning", "CVE blast radius", "Posture trend charts", "Technology fingerprinting", "AI-assisted scan wizard"] },
+  { tag: "ANALYSE", items: ["Attack path visualisation", "Risk staging gate", "FAIR-lite risk scoring", "Threat intelligence mapping", "Compliance gap analysis", "Ask-your-data NL query"] },
+  { tag: "RESPOND", items: ["Threat register (MITRE)", "Control deficiency tracker", "5-phase CTEM workflow", "Remediation action tracker", "Crown jewel prioritisation", "VAPT report generation"] },
+  { tag: "REPORT", items: ["PDF & DOCX export", "Compliance evidence ZIP", "Framework heatmaps", "Custom control frameworks", "Scan version history & diff", "Embeddable scorecard"] },
+  { tag: "AUTOMATE", items: ["60+ specialist AI agents", "Webhook delivery (HMAC)", "M2M API keys", "AI workflow builder", "RAG knowledge base", "Provider failover"] },
+  { tag: "SCANNERS", items: ["OWASP ZAP, Nmap, OpenVAS", "Semgrep, CodeQL, Sonar", "Trivy, Gitleaks, TruffleHog", "Tenable, Qualys, Rapid7", "Burp Enterprise, Snyk", "Invicti, Acunetix"] },
 ];
 
-const CAROUSEL_CARDS = [
-  { title: "Deployment",  desc: "Runs in your cloud, on-prem, or fully hosted — same platform, same agents, same console either way.",
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg> },
-  { title: "Onboarding",  desc: "Point Owlet at a tenant and get posture, findings, and risk scoring the same day.",
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="1.8"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg> },
-  { title: "Support",     desc: "Analysts who've run SOCs answer questions directly — not a generic ticket queue.",
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg> },
-  { title: "Licensing",   desc: "License by product or by platform, and scale as tenants, agents, and assets grow.",
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
-  { title: "Frameworks",  desc: "Map custom controls alongside NIST, ISO, PCI DSS, and GDPR out of the box.",
-    icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> },
-];
-
+/* ─── COMPONENT ─────────────────────────────────────────────────────────────── */
 export default function LandingV2() {
   const { instance } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const navigate = useNavigate();
-  const carRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isAuthenticated) navigate("/hub", { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Inject CSS
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = CSS;
@@ -232,308 +246,413 @@ export default function LandingV2() {
     return () => { document.head.removeChild(style); };
   }, []);
 
-  // Scroll reveal
   useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>(".ol-reveal");
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
-    }, { threshold: 0.12 });
+    const els = document.querySelectorAll<HTMLElement>(".lp-rv");
+    const io = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }),
+      { threshold: 0.1 }
+    );
     els.forEach(el => io.observe(el));
     return () => io.disconnect();
   }, []);
 
-  // Spotlight
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const hero = document.getElementById("ol-hero");
-    const spot = document.getElementById("ol-spotlight");
-    if (reduced || !hero || !spot) return;
-    const move = (e: MouseEvent) => {
-      const r = hero.getBoundingClientRect();
-      spot.style.left = (e.clientX - r.left) + "px";
-      spot.style.top  = (e.clientY - r.top)  + "px";
-      spot.style.opacity = "1";
-    };
-    const leave = () => { spot.style.opacity = "0"; };
-    hero.addEventListener("mousemove", move);
-    hero.addEventListener("mouseleave", leave);
-    return () => { hero.removeEventListener("mousemove", move); hero.removeEventListener("mouseleave", leave); };
-  }, []);
-
-  // Tilt + glow
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!reduced) {
-      document.querySelectorAll<HTMLElement>(".ol-tilt").forEach(card => {
-        const move = (e: MouseEvent) => {
-          const r = card.getBoundingClientRect();
-          const x = (e.clientX - r.left) / r.width  - 0.5;
-          const y = (e.clientY - r.top)  / r.height - 0.5;
-          card.style.transform = `rotateY(${x * 7}deg) rotateX(${-y * 7}deg) translateY(-4px)`;
-        };
-        const leave = () => { card.style.transform = ""; };
-        card.addEventListener("mousemove", move);
-        card.addEventListener("mouseleave", leave);
-      });
-    }
-    document.querySelectorAll<HTMLElement>(".ol-stat-card, .ol-car-card").forEach(card => {
-      card.addEventListener("mousemove", (e: MouseEvent) => {
-        const r = card.getBoundingClientRect();
-        card.style.setProperty("--mx", ((e.clientX - r.left) / r.width  * 100) + "%");
-        card.style.setProperty("--my", ((e.clientY - r.top)  / r.height * 100) + "%");
-      });
-    });
-  }, []);
-
-  // Counters
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        const el = entry.target as HTMLElement;
-        const target = parseInt(el.dataset.target || "0", 10);
-        const suffix = el.dataset.suffix || "";
-        if (reduced) { el.textContent = target + suffix; io.unobserve(el); return; }
-        const start = performance.now();
-        const tick = (now: number) => {
-          const p = Math.min((now - start) / 1200, 1);
-          el.textContent = Math.round((1 - Math.pow(1 - p, 3)) * target) + suffix;
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-        io.unobserve(el);
-      });
-    }, { threshold: 0.5 });
-    document.querySelectorAll(".ol-counter").forEach(c => io.observe(c));
-    return () => io.disconnect();
-  }, []);
-
-  const signIn = () => instance.loginRedirect({ ...loginRequest, redirectStartPage: `${window.location.origin}/hub` }).catch(console.error);
-  const scrollCar = (dir: number) => carRef.current?.scrollBy({ left: 640 * dir, behavior: "smooth" });
+  const signIn = () =>
+    instance.loginRedirect({ ...loginRequest, redirectStartPage: `${window.location.origin}/hub` }).catch(console.error);
 
   return (
-    <div className="ol-land">
-      <div className="ol-grain" aria-hidden="true" />
+    <div className="lp">
 
-      {/* NAV */}
-      <header className="ol-header">
-        <div className="ol-wrap ol-nav">
-          <img src="/owlet-logo.svg" alt="Owlet" style={{ height: 36, width: "auto" }} />
-          <nav className="ol-nav-links">
-            <a href="#ol-platform">Platform</a>
-            <a href="#ol-products">Products</a>
-            <a href="#ol-why">Why Owlet</a>
+      {/* ── NAV ── */}
+      <header className="lp-nav-wrap">
+        <div className="lp-wrap lp-nav">
+          <img src="/owlet-logo.svg" alt="Owlet" style={{ height: 34, width: "auto" }} />
+          <nav className="lp-nav-links">
+            <a href="#lp-pipeline">How it works</a>
+            <a href="#lp-cap">Capabilities</a>
+            <a href="#lp-integ">Integrations</a>
           </nav>
-          <div className="ol-nav-cta">
-            <button className="ol-sign-in" onClick={signIn}>Sign in</button>
-            <button className="ol-btn ol-btn-dark" onClick={signIn}>
-              <span className="ol-shine" />Explore the platform
-            </button>
+          <div className="lp-nav-right">
+            <button className="lp-btn lp-btn-outline" onClick={signIn}>Sign in</button>
           </div>
         </div>
       </header>
 
-      {/* HERO */}
-      <section className="ol-hero" id="ol-hero">
-        <div className="ol-mesh" aria-hidden="true">
-          <div className="ol-blob ol-blob1" />
-          <div className="ol-blob ol-blob2" />
-          <div className="ol-blob ol-blob3" />
-        </div>
-        <div className="ol-spotlight" id="ol-spotlight" aria-hidden="true" />
-        <div className="ol-wrap">
-          <div className="ol-hero-grid">
-            <div className="ol-reveal">
-              <span className="ol-eyebrow ol-mono">CONTINUOUS SECURITY MONITORING</span>
-              <h1 className="ol-h1">See your exposure. <span className="ol-grad">See it clearly.</span></h1>
-              <p className="ol-lead">Owlet brings vulnerability management, threat intelligence, compliance, and risk into one console — with 60+ AI agents doing the work across every tenant you manage.</p>
-              <div className="ol-hero-ctas">
-                <button className="ol-btn ol-btn-dark ol-btn-lg" onClick={signIn}><span className="ol-shine" />See the platform</button>
-                <a href="#ol-why" className="ol-btn ol-btn-ghost ol-btn-lg">How it works</a>
+      {/* ── HERO ── */}
+      <section className="lp-hero">
+        <div className="lp-wrap">
+          <div className="lp-hero-grid">
+            <div className="lp-rv">
+              <div className="lp-eyebrow lp-mono">
+                <span className="lp-eyebrow-dot" />
+                SECURITY ENGINEERING PLATFORM
+              </div>
+              <h1 className="lp-h1">The full lifecycle.<br /><em>Not just a scanner.</em></h1>
+              <p className="lp-hero-sub">
+                From asset discovery and vulnerability assessment to risk evaluation,
+                compliance monitoring, threat modelling, and audit-ready reporting —
+                connected end to end, without the integration overhead.
+              </p>
+              <div className="lp-hero-ctas">
+                <button className="lp-btn lp-btn-amber lp-btn-lg" onClick={signIn}>Sign in to explore</button>
+                <a href="#lp-pipeline" className="lp-btn lp-btn-outline lp-btn-lg">See how it works</a>
               </div>
             </div>
-            <div className="ol-radar-panel ol-reveal">
-              <div className="ol-radar-wrap" aria-hidden="true">
-                <div className="ol-ring" /><div className="ol-ring r2" /><div className="ol-ring r3" /><div className="ol-ring r4" />
-                <div className="ol-sweep" />
-                <div className="ol-center" />
-                <div className="ol-blip" style={{ left: "22%", top: "38%" }} />
-                <div className="ol-blip" style={{ left: "68%", top: "26%" }} />
-                <div className="ol-blip crit" style={{ left: "74%", top: "64%" }} />
-                <div className="ol-blip" style={{ left: "40%", top: "76%" }} />
-                <div className="ol-blip" style={{ left: "58%", top: "50%" }} />
-              </div>
-              <div className="ol-radar-caption ol-mono"><span>214 assets</span><span>3 critical</span><span>live</span></div>
-            </div>
-          </div>
-        </div>
-        <div className="ol-ticker-outer" role="marquee" aria-label="Live platform activity">
-          <div className="ol-ticker-track">
-            {TICKER_ITEMS.map(([tag, text], i) => (
-              <span key={i} className="ol-tick-item ol-mono"><span className="ol-tag">{tag}</span>{text}</span>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* STATS */}
-      <section className="ol-stats" id="ol-platform">
-        <div className="ol-wrap ol-stats-grid">
-          {STATS.map((s, i) => (
-            <div key={i} className="ol-stat-card ol-reveal">
-              <div className="ol-stat-num">
-                <span className="ol-counter" data-target={String(s.target)} data-suffix={s.suffix}>0</span>
+            {/* mock findings panel */}
+            <div className="lp-mock lp-rv" style={{ transitionDelay: ".1s" }}>
+              <div className="lp-mock-bar">
+                <span className="lp-dot" style={{ background: "#ff5f57" }} />
+                <span className="lp-dot" style={{ background: "#febc2e" }} />
+                <span className="lp-dot" style={{ background: "#28c840" }} />
+                <span className="lp-mock-title lp-mono">Owlet — Findings</span>
               </div>
-              <div className="ol-stat-label">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* PRODUCTS */}
-      <section className="ol-section" id="ol-products">
-        <div className="ol-dotfield" aria-hidden="true" />
-        <div className="ol-wrap">
-          <div className="ol-section-head ol-reveal">
-            <h2 className="ol-h2">One platform, <span className="ol-accent">every</span> security function</h2>
-            <p>Eight purpose-built products across four categories — choose what you need, or run them all together.</p>
-          </div>
-          <div className="ol-cat-groups">
-            <div className="ol-cat-group ol-cg-detect ol-reveal ol-tilt">
-              <div className="ol-glow-border" />
-              <div className="ol-cat-inner">
-                <div className="ol-cat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2F6F62" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
-                <span className="ol-cat-tag ol-mono">DETECT</span>
-                <div className="ol-product-item"><h3 className="ol-h3">Threat Intelligence</h3><p>MITRE ATT&amp;CK–mapped threats, attack path graphs, and exposure tracking.</p></div>
-                <div className="ol-product-item"><h3 className="ol-h3">Attack Surface Discovery</h3><p>Continuous asset and exposure mapping across cloud, on-prem, and shadow IT.</p></div>
+              <div className="lp-mock-tabs">
+                <span className="lp-mock-tab on lp-mono">Findings</span>
+                <span className="lp-mock-tab lp-mono">Assets</span>
+                <span className="lp-mock-tab lp-mono">Risk</span>
               </div>
-            </div>
-            <div className="ol-cat-group ol-cg-assess ol-reveal ol-tilt">
-              <div className="ol-glow-border" />
-              <div className="ol-cat-inner">
-                <div className="ol-cat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C77F1E" strokeWidth="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg></div>
-                <span className="ol-cat-tag ol-mono">ASSESS</span>
-                <div className="ol-product-item"><h3 className="ol-h3">Vulnerability Management</h3><p>Scans, findings, posture trends, and multi-scanner orchestration in one place.</p></div>
-                <div className="ol-product-item"><h3 className="ol-h3">Risk Manager</h3><p>FAIR-lite ALE scoring, financial exposure dashboards, and board-ready reports.</p></div>
-              </div>
-            </div>
-            <div className="ol-cat-group ol-cg-respond ol-reveal ol-tilt">
-              <div className="ol-glow-border" />
-              <div className="ol-cat-inner">
-                <div className="ol-cat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C6FE0" strokeWidth="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
-                <span className="ol-cat-tag ol-mono">RESPOND</span>
-                <div className="ol-product-item"><h3 className="ol-h3">AI Security Advisor</h3><p>60+ specialist AI agents — risk scoring, threat intel, IR playbooks, and more.</p></div>
-                <div className="ol-product-item"><h3 className="ol-h3">Incident Response</h3><p>Guided runbooks and automated containment steps when something is actually wrong.</p></div>
-              </div>
-            </div>
-            <div className="ol-cat-group ol-cg-govern ol-reveal ol-tilt">
-              <div className="ol-glow-border" />
-              <div className="ol-cat-inner">
-                <div className="ol-cat-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#E0716F" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
-                <span className="ol-cat-tag ol-mono">GOVERN</span>
-                <div className="ol-product-item"><h3 className="ol-h3">Compliance Monitor</h3><p>Framework control gaps across NIST, ISO 27001, PCI DSS, GDPR, and CIS v8.</p></div>
-                <div className="ol-product-item"><h3 className="ol-h3">Governance &amp; CTEM</h3><p>5-phase CTEM workflow, remediation tracker, and an embeddable security scorecard.</p></div>
+              <div className="lp-mock-body">
+                {[
+                  { sev: "CRIT", cls: "sc", title: "Remote code execution via deserialization", asset: "api-gateway.prod" },
+                  { sev: "HIGH", cls: "sh", title: "S3 bucket publicly accessible", asset: "storage-logs-backup" },
+                  { sev: "HIGH", cls: "sh", title: "MFA not enforced — Admin role", asset: "Entra ID · Global Admins" },
+                  { sev: "MED",  cls: "sm", title: "TLS 1.0 enabled on legacy endpoint", asset: "payments-api-v1" },
+                  { sev: "LOW",  cls: "sl", title: "Missing security headers (X-Frame)", asset: "portal.corp.internal" },
+                ].map((r, i) => (
+                  <div key={i} className="lp-mock-row">
+                    <span className={`lp-sev ${r.cls}`}>{r.sev}</span>
+                    <span className="lp-mock-fname">{r.title}</span>
+                    <span className="lp-mock-asset">{r.asset}</span>
+                  </div>
+                ))}
+                <div className="lp-mock-footer">
+                  <span className="lp-mock-live lp-mono">
+                    <span className="lp-mock-live-dot" />3 agents running
+                  </span>
+                  <div className="lp-mock-counts">
+                    <span>12 assets</span>
+                    <span>31 findings</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* WHY / CAROUSEL */}
-      <section className="ol-section" id="ol-why" style={{ paddingTop: 0 }}>
-        <div className="ol-wrap">
-          <div className="ol-carousel-head ol-reveal">
-            <h2 className="ol-h2-sm">How Owlet fits into your stack</h2>
-            <div className="ol-carousel-nav">
-              <button className="ol-nav-arrow" onClick={() => scrollCar(-1)} aria-label="Previous">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"/></svg>
-              </button>
-              <button className="ol-nav-arrow" onClick={() => scrollCar(1)} aria-label="Next">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor"/></svg>
-              </button>
-            </div>
+      {/* ── PIPELINE ── */}
+      <section className="lp-pipe" id="lp-pipeline">
+        <div className="lp-wrap">
+          <div className="lp-pipe-head lp-rv">
+            <h2>Six stages. One workflow.</h2>
+            <p>Most teams stitch together a scanner, a GRC tool, a ticketing system, and a spreadsheet. This replaces all of them.</p>
           </div>
-          <div className="ol-carousel-track ol-reveal" ref={carRef}>
-            {CAROUSEL_CARDS.map((c, i) => (
-              <div key={i} className="ol-car-card ol-tilt">
-                <div className="ol-car-icon">{c.icon}</div>
-                <h3>{c.title}</h3>
-                <p>{c.desc}</p>
+          <div className="lp-pipe-row">
+            {PIPELINE.map((s, i) => (
+              <div key={i} className="lp-pipe-stage lp-rv" style={{ transitionDelay: `${i * 0.07}s` }}>
+                <div className="lp-pipe-num lp-mono">{s.n}</div>
+                <div className="lp-pipe-label">{s.label}</div>
+                <ul className="lp-pipe-items">
+                  {s.items.map((it, j) => <li key={j}>{it}</li>)}
+                </ul>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA BANNER */}
-      <section className="ol-section" style={{ paddingTop: 0 }}>
-        <div className="ol-wrap">
-          <div className="ol-cta-banner ol-reveal">
-            <div className="ol-grid-pat" aria-hidden="true" />
-            <div className="ol-cta-tagline ol-mono">OWLET</div>
-            <h2 className="ol-h2-cta">Everything security teams need to know, in one place.</h2>
-            <p className="ol-sub">Point Owlet at a tenant and see posture, findings, and risk the same day.</p>
-            <div className="ol-hero-ctas" style={{ justifyContent: "center", marginTop: 30 }}>
-              <button className="ol-btn ol-btn-amber ol-btn-lg" onClick={signIn}><span className="ol-shine" />See the platform</button>
-              <a href="#ol-products" className="ol-btn ol-btn-ghost-dark ol-btn-lg">Learn more</a>
+      {/* ── CHAPTER 1: Risk staging gate ── */}
+      <section className="lp-sec">
+        <div className="lp-wrap">
+          <div className="lp-chapter-grid">
+            <div className="lp-rv">
+              <span className="lp-tag">RISK MANAGEMENT</span>
+              <h2 className="lp-h2">Findings don't<br /><em>automatically become risks.</em></h2>
+              <p className="lp-sec-sub">
+                Most tools dump scanner output straight into a risk register.
+                Owlet puts everything through a staging gate first — a structured
+                evaluation that walks through probability factors and consequence
+                before anything is formally recorded.
+              </p>
+              <ul className="lp-bullets">
+                <li>8-step evaluation: accessibility, discoverability, exploitability, authentication, repeatability, consequence, and treatment</li>
+                <li>Live 5×5 risk matrix updates as you score each factor</li>
+                <li>AI drafts the risk proposal from scanner findings — you evaluate it</li>
+                <li>Staging area keeps proposals separate from the live register until reviewed</li>
+                <li>FAIR-lite financial exposure scoring on accepted risks</li>
+              </ul>
+            </div>
+
+            {/* risk matrix visual */}
+            <div className="lp-rv" style={{ transitionDelay: ".1s" }}>
+              <div className="lp-matrix-wrap">
+                <div className="lp-matrix-title lp-mono">Risk Matrix — Live Scoring</div>
+                <div className="lp-matrix" style={{ fontFamily: "IBM Plex Mono, monospace" }}>
+                  {/* Y-axis label */}
+                  <div className="lp-mx-axis lp-mx-y" style={{ gridColumn: 1, gridRow: "1/6", fontSize: 9, color: "var(--muted)", writingMode: "vertical-rl", transform: "rotate(180deg)", textAlign: "center" }}>LIKELIHOOD</div>
+                  {/* rows top→bottom = high likelihood → low */}
+                  {[
+                    ["mx-med","mx-high","mx-high","mx-crit","mx-crit"],
+                    ["mx-low","mx-med","mx-high","mx-high","mx-crit"],
+                    ["mx-low","mx-low","mx-med","mx-high","mx-high mx-hl"],
+                    ["mx-low","mx-low","mx-low","mx-med","mx-high"],
+                    ["mx-low","mx-low","mx-low","mx-low","mx-med"],
+                  ].map((row, ri) =>
+                    row.map((cls, ci) => (
+                      <div key={`${ri}-${ci}`} className={`lp-mx-cell ${cls}`}
+                        style={{ gridColumn: ci + 2, gridRow: ri + 1, fontSize: 9 }}>
+                        {cls.includes("crit") ? "C" : cls.includes("high") ? "H" : cls.includes("med") ? "M" : "L"}
+                      </div>
+                    ))
+                  )}
+                  {/* X-axis */}
+                  <div style={{ gridColumn: "2/7", gridRow: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace", paddingTop: 4 }}>
+                    CONSEQUENCE →
+                  </div>
+                </div>
+                <div className="lp-risk-card">
+                  <span className="lp-risk-badge lp-mono">HIGH · 12</span>
+                  <div className="lp-risk-meta">
+                    <strong>MFA Bypass — Admin Role</strong><br />
+                    Consequence 4 × Likelihood avg 3.0
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="ol-footer">
-        <div className="ol-wrap">
-          <div className="ol-footer-top">
-            <div className="ol-footer-col">
-              <img src="/owlet-logo.svg" alt="Owlet" style={{ height: 32, width: "auto", marginBottom: 14, display: "block" }} />
-              <p style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6, maxWidth: 220, margin: 0 }}>One platform for vulnerability management, threat intelligence, compliance, and risk.</p>
+      {/* ── CHAPTER 2: AI deliverables ── */}
+      <section className="lp-sec lp-sec-alt">
+        <div className="lp-wrap">
+          <div className="lp-chapter-grid flip">
+            {/* sigma code visual */}
+            <div className="lp-rv">
+              <div className="lp-code-wrap">
+                <div className="lp-code-bar">
+                  <span className="lp-dot" style={{ background: "#ff5f57" }} />
+                  <span className="lp-dot" style={{ background: "#febc2e" }} />
+                  <span className="lp-dot" style={{ background: "#28c840" }} />
+                  <span className="lp-code-bar-label lp-mono">sigma-rule — generated by Threat Detection Agent</span>
+                </div>
+                <div className="lp-code-body">
+                  <span className="cc"># Auto-generated · review before deployment{"\n"}</span>
+                  <span className="ck">title</span><span className="cw">: </span><span className="cv">Suspicious PowerShell Download Cradle{"\n"}</span>
+                  <span className="ck">status</span><span className="cw">: </span><span className="cy">experimental{"\n"}</span>
+                  <span className="ck">logsource</span><span className="cw">:{"\n"}</span>
+                  <span className="cw">  </span><span className="ck">product</span><span className="cw">: </span><span className="cv">windows{"\n"}</span>
+                  <span className="cw">  </span><span className="ck">service</span><span className="cw">: </span><span className="cv">sysmon{"\n"}</span>
+                  <span className="ck">detection</span><span className="cw">:{"\n"}</span>
+                  <span className="cw">  </span><span className="ck">selection</span><span className="cw">:{"\n"}</span>
+                  <span className="cw">    </span><span className="ck">EventID</span><span className="cw">: </span><span className="cs">1{"\n"}</span>
+                  <span className="cw">    </span><span className="ck">CommandLine|contains</span><span className="cw">:{"\n"}</span>
+                  <span className="cw">      - </span><span className="cv">&apos;IEX&apos;{"\n"}</span>
+                  <span className="cw">      - </span><span className="cv">&apos;DownloadString&apos;{"\n"}</span>
+                  <span className="cw">  </span><span className="ck">condition</span><span className="cw">: </span><span className="cv">selection{"\n"}</span>
+                  <span className="ck">level</span><span className="cw">: </span><span className="cy">high{"\n"}</span>
+                  <span className="ck">tags</span><span className="cw">:{"\n"}</span>
+                  <span className="cw">  - </span><span className="cv">attack.execution{"\n"}</span>
+                  <span className="cw">  - </span><span className="cv">attack.t1059.001</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                {["VAPT Report", "Sigma Rule", "FAIR Assessment", "Remediation Playbook"].map(d => (
+                  <span key={d} className="lp-pill" style={{ fontSize: 12, fontWeight: 600, borderColor: "var(--teal-pale)", color: "var(--teal-dark)", background: "var(--teal-pale)" }}>{d}</span>
+                ))}
+              </div>
             </div>
-            <div className="ol-footer-col">
-              <h4 className="ol-footer-head">PRODUCT</h4>
-              <ul>
-                <li><a href="#ol-products">Vulnerability Management</a></li>
-                <li><a href="#ol-products">Threat Intelligence</a></li>
-                <li><a href="#ol-products">Compliance Monitor</a></li>
-                <li><a href="#ol-products">Risk Manager</a></li>
-                <li><a href="#ol-products">AI Security Advisor</a></li>
-              </ul>
-            </div>
-            <div className="ol-footer-col">
-              <h4 className="ol-footer-head">PLATFORM</h4>
-              <ul>
-                <li><a href="#ol-platform">Multi-tenant console</a></li>
-                <li><a href="#ol-platform">AI agents</a></li>
-                <li><a href="#ol-platform">Integrations</a></li>
-                <li><a href="#ol-platform">API reference</a></li>
-              </ul>
-            </div>
-            <div className="ol-footer-col">
-              <h4 className="ol-footer-head">COMPANY</h4>
-              <ul>
-                <li><a href="#ol-why">About</a></li>
-                <li><a href="#ol-why">Careers</a></li>
-                <li><a href="#ol-why">Blog</a></li>
-                <li><a href="#ol-why">Contact</a></li>
-              </ul>
-            </div>
-            <div className="ol-footer-col">
-              <h4 className="ol-footer-head">RESOURCES</h4>
-              <ul>
-                <li><a href="#">Docs</a></li>
-                <li><a href="#">Security</a></li>
-                <li><a href="#">Trust center</a></li>
-                <li><a href="#">Status</a></li>
+
+            <div className="lp-rv" style={{ transitionDelay: ".1s" }}>
+              <span className="lp-tag">AI AGENTS</span>
+              <h2 className="lp-h2">Not suggestions.<br /><em>Actual deliverables.</em></h2>
+              <p className="lp-sec-sub">
+                The agents here produce things you can ship: VAPT reports written from
+                scan findings, Sigma detection rule stubs for every identified threat,
+                FAIR-based risk assessments, and step-by-step remediation playbooks.
+                Run an agent, get a document.
+              </p>
+              <ul className="lp-bullets">
+                <li>VAPT reports generated from findings — executive summary, per-finding remediation, conclusion</li>
+                <li>Sigma YAML rule stubs per threat, matched to the component's log source</li>
+                <li>Orchestrator agent chains threat intel, compliance, and remediation in one run</li>
+                <li>AI code review — function-level, 4-phase: triage → review → self-critique → cross-file taint</li>
+                <li>Export as PDF or DOCX — full report or remediation plan only</li>
               </ul>
             </div>
           </div>
-          <div className="ol-footer-bottom">
-            <span>© {new Date().getFullYear()} Owlet. All rights reserved.</span>
-            <div className="ol-footer-bottom-links"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Trust center</a></div>
+        </div>
+      </section>
+
+      {/* ── CHAPTER 3: Multi-tenant ── */}
+      <section className="lp-sec">
+        <div className="lp-wrap">
+          <div className="lp-chapter-grid">
+            <div className="lp-rv">
+              <span className="lp-tag">MULTI-TENANT</span>
+              <h2 className="lp-h2">One console.<br /><em>Every client.</em></h2>
+              <p className="lp-sec-sub">
+                Multi-tenancy isn't an add-on. The client selector is global — every
+                page, every agent, every report is scoped to the active account.
+                Teams managing multiple organisations don't need to switch tabs, tools,
+                or contexts.
+              </p>
+              <ul className="lp-bullets">
+                <li>Global client context — no per-page selectors or repeated lookups</li>
+                <li>Per-client findings, risks, compliance posture, VAPT history, and scorecard</li>
+                <li>Soft-delete with 30-day retention, full restore, and permanent delete cascade</li>
+                <li>Embeddable public scorecard per client — no auth required, embed anywhere</li>
+                <li>Connector health dashboard — green/yellow/red per client, per scanner</li>
+              </ul>
+            </div>
+
+            {/* client switcher visual */}
+            <div className="lp-rv" style={{ transitionDelay: ".1s" }}>
+              <div className="lp-clients-wrap">
+                <div className="lp-clients-head">
+                  <span className="lp-clients-head-label lp-mono">Active Account</span>
+                  <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace" }}>3 clients</span>
+                </div>
+                {[
+                  { name: "ACME Corporation", meta: "12 findings · last scan 2h ago", color: "#10b981", tagCls: "ct-ok", tag: "Healthy" },
+                  { name: "Northfield Group", meta: "3 critical · scan running", color: "#ef4444", tagCls: "ct-warn", tag: "Critical", active: true },
+                  { name: "Meridian Holdings", meta: "Importing Nessus CSV…", color: "#f59e0b", tagCls: "ct-scan", tag: "Scanning" },
+                ].map((c, i) => (
+                  <div key={i} className={`lp-client-row${c.active ? " active" : ""}`}>
+                    <span className="lp-client-dot" style={{ background: c.color }} />
+                    <div className="lp-client-info">
+                      <div className="lp-client-name">{c.name}</div>
+                      <div className="lp-client-meta lp-mono">{c.meta}</div>
+                    </div>
+                    <span className={`lp-client-tag ${c.tagCls}`}>{c.tag}</span>
+                  </div>
+                ))}
+                <div style={{ padding: "12px 18px", borderTop: "1px solid var(--line)", display: "flex", gap: 10 }}>
+                  {["Findings", "Risk", "Posture", "VAPT"].map(t => (
+                    <span key={t} style={{ fontSize: 11.5, padding: "4px 10px", borderRadius: 5, background: "var(--paper)", color: "var(--muted)", fontFamily: "IBM Plex Mono, monospace", cursor: "default" }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── CHAPTER 4: Compliance to evidence ── */}
+      <section className="lp-sec lp-sec-alt">
+        <div className="lp-wrap">
+          <div className="lp-chapter-grid flip">
+            {/* framework visual */}
+            <div className="lp-rv">
+              <div className="lp-fw-wrap">
+                <div className="lp-fw-head">
+                  <span className="lp-fw-head-label lp-mono">Compliance Monitor</span>
+                  <span className="lp-fw-sel lp-mono">NIST CSF 2.0</span>
+                </div>
+                {[
+                  { id: "ID.AM-1", name: "Asset inventory maintained", st: "fs-pass", label: "Pass" },
+                  { id: "ID.AM-2", name: "Software platform inventory", st: "fs-pass", label: "Pass" },
+                  { id: "PR.AC-1", name: "Identity and credential management", st: "fs-fail", label: "Gap" },
+                  { id: "PR.DS-1", name: "Data-at-rest protection", st: "fs-part", label: "Partial" },
+                  { id: "DE.CM-1", name: "Network monitoring active", st: "fs-pass", label: "Pass" },
+                  { id: "RS.RP-1", name: "Response plan in place", st: "fs-fail", label: "Gap" },
+                ].map((r, i) => (
+                  <div key={i} className="lp-fw-row" style={{ background: r.st === "fs-fail" ? "#fff8f8" : "transparent" }}>
+                    <span className="lp-fw-id lp-mono">{r.id}</span>
+                    <span className="lp-fw-name">{r.name}</span>
+                    <span className={`lp-fw-status ${r.st} lp-mono`}>{r.label}</span>
+                  </div>
+                ))}
+                <div className="lp-fw-foot">
+                  <span className="lp-fw-foot-note lp-mono">67% compliant · 2 gaps</span>
+                  <span className="lp-fw-dl">↓ Evidence ZIP</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="lp-rv" style={{ transitionDelay: ".1s" }}>
+              <span className="lp-tag">COMPLIANCE</span>
+              <h2 className="lp-h2">Control gap to<br /><em>audit package.</em></h2>
+              <p className="lp-sec-sub">
+                Map findings directly to framework controls. Build custom frameworks
+                from your own control library. When audit time comes, download a single
+                ZIP with findings, control assessments, remediation logs, and agent reports — ready to hand over.
+              </p>
+              <ul className="lp-bullets">
+                <li>NIST CSF 2.0, NIST AI RMF, ISO 27001, PCI DSS v4.0, GDPR, CIS v8 out of the box</li>
+                <li>Custom framework builder — pick controls from any existing framework or write your own</li>
+                <li>Compliance scoped to a specific scan — compare before and after a remediation sprint</li>
+                <li>One-click evidence ZIP: findings CSV, control gaps JSON, remediation log, agent reports</li>
+                <li>Framework advisor — AI recommends relevant frameworks based on your environment</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── INTEGRATIONS ── */}
+      <div className="lp-integ" id="lp-integ">
+        <div className="lp-wrap">
+          <div className="lp-integ-head lp-rv">
+            <p className="lp-mono">CONNECTS TO YOUR EXISTING STACK</p>
+          </div>
+          <div className="lp-integ-groups">
+            {[
+              { key: "scanners", items: ["Tenable.io", "Qualys VMDR", "Rapid7 InsightVM", "Burp Enterprise", "Snyk", "Invicti", "Acunetix"] },
+              { key: "built-in", items: ["OWASP ZAP", "Nmap", "OpenVAS", "Semgrep", "CodeQL", "SonarQube", "Trivy", "Gitleaks", "TruffleHog"] },
+              { key: "import", items: ["SARIF", "Nessus CSV", "Burp XML", "OpenVAS XML", "Qualys CSV", "Checkmarx", "Generic CSV / JSON"] },
+              { key: "cloud", items: ["Azure (Entra ID · Defender · Resource Graph)", "AWS (Security Hub · Inspector)", "GitHub Actions"] },
+              { key: "ai", items: ["Azure OpenAI", "OpenAI", "Google Gemini", "AWS Bedrock", "Anthropic Claude"] },
+            ].map((g, i) => (
+              <div key={i} className="lp-integ-row lp-rv" style={{ transitionDelay: `${i * 0.06}s` }}>
+                <span className="lp-integ-key lp-mono">{g.key}</span>
+                {g.items.map((it, j) => <span key={j} className="lp-pill">{it}</span>)}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── CAPABILITIES ── */}
+      <section className="lp-cap" id="lp-cap">
+        <div className="lp-wrap">
+          <div className="lp-rv">
+            <span className="lp-tag">WHAT'S IN THE PLATFORM</span>
+            <h2 className="lp-h2" style={{ marginTop: 8 }}>Everything, enumerated.</h2>
+            <p style={{ marginTop: 12, fontSize: 15, color: "var(--muted)" }}>No feature hidden behind a tier. Here's the full list.</p>
+          </div>
+          <div className="lp-cap-grid">
+            {CAPABILITIES.map((g, i) => (
+              <div key={i} className="lp-cap-group lp-rv" style={{ transitionDelay: `${i * 0.06}s` }}>
+                <div className="lp-cap-group-tag lp-mono">{g.tag}</div>
+                {g.items.map((it, j) => (
+                  <div key={j} className="lp-cap-item">{it}</div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section className="lp-cta">
+        <div className="lp-wrap lp-rv">
+          <h2>Ready to look inside?</h2>
+          <p>Sign in with your organisation account and explore the platform.</p>
+          <div className="lp-cta-actions">
+            <button className="lp-btn lp-btn-amber lp-btn-lg" onClick={signIn}>Sign in</button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="lp-footer">
+        <div className="lp-wrap lp-footer-inner">
+          <span className="lp-footer-note">© {new Date().getFullYear()} Owlet. All rights reserved.</span>
+          <span className="lp-footer-sign" onClick={signIn}>Sign in →</span>
         </div>
       </footer>
+
     </div>
   );
 }
