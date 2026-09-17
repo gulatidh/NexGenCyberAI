@@ -201,20 +201,32 @@ def _upsert_imported_assets(
     for pf in findings:
         if pf.resource_type in _SKIP_RESOURCE_TYPES:
             continue
-        rid = (pf.resource_id or "").strip()
-        if rid.lower() in _SKIP_RESOURCE_IDS or len(rid) < 3:
-            continue
 
-        ext_id, display = _extract_asset_identity(rid, pf.resource_type)
-        if not ext_id or len(ext_id) < 3:
-            continue
+        # Primary resource_id of the finding
+        candidates = [(pf.resource_id or "").strip()]
 
-        if ext_id not in seen:
-            seen[ext_id] = {
-                "name": display,
-                "asset_class": _RESOURCE_TO_CLASS.get(pf.resource_type, "other"),
-                "asset_type": pf.resource_type,
-            }
+        # For Nessus CSV: affected_hosts holds all hosts collapsed into one
+        # deduplicated finding — expand them so every host becomes an asset.
+        # Prefer DNS name; fall back to IP (mirrors parser's resource_id logic).
+        for h in pf.raw.get("affected_hosts", []):
+            dns = (h.get("dns") or "").strip()
+            ip = (h.get("ip") or "").strip()
+            host_id = dns or ip
+            if host_id and host_id.lower() not in _SKIP_RESOURCE_IDS:
+                candidates.append(host_id)
+
+        for rid in candidates:
+            if not rid or rid.lower() in _SKIP_RESOURCE_IDS or len(rid) < 3:
+                continue
+            ext_id, display = _extract_asset_identity(rid, pf.resource_type)
+            if not ext_id or len(ext_id) < 3:
+                continue
+            if ext_id not in seen:
+                seen[ext_id] = {
+                    "name": display,
+                    "asset_class": _RESOURCE_TO_CLASS.get(pf.resource_type, "other"),
+                    "asset_type": pf.resource_type,
+                }
 
     if not seen:
         return {"created": 0, "updated": 0}
