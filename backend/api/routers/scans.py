@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 import json
-from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType
+from api.models.models import Scan, ScanStatus, Finding, Connector, FrameworkAssessment, AgentRun, AgentType, ScanDelta
 from api.schemas.schemas import ScanCreate, ScanResponse, FindingResponse, FindingUpdate
 from db.database import get_db
 from core.security import get_current_user
@@ -715,6 +715,12 @@ async def delete_scan(
             db.query(RawModel).filter(RawModel.import_id == ai.id).delete(synchronize_session=False)
         db.delete(ai)
         db.flush()
+
+    # Delete scan_deltas referencing this scan (both sides of the diff pair)
+    from sqlalchemy import or_
+    db.query(ScanDelta).filter(
+        or_(ScanDelta.scan_a_id == scan_id, ScanDelta.scan_b_id == scan_id)
+    ).delete(synchronize_session=False)
 
     # Delete scan — ORM cascade handles findings via relationship
     db.delete(scan)

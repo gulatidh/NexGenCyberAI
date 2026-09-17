@@ -1158,8 +1158,9 @@ def delete_import(
     from api.models.models import (
         AgentRun, Comment, ControlDeficiency, Finding as F,
         FrameworkAssessment, RemediationAction, RemediationJob,
-        ScanBlackboardEntry, ThreatEntry,
+        ScanBlackboardEntry, ScanDelta, ThreatEntry,
     )
+    from sqlalchemy import or_
 
     ai = db.query(AssessmentImport).filter(
         AssessmentImport.id == import_id,
@@ -1239,6 +1240,9 @@ def delete_import(
                 db.query(Scan).filter(Scan.parent_scan_id == scan_id).update(
                     {"parent_scan_id": None}, synchronize_session=False
                 )
+                db.query(ScanDelta).filter(
+                    or_(ScanDelta.scan_a_id == scan_id, ScanDelta.scan_b_id == scan_id)
+                ).delete(synchronize_session=False)
                 db.delete(scan)  # ORM cascade handles findings
 
         db.commit()
