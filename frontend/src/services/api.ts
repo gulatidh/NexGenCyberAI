@@ -230,6 +230,8 @@ export const scansApi = {
   },
   importHistory: (clientId: string) =>
     apiClient.get(`/clients/${clientId}/scans/import/history`).then((r) => r.data),
+  deleteImport: (clientId: string, importId: number) =>
+    apiClient.delete(`/clients/${clientId}/scans/import/history/${importId}`).then((r) => r.data),
   getScanImport: (clientId: string, scanId: string) =>
     apiClient.get(`/clients/${clientId}/scans/import/imports`, { params: { scan_id: scanId } })
       .then((r) => (r.data as any[])[0] ?? null),

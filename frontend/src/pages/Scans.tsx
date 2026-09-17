@@ -174,6 +174,7 @@ interface ImportHistoryRow {
   import_ref?: string;
   scanner_type?: string;
   detected_format?: string;
+  source_filename?: string;
   raw_finding_count?: number;
   normalized_finding_count?: number;
   created_at?: string;
@@ -203,11 +204,25 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
   const [successSnack, setSuccessSnack] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const ROWS_PER_PAGE = 10;
+  const [pendingDeleteImport, setPendingDeleteImport] = useState<ImportHistoryRow | null>(null);
 
   const { data: historyData = [] } = useQuery<ImportHistoryRow[]>({
     queryKey: ["import-history", clientId],
     queryFn: () => scansApi.importHistory(clientId),
     enabled: !!clientId,
+  });
+
+  const deleteImportMutation = useMutation({
+    mutationFn: (row: ImportHistoryRow) =>
+      scansApi.deleteImport(clientId, Number(row.id)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["import-history", clientId] });
+      qc.invalidateQueries({ queryKey: ["scans", clientId] });
+      qc.invalidateQueries({ queryKey: ["assets", clientId] });
+      qc.invalidateQueries({ queryKey: ["findings", clientId] });
+      setPendingDeleteImport(null);
+      setSuccessSnack("Import deleted — findings and assets removed.");
+    },
   });
 
   const clearAll = () => {
@@ -630,6 +645,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
                   <TableCell sx={{ minWidth: 90 }}>Raw / Norm</TableCell>
                   <TableCell>Imported by</TableCell>
                   <TableCell>Date</TableCell>
+                  <TableCell sx={{ width: 40 }} />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -662,6 +678,14 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
                         {row.created_at ? new Date(row.created_at).toLocaleDateString() : "—"}
                       </Typography>
                     </TableCell>
+                    <TableCell sx={{ py: 0 }}>
+                      <Tooltip title="Delete import (removes findings and assets)">
+                        <IconButton size="small" onClick={() => setPendingDeleteImport(row)}
+                          sx={{ color: "error.main", opacity: 0.7, "&:hover": { opacity: 1 } }}>
+                          <DeleteOutlined sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -669,6 +693,33 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
           </Box>
         </Box>
       )}
+
+      {/* ── Confirm delete import dialog ── */}
+      <Dialog open={!!pendingDeleteImport} onClose={() => setPendingDeleteImport(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: "error.main" }}>Delete import?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            This will permanently delete:
+          </Typography>
+          <Box component="ul" sx={{ pl: 2.5, m: 0, "& li": { fontSize: 13, mb: 0.5 } }}>
+            <li>All raw scanner rows from <strong>{pendingDeleteImport?.source_filename ?? pendingDeleteImport?.import_name}</strong></li>
+            <li>All normalized findings imported in this session</li>
+            <li>All assets discovered by this import</li>
+            <li>The scan record and any agent runs against it</li>
+          </Box>
+          <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mt: 1.5 }}>
+            This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button variant="outlined" size="small" onClick={() => setPendingDeleteImport(null)}>Cancel</Button>
+          <Button variant="contained" color="error" size="small"
+            disabled={deleteImportMutation.isPending}
+            onClick={() => pendingDeleteImport && deleteImportMutation.mutate(pendingDeleteImport)}>
+            {deleteImportMutation.isPending ? "Deleting…" : "Delete everything"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar open={!!successSnack} autoHideDuration={4000} onClose={() => setSuccessSnack(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>

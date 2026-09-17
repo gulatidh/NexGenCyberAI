@@ -2,11 +2,12 @@
 Scan Import router — upload offline scan result files.
 
 Endpoints:
-  POST /clients/{client_id}/scans/import/parse        — parse & preview (no DB write)
-  POST /clients/{client_id}/scans/import/commit       — save to DB + raw tables
-  GET  /clients/{client_id}/scans/import/history      — list import sessions
-  GET  /clients/{client_id}/scans/import/imports      — same, cleaner path
-  GET  /clients/{client_id}/scans/import/raw/{scanner_type} — raw rows for a scanner
+  POST   /clients/{client_id}/scans/import/parse           — parse & preview (no DB write)
+  POST   /clients/{client_id}/scans/import/commit          — save to DB + raw tables
+  GET    /clients/{client_id}/scans/import/history         — list import sessions
+  GET    /clients/{client_id}/scans/import/imports         — same, cleaner path
+  GET    /clients/{client_id}/scans/import/raw/{scanner_type} — raw rows for a scanner
+  DELETE /clients/{client_id}/scans/import/history/{import_id} — full delete (raw + findings + assets)
 """
 from __future__ import annotations
 
@@ -1120,3 +1121,94 @@ def get_raw_findings(
         d = {c.name: getattr(r, c.name) for c in r.__table__.columns}
         result.append(d)
     return result
+
+
+@router.delete("/history/{import_id}", status_code=200, dependencies=[Depends(require_editor_anywhere)])
+def delete_import(
+    client_id: str,
+    import_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Full delete of an import session: raw rows, normalized findings, assets discovered
+    by this import, and the scan record itself.  Mirrors the cascade in delete_scan."""
+    ai = db.query(AssessmentImport).filter(
+        AssessmentImport.id == import_id,
+        AssessmentImport.client_id == client_id,
+    ).first()
+    if not ai:
+        raise HTTPException(status_code=404, detail="Import not found")
+
+    scan_id = ai.scan_id
+
+    # ── Delete assets sourced from this import ──────────────────────────────
+    if scan_id:
+        db.query(Asset).filter(
+            Asset.client_id == client_id,
+            func.json_extract(Asset.provider_metadata, "$.scan_id") == scan_id,
+        ).delete(synchronize_session=False)
+
+    # ── Delete raw scanner rows ─────────────────────────────────────────────
+    for RawModel in [
+        RawTenableFinding, RawNessusFinding, RawBurpFinding, RawQualysFinding,
+        RawOpenVASFinding, RawSarifFinding, RawGenericFinding,
+        RawNmapFinding, RawTrivyFinding, RawZapFinding, RawSecretFinding,
+    ]:
+        db.query(RawModel).filter(RawModel.import_id == ai.id).delete(synchronize_session=False)
+
+    # ── Delete AssessmentImport row ─────────────────────────────────────────
+    db.delete(ai)
+    db.flush()
+
+    # ── Full scan cascade (findings, comments, agent runs, register nulling) ─
+    if scan_id:
+        from api.models.models import (
+            AgentRun, Comment, ControlDeficiency, Finding as F,
+            FrameworkAssessment, RemediationAction, RemediationJob,
+            ScanBlackboardEntry, ThreatEntry,
+        )
+        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.client_id == client_id).first()
+        if scan:
+            finding_ids = [r.id for r in db.query(F.id).filter(F.scan_id == scan_id).all()]
+            agent_run_ids = [r.id for r in db.query(AgentRun.id).filter(AgentRun.scan_id == scan_id).all()]
+
+            if finding_ids:
+                db.query(Comment).filter(
+                    Comment.entity_type == "finding",
+                    Comment.entity_id.in_(finding_ids),
+                ).delete(synchronize_session=False)
+
+            if agent_run_ids:
+                for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
+                    db.query(reg).filter(reg.agent_run_id.in_(agent_run_ids)).update(
+                        {"agent_run_id": None}, synchronize_session=False
+                    )
+                db.query(ScanBlackboardEntry).filter(
+                    ScanBlackboardEntry.agent_run_id.in_(agent_run_ids)
+                ).update({"agent_run_id": None}, synchronize_session=False)
+
+            db.query(ScanBlackboardEntry).filter(
+                ScanBlackboardEntry.scan_id == scan_id
+            ).delete(synchronize_session=False)
+            db.query(AgentRun).filter(AgentRun.scan_id == scan_id).delete(synchronize_session=False)
+
+            db.query(FrameworkAssessment).filter(
+                FrameworkAssessment.scan_id == scan_id
+            ).update({"scan_id": None}, synchronize_session=False)
+            for reg in (ThreatEntry, ControlDeficiency, RemediationAction):
+                db.query(reg).filter(reg.scan_id == scan_id).update(
+                    {"scan_id": None}, synchronize_session=False
+                )
+            db.query(RemediationJob).filter(RemediationJob.scan_id == scan_id).update(
+                {"scan_id": None}, synchronize_session=False
+            )
+            db.query(RemediationJob).filter(RemediationJob.verification_scan_id == scan_id).update(
+                {"verification_scan_id": None}, synchronize_session=False
+            )
+            db.query(Scan).filter(Scan.parent_scan_id == scan_id).update(
+                {"parent_scan_id": None}, synchronize_session=False
+            )
+            db.delete(scan)  # ORM cascade handles findings
+
+    db.commit()
+    return {"deleted": True, "import_id": import_id, "scan_id": scan_id}
