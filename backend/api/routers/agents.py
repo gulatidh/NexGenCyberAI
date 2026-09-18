@@ -10,7 +10,7 @@ from api.models.models import (
     AgentRun, AgentFeedback, AgentType, Scan, Finding, Risk, RiskLevel,
     ThreatEntry, ControlDeficiency, RemediationAction,
     CustomFramework, CustomFrameworkControl,
-    FrameworkAssessment, FrameworkType,
+    FrameworkAssessment, FrameworkType, RiskProposal,
 )
 from api.schemas.schemas import AgentRunRequest, AgentRunResponse
 from db.database import get_db
@@ -225,30 +225,34 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
     """Route each agent type's output to the correct dedicated register.
 
     Source → Register mapping:
-      risk_manager   → Risk table
-      orchestrator   → Risk table + ThreatEntry + ControlDeficiency + RemediationAction
+      risk_manager   → RiskProposal table (source=ai, status=pending)
+      orchestrator   → RiskProposal table + ThreatEntry + ControlDeficiency + RemediationAction
       threat_intel   → ThreatEntry table
       compliance_monitor → ControlDeficiency table + FrameworkAssessment (heatmap)
       remediation    → RemediationAction table
       va_scanner / framework_analyst → no register (output_data only)
     """
     if agent_val == "orchestrator":
-        # Risk rows from raw scan findings
+        # Route findings-derived risks through the staging gate (not directly to register)
         if raw_findings:
             from agents.risk.risk_agent import map_to_risk_register_structured
             structured = map_to_risk_register_structured(raw_findings)
             for r in structured:
-                db.add(Risk(
+                notes = (
+                    f"AI pre-assessment — risk_level: {r['risk_level']}, "
+                    f"likelihood: {r['likelihood']}/5, impact: {r['impact']}/5, "
+                    f"score: {r['risk_score']}. Treatment: {r.get('treatment', '')}"
+                )
+                db.add(RiskProposal(
                     client_id=client_id,
                     title=r["title"],
                     description=r.get("description") or None,
-                    risk_level=RiskLevel(r["risk_level"]),
-                    likelihood=r["likelihood"],
-                    impact=r["impact"],
-                    risk_score=r["risk_score"],
                     category=r.get("category"),
-                    status="open",
-                    finding_ids=[],
+                    risk_type="Security",
+                    source="ai",
+                    source_agent_run_id=run_id,
+                    status="pending",
+                    notes=notes,
                 ))
             result["risks_created"] = len(structured)
         # Sub-agent register rows
@@ -260,17 +264,21 @@ def _persist_to_registers(db, agent_val: str, client_id: str, run_id: str, scan_
         from agents.risk.risk_agent import map_to_risk_register_structured
         structured = map_to_risk_register_structured(raw_findings)
         for r in structured:
-            db.add(Risk(
+            notes = (
+                f"AI pre-assessment — risk_level: {r['risk_level']}, "
+                f"likelihood: {r['likelihood']}/5, impact: {r['impact']}/5, "
+                f"score: {r['risk_score']}. Treatment: {r.get('treatment', '')}"
+            )
+            db.add(RiskProposal(
                 client_id=client_id,
                 title=r["title"],
                 description=r.get("description") or None,
-                risk_level=RiskLevel(r["risk_level"]),
-                likelihood=r["likelihood"],
-                impact=r["impact"],
-                risk_score=r["risk_score"],
                 category=r.get("category"),
-                status="open",
-                finding_ids=[],
+                risk_type="Security",
+                source="ai",
+                source_agent_run_id=run_id,
+                status="pending",
+                notes=notes,
             ))
         result["risks_created"] = len(structured)
 
