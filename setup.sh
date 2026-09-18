@@ -189,10 +189,18 @@ else
 
     # GitHub (for scanners that still use GitHub Actions)
     echo ""
-    info "GitHub (for scanners that still use GitHub Actions)"
-    prompt "GitHub token (ghp_...):" GITHUB_TOKEN
-    prompt "GitHub owner/org (e.g. gulatidh):" GITHUB_OWNER
-    prompt "GitHub repo name (e.g. NexGenCyberAI):" GITHUB_REPO
+    info "GitHub (for scanners that use GitHub Actions — ZAP, CodeQL, Semgrep, Nmap, etc.)"
+    info "Token needs: Actions=Read/Write, Contents=Read"
+    prompt "GitHub PAT (github_pat_... or ghp_...):" GITHUB_DISPATCH_TOKEN
+    prompt "GitHub owner/org (e.g. gulatidh):" GITHUB_REPO_OWNER
+    prompt "GitHub repo name (e.g. NexGenCyberAI):" GITHUB_REPO_NAME
+
+    # Public API base — needed so GitHub Actions runners can POST results back
+    echo ""
+    info "Public API base URL — GitHub Actions runners (cloud) must reach this to post scan results."
+    info "For the hosted Owlet portal: https://owlet-api.azurewebsites.net"
+    info "For local-only setup (Kali/WSL): leave blank — only local-runner scanners will work."
+    prompt "Public API base URL (press Enter to skip for local-only):" PUBLIC_API_BASE
 
     cat > "$ENV_FILE" <<EOF
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -216,9 +224,15 @@ AWS_ACCESS_KEY_ID=${AWS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET}
 
 # ── GitHub Actions (for cloud-based scanners) ─────────────────────────────────
-GITHUB_TOKEN=${GITHUB_TOKEN}
-GITHUB_OWNER=${GITHUB_OWNER}
-GITHUB_REPO=${GITHUB_REPO}
+# Token needs Actions=Read/Write + Contents=Read permissions
+GITHUB_DISPATCH_TOKEN=${GITHUB_DISPATCH_TOKEN}
+GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+
+# ── Public API base (GitHub Actions runners must reach this URL) ───────────────
+# Leave blank for local-only setup — GitHub Actions scanners won't work without it.
+# Set to https://owlet-api.azurewebsites.net when using the cloud portal.
+PUBLIC_API_BASE=${PUBLIC_API_BASE}
 
 # ── Admin bootstrap ───────────────────────────────────────────────────────────
 # Users listed here bypass the UserAccess grant check and always have full access.

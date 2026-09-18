@@ -740,6 +740,32 @@ export default function ScanDetail() {
         </Box>
       )}
 
+      {/* Failed-scan error banner */}
+      {data.status === "failed" && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={
+            data.error_message?.includes("dispatch not configured") || data.error_message?.includes("GitHub") ? (
+              <Button color="inherit" size="small" href="/platform/settings?tab=13" target="_blank">
+                Fix in Settings
+              </Button>
+            ) : undefined
+          }
+        >
+          <strong>Scan failed</strong>
+          {data.error_message ? `: ${data.error_message}` : ""}
+          {(data.error_message?.includes("dispatch not configured") || data.error_message?.includes("GitHub dispatch")) && (
+            <Box sx={{ mt: 0.5, fontSize: 12 }}>
+              GitHub Actions scanners (CodeQL, ZAP, Semgrep, Nmap) require <code>GITHUB_DISPATCH_TOKEN</code>,{" "}
+              <code>GITHUB_REPO_OWNER</code>, <code>GITHUB_REPO_NAME</code>, and <code>PUBLIC_API_BASE</code> in{" "}
+              <code>backend/.env</code>. Go to Settings → Software Update → check the env vars, or re-run{" "}
+              <code>bash setup.sh</code>.
+            </Box>
+          )}
+        </Alert>
+      )}
+
       {/* AI Verdict tab */}
       {(tab === "verdict" || printing) && (
         verdict ? (
