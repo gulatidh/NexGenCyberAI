@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     # this on once the runtime has headroom / runs work off the web worker.
     PROACTIVE_BUDDIES_ENABLED: bool = False
 
+    # Local / airgap runner — when True all workflow-based scanners run locally
+    # via subprocess instead of dispatching to GitHub Actions.
+    AIRGAP_MODE: bool = False
+
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: str = ""
     AZURE_OPENAI_ENDPOINT: str = ""
