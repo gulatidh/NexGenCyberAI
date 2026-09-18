@@ -87,8 +87,8 @@ const SCANNERS: ScannerDef[] = [
     description: "Template-based vulnerability scanner with 9,000+ PoC templates covering CVEs, default credentials, misconfigurations, and exposed panels. Every finding is confirmed. Runs in GitHub Actions." },
   { id: "sslyze", name: "SSLyze", connectorType: "sslyze", category: "network", status: "live",
     description: "TLS/SSL configuration auditor — detects deprecated protocols (SSL 2/3, TLS 1.0/1.1), weak ciphers, expired certs, Heartbleed, and ROBOT. Runs in GitHub Actions." },
-  { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "soon",
-    description: "Open-source network vulnerability scanner. Workflow coming soon." },
+  { id: "openvas", name: "OpenVAS / Greenbone", connectorType: "openvas", category: "network", status: "live",
+    description: "Open-source network vulnerability scanner. Runs locally on Kali — requires gvm-setup + gvm-start. Set to Local mode in Platform → Local Runner." },
   { id: "trivy", name: "Trivy", connectorType: "trivy", category: "network", status: "live",
     description: "Container image + filesystem + IaC scanner. Runs in GitHub Actions." },
   // Dependency / Secret
