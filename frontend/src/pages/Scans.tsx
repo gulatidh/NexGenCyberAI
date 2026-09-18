@@ -1265,22 +1265,41 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
           </AccordionSummary>
           <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2 }}>
             <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
-              Click "New Assessment" to launch any of these scanners. Platform scanners run via GitHub Actions.
+              Click a scanner chip to launch it, or use "New Assessment" above. Badges show saved connectors.
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {platformScanners.map((s) => (
-                <Chip
-                  key={s.id}
-                  label={s.name}
-                  size="small"
-                  sx={{
-                    bgcolor: s.status === "live" ? "rgba(52,168,83,0.12)" : "rgba(255,255,255,0.04)",
-                    color: s.status === "live" ? "#34A853" : "text.secondary",
-                    border: s.status === "live" ? "1px solid rgba(52,168,83,0.3)" : "1px solid transparent",
-                    fontWeight: 600,
-                  }}
-                />
-              ))}
+              {platformScanners.map((s) => {
+                const isLive = s.status === "live";
+                const savedCount = connectors.filter((c) => c.connector_type === s.connectorType).length;
+                return (
+                  <Badge
+                    key={s.id}
+                    badgeContent={savedCount || null}
+                    sx={{ "& .MuiBadge-badge": { bgcolor: "#4285F4", color: "#fff", fontSize: 9, fontWeight: 700, minWidth: 16, height: 16 } }}
+                  >
+                    <Chip
+                      label={s.name}
+                      size="small"
+                      onClick={() => {
+                        if (!isLive || !canAct || !selectedClientId) return;
+                        setCategory(s.category as ScanCategory);
+                        setScannerId(s.id);
+                        const match = connectors.find((c) => c.connector_type === s.connectorType);
+                        if (match) setConnectorId(match.id);
+                        setOpen(true);
+                      }}
+                      sx={{
+                        bgcolor: isLive ? "rgba(52,168,83,0.12)" : "rgba(255,255,255,0.04)",
+                        color: isLive ? "#34A853" : "text.secondary",
+                        border: isLive ? "1px solid rgba(52,168,83,0.3)" : "1px solid transparent",
+                        fontWeight: 600,
+                        cursor: isLive && canAct && selectedClientId ? "pointer" : "default",
+                        "&:hover": isLive && canAct && selectedClientId ? { bgcolor: "rgba(52,168,83,0.22)" } : {},
+                      }}
+                    />
+                  </Badge>
+                );
+              })}
             </Box>
             {/* Inbuilt assessments — full tiles */}
             {(() => {
