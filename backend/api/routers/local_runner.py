@@ -120,6 +120,63 @@ TOOLS: dict[str, dict] = {
         "workflow": None,
         "post_install": "gvm-setup",
     },
+    "checkov": {
+        "label": "Checkov",
+        "desc": "IaC security scanner (Terraform, CloudFormation, K8s)",
+        "check_cmd": ["checkov", "--version"],
+        "version_parse": lambda o: o.strip(),
+        "apt_pkg": None,
+        "binary_url": None,
+        "binary_name": None,
+        "pip_pkg": "checkov",
+        "workflow": "checkov-scan.yml",
+    },
+    "sslyze": {
+        "label": "SSLyze",
+        "desc": "TLS/SSL configuration analyser",
+        "check_cmd": ["sslyze", "--version"],
+        "version_parse": lambda o: o.strip(),
+        "apt_pkg": None,
+        "binary_url": None,
+        "binary_name": None,
+        "pip_pkg": "sslyze",
+        "workflow": "sslyze-scan.yml",
+    },
+    "zap": {
+        "label": "OWASP ZAP",
+        "desc": "Web application security scanner (local daemon mode)",
+        "check_cmd": ["zap.sh", "-version"],
+        "version_parse": lambda o: o.strip(),
+        "apt_pkg": "zaproxy",
+        "binary_url": None,
+        "binary_name": None,
+        "pip_pkg": None,
+        "workflow": "zap-scan.yml",
+    },
+    "codeql": {
+        "label": "CodeQL CLI",
+        "desc": "GitHub's semantic code analysis engine",
+        "check_cmd": ["codeql", "version", "--format=json"],
+        "version_parse": lambda o: (json.loads(o) if o.strip().startswith("{") else {}).get("version") or o.strip(),
+        "apt_pkg": None,
+        "binary_url": f"https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.19.0/codeql-bundle-linux64.tar.gz",
+        "binary_name": "codeql/codeql",
+        "binary_archive": "tar",
+        "pip_pkg": None,
+        "workflow": "codeql-scan.yml",
+    },
+    "owasp_dc": {
+        "label": "OWASP Dependency-Check",
+        "desc": "Dependency vulnerability scanner (Java-based)",
+        "check_cmd": ["dependency-check.sh", "--version"],
+        "version_parse": lambda o: o.strip(),
+        "apt_pkg": None,
+        "binary_url": "https://github.com/jeremylong/DependencyCheck/releases/download/v10.0.4/dependency-check-10.0.4-release.zip",
+        "binary_name": "dependency-check/bin/dependency-check.sh",
+        "binary_archive": "zip",
+        "pip_pkg": None,
+        "workflow": "owasp-dc-scan.yml",
+    },
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -560,6 +617,34 @@ class _GHConfigBody(BaseModel):
     repo_owner:     Optional[str] = None
     repo_name:      Optional[str] = None
     public_api_base: Optional[str] = None
+
+
+@router.get("/airgap-config")
+def get_airgap_config(_=Depends(get_current_user)):
+    return {"airgap_mode": os.environ.get("AIRGAP_MODE", "").lower() in ("1", "true", "yes")}
+
+
+@router.post("/airgap-config")
+def set_airgap_config(body: dict, _=Depends(get_current_user)):
+    val = "true" if body.get("airgap_mode") else "false"
+    os.environ["AIRGAP_MODE"] = val
+    env_file = Path(__file__).parent.parent.parent / ".env"
+    if env_file.exists():
+        lines = env_file.read_text(errors="replace").splitlines(keepends=True)
+        new_lines, found = [], False
+        for line in lines:
+            if line.startswith("AIRGAP_MODE=") or line.startswith("AIRGAP_MODE ="):
+                new_lines.append(f"AIRGAP_MODE={val}\n")
+                found = True
+            else:
+                new_lines.append(line)
+        if not found:
+            new_lines.append(f"AIRGAP_MODE={val}\n")
+        env_file.write_text("".join(new_lines))
+    else:
+        with env_file.open("a") as f:
+            f.write(f"AIRGAP_MODE={val}\n")
+    return {"ok": True, "airgap_mode": val == "true"}
 
 
 @router.get("/github-config")

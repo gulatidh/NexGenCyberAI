@@ -47,6 +47,16 @@ async def run_local_scan(scan_id: str, tool: str, config: dict) -> None:
                 findings = await _semgrep(config.get("repo_url") or config.get("target", ""))
             elif tool == "openvas":
                 findings = await _openvas(config.get("target", ""), config)
+            elif tool == "checkov":
+                findings = await _checkov(config.get("repo_url") or config.get("target", ""))
+            elif tool == "sslyze":
+                findings = await _sslyze(config.get("target", ""))
+            elif tool == "codeql":
+                findings = await _codeql(config.get("repo_url") or config.get("target", ""))
+            elif tool == "owasp_dc":
+                findings = await _owasp_dc(config.get("repo_url") or config.get("target", ""))
+            elif tool == "zap":
+                findings = await _zap(config.get("target", ""), config)
             else:
                 findings = []
 
@@ -464,5 +474,370 @@ def _parse_openvas_report(xml: str, target: str) -> List[dict]:
             "evidence": {"host": host, "port": port, "threat": threat},
             "cve_id": cve_id,
             "cvss_score": float(cvss) if cvss else 0,
+        })
+    return findings
+
+
+# ── Checkov ───────────────────────────────────────────────────────────────────
+
+async def _checkov(target: str) -> List[dict]:
+    if not target:
+        return []
+    proc = await asyncio.create_subprocess_exec(
+        "checkov", "-d", target, "--output", "json", "--quiet",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=_env(),
+    )
+    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=300)
+    SEV_MAP = {"HIGH": "high", "MEDIUM": "medium", "LOW": "low"}
+    findings = []
+    try:
+        raw = json.loads(stdout.decode(errors="replace") or "[]")
+    except Exception:
+        return []
+    results_list = raw if isinstance(raw, list) else [raw]
+    for block in results_list:
+        for check in (block.get("results", {}).get("failed_checks") or []):
+            chk = check.get("check") or {}
+            sev_label = (chk.get("severity") or "LOW").upper()
+            file_path = check.get("file_path") or ""
+            line = (check.get("file_line_range") or [0])[0]
+            findings.append({
+                "title": chk.get("name") or check.get("check_id") or "Checkov finding",
+                "description": f"Checkov rule {check.get('check_id', '')} failed on {file_path}",
+                "severity": SEV_MAP.get(sev_label, "info"),
+                "resource_id": f"{file_path}:{line}",
+                "resource_type": "code_file",
+                "control_id": check.get("check_id") or "",
+                "framework": "nist_csf",
+                "remediation": "Refer to Checkov documentation for this rule.",
+                "evidence": {"resource": check.get("resource", ""), "file": file_path, "line": line},
+                "cve_id": "",
+                "cvss_score": 0,
+            })
+    return findings
+
+
+# ── SSLyze ────────────────────────────────────────────────────────────────────
+
+async def _sslyze(target: str) -> List[dict]:
+    if not target:
+        return []
+    proc = await asyncio.create_subprocess_exec(
+        "sslyze", "--json_out=-", target,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=_env(),
+    )
+    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+    try:
+        data = json.loads(stdout.decode(errors="replace"))
+    except Exception:
+        return []
+    findings = []
+    results = (data.get("server_scan_results") or [])
+    if not results:
+        return []
+    scan_result = results[0].get("scan_result") or {}
+
+    def _ciphers(key: str) -> list:
+        return (scan_result.get(key) or {}).get("result", {}).get("accepted_cipher_suites") or []
+
+    checks = [
+        ("ssl_2_0_cipher_suites", "critical", "SSLv2 Enabled", "Disable SSLv2 immediately — it is cryptographically broken."),
+        ("ssl_3_0_cipher_suites", "critical", "SSLv3 Enabled", "Disable SSLv3 — vulnerable to POODLE attack."),
+        ("tls_1_0_cipher_suites", "high", "TLS 1.0 Enabled", "Disable TLS 1.0 — deprecated, vulnerable to BEAST/POODLE."),
+        ("tls_1_1_cipher_suites", "high", "TLS 1.1 Enabled", "Disable TLS 1.1 — deprecated by RFC 8996."),
+    ]
+    for key, sev, title, remediation in checks:
+        if _ciphers(key):
+            findings.append({
+                "title": title,
+                "description": f"{title} detected on {target}.",
+                "severity": sev,
+                "resource_id": target,
+                "resource_type": "tls/ssl",
+                "control_id": "SC-8",
+                "framework": "nist_csf",
+                "remediation": remediation,
+                "evidence": {"target": target, "check": key},
+                "cve_id": "",
+                "cvss_score": 0,
+            })
+
+    heartbleed = (scan_result.get("heartbleed") or {}).get("result", {})
+    if heartbleed.get("is_vulnerable_to_heartbleed"):
+        findings.append({
+            "title": "Heartbleed Vulnerability (CVE-2014-0160)",
+            "severity": "critical",
+            "description": f"Server at {target} is vulnerable to Heartbleed.",
+            "resource_id": target, "resource_type": "tls/ssl", "control_id": "SC-8",
+            "framework": "nist_csf",
+            "remediation": "Upgrade OpenSSL to 1.0.1g or later. Reissue all TLS certificates.",
+            "evidence": {"target": target}, "cve_id": "CVE-2014-0160", "cvss_score": 7.5,
+        })
+
+    robot = (scan_result.get("robot") or {}).get("result", {}).get("robot_result") or ""
+    if robot in ("VULNERABLE_WEAK_ORACLE", "VULNERABLE_STRONG_ORACLE"):
+        findings.append({
+            "title": "ROBOT Attack Vulnerability",
+            "severity": "high",
+            "description": f"Server at {target} is vulnerable to ROBOT (Return Of Bleichenbacher's Oracle Threat).",
+            "resource_id": target, "resource_type": "tls/ssl", "control_id": "SC-8",
+            "framework": "nist_csf",
+            "remediation": "Disable RSA key exchange cipher suites. Use ECDHE for forward secrecy.",
+            "evidence": {"target": target, "robot_result": robot}, "cve_id": "", "cvss_score": 0,
+        })
+
+    return findings
+
+
+# ── CodeQL ────────────────────────────────────────────────────────────────────
+
+async def _codeql(repo_url: str, language: str = "") -> List[dict]:
+    if not repo_url:
+        return []
+    codeql_bin = (
+        shutil.which("codeql", path=_env()["PATH"])
+        or str(Path.home() / ".owlet" / "bin" / "codeql" / "codeql")
+    )
+    if not Path(codeql_bin).exists():
+        raise RuntimeError("CodeQL CLI not found — install from https://github.com/github/codeql-action/releases")
+
+    with tempfile.TemporaryDirectory() as base:
+        src = os.path.join(base, "src")
+        db = os.path.join(base, "db")
+        sarif = os.path.join(base, "results.sarif")
+
+        clone = await asyncio.create_subprocess_exec(
+            "git", "clone", "--depth=1", repo_url, src,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(clone.communicate(), timeout=300)
+
+        if not language:
+            src_path = Path(src)
+            if list(src_path.rglob("*.py")):
+                language = "python"
+            elif list(src_path.rglob("*.js")) or list(src_path.rglob("*.ts")):
+                language = "javascript"
+            elif list(src_path.rglob("*.java")):
+                language = "java"
+            elif list(src_path.rglob("*.cs")):
+                language = "csharp"
+            elif list(src_path.rglob("*.go")):
+                language = "go"
+            elif list(src_path.rglob("*.rb")):
+                language = "ruby"
+            elif list(src_path.rglob("*.cpp")) or list(src_path.rglob("*.c")):
+                language = "cpp"
+            else:
+                language = "python"
+
+        create = await asyncio.create_subprocess_exec(
+            codeql_bin, "database", "create", db,
+            f"--language={language}", f"--source-root={src}", "--overwrite",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            env=_env(),
+        )
+        await asyncio.wait_for(create.communicate(), timeout=1800)
+
+        suite = f"codeql/{language}-queries:codeql-suites/{language}-security-and-quality.qls"
+        analyze = await asyncio.create_subprocess_exec(
+            codeql_bin, "database", "analyze", db,
+            "--format=sarif-latest", f"--output={sarif}", suite,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            env=_env(),
+        )
+        await asyncio.wait_for(analyze.communicate(), timeout=1800)
+
+        try:
+            with open(sarif) as f:
+                data = json.load(f)
+        except Exception:
+            return []
+
+    SEV_MAP = {"error": "high", "warning": "medium", "note": "low", "none": "info"}
+    findings = []
+    for run in (data.get("runs") or []):
+        for result in (run.get("results") or []):
+            loc = ((result.get("locations") or [{}])[0]
+                   .get("physicalLocation") or {})
+            uri = (loc.get("artifactLocation") or {}).get("uri") or ""
+            line = (loc.get("region") or {}).get("startLine") or 0
+            level = result.get("level") or "warning"
+            findings.append({
+                "title": result.get("ruleId") or "CodeQL finding",
+                "description": (result.get("message") or {}).get("text") or "",
+                "severity": SEV_MAP.get(level, "medium"),
+                "resource_id": f"{uri}:{line}",
+                "resource_type": "code_file",
+                "control_id": result.get("ruleId") or "",
+                "framework": "nist_csf",
+                "remediation": "Review CodeQL rule documentation for remediation guidance.",
+                "evidence": {"uri": uri, "line": line, "rule": result.get("ruleId")},
+                "cve_id": "",
+                "cvss_score": 0,
+            })
+    return findings
+
+
+# ── OWASP Dependency-Check ────────────────────────────────────────────────────
+
+async def _owasp_dc(repo_url: str) -> List[dict]:
+    if not repo_url:
+        return []
+    dc_sh = (
+        str(Path.home() / ".owlet" / "bin" / "dependency-check.sh")
+        or shutil.which("dependency-check.sh", path=_env()["PATH"])
+    )
+    if not dc_sh or not Path(dc_sh).exists():
+        raise RuntimeError(
+            "dependency-check.sh not found — download from https://github.com/jeremylong/DependencyCheck/releases"
+        )
+
+    with tempfile.TemporaryDirectory() as base:
+        src = os.path.join(base, "src")
+        out = os.path.join(base, "report")
+        os.makedirs(out)
+
+        clone = await asyncio.create_subprocess_exec(
+            "git", "clone", "--depth=1", repo_url, src,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(clone.communicate(), timeout=300)
+
+        proc = await asyncio.create_subprocess_exec(
+            dc_sh, "--scan", src, "--format", "JSON", "--out", out, "--noupdate",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            env=_env(),
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=1800)
+
+        report_path = os.path.join(out, "dependency-check-report.json")
+        try:
+            with open(report_path) as f:
+                data = json.load(f)
+        except Exception:
+            return []
+
+    SEV_MAP = {"CRITICAL": "critical", "HIGH": "high", "MEDIUM": "medium", "LOW": "low"}
+    findings = []
+    for dep in (data.get("dependencies") or []):
+        fname = dep.get("fileName") or ""
+        for vuln in (dep.get("vulnerabilities") or []):
+            cve_id = vuln.get("name") or ""
+            cvss3 = (vuln.get("cvssv3") or {})
+            findings.append({
+                "title": f"{cve_id} in {fname}" if cve_id else f"Vulnerability in {fname}",
+                "description": vuln.get("description") or "",
+                "severity": SEV_MAP.get((vuln.get("severity") or "").upper(), "info"),
+                "resource_id": fname,
+                "resource_type": "package",
+                "control_id": cve_id or "RA-5",
+                "framework": "nist_csf",
+                "remediation": "Update the affected dependency to a patched version.",
+                "evidence": {
+                    "fileName": fname,
+                    "cvssv3_score": cvss3.get("baseScore"),
+                    "cvssv3_vector": cvss3.get("vectorString"),
+                },
+                "cve_id": cve_id,
+                "cvss_score": float(cvss3.get("baseScore") or 0),
+            })
+    return findings
+
+
+# ── OWASP ZAP (local daemon) ──────────────────────────────────────────────────
+
+async def _zap(target: str, config: dict) -> List[dict]:
+    if not target:
+        return []
+    zap_bin = (
+        shutil.which("zap.sh", path=_env()["PATH"])
+        or ("/usr/share/zaproxy/zap.sh" if Path("/usr/share/zaproxy/zap.sh").exists() else None)
+        or str(Path.home() / ".owlet" / "bin" / "zap.sh")
+    )
+    if not zap_bin or not Path(zap_bin).exists():
+        raise RuntimeError("zap.sh not found — install OWASP ZAP via 'sudo apt install zaproxy'")
+
+    profile = config.get("profile") or "baseline"
+    zap_port = 8090
+    zap_base = f"http://127.0.0.1:{zap_port}"
+
+    proc = await asyncio.create_subprocess_exec(
+        zap_bin, "-daemon", f"-port={zap_port}", "-host", "127.0.0.1",
+        "-config", "api.disablekey=true",
+        "-config", "api.addrs.addr.name=.*",
+        "-config", "api.addrs.addr.regex=true",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+        env=_env(),
+    )
+
+    def _get(path: str) -> dict:
+        import urllib.request as _ur
+        with _ur.urlopen(f"{zap_base}{path}", timeout=10) as r:
+            return json.loads(r.read())
+
+    def _post(path: str, params: dict) -> dict:
+        import urllib.request as _ur, urllib.parse as _up
+        data = _up.urlencode(params).encode()
+        req = _ur.Request(f"{zap_base}{path}", data=data)
+        with _ur.urlopen(req, timeout=10) as r:
+            return json.loads(r.read())
+
+    try:
+        for _ in range(60):
+            await asyncio.sleep(2)
+            try:
+                _get("/JSON/core/view/version/")
+                break
+            except Exception:
+                pass
+
+        _post("/JSON/spider/action/scan/", {"url": target, "recurse": "true"})
+        for _ in range(120):
+            await asyncio.sleep(5)
+            status = _get("/JSON/spider/view/status/").get("status") or "0"
+            if status == "100":
+                break
+
+        if profile == "active":
+            _post("/JSON/ascan/action/scan/", {"url": target, "recurse": "true"})
+            for _ in range(360):
+                await asyncio.sleep(10)
+                status = _get("/JSON/ascan/view/status/").get("status") or "0"
+                if status == "100":
+                    break
+
+        alerts_resp = _get(f"/JSON/core/view/alerts/?baseurl={target}&start=0&count=1000")
+        alerts = alerts_resp.get("alerts") or []
+    finally:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+
+    RISK_MAP = {"High": "high", "Medium": "medium", "Low": "low", "Informational": "info"}
+    findings = []
+    for alert in alerts:
+        cwe = alert.get("cweid") or "0"
+        findings.append({
+            "title": alert.get("name") or "ZAP alert",
+            "description": alert.get("description") or "",
+            "severity": RISK_MAP.get(alert.get("risk") or "Informational", "info"),
+            "resource_id": alert.get("url") or target,
+            "resource_type": "web/url",
+            "control_id": f"CWE-{cwe}" if cwe != "0" else "SA-11",
+            "framework": "nist_csf",
+            "remediation": alert.get("solution") or "Review the ZAP alert for remediation guidance.",
+            "evidence": {
+                "url": alert.get("url"), "evidence": (alert.get("evidence") or "")[:500],
+                "wasc_id": alert.get("wascid"),
+            },
+            "cve_id": "",
+            "cvss_score": 0,
         })
     return findings

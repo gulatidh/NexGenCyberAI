@@ -325,6 +325,74 @@ function GitHubActionsConfigCard() {
   );
 }
 
+// ── Airgap mode card ──────────────────────────────────────────────────────────
+
+function AirgapCard() {
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const { data, refetch } = useQuery({
+    queryKey: ["local-runner-airgap"],
+    queryFn: () => apiClient.get("/local-runner/airgap-config").then((r) => r.data),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const enabled: boolean = data?.airgap_mode === true;
+
+  const toggle = async () => {
+    setSaving(true);
+    setResult(null);
+    try {
+      await apiClient.post("/local-runner/airgap-config", { airgap_mode: !enabled });
+      setResult({ ok: true, message: !enabled ? "Airgap mode enabled — all scanners now run locally." : "Airgap mode disabled — scanners will use GitHub Actions when configured." });
+      refetch();
+    } catch (e: any) {
+      setResult({ ok: false, message: e?.response?.data?.detail || String(e) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderColor: enabled ? "success.main" : "divider" }}>
+      <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 2 }}>
+        <Box sx={{ flex: 1 }}>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1, mb: 0.5 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }}>Airgap Mode</Typography>
+            <Chip
+              label={enabled ? "ENABLED" : "Disabled"}
+              size="small"
+              color={enabled ? "success" : "default"}
+              variant={enabled ? "filled" : "outlined"}
+              sx={{ fontSize: 10, height: 18 }}
+            />
+          </Stack>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            When enabled, ALL scanners run locally via subprocess — no GitHub Actions, no public URL required.
+            Ideal for air-gapped environments with Azure Private Endpoint AI. Each tool must be installed locally first.
+          </Typography>
+          {result && (
+            <Alert severity={result.ok ? "success" : "error"} sx={{ mt: 1, py: 0.5, fontSize: 12 }}>
+              {result.message}
+            </Alert>
+          )}
+        </Box>
+        <Tooltip title={enabled ? "Disable airgap mode" : "Enable airgap mode"}>
+          <span>
+            <Switch
+              checked={enabled}
+              onChange={toggle}
+              disabled={saving}
+              color="success"
+            />
+          </span>
+        </Tooltip>
+      </Stack>
+    </Paper>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LocalRunnerSetup() {
@@ -701,6 +769,8 @@ export default function LocalRunnerSetup() {
               Toggle each scanner between running locally on this machine or via
               GitHub Actions. Only installed tools can be set to Local.
             </Typography>
+
+            <AirgapCard />
 
             <GitHubActionsConfigCard />
 

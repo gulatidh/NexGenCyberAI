@@ -234,6 +234,11 @@ GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
 # Set to https://owlet-api.azurewebsites.net when using the cloud portal.
 PUBLIC_API_BASE=${PUBLIC_API_BASE}
 
+# ── Airgap mode ───────────────────────────────────────────────────────────────
+# Set to true to run ALL scanners locally — no GitHub Actions, no public URL needed.
+# Required for air-gapped environments. Tools must be installed locally first.
+AIRGAP_MODE=false
+
 # ── Admin bootstrap ───────────────────────────────────────────────────────────
 # Users listed here bypass the UserAccess grant check and always have full access.
 # Without at least one entry here, everyone gets 403 on a fresh local database.
@@ -390,6 +395,63 @@ if $INSTALL_TOOLS; then
     "$PIP" install gvm-tools &>/dev/null && ok "gvm-tools installed" || true
   else
     warn "OpenVAS is only available on Kali Linux via apt — skipping"
+  fi
+
+  # Checkov — IaC security scanner
+  if ! "$VENV_DIR/bin/checkov" --version &>/dev/null 2>&1 && ! command -v checkov &>/dev/null; then
+    info "Installing Checkov…"
+    "$PIP" install checkov &>/dev/null && ok "Checkov installed" || warn "Checkov install failed"
+  else
+    ok "Checkov already installed"
+  fi
+
+  # SSLyze — TLS/SSL analyser
+  if ! command -v sslyze &>/dev/null; then
+    info "Installing SSLyze…"
+    "$PIP" install sslyze &>/dev/null && ok "SSLyze installed" || warn "SSLyze install failed"
+  else
+    ok "SSLyze already installed"
+  fi
+
+  # OWASP ZAP
+  if ! command -v zap.sh &>/dev/null && [ ! -f "/usr/share/zaproxy/zap.sh" ]; then
+    info "Installing OWASP ZAP…"
+    sudo apt-get install -y zaproxy &>/dev/null && ok "OWASP ZAP installed" || \
+      warn "ZAP not in apt — download manually from https://zaproxy.org"
+  else
+    ok "OWASP ZAP already installed"
+  fi
+
+  # CodeQL CLI
+  CODEQL_VERSION="2.19.0"
+  if [ ! -f "$HOME/.owlet/bin/codeql/codeql" ]; then
+    info "Downloading CodeQL CLI v${CODEQL_VERSION}…"
+    CODEQL_URL="https://github.com/github/codeql-action/releases/download/codeql-bundle-v${CODEQL_VERSION}/codeql-bundle-linux64.tar.gz"
+    if curl -fsSL "$CODEQL_URL" | tar -xz -C "$HOME/.owlet/bin/" 2>/dev/null; then
+      ok "CodeQL CLI installed at ~/.owlet/bin/codeql/codeql"
+    else
+      warn "CodeQL download failed — download manually from https://github.com/github/codeql-action/releases"
+    fi
+  else
+    ok "CodeQL CLI already installed"
+  fi
+
+  # OWASP Dependency-Check
+  DC_VERSION="10.0.4"
+  DC_DIR="$HOME/.owlet/bin/dependency-check"
+  if [ ! -f "$DC_DIR/bin/dependency-check.sh" ]; then
+    info "Downloading OWASP Dependency-Check v${DC_VERSION}…"
+    DC_URL="https://github.com/jeremylong/DependencyCheck/releases/download/v${DC_VERSION}/dependency-check-${DC_VERSION}-release.zip"
+    if curl -fsSL "$DC_URL" -o /tmp/dc.zip 2>/dev/null; then
+      unzip -q /tmp/dc.zip -d "$HOME/.owlet/bin/" 2>/dev/null
+      rm -f /tmp/dc.zip
+      ln -sf "$DC_DIR/bin/dependency-check.sh" "$HOME/.owlet/bin/dependency-check.sh"
+      ok "OWASP Dependency-Check installed"
+    else
+      warn "Dependency-Check download failed — download manually from https://github.com/jeremylong/DependencyCheck/releases"
+    fi
+  else
+    ok "OWASP Dependency-Check already installed"
   fi
 fi
 

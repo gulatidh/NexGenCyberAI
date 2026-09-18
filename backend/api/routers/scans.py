@@ -100,6 +100,42 @@ async def _execute_scan(
                     await run_enterprise_scan(ctype_value, scan.id, db_url, _ent_creds, _ent_cfg)
                     return
 
+                # ── Airgap / local runner early intercept ─────────────────────
+                import os as _os
+                _AIRGAP = _os.environ.get("AIRGAP_MODE", "").lower() in ("1", "true", "yes")
+                _ALL_LOCAL_TOOLS = {
+                    "nmap": "nmap", "openvas": "openvas",
+                    "gitleaks": "gitleaks", "trufflehog": "trufflehog",
+                    "trivy": "trivy", "semgrep": "semgrep", "nuclei": "nuclei",
+                    "checkov": "checkov", "sslyze": "sslyze",
+                    "codeql": "codeql", "owasp_dc": "owasp_dc",
+                    "web": "zap",
+                }
+                _early_tool = _ALL_LOCAL_TOOLS.get(ctype_value)
+                if _early_tool and _AIRGAP:
+                    try:
+                        _cfg_for_scan = connector_db.config or {}
+                        _creds_for_scan = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                        _target = _cfg_for_scan.get("target_url") or _cfg_for_scan.get("target") or _creds_for_scan.get("target") or ""
+                        _repo_url = _cfg_for_scan.get("repo_url") or _creds_for_scan.get("repo_url") or ""
+                        _airgap_config = {
+                            "target": _target,
+                            "repo_url": _repo_url,
+                            "image": _cfg_for_scan.get("image") or "",
+                            "profile": _cfg_for_scan.get("default_profile") or "baseline",
+                        }
+                        from services.local_scanners import run_local_scan
+                        import asyncio as _aio
+                        _aio.ensure_future(run_local_scan(scan.id, _early_tool, _airgap_config))
+                        return
+                    except Exception as _exc:
+                        scan.status = ScanStatus.FAILED
+                        scan.error_message = f"Airgap local scan failed to start: {_exc}"
+                        scan.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+                        return
+                # ─────────────────────────────────────────────────────────────
+
                 if ctype_value == _CT.WEB.value:
                     from connectors.web.connector import trigger_zap_scan
                     from api.models.models import FrameworkType
@@ -190,11 +226,13 @@ async def _execute_scan(
                         db.commit()
                         return
 
-                    # ── Local runner check — runs before GitHub Actions dispatch ──
+                    # ── Per-tool local runner check (non-airgap mode) ─────────
                     _CTYPE_TO_TOOL = {
                         "nmap": "nmap", "openvas": "openvas",
                         "gitleaks": "gitleaks", "trufflehog": "trufflehog",
                         "trivy": "trivy", "semgrep": "semgrep", "nuclei": "nuclei",
+                        "checkov": "checkov", "sslyze": "sslyze",
+                        "codeql": "codeql", "owasp_dc": "owasp_dc",
                     }
                     _local_tool = _CTYPE_TO_TOOL.get(ctype_value)
                     if _local_tool:
@@ -208,6 +246,7 @@ async def _execute_scan(
                                         "target": conn_obj._primary_target(),
                                         "repo_url": conn_obj._get("repo_url") or None,
                                         "image": conn_obj._get("image") or None,
+                                        "profile": (connector_db.config or {}).get("default_profile") or "baseline",
                                     },
                                 )
                                 return
