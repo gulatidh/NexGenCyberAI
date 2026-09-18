@@ -876,7 +876,7 @@ export default function Connections() {
           </Card>
         ) : (
           <Box>
-            {SCANNER_CATEGORIES.filter((cat) => cat === "enterprise").map((cat) => {
+            {SCANNER_CATEGORIES.map((cat) => {
               const group = scannerConnectors.filter((c) => CONNECTOR_CATEGORY[c.connector_type] === cat);
               if (group.length === 0) return null;
               return (
