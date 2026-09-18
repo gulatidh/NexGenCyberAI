@@ -322,6 +322,14 @@ async def ingest_scan_results(payload: IngestPayload = Body(...), db: Session = 
         db.commit()
         return {"ok": True, "status": "failed"}
 
+    try:
+        return _do_ingest(scan, payload, db, background_tasks)
+    except Exception as exc:
+        logger.exception("Ingest failed for scan %s", payload.scan_id)
+        raise HTTPException(status_code=500, detail=f"Ingest error: {exc}") from exc
+
+
+def _do_ingest(scan, payload, db, background_tasks):
     # Determine scanner type + create AssessmentImport before findings loop
     scanner_type = _scanner_type_from_connector(db, scan)
     import_id = _create_ingest_import(db, scan, scanner_type, len(payload.findings))

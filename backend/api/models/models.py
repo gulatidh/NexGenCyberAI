@@ -365,6 +365,7 @@ class Finding(Base):
     acceptance_expires_at = Column(DateTime(timezone=True), nullable=True)
     # Ontology FK — links finding to the asset it was discovered on
     asset_id = Column(String(36), ForeignKey("assets.id"), nullable=True, index=True)
+    import_id = Column(Integer, ForeignKey("assessment_imports.id"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
