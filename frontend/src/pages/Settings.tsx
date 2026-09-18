@@ -1575,6 +1575,7 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
 // ── Local Runner Tab ─────────────────────────────────────────────────────────
 
 function LocalRunnerTab() {
+  const qc = useQueryClient();
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ["local-runner-status"],
     queryFn: () => import("../services/api").then(({ apiClient }) =>
@@ -1583,6 +1584,41 @@ function LocalRunnerTab() {
     staleTime: 30_000,
     retry: false,
   });
+
+  // GitHub Actions config
+  const { data: ghData } = useQuery<any>({
+    queryKey: ["local-runner-gh-config"],
+    queryFn: () => import("../services/api").then(({ apiClient }) =>
+      apiClient.get("/local-runner/github-config").then((r: any) => r.data)
+    ),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const [ghOpen, setGhOpen] = useState(false);
+  const [ghForm, setGhForm] = useState({ token: "", repo_owner: "", repo_name: "", public_api_base: "" });
+  const [ghSaving, setGhSaving] = useState(false);
+  const [ghResult, setGhResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const handleGhSave = async () => {
+    setGhSaving(true);
+    setGhResult(null);
+    const payload: Record<string, string> = {};
+    if (ghForm.token)           payload.token = ghForm.token;
+    if (ghForm.repo_owner)      payload.repo_owner = ghForm.repo_owner;
+    if (ghForm.repo_name)       payload.repo_name = ghForm.repo_name;
+    if (ghForm.public_api_base) payload.public_api_base = ghForm.public_api_base;
+    try {
+      const { apiClient } = await import("../services/api");
+      const res = await apiClient.post("/local-runner/github-config", payload).then((r: any) => r.data);
+      setGhResult({ ok: true, msg: `Saved: ${(res.updated || []).join(", ") || "no changes"}` });
+      qc.invalidateQueries({ queryKey: ["local-runner-gh-config"] });
+      setGhForm({ token: "", repo_owner: "", repo_name: "", public_api_base: "" });
+    } catch (e: any) {
+      setGhResult({ ok: false, msg: e?.response?.data?.detail || String(e) });
+    } finally {
+      setGhSaving(false);
+    }
+  };
 
   const tools: any[] = data?.tools ?? [];
   const isKali: boolean = data?.is_kali ?? false;
@@ -1648,6 +1684,71 @@ function LocalRunnerTab() {
           </Box>
         </>
       )}
+
+      {/* GitHub Actions configuration */}
+      <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 2, mb: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+          <Box>
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }}>GitHub Actions configuration</Typography>
+            <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
+              Required for CodeQL, ZAP, Semgrep, Nmap (GitHub Actions mode)
+            </Typography>
+          </Box>
+          <Button size="small" onClick={() => setGhOpen((p) => !p)}>
+            {ghOpen ? "Hide" : "Configure"}
+          </Button>
+        </Box>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1 }}>
+          {[
+            { label: "Token",        set: ghData?.token_set,        val: ghData?.token_prefix ? `${ghData.token_prefix}…` : null },
+            { label: "Repo Owner",   set: !!ghData?.repo_owner,     val: ghData?.repo_owner || null },
+            { label: "Repo Name",    set: !!ghData?.repo_name,      val: ghData?.repo_name || null },
+            { label: "Public API",   set: !!ghData?.public_api_base, val: ghData?.public_api_base || null },
+          ].map((r) => (
+            <Chip key={r.label} size="small" variant="outlined"
+              label={`${r.label}: ${r.set ? (r.val || "set") : "missing"}`}
+              color={r.set ? "success" : "error"}
+              sx={{ fontSize: 11 }} />
+          ))}
+        </Box>
+        {ghData && !ghData.public_api_base && (
+          <Alert severity="warning" sx={{ mb: 1, py: 0.5, fontSize: 11 }}>
+            Public API Base missing — GitHub Actions runners can't post results back without it.
+            Set to: https://owlet-api.azurewebsites.net
+          </Alert>
+        )}
+        <Collapse in={ghOpen}>
+          <Divider sx={{ my: 1.5 }} />
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+            <TextField label="GitHub PAT" size="small" fullWidth type="password"
+              value={ghForm.token} onChange={(e) => setGhForm((p) => ({ ...p, token: e.target.value }))}
+              placeholder="github_pat_… (leave blank to keep existing)" />
+            <Box sx={{ display: "flex", gap: 1.5 }}>
+              <TextField label="Repo Owner" size="small" sx={{ flex: 1 }}
+                value={ghForm.repo_owner} onChange={(e) => setGhForm((p) => ({ ...p, repo_owner: e.target.value }))}
+                placeholder={ghData?.repo_owner || "gulatidh"} />
+              <TextField label="Repo Name" size="small" sx={{ flex: 1 }}
+                value={ghForm.repo_name} onChange={(e) => setGhForm((p) => ({ ...p, repo_name: e.target.value }))}
+                placeholder={ghData?.repo_name || "NexGenCyberAI"} />
+            </Box>
+            <TextField label="Public API Base URL" size="small" fullWidth
+              value={ghForm.public_api_base} onChange={(e) => setGhForm((p) => ({ ...p, public_api_base: e.target.value }))}
+              placeholder={ghData?.public_api_base || "https://owlet-api.azurewebsites.net"} />
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <Button variant="contained" size="small" onClick={handleGhSave} disabled={ghSaving ||
+                (!ghForm.token && !ghForm.repo_owner && !ghForm.repo_name && !ghForm.public_api_base)}
+                startIcon={ghSaving ? <CircularProgress size={12} /> : undefined}>
+                {ghSaving ? "Saving…" : "Save"}
+              </Button>
+              {ghResult && (
+                <Alert severity={ghResult.ok ? "success" : "error"} sx={{ py: 0, fontSize: 11, flex: 1 }}>
+                  {ghResult.msg}
+                </Alert>
+              )}
+            </Box>
+          </Box>
+        </Collapse>
+      </Box>
 
       <Box sx={{ bgcolor: "rgba(0,0,0,0.2)", borderRadius: 1, p: 2 }}>
         <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 1.5 }}>Quick setup (Kali WSL on Windows)</Typography>

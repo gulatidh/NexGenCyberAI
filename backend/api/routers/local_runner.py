@@ -553,6 +553,64 @@ async def cloud_heartbeat(db: Session = Depends(get_db), _=Depends(get_current_u
     return {"ok": True, "last_seen_at": result.get("last_seen_at")}
 
 
+# ── GitHub Actions config endpoints ──────────────────────────────────────────
+
+class _GHConfigBody(BaseModel):
+    token:          Optional[str] = None
+    repo_owner:     Optional[str] = None
+    repo_name:      Optional[str] = None
+    public_api_base: Optional[str] = None
+
+
+@router.get("/github-config")
+def get_github_config(_=Depends(get_current_user)):
+    """Return current GitHub Actions dispatch configuration (token masked)."""
+    token = os.environ.get("GITHUB_DISPATCH_TOKEN") or ""
+    return {
+        "token_set":       bool(token),
+        "token_prefix":    token[:8] if token else None,
+        "repo_owner":      os.environ.get("GITHUB_REPO_OWNER") or None,
+        "repo_name":       os.environ.get("GITHUB_REPO_NAME") or None,
+        "public_api_base": os.environ.get("PUBLIC_API_BASE") or None,
+    }
+
+
+@router.post("/github-config")
+def save_github_config(body: _GHConfigBody, _=Depends(get_current_user)):
+    """Write GitHub Actions config into backend/.env and update os.environ live."""
+    env_file = Path(__file__).parent.parent.parent / ".env"
+    field_map = {
+        "GITHUB_DISPATCH_TOKEN": body.token,
+        "GITHUB_REPO_OWNER":     body.repo_owner,
+        "GITHUB_REPO_NAME":      body.repo_name,
+        "PUBLIC_API_BASE":       body.public_api_base,
+    }
+    updated: list[str] = []
+    for key, val in field_map.items():
+        if not val or not val.strip():
+            continue
+        val = val.strip()
+        os.environ[key] = val
+        updated.append(key)
+        if env_file.exists():
+            lines = env_file.read_text(errors="replace").splitlines(keepends=True)
+            found = False
+            new_lines = []
+            for line in lines:
+                if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+                    new_lines.append(f"{key}={val}\n")
+                    found = True
+                else:
+                    new_lines.append(line)
+            if not found:
+                new_lines.append(f"{key}={val}\n")
+            env_file.write_text("".join(new_lines))
+        else:
+            with env_file.open("a") as f:
+                f.write(f"{key}={val}\n")
+    return {"ok": True, "updated": updated}
+
+
 def _get_version() -> str:
     try:
         r = subprocess.run(

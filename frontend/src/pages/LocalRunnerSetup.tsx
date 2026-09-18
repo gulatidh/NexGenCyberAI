@@ -52,6 +52,10 @@ const localRunnerApi = {
     apiClient.post("/local-runner/cloud/link", { cloud_url, token }).then((r) => r.data),
   heartbeat: () =>
     apiClient.post("/local-runner/cloud/heartbeat").then((r) => r.data),
+  githubConfig: () =>
+    apiClient.get("/local-runner/github-config").then((r) => r.data),
+  saveGithubConfig: (data: Record<string, string>) =>
+    apiClient.post("/local-runner/github-config", data).then((r) => r.data),
 };
 
 // ── Wizard steps ──────────────────────────────────────────────────────────────
@@ -186,6 +190,133 @@ function CloudPairingCard() {
           {linkResult && (
             <Alert severity={linkResult.ok ? "success" : "error"} sx={{ py: 0.5, fontSize: 12 }}>
               {linkResult.message}
+            </Alert>
+          )}
+        </Stack>
+      </Collapse>
+    </Paper>
+  );
+}
+
+// ── GitHub Actions config sub-component ──────────────────────────────────────
+
+function GitHubActionsConfigCard() {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ token: "", repo_owner: "", repo_name: "", public_api_base: "" });
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const qc = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ["local-runner-github-config"],
+    queryFn: localRunnerApi.githubConfig,
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveResult(null);
+    const payload: Record<string, string> = {};
+    if (form.token)           payload.token = form.token;
+    if (form.repo_owner)      payload.repo_owner = form.repo_owner;
+    if (form.repo_name)       payload.repo_name = form.repo_name;
+    if (form.public_api_base) payload.public_api_base = form.public_api_base;
+    try {
+      const res = await localRunnerApi.saveGithubConfig(payload);
+      setSaveResult({ ok: true, message: `Saved: ${(res.updated || []).join(", ") || "no changes"}` });
+      qc.invalidateQueries({ queryKey: ["local-runner-github-config"] });
+      setForm({ token: "", repo_owner: "", repo_name: "", public_api_base: "" });
+    } catch (e: any) {
+      setSaveResult({ ok: false, message: e?.response?.data?.detail || String(e) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rows = [
+    { label: "GitHub Token", set: data?.token_set, value: data?.token_prefix ? `${data.token_prefix}…` : null },
+    { label: "Repo Owner",   set: !!data?.repo_owner,  value: data?.repo_owner  || null },
+    { label: "Repo Name",    set: !!data?.repo_name,   value: data?.repo_name   || null },
+    { label: "Public API Base", set: !!data?.public_api_base, value: data?.public_api_base || null },
+  ];
+
+  const allSet = rows.every((r) => r.set);
+  const missingApiBase = data && !data.public_api_base;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+        <Box>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }}>GitHub Actions configuration</Typography>
+            <Chip
+              label={allSet ? "Configured" : "Incomplete"}
+              size="small"
+              color={allSet ? "success" : "warning"}
+              variant="outlined"
+            />
+          </Stack>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>
+            Required for: CodeQL, ZAP, Semgrep (GH Actions mode), Nmap (GH Actions mode). Not needed for local-mode scanners.
+          </Typography>
+        </Box>
+        <Button size="small" onClick={() => setOpen((p) => !p)}>
+          {open ? "Hide" : allSet ? "Edit" : "Configure"}
+        </Button>
+      </Stack>
+
+      {/* Status grid */}
+      <Stack spacing={0.5} sx={{ mt: 1.5 }}>
+        {rows.map((r) => (
+          <Stack key={r.label} direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+            <Typography sx={{ fontSize: 12, color: "text.secondary", width: 130, flexShrink: 0 }}>{r.label}</Typography>
+            <Chip
+              label={r.set ? "Set" : "Missing"}
+              size="small"
+              color={r.set ? "success" : "error"}
+              variant="outlined"
+              sx={{ fontSize: 10, height: 18 }}
+            />
+            <Typography sx={{ fontSize: 11, color: "text.disabled", fontFamily: "monospace" }}>
+              {r.value || "—"}
+            </Typography>
+          </Stack>
+        ))}
+      </Stack>
+
+      {missingApiBase && (
+        <Alert severity="warning" sx={{ mt: 1.5, fontSize: 12, py: 0.5 }}>
+          Without a public API base URL, GitHub Actions runners can't post results back.
+          Use the cloud portal URL: <strong>https://owlet-api.azurewebsites.net</strong>
+        </Alert>
+      )}
+
+      <Collapse in={open}>
+        <Divider sx={{ my: 1.5 }} />
+        <Stack spacing={1.5}>
+          <TextField label="GitHub PAT (leave blank to keep existing)" size="small" fullWidth
+            value={form.token} onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))}
+            placeholder="github_pat_..." type="password" />
+          <Stack direction="row" sx={{ gap: 1.5 }}>
+            <TextField label="Repo Owner" size="small" sx={{ flex: 1 }}
+              value={form.repo_owner} onChange={(e) => setForm((p) => ({ ...p, repo_owner: e.target.value }))}
+              placeholder={data?.repo_owner || "gulatidh"} />
+            <TextField label="Repo Name" size="small" sx={{ flex: 1 }}
+              value={form.repo_name} onChange={(e) => setForm((p) => ({ ...p, repo_name: e.target.value }))}
+              placeholder={data?.repo_name || "NexGenCyberAI"} />
+          </Stack>
+          <TextField label="Public API Base URL" size="small" fullWidth
+            value={form.public_api_base} onChange={(e) => setForm((p) => ({ ...p, public_api_base: e.target.value }))}
+            placeholder={data?.public_api_base || "https://owlet-api.azurewebsites.net"} />
+          <Button variant="contained" size="small" onClick={handleSave}
+            disabled={saving || (!form.token && !form.repo_owner && !form.repo_name && !form.public_api_base)}
+            startIcon={saving ? <CircularProgress size={12} /> : undefined}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+          {saveResult && (
+            <Alert severity={saveResult.ok ? "success" : "error"} sx={{ py: 0.5, fontSize: 12 }}>
+              {saveResult.message}
             </Alert>
           )}
         </Stack>
@@ -570,6 +701,8 @@ export default function LocalRunnerSetup() {
               Toggle each scanner between running locally on this machine or via
               GitHub Actions. Only installed tools can be set to Local.
             </Typography>
+
+            <GitHubActionsConfigCard />
 
             <Stack spacing={1.5} sx={{ mb: 3 }}>
               {tools.map((t) => {
