@@ -166,14 +166,12 @@ async def _execute_scan(
                         # Auto-fallback to local ZAP when GitHub not configured
                         if "not configured" in _zap_err:
                             try:
+                                import asyncio as _aio
                                 from services.local_scanners import run_local_scan
                                 scan.progress_message = "GitHub Actions not configured — running ZAP locally…"
                                 scan.status = ScanStatus.RUNNING
                                 db.commit()
-                                background_tasks.add_task(
-                                    run_local_scan, scan.id, "zap",
-                                    {"target": target_url, "profile": profile},
-                                )
+                                _aio.ensure_future(run_local_scan(scan.id, "zap", {"target": target_url, "profile": profile}))
                                 return
                             except Exception:
                                 pass
@@ -296,19 +294,17 @@ async def _execute_scan(
                         _fallback_tool = _CTYPE_TO_TOOL.get(ctype_value)
                         if "not configured" in _dispatch_err and _fallback_tool:
                             try:
+                                import asyncio as _aio
                                 from services.local_scanners import run_local_scan
                                 scan.progress_message = f"GitHub Actions not configured — running {_fallback_tool} locally…"
                                 scan.status = ScanStatus.RUNNING
                                 db.commit()
-                                background_tasks.add_task(
-                                    run_local_scan, scan.id, _fallback_tool,
-                                    {
-                                        "target": target,
-                                        "repo_url": conn_obj._get("repo_url") or None,
-                                        "image": conn_obj._get("image") or None,
-                                        "profile": (connector_db.config or {}).get("default_profile") or "baseline",
-                                    },
-                                )
+                                _aio.ensure_future(run_local_scan(scan.id, _fallback_tool, {
+                                    "target": target,
+                                    "repo_url": conn_obj._get("repo_url") or None,
+                                    "image": conn_obj._get("image") or None,
+                                    "profile": (connector_db.config or {}).get("default_profile") or "baseline",
+                                }))
                                 return
                             except Exception:
                                 pass
