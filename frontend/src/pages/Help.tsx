@@ -214,6 +214,33 @@ const GROUPS: Group[] = [
         ],
       },
       {
+        id: "local-runner",
+        title: "Local Runner — run scanners on Kali Linux instead of GitHub Actions",
+        summary: "The Local Runner lets you install scanner tools (nmap, gitleaks, trivy, trufflehog, semgrep, nuclei, OpenVAS) directly on a Kali Linux machine (WSL or native) and run them locally. Scans that would normally dispatch to GitHub Actions instead execute on your machine — no cloud compute, no GitHub token, no workflow quota.",
+        steps: [
+          { text: "Who needs this: teams that have a dedicated security workstation running Kali Linux (or Kali WSL on Windows), or environments where outbound GitHub Actions access is restricted." },
+          { text: "Step 1 — Get Kali Linux running.", detail: "Option A (Windows WSL): Open Microsoft Store → search 'Kali Linux' → Install → open a terminal and type 'kali'. Option B (native VM/bare metal): standard Kali installation — https://www.kali.org/get-kali." },
+          { text: "Step 2 — Clone the repo and run setup.sh.", detail: "Inside Kali (or Kali WSL), run:\n  git clone https://github.com/gulatidh/NexGenCyberAI.git\n  cd NexGenCyberAI\n  bash setup.sh\n\nThe script detects Kali automatically, installs Python packages, prompts for Azure AD credentials and AI provider keys to create backend/.env, installs scanner tools via apt (nmap, trivy, openvas) or binary download (gitleaks, trufflehog, nuclei), and then starts the backend." },
+          { text: "Step 3 — Log in to the local portal.", detail: "After setup.sh starts the backend, open http://localhost:5173 (or run 'cd frontend && npm run dev' in a second terminal for the frontend). Log in with Azure AD — same as the cloud version." },
+          { text: "Step 4 — Open the Local Runner Setup wizard.", detail: "In the portal, go to Platform → Local Runner. The wizard has four steps:\n  1. Check environment — probes all tools and shows install state.\n  2. Install tools — install any missing tools with a live progress log.\n  3. Configure dispatch — toggle each scanner between Local and GitHub Actions.\n  4. Test & finish — smoke test each tool." },
+          { text: "Step 5 — Run a scan.", detail: "Go to Discover → Assessments → New Scan. Launch any scanner you've switched to Local mode. Instead of dispatching to GitHub Actions, it runs directly on your machine and writes findings to the local database." },
+          { text: "OpenVAS (full vulnerability scanner) — Kali only.", detail: "After installing openvas via the wizard, run: sudo gvm-setup (one time — downloads the NVT feed, ~20 min). Then sudo gvm-start. OpenVAS scans connect to the local GVM daemon at 127.0.0.1:9390." },
+        ],
+        tips: [
+          "On Kali, nmap and nuclei are pre-installed. The wizard uses apt-get for tools that have Kali packages and binary download as a fallback.",
+          "You can mix modes: keep slow or internet-dependent scans (OpenVAS, nuclei) local, and let lightweight scanners stay on GitHub Actions. Toggle per-tool in the wizard's Configure step.",
+          "The local runner and the cloud Owlet portal (owlet.azurewebsites.net) are separate deployments. Findings from a local run stay in the local database unless you're running against the same Azure SQL database.",
+          "If gvm-setup fails partway: it's safe to re-run. The NVT feed download is resumable. Common fix: sudo apt-get install -y postgresql before gvm-setup.",
+          "setup.sh adds ~/.owlet/bin and ~/.local/bin to PATH in your ~/.bashrc. After first run, reload your shell: source ~/.bashrc.",
+        ],
+        warnings: [
+          "The Local Runner requires Kali Linux (WSL or native). It works on Ubuntu WSL for most tools (nmap, gitleaks, trivy, trufflehog, semgrep, nuclei) but OpenVAS requires Kali's apt package.",
+          "OpenVAS scans launch active network probes. Only scan targets you have explicit authorisation to test. Running OpenVAS against targets you don't own is illegal.",
+          "setup.sh stores Azure AD credentials and AI API keys in backend/.env in plaintext. Secure the file and restrict read permissions: chmod 600 backend/.env.",
+          "Local runner scans are not covered by the trial plan scan limit — they bypass the cloud auth gate because they run against a local backend instance.",
+        ],
+      },
+      {
         id: "jira-connector",
         title: "Add a Jira connector (ticket integration)",
         summary: "Connect to Jira Cloud to create tracked tickets directly from Findings and Remediation Tracker items. Jira is a ticket integration — not a security scanner — so you set it up once in Connections and then use it from the Findings or Remediation Tracker pages.",
