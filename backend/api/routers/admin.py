@@ -544,6 +544,7 @@ def list_prompt_logs(
 
 import subprocess as _subprocess
 import os as _os
+import shutil as _shutil
 from pathlib import Path as _Path
 
 @router.get("/update/status")
@@ -619,8 +620,16 @@ async def pull_update(_=Depends(get_current_user)):
     else:
         steps.append({"step": "pip install", "ok": True, "output": "requirements.txt not found — skipped"})
 
-    # 3 — ensure frontend/.env.local exists (AADSTS900144 guard)
-    fe_env = repo / "frontend" / ".env.local"
+    # 3 — npm install (pick up any new frontend packages)
+    fe_dir = repo / "frontend"
+    if (fe_dir / "package.json").exists() and _shutil.which("npm"):
+        ok3, out3 = _run(["npm", "install", "--prefer-offline"], cwd=fe_dir, timeout=180)
+        steps.append({"step": "npm install", "ok": ok3, "output": out3 or "All packages up to date"})
+    else:
+        steps.append({"step": "npm install", "ok": True, "output": "npm not found or no package.json — skipped"})
+
+    # 4 — ensure frontend/.env.local exists (AADSTS900144 guard)
+    fe_env = fe_dir / ".env.local"
     if not fe_env.exists():
         try:
             fe_env.write_text(
@@ -679,6 +688,25 @@ async def setup_local_env(_=Depends(get_current_user)):
         "    sudo gvm-start > /dev/null 2>&1\n"
         "fi",
     )
+
+    # Weekly NVT feed update via cron (every Sunday 2am)
+    try:
+        import crontab as _ct  # type: ignore
+        pass  # crontab module present — use it
+    except ImportError:
+        _ct = None
+
+    cron_marker = "gvm-feed-update"
+    try:
+        import subprocess as _sp2
+        cron_out = _sp2.run(["crontab", "-l"], capture_output=True, text=True)
+        existing_cron = cron_out.stdout if cron_out.returncode == 0 else ""
+        if cron_marker not in existing_cron:
+            new_cron = existing_cron.rstrip("\n") + "\n# Owlet — weekly OpenVAS NVT feed update\n0 2 * * 0 sudo gvm-feed-update > /dev/null 2>&1\n"
+            _sp2.run(["crontab", "-"], input=new_cron, text=True, capture_output=True)
+            added.append("gvm-feed-update cron (weekly Sunday 2am)")
+    except Exception:
+        pass  # crontab not available — skip silently
 
     if added:
         msg = f"Added to ~/.bashrc: {', '.join(added)}. Open a new terminal or run: source ~/.bashrc"

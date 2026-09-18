@@ -1551,7 +1551,7 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
           onClick={handlePull}
           sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
         >
-          {pulling ? "Updating… (pip may take a minute)" : "Pull & Update"}
+          {pulling ? "Updating… (may take a few minutes)" : "Pull & Update"}
         </Button>
         <Button
           variant="outlined"
@@ -1566,7 +1566,7 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
         </Button>
       </Box>
       <Typography sx={{ fontSize: 11, color: "text.disabled", mt: 1 }}>
-        "Pull & Update" runs git pull + pip install + ensures frontend config. "Setup Local Environment" adds venv auto-activate and gvm-start to ~/.bashrc — run once after first install.
+        "Pull & Update" runs git pull → pip install → npm install → ensures frontend config. Vite hot-reloads code changes automatically; backend reloads via uvicorn --reload. "Setup Local Environment" adds venv auto-activate and gvm-start to ~/.bashrc — run once after first install.
       </Typography>
     </Box>
   );
