@@ -13,6 +13,11 @@ interface Step {
   text: string;
   detail?: string;
 }
+interface TroubleshootingEntry {
+  error: string;
+  cause: string;
+  fix: string;
+}
 interface Topic {
   id: string;
   title: string;
@@ -20,6 +25,7 @@ interface Topic {
   steps: Step[];
   tips?: string[];
   warnings?: string[];
+  troubleshooting?: TroubleshootingEntry[];
 }
 interface Group {
   id: string;
@@ -238,6 +244,23 @@ const GROUPS: Group[] = [
           "OpenVAS scans launch active network probes. Only scan targets you have explicit authorisation to test. Running OpenVAS against targets you don't own is illegal.",
           "setup.sh stores Azure AD credentials and AI API keys in backend/.env in plaintext. Secure the file and restrict read permissions: chmod 600 backend/.env.",
           "Local runner scans are not covered by the trial plan scan limit — they bypass the cloud auth gate because they run against a local backend instance.",
+        ],
+        troubleshooting: [
+          {
+            error: "AADSTS900144: The request body must contain the following parameter: 'client_id'",
+            cause: "The frontend .env.local file is missing. This file is gitignored, so it doesn't exist after a fresh clone. Without it, the Azure AD client_id is empty and MSAL cannot start the login flow.",
+            fix: "Run setup.sh — it now creates frontend/.env.local automatically with the correct client_id, tenant_id and redirect URI. If you set up manually without setup.sh, create the file yourself:\n  cd NexGenCyberAI/frontend\n  cat > .env.local <<'EOF'\nREACT_APP_API_URL=http://localhost:8000/api/v1\nREACT_APP_AZURE_CLIENT_ID=2978ef0b-865f-40bc-b7eb-507b6e258ae9\nREACT_APP_AZURE_TENANT_ID=5e9623cc-7e4c-4408-8b5d-e15ea58e9528\nREACT_APP_REDIRECT_URI=http://localhost:3000\nEOF\n  npm start",
+          },
+          {
+            error: "Kali pip error: error: externally-managed-environment (PEP 668)",
+            cause: "Modern Kali blocks system-wide pip installs to protect OS packages. The --user flag also fails inside a virtual environment.",
+            fix: "setup.sh now handles this automatically: it installs python3-venv, creates venv/ at the repo root, and uses venv/bin/pip for all installs. If you see this error, make sure you are running the latest setup.sh (after the September 2026 update). If venv already exists from a Windows clone, delete it first: rm -rf venv, then re-run bash setup.sh.",
+          },
+          {
+            error: "ERROR: Failed to build 'pymssql' — setuptools_scm conflict",
+            cause: "pymssql==2.3.4 requires setuptools_scm<9 which conflicts with Python 3.14. Also needs a C compiler and freetds-dev to build from source.",
+            fix: "setup.sh now installs build-essential, python3-dev, and freetds-dev via apt before pip, and requirements.txt is now unpinned (pymssql instead of pymssql==2.3.4). If you had a failed install, re-run: bash setup.sh.",
+          },
         ],
       },
       {
@@ -1679,6 +1702,26 @@ function TopicBlock({ topic, color }: { topic: Topic; color: string }) {
         <StepList steps={topic.steps} />
         <CalloutList items={topic.tips} kind="tip" />
         <CalloutList items={topic.warnings} kind="warning" />
+        {topic.troubleshooting && topic.troubleshooting.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: "text.disabled", mb: 1, textTransform: "uppercase" }}>
+              Troubleshooting
+            </Typography>
+            {topic.troubleshooting.map((t, i) => (
+              <Box key={i} sx={{ mb: 1.5, p: 1.5, borderRadius: 1, border: "1px solid", borderColor: "error.dark", bgcolor: "rgba(211,47,47,0.06)" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "error.main", mb: 0.5, fontFamily: "monospace" }}>
+                  {t.error}
+                </Typography>
+                <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+                  <strong>Cause:</strong> {t.cause}
+                </Typography>
+                <Typography component="pre" sx={{ fontSize: 11, color: "text.primary", whiteSpace: "pre-wrap", wordBreak: "break-word", m: 0 }}>
+                  <strong>Fix:</strong> {t.fix}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
       </AccordionDetails>
     </Accordion>
   );
