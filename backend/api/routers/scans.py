@@ -162,8 +162,27 @@ async def _execute_scan(
                         exclude_paths=cfg.get("exclude_paths") or [],
                     )
                     if not result.get("ok"):
+                        _zap_err = result.get("error", "")
+                        # Auto-fallback to local ZAP when GitHub not configured
+                        if "not configured" in _zap_err:
+                            try:
+                                from services.local_scanners import run_local_scan
+                                scan.progress_message = "GitHub Actions not configured — running ZAP locally…"
+                                scan.status = ScanStatus.RUNNING
+                                db.commit()
+                                background_tasks.add_task(
+                                    run_local_scan, scan.id, "zap",
+                                    {"target": target_url, "profile": profile},
+                                )
+                                return
+                            except Exception:
+                                pass
                         scan.status = ScanStatus.FAILED
-                        scan.error_message = f"Workflow dispatch failed: {result.get('error')}"
+                        scan.error_message = (
+                            f"Workflow dispatch failed: {_zap_err}"
+                            + (" — configure GITHUB_DISPATCH_TOKEN in Settings → Local Runner, or enable AIRGAP_MODE."
+                               if "not configured" in _zap_err else "")
+                        )
                         scan.completed_at = datetime.now(timezone.utc)
                         db.commit()
                     # Stay in RUNNING — workflow will mark COMPLETED via ingest.
@@ -272,8 +291,33 @@ async def _execute_scan(
                     }
                     result = dispatch_workflow(conn_obj.WORKFLOW_FILE, inputs)
                     if not result.get("ok"):
+                        _dispatch_err = result.get("error", "")
+                        # GitHub not configured but tool has local runner → auto-fallback
+                        _fallback_tool = _CTYPE_TO_TOOL.get(ctype_value)
+                        if "not configured" in _dispatch_err and _fallback_tool:
+                            try:
+                                from services.local_scanners import run_local_scan
+                                scan.progress_message = f"GitHub Actions not configured — running {_fallback_tool} locally…"
+                                scan.status = ScanStatus.RUNNING
+                                db.commit()
+                                background_tasks.add_task(
+                                    run_local_scan, scan.id, _fallback_tool,
+                                    {
+                                        "target": target,
+                                        "repo_url": conn_obj._get("repo_url") or None,
+                                        "image": conn_obj._get("image") or None,
+                                        "profile": (connector_db.config or {}).get("default_profile") or "baseline",
+                                    },
+                                )
+                                return
+                            except Exception:
+                                pass
                         scan.status = ScanStatus.FAILED
-                        scan.error_message = f"Workflow dispatch failed: {result.get('error')}"
+                        scan.error_message = (
+                            f"Workflow dispatch failed: {_dispatch_err}"
+                            + (" — configure GITHUB_DISPATCH_TOKEN in Settings → Local Runner, or enable AIRGAP_MODE."
+                               if "not configured" in _dispatch_err else "")
+                        )
                         scan.completed_at = datetime.now(timezone.utc)
                         db.commit()
                     # Else: stay in RUNNING — workflow will mark COMPLETED via ingest.
