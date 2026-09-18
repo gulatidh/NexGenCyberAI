@@ -2067,6 +2067,25 @@ class ControlPolicy(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 
+class LocalRunnerRegistration(Base):
+    """A local runner instance that has paired with this cloud portal."""
+    __tablename__ = "local_runner_registrations"
+    id                  = Column(String(36), primary_key=True, default=_uuid)
+    name                = Column(String(200), nullable=False)           # user-given label
+    token_hash          = Column(String(64), nullable=False, unique=True)  # SHA-256 of bearer token
+    token_prefix        = Column(String(20), nullable=False)            # first 12 chars for UI
+    created_by          = Column(String(200), nullable=True)            # JWT sub of admin who generated token
+    machine_name        = Column(String(200), nullable=True)            # hostname from local machine
+    owlet_version       = Column(String(100), nullable=True)            # git describe / commit hash
+    is_kali             = Column(Boolean, default=False)
+    tools_json          = Column(Text, nullable=True)                   # JSON list of tool status dicts from last heartbeat
+    status              = Column(String(20), default="pending")         # pending | active | stale | offline
+    registered_at       = Column(DateTime(timezone=True), nullable=True)  # set on first heartbeat
+    last_seen_at        = Column(DateTime(timezone=True), nullable=True)
+    token_expires_at    = Column(DateTime(timezone=True), nullable=True)
+    created_at          = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class LocalRunnerTool(Base):
     """Per-tool install state and dispatch mode for the local Kali/WSL runner."""
     __tablename__ = "local_runner_tools"

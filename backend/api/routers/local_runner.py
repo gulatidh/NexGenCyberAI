@@ -1,7 +1,7 @@
 """Local Runner Setup — install and configure scanners to run directly on
 the local Kali/WSL machine instead of dispatching to GitHub Actions."""
 
-import asyncio, json, os, shutil, stat, subprocess, tarfile, tempfile, urllib.request, zipfile
+import asyncio, json, os, shutil, socket, stat, subprocess, tarfile, tempfile, urllib.request, zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator, Optional
@@ -427,3 +427,142 @@ async def test_tool(tool: str, _=Depends(get_current_user)):
         return {"ok": False, "output": "Timed out after 30s"}
     except Exception as exc:
         return {"ok": False, "output": str(exc)}
+
+
+# ── Cloud portal pairing ──────────────────────────────────────────────────────
+
+_CLOUD_LINK_FILE = Path.home() / ".owlet" / "cloud_link.json"
+
+
+def _load_link() -> dict:
+    try:
+        return json.loads(_CLOUD_LINK_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_link(data: dict) -> None:
+    _CLOUD_LINK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _CLOUD_LINK_FILE.write_text(json.dumps(data, indent=2))
+
+
+class CloudLinkRequest(BaseModel):
+    cloud_url: str   # e.g. https://owlet-api.azurewebsites.net
+    token: str       # the owlet_runner_... token from the cloud portal
+
+
+@router.post("/cloud/link")
+async def cloud_link(body: CloudLinkRequest, db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Register this local runner with the cloud portal using a pairing token."""
+    cloud_url = body.cloud_url.rstrip("/")
+    # Collect current tool status to send on registration
+    tools_status = []
+    for tool_name in TOOLS:
+        probe = _probe(tool_name)
+        row = db.query(LocalRunnerTool).filter(LocalRunnerTool.tool_name == tool_name).first()
+        mode = (row.mode if row else None) or "github_actions"
+        tools_status.append({
+            "tool": tool_name,
+            "installed": probe["installed"],
+            "version": probe["version"],
+            "mode": mode,
+        })
+
+    payload = {
+        "machine_name": socket.gethostname(),
+        "is_kali": _is_kali(),
+        "tools": tools_status,
+        "owlet_version": _get_version(),
+    }
+
+    try:
+        import urllib.request as _ur, urllib.error
+        req = _ur.Request(
+            f"{cloud_url}/api/v1/runner-registry/register",
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {body.token}",
+            },
+            method="POST",
+        )
+        with _ur.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+    except Exception as exc:
+        raise HTTPException(502, f"Registration failed: {exc}")
+
+    runner_id = result.get("runner_id")
+    _save_link({"cloud_url": cloud_url, "token": body.token, "runner_id": runner_id})
+    return {
+        "ok": True,
+        "runner_id": runner_id,
+        "cloud_url": cloud_url,
+        "message": result.get("message", "Registered successfully"),
+    }
+
+
+@router.get("/cloud/status")
+async def cloud_status(_=Depends(get_current_user)):
+    """Return the current cloud portal link status."""
+    link = _load_link()
+    if not link:
+        return {"linked": False}
+    return {
+        "linked": True,
+        "cloud_url": link.get("cloud_url"),
+        "runner_id": link.get("runner_id"),
+    }
+
+
+@router.post("/cloud/heartbeat")
+async def cloud_heartbeat(db: Session = Depends(get_db), _=Depends(get_current_user)):
+    """Send a heartbeat with current tool status to the cloud portal."""
+    link = _load_link()
+    if not link:
+        raise HTTPException(400, "Not linked to a cloud portal — call /cloud/link first")
+
+    tools_status = []
+    for tool_name in TOOLS:
+        probe = _probe(tool_name)
+        row = db.query(LocalRunnerTool).filter(LocalRunnerTool.tool_name == tool_name).first()
+        mode = (row.mode if row else None) or "github_actions"
+        tools_status.append({
+            "tool": tool_name,
+            "installed": probe["installed"],
+            "version": probe["version"],
+            "mode": mode,
+        })
+
+    cloud_url = link["cloud_url"].rstrip("/")
+    runner_id = link["runner_id"]
+    payload = {"tools": tools_status, "owlet_version": _get_version()}
+
+    try:
+        import urllib.request as _ur
+        req = _ur.Request(
+            f"{cloud_url}/api/v1/runner-registry/runners/{runner_id}/heartbeat",
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {link['token']}",
+            },
+            method="PATCH",
+        )
+        with _ur.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+    except Exception as exc:
+        raise HTTPException(502, f"Heartbeat failed: {exc}")
+
+    return {"ok": True, "last_seen_at": result.get("last_seen_at")}
+
+
+def _get_version() -> str:
+    try:
+        r = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            capture_output=True, text=True, timeout=5,
+            cwd=str(Path(__file__).parent.parent.parent.parent),
+        )
+        return r.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"

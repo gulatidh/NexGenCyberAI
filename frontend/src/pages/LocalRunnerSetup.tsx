@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Alert, Box, Button, Chip, CircularProgress, Divider,
-  Paper, Stack, Step, StepLabel, Stepper, Switch,
+  Alert, Box, Button, Chip, CircularProgress, Collapse, Divider,
+  Paper, Stack, Step, StepLabel, Stepper, Switch, TextField,
   Tooltip, Typography, LinearProgress,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -46,6 +46,12 @@ const localRunnerApi = {
     apiClient.patch(`/local-runner/config/${tool}`, { mode }).then((r) => r.data),
   test: (tool: string): Promise<{ ok: boolean; output: string }> =>
     apiClient.post(`/local-runner/test/${tool}`).then((r) => r.data),
+  cloudStatus: () =>
+    apiClient.get("/local-runner/cloud/status").then((r) => r.data),
+  cloudLink: (cloud_url: string, token: string) =>
+    apiClient.post("/local-runner/cloud/link", { cloud_url, token }).then((r) => r.data),
+  heartbeat: () =>
+    apiClient.post("/local-runner/cloud/heartbeat").then((r) => r.data),
 };
 
 // ── Wizard steps ──────────────────────────────────────────────────────────────
@@ -56,6 +62,137 @@ const STEPS = [
   "Configure dispatch",
   "Test & finish",
 ];
+
+// ── Cloud pairing sub-component ───────────────────────────────────────────────
+
+function CloudPairingCard() {
+  const [open, setOpen] = useState(false);
+  const [cloudUrl, setCloudUrl] = useState("https://owlet-api.azurewebsites.net");
+  const [token, setToken] = useState("");
+  const [linking, setLinking] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [pinging, setPinging] = useState(false);
+  const [pingResult, setPingResult] = useState<string | null>(null);
+  const qc = useQueryClient();
+
+  const { data: cloudStatus } = useQuery({
+    queryKey: ["local-runner-cloud-status"],
+    queryFn: localRunnerApi.cloudStatus,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  const linked: boolean = cloudStatus?.linked ?? false;
+
+  const handleLink = async () => {
+    if (!cloudUrl || !token) return;
+    setLinking(true);
+    setLinkResult(null);
+    try {
+      const result = await localRunnerApi.cloudLink(cloudUrl.trim(), token.trim());
+      setLinkResult({ ok: true, message: result.message || "Linked successfully" });
+      qc.invalidateQueries({ queryKey: ["local-runner-cloud-status"] });
+    } catch (e: any) {
+      setLinkResult({ ok: false, message: e?.response?.data?.detail || String(e) });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const handleHeartbeat = async () => {
+    setPinging(true);
+    setPingResult(null);
+    try {
+      const result = await localRunnerApi.heartbeat();
+      setPingResult(`Last seen: ${result.last_seen_at}`);
+    } catch (e: any) {
+      setPingResult(`Failed: ${e?.response?.data?.detail || String(e)}`);
+    } finally {
+      setPinging(false);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, mt: 1 }}>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+        <Box>
+          <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
+            <CloudIcon sx={{ color: linked ? "success.main" : "text.disabled", fontSize: 18 }} />
+            <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
+              Cloud portal pairing
+            </Typography>
+            <Chip
+              label={linked ? "Linked" : "Not linked"}
+              size="small"
+              color={linked ? "success" : "default"}
+              variant="outlined"
+            />
+          </Stack>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>
+            {linked
+              ? `Connected to ${cloudStatus?.cloud_url}`
+              : "Pair this local runner with the Owlet cloud portal so the AI assistant can see your runner status."}
+          </Typography>
+        </Box>
+        <Stack direction="row" sx={{ gap: 1 }}>
+          {linked && (
+            <Button size="small" variant="outlined" onClick={handleHeartbeat} disabled={pinging}>
+              {pinging ? <CircularProgress size={12} /> : "Ping"}
+            </Button>
+          )}
+          <Button size="small" onClick={() => setOpen((p) => !p)}>
+            {open ? "Hide" : linked ? "Reconfigure" : "Set up"}
+          </Button>
+        </Stack>
+      </Stack>
+
+      {pingResult && (
+        <Typography sx={{ fontSize: 11, color: "text.secondary", mt: 1 }}>{pingResult}</Typography>
+      )}
+
+      <Collapse in={open}>
+        <Divider sx={{ my: 1.5 }} />
+        <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 1.5 }}>
+          1. In the cloud portal, go to <strong>Settings → Local Runner → Generate Token</strong> and copy the token.
+          2. Paste it here with the cloud API URL and click Link.
+        </Typography>
+        <Stack spacing={1.5}>
+          <TextField
+            label="Cloud API URL"
+            size="small"
+            fullWidth
+            value={cloudUrl}
+            onChange={(e) => setCloudUrl(e.target.value)}
+            placeholder="https://owlet-api.azurewebsites.net"
+          />
+          <TextField
+            label="Pairing token"
+            size="small"
+            fullWidth
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="owlet_runner_..."
+            type="password"
+          />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleLink}
+            disabled={!cloudUrl || !token || linking}
+            startIcon={linking ? <CircularProgress size={12} /> : undefined}
+          >
+            {linking ? "Linking…" : "Link to cloud portal"}
+          </Button>
+          {linkResult && (
+            <Alert severity={linkResult.ok ? "success" : "error"} sx={{ py: 0.5, fontSize: 12 }}>
+              {linkResult.message}
+            </Alert>
+          )}
+        </Stack>
+      </Collapse>
+    </Paper>
+  );
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -287,7 +424,11 @@ export default function LocalRunnerSetup() {
                 ? "All tools installed. Proceed to configure dispatch mode."
                 : `${tools.length - installedCount} tool(s) need installation.`}
             </Alert>
-            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+
+            {/* Cloud pairing */}
+            <CloudPairingCard />
+
+            <Stack direction="row" sx={{ justifyContent: "flex-end", mt: 2 }}>
               <Button variant="contained" onClick={() => setStep(1)}>
                 {installedCount === tools.length ? "Next →" : "Install missing tools →"}
               </Button>

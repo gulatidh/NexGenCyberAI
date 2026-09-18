@@ -2795,6 +2795,13 @@ try:
 except Exception as _e:
     logger.warning("local_runner router not loaded: %s", _e)
 
+try:
+    from api.routers import runner_registry as _runner_registry
+    app.include_router(_runner_registry.router, prefix="/api/v1")
+    logger.info("runner_registry router loaded")
+except Exception as _e:
+    logger.warning("runner_registry router not loaded: %s", _e)
+
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _comments, _webhooks, _ctem, _evidence, _documents,

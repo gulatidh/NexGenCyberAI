@@ -518,3 +518,83 @@ Toggle to "Blank Report" in the dialog — creates an empty report for you to fi
 | Advisory agent ignores my pasted data | Paste data into the "Paste context" field, not the free instructions field — they serve different roles |
 | File upload in agent wizard fails | Max 20 MB per file; only PDF, DOCX, and TXT are supported |
 | Crown Jewel agent produces no re-scoring | You must pass a Scan AND paste crown jewel asset identifiers — without the asset list, it can only use generic proximity heuristics |
+| Local runner shows "not detected" in Settings | You are viewing the cloud portal — the /local-runner/status endpoint only works when querying a local Owlet instance |
+| gvm-setup fails halfway | Re-run is safe. First try: sudo apt-get install -y postgresql then re-run sudo gvm-setup |
+| Tool installed but shows "not found" | Run: source ~/.bashrc to reload PATH. The setup adds ~/.owlet/bin automatically |
+| Cloud link fails (502) | Check the cloud URL has no trailing slash and includes /api/v1 prefix. Token must start with owlet_runner_ |
+
+---
+
+## Local Runner
+
+The Local Runner allows scanner tools to run directly on a Kali Linux machine (WSL or native) instead of dispatching to GitHub Actions. This is useful for air-gapped environments, organisations where GitHub Actions access is restricted, or teams that want to use the full OpenVAS vulnerability scanner.
+
+### Supported tools
+- **nmap** — network port scanner (pre-installed on Kali)
+- **gitleaks** — git secret detection
+- **trivy** — container and filesystem vulnerability scanner
+- **trufflehog** — deep secret scanning through git history
+- **semgrep** — static analysis for code security issues
+- **nuclei** — template-based vulnerability scanner
+- **OpenVAS / GVM** — full vulnerability assessment with NVT feed (Kali only, requires gvm-setup)
+
+### Installation steps (Kali WSL on Windows)
+
+**Step 1 — Install Kali Linux on Windows**
+```
+1. Open Microsoft Store
+2. Search "Kali Linux"
+3. Click Install
+4. Open Windows Terminal → type: kali
+5. Set a username and password when prompted
+```
+
+**Step 2 — Inside Kali, clone the repo and run setup.sh**
+```bash
+git clone https://github.com/gulatidh/NexGenCyberAI.git
+cd NexGenCyberAI
+bash setup.sh
+```
+The script will:
+- Detect that you are on Kali
+- Install Python packages from requirements.txt
+- Prompt you for Azure AD Client ID, Tenant ID, and AI provider keys
+- Install scanner tools (apt for nmap/trivy/openvas, binary download for gitleaks/trufflehog/nuclei)
+- Start the backend at http://localhost:8000
+
+**Step 3 — Start the frontend (separate terminal)**
+```bash
+cd NexGenCyberAI/frontend
+npm run dev
+```
+Then open http://localhost:5173 and log in with Azure AD.
+
+**Step 4 — Open the setup wizard**
+Go to **Platform → Local Runner** in the portal. The 4-step wizard:
+1. Check environment — shows which tools are installed
+2. Install tools — installs missing tools with a live log
+3. Configure dispatch — toggle scanners between Local and GitHub Actions
+4. Test & finish — smoke tests each tool
+
+**Step 5 — Optional: pair with the cloud portal**
+In the cloud portal (owlet.azurewebsites.net), go to **Settings → Local Runner → Generate Token**.
+Copy the token and on your local runner run:
+```bash
+curl -X POST http://localhost:8000/api/v1/local-runner/cloud/link \
+  -H 'Content-Type: application/json' \
+  -d '{"cloud_url":"https://owlet-api.azurewebsites.net","token":"owlet_runner_..."}'
+```
+After pairing, the cloud portal can see your runner's status and the Aegis Assistant knows which tools are installed.
+
+### OpenVAS setup (Kali only, one-time)
+```bash
+sudo gvm-setup     # downloads NVT feed — takes ~20 minutes first time
+sudo gvm-start     # starts the GVM daemon
+```
+After this, OpenVAS scans connect to the local daemon at 127.0.0.1:9390.
+
+### Running a local scan
+Once tools are configured to Local mode, launch a scan normally from **Discover → Assessments → New Scan**. The scan runs on your machine instead of GitHub Actions — no token, no quota, no outbound dispatch.
+
+### How the assistant uses live runner state
+When you ask questions on the Local Runner page, the assistant reads the current tool install state from the database and gives you specific advice — for example, "nmap is installed but not in local mode — toggle it in Step 3 of the wizard" or "OpenVAS is not installed — run sudo gvm-setup after installing via apt".
