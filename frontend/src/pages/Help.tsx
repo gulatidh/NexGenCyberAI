@@ -261,6 +261,11 @@ const GROUPS: Group[] = [
             cause: "pymssql==2.3.4 requires setuptools_scm<9 which conflicts with Python 3.14. Also needs a C compiler and freetds-dev to build from source.",
             fix: "setup.sh now installs build-essential, python3-dev, and freetds-dev via apt before pip, and requirements.txt is now unpinned (pymssql instead of pymssql==2.3.4). If you had a failed install, re-run: bash setup.sh.",
           },
+          {
+            error: "403 Forbidden — 'Access not granted. Contact your administrator.'",
+            cause: "The backend has a UserAccess grant table. On a fresh local database it is empty, so every user gets 403 unless their email is listed in INITIAL_ADMIN_EMAILS in backend/.env. setup.sh was not setting this variable, leaving the database locked to everyone.",
+            fix: "Quick fix — add your email to backend/.env and restart the backend:\n  echo 'INITIAL_ADMIN_EMAILS=dheeraj@gretagulati.com,dheeraj.a.gulati@accenture.com' >> ~/NexGenCyberAI/backend/.env\nThen Ctrl+C the backend and run uvicorn again.\n\nPermanent fix — setup.sh now includes INITIAL_ADMIN_EMAILS automatically. Re-run setup.sh and say Y to overwrite .env to pick it up.",
+          },
         ],
       },
       {

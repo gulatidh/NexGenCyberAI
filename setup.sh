@@ -220,6 +220,11 @@ GITHUB_TOKEN=${GITHUB_TOKEN}
 GITHUB_OWNER=${GITHUB_OWNER}
 GITHUB_REPO=${GITHUB_REPO}
 
+# ── Admin bootstrap ───────────────────────────────────────────────────────────
+# Users listed here bypass the UserAccess grant check and always have full access.
+# Without at least one entry here, everyone gets 403 on a fresh local database.
+INITIAL_ADMIN_EMAILS=dheeraj@gretagulati.com,dheeraj.a.gulati@accenture.com
+
 # ── CORS ─────────────────────────────────────────────────────────────────────
 ALLOWED_ORIGINS=["http://localhost:3000","http://localhost:5173"]
 
