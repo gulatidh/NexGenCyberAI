@@ -28,6 +28,7 @@ import {
   NewReleases, Psychology, Webhook, VpnKey, MenuBook,
   ExpandMore, ExpandLess, Language,
   SystemUpdate, CloudDownload, CheckCircleOutlined, ErrorOutlined, Terminal,
+  Computer, CheckCircle as CheckCircleIcon, Error as ErrorIconMUI,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import Skeleton from "@mui/material/Skeleton";
@@ -1386,6 +1387,7 @@ const TABS = [
   { label: "Users",            icon: <AdminPanelSettings fontSize="small" />,  color: "#F06292", adminOnly: true },
   { label: "Deleted Accounts", icon: <DeleteSweep fontSize="small" />,         color: "#9E9E9E", adminOnly: true },
   { label: "Software Update",  icon: <SystemUpdate fontSize="small" />,        color: "#4285F4", adminOnly: true },
+  { label: "Local Runner",     icon: <Computer fontSize="small" />,            color: "#34A853" },
 ];
 
 function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
@@ -1525,6 +1527,98 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ── Local Runner Tab ─────────────────────────────────────────────────────────
+
+function LocalRunnerTab() {
+  const { data, isLoading, refetch } = useQuery<any>({
+    queryKey: ["local-runner-status"],
+    queryFn: () => import("../services/api").then(({ apiClient }) =>
+      apiClient.get("/local-runner/status").then((r: any) => r.data)
+    ),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const tools: any[] = data?.tools ?? [];
+  const isKali: boolean = data?.is_kali ?? false;
+  const installedCount = tools.filter((t) => t.installed).length;
+  const localCount = tools.filter((t) => t.mode === "local").length;
+
+  return (
+    <Box>
+      <SectionHeader icon={<Computer />} title="Local Runner" subtitle="Run scanners directly on Kali Linux instead of GitHub Actions" />
+
+      {isKali && (
+        <Alert severity="success" sx={{ mb: 2, py: 0.5, fontSize: 13 }}>
+          Kali Linux detected — most tools are available via apt.
+        </Alert>
+      )}
+
+      {!data && !isLoading && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Local runner backend not detected. Follow the setup steps below to install on a Kali machine.
+        </Alert>
+      )}
+
+      {isLoading && <LinearProgress sx={{ mb: 2 }} />}
+
+      {tools.length > 0 && (
+        <>
+          <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap" }}>
+            <Chip label={`${installedCount}/${tools.length} tools installed`} color={installedCount === tools.length ? "success" : "warning"} size="small" />
+            <Chip label={`${localCount} running locally`} color={localCount > 0 ? "success" : "default"} size="small" />
+            {isKali && <Chip label="Kali Linux" color="error" size="small" />}
+          </Box>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
+            {tools.map((t: any) => (
+              <Box key={t.tool} sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+                {t.installed
+                  ? <CheckCircleIcon sx={{ color: "success.main", fontSize: 18 }} />
+                  : <ErrorIconMUI sx={{ color: "warning.main", fontSize: 18 }} />}
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{t.label}</Typography>
+                  <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{t.desc}</Typography>
+                </Box>
+                {t.installed && (
+                  <Chip label={`v${t.version || "?"}`} size="small" variant="outlined" color="success" />
+                )}
+                <Chip
+                  label={t.mode === "local" ? "Local" : "GitHub Actions"}
+                  size="small"
+                  color={t.mode === "local" ? "success" : "default"}
+                  variant={t.mode === "local" ? "filled" : "outlined"}
+                />
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+            <Button variant="contained" size="small" href="/platform/local-runner">
+              Open Setup Wizard
+            </Button>
+            <Button variant="outlined" size="small" onClick={() => refetch()}>
+              Refresh
+            </Button>
+          </Box>
+        </>
+      )}
+
+      <Box sx={{ bgcolor: "rgba(0,0,0,0.2)", borderRadius: 1, p: 2 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 1.5 }}>Quick setup (Kali WSL on Windows)</Typography>
+        <Box sx={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 12, color: "#7dd3c0", bgcolor: "#0d1219", p: 1.5, borderRadius: 1, mb: 1.5, whiteSpace: "pre" }}>
+          {`# 1. Install Kali from Microsoft Store, then inside Kali:\ngit clone https://github.com/gulatidh/NexGenCyberAI.git\ncd NexGenCyberAI\nbash setup.sh`}
+        </Box>
+        <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+          setup.sh detects Kali, installs Python packages, prompts for Azure AD and AI provider credentials,
+          installs scanner tools, and starts the backend. After setup, log in at http://localhost:5173
+          and go to Platform → Local Runner to configure which scanners run locally.
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 export default function Settings() {
   const [tab, setTab] = useState(0);
   const navigate = useNavigate();
@@ -1602,6 +1696,7 @@ export default function Settings() {
       <TabPanel value={tab} index={11}><UsersTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={12}><DeletedClientsTab isAdmin={isAdmin} /></TabPanel>
       <TabPanel value={tab} index={13}><SoftwareUpdateTab isAdmin={isAdmin} /></TabPanel>
+      <TabPanel value={tab} index={14}><LocalRunnerTab /></TabPanel>
     </Box>
   );
 }
