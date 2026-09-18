@@ -2067,6 +2067,19 @@ class ControlPolicy(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
 
+class LocalRunnerTool(Base):
+    """Per-tool install state and dispatch mode for the local Kali/WSL runner."""
+    __tablename__ = "local_runner_tools"
+    id           = Column(String(36), primary_key=True, default=_uuid)
+    tool_name    = Column(String(100), unique=True, nullable=False)
+    installed    = Column(Boolean, default=False)
+    version      = Column(String(100), nullable=True)
+    mode         = Column(String(50), default="github_actions")  # local | github_actions
+    binary_path  = Column(String(500), nullable=True)
+    last_checked = Column(DateTime(timezone=True), nullable=True)
+    updated_at   = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 class SystemKBEntry(Base):
     """Living technical reference for the Owlet ecosystem — admin-editable, assistant-injectable."""
     __tablename__ = "system_kb_entries"

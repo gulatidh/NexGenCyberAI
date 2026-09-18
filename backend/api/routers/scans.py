@@ -190,6 +190,31 @@ async def _execute_scan(
                         db.commit()
                         return
 
+                    # ── Local runner check — runs before GitHub Actions dispatch ──
+                    _CTYPE_TO_TOOL = {
+                        "nmap": "nmap", "openvas": "openvas",
+                        "gitleaks": "gitleaks", "trufflehog": "trufflehog",
+                        "trivy": "trivy", "semgrep": "semgrep", "nuclei": "nuclei",
+                    }
+                    _local_tool = _CTYPE_TO_TOOL.get(ctype_value)
+                    if _local_tool:
+                        try:
+                            from api.routers.local_runner import get_scanner_mode
+                            if get_scanner_mode(_local_tool) == "local":
+                                from services.local_scanners import run_local_scan
+                                background_tasks.add_task(
+                                    run_local_scan, scan.id, _local_tool,
+                                    {
+                                        "target": conn_obj._primary_target(),
+                                        "repo_url": conn_obj._get("repo_url") or None,
+                                        "image": conn_obj._get("image") or None,
+                                    },
+                                )
+                                return
+                        except Exception:
+                            pass  # fall through to GitHub Actions on any import error
+                    # ─────────────────────────────────────────────────────────
+
                     scan_token = mint_scan_token(scan.id)
                     set_runtime(scan.id, {
                         # Surface every key the workflow runner might read via

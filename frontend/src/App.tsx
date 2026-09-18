@@ -141,6 +141,7 @@ const AIUsageCost         = React.lazy(() => import("./pages/AIUsageCost"));
 const AgentReportLibrary  = React.lazy(() => import("./pages/AgentReportLibrary"));
 const GuestLanding        = React.lazy(() => import("./pages/GuestLanding"));
 const GuestPortal         = React.lazy(() => import("./pages/GuestPortal"));
+const LocalRunnerSetup    = React.lazy(() => import("./pages/LocalRunnerSetup"));
 
 // Redirect helpers that preserve route params
 function RedirectScanDetail() { const { id } = useParams(); return <Navigate to={`/discover/scans/${id}`} replace />; }
@@ -348,6 +349,7 @@ function ProtectedApp() {
             <Route path="ticket-sync"         element={<TicketSyncPage />} />
             <Route path="ai-settings"         element={<AISettings />} />
             <Route path="audit-logs"          element={<AuditLogs />} />
+            <Route path="local-runner"        element={<LocalRunnerSetup />} />
           </Route>
 
           {/* ── Samples ──────────────────────────────────────────────────── */}

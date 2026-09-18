@@ -1,7 +1,7 @@
 import SectionPage, { SectionDef } from "../components/SectionPage";
 import {
   People, Cable, SyncAlt, AccountTree, Tune,
-  Settings as SettingsIcon, HelpOutlined,
+  Settings as SettingsIcon, HelpOutlined, Computer,
 } from "@mui/icons-material";
 const ic = (color: string) => ({ color, fontSize: 16 } as const);
 
@@ -24,6 +24,7 @@ export const SETUP_SECTION: SectionDef = {
     // Governance Config
     { name: "Risk Appetite", icon: <Tune sx={ic("#FBBC04")} />,        desc: "Configure organisation risk tolerance bands for the 5×5 GCC IM8 matrix.",                  route: "/analyse/risk-appetite", group: "Governance Config" },
     { name: "Data Model",    icon: <AccountTree sx={ic("#FF5722")} />,  desc: "Platform ontology — eleven entities, one interactive graph.",                              route: "/data-model",            group: "Governance Config" },
+    { name: "Local Runner",   icon: <Computer sx={ic("#34A853")} />,    desc: "Install scanners on Kali/WSL and run them locally instead of GitHub Actions.",         route: "/platform/local-runner", group: "Governance Config" },
     { name: "Settings",      icon: <SettingsIcon sx={ic("#78909C")} />, desc: "User preferences, deleted accounts, and platform configuration.",                          route: "/platform/settings",     group: "Governance Config" },
     { name: "Help",          icon: <HelpOutlined sx={ic("#4285F4")} />, desc: "Documentation, setup guides, and platform support resources.",                             route: "/platform/help",         group: "Governance Config" },
   ],
