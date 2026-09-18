@@ -84,7 +84,7 @@ const CONNECTOR_ICONS: Record<ConnectorType, string> = {
   upload: "📤 Import / Upload",
 };
 
-const DISABLED_CONNECTOR_TYPES = new Set<string>(["sonarqube", "openvas"]);
+const DISABLED_CONNECTOR_TYPES = new Set<string>(["sonarqube"]);
 
 const SCANNER_CATEGORIES = ["dast", "sast", "network", "dependency", "enterprise"] as const;
 
@@ -292,7 +292,7 @@ const TYPE_HELP: Partial<Record<ConnectorType, string>> = {
   codeql:     "Point at a Git repo URL (public or PAT-accessible). The workflow auto-detects the language and runs CodeQL's security-and-quality query suite.",
   sonarqube:  "Either point at a self-hosted SonarQube server, or use SonarCloud (host=https://sonarcloud.io). Workflow coming soon.",
   nmap:       "Scan a single host, IP, or CIDR. Requires written authorisation from the network owner. Runs nmap -Pn -sS -sV --top-ports 1000 --script=default,safe,vuln.",
-  openvas:    "Greenbone/OpenVAS scans the target IP/CIDR with the default profile. Workflow coming soon.",
+  openvas:    "Greenbone/OpenVAS scans the target IP/CIDR with the default vulnerability profile. Runs locally on Kali — set to Local mode in Platform → Local Runner.",
   trivy:      "Provide either a container image OR a Git repo URL. Image scans hit the registry; repo scans pull manifests + IaC for misconfigs and CVEs.",
   owasp_dc:   "Scans dependency manifests (pom.xml, package.json, …) in the cloned repo against known CVEs. Add an nvd_api_key to avoid NVD rate-limits.",
   gitleaks:   "Walks the full git history for committed secrets. Public repos work without auth; private repos need a PAT.",
