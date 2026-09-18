@@ -1395,6 +1395,59 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
   const [pullResult, setPullResult] = useState<any>(null);
   const [settingUp, setSettingUp] = useState(false);
   const [setupResult, setSetupResult] = useState<any>(null);
+  const [installingTools, setInstallingTools] = useState(false);
+  const [toolsLog, setToolsLog] = useState<string[]>([]);
+  const [toolsDone, setToolsDone] = useState(false);
+
+  const { data: toolStatus, refetch: refetchTools } = useQuery<any>({
+    queryKey: ["local-runner-status-su"],
+    queryFn: () => import("../services/api").then(({ apiClient }) =>
+      apiClient.get("/local-runner/status").then((r: any) => r.data)
+    ),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const installAllTools = async () => {
+    const tools: any[] = toolStatus?.tools ?? [];
+    const missing = tools.filter((t: any) => !t.installed).map((t: any) => t.tool);
+    if (!missing.length) { setToolsLog(["All tools already installed."]); setToolsDone(true); return; }
+    setInstallingTools(true);
+    setToolsDone(false);
+    setToolsLog([`Installing ${missing.length} tools: ${missing.join(", ")}…`]);
+    const BASE = (window as any).__API_BASE__ || "";
+    for (const tool of missing) {
+      setToolsLog((p) => [...p, `\n▶ Installing ${tool}…`]);
+      try {
+        const res = await fetch(`${BASE}/api/v1/local-runner/install/${tool}/stream`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("owlet-id-token") || ""}` },
+        });
+        if (!res.body) { setToolsLog((p) => [...p, `  ✗ No stream for ${tool}`]); continue; }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = dec.decode(value, { stream: true });
+          for (const line of text.split("\n")) {
+            if (!line.startsWith("data:")) continue;
+            try {
+              const evt = JSON.parse(line.slice(5).trim());
+              if (evt.log) setToolsLog((p) => [...p, `  ${evt.log}`]);
+              if (evt.done) setToolsLog((p) => [...p, `  ✓ ${tool} installed`]);
+              if (evt.error) setToolsLog((p) => [...p, `  ✗ ${evt.error}`]);
+            } catch { /* skip malformed */ }
+          }
+        }
+      } catch (e: any) {
+        setToolsLog((p) => [...p, `  ✗ ${tool}: ${e?.message || e}`]);
+      }
+    }
+    setToolsLog((p) => [...p, "\nDone."]);
+    setInstallingTools(false);
+    setToolsDone(true);
+    refetchTools();
+  };
 
   const { data: status, isLoading, refetch } = useQuery<any>({
     queryKey: ["update-status"],
@@ -1542,6 +1595,23 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
         </Alert>
       )}
 
+      {/* Tool install log */}
+      {toolsLog.length > 0 && (
+        <Card variant="outlined" sx={{ mb: 3, bgcolor: "rgba(0,0,0,0.3)" }}>
+          <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: "text.secondary", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Tool Install Log
+              </Typography>
+              {toolsDone && <Chip label="Done" size="small" color="success" sx={{ fontSize: 10 }} />}
+            </Box>
+            <Box sx={{ fontFamily: "monospace", fontSize: 11, color: "text.secondary", whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+              {toolsLog.join("\n")}
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Buttons */}
       <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
         <Button
@@ -1552,6 +1622,15 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
           sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
         >
           {pulling ? "Updating… (may take a few minutes)" : "Pull & Update"}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={installingTools ? <CircularProgress size={16} color="inherit" /> : <Computer />}
+          disabled={!isAdmin || installingTools}
+          onClick={installAllTools}
+          sx={{ borderColor: "#34A853", color: "#34A853", "&:hover": { bgcolor: "rgba(52,168,83,0.08)" } }}
+        >
+          {installingTools ? "Installing Tools…" : "Install All Scanner Tools"}
         </Button>
         <Button
           variant="outlined"
@@ -1576,6 +1655,43 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
 
 function LocalRunnerTab() {
   const qc = useQueryClient();
+  const [toolInstalling, setToolInstalling] = useState<Record<string, boolean>>({});
+  const [toolLog, setToolLog] = useState<Record<string, string[]>>({});
+  const [toolDone, setToolDone] = useState<Record<string, boolean>>({});
+
+  const installTool = async (toolId: string) => {
+    if (toolInstalling[toolId]) return;
+    setToolInstalling((p) => ({ ...p, [toolId]: true }));
+    setToolLog((p) => ({ ...p, [toolId]: [] }));
+    setToolDone((p) => ({ ...p, [toolId]: false }));
+    const BASE = (window as any).__API_BASE__ || "";
+    try {
+      const res = await fetch(`${BASE}/api/v1/local-runner/install/${toolId}/stream`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("owlet-id-token") || ""}` },
+      });
+      if (!res.body) { setToolLog((p) => ({ ...p, [toolId]: ["No stream"] })); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const line of dec.decode(value, { stream: true }).split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          try {
+            const evt = JSON.parse(line.slice(5).trim());
+            if (evt.log) setToolLog((p) => ({ ...p, [toolId]: [...(p[toolId] ?? []), evt.log] }));
+            if (evt.done) { setToolDone((p) => ({ ...p, [toolId]: true })); refetch(); }
+            if (evt.error) setToolLog((p) => ({ ...p, [toolId]: [...(p[toolId] ?? []), `Error: ${evt.error}`] }));
+          } catch { /* skip */ }
+        }
+      }
+    } catch (e: any) {
+      setToolLog((p) => ({ ...p, [toolId]: [String(e?.message || e)] }));
+    } finally {
+      setToolInstalling((p) => ({ ...p, [toolId]: false }));
+    }
+  };
+
   const { data, isLoading, refetch } = useQuery<any>({
     queryKey: ["local-runner-status"],
     queryFn: () => import("../services/api").then(({ apiClient }) =>
@@ -1653,30 +1769,57 @@ function LocalRunnerTab() {
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 3 }}>
             {tools.map((t: any) => (
-              <Box key={t.tool} sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
-                {t.installed
-                  ? <CheckCircleIcon sx={{ color: "success.main", fontSize: 18 }} />
-                  : <ErrorIconMUI sx={{ color: "warning.main", fontSize: 18 }} />}
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{t.label}</Typography>
-                  <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{t.desc}</Typography>
+              <Box key={t.tool}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, p: 1.5, border: "1px solid", borderColor: toolDone[t.tool] ? "success.main" : "divider", borderRadius: 1 }}>
+                  {t.installed || toolDone[t.tool]
+                    ? <CheckCircleIcon sx={{ color: "success.main", fontSize: 18 }} />
+                    : <ErrorIconMUI sx={{ color: "warning.main", fontSize: 18 }} />}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{t.label}</Typography>
+                    <Typography sx={{ fontSize: 11, color: "text.secondary" }}>{t.desc}</Typography>
+                  </Box>
+                  {t.installed && (
+                    <Chip label={`v${t.version || "?"}`} size="small" variant="outlined" color="success" />
+                  )}
+                  <Chip
+                    label={t.mode === "local" ? "Local" : "GitHub Actions"}
+                    size="small"
+                    color={t.mode === "local" ? "success" : "default"}
+                    variant={t.mode === "local" ? "filled" : "outlined"}
+                  />
+                  {!t.installed && !toolDone[t.tool] && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      disabled={!!toolInstalling[t.tool]}
+                      onClick={() => installTool(t.tool)}
+                      sx={{ fontSize: 11, minWidth: 70, borderColor: "#FBBC04", color: "#FBBC04", "&:hover": { bgcolor: "rgba(251,188,4,0.08)" } }}
+                    >
+                      {toolInstalling[t.tool] ? <CircularProgress size={12} color="inherit" /> : "Install"}
+                    </Button>
+                  )}
                 </Box>
-                {t.installed && (
-                  <Chip label={`v${t.version || "?"}`} size="small" variant="outlined" color="success" />
+                {toolLog[t.tool]?.length > 0 && (
+                  <Box sx={{ fontFamily: "monospace", fontSize: 10, color: "text.secondary", bgcolor: "rgba(0,0,0,0.3)", px: 2, py: 1, borderRadius: "0 0 4px 4px", maxHeight: 100, overflow: "auto" }}>
+                    {toolLog[t.tool].join("\n")}
+                  </Box>
                 )}
-                <Chip
-                  label={t.mode === "local" ? "Local" : "GitHub Actions"}
-                  size="small"
-                  color={t.mode === "local" ? "success" : "default"}
-                  variant={t.mode === "local" ? "filled" : "outlined"}
-                />
               </Box>
             ))}
           </Box>
 
-          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
+          <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
             <Button variant="contained" size="small" href="/platform/local-runner">
               Open Setup Wizard
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => tools.filter((t: any) => !t.installed && !toolDone[t.tool]).forEach((t: any) => installTool(t.tool))}
+              disabled={tools.every((t: any) => t.installed || toolDone[t.tool])}
+              sx={{ borderColor: "#34A853", color: "#34A853" }}
+            >
+              Install All Missing
             </Button>
             <Button variant="outlined" size="small" onClick={() => refetch()}>
               Refresh
