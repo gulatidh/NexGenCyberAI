@@ -68,6 +68,22 @@ if ! command -v pip3 &>/dev/null; then
 fi
 ok "pip3: $(pip3 --version | awk '{print $2}')"
 
+# Detect Python minor version for version-specific packages (e.g. python3.14-venv)
+PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo "")
+PY_MAJ_MIN="python3${PY_MINOR:+.${PY_MINOR}}"
+
+# On Debian/Kali, ensure venv + build deps for pymssql are installed system-wide
+if $IS_DEBIAN; then
+  info "Installing Python build dependencies (venv, dev headers, freetds)…"
+  # python3-venv + version-specific variant (Kali ships python3.14 but not python3-venv by default)
+  sudo apt-get install -y python3-venv "${PY_MAJ_MIN}-venv" \
+    build-essential python3-dev "${PY_MAJ_MIN}-dev" freetds-dev \
+    &>/dev/null 2>&1 || \
+  # Fallback: try without version-specific packages (older Python)
+  sudo apt-get install -y python3-venv build-essential python3-dev freetds-dev &>/dev/null 2>&1 || \
+    warn "Some build deps may be missing — if pip install fails, run: sudo apt install build-essential python3-dev freetds-dev"
+fi
+
 if ! command -v git &>/dev/null; then
   if $IS_DEBIAN; then
     sudo apt-get install -y git
@@ -84,13 +100,41 @@ else
   warn "OS: $OS_NAME — Go binaries will be downloaded for most tools"
 fi
 
+# ── Python virtual environment ────────────────────────────────────────────────
+
+section "Python virtual environment"
+
+VENV_DIR="$REPO_DIR/venv"
+
+# Remove a Windows-created venv — it has a different directory structure and
+# won't work on Linux (venv/bin/ won't exist, only venv/Scripts/).
+if [[ -d "$VENV_DIR" && ! -f "$VENV_DIR/bin/activate" ]]; then
+  warn "Removing incompatible venv (likely created on Windows)…"
+  rm -rf "$VENV_DIR"
+fi
+
+if [[ ! -d "$VENV_DIR" ]]; then
+  info "Creating Python virtual environment at $VENV_DIR…"
+  python3 -m venv "$VENV_DIR"
+  ok "Virtual environment created"
+else
+  ok "Virtual environment already exists at $VENV_DIR"
+fi
+
+# Use the venv's pip and python for all subsequent installs
+PIP="$VENV_DIR/bin/pip"
+PYTHON="$VENV_DIR/bin/python"
+
+# Upgrade pip inside the venv to avoid build-wheel issues
+"$PIP" install --upgrade pip setuptools wheel &>/dev/null && ok "pip/setuptools/wheel upgraded"
+
 # ── Python dependencies ───────────────────────────────────────────────────────
 
 section "Python dependencies"
 REQ="$BACKEND/requirements.txt"
 if [[ -f "$REQ" ]]; then
-  info "Installing backend requirements…"
-  pip3 install --user -r "$REQ"
+  info "Installing backend requirements (this may take a few minutes)…"
+  "$PIP" install -r "$REQ"
   ok "Python packages installed"
 else
   warn "requirements.txt not found — skipping pip install"
@@ -261,10 +305,10 @@ if $INSTALL_TOOLS; then
         "tar" "trivy"
     fi
 
-    # Semgrep via pip
-    if ! command -v semgrep &>/dev/null; then
-      info "Installing semgrep via pip…"
-      pip3 install --user semgrep &>/dev/null && ok "semgrep installed" || warn "semgrep install failed"
+    # Semgrep via pip (into the venv)
+    if ! "$VENV_DIR/bin/semgrep" --version &>/dev/null 2>&1 && ! command -v semgrep &>/dev/null; then
+      info "Installing semgrep…"
+      "$PIP" install semgrep &>/dev/null && ok "semgrep installed" || warn "semgrep install failed"
     else
       ok "semgrep already installed"
     fi
@@ -298,7 +342,7 @@ if $INSTALL_TOOLS; then
       ok "OpenVAS / GVM already installed"
     fi
     # gvm-tools Python package (provides gvm-cli)
-    pip3 install --user gvm-tools &>/dev/null && ok "gvm-tools installed" || true
+    "$PIP" install gvm-tools &>/dev/null && ok "gvm-tools installed" || true
   else
     warn "OpenVAS is only available on Kali Linux via apt — skipping"
   fi
@@ -334,7 +378,7 @@ if $START_BACKEND; then
   info "(Press Ctrl+C to stop, or run in a separate terminal)"
   echo ""
   cd "$BACKEND"
-  exec python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  exec "$PYTHON" -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -343,8 +387,8 @@ section "Done"
 echo ""
 echo -e "${GREEN}Owlet local runner is set up.${RESET}"
 echo ""
-echo "  Start the backend:   cd $BACKEND && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000"
-echo "  Start the frontend:  cd $FRONTEND && npm run dev"
+echo "  Start the backend:   cd $BACKEND && $PYTHON -m uvicorn main:app --host 0.0.0.0 --port 8000"
+echo "  Start the frontend:  cd $FRONTEND && npm install && npm start"
 echo ""
 echo "  Then open: http://localhost:5173  (or port 3000)"
 echo ""

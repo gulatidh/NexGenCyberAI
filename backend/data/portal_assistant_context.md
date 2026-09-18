@@ -557,17 +557,23 @@ bash setup.sh
 ```
 The script will:
 - Detect that you are on Kali
-- Install Python packages from requirements.txt
+- Install `python3-venv`, `build-essential`, `python3-dev`, and `freetds-dev` via apt (needed for pymssql compilation and to create a venv)
+- Create a Python virtual environment at `venv/` — this is required because Kali (PEP 668) blocks system-wide pip installs
+- If a `venv/` folder already exists from a Windows clone (no `venv/bin/activate`), it removes and recreates it
+- Install backend packages into the venv using the venv's pip (no `--user` flag)
 - Prompt you for Azure AD Client ID, Tenant ID, and AI provider keys
 - Install scanner tools (apt for nmap/trivy/openvas, binary download for gitleaks/trufflehog/nuclei)
-- Start the backend at http://localhost:8000
+- Start the backend using the venv python at http://localhost:8000
 
 **Step 3 — Start the frontend (separate terminal)**
 ```bash
 cd NexGenCyberAI/frontend
-npm run dev
+npm install
+npm start
 ```
 Then open http://localhost:5173 and log in with Azure AD.
+
+> **Note:** Use `npm start`, not `npm run dev`. The project's package.json defines `start` (which runs Vite) — there is no `dev` script.
 
 **Step 4 — Open the setup wizard**
 Go to **Platform → Local Runner** in the portal. The 4-step wizard:
