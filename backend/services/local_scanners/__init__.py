@@ -86,7 +86,6 @@ def _write_findings(db, scan, findings: List[dict]) -> None:
         sev = sev_map.get((f.get("severity") or "info").lower(), Severity.INFO)
         db.add(Finding(
             scan_id=scan.id,
-            client_id=scan.client_id,
             title=(f.get("title") or "Finding")[:500],
             description=f.get("description") or "",
             severity=sev,

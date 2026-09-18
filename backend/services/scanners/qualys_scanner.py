@@ -381,7 +381,7 @@ async def _import_totalcloud_findings(api_url: str, auth) -> list:
                         "severity": _tc_severity(criticality),
                         "resource_id": resource_name,
                         "resource_type": f"azure_{resource_type.lower().replace(' ', '_')}",
-                        "framework": "qualys_cspm",
+                        "framework": None,
                         "control_id": control_id,
                         "remediation": remediation,
                         "evidence": {
