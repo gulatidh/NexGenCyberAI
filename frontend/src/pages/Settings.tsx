@@ -1393,6 +1393,8 @@ const TABS = [
 function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
   const [pulling, setPulling] = useState(false);
   const [pullResult, setPullResult] = useState<any>(null);
+  const [settingUp, setSettingUp] = useState(false);
+  const [setupResult, setSetupResult] = useState<any>(null);
 
   const { data: status, isLoading, refetch } = useQuery<any>({
     queryKey: ["update-status"],
@@ -1411,6 +1413,19 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
       setPullResult({ success: false, output: e?.response?.data?.detail || "Pull failed" });
     } finally {
       setPulling(false);
+    }
+  };
+
+  const handleSetupLocal = async () => {
+    setSettingUp(true);
+    setSetupResult(null);
+    try {
+      const res = await adminApi.setupLocal();
+      setSetupResult(res);
+    } catch (e: any) {
+      setSetupResult({ success: false, output: e?.response?.data?.detail || "Setup failed" });
+    } finally {
+      setSettingUp(false);
     }
   };
 
@@ -1484,7 +1499,7 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
         </Card>
       )}
 
-      {/* Pull result */}
+      {/* Pull result — per-step breakdown */}
       {pullResult && (
         <Card variant="outlined" sx={{ mb: 3, bgcolor: pullResult.success ? "rgba(52,168,83,0.06)" : "rgba(234,67,53,0.06)", border: `1px solid ${pullResult.success ? "rgba(52,168,83,0.3)" : "rgba(234,67,53,0.3)"}` }}>
           <CardContent>
@@ -1493,23 +1508,42 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
                 ? <CheckCircleOutlined sx={{ color: "#34A853", fontSize: 18 }} />
                 : <ErrorOutlined sx={{ color: "#EA4335", fontSize: 18 }} />}
               <Typography sx={{ fontWeight: 600, fontSize: 13, color: pullResult.success ? "#34A853" : "#EA4335" }}>
-                {pullResult.already_current ? "Already up to date" : pullResult.success ? "Update applied successfully" : "Pull failed"}
+                {pullResult.already_current ? "Already up to date" : pullResult.success ? "Update applied successfully" : "Update failed"}
               </Typography>
             </Box>
-            <Box sx={{ fontFamily: "monospace", fontSize: 12, color: "text.secondary", whiteSpace: "pre-wrap", bgcolor: "rgba(0,0,0,0.3)", p: 1.5, borderRadius: 1 }}>
+            {/* Per-step chips */}
+            {pullResult.steps && (
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1.5 }}>
+                {pullResult.steps.map((s: any, i: number) => (
+                  <Chip key={i} size="small"
+                    icon={s.ok ? <CheckCircleOutlined sx={{ fontSize: 13 }} /> : <ErrorOutlined sx={{ fontSize: 13 }} />}
+                    label={s.step}
+                    sx={{ fontSize: 11, bgcolor: s.ok ? "rgba(52,168,83,0.12)" : "rgba(234,67,53,0.12)", color: s.ok ? "#34A853" : "#EA4335", border: `1px solid ${s.ok ? "rgba(52,168,83,0.3)" : "rgba(234,67,53,0.3)"}` }}
+                  />
+                ))}
+              </Box>
+            )}
+            <Box sx={{ fontFamily: "monospace", fontSize: 11, color: "text.secondary", whiteSpace: "pre-wrap", bgcolor: "rgba(0,0,0,0.3)", p: 1.5, borderRadius: 1, maxHeight: 200, overflow: "auto" }}>
               {pullResult.output}
             </Box>
             {pullResult.restart_required && (
               <Alert severity="info" sx={{ mt: 1.5, fontSize: 12 }}>
-                Restart the backend server to apply the updated code.
+                Backend will auto-reload if started with <code>--reload</code>. If not, restart uvicorn manually.
               </Alert>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Pull button */}
-      <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+      {/* Setup local result */}
+      {setupResult && (
+        <Alert severity={setupResult.success ? "success" : "error"} sx={{ mb: 2, fontSize: 12 }}>
+          {setupResult.output}
+        </Alert>
+      )}
+
+      {/* Buttons */}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
         <Button
           variant="contained"
           startIcon={pulling ? <CircularProgress size={16} color="inherit" /> : <CloudDownload />}
@@ -1517,12 +1551,23 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
           onClick={handlePull}
           sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
         >
-          {pulling ? "Pulling..." : "Pull Latest Updates"}
+          {pulling ? "Updating… (pip may take a minute)" : "Pull & Update"}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={settingUp ? <CircularProgress size={16} color="inherit" /> : <Computer />}
+          disabled={!isAdmin || settingUp}
+          onClick={handleSetupLocal}
+        >
+          {settingUp ? "Configuring…" : "Setup Local Environment"}
         </Button>
         <Button variant="outlined" size="small" onClick={() => refetch()} disabled={isLoading}>
           Refresh Status
         </Button>
       </Box>
+      <Typography sx={{ fontSize: 11, color: "text.disabled", mt: 1 }}>
+        "Pull & Update" runs git pull + pip install + ensures frontend config. "Setup Local Environment" adds venv auto-activate and gvm-start to ~/.bashrc — run once after first install.
+      </Typography>
     </Box>
   );
 }

@@ -544,6 +544,7 @@ def list_prompt_logs(
 
 import subprocess as _subprocess
 import os as _os
+from pathlib import Path as _Path
 
 @router.get("/update/status")
 async def update_status(_=Depends(get_current_user)):
@@ -579,27 +580,109 @@ async def update_status(_=Depends(get_current_user)):
         return {"error": str(exc), "update_available": False}
 
 
+def _repo_root() -> _Path:
+    return _Path(__file__).parent.parent.parent.parent
+
+
+def _venv_pip() -> str:
+    pip = _repo_root() / "venv" / "bin" / "pip"
+    return str(pip) if pip.exists() else "pip3"
+
+
+def _run(cmd, cwd=None, timeout=120) -> tuple[bool, str]:
+    """Run a command, return (ok, combined_output)."""
+    try:
+        r = _subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0, (r.stdout + r.stderr).strip()
+    except _subprocess.TimeoutExpired:
+        return False, f"Command timed out after {timeout}s: {' '.join(cmd)}"
+    except Exception as exc:
+        return False, str(exc)
+
+
 @router.post("/update/pull")
 async def pull_update(_=Depends(get_current_user)):
-    """Run git pull origin main and return the output."""
-    try:
-        repo = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-        result = _subprocess.run(
-            ["git", "pull", "origin", "main"],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        output = (result.stdout + result.stderr).strip()
-        already_current = "Already up to date" in output
-        return {
-            "success":         result.returncode == 0,
-            "output":          output,
-            "already_current": already_current,
-            "restart_required": result.returncode == 0 and not already_current,
-        }
-    except _subprocess.TimeoutExpired:
-        return {"success": False, "output": "git pull timed out after 60 seconds.", "restart_required": False}
-    except Exception as exc:
-        return {"success": False, "output": str(exc), "restart_required": False}
+    """Full local-runner update: git pull → pip install → write frontend .env.local."""
+    repo = _repo_root()
+    steps = []
+
+    # 1 — git pull
+    ok, out = _run(["git", "pull", "origin", "main"], cwd=repo, timeout=60)
+    steps.append({"step": "git pull", "ok": ok, "output": out})
+    already_current = "Already up to date" in out
+
+    # 2 — pip install (pick up any new requirements)
+    req = repo / "backend" / "requirements.txt"
+    if req.exists():
+        ok2, out2 = _run([_venv_pip(), "install", "-q", "-r", str(req)], timeout=300)
+        steps.append({"step": "pip install", "ok": ok2, "output": out2 or "All packages up to date"})
+    else:
+        steps.append({"step": "pip install", "ok": True, "output": "requirements.txt not found — skipped"})
+
+    # 3 — ensure frontend/.env.local exists (AADSTS900144 guard)
+    fe_env = repo / "frontend" / ".env.local"
+    if not fe_env.exists():
+        try:
+            fe_env.write_text(
+                "REACT_APP_API_URL=http://localhost:8000/api/v1\n"
+                "REACT_APP_AZURE_CLIENT_ID=2978ef0b-865f-40bc-b7eb-507b6e258ae9\n"
+                "REACT_APP_AZURE_TENANT_ID=5e9623cc-7e4c-4408-8b5d-e15ea58e9528\n"
+                "REACT_APP_REDIRECT_URI=http://localhost:3000\n"
+                "REACT_APP_BACKEND_CLIENT_ID=4972190d-8a6c-4e0e-a326-aee1ca281bf3\n"
+            )
+            steps.append({"step": "frontend/.env.local", "ok": True, "output": "Created (was missing)"})
+        except Exception as exc:
+            steps.append({"step": "frontend/.env.local", "ok": False, "output": str(exc)})
+    else:
+        steps.append({"step": "frontend/.env.local", "ok": True, "output": "Already exists"})
+
+    overall_ok = all(s["ok"] for s in steps)
+    combined = "\n".join(f"[{s['step']}]\n{s['output']}" for s in steps)
+    return {
+        "success":          overall_ok,
+        "output":           combined,
+        "already_current":  already_current,
+        "restart_required": ok and not already_current,
+        "steps":            steps,
+    }
+
+
+@router.post("/update/setup-local")
+async def setup_local_env(_=Depends(get_current_user)):
+    """One-time local environment setup: venv auto-activate + gvm-start in ~/.bashrc."""
+    home = _Path.home()
+    bashrc = home / ".bashrc"
+    added = []
+
+    def _append_if_missing(marker: str, block: str):
+        content = bashrc.read_text(errors="replace") if bashrc.exists() else ""
+        if marker not in content:
+            with bashrc.open("a") as f:
+                f.write(f"\n{block}\n")
+            added.append(marker)
+
+    # Auto-activate venv
+    venv_activate = _repo_root() / "venv" / "bin" / "activate"
+    _append_if_missing(
+        "# Owlet venv",
+        f"# Owlet venv — auto-activate\n"
+        f"if [ -f \"{venv_activate}\" ]; then\n"
+        f"    source \"{venv_activate}\"\n"
+        f"fi",
+    )
+
+    # Auto-start GVM daemon (OpenVAS)
+    _append_if_missing(
+        "# Owlet GVM auto-start",
+        "# Owlet GVM auto-start (OpenVAS)\n"
+        "if command -v gvmd &>/dev/null && ! pgrep -x gvmd > /dev/null 2>&1; then\n"
+        "    sudo gvm-start > /dev/null 2>&1\n"
+        "fi",
+    )
+
+    if added:
+        msg = f"Added to ~/.bashrc: {', '.join(added)}. Open a new terminal or run: source ~/.bashrc"
+    else:
+        msg = "~/.bashrc already configured — nothing to add."
+
+    return {"success": True, "output": msg, "added": added}
