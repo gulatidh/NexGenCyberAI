@@ -196,28 +196,22 @@ async def _install_stream(tool_name: str) -> AsyncGenerator[str, None]:
     # ── apt (prefer on Kali, also for tools that only have apt) ──────────────
     apt_pkg = spec.get("apt_pkg")
     if apt_pkg and (is_kali or not spec.get("binary_url")):
-        yield _sse({"msg": f"Installing {apt_pkg} via apt-get…"})
-        # Try without sudo, then with sudo
-        for cmd in [
-            ["apt-get", "install", "-y", apt_pkg],
-            ["sudo", "apt-get", "install", "-y", "-q", apt_pkg],
-        ]:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            async for raw in proc.stdout:
-                line = raw.decode(errors="replace").rstrip()
-                if line:
-                    yield _sse({"line": line})
-            await proc.wait()
-            if proc.returncode == 0:
-                break
+        yield _sse({"msg": f"Installing {apt_pkg} via apt-get (sudo)…"})
+        # Always use sudo — the backend runs as a regular user and apt needs root
+        proc = await asyncio.create_subprocess_exec(
+            "sudo", "apt-get", "install", "-y", "-q", apt_pkg,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        async for raw in proc.stdout:
+            line = raw.decode(errors="replace").rstrip()
+            if line:
+                yield _sse({"line": line})
+        await proc.wait()
         if proc.returncode != 0:
             # apt failed — fall through to binary download if available
             if not spec.get("binary_url") and not spec.get("pip_pkg"):
-                yield _sse({"error": f"apt-get install {apt_pkg} failed. Try: sudo apt-get install -y {apt_pkg}"})
+                yield _sse({"error": f"apt-get install {apt_pkg} failed. Run manually: sudo apt-get install -y {apt_pkg}"})
                 return
             yield _sse({"msg": "apt-get failed — trying binary download instead…"})
 
@@ -225,8 +219,11 @@ async def _install_stream(tool_name: str) -> AsyncGenerator[str, None]:
     pip_pkg = spec.get("pip_pkg")
     if pip_pkg:
         yield _sse({"msg": f"Installing {pip_pkg} via pip…"})
+        # Use venv pip if available (avoids PEP 668 externally-managed error on Kali)
+        _venv_pip = Path(__file__).parent.parent.parent.parent / "venv" / "bin" / "pip"
+        _pip_cmd = str(_venv_pip) if _venv_pip.exists() else "pip3"
         proc = await asyncio.create_subprocess_exec(
-            "pip3", "install", "--user", pip_pkg,
+            _pip_cmd, "install", pip_pkg,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )
