@@ -156,12 +156,14 @@ TOOLS: dict[str, dict] = {
     "codeql": {
         "label": "CodeQL CLI",
         "desc": "GitHub's semantic code analysis engine",
-        "check_cmd": ["codeql", "version", "--format=json"],
+        # binary lives at ~/.owlet/bin/codeql/codeql — use full sub-path for _probe/_which
+        "check_cmd": ["codeql/codeql", "version", "--format=json"],
         "version_parse": lambda o: (json.loads(o) if o.strip().startswith("{") else {}).get("version") or o.strip(),
         "apt_pkg": None,
-        "binary_url": f"https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.19.0/codeql-bundle-linux64.tar.gz",
+        "binary_url": "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.19.0/codeql-bundle-linux64.tar.gz",
         "binary_name": "codeql/codeql",
         "binary_archive": "tar",
+        "binary_extract_dir": "codeql",  # extract entire directory, not just the binary
         "pip_pkg": None,
         "workflow": "codeql-scan.yml",
     },
@@ -199,12 +201,16 @@ def _probe(tool_name: str) -> dict:
     spec = TOOLS.get(tool_name, {})
     if not spec:
         return {"installed": False, "version": None, "binary_path": None}
-    binary_path = _which(spec["check_cmd"][0])
+    # Use binary_name for lookup when check_cmd[0] is a sub-path (e.g. "codeql/codeql")
+    lookup = spec.get("binary_name") or spec["check_cmd"][0]
+    binary_path = _which(lookup)
     if not binary_path:
         return {"installed": False, "version": None, "binary_path": None}
     try:
+        # Use resolved absolute path as argv[0] so nested binaries work
+        cmd = [binary_path] + spec["check_cmd"][1:]
         r = subprocess.run(
-            spec["check_cmd"], capture_output=True, text=True,
+            cmd, capture_output=True, text=True,
             timeout=10, env=_env_with_bin(),
         )
         out = r.stdout or r.stderr or ""
@@ -307,34 +313,53 @@ async def _install_stream(tool_name: str) -> AsyncGenerator[str, None]:
             await asyncio.get_event_loop().run_in_executor(
                 None, lambda: urllib.request.urlretrieve(binary_url, archive_path)
             )
-            yield _sse({"msg": "Extracting binary…"})
-            dest = OWLET_BIN / binary_name
-            if archive_type == "tar":
+            yield _sse({"msg": "Extracting…"})
+            extract_dir = spec.get("binary_extract_dir")  # e.g. "codeql" → extract whole dir
+            if extract_dir and archive_type == "tar":
+                # Extract entire directory tree (e.g. CodeQL bundle needs query packs alongside binary)
+                dest_dir = OWLET_BIN / extract_dir
+                shutil.rmtree(dest_dir, ignore_errors=True)
                 with tarfile.open(archive_path) as tf:
-                    member = next(
-                        (m for m in tf.getmembers()
-                         if m.name == binary_name or m.name.endswith(f"/{binary_name}")),
-                        None,
-                    )
-                    if not member:
-                        yield _sse({"error": f"'{binary_name}' not found in archive"})
+                    members = [m for m in tf.getmembers()
+                               if m.name == extract_dir or m.name.startswith(f"{extract_dir}/")]
+                    if not members:
+                        yield _sse({"error": f"'{extract_dir}/' not found in archive"})
                         return
-                    member.name = binary_name
-                    tf.extract(member, OWLET_BIN)
-            else:  # zip
-                with zipfile.ZipFile(archive_path) as zf:
-                    match = next(
-                        (n for n in zf.namelist()
-                         if n == binary_name or n.endswith(f"/{binary_name}")),
-                        None,
-                    )
-                    if not match:
-                        yield _sse({"error": f"'{binary_name}' not found in zip"})
-                        return
-                    with zf.open(match) as src, open(dest, "wb") as dst:
-                        dst.write(src.read())
-            dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-            yield _sse({"msg": f"Installed to {dest}"})
+                    tf.extractall(OWLET_BIN, members=members)
+                # chmod the binary inside the extracted dir
+                bin_path = OWLET_BIN / binary_name
+                if bin_path.exists():
+                    bin_path.chmod(bin_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+                yield _sse({"msg": f"Installed to {dest_dir}"})
+            else:
+                dest = OWLET_BIN / binary_name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if archive_type == "tar":
+                    with tarfile.open(archive_path) as tf:
+                        member = next(
+                            (m for m in tf.getmembers()
+                             if m.name == binary_name or m.name.endswith(f"/{binary_name}")),
+                            None,
+                        )
+                        if not member:
+                            yield _sse({"error": f"'{binary_name}' not found in archive"})
+                            return
+                        member.name = binary_name
+                        tf.extract(member, OWLET_BIN)
+                else:  # zip
+                    with zipfile.ZipFile(archive_path) as zf:
+                        match = next(
+                            (n for n in zf.namelist()
+                             if n == binary_name or n.endswith(f"/{binary_name}")),
+                            None,
+                        )
+                        if not match:
+                            yield _sse({"error": f"'{binary_name}' not found in zip"})
+                            return
+                        with zf.open(match) as src, open(dest, "wb") as dst:
+                            dst.write(src.read())
+                dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+                yield _sse({"msg": f"Installed to {dest}"})
         except Exception as exc:
             yield _sse({"error": str(exc)})
             return

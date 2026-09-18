@@ -597,12 +597,17 @@ async def _sslyze(target: str) -> List[dict]:
 async def _codeql(repo_url: str, language: str = "") -> List[dict]:
     if not repo_url:
         return []
+    # Prefer the explicit ~/.owlet/bin/codeql/codeql path (full bundle with query packs)
+    _owlet_codeql = Path.home() / ".owlet" / "bin" / "codeql" / "codeql"
     codeql_bin = (
-        shutil.which("codeql", path=_env()["PATH"])
-        or str(Path.home() / ".owlet" / "bin" / "codeql" / "codeql")
+        str(_owlet_codeql) if _owlet_codeql.exists()
+        else shutil.which("codeql", path=_env()["PATH"])
     )
-    if not Path(codeql_bin).exists():
-        raise RuntimeError("CodeQL CLI not found — install from https://github.com/github/codeql-action/releases")
+    if not codeql_bin or not Path(codeql_bin).exists():
+        raise RuntimeError(
+            "CodeQL CLI not found — go to Settings → Local Runner and click Install next to CodeQL, "
+            "or re-run setup.sh on Kali."
+        )
 
     with tempfile.TemporaryDirectory() as base:
         src = os.path.join(base, "src")
