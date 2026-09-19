@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── Fixed schema fields (normaliser enforces these) ─────────────────────────
 
 
-_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "platform", "trust_zone", "environment", "datacenter", "criticality", "notes")
+_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "platform", "trust_zone", "environment", "datacenter", "criticality", "data_classification", "bia_impact", "bia_justification", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
                      "port", "direction", "trust_boundary_crossing", "exposure",
                      "authentication_required")
@@ -330,6 +330,10 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
 
 {{
   "executive_summary": "<2-4 sentence CISO-level overview>",
+  "scope_statement": "<1-2 sentences: what is explicitly in scope for this threat model — systems, environments, trust zones>",
+  "out_of_scope": ["<item 1 — e.g. Physical security of data centers>", "<item 2 — e.g. Third-party SaaS supply chain risks>", "<item 3 — e.g. End-user device security>"],
+  "assumptions": ["<assumption 1 — e.g. All network ACLs are correctly enforced as per firewall policy>", "<assumption 2 — e.g. TLS certificates are valid and managed by the platform team>", "<assumption 3 — e.g. Patch management process exists but current patch cadence is unknown>"],
+  "regulatory_frameworks_applicable": ["<e.g. nist_800_53>", "<e.g. iso_27001>", "<e.g. mas_trm if Singapore financial context>"],
   "components": [
     {{ "id": "<short-slug>", "name": "<asset name>",
       "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|threat_actor|other>",
@@ -341,6 +345,9 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "environment": "<Production|UAT|Development|DR|Staging>",
       "datacenter": "<free text — e.g. Azure Southeast Asia, On-Prem DC1, AWS us-east-1, Office Network>",
       "criticality": "<critical|high|medium|low>",
+      "data_classification": "<public|internal|confidential|highly_confidential|secret>",
+      "bia_impact": "<critical|high|medium|low>",
+      "bia_justification": "<one sentence — e.g. 'Stores PII for all customers, 4-hour RTO; outage disrupts payment processing'>",
       "notes": "<one-line>" }}
   ],
   SCHEMA NOTES:
@@ -370,7 +377,7 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "is_attack_vector": <true|false>,
       "protocol": "<https|sql|ssh|smb|grpc|amqp|dns|other>",
       "port": "<port number e.g. 443, 5432, 8080>",
-      "data": "<credentials|pii|financial|telemetry|config|other>",
+      "data": "<pii|financial|operational|config|credentials|audit_logs|session_tokens|transactions|reports|telemetry|public|other>",
       "encrypted": <true|false>,
       "direction": "<ingress|egress|internal|bidirectional>",
       "trust_boundary_crossing": <true|false>,
@@ -420,10 +427,14 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
   ],
   "mitigations": [
     {{ "id": "M01", "threat_id": "T01",
-      "action": "<concrete remediation step>",
-      "implementation_detail": "<3-6 sentences: exactly what to configure / code / deploy. Not 'review your IAM policies' — 'enable Conditional Access policy requiring MFA for any sign-in from outside the corporate IP range, scoped to the Finance group'>",
+      "action": "<concrete remediation step — specific, not generic>",
+      "implementation_detail": "<3-6 sentences: exactly what to configure / code / deploy. Not 'review your IAM policies' — 'enable Conditional Access policy requiring MFA for any sign-in from outside the corporate IP range, scoped to the Finance group'. Where internal lateral movement is the threat, recommend ZTNA / identity-aware proxy architecture over traditional network segmentation alone.>",
+      "architecture_approach": "<ztna|network_segmentation|pam|mfa|tls|monitoring|patching|waf|dlp|siem|data_encryption|least_privilege|identity_aware_proxy>",
       "control_refs": [
-        {{ "framework": "nist_800_53|nist_csf|owasp_asvs|owasp_top10|cis_v8|iso_27001", "control_id": "AC-2" }}
+        {{ "framework": "nist_800_53|nist_csf|owasp_asvs|owasp_top10|cis_v8|iso_27001|mas_trm|gcc_im8|pci_dss", "control_id": "AC-2", "requirement": "<short description of the requirement>" }}
+      ],
+      "regulatory_refs": [
+        {{ "framework": "mas_trm|gcc_im8|iso_27001|nist_800_53|pci_dss", "section": "7.2.1", "requirement": "<name of the regulation or standard requirement>" }}
       ],
       "status": "open",
       "owner_role": "<security|appdev|platform|grc>",
@@ -1395,9 +1406,16 @@ def _normalise(raw: Dict[str, Any], methodology: str) -> Dict[str, Any]:
             "rationale": _str(ap.get("rationale")),
         })
 
+    out_of_scope_raw = raw.get("out_of_scope") or []
+    assumptions_raw = raw.get("assumptions") or []
+    reg_fw_raw = raw.get("regulatory_frameworks_applicable") or []
     return {
         "executive_summary": _str(raw.get("executive_summary")) or
             f"Threat model covers {len(components)} component(s) with {len(threats)} threats.",
+        "scope_statement": _str(raw.get("scope_statement")),
+        "out_of_scope": [_str(x) for x in (out_of_scope_raw if isinstance(out_of_scope_raw, list) else []) if x],
+        "assumptions": [_str(x) for x in (assumptions_raw if isinstance(assumptions_raw, list) else []) if x],
+        "regulatory_frameworks_applicable": [_str(x) for x in (reg_fw_raw if isinstance(reg_fw_raw, list) else []) if x],
         "components": components,
         "data_flows": data_flows,
         "trust_boundaries": trust_boundaries,
@@ -2080,6 +2098,13 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
             tm.maturity_scores = {}
         # Phase 9 — adversary profiles
         tm.adversary_profiles_json = model.get("adversary_profiles") or []
+        # Scope, assumptions, regulatory context (stored as metadata_json)
+        tm.metadata_json = {
+            "scope_statement": model.get("scope_statement") or "",
+            "out_of_scope": model.get("out_of_scope") or [],
+            "assumptions": model.get("assumptions") or [],
+            "regulatory_frameworks_applicable": model.get("regulatory_frameworks_applicable") or [],
+        }
         # Phase 9 — attack trees (derived from blast_radius chaining)
         try:
             tm.attack_trees_json = _derive_attack_trees(

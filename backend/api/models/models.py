@@ -837,6 +837,8 @@ class ThreatModel(Base):
     attack_trees_json = Column(JSON, default=list)
     # Phase 9 — adversary profiles (actor → TTPs → targeted assets)
     adversary_profiles_json = Column(JSON, default=list)
+    # Scope statement, out_of_scope list, assumptions, applicable regulatory frameworks
+    metadata_json = Column(JSON, default=dict)
     # Phase 9 — structured Sigma/KQL rule stubs from detection_rule_refs
     sigma_rules_json = Column(JSON, default=list)
     # Phase 9 — auto re-generate when a new scan completes for this client

@@ -375,6 +375,7 @@ def _ensure_added_columns() -> None:
             ("attack_trees_json", "TEXT"),
             ("adversary_profiles_json", "TEXT"),
             ("sigma_rules_json", "TEXT"),
+            ("metadata_json", "TEXT"),
             ("auto_remodel", "INTEGER DEFAULT 0"),
             ("cloud_provider", "VARCHAR(32) DEFAULT 'generic'"),
         ]:

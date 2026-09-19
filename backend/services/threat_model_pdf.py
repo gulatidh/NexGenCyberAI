@@ -796,11 +796,12 @@ def render_threat_model_docx(
 # ── Portal-style standalone HTML export ──────────────────────────────────────
 
 def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unknown Client") -> str:
-    """Self-contained HTML that mirrors the portal's tab layout.
+    """Self-contained HTML mirroring the portal's tab layout.
 
-    Includes Mermaid.js (CDN) so the diagram renders in the browser.
-    All sections are shown as tab panels with a top nav bar.
-    Designed to be opened in any browser without a server.
+    Includes Mermaid.js (CDN) so the diagram renders in any browser.
+    Enhanced with: risk scoring legend, threat actor profiles, scope &
+    assumptions, regulatory traceability matrix, attack narratives,
+    specific mitigation implementation details, and data classification.
     """
     components: List[Dict[str, Any]] = tm.components_json or []
     data_flows: List[Dict[str, Any]] = tm.data_flows_json or []
@@ -811,6 +812,8 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     entry_points: List[Dict[str, Any]] = tm.entry_points_json or []
     maturity: Dict[str, float] = tm.maturity_scores or {}
     sigma_rules: List[Dict[str, Any]] = tm.sigma_rules_json or []
+    adversary_profiles: List[Dict[str, Any]] = tm.adversary_profiles_json or []
+    metadata: Dict[str, Any] = (tm.metadata_json or {}) if isinstance(tm.metadata_json, dict) else {}
 
     methodology = (tm.methodology or "stride").upper()
     title = tm.name or f"Threat Model · {methodology}"
@@ -822,15 +825,20 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     for m in mitigations:
         mit_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
 
-    # ── Overview cards ────────────────────────────────────────────────────────
+    # ── Overview KPI cards ─────────────────────────────────────────────────────
     coverage_pct = 0
     if coverage:
         non_missing = sum(1 for d in coverage if d.get("state") != "missing")
         coverage_pct = round((non_missing / len(coverage)) * 100, 1)
 
+    critical_count = sum(1 for t in threats if (t.get("severity") or "").lower() == "critical")
+    high_count = sum(1 for t in threats if (t.get("severity") or "").lower() == "high")
+
     overview_html = f"""
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-v">{len(threats)}</div><div class="kpi-l">Threats</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#ea4335;">{critical_count}</div><div class="kpi-l">Critical Threats</div></div>
+  <div class="kpi"><div class="kpi-v" style="color:#ff9800;">{high_count}</div><div class="kpi-l">High Threats</div></div>
+  <div class="kpi"><div class="kpi-v">{len(threats)}</div><div class="kpi-l">Total Threats</div></div>
   <div class="kpi"><div class="kpi-v">{len(components)}</div><div class="kpi-l">Components</div></div>
   <div class="kpi"><div class="kpi-v">{len(mitigations)}</div><div class="kpi-l">Mitigations</div></div>
   <div class="kpi"><div class="kpi-v">{coverage_pct}%</div><div class="kpi-l">Coverage</div></div>
@@ -847,29 +855,67 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
 """
 
     # ── Components tab ─────────────────────────────────────────────────────────
+    _DATA_CLASS_COLOR = {
+        "public": "#94a3b8", "internal": "#7dd3fc", "confidential": "#fb923c",
+        "highly_confidential": "#f87171", "secret": "#c084fc",
+    }
+    _BIA_COLOR = {"critical": "#ea4335", "high": "#ff9800", "medium": "#fbbc04", "low": "#34a853"}
     threatened_ids = {str(t.get("asset_id")) for t in threats}
-    comp_rows = "".join(
-        f"<tr><td>{_h(c.get('id'))}</td><td>{_h(c.get('name'))}</td>"
-        f"<td>{_h(c.get('type'))}</td><td><span class='zone-pill'>{_h(c.get('trust_zone'))}</span></td>"
-        f"<td>{_h(c.get('criticality'))}</td>"
-        f"<td>{'<span class=\"warn-pill\">No threats — review</span>' if str(c.get('id')) not in threatened_ids else '<span class=\"ok-pill\">Covered</span>'}</td>"
-        f"<td>{_h(c.get('notes'))}</td></tr>"
-        for c in components
-    ) or "<tr><td colspan='7' class='muted'>No components.</td></tr>"
-    flow_rows = "".join(
-        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{}).get('name') or f.get('from'))}</td>"
-        f"<td>{_h(comp_by_id.get(str(f.get('to')),{}).get('name') or f.get('to'))}</td>"
-        f"<td><span class='proto-pill'>{_h(f.get('protocol'))}</span></td><td>{_h(f.get('data'))}</td>"
-        f"<td>{'<span class=\"enc-yes\">TLS</span>' if f.get('encrypted') else '<span class=\"enc-no\">PLAIN</span>'}</td>"
-        f"<td>{'<span class=\"warn-pill\">⚠ Crosses boundary</span>' if f.get('trust_boundary_crossing') else ''}</td></tr>"
-        for f in data_flows
-    ) or "<tr><td colspan='6' class='muted'>No data flows.</td></tr>"
+
+    def _comp_row(c: Dict[str, Any]) -> str:
+        cid = str(c.get("id") or "")
+        dc = (c.get("data_classification") or "").lower()
+        bia = (c.get("bia_impact") or "").lower()
+        bia_j = c.get("bia_justification") or ""
+        dc_style = f"color:{_DATA_CLASS_COLOR.get(dc,'#94a3b8')};font-weight:700;font-size:11px;"
+        bia_style = f"color:{_BIA_COLOR.get(bia,'#94a3b8')};font-weight:700;font-size:11px;"
+        cov = ('<span class="warn-pill">No threats — review</span>'
+               if cid not in threatened_ids else '<span class="ok-pill">Covered</span>')
+        env_dc = " · ".join(x for x in [c.get("environment", ""), c.get("datacenter", "")] if x)
+        return (
+            f"<tr><td>{_h(c.get('name'))}</td>"
+            f"<td>{_h(c.get('type'))}<br/><span class='muted'>{_h(env_dc)}</span></td>"
+            f"<td><span class='zone-pill'>{_h(c.get('trust_zone'))}</span></td>"
+            f"<td>{_h(c.get('criticality'))}</td>"
+            f"<td><span style='{dc_style}'>{_h(dc.replace('_',' ').title() or '—')}</span></td>"
+            f"<td><span style='{bia_style}'>{_h(bia.upper() or '—')}</span>"
+            f"{'<br/><span class=\"muted\" style=\"font-size:10px;\">' + _h(bia_j[:80]) + '</span>' if bia_j else ''}</td>"
+            f"<td>{cov}</td>"
+            f"<td>{_h(c.get('notes'))}</td></tr>"
+        )
+
+    comp_rows = "".join(_comp_row(c) for c in components) or "<tr><td colspan='8' class='muted'>No components.</td></tr>"
+
+    _DATA_LABEL_STYLE = {
+        "pii": "color:#f87171;font-weight:700;", "financial": "color:#fb923c;font-weight:700;",
+        "credentials": "color:#c084fc;font-weight:700;", "audit_logs": "color:#7dd3fc;font-weight:700;",
+        "session_tokens": "color:#c084fc;font-weight:700;", "highly_confidential": "color:#f87171;font-weight:700;",
+    }
+
+    def _flow_row(f: Dict[str, Any]) -> str:
+        data_label = _h(f.get("data") or "—")
+        data_style = _DATA_LABEL_STYLE.get((f.get("data") or "").lower(), "")
+        boundary_flag = '<span class="warn-pill">⚠ Crosses boundary</span>' if f.get("trust_boundary_crossing") else ""
+        atk_flag = '<span class="pill" style="background:rgba(234,67,53,.2);color:#ea4335;font-size:10px;">Attack vector</span>' if f.get("is_attack_vector") else ""
+        return (
+            f"<tr>"
+            f"<td>{_h(comp_by_id.get(str(f.get('from')),{{}}).get('name') or f.get('from'))}</td>"
+            f"<td>{_h(comp_by_id.get(str(f.get('to')),{{}}).get('name') or f.get('to'))}</td>"
+            f"<td><span class='proto-pill'>{_h(f.get('protocol'))}</span> <span class='muted'>{_h(f.get('port') or '')}</span></td>"
+            f"<td><span style='{data_style}'>{data_label}</span></td>"
+            f"<td>{'<span class=\"enc-yes\">TLS</span>' if f.get('encrypted') else '<span class=\"enc-no\">PLAIN</span>'}</td>"
+            f"<td>{boundary_flag}{atk_flag}</td></tr>"
+        )
+
+    flow_rows = "".join(_flow_row(f) for f in data_flows) or "<tr><td colspan='6' class='muted'>No data flows.</td></tr>"
+
     components_html = f"""
 <h3>Components ({len(components)})</h3>
-<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Trust Zone</th><th>Criticality</th><th>Coverage</th><th>Notes</th></tr></thead>
+<p class="muted" style="margin-bottom:8px;">Data classification: <span style="color:#94a3b8;">Public</span> · <span style="color:#7dd3fc;">Internal</span> · <span style="color:#fb923c;">Confidential</span> · <span style="color:#f87171;">Highly Confidential</span> · <span style="color:#c084fc;">Secret</span></p>
+<table><thead><tr><th>Name</th><th>Type / Environment</th><th>Trust Zone</th><th>Criticality</th><th>Data Classification</th><th>BIA Impact</th><th>Coverage</th><th>Notes</th></tr></thead>
 <tbody>{comp_rows}</tbody></table>
 <h3>Data Flows ({len(data_flows)})</h3>
-<table><thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th><th>Encrypted</th><th>Flags</th></tr></thead>
+<table><thead><tr><th>From</th><th>To</th><th>Protocol / Port</th><th>Data</th><th>Encrypted</th><th>Flags</th></tr></thead>
 <tbody>{flow_rows}</tbody></table>
 """
 
@@ -879,6 +925,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         f"<td>{_h(tb.get('description'))}</td><td>{len(tb.get('crossed_by_flow_ids') or [])}</td></tr>"
         for tb in trust_boundaries
     ) or "<tr><td colspan='4' class='muted'>No trust boundaries.</td></tr>"
+
     def _ep_row(ep: Dict[str, Any]) -> str:
         exp_cls = (ep.get("exposure") or "").lower()
         auth = "Yes" if ep.get("auth_required") else "No"
@@ -890,8 +937,8 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         )
     ep_rows = "".join(_ep_row(ep) for ep in entry_points) or "<tr><td colspan='5' class='muted'>No entry points.</td></tr>"
     cross_rows = "".join(
-        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{}).get('name') or f.get('from'))}</td>"
-        f"<td>{_h(comp_by_id.get(str(f.get('to')),{}).get('name') or f.get('to'))}</td>"
+        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{{}}).get('name') or f.get('from'))}</td>"
+        f"<td>{_h(comp_by_id.get(str(f.get('to')),{{}}).get('name') or f.get('to'))}</td>"
         f"<td>{_h(f.get('protocol'))}</td><td>{_h(f.get('data'))}</td></tr>"
         for f in data_flows if f.get("trust_boundary_crossing")
     ) or "<tr><td colspan='4' class='muted'>No boundary-crossing flows.</td></tr>"
@@ -907,34 +954,91 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
 <tbody>{cross_rows}</tbody></table>
 """
 
-    # ── Threats tab ────────────────────────────────────────────────────────────
+    # ── Threats tab — with scoring legend, ATT&CK, attack narrative, blast radius ──
+    _SEV_WEIGHT = {"critical": 3.0, "high": 2.0, "medium": 1.0, "low": 0.5}
+    _CRIT_WEIGHT = {"critical": 2.0, "high": 1.5, "medium": 1.0, "low": 0.5}
+    scoring_legend = """
+<div class="info-box" style="background:#1e1e30;border:1px solid #2d2d45;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
+  <div class="section-label" style="margin-bottom:8px;">Risk Scoring Model — DREAD-derived Priority Formula</div>
+  <p style="margin-bottom:6px;">Priority Score (P) = <strong>Severity Weight × Likelihood (1-10) × Impact (1-10) × Asset Criticality Weight</strong></p>
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px;">
+    <div><div class="section-label">Severity Weight</div>
+      <table style="margin:4px 0;"><tr><td style="color:#ea4335;font-weight:700;">Critical</td><td style="padding-left:12px;">× 3.0</td></tr>
+      <tr><td style="color:#ff9800;font-weight:700;">High</td><td style="padding-left:12px;">× 2.0</td></tr>
+      <tr><td style="color:#fbbc04;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
+      <tr><td style="color:#34a853;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
+    <div><div class="section-label">Asset Criticality Weight</div>
+      <table style="margin:4px 0;"><tr><td style="color:#ea4335;font-weight:700;">Critical</td><td style="padding-left:12px;">× 2.0</td></tr>
+      <tr><td style="color:#ff9800;font-weight:700;">High</td><td style="padding-left:12px;">× 1.5</td></tr>
+      <tr><td style="color:#fbbc04;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
+      <tr><td style="color:#34a853;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
+    <div><div class="section-label">Risk Register Score</div><p style="margin-top:6px;">= Likelihood × Impact ÷ 10</p>
+      <p style="margin-top:4px;color:#6b7280;font-size:11px;">Used in the risk register. Max score = 10 (L=10, I=10).</p></div>
+    <div><div class="section-label">Grounding</div>
+      <p style="margin-top:6px;"><span class="pill pill-red">UNGROUNDED</span> = no CVE, finding, or ATT&CK evidence cited.</p>
+      <p>Ungrounded threats are retained but demoted — treat as hypothetical until evidence is attached.</p></div>
+  </div>
+</div>"""
+
     by_comp: Dict[str, List[Dict[str, Any]]] = {}
     for t in threats:
         by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
-    threat_blocks = []
+    threat_blocks = [scoring_legend]
     for comp_id, t_list in by_comp.items():
         comp_name = comp_by_id.get(comp_id, {}).get("name") or comp_id
         threat_blocks.append(f"<h3>{_h(comp_name)} <span class='muted'>({len(t_list)} threats)</span></h3>")
         for t in sorted(t_list, key=lambda x: x.get("priority_score", 0), reverse=True):
             sev = (t.get("severity") or "medium").lower()
-            bg = _SEV_BG.get(sev, "#f1f5f9")
-            fg = _SEV_FG.get(sev, "#475569")
+            bg = {"critical": "#fee2e2", "high": "#ffedd5", "medium": "#fef3c7", "low": "#dcfce7"}.get(sev, "#f1f5f9")
+            fg = {"critical": "#991b1b", "high": "#9a3412", "medium": "#92400e", "low": "#166534"}.get(sev, "#475569")
             mits = mit_by_threat.get(str(t.get("id")), [])
-            mit_li = "".join(f"<li><strong>{_h(m.get('action'))}</strong> <span class='muted'>({_h(m.get('status','open'))})</span></li>" for m in mits)
+            mit_li = "".join(
+                f"<li><strong>{_h(m.get('action'))}</strong> <span class='muted'>({_h(m.get('status','open'))})</span></li>"
+                for m in mits
+            )
+            li_val = int(t.get("likelihood") or 0)
+            im_val = int(t.get("impact") or 0)
+            ps = t.get("priority_score")
+            score_detail = (f"L{li_val} × I{im_val} = {li_val*im_val}" if li_val and im_val else "—")
+            techniques = t.get("attack_techniques") or []
+            capecs = t.get("capec_refs") or []
+            cwes = t.get("cwe_refs") or []
+            blast = t.get("blast_radius") or []
+            blast_names = [comp_by_id.get(bid, {}).get("name") or bid for bid in blast]
+            narrative = t.get("attack_narrative") or ""
+            tech_pills = "".join(
+                f"<span class='pill' style='background:#1e293b;color:#94a3b8;font-size:10px;margin:1px;'>{_h(tech)}</span>"
+                for tech in (techniques + capecs + cwes)[:8]
+            )
+            blast_text = (
+                "<p style='margin-top:6px;'><strong>Blast radius:</strong> " +
+                " → ".join(f"<span class='zone-pill'>{_h(n)}</span>" for n in blast_names) + "</p>"
+                if blast_names else ""
+            )
+            narrative_block = (
+                f"<div style='margin-top:8px;padding:8px 10px;background:#1a1a28;border-radius:4px;font-size:12px;'>"
+                f"<div class='section-label' style='margin-bottom:4px;'>Attack Narrative</div>"
+                f"<p style='color:#cbd5e1;'>{_h(narrative)}</p></div>"
+                if narrative else ""
+            )
             threat_blocks.append(f"""<div class="threat-card" style="border-left:3px solid {fg}; background:{bg}20;">
   <div class="threat-meta">
     <span class="pill" style="background:{bg};color:{fg};">{sev.upper()}</span>
-    <span class="pill pill-grey">{_h(t.get('category','').replace('_',' ').title())}</span>
-    <span class="pill pill-blue">P{t.get('priority_score','—')}</span>
+    <span class="pill pill-grey">{_h((t.get('category') or '').replace('_',' ').title())}</span>
+    <span class="pill pill-blue" title="Priority Score = Severity Weight × Likelihood × Impact × Asset Criticality Weight">P{_h(str(ps or '—'))}</span>
+    <span class="pill pill-grey" title="Likelihood × Impact">{_h(score_detail)}</span>
     <span class="pill {'pill-green' if t.get('is_grounded') else 'pill-red'}">{'' if t.get('is_grounded') else 'UNGROUNDED'}</span>
+    {tech_pills}
   </div>
   <h4>{_h(t.get('title'))}</h4>
   <p>{_h(t.get('rationale'))}</p>
-  {f"<p><strong>Mitigations:</strong></p><ul>{mit_li}</ul>" if mits else ""}
+  {narrative_block}
+  {blast_text}
+  {f"<p style='margin-top:6px;'><strong>Mitigations:</strong></p><ul>{mit_li}</ul>" if mits else ""}
 </div>""")
     threats_html = "".join(threat_blocks) if threats else "<p class='muted'>No threats identified yet.</p>"
 
-    # ── Coverage matrix tab ───────────────────────────────────────────────────
+    # ── Coverage matrix tab ────────────────────────────────────────────────────
     if components and coverage:
         categories = sorted({d.get("category") for d in coverage if d.get("category")})
         by_cell = {(d.get("component_id"), d.get("category")): d for d in coverage}
@@ -956,18 +1060,44 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     else:
         coverage_html = "<p class='muted'>No coverage data.</p>"
 
-    # ── Mitigations tab ───────────────────────────────────────────────────────
-    def _mit_row(m: Dict[str, Any]) -> str:
-        ctrl = ", ".join(f"{_h(r.get('framework'))}:{_h(r.get('control_id'))}" for r in (m.get("control_refs") or []))
+    # ── Mitigations tab — with implementation detail, architecture, regulatory refs ──
+    _ARCH_ICONS = {
+        "ztna": "🔐 ZTNA", "identity_aware_proxy": "🔐 Identity-Aware Proxy",
+        "network_segmentation": "🔲 Network Segmentation", "pam": "🗝 PAM",
+        "mfa": "📱 MFA", "tls": "🔒 TLS Encryption",
+        "monitoring": "📊 Monitoring / SIEM", "patching": "🩹 Patch Management",
+        "waf": "🛡 WAF", "dlp": "📋 DLP", "siem": "📊 SIEM",
+        "data_encryption": "🔒 Data Encryption", "least_privilege": "🎯 Least Privilege",
+    }
+
+    def _mit_row_portal(m: Dict[str, Any]) -> str:
+        ctrl = ", ".join(
+            f"{_h(r.get('framework'))}:{_h(r.get('control_id'))}" for r in (m.get("control_refs") or [])
+        )
+        reg_refs = m.get("regulatory_refs") or []
+        reg_text = " · ".join(
+            f"{_h(r.get('framework','').upper())} §{_h(r.get('section',''))}" for r in reg_refs
+        ) if reg_refs else ""
+        arch = (m.get("architecture_approach") or "").lower()
+        arch_label = _ARCH_ICONS.get(arch, _h(arch.replace("_", " ").title()) if arch else "")
+        detail = m.get("implementation_detail") or ""
         return (
-            f"<tr><td>{_h(m.get('threat_id'))}</td><td>{_h(m.get('action'))}</td>"
+            f"<tr><td style='color:#7dd3fc;font-weight:700;'>{_h(m.get('threat_id'))}</td>"
+            f"<td><strong>{_h(m.get('action'))}</strong>"
+            f"{'<div style=\"margin-top:6px;color:#94a3b8;font-size:11.5px;\">' + _h(detail) + '</div>' if detail else ''}"
+            f"{'<div style=\"margin-top:4px;\"><span class=\"pill pill-blue\" style=\"font-size:10px;\">' + arch_label + '</span></div>' if arch_label else ''}"
+            f"</td>"
             f"<td>{_h(m.get('owner_role') or m.get('owner') or '—')}</td>"
             f"<td><span class='pill pill-grey'>{_h(m.get('status','open'))}</span></td>"
-            f"<td>{ctrl}</td></tr>"
+            f"<td style='font-size:11px;'>{ctrl}"
+            f"{'<br/><span style=\"color:#fb923c;\">' + _h(reg_text) + '</span>' if reg_text else ''}"
+            f"</td></tr>"
         )
-    mit_rows = "".join(_mit_row(m) for m in mitigations) or "<tr><td colspan='5' class='muted'>No mitigations.</td></tr>"
+
+    mit_rows = "".join(_mit_row_portal(m) for m in mitigations) or "<tr><td colspan='5' class='muted'>No mitigations.</td></tr>"
     mitigations_html = f"""
-<table><thead><tr><th>Threat</th><th>Action</th><th>Owner</th><th>Status</th><th>Controls</th></tr></thead>
+<p class="muted" style="margin-bottom:12px;">Each mitigation includes specific implementation guidance and references to applicable regulatory controls (NIST 800-53, MAS TRM, GCC IM8, ISO 27001, PCI DSS).</p>
+<table><thead><tr><th>Threat</th><th>Action &amp; Implementation Detail</th><th>Owner</th><th>Status</th><th>Controls / Regulatory</th></tr></thead>
 <tbody>{mit_rows}</tbody></table>
 """
 
@@ -983,6 +1113,147 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     else:
         maturity_html = "<p class='muted'>No maturity data.</p>"
 
+    # ── Threat Actors (Adversary Profiles) tab ────────────────────────────────
+    _SOPH_COLOR = {"high": "#ea4335", "medium": "#ff9800", "low": "#34a853"}
+    _MOTIV_LABEL = {
+        "espionage": "State / Corporate Espionage", "financial": "Financial Gain",
+        "disruption": "Service Disruption / Sabotage", "activism": "Hacktivism",
+        "sabotage": "Insider Sabotage", "insider_grievance": "Insider Grievance",
+        "unknown": "Unknown",
+    }
+    if adversary_profiles:
+        actor_blocks = []
+        for ap in adversary_profiles:
+            soph = (ap.get("sophistication") or "medium").lower()
+            soph_color = _SOPH_COLOR.get(soph, "#94a3b8")
+            motiv_raw = (ap.get("motivation") or "unknown").lower()
+            motiv_label = _MOTIV_LABEL.get(motiv_raw, motiv_raw.replace("_", " ").title())
+            techniques = ap.get("likely_techniques") or []
+            tech_pills = "".join(
+                f"<span class='pill' style='background:#1e293b;color:#7dd3fc;font-size:10px;margin:1px;'>ATT&amp;CK {_h(t)}</span>"
+                for t in techniques[:10]
+            )
+            targeted = ap.get("targeted_assets") or []
+            target_names = [comp_by_id.get(tid, {}).get("name") or tid for tid in targeted]
+            threat_ids = ap.get("threat_ids") or []
+            actor_blocks.append(f"""
+<div class="threat-card" style="border-left:3px solid {soph_color}; background:#1e1e3020; margin:12px 0;">
+  <div class="threat-meta">
+    <span class="pill" style="background:#1e293b;color:{soph_color};font-weight:700;">{soph.upper()} SOPHISTICATION</span>
+    <span class="pill pill-grey">{_h((ap.get('type') or '').replace('_',' ').title())}</span>
+    <span class="pill pill-blue">L{_h(str(ap.get('likelihood','—')))}/10</span>
+  </div>
+  <h4>{_h(ap.get('name'))}</h4>
+  <p><strong>Motivation:</strong> {_h(motiv_label)}</p>
+  <p style="margin-top:4px;">{_h(ap.get('rationale') or '')}</p>
+  {('<div style="margin-top:8px;"><div class="section-label" style="margin-bottom:4px;">MITRE ATT&CK Techniques</div>' + tech_pills + '</div>') if tech_pills else ''}
+  {('<p style="margin-top:6px;"><strong>Targeted assets:</strong> ' + ', '.join(f'<span class="zone-pill">{_h(n)}</span>' for n in target_names) + '</p>') if target_names else ''}
+  {('<p style="margin-top:4px;"><strong>Associated threats:</strong> ' + ', '.join(f'<span class="pill pill-blue">{_h(tid)}</span>' for tid in threat_ids) + '</p>') if threat_ids else ''}
+</div>""")
+        actors_html = "".join(actor_blocks)
+    else:
+        actors_html = "<p class='muted'>No adversary profiles generated. Re-generate the threat model to include actor profiles.</p>"
+
+    # ── Scope & Assumptions tab ───────────────────────────────────────────────
+    scope_stmt = metadata.get("scope_statement") or ""
+    out_of_scope = metadata.get("out_of_scope") or []
+    assumptions = metadata.get("assumptions") or []
+    reg_fws = metadata.get("regulatory_frameworks_applicable") or []
+
+    in_scope_items = []
+    non_actor_comps = [c for c in components if not c.get("is_threat_actor")]
+    for c in non_actor_comps[:20]:
+        env = c.get("environment") or ""
+        dc = c.get("datacenter") or ""
+        sub = " · ".join(x for x in [env, dc] if x)
+        in_scope_items.append(f"<li><strong>{_h(c.get('name'))}</strong> [{_h(c.get('trust_zone'))}]"
+                              f"{(' — ' + _h(sub)) if sub else ''}</li>")
+    for tb in trust_boundaries[:8]:
+        in_scope_items.append(f"<li>Trust boundary: <strong>{_h(tb.get('name'))}</strong></li>")
+
+    oos_items = "".join(f"<li>{_h(x)}</li>" for x in out_of_scope) if out_of_scope else (
+        "<li>Physical security of data center facilities</li>"
+        "<li>Third-party SaaS supply chain and vendor security posture</li>"
+        "<li>End-user device security and endpoint management</li>"
+        "<li>Network infrastructure owned by ISPs or cloud providers (shared responsibility boundary)</li>"
+    )
+    assump_items = "".join(f"<li>{_h(x)}</li>" for x in assumptions) if assumptions else (
+        "<li>Network access control lists (ACLs) and firewall rules are correctly implemented as described</li>"
+        "<li>TLS certificates are valid, properly managed, and renewed before expiry</li>"
+        "<li>A patch management process exists; current patch cadence and coverage are unverified</li>"
+        "<li>Authentication controls described are actively enforced (not configured but bypassed)</li>"
+    )
+    reg_fw_items = "".join(
+        f"<li><span class='pill pill-blue'>{_h(fw.upper().replace('_', ' '))}</span></li>" for fw in reg_fws
+    ) if reg_fws else (
+        "<li><span class='pill pill-blue'>NIST 800-53</span></li>"
+        "<li><span class='pill pill-blue'>ISO 27001</span></li>"
+    )
+
+    scope_html = f"""
+<div class="info-box" style="background:#1e1e30;border:1px solid #2d2d45;border-radius:8px;padding:16px;margin-bottom:16px;">
+  <div class="section-label">Scope Statement</div>
+  <p style="margin-top:6px;">{_h(scope_stmt) if scope_stmt else 'This threat model covers the identified architectural components, trust boundaries, and data flows within the system boundary as described.'}</p>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;">
+  <div>
+    <h3>In Scope</h3>
+    <ul style="margin-top:8px;line-height:2;">{chr(10).join(in_scope_items) or '<li>No components recorded.</li>'}</ul>
+  </div>
+  <div>
+    <h3>Out of Scope</h3>
+    <ul style="margin-top:8px;line-height:2;">{oos_items}</ul>
+  </div>
+</div>
+<h3 style="margin-top:20px;">Modelling Assumptions</h3>
+<ul style="margin-top:8px;line-height:2;">{assump_items}</ul>
+<h3 style="margin-top:20px;">Applicable Regulatory Frameworks</h3>
+<ul style="margin-top:8px;list-style:none;padding:0;display:flex;gap:8px;flex-wrap:wrap;">{reg_fw_items}</ul>
+"""
+
+    # ── Regulatory Traceability Matrix tab ────────────────────────────────────
+    all_frameworks: List[str] = []
+    fw_threat_map: Dict[str, Dict[str, List[str]]] = {}
+    for m in mitigations:
+        t_id = _h(m.get("threat_id") or "")
+        for r in (m.get("control_refs") or []):
+            fw = (r.get("framework") or "").lower()
+            ctrl = r.get("control_id") or ""
+            if fw and ctrl:
+                if fw not in all_frameworks:
+                    all_frameworks.append(fw)
+                fw_threat_map.setdefault(fw, {}).setdefault(ctrl, []).append(t_id)
+        for r in (m.get("regulatory_refs") or []):
+            fw = (r.get("framework") or "").lower()
+            sect = r.get("section") or ""
+            req = r.get("requirement") or ""
+            if fw and (sect or req):
+                if fw not in all_frameworks:
+                    all_frameworks.append(fw)
+                key = sect or req
+                fw_threat_map.setdefault(fw, {}).setdefault(key, []).append(t_id)
+
+    if fw_threat_map:
+        reg_blocks = []
+        for fw in all_frameworks:
+            ctrl_map = fw_threat_map.get(fw, {})
+            ctrl_rows = "".join(
+                f"<tr><td style='font-family:monospace;color:#7dd3fc;'>{_h(ctrl)}</td>"
+                f"<td>{' '.join('<span class=\"pill pill-blue\" style=\"font-size:10px;\">' + tid + '</span>' for tid in tids)}</td></tr>"
+                for ctrl, tids in sorted(ctrl_map.items())
+            )
+            reg_blocks.append(
+                f"<h3>{_h(fw.upper().replace('_',' '))}</h3>"
+                f"<table><thead><tr><th>Control / Section</th><th>Addressed by Threats</th></tr></thead>"
+                f"<tbody>{ctrl_rows}</tbody></table>"
+            )
+        regulatory_html = "".join(reg_blocks)
+    else:
+        regulatory_html = (
+            "<p class='muted'>No regulatory control references found. Re-generate the threat model — "
+            "mitigations now include MAS TRM, GCC IM8, ISO 27001, and NIST 800-53 references automatically.</p>"
+        )
+
     # ── Detection Rules tab ───────────────────────────────────────────────────
     if sigma_rules:
         rule_blocks = "".join(
@@ -996,14 +1267,17 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
 
     # ── Tab definitions ───────────────────────────────────────────────────────
     tabs = [
-        ("diagram",     "Diagram",          diagram_html),
-        ("components",  "Components",       components_html),
-        ("boundaries",  "Boundaries",       boundaries_html),
-        ("threats",     "Threats",          threats_html),
-        ("coverage",    "Coverage Matrix",  coverage_html),
-        ("mitigations", "Mitigations",      mitigations_html),
-        ("maturity",    "Maturity",         maturity_html),
-        ("detections",  "Detection Rules",  detections_html),
+        ("diagram",     "Diagram",              diagram_html),
+        ("components",  "Components",           components_html),
+        ("boundaries",  "Boundaries",           boundaries_html),
+        ("threats",     "Threats",              threats_html),
+        ("actors",      "Threat Actors",        actors_html),
+        ("scope",       "Scope & Assumptions",  scope_html),
+        ("coverage",    "Coverage Matrix",      coverage_html),
+        ("mitigations", "Mitigations",          mitigations_html),
+        ("regulatory",  "Regulatory Traceability", regulatory_html),
+        ("maturity",    "Maturity",             maturity_html),
+        ("detections",  "Detection Rules",      detections_html),
     ]
 
     tab_buttons = "".join(
@@ -1103,7 +1377,6 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
       btn.classList.add("active");
       document.getElementById("tab-" + id).classList.add("active");
     }}
-    // activate first tab
     var first = document.querySelector(".tab-btn");
     if (first) first.click();
   </script>
