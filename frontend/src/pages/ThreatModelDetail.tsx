@@ -155,14 +155,16 @@ function normPlatform(p: string): string {
 
 // Level 2 — Security Tier (within the platform)
 const ZONES = [
-  "DMZ", "Web Tier", "Application Tier", "Data Tier", "Management Zone", "External",
+  "DMZ", "Web Tier", "API Tier", "Application Tier", "Report Server", "Data Tier", "Management Zone", "External",
 ] as const;
 type Zone = typeof ZONES[number];
 
 const ZONE_COLOR: Record<string, string> = {
   "DMZ":              "#F9AB00",
   "Web Tier":         "#FF7043",
+  "API Tier":         "#0097A7",
   "Application Tier": "#1A73E8",
+  "Report Server":    "#6D4C41",
   "Data Tier":        "#9C27B0",
   "Management Zone":  "#00897B",
   "External":         "#EA4335",
@@ -187,7 +189,9 @@ function normZone(z: string): string {
   if (l === "external") return "External";
   if (l === "public" || l === "dmz" || l === "perimeter") return "DMZ";
   if (l === "web tier" || l === "web") return "Web Tier";
+  if (l === "api tier" || l === "api" || l === "api gateway" || l === "api layer") return "API Tier";
   if (l === "application tier" || l === "app tier") return "Application Tier";
+  if (l === "report server" || l === "reporting" || l === "report tier" || l === "ssrs" || l === "bi server") return "Report Server";
   if (l === "data-tier" || l === "data tier" || l === "database tier" || l === "database") return "Data Tier";
   if (l === "management" || l === "management zone") return "Management Zone";
   if (l === "vendor" || l === "vendor cloud") return "Application Tier";

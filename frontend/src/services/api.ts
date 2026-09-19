@@ -434,9 +434,10 @@ export const threatModelsApi = {
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}`, body).then((r) => r.data),
   patchMitigation: (clientId: string, modelId: string, mitId: string, body: any) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/mitigations/${encodeURIComponent(mitId)}`, body).then((r) => r.data),
-  createFromDiagram: (clientId: string, file: File, opts: { name?: string; methodology?: string; framework?: string }) => {
+  createFromDiagram: (clientId: string, files: File | File[], opts: { name?: string; methodology?: string; framework?: string }) => {
     const fd = new FormData();
-    fd.append("file", file);
+    const fileList = Array.isArray(files) ? files : [files];
+    fileList.forEach((f) => fd.append("files", f));
     if (opts.name) fd.append("name", opts.name);
     if (opts.methodology) fd.append("methodology", opts.methodology);
     if (opts.framework) fd.append("framework", opts.framework);

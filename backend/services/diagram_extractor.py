@@ -351,7 +351,7 @@ Output STRICT JSON with this exact schema — no prose, no markdown fences:
   "components": [
     {"id": "<short-slug>", "name": "<system name>",
      "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
-     "trust_zone": "<public|dmz|private|data-tier|management>",
+     "trust_zone": "<public|dmz|web tier|api tier|private|application tier|report server|data-tier|management>",
      "criticality": "<critical|high|medium|low>", "notes": "<one-line>"}
   ],
   "data_flows": [
@@ -365,7 +365,9 @@ Output STRICT JSON with this exact schema — no prose, no markdown fences:
 Rules:
 - Use stable lowercase slug IDs (e.g. "web-app", "auth-svc", "order-db").
 - Infer trust_zone from position / labels — Internet-facing = public, DMZ = dmz,
-  internal services = private, data stores = data-tier, ops/admin = management.
+  web servers/SPAs = web tier, API gateways/APIM = api tier,
+  internal services = application tier, reporting/BI/SSRS = report server,
+  data stores = data-tier, ops/admin/SIEM = management.
 - If an arrow direction is unclear, set from→to in the direction of data request.
 - If you genuinely cannot identify a flow's protocol, use "other" and encrypted=true.
 - Empty arrays are valid when nothing of that kind is present.

@@ -42,6 +42,10 @@ function zoneStyle(zone: string): ZoneStyle {
     return { border: "#1A73E8", bg: "rgba(26,115,232,0.06)", label: "#1A73E8" };
   if (/vendor|cloud|third|partner|saas/.test(z))
     return { border: "#FF7043", bg: "rgba(255,112,67,0.06)", label: "#FF7043" };
+  if (/api.tier|api.layer|api.gateway/.test(z))
+    return { border: "#0097A7", bg: "rgba(0,151,167,0.06)", label: "#0097A7" };
+  if (/report.server|reporting|ssrs|bi.server/.test(z))
+    return { border: "#6D4C41", bg: "rgba(109,76,65,0.06)", label: "#6D4C41" };
   if (/database|data.tier|data.store|restricted|storage/.test(z))
     return { border: "#9C27B0", bg: "rgba(156,39,176,0.06)", label: "#9C27B0" };
   if (/manage|admin|privilege|control|zone/.test(z))
@@ -400,6 +404,8 @@ function buildGraph(
     if (l === "internet" || l === "external" || l === "untrusted") return "External";
     if (l === "dmz" || l === "perimeter" || l === "edge" || l === "public") return "DMZ";
     if (l === "web tier" || l === "web") return "Web Tier";
+    if (l === "api tier" || l === "api" || l === "api gateway" || l === "api layer") return "API Tier";
+    if (l === "report server" || l === "reporting" || l === "ssrs" || l === "bi server") return "Report Server";
     if (l === "data tier" || l === "data-tier" || l === "database tier" || l === "database") return "Data Tier";
     if (l === "management" || l === "management zone") return "Management Zone";
     if (l === "vendor cloud" || l === "vendor") return "Application Tier";
@@ -779,12 +785,15 @@ function DfdLegend() {
     { label: "Third-Party", color: "#9C27B0" },
   ];
   const tiers = [
-    { label: "Internet",        color: "#EA4335" },
-    { label: "DMZ",             color: "#F9AB00" },
+    { label: "Internet",         color: "#EA4335" },
+    { label: "DMZ",              color: "#F9AB00" },
+    { label: "Web Tier",         color: "#FF7043" },
+    { label: "API Tier",         color: "#0097A7" },
     { label: "Application Tier", color: "#1A73E8" },
-    { label: "Data Tier",       color: "#9C27B0" },
-    { label: "Management Zone", color: "#00897B" },
-    { label: "External",        color: "#EA4335" },
+    { label: "Report Server",    color: "#6D4C41" },
+    { label: "Data Tier",        color: "#9C27B0" },
+    { label: "Management Zone",  color: "#00897B" },
+    { label: "External",         color: "#EA4335" },
   ];
 
   return (

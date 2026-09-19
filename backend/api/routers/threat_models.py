@@ -688,7 +688,7 @@ class FromDiagramResponse(BaseModel):
 @router.post("/from-diagram", response_model=FromDiagramResponse, status_code=201, dependencies=[Depends(require_editor_anywhere)])
 async def create_from_diagram(
     client_id: str,
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     project_id: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
     framework: Optional[str] = Form(None),
@@ -696,9 +696,9 @@ async def create_from_diagram(
     db: Session = Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    """Upload an architecture diagram (.drawio / .xml / .pdf / .jpg / .png),
-    extract components + data flows, and persist a ThreatModel row in
-    `extracted_review` status.
+    """Upload one or more architecture diagrams (.drawio / .xml / .pdf / .jpg / .png),
+    extract components + data flows (merged when multiple files), and persist a
+    ThreatModel row in `extracted_review` status.
 
     The user reviews / edits the extracted DFD on the detail page, then
     calls `POST /{id}/start-modeling` to kick off AI threat generation."""
@@ -709,26 +709,59 @@ async def create_from_diagram(
     ).first():
         raise HTTPException(status_code=404, detail="Project not found for this client")
 
-    data = await file.read()
-    if len(data) > _MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large ({len(data)} bytes). Max {_MAX_UPLOAD_BYTES} bytes.",
-        )
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty file.")
-    if not any((file.filename or "").lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file extension. Allowed: {sorted(SUPPORTED_EXTENSIONS)}",
-        )
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
 
-    try:
-        extracted = await extract_diagram(file.filename or "", file.content_type, data)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    all_components: List[Dict[str, Any]] = []
+    all_flows: List[Dict[str, Any]] = []
+    all_warnings: List[str] = []
+    first_source = None
+    source_diagram = None  # keep first image for vision context
+
+    for file in files:
+        data = await file.read()
+        if len(data) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{file.filename}' too large ({len(data)} bytes). Max {_MAX_UPLOAD_BYTES} bytes.",
+            )
+        if not data:
+            raise HTTPException(status_code=400, detail=f"File '{file.filename}' is empty.")
+        if not any((file.filename or "").lower().endswith(ext) for ext in SUPPORTED_EXTENSIONS):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported extension for '{file.filename}'. Allowed: {sorted(SUPPORTED_EXTENSIONS)}",
+            )
+        try:
+            extracted = await extract_diagram(file.filename or "", file.content_type, data)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"{file.filename}: {exc}")
+        except RuntimeError as exc:
+            raise HTTPException(status_code=502, detail=f"{file.filename}: {exc}")
+
+        if first_source is None:
+            first_source = extracted.get("source", "image")
+        if source_diagram is None and extracted.get("source") == "image" and len(data) <= _MAX_DIAGRAM_IMG_BYTES:
+            import base64 as _b64
+            source_diagram = {"mime": file.content_type or "image/png", "b64": _b64.b64encode(data).decode("ascii")}
+
+        # Merge: prefix duplicate IDs with a per-file counter to avoid collisions
+        existing_ids = {c["id"] for c in all_components}
+        file_prefix = f"f{len(all_components) // max(1, len(extracted['components']) or 1)}_"
+        id_remap: dict = {}
+        for c in extracted["components"]:
+            new_id = c["id"]
+            if new_id in existing_ids:
+                new_id = file_prefix + c["id"]
+            id_remap[c["id"]] = new_id
+            all_components.append({**c, "id": new_id})
+            existing_ids.add(new_id)
+        for f in extracted["data_flows"]:
+            all_flows.append({**f, "from": id_remap.get(f["from"], f["from"]), "to": id_remap.get(f["to"], f["to"])})
+        all_warnings.extend(extracted.get("warnings", []))
+
+    extracted_source = first_source or "image"
+    fallback_name = ", ".join((f.filename or "diagram").rsplit(".", 1)[0] for f in files[:3])[:200]
 
     chosen_methodology = (methodology or DEFAULT_METHODOLOGY).lower()
     if chosen_methodology not in METHODOLOGIES:
@@ -740,38 +773,26 @@ async def create_from_diagram(
         except ValueError:
             chosen_framework = None
 
-    # Keep the original image so the threat step can show the AI the actual
-    # diagram (vision), not just the extracted component list. Images only —
-    # drawio is already precise, and PDFs would need rendering. Cap size to
-    # keep the multimodal payload / token cost sane.
-    source_diagram = None
-    if extracted.get("source") == "image" and len(data) <= _MAX_DIAGRAM_IMG_BYTES:
-        import base64 as _b64
-        source_diagram = {
-            "mime": file.content_type or "image/png",
-            "b64": _b64.b64encode(data).decode("ascii"),
-        }
-
-    fallback_name = (file.filename or "Diagram upload").rsplit(".", 1)[0]
+    file_list = ", ".join(f.filename or "diagram" for f in files[:3])
     tm = ThreatModel(
         client_id=client_id,
         project_id=project_id,
-        name=(name or "").strip() or fallback_name[:200],
+        name=(name or "").strip() or fallback_name,
         scope_type="diagram",
         scope_id=None,
         framework=chosen_framework,
         methodology=chosen_methodology,
         status="extracted_review",
         initiated_by=user.get("upn", user.get("preferred_username", "system")),
-        components_json=extracted["components"],
-        data_flows_json=extracted["data_flows"],
+        components_json=all_components,
+        data_flows_json=all_flows,
         source_diagram=source_diagram,
         threats_json=[],
         mitigations_json=[],
         dfd_mermaid=None,
         executive_summary=(
-            f"Diagram-derived architecture from uploaded {extracted['source']} "
-            f"file `{file.filename}`. Pending AI threat analysis."
+            f"Diagram-derived architecture from {len(files)} uploaded file(s): {file_list}. "
+            "Pending AI threat analysis."
         ),
     )
     db.add(tm)
@@ -779,10 +800,10 @@ async def create_from_diagram(
     db.refresh(tm)
     return FromDiagramResponse(
         model_id=tm.id,
-        components=extracted["components"],
-        data_flows=extracted["data_flows"],
-        source=extracted["source"],
-        warnings=extracted.get("warnings", []),
+        components=all_components,
+        data_flows=all_flows,
+        source=extracted_source,
+        warnings=all_warnings,
     )
 
 

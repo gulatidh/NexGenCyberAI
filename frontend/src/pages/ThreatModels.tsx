@@ -90,7 +90,7 @@ export default function ThreatModels() {
   const [autoRemodel, setAutoRemodel] = useState(false);
 
   // ── Upload-dialog form state
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadName, setUploadName] = useState("");
   const [uploadMethodology, setUploadMethodology] = useState<string>("stride");
 
@@ -158,14 +158,14 @@ export default function ThreatModels() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: () => threatModelsApi.createFromDiagram(selectedClientId, uploadFile!, {
+    mutationFn: () => threatModelsApi.createFromDiagram(selectedClientId, uploadFiles, {
       name: uploadName || undefined,
       methodology: uploadMethodology,
     }),
     onSuccess: (resp: any) => {
       qc.invalidateQueries({ queryKey: ["threat-models", selectedClientId] });
       setOpenUpload(false);
-      setUploadFile(null);
+      setUploadFiles([]);
       setUploadName("");
       const warnSuffix = (resp?.warnings || []).length ? ` (${resp.warnings.length} warning)` : "";
       toast.success(`Extracted ${resp?.components?.length || 0} components${warnSuffix} — review and start modelling`);
@@ -601,7 +601,7 @@ export default function ThreatModels() {
       </Dialog>
 
       {/* Upload dialog */}
-      <Dialog open={openUpload} onClose={() => setOpenUpload(false)} maxWidth="sm" fullWidth
+      <Dialog open={openUpload} onClose={() => { setOpenUpload(false); setUploadFiles([]); }} maxWidth="sm" fullWidth
         slotProps={{ paper: { sx: { bgcolor: "background.paper", color: "text.primary" } } }}>
         <DialogTitle>
           Upload an architecture diagram
@@ -619,8 +619,8 @@ export default function ThreatModels() {
                 onDragOver={(e) => { e.preventDefault(); }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const f = e.dataTransfer.files?.[0];
-                  if (f) setUploadFile(f);
+                  const dropped = Array.from(e.dataTransfer.files || []);
+                  if (dropped.length) setUploadFiles((prev) => [...prev, ...dropped]);
                 }}
                 sx={{
                   border: "1px dashed rgba(255,255,255,0.25)",
@@ -631,7 +631,9 @@ export default function ThreatModels() {
               >
                 <UploadFile sx={{ fontSize: 32, color: "text.secondary", mb: 0.5 }} />
                 <Typography variant="body2" sx={{ color: "text.secondary", mb: 1.5 }}>
-                  {uploadFile ? uploadFile.name : "Drop file here or pick one below"}
+                  {uploadFiles.length === 0
+                    ? "Drop files here or pick below (multiple supported)"
+                    : `${uploadFiles.length} file${uploadFiles.length > 1 ? "s" : ""} selected`}
                 </Typography>
                 <Button
                   component="label"
@@ -639,18 +641,33 @@ export default function ThreatModels() {
                   variant="outlined"
                   sx={{ textTransform: "none", borderColor: "divider", color: "text.secondary" }}
                 >
-                  Choose file
+                  Choose files
                   <input
                     hidden
                     type="file"
                     accept={ACCEPTED_UPLOAD}
-                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    multiple
+                    onChange={(e) => {
+                      const picked = Array.from(e.target.files || []);
+                      if (picked.length) setUploadFiles((prev) => [...prev, ...picked]);
+                    }}
                   />
                 </Button>
-                {uploadFile && (
-                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
-                    {(uploadFile.size / 1024).toFixed(1)} KB · {uploadFile.type || "unknown"}
-                  </Typography>
+                {uploadFiles.length > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    {uploadFiles.map((f, i) => (
+                      <Box key={i} sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, mt: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {f.name} · {(f.size / 1024).toFixed(1)} KB
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#EA4335", cursor: "pointer", ml: 0.5 }}
+                          onClick={() => setUploadFiles((prev) => prev.filter((_, j) => j !== i))}
+                        >✕</Typography>
+                      </Box>
+                    ))}
+                  </Box>
                 )}
               </Box>
             </Box>
@@ -677,9 +694,9 @@ export default function ThreatModels() {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenUpload(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button onClick={() => { setOpenUpload(false); setUploadFiles([]); }} sx={{ color: "text.secondary" }}>Cancel</Button>
           <Button variant="contained"
-            disabled={!uploadFile || uploadMutation.isPending}
+            disabled={uploadFiles.length === 0 || uploadMutation.isPending}
             onClick={() => uploadMutation.mutate()}>
             {uploadMutation.isPending ? <CircularProgress size={18} /> : "Extract diagram"}
           </Button>

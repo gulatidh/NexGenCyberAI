@@ -337,7 +337,7 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "is_threat_actor": <true|false>,
       "threat_actor_type": "<external_attacker|insider_threat|nation_state|script_kiddie|vendor_risk|null>",
       "platform": "<Azure|AWS|GCP|Corporate|Internet|Third-Party>",
-      "trust_zone": "<DMZ|Web Tier|Application Tier|Data Tier|Management Zone|External>",
+      "trust_zone": "<DMZ|Web Tier|API Tier|Application Tier|Report Server|Data Tier|Management Zone|External>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
   ],
@@ -355,7 +355,9 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
     trust_zone values (security tier WITHIN the platform):
       DMZ = semi-trusted perimeter (load balancers, WAF, CDN, reverse proxies, internet-facing API gateways)
       Web Tier = public-facing web layer (web servers, SPAs, static hosting)
-      Application Tier = internal application/API layer (microservices, backend APIs, app containers, App Services)
+      API Tier = dedicated API gateway or API management layer (APIM, Kong, AWS API Gateway, internal API proxies)
+      Application Tier = internal application layer (microservices, backend app containers, App Services, business logic)
+      Report Server = reporting / BI layer (SSRS, Power BI Report Server, Crystal Reports, analytics export services)
       Data Tier = data stores requiring restricted access (SQL, Cosmos DB, blob storage, Redis, queues, Key Vault secrets)
       Management Zone = privileged admin layer ONLY (SIEM, Key Vault itself, Bastion, monitoring, IAM, security tooling)
       External = components outside the organization (threat actors, external users, 3rd-party integrations)
@@ -914,6 +916,16 @@ def _infer_zone(text: str) -> str:
     )):
         return "DMZ"
     if any(k in t for k in (
+        "apim", "api management", "api manager", "kong", "apigee", "api proxy",
+        "api tier", "api layer",
+    )):
+        return "API Tier"
+    if any(k in t for k in (
+        "report server", "ssrs", "reporting server", "bi server",
+        "crystal report", "power bi report", "report services",
+    )):
+        return "Report Server"
+    if any(k in t for k in (
         "database", " db ", "_db_", "sql", "storage", "bucket", "blob",
         "warehouse", "lake", "cosmos", "dynamo", "rds", "cache", "redis",
     )):
@@ -1411,7 +1423,7 @@ def _derive_attack_trees(
                 flow_adj.setdefault(to, set()).add(frm)
 
     # Trust zone ordering (lower index = more exposed)
-    _ZONE_ORDER = ["public", "dmz", "partner", "private", "management", "data-tier"]
+    _ZONE_ORDER = ["public", "dmz", "web tier", "api tier", "partner", "private", "application tier", "report server", "management", "management zone", "data-tier", "data tier"]
 
     def _zone_rank(cid: str) -> int:
         zone = _str((comp_info.get(cid) or {}).get("trust_zone")).lower()
