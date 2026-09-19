@@ -19,11 +19,27 @@ class OpenVASConnector(WorkflowConnector):
 
     async def test_connection(self) -> ConnectorTestResult:
         """Verify the local GVM daemon is reachable by sending <get_version/>."""
+        # shutil.which only searches PATH; backend service PATH is stripped so
+        # probe common installation locations as a fallback.
+        _GVM_CLI_CANDIDATES = [
+            "/usr/bin/gvm-cli",
+            "/usr/local/bin/gvm-cli",
+            "/usr/share/gvm/gvm-cli",
+            str(Path.home() / ".local/bin/gvm-cli"),
+        ]
         gvm_cli = shutil.which("gvm-cli")
+        if not gvm_cli:
+            for _c in _GVM_CLI_CANDIDATES:
+                if Path(_c).is_file():
+                    gvm_cli = _c
+                    break
         if not gvm_cli:
             return ConnectorTestResult(
                 success=False,
-                message="gvm-cli not found — run 'sudo gvm-setup' on Kali first.",
+                message=(
+                    "gvm-cli not found in PATH or common locations. "
+                    "Install it with: pip install gvm-tools  (then 'sudo gvm-setup' if first time)"
+                ),
             )
 
         user     = self.credentials.get("gvm_user", "admin")

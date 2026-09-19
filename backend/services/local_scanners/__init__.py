@@ -377,10 +377,20 @@ async def _openvas(target: str, config: dict) -> List[dict]:
     """Connect to local GVM daemon and run a scan against target."""
     if not target:
         return []
+    _GVM_CLI_CANDIDATES = [
+        "/usr/bin/gvm-cli",
+        "/usr/local/bin/gvm-cli",
+        str(Path.home() / ".local/bin/gvm-cli"),
+    ]
     gvm_cli = shutil.which("gvm-cli", path=_env()["PATH"])
     if not gvm_cli:
+        for _c in _GVM_CLI_CANDIDATES:
+            if Path(_c).is_file():
+                gvm_cli = _c
+                break
+    if not gvm_cli:
         raise RuntimeError(
-            "gvm-cli not found — install openvas and run 'sudo gvm-setup' first"
+            "gvm-cli not found — install with: pip install gvm-tools"
         )
 
     user     = config.get("gvm_user", "admin")
