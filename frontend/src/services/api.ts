@@ -436,6 +436,8 @@ export const threatModelsApi = {
     const base = `/clients/${clientId}/threat-models/${modelId}/docx`;
     return sections && sections.length ? `${base}?sections=${sections.join(",")}` : base;
   },
+  htmlUrl: (clientId: string, modelId: string) =>
+    `/clients/${clientId}/threat-models/${modelId}/portal-html`,
   patchThreat: (clientId: string, modelId: string, threatId: string, body: any) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}`, body).then((r) => r.data),
   patchMitigation: (clientId: string, modelId: string, mitId: string, body: any) =>

@@ -791,3 +791,321 @@ def render_threat_model_docx(
     doc.save(buf)
     buf.seek(0)
     return buf.read()
+
+
+# ── Portal-style standalone HTML export ──────────────────────────────────────
+
+def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unknown Client") -> str:
+    """Self-contained HTML that mirrors the portal's tab layout.
+
+    Includes Mermaid.js (CDN) so the diagram renders in the browser.
+    All sections are shown as tab panels with a top nav bar.
+    Designed to be opened in any browser without a server.
+    """
+    components: List[Dict[str, Any]] = tm.components_json or []
+    data_flows: List[Dict[str, Any]] = tm.data_flows_json or []
+    threats: List[Dict[str, Any]] = tm.threats_json or []
+    mitigations: List[Dict[str, Any]] = tm.mitigations_json or []
+    coverage: List[Dict[str, Any]] = tm.coverage_decisions or []
+    trust_boundaries: List[Dict[str, Any]] = tm.trust_boundaries_json or []
+    entry_points: List[Dict[str, Any]] = tm.entry_points_json or []
+    maturity: Dict[str, float] = tm.maturity_scores or {}
+    sigma_rules: List[Dict[str, Any]] = tm.sigma_rules_json or []
+
+    methodology = (tm.methodology or "stride").upper()
+    title = tm.name or f"Threat Model · {methodology}"
+    date_str = (tm.generated_at or datetime.utcnow()).strftime("%d %B %Y")
+    dfd_mermaid = tm.dfd_mermaid or ""
+
+    comp_by_id = {str(c.get("id")): c for c in components}
+    mit_by_threat: Dict[str, List[Dict[str, Any]]] = {}
+    for m in mitigations:
+        mit_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
+
+    # ── Overview cards ────────────────────────────────────────────────────────
+    coverage_pct = 0
+    if coverage:
+        non_missing = sum(1 for d in coverage if d.get("state") != "missing")
+        coverage_pct = round((non_missing / len(coverage)) * 100, 1)
+
+    overview_html = f"""
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-v">{len(threats)}</div><div class="kpi-l">Threats</div></div>
+  <div class="kpi"><div class="kpi-v">{len(components)}</div><div class="kpi-l">Components</div></div>
+  <div class="kpi"><div class="kpi-v">{len(mitigations)}</div><div class="kpi-l">Mitigations</div></div>
+  <div class="kpi"><div class="kpi-v">{coverage_pct}%</div><div class="kpi-l">Coverage</div></div>
+  <div class="kpi"><div class="kpi-v">{len(trust_boundaries)}</div><div class="kpi-l">Boundaries</div></div>
+  <div class="kpi"><div class="kpi-v">{len(entry_points)}</div><div class="kpi-l">Entry Points</div></div>
+</div>
+{f'<div class="exec-summary"><strong>Executive Summary</strong><p>{_h(tm.executive_summary)}</p></div>' if tm.executive_summary else ""}
+"""
+
+    # ── Diagram tab ────────────────────────────────────────────────────────────
+    diagram_html = f"""
+<div class="section-label">Data Flow Diagram — {_h(methodology)}</div>
+{"<div class='mermaid'>" + _h(dfd_mermaid) + "</div>" if dfd_mermaid else "<p class='muted'>No diagram generated yet.</p>"}
+"""
+
+    # ── Components tab ─────────────────────────────────────────────────────────
+    threatened_ids = {str(t.get("asset_id")) for t in threats}
+    comp_rows = "".join(
+        f"<tr><td>{_h(c.get('id'))}</td><td>{_h(c.get('name'))}</td>"
+        f"<td>{_h(c.get('type'))}</td><td><span class='zone-pill'>{_h(c.get('trust_zone'))}</span></td>"
+        f"<td>{_h(c.get('criticality'))}</td>"
+        f"<td>{'<span class=\"warn-pill\">No threats — review</span>' if str(c.get('id')) not in threatened_ids else '<span class=\"ok-pill\">Covered</span>'}</td>"
+        f"<td>{_h(c.get('notes'))}</td></tr>"
+        for c in components
+    ) or "<tr><td colspan='7' class='muted'>No components.</td></tr>"
+    flow_rows = "".join(
+        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{}).get('name') or f.get('from'))}</td>"
+        f"<td>{_h(comp_by_id.get(str(f.get('to')),{}).get('name') or f.get('to'))}</td>"
+        f"<td><span class='proto-pill'>{_h(f.get('protocol'))}</span></td><td>{_h(f.get('data'))}</td>"
+        f"<td>{'<span class=\"enc-yes\">TLS</span>' if f.get('encrypted') else '<span class=\"enc-no\">PLAIN</span>'}</td>"
+        f"<td>{'<span class=\"warn-pill\">⚠ Crosses boundary</span>' if f.get('trust_boundary_crossing') else ''}</td></tr>"
+        for f in data_flows
+    ) or "<tr><td colspan='6' class='muted'>No data flows.</td></tr>"
+    components_html = f"""
+<h3>Components ({len(components)})</h3>
+<table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Trust Zone</th><th>Criticality</th><th>Coverage</th><th>Notes</th></tr></thead>
+<tbody>{comp_rows}</tbody></table>
+<h3>Data Flows ({len(data_flows)})</h3>
+<table><thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th><th>Encrypted</th><th>Flags</th></tr></thead>
+<tbody>{flow_rows}</tbody></table>
+"""
+
+    # ── Boundaries tab ─────────────────────────────────────────────────────────
+    tb_rows = "".join(
+        f"<tr><td>{_h(tb.get('name'))}</td><td>{_h(tb.get('from_zone'))} → {_h(tb.get('to_zone'))}</td>"
+        f"<td>{_h(tb.get('description'))}</td><td>{len(tb.get('crossed_by_flow_ids') or [])}</td></tr>"
+        for tb in trust_boundaries
+    ) or "<tr><td colspan='4' class='muted'>No trust boundaries.</td></tr>"
+    def _ep_row(ep: Dict[str, Any]) -> str:
+        exp_cls = (ep.get("exposure") or "").lower()
+        auth = "Yes" if ep.get("auth_required") else "No"
+        comp = _h(comp_by_id.get(str(ep.get("component_id")), {}).get("name") or ep.get("component_id"))
+        return (
+            f"<tr><td>{_h(ep.get('name'))}</td><td>{_h(ep.get('kind'))}</td>"
+            f"<td><span class='sev-{exp_cls}'>{_h(ep.get('exposure'))}</span></td>"
+            f"<td>{auth}</td><td>{comp}</td></tr>"
+        )
+    ep_rows = "".join(_ep_row(ep) for ep in entry_points) or "<tr><td colspan='5' class='muted'>No entry points.</td></tr>"
+    cross_rows = "".join(
+        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{}).get('name') or f.get('from'))}</td>"
+        f"<td>{_h(comp_by_id.get(str(f.get('to')),{}).get('name') or f.get('to'))}</td>"
+        f"<td>{_h(f.get('protocol'))}</td><td>{_h(f.get('data'))}</td></tr>"
+        for f in data_flows if f.get("trust_boundary_crossing")
+    ) or "<tr><td colspan='4' class='muted'>No boundary-crossing flows.</td></tr>"
+    boundaries_html = f"""
+<h3>Trust Boundaries ({len(trust_boundaries)})</h3>
+<table><thead><tr><th>Name</th><th>Zones</th><th>Description</th><th>Crossing flows</th></tr></thead>
+<tbody>{tb_rows}</tbody></table>
+<h3>Entry Points ({len(entry_points)})</h3>
+<table><thead><tr><th>Name</th><th>Kind</th><th>Exposure</th><th>Auth required</th><th>Component</th></tr></thead>
+<tbody>{ep_rows}</tbody></table>
+<h3>Boundary-Crossing Flows</h3>
+<table><thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th></tr></thead>
+<tbody>{cross_rows}</tbody></table>
+"""
+
+    # ── Threats tab ────────────────────────────────────────────────────────────
+    by_comp: Dict[str, List[Dict[str, Any]]] = {}
+    for t in threats:
+        by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
+    threat_blocks = []
+    for comp_id, t_list in by_comp.items():
+        comp_name = comp_by_id.get(comp_id, {}).get("name") or comp_id
+        threat_blocks.append(f"<h3>{_h(comp_name)} <span class='muted'>({len(t_list)} threats)</span></h3>")
+        for t in sorted(t_list, key=lambda x: x.get("priority_score", 0), reverse=True):
+            sev = (t.get("severity") or "medium").lower()
+            bg = _SEV_BG.get(sev, "#f1f5f9")
+            fg = _SEV_FG.get(sev, "#475569")
+            mits = mit_by_threat.get(str(t.get("id")), [])
+            mit_li = "".join(f"<li><strong>{_h(m.get('action'))}</strong> <span class='muted'>({_h(m.get('status','open'))})</span></li>" for m in mits)
+            threat_blocks.append(f"""<div class="threat-card" style="border-left:3px solid {fg}; background:{bg}20;">
+  <div class="threat-meta">
+    <span class="pill" style="background:{bg};color:{fg};">{sev.upper()}</span>
+    <span class="pill pill-grey">{_h(t.get('category','').replace('_',' ').title())}</span>
+    <span class="pill pill-blue">P{t.get('priority_score','—')}</span>
+    <span class="pill {'pill-green' if t.get('is_grounded') else 'pill-red'}">{'' if t.get('is_grounded') else 'UNGROUNDED'}</span>
+  </div>
+  <h4>{_h(t.get('title'))}</h4>
+  <p>{_h(t.get('rationale'))}</p>
+  {f"<p><strong>Mitigations:</strong></p><ul>{mit_li}</ul>" if mits else ""}
+</div>""")
+    threats_html = "".join(threat_blocks) if threats else "<p class='muted'>No threats identified yet.</p>"
+
+    # ── Coverage matrix tab ───────────────────────────────────────────────────
+    if components and coverage:
+        categories = sorted({d.get("category") for d in coverage if d.get("category")})
+        by_cell = {(d.get("component_id"), d.get("category")): d for d in coverage}
+        hdr_cells = "<th>Component</th>" + "".join(f"<th>{_h(c.replace('_',' ').title())}</th>" for c in categories)
+        cov_rows = []
+        for c in components:
+            cells = [f"<td><strong>{_h(c.get('name'))}</strong></td>"]
+            for cat in categories:
+                d = by_cell.get((str(c.get("id")), cat))
+                if d:
+                    st = d.get("state", "missing")
+                    b = _STATE_BG.get(st, "#f1f5f9")
+                    f2 = _STATE_FG.get(st, "#475569")
+                    cells.append(f"<td style='background:{b};color:{f2};font-size:11px;'>{st.replace('_',' ').title()}</td>")
+                else:
+                    cells.append("<td>—</td>")
+            cov_rows.append("<tr>" + "".join(cells) + "</tr>")
+        coverage_html = f"<table class='coverage-table'><thead><tr>{hdr_cells}</tr></thead><tbody>{''.join(cov_rows)}</tbody></table>"
+    else:
+        coverage_html = "<p class='muted'>No coverage data.</p>"
+
+    # ── Mitigations tab ───────────────────────────────────────────────────────
+    def _mit_row(m: Dict[str, Any]) -> str:
+        ctrl = ", ".join(f"{_h(r.get('framework'))}:{_h(r.get('control_id'))}" for r in (m.get("control_refs") or []))
+        return (
+            f"<tr><td>{_h(m.get('threat_id'))}</td><td>{_h(m.get('action'))}</td>"
+            f"<td>{_h(m.get('owner_role') or m.get('owner') or '—')}</td>"
+            f"<td><span class='pill pill-grey'>{_h(m.get('status','open'))}</span></td>"
+            f"<td>{ctrl}</td></tr>"
+        )
+    mit_rows = "".join(_mit_row(m) for m in mitigations) or "<tr><td colspan='5' class='muted'>No mitigations.</td></tr>"
+    mitigations_html = f"""
+<table><thead><tr><th>Threat</th><th>Action</th><th>Owner</th><th>Status</th><th>Controls</th></tr></thead>
+<tbody>{mit_rows}</tbody></table>
+"""
+
+    # ── Maturity tab ──────────────────────────────────────────────────────────
+    if maturity:
+        mat_cards = "".join(
+            f"<div class='mat-card'><div class='mat-label'>{_h(k.replace('_',' ').title())}</div>"
+            f"<div class='mat-score'>{float(v):.1f}<span class='muted'>/5</span></div>"
+            f"<div class='mat-bar'><div class='mat-fill' style='width:{_pct(min(1.0,float(v)/5.0))}'></div></div></div>"
+            for k, v in sorted(maturity.items())
+        )
+        maturity_html = f"<div class='mat-grid'>{mat_cards}</div>"
+    else:
+        maturity_html = "<p class='muted'>No maturity data.</p>"
+
+    # ── Detection Rules tab ───────────────────────────────────────────────────
+    if sigma_rules:
+        rule_blocks = "".join(
+            f"<div class='rule-card'><div class='rule-title'>{_h(r.get('rule_id',''))}: {_h(r.get('description',''))}</div>"
+            f"<pre class='sigma-pre'>{_h(r.get('sigma_yaml',''))}</pre></div>"
+            for r in sigma_rules
+        )
+        detections_html = rule_blocks
+    else:
+        detections_html = "<p class='muted'>No detection rules generated yet. Use AI → Suggest Detection Rules.</p>"
+
+    # ── Tab definitions ───────────────────────────────────────────────────────
+    tabs = [
+        ("diagram",     "Diagram",          diagram_html),
+        ("components",  "Components",       components_html),
+        ("boundaries",  "Boundaries",       boundaries_html),
+        ("threats",     "Threats",          threats_html),
+        ("coverage",    "Coverage Matrix",  coverage_html),
+        ("mitigations", "Mitigations",      mitigations_html),
+        ("maturity",    "Maturity",         maturity_html),
+        ("detections",  "Detection Rules",  detections_html),
+    ]
+
+    tab_buttons = "".join(
+        f'<button class="tab-btn" onclick="showTab(this,\'{tid}\')">{_h(tlabel)}</button>'
+        for tid, tlabel, _ in tabs
+    )
+    tab_panels = "".join(
+        f'<div id="tab-{tid}" class="tab-panel">{content}</div>'
+        for tid, _, content in tabs
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>{_h(title)} — NexGen Cyber AI</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {{ --blue:#1a73e8; --red:#ea4335; --green:#34a853; --orange:#ff9800; --grey:#6b7280; }}
+    * {{ box-sizing:border-box; margin:0; padding:0; }}
+    body {{ font-family:"Segoe UI","Inter",Arial,sans-serif; background:#0f0f13; color:#e2e8f0; font-size:14px; }}
+    .topbar {{ background:#1a1a2e; border-bottom:1px solid #2d2d45; padding:12px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }}
+    .brand {{ color:var(--blue); font-weight:700; font-size:18px; }}
+    .title {{ font-weight:600; font-size:16px; color:#f1f5f9; }}
+    .meta {{ color:var(--grey); font-size:12px; }}
+    .kpi-row {{ display:flex; gap:12px; flex-wrap:wrap; padding:16px 24px; background:#141420; border-bottom:1px solid #2d2d45; }}
+    .kpi {{ background:#1e1e30; border:1px solid #2d2d45; border-radius:8px; padding:12px 18px; min-width:100px; }}
+    .kpi-v {{ font-size:22px; font-weight:700; color:var(--blue); }}
+    .kpi-l {{ font-size:11px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }}
+    .exec-summary {{ padding:12px 24px; background:#141420; border-bottom:1px solid #2d2d45; color:#94a3b8; font-size:13px; line-height:1.6; }}
+    .exec-summary strong {{ color:#e2e8f0; }}
+    .tab-nav {{ display:flex; gap:2px; background:#141420; border-bottom:1px solid #2d2d45; padding:0 24px; overflow-x:auto; }}
+    .tab-btn {{ padding:10px 18px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--grey); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; transition:color .15s; }}
+    .tab-btn:hover {{ color:#e2e8f0; }}
+    .tab-btn.active {{ border-bottom-color:var(--blue); color:var(--blue); }}
+    .tab-panel {{ display:none; padding:24px; }}
+    .tab-panel.active {{ display:block; }}
+    .section-label {{ font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--grey); margin-bottom:12px; }}
+    h3 {{ font-size:14px; font-weight:700; color:#e2e8f0; margin:20px 0 8px; padding-bottom:4px; border-bottom:1px solid #2d2d45; }}
+    h4 {{ font-size:13px; font-weight:700; color:#e2e8f0; margin:8px 0 4px; }}
+    p {{ color:#94a3b8; line-height:1.6; margin:4px 0; }}
+    ul {{ padding-left:20px; color:#94a3b8; }}
+    li {{ margin:2px 0; }}
+    table {{ width:100%; border-collapse:collapse; font-size:12.5px; margin:8px 0 20px; }}
+    th {{ background:#1e1e30; color:#94a3b8; font-weight:600; text-align:left; padding:8px 10px; border-bottom:1px solid #2d2d45; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }}
+    td {{ padding:7px 10px; border-bottom:1px solid #1e1e30; color:#e2e8f0; vertical-align:top; }}
+    tr:hover td {{ background:#1a1a28; }}
+    .muted {{ color:var(--grey); font-size:12px; }}
+    .pill {{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; line-height:1.4; }}
+    .pill-grey {{ background:#2d2d45; color:#94a3b8; }}
+    .pill-blue {{ background:rgba(26,115,232,.2); color:var(--blue); }}
+    .pill-green {{ background:rgba(52,168,83,.2); color:var(--green); }}
+    .pill-red {{ background:rgba(234,67,53,.2); color:var(--red); }}
+    .zone-pill {{ background:#1e293b; color:#7dd3fc; font-size:11px; padding:2px 8px; border-radius:8px; }}
+    .proto-pill {{ background:#1e293b; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:8px; }}
+    .enc-yes {{ color:var(--green); font-weight:700; font-size:11px; }}
+    .enc-no {{ color:var(--red); font-weight:700; font-size:11px; }}
+    .warn-pill {{ background:rgba(255,152,0,.15); color:var(--orange); font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; }}
+    .ok-pill {{ background:rgba(52,168,83,.1); color:var(--green); font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; }}
+    .sev-high,.sev-critical {{ color:var(--red); font-weight:700; }}
+    .sev-medium {{ color:var(--orange); font-weight:700; }}
+    .sev-low {{ color:var(--green); font-weight:700; }}
+    .threat-card {{ padding:12px 14px; border-radius:6px; margin:10px 0; border-left-width:3px; border-left-style:solid; }}
+    .threat-meta {{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }}
+    .mat-grid {{ display:flex; flex-wrap:wrap; gap:12px; }}
+    .mat-card {{ background:#1e1e30; border:1px solid #2d2d45; border-radius:8px; padding:12px 16px; min-width:160px; flex:1; }}
+    .mat-label {{ font-size:11px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; }}
+    .mat-score {{ font-size:24px; font-weight:700; color:var(--blue); margin:4px 0; }}
+    .mat-bar {{ height:5px; background:#2d2d45; border-radius:3px; overflow:hidden; }}
+    .mat-fill {{ height:100%; background:var(--blue); border-radius:3px; }}
+    .coverage-table {{ font-size:11px; }}
+    .coverage-table th {{ font-size:10px; }}
+    .rule-card {{ background:#0d1117; border:1px solid #2d2d45; border-radius:6px; padding:14px; margin:10px 0; }}
+    .rule-title {{ font-weight:700; color:#e2e8f0; font-size:12px; margin-bottom:8px; }}
+    .sigma-pre {{ font-family:"Fira Code","Consolas",monospace; font-size:11px; color:#e6edf3; background:#0d1117; overflow:auto; white-space:pre; line-height:1.5; }}
+    .mermaid {{ background:#1a1a2e; border-radius:8px; padding:16px; overflow:auto; }}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="brand">NexGen Cyber AI</span>
+    <div>
+      <div class="title">{_h(title)}</div>
+      <div class="meta">Client: {_h(client_name)} &nbsp;·&nbsp; {_h(methodology)} &nbsp;·&nbsp; {_h(date_str)}</div>
+    </div>
+  </div>
+  {overview_html}
+  <div class="tab-nav">
+    {tab_buttons}
+  </div>
+  {tab_panels}
+  <script>
+    mermaid.initialize({{ startOnLoad: true, theme: "dark" }});
+    function showTab(btn, id) {{
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + id).classList.add("active");
+    }}
+    // activate first tab
+    var first = document.querySelector(".tab-btn");
+    if (first) first.click();
+  </script>
+</body>
+</html>"""

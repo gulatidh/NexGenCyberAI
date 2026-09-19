@@ -1285,6 +1285,33 @@ async def get_threat_model_docx(
     )
 
 
+@router.get("/{model_id}/portal-html")
+async def get_threat_model_portal_html(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Portal-style standalone HTML — same tab layout as the site, Mermaid rendered via CDN."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    client_name = "Unknown Client"
+    c = db.query(Client).filter(Client.id == tm.client_id).first()
+    if c:
+        client_name = c.name
+    from services.threat_model_pdf import render_threat_model_portal_html
+    html = render_threat_model_portal_html(tm, client_name=client_name)
+    safe_name = (tm.name or "threat-model").replace(" ", "-").replace("/", "-")[:60]
+    return Response(
+        content=html,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.html"'},
+    )
+
+
 @router.delete("/{model_id}", status_code=204)
 async def delete_threat_model(
     client_id: str,

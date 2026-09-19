@@ -48,6 +48,7 @@ const EXPORT_SECTIONS = [
 import { fromNow } from "../utils/datetime";
 import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdReactFlow from "../components/DfdReactFlow";
+import DfdDiagram from "../components/DfdDiagram";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 const TM_NAV: DetailNavItem[] = [
@@ -556,7 +557,29 @@ export default function ThreatModelDetail() {
       console.error("Draw.io download error:", err);
     }
   }, [clientId, modelId, _getToken]);
+
+  const downloadHtml = useCallback(async () => {
+    try {
+      const token = await _getToken();
+      const url = API_BASE + threatModelsApi.htmlUrl(clientId, modelId!);
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`HTML export failed: ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `threat-model-${(modelId || "").slice(0, 8)}.html`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err: any) {
+      toast.error("HTML export failed");
+      console.error("HTML export error:", err);
+    }
+  }, [clientId, modelId, _getToken]);
+
   const [tab, setTab] = useState<string>("diagram");
+  const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid">("interactive");
+  const [diagramView, setDiagramView] = useState<"architecture" | "threat_heat" | "detection_coverage">("architecture");
   const [printing, setPrinting] = useState<boolean>(false);
   const [exportOpen, setExportOpen] = useState<boolean>(false);
   const [exportSections, setExportSections] = useState<Set<string>>(
@@ -583,6 +606,13 @@ export default function ThreatModelDetail() {
     },
   });
 
+  const styledDfdQuery = useQuery<{ view: string; mermaid: string }>({
+    queryKey: ["threat-model-dfd", modelId, diagramView],
+    queryFn: () => threatModelsApi.styledDfd(clientId, modelId!, diagramView),
+    enabled: !!modelId && !!clientId && diagramMode === "mermaid"
+             && diagramView !== "architecture" && data?.status === "completed",
+    staleTime: 30_000,
+  });
 
   const rescanMutation = useMutation({
     mutationFn: () => threatModelsApi.rescan(clientId, modelId!),
@@ -791,8 +821,16 @@ export default function ThreatModelDetail() {
             />
           ))}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: "wrap" }}>
           <Button onClick={() => setExportOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            startIcon={<Download />}
+            onClick={() => { setExportOpen(false); downloadHtml(); }}
+            variant="outlined"
+            sx={{ color: "#34A853", borderColor: "rgba(52,168,83,0.5)" }}
+          >
+            HTML
+          </Button>
           <Button
             startIcon={<Print />}
             onClick={() => { setExportOpen(false); downloadThreatModel("pdf", Array.from(exportSections)); }}
@@ -985,26 +1023,74 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">Data Flow Diagram</Typography>}
         <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
-            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", mb: 1.5 }}>
-              <Button
-                size="small"
-                startIcon={<Download sx={{ fontSize: 16 }} />}
-                onClick={downloadDrawio}
-                disabled={data.status !== "completed"}
-                sx={{
-                  textTransform: "none", fontSize: 12, fontWeight: 600,
-                  color: "text.secondary",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "divider" },
-                }}
-              >Download .drawio</Button>
+            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
+              <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "action.hover", borderRadius: 1.5 }}>
+                {(
+                  [
+                    { key: "interactive", label: "Interactive", icon: <AccountTree sx={{ fontSize: 16 }} /> },
+                    { key: "mermaid",     label: "Mermaid",     icon: <Hub sx={{ fontSize: 16 }} /> },
+                  ] as Array<{ key: "interactive"|"mermaid"; label: string; icon: React.ReactNode }>
+                ).map((opt) => (
+                  <Button key={opt.key} size="small" startIcon={opt.icon} onClick={() => setDiagramMode(opt.key)}
+                    sx={{
+                      minWidth: 110, textTransform: "none", fontSize: 12, fontWeight: 600,
+                      color: diagramMode === opt.key ? "#4285F4" : "text.secondary",
+                      bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.12)" : "transparent",
+                      border: diagramMode === opt.key ? "1px solid rgba(66,133,244,0.4)" : "1px solid transparent",
+                      "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
+                    }}
+                  >{opt.label}</Button>
+                ))}
+              </Box>
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                {diagramMode === "mermaid" && data.status === "completed" && (
+                  <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
+                    {(
+                      [
+                        { v: "architecture",        label: "Architecture", color: "#4285F4" },
+                        { v: "threat_heat",         label: "Threat heat",  color: "#EA4335" },
+                        { v: "detection_coverage",  label: "Detections",   color: "#34A853" },
+                      ] as Array<{ v: typeof diagramView; label: string; color: string }>
+                    ).map((opt) => {
+                      const active = diagramView === opt.v;
+                      return (
+                        <Button key={opt.v} size="small" onClick={() => setDiagramView(opt.v)}
+                          sx={{
+                            minWidth: 102, textTransform: "none", fontSize: 11.5, fontWeight: 600,
+                            color: active ? opt.color : "text.secondary",
+                            bgcolor: active ? `${opt.color}18` : "transparent",
+                            border: active ? `1px solid ${opt.color}` : "1px solid transparent",
+                            "&:hover": { bgcolor: `${opt.color}10` },
+                          }}
+                        >{opt.label}</Button>
+                      );
+                    })}
+                  </Box>
+                )}
+                <Button size="small" startIcon={<Download sx={{ fontSize: 16 }} />}
+                  onClick={downloadDrawio} disabled={data.status !== "completed"}
+                  sx={{
+                    textTransform: "none", fontSize: 12, fontWeight: 600, color: "text.secondary",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "divider" },
+                  }}
+                >Download .drawio</Button>
+              </Box>
             </Box>
-            {!printing && (
+            {diagramMode === "interactive" && !printing ? (
               <DfdReactFlow
                 components={data.components}
                 dataFlows={data.data_flows}
                 threats={data.threats}
                 trustBoundaries={data.trust_boundaries ?? []}
+              />
+            ) : (
+              <DfdDiagram
+                source={
+                  diagramView !== "architecture" && styledDfdQuery.data?.mermaid
+                    ? styledDfdQuery.data.mermaid
+                    : (data.dfd_mermaid || "")
+                }
               />
             )}
             {data.data_flows.length > 0 && (
