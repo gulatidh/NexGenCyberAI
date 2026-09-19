@@ -68,6 +68,7 @@ const TM_NAV: DetailNavItem[] = [
 interface Component {
   id: string; name: string; type: string;
   platform?: string; trust_zone: string; criticality: string; notes?: string;
+  environment?: string; datacenter?: string;
 }
 interface DataFlow { from: string; to: string; protocol: string; data: string; encrypted: boolean; notes?: string; }
 interface EvidenceRef { kind: string; id: string; label?: string }
@@ -220,7 +221,8 @@ function prettyCat(s: string): string {
   return (s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-const TYPES = ["endpoint", "api", "database", "storage", "identity", "queue", "secret-store", "repo", "vm", "other"];
+const TYPES = ["host", "application", "api", "database", "storage", "identity", "vm", "load_balancer", "firewall", "waf", "network", "user", "endpoint", "queue", "secret-store", "repo", "other"];
+const ENVS = ["Prod", "Non-prod", "Dev", "SIT", "UAT", "DR"];
 const CRITS = ["critical", "high", "medium", "low"];
 
 const CRIT_COLOR: Record<string, string> = {
@@ -240,10 +242,12 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   // New-component form state
   const [nName, setNName] = useState("");
-  const [nType, setNType] = useState("api");
+  const [nType, setNType] = useState("host");
   const [nPlatform, setNPlatform] = useState<Platform>("Corporate");
   const [nZone, setNZone] = useState<Zone>("Application Tier");
   const [nCrit, setNCrit] = useState("medium");
+  const [nEnv, setNEnv] = useState("Prod");
+  const [nDc, setNDc] = useState("");
 
   React.useEffect(() => {
     setRows(components.map((c) => ({ ...c, platform: normPlatform(c.platform || ""), trust_zone: normZone(c.trust_zone) })));
@@ -265,9 +269,11 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
     const newId = `c${Date.now()}`;
     setRows((prev) => [...prev, {
       id: newId, name: nName.trim(), type: nType,
-      platform: nPlatform, trust_zone: nZone, criticality: nCrit, notes: "",
+      platform: nPlatform, trust_zone: nZone, criticality: nCrit,
+      environment: nEnv, datacenter: nDc.trim(), notes: "",
     } as Component]);
     setNName("");
+    setNDc("");
   };
 
   const remodel = useMutation({
@@ -275,7 +281,10 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
       components: rows.map((r) => ({
         id: r.id, name: r.name, type: r.type,
         platform: r.platform || "Corporate",
-        trust_zone: r.trust_zone, criticality: r.criticality, notes: r.notes || "",
+        trust_zone: r.trust_zone, criticality: r.criticality,
+        environment: r.environment || "",
+        datacenter: r.datacenter || "",
+        notes: r.notes || "",
       })),
       analyst_notes: noteText.trim() || undefined,
     }),
@@ -315,10 +324,12 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
         {/* Column headers */}
         <Box sx={{ display: "flex", gap: 1, px: 0.5, mb: 0.5 }}>
           <Typography variant="caption" sx={{ color: "text.disabled", flex: 1, fontSize: 10 }}>COMPONENT</Typography>
-          <Typography variant="caption" sx={{ color: "text.disabled", width: 100, fontSize: 10 }}>TYPE</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 110, fontSize: 10 }}>TYPE</Typography>
           <Typography variant="caption" sx={{ color: "text.disabled", width: 120, fontSize: 10 }}>PLATFORM</Typography>
           <Typography variant="caption" sx={{ color: "text.disabled", width: 138, fontSize: 10 }}>SECURITY TIER</Typography>
           <Typography variant="caption" sx={{ color: "text.disabled", width: 90, fontSize: 10 }}>CRITICALITY</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 80, fontSize: 10 }}>ENV</Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled", width: 120, fontSize: 10 }}>DATACENTER</Typography>
           <Box sx={{ width: 48 }} />
         </Box>
 
@@ -343,7 +354,7 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
                 </Tooltip>
 
                 {/* Type */}
-                <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 100 }}
+                <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 110 }}
                   onChange={(e) => updateRow(r.id, "type", e.target.value)}>
                   {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
                 </Select>
@@ -397,6 +408,19 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
                   ))}
                 </Select>
 
+                {/* Environment */}
+                <Select size="small" value={r.environment || "Prod"} sx={{ ...selectSx, width: 80 }}
+                  onChange={(e) => updateRow(r.id, "environment", e.target.value)}>
+                  {ENVS.map((env) => <MenuItem key={env} value={env} sx={{ fontSize: 11 }}>{env}</MenuItem>)}
+                </Select>
+
+                {/* Datacenter */}
+                <TextField size="small" placeholder="DC / Region"
+                  value={r.datacenter || ""}
+                  onChange={(e) => updateRow(r.id, "datacenter", e.target.value)}
+                  sx={{ width: 120, "& .MuiInputBase-root": { fontSize: 11, height: 26 }, "& .MuiInputBase-input": { py: "3px", px: "8px" } }}
+                />
+
                 {/* Notes toggle */}
                 <Tooltip title={expandedNotes.has(r.id) ? "Hide notes" : "Edit notes"}>
                   <IconButton size="small" onClick={() => toggleNotes(r.id)}
@@ -443,7 +467,7 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
             onChange={(e) => setNName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addRow()}
             sx={{ minWidth: 180, flex: 1, "& .MuiInputBase-root": { fontSize: 12, height: 30 } }} />
-          <Select size="small" value={nType} onChange={(e) => setNType(e.target.value)} sx={{ ...selectSx, width: 100 }}>
+          <Select size="small" value={nType} onChange={(e) => setNType(e.target.value)} sx={{ ...selectSx, width: 110 }}>
             {TYPES.map((t) => <MenuItem key={t} value={t} sx={{ fontSize: 11 }}>{t}</MenuItem>)}
           </Select>
           <Select size="small" value={nPlatform} onChange={(e) => setNPlatform(e.target.value as Platform)} sx={{ ...selectSx, width: 120 }}>
@@ -466,9 +490,15 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
               </MenuItem>
             ))}
           </Select>
-          <Select size="small" value={nCrit} onChange={(e) => setNCrit(e.target.value)} sx={{ ...selectSx, width: 100 }}>
+          <Select size="small" value={nCrit} onChange={(e) => setNCrit(e.target.value)} sx={{ ...selectSx, width: 90 }}>
             {CRITS.map((c) => <MenuItem key={c} value={c} sx={{ fontSize: 11 }}>{c}</MenuItem>)}
           </Select>
+          <Select size="small" value={nEnv} onChange={(e) => setNEnv(e.target.value)} sx={{ ...selectSx, width: 80 }}>
+            {ENVS.map((env) => <MenuItem key={env} value={env} sx={{ fontSize: 11 }}>{env}</MenuItem>)}
+          </Select>
+          <TextField size="small" placeholder="DC / Region" value={nDc}
+            onChange={(e) => setNDc(e.target.value)}
+            sx={{ width: 120, "& .MuiInputBase-root": { fontSize: 12, height: 30 } }} />
           <Button size="small" startIcon={<Add sx={{ fontSize: 14 }} />} onClick={addRow}
             disabled={!nName.trim()}
             sx={{ textTransform: "none", height: 28, fontSize: 12, flexShrink: 0 }}>
