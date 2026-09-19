@@ -194,8 +194,15 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
       help: "Single host, IP, or CIDR range. Authorisation required — never scan systems you don't own." },
   ],
   openvas: [
-    { key: "target", label: "Target host / IP / CIDR", placeholder: "10.0.1.5  or  192.168.1.0/24",
-      help: "Greenbone/OpenVAS scans this target with the default vulnerability profile." },
+    { key: "target",       label: "Target host / IP / CIDR", placeholder: "10.0.1.5  or  192.168.1.0/24",
+      help: "Greenbone/OpenVAS scans this target with the Full-and-Fast vulnerability profile." },
+    { key: "gvm_host",     label: "GVM Host", placeholder: "127.0.0.1",
+      help: "Host running the GVM daemon. Usually 127.0.0.1 on Kali." },
+    { key: "gvm_port",     label: "GVM Port", placeholder: "9390",
+      help: "GMP socket port — default 9390." },
+    { key: "gvm_user",     label: "GVM Username", placeholder: "admin" },
+    { key: "gvm_password", label: "GVM Password", secret: true,
+      help: "Set during 'sudo gvm-setup'. Find it with: sudo cat /var/lib/gvm/gvm.cfg" },
   ],
   trivy: [
     { key: "image",        label: "Container image (optional)", placeholder: "ghcr.io/org/app:1.2.3",
