@@ -36,6 +36,19 @@ from api.models.models import Finding, Scan, Client, Connector, AgentRun
 logger = logging.getLogger(__name__)
 
 
+def _ev(evidence) -> dict:
+    """Normalize the evidence column to a plain dict regardless of storage format."""
+    if isinstance(evidence, dict):
+        return evidence
+    if isinstance(evidence, str):
+        try:
+            d = json.loads(evidence)
+            return d if isinstance(d, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
 # ── Risk Priority Score ──────────────────────────────────────────────────────
 
 SEV_TO_CVSS_FALLBACK = {"critical": 9.5, "high": 7.5, "medium": 5.0, "low": 3.0, "info": 1.0}
@@ -60,7 +73,7 @@ def compute_rps(finding: Finding) -> Dict[str, Any]:
         factors["cvss"] = {
             "value": round(float(finding.cvss_score), 1),
             "source": "evidenced",
-            "provider": (finding.evidence or {}).get("primary_url") and "scanner" or "scanner",
+            "provider": _ev(finding.evidence).get("primary_url") and "scanner" or "scanner",
             "rationale": "Base CVSS provided by scanner / NVD lookup.",
         }
     else:
@@ -256,7 +269,7 @@ def _summarise_findings(findings: List[Finding]) -> Dict[str, Any]:
             by_resource[f.resource_id] += 1
         if f.cve_id:
             cves.add(f.cve_id)
-        ev = f.evidence or {}
+        ev = _ev(f.evidence)
         cwe = ev.get("cwe") or ev.get("cwe_id")
         if cwe:
             cwe_seen.add(str(cwe))
@@ -284,7 +297,7 @@ def _vendor_scorecard(findings: List[Finding], category: str) -> List[Dict[str, 
     vendors = catalog.get(category, catalog["Network"])
     out: List[Dict[str, Any]] = []
     blob = " ".join(
-        ((f.title or "") + " " + (f.description or "") + " " + json.dumps(f.evidence or {}))
+        ((f.title or "") + " " + (f.description or "") + " " + json.dumps(_ev(f.evidence)))
         for f in findings[:200]
     ).lower()
     for v in vendors:

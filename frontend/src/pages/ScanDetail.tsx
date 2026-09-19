@@ -465,6 +465,7 @@ export default function ScanDetail() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<string>("verdict");
   const [agentMenuAnchor, setAgentMenuAnchor] = useState<null | HTMLElement>(null);
+  const [verdictPending, setVerdictPending] = useState(false);
   const { clientId } = useActiveClient();
   // When the browser triggers print (button or Ctrl+P), expand every tab
   // section so the whole assessment renders as a single document.
@@ -486,17 +487,22 @@ export default function ScanDetail() {
     enabled: !!scanId,
     refetchInterval: (q) => {
       const d = q.state.data as ScanDetailData | undefined;
-      return d?.status === "running" ? 5000 : false;
+      if (d?.status === "running") return 5000;
+      if (verdictPending && !d?.ai_verdict) return 4000;
+      return false;
     },
   });
+
+  // Stop polling once the verdict lands
+  React.useEffect(() => {
+    if (verdictPending && data?.ai_verdict) setVerdictPending(false);
+  }, [data?.ai_verdict, verdictPending]);
 
   const generateMutation = useMutation({
     mutationFn: () => assessmentsApi.generateVerdict(scanId!),
     onSuccess: () => {
       toast.success("Verdict queued — regenerating…");
-      // Poll for the new verdict
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["scan-detail", scanId] }), 2000);
-      setTimeout(() => qc.invalidateQueries({ queryKey: ["scan-detail", scanId] }), 8000);
+      setVerdictPending(true);
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to queue verdict"),
   });
