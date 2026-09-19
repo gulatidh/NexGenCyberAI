@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # ── Fixed schema fields (normaliser enforces these) ─────────────────────────
 
 
-_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "platform", "trust_zone", "criticality", "notes")
+_COMPONENT_FIELDS = ("id", "name", "type", "dfd_type", "is_threat_actor", "threat_actor_type", "platform", "trust_zone", "environment", "datacenter", "criticality", "notes")
 _DATA_FLOW_FIELDS = ("from", "to", "protocol", "data", "encrypted", "notes",
                      "port", "direction", "trust_boundary_crossing", "exposure",
                      "authentication_required")
@@ -338,6 +338,8 @@ Output STRICT JSON only — no prose, no markdown fences, no commentary outside 
       "threat_actor_type": "<external_attacker|insider_threat|nation_state|script_kiddie|vendor_risk|null>",
       "platform": "<Azure|AWS|GCP|Corporate|Internet|Third-Party>",
       "trust_zone": "<DMZ|Web Tier|API Tier|Application Tier|Report Server|Data Tier|Management Zone|External>",
+      "environment": "<Production|UAT|Development|DR|Staging>",
+      "datacenter": "<free text — e.g. Azure Southeast Asia, On-Prem DC1, AWS us-east-1, Office Network>",
       "criticality": "<critical|high|medium|low>",
       "notes": "<one-line>" }}
   ],
@@ -999,32 +1001,59 @@ def _components_from_assets(assets: Optional[List[Dict[str, Any]]]) -> List[Dict
     return comps
 
 
+_PLAT_DISPLAY = {
+    "Azure":       "Azure Cloud",
+    "AWS":         "AWS Cloud",
+    "GCP":         "GCP Cloud",
+    "Corporate":   "Corporate Network",
+    "Internet":    "Internet / External",
+    "Third-Party": "Third-Party Services",
+}
+
+
 def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, Any]]) -> str:
-    """Deterministically render a valid Mermaid `flowchart TD` from the
-    structured DFD. Nodes are grouped into trust-zone subgraphs; edge labels
-    are quoted + sanitised so protocol/data annotations like
-    `https (pii, encrypted)` can't break the parser."""
+    """Render a valid Mermaid `flowchart TD` with nested subgraphs:
+    outer = platform (Corporate, Azure, Internet …), inner = trust zone.
+    Edge labels are quoted + sanitised."""
     lines: List[str] = ["flowchart TD"]
     id_map: Dict[str, str] = {}
-    zones: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
+
+    # Group: platform -> trust_zone -> [(nid, comp)]
+    plat_zones: Dict[str, Dict[str, List[Tuple[str, Dict[str, Any]]]]] = {}
     for c in components:
         cid = _str(c.get("id"))
         if not cid:
             continue
         nid = _mm_id(cid)
         id_map[cid] = nid
-        zones.setdefault(_str(c.get("trust_zone")) or "private", []).append((nid, c))
+        plat = _str(c.get("platform") or "Corporate").strip() or "Corporate"
+        zone = _str(c.get("trust_zone") or "Private").strip() or "Private"
+        plat_zones.setdefault(plat, {}).setdefault(zone, []).append((nid, c))
 
-    for zone, comps in zones.items():
-        zlabel = _mm_label(zone.title().replace("-", " ")) or "Zone"
-        lines.append(f'  subgraph {_mm_id("zone_" + zone)}["{zlabel}"]')
-        for nid, c in comps:
-            name = _mm_label(c.get("name") or c.get("id") or "?")
-            ctype = _mm_label(c.get("type") or "")
-            # No emoji prefix — Mermaid renders multi-byte emoji as "??" in
-            # some browsers/renderers; name + type label is sufficient.
-            label = (f"{name}<br/><small>{ctype}</small>" if ctype else name)
-            lines.append(f'    {nid}["{label}"]')
+    for plat, zones in plat_zones.items():
+        plat_id = _mm_id("plat_" + plat)
+        plat_label = _mm_label(_PLAT_DISPLAY.get(plat, plat))
+        lines.append(f'  subgraph {plat_id}["{plat_label}"]')
+        for zone, comps in zones.items():
+            zone_id = _mm_id("zone_" + plat + "_" + zone)
+            zone_label = _mm_label(zone.title().replace("-", " ")) or "Zone"
+            lines.append(f'    subgraph {zone_id}["{zone_label}"]')
+            for nid, c in comps:
+                name = _mm_label(c.get("name") or c.get("id") or "?")
+                ctype = _mm_label(c.get("type") or "")
+                env  = _mm_label(c.get("environment") or "")
+                dc   = _mm_label(c.get("datacenter") or "")
+                # Build sublabel: type | env (dc)
+                parts = [x for x in [ctype, env] if x]
+                sub = " | ".join(parts)
+                if dc:
+                    sub = f"{sub} ({dc})" if sub else dc
+                label = f"{name}<br/><small>{sub}</small>" if sub else name
+                if c.get("is_threat_actor"):
+                    lines.append(f'      {nid}(["{label}"])')
+                else:
+                    lines.append(f'      {nid}["{label}"]')
+            lines.append("    end")
         lines.append("  end")
 
     _DIR_ICON = {"ingress": ">>", "egress": "<<", "bidirectional": "<>", "internal": ""}

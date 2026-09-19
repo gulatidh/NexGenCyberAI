@@ -1145,7 +1145,9 @@ export default function ThreatModelDetail() {
               <TableHead>
                 <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                   <TableCell>ID</TableCell><TableCell>NAME</TableCell><TableCell>TYPE</TableCell>
-                  <TableCell>TRUST ZONE</TableCell><TableCell>CRITICALITY</TableCell><TableCell>NOTES</TableCell>
+                  <TableCell>PLATFORM</TableCell><TableCell>TRUST ZONE</TableCell>
+                  <TableCell>ENV</TableCell><TableCell>DATACENTER</TableCell>
+                  <TableCell>CRITICALITY</TableCell><TableCell>NOTES</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1164,10 +1166,13 @@ export default function ThreatModelDetail() {
                         )}
                       </TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{c.type}</TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{(c as any).platform || "—"}</TableCell>
                       <TableCell>
                         <Chip label={c.trust_zone} size="small"
                           sx={{ bgcolor: `${zc}20`, color: zc, height: 18, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }} />
                       </TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{(c as any).environment || "—"}</TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontSize: 11 }}>{(c as any).datacenter || "—"}</TableCell>
                       <TableCell>
                         <Chip label={c.criticality} size="small"
                           sx={{ bgcolor: `${SEV_COLOR[c.criticality] || "#888"}20`,

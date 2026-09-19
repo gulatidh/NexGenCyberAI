@@ -352,6 +352,9 @@ Output STRICT JSON with this exact schema — no prose, no markdown fences:
     {"id": "<short-slug>", "name": "<system name>",
      "type": "<vm|storage|identity|repo|endpoint|database|api|queue|secret-store|other>",
      "trust_zone": "<public|dmz|web tier|api tier|private|application tier|report server|data-tier|management>",
+     "platform": "<Azure|AWS|GCP|Corporate|Internet|Third-Party>",
+     "environment": "<Production|UAT|Development|DR|Staging>",
+     "datacenter": "<free text — e.g. Azure Southeast Asia, On-Prem DC1>",
      "criticality": "<critical|high|medium|low>", "notes": "<one-line>"}
   ],
   "data_flows": [

@@ -113,6 +113,10 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   const threatCount = (data.threatCount as number) ?? 0;
   const maxSev = data.maxSeverity as string | null;
   const label = data.label as string ?? "";
+  const environment = (data.environment as string) || "";
+  const datacenter  = (data.datacenter  as string) || "";
+  const envDcParts  = [environment, datacenter].filter(Boolean);
+  const envDcLabel  = envDcParts.join(" · ");
 
   const handles = (
     <>
@@ -164,13 +168,20 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   const textColor   = isDark ? "#E0E0E0" : "#212121";
 
   const labelEl = (
-    <Typography sx={{
-      fontSize: 10.5, fontWeight: 600, color: textColor, textAlign: "center",
-      lineHeight: 1.3, overflow: "hidden", display: "-webkit-box",
-      WebkitLineClamp: 3, WebkitBoxOrient: "vertical", wordBreak: "break-word",
-    }}>
-      {label}
-    </Typography>
+    <Box sx={{ textAlign: "center" }}>
+      <Typography sx={{
+        fontSize: 10.5, fontWeight: 600, color: textColor,
+        lineHeight: 1.3, overflow: "hidden", display: "-webkit-box",
+        WebkitLineClamp: 3, WebkitBoxOrient: "vertical", wordBreak: "break-word",
+      }}>
+        {label}
+      </Typography>
+      {envDcLabel && (
+        <Typography sx={{ fontSize: 8.5, color: isDark ? "#78909C" : "#757575", mt: 0.25, lineHeight: 1.2 }}>
+          {envDcLabel}
+        </Typography>
+      )}
+    </Box>
   );
 
   if (shape === "external_entity") {
@@ -634,6 +645,8 @@ function buildGraph(
             platform,
             trustZone: tier,
             criticality: c.criticality || "",
+            environment: c.environment || "",
+            datacenter: c.datacenter || "",
             threatCount: td?.count ?? 0,
             maxSeverity: td?.maxSev ?? null,
           },
@@ -670,6 +683,7 @@ interface ComponentInput {
   id: string; name: string; type: string; dfd_type?: string;
   platform?: string; trust_zone: string; criticality: string;
   is_threat_actor?: boolean; threat_actor_type?: string;
+  environment?: string; datacenter?: string;
 }
 interface DataFlowInput {
   from: string; to: string; protocol: string; data: string;
