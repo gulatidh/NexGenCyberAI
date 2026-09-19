@@ -438,7 +438,7 @@ async def _llm_extract_diagram(
     try:
         from core.ai_providers import get_llm
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = get_llm(temperature=0.1, max_tokens=2048)
+        llm = get_llm(temperature=0.1, max_tokens=4096)
     except Exception as exc:
         raise RuntimeError(f"AI provider unavailable for diagram extraction: {exc}") from exc
 
@@ -459,16 +459,28 @@ async def _llm_extract_diagram(
     if isinstance(text, list):
         text = "\n".join(str(p) for p in text)
     text = text.strip()
+    # Strip markdown fences (```json ... ``` or ``` ... ```)
     if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-        if text.endswith("```"):
-            text = text[:-3]
+        text = re.sub(r"^```[a-z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text.strip())
+    text = text.strip()
+    # Extract the outermost { ... } block
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start:end + 1]
     try:
-        start = text.find("{")
-        end = text.rfind("}")
-        parsed = json.loads(text[start:end + 1]) if start >= 0 and end > start else {}
-    except Exception as exc:
-        raise RuntimeError(f"LLM did not return parseable JSON: {exc}") from exc
+        parsed = json.loads(text)
+    except Exception:
+        # Common LLM JSON mistakes: trailing commas, Python bool/None literals
+        fixed = re.sub(r",\s*([}\]])", r"\1", text)          # trailing commas
+        fixed = re.sub(r"\bTrue\b", "true", fixed)
+        fixed = re.sub(r"\bFalse\b", "false", fixed)
+        fixed = re.sub(r"\bNone\b", "null", fixed)
+        try:
+            parsed = json.loads(fixed)
+        except Exception as exc:
+            raise RuntimeError(f"LLM did not return parseable JSON: {exc}") from exc
 
     components_raw = parsed.get("components") or []
     flows_raw = parsed.get("data_flows") or []
