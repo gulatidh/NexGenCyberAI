@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Alert, Box, Button, Chip, CircularProgress, Collapse, Divider,
   Paper, Stack, Step, StepLabel, Stepper, Switch, TextField,
@@ -8,6 +8,8 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import DownloadingIcon from "@mui/icons-material/Downloading";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ComputerIcon from "@mui/icons-material/Computer";
 import CloudIcon from "@mui/icons-material/Cloud";
@@ -66,6 +68,101 @@ const STEPS = [
   "Configure dispatch",
   "Test & finish",
 ];
+
+// ── Quick Setup Guide ─────────────────────────────────────────────────────────
+
+const CODE: React.CSSProperties = {
+  display: "block", fontFamily: "monospace", fontSize: 12,
+  background: "rgba(0,0,0,0.35)", borderRadius: 4, padding: "8px 12px",
+  margin: "6px 0", whiteSpace: "pre", overflowX: "auto",
+};
+
+function QuickSetupGuide() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Paper variant="outlined" sx={{ mb: 3, borderColor: "primary.main" }}>
+      <Button
+        fullWidth
+        onClick={() => setOpen((o) => !o)}
+        endIcon={open ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        sx={{ justifyContent: "space-between", px: 2, py: 1.2, textAlign: "left", fontWeight: 700, fontSize: 13 }}
+      >
+        📋 Quick Setup Guide — Kali Linux (WSL on Windows)
+      </Button>
+      <Collapse in={open}>
+        <Box sx={{ px: 2, pb: 2 }}>
+
+          {/* Step 1 */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            1. Install Kali Linux (WSL)
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+            Open Microsoft Store → search <strong>Kali Linux</strong> → Install → open a terminal and type <code>kali</code>.
+          </Typography>
+
+          {/* Step 2 */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            2. Clone repo and run setup
+          </Typography>
+          <code style={CODE}>{`git clone https://github.com/gulatidh/NexGenCyberAI.git
+cd NexGenCyberAI
+bash setup.sh`}</code>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            setup.sh installs all scanner tools, creates the Python venv, generates backend/.env, and adds your user to the <code>_gvm</code> group for OpenVAS.
+          </Typography>
+
+          {/* Step 3 */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            3. Start the backend
+          </Typography>
+          <code style={CODE}>{`cd NexGenCyberAI/backend
+../venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload`}</code>
+
+          {/* Step 4 */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            4. Start the frontend (new terminal tab)
+          </Typography>
+          <code style={CODE}>{`cd NexGenCyberAI/frontend
+npm install   # first time only
+npm start`}</code>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            Then open <strong>http://localhost:3000</strong> in your browser.
+          </Typography>
+
+          {/* Step 5 — OpenVAS */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            5. OpenVAS post-setup (first time only)
+          </Typography>
+          <code style={CODE}>{`sudo gvm-setup      # downloads NVT feed — takes ~20 min
+sudo gvm-start`}</code>
+          <Alert severity="warning" sx={{ my: 1, py: 0.5, fontSize: 12 }}>
+            <strong>Permission fix required after setup.sh</strong> — the <code>_gvm</code> group change needs a session restart to take effect.
+          </Alert>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+            <strong>Option A (immediate, no restart):</strong>
+          </Typography>
+          <code style={CODE}>{`sudo chmod 666 /run/gvmd/gvmd.sock`}</code>
+          <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+            <strong>Option B (permanent — WSL restart from PowerShell):</strong>
+          </Typography>
+          <code style={CODE}>{`wsl --terminate kali-linux`}</code>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            Then reopen Kali. Create an OpenVAS connector in <strong>Connections → Scanner Connectors</strong> with your GVM username and password (shown at end of gvm-setup output).
+          </Typography>
+
+          {/* Step 6 */}
+          <Typography sx={{ fontWeight: 700, mt: 1.5, mb: 0.5, fontSize: 13 }}>
+            6. Complete the wizard below
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+            Work through the steps: Check environment → Install tools → Configure dispatch → Test & finish. Then run scans from Discover → Assessments.
+          </Typography>
+
+        </Box>
+      </Collapse>
+    </Paper>
+  );
+}
 
 // ── Cloud pairing sub-component ───────────────────────────────────────────────
 
@@ -555,6 +652,8 @@ export default function LocalRunnerSetup() {
             Kali Linux detected — apt packages available for most tools.
           </Alert>
         )}
+
+        <QuickSetupGuide />
 
         <Stepper activeStep={step} sx={{ mb: 4 }}>
           {STEPS.map((s) => (
