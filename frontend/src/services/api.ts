@@ -429,7 +429,9 @@ export const threatModelsApi = {
   diff: (clientId: string, modelId: string, prevId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/diff/${prevId}`).then((r) => r.data),
   pdfUrl: (clientId: string, modelId: string) =>
-    `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/pdf`,
+    `/clients/${clientId}/threat-models/${modelId}/pdf`,
+  docxUrl: (clientId: string, modelId: string) =>
+    `/clients/${clientId}/threat-models/${modelId}/docx`,
   patchThreat: (clientId: string, modelId: string, threatId: string, body: any) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}`, body).then((r) => r.data),
   patchMitigation: (clientId: string, modelId: string, mitId: string, body: any) =>

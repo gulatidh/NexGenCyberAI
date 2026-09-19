@@ -16,6 +16,7 @@ system-level native deps in the deployment environment.
 """
 from __future__ import annotations
 import html as html_lib
+import io
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -447,3 +448,183 @@ def _signoff() -> str:
     </div>
   </div>
 </section>"""
+
+
+# ── Word (DOCX) export ───────────────────────────────────────────────────────
+
+
+def render_threat_model_docx(tm: ThreatModel, *, client_name: str = "Unknown Client") -> bytes:
+    from docx import Document
+    from docx.shared import Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    components: List[Dict[str, Any]] = tm.components_json or []
+    data_flows: List[Dict[str, Any]] = tm.data_flows_json or []
+    threats: List[Dict[str, Any]] = tm.threats_json or []
+    mitigations: List[Dict[str, Any]] = tm.mitigations_json or []
+    maturity: Dict[str, float] = tm.maturity_scores or {}
+
+    methodology = (tm.methodology or "stride").upper()
+    title = tm.name or f"Threat Model · {methodology}"
+    date_str = (tm.generated_at or datetime.utcnow()).strftime("%d %B %Y")
+
+    doc = Document()
+
+    # Narrow margins
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+    # ── Cover ────────────────────────────────────────────────────────────────
+    def _blue_heading(text: str, level: int = 1):
+        p = doc.add_heading(text, level=level)
+        for run in p.runs:
+            run.font.color.rgb = RGBColor(0x1A, 0x73, 0xE8)
+        return p
+
+    _blue_heading("NexGen Cyber AI — Threat Model Deliverable", level=1)
+    p = doc.add_paragraph()
+    p.add_run(title).bold = True
+    p.runs[0].font.size = Pt(18)
+
+    meta = doc.add_paragraph()
+    meta.add_run(f"Client: {client_name}    Methodology: {methodology}    Date: {date_str}\n")
+    meta.add_run(f"Threats: {len(threats)}    Components: {len(components)}    Mitigations: {len(mitigations)}")
+    meta.paragraph_format.space_after = Pt(12)
+    doc.add_page_break()
+
+    # ── Executive Summary ────────────────────────────────────────────────────
+    _blue_heading("1. Executive Summary", level=2)
+    doc.add_paragraph(tm.executive_summary or "(no executive summary captured)")
+
+    # ── Components ───────────────────────────────────────────────────────────
+    _blue_heading("2. Components", level=2)
+    if components:
+        tbl = doc.add_table(rows=1, cols=5)
+        tbl.style = "Table Grid"
+        hdr = tbl.rows[0].cells
+        for i, h in enumerate(["ID", "Name", "Type", "Trust Zone", "Criticality"]):
+            hdr[i].text = h
+            for run in hdr[i].paragraphs[0].runs:
+                run.bold = True
+        for c in components:
+            row = tbl.add_row().cells
+            row[0].text = str(c.get("id") or "")
+            row[1].text = str(c.get("name") or "")
+            row[2].text = str(c.get("type") or "")
+            row[3].text = str(c.get("trust_zone") or "")
+            row[4].text = str(c.get("criticality") or "")
+    else:
+        doc.add_paragraph("(no components)")
+
+    # ── Data Flows ───────────────────────────────────────────────────────────
+    _blue_heading("3. Data Flows", level=2)
+    if data_flows:
+        tbl = doc.add_table(rows=1, cols=5)
+        tbl.style = "Table Grid"
+        hdr = tbl.rows[0].cells
+        for i, h in enumerate(["From", "To", "Protocol", "Data", "Encrypted"]):
+            hdr[i].text = h
+            for run in hdr[i].paragraphs[0].runs:
+                run.bold = True
+        for f in data_flows:
+            row = tbl.add_row().cells
+            row[0].text = str(f.get("from") or "")
+            row[1].text = str(f.get("to") or "")
+            row[2].text = str(f.get("protocol") or "")
+            row[3].text = str(f.get("data") or "")
+            row[4].text = "Yes" if f.get("encrypted") else "No"
+    else:
+        doc.add_paragraph("(no data flows)")
+
+    # ── Threats by component ─────────────────────────────────────────────────
+    doc.add_page_break()
+    _blue_heading("4. Threats by Component", level=2)
+    comp_by_id = {str(c.get("id")): c for c in components}
+    mit_by_threat: Dict[str, List[Dict[str, Any]]] = {}
+    for m in mitigations:
+        mit_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
+
+    by_comp: Dict[str, List[Dict[str, Any]]] = {}
+    for t in threats:
+        by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
+
+    if not threats:
+        doc.add_paragraph("(no threats identified)")
+    else:
+        for comp_id, t_list in by_comp.items():
+            comp = comp_by_id.get(comp_id, {})
+            comp_name = comp.get("name") or comp_id
+            _blue_heading(f"{comp_name} ({len(t_list)} threats)", level=3)
+            for t in sorted(t_list, key=lambda x: x.get("priority_score", 0), reverse=True):
+                sev = (t.get("severity") or "medium").upper()
+                p = doc.add_paragraph(style="List Bullet")
+                p.add_run(f"[{sev}] {t.get('title') or '(untitled)'}").bold = True
+                doc.add_paragraph(f"Category: {t.get('category', '')}  |  Priority: {t.get('priority_score', '—')}  |  Status: {t.get('status', 'identified')}")
+                if t.get("rationale"):
+                    doc.add_paragraph(f"Rationale: {t.get('rationale')}")
+                mits = mit_by_threat.get(str(t.get("id")), [])
+                if mits:
+                    for m in mits:
+                        doc.add_paragraph(f"  → {m.get('action', '')}", style="List Bullet 2")
+
+    # ── Mitigations roadmap ──────────────────────────────────────────────────
+    doc.add_page_break()
+    _blue_heading("5. Mitigation Roadmap", level=2)
+    if mitigations:
+        tbl = doc.add_table(rows=1, cols=5)
+        tbl.style = "Table Grid"
+        hdr = tbl.rows[0].cells
+        for i, h in enumerate(["Threat ID", "Action", "Owner", "Status", "Control Refs"]):
+            hdr[i].text = h
+            for run in hdr[i].paragraphs[0].runs:
+                run.bold = True
+        for m in mitigations:
+            ctrl_refs = ", ".join(
+                f"{r.get('framework')}:{r.get('control_id')}" for r in (m.get("control_refs") or [])
+            )
+            row = tbl.add_row().cells
+            row[0].text = str(m.get("threat_id") or "")
+            row[1].text = str(m.get("action") or "")
+            row[2].text = str(m.get("owner_role") or m.get("owner") or "—")
+            row[3].text = str(m.get("status") or "open")
+            row[4].text = ctrl_refs or "—"
+    else:
+        doc.add_paragraph("(no mitigations)")
+
+    # ── Maturity scores ──────────────────────────────────────────────────────
+    if maturity:
+        doc.add_page_break()
+        _blue_heading("6. Maturity by Category", level=2)
+        tbl = doc.add_table(rows=1, cols=2)
+        tbl.style = "Table Grid"
+        hdr = tbl.rows[0].cells
+        hdr[0].text = "Category"
+        hdr[1].text = "Score (/ 5.0)"
+        for run in hdr[0].paragraphs[0].runs:
+            run.bold = True
+        for run in hdr[1].paragraphs[0].runs:
+            run.bold = True
+        for cat, score in sorted(maturity.items()):
+            row = tbl.add_row().cells
+            row[0].text = cat.replace("_", " ").title()
+            row[1].text = f"{float(score):.1f}"
+
+    # ── Sign-off ─────────────────────────────────────────────────────────────
+    doc.add_page_break()
+    _blue_heading("Sign-off", level=2)
+    doc.add_paragraph("This threat model is a point-in-time analysis. Sign below to acknowledge review and acceptance of the mitigation roadmap.")
+    doc.add_paragraph("\n\n")
+    tbl = doc.add_table(rows=2, cols=2)
+    tbl.style = "Table Grid"
+    tbl.rows[0].cells[0].text = "Prepared by (NexGen consultant)"
+    tbl.rows[0].cells[1].text = "Accepted by (Customer / CISO)"
+    tbl.rows[1].cells[0].text = "\n\n"
+    tbl.rows[1].cells[1].text = "\n\n"
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.read()

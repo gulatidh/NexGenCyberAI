@@ -8,7 +8,7 @@
  *
  * Polls every 4s while the model is in pending/generating state.
  */
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -22,12 +22,15 @@ import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
-  MenuBook, Group, VerifiedUser, Timeline,
+  MenuBook, Group, VerifiedUser, Timeline, Article,
 } from "@mui/icons-material";
 import { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMsal } from "@azure/msal-react";
+import { loginRequest } from "../auth/msalConfig";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
+const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
 import { fromNow } from "../utils/datetime";
 import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
 import DfdDiagram from "../components/DfdDiagram";
@@ -482,6 +485,43 @@ export default function ThreatModelDetail() {
   const clientId = search.get("client") || "";
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { instance, accounts } = useMsal();
+
+  const downloadThreatModel = useCallback(async (format: "pdf" | "docx") => {
+    try {
+      const account = accounts[0];
+      let token = "";
+      if (account) {
+        try {
+          const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
+          token = resp.idToken || resp.accessToken;
+        } catch { }
+      }
+      const path = format === "pdf"
+        ? threatModelsApi.pdfUrl(clientId, modelId!)
+        : threatModelsApi.docxUrl(clientId, modelId!);
+      const url = API_BASE + path;
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      if (format === "pdf") {
+        const w = window.open(blobUrl, "_blank");
+        if (!w) window.print();
+        // revoke after a delay so the new tab has time to load the document
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      } else {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `threat-model-${(modelId || "").slice(0, 8)}.docx`;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch (err: any) {
+      toast.error("Export failed — check the console for details");
+      console.error("Threat model export error:", err);
+    }
+  }, [clientId, modelId, instance, accounts]);
   const [tab, setTab] = useState<string>("diagram");
   // Diagram-renderer toggle: 'interactive' (React Flow DFD) | 'mermaid'
   const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid">("interactive");
@@ -692,14 +732,18 @@ export default function ThreatModelDetail() {
         <Button
           startIcon={<Print />}
           size="small"
-          onClick={() => {
-            // Open the server-rendered deliverable in a new tab; it auto-prints.
-            const w = window.open(threatModelsApi.pdfUrl(clientId, modelId!), "_blank");
-            if (!w) window.print();
-          }}
+          onClick={() => downloadThreatModel("pdf")}
           sx={{ color: "text.secondary" }}
         >
           Print / PDF
+        </Button>
+        <Button
+          startIcon={<Article />}
+          size="small"
+          onClick={() => downloadThreatModel("docx")}
+          sx={{ color: "text.secondary" }}
+        >
+          Word
         </Button>
       </Box>
 

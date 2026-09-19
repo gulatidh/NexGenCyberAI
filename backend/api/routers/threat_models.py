@@ -1254,6 +1254,33 @@ async def get_threat_model_pdf(
     return Response(content=html, media_type="text/html; charset=utf-8")
 
 
+@router.get("/{model_id}/docx")
+async def get_threat_model_docx(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Return the threat model as a Word (.docx) document."""
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    client_name = "Unknown Client"
+    c = db.query(Client).filter(Client.id == tm.client_id).first()
+    if c:
+        client_name = c.name
+    from services.threat_model_pdf import render_threat_model_docx
+    docx_bytes = render_threat_model_docx(tm, client_name=client_name)
+    safe_name = (tm.name or "threat-model").replace(" ", "-").replace("/", "-")[:60]
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.docx"'},
+    )
+
+
 @router.delete("/{model_id}", status_code=204)
 async def delete_threat_model(
     client_id: str,
