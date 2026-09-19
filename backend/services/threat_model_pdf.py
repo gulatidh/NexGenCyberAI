@@ -19,9 +19,14 @@ import html as html_lib
 import io
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 from api.models.models import ThreatModel
+
+_ALL_SECTIONS: FrozenSet[str] = frozenset([
+    "cover", "exec_summary", "architecture", "boundaries",
+    "risk_matrix", "coverage_matrix", "maturity", "threats", "mitigations", "signoff",
+])
 
 
 def _h(s: Any) -> str:
@@ -39,7 +44,25 @@ _STATE_BG = {"threat": "#fee2e2", "considered": "#e0e7ff", "not_applicable": "#f
 _STATE_FG = {"threat": "#991b1b", "considered": "#3730a3", "not_applicable": "#475569", "missing": "#92400e"}
 
 
-def render_threat_model_html(tm: ThreatModel, *, client_name: str = "Unknown Client") -> str:
+def _heatmap_cell_color(score: int) -> tuple[str, str]:
+    """Return (bg, fg) for a likelihood*impact score."""
+    if score >= 16:
+        return "#fee2e2", "#991b1b"   # critical
+    if score >= 9:
+        return "#ffedd5", "#9a3412"   # high
+    if score >= 4:
+        return "#fef3c7", "#92400e"   # medium
+    return "#dcfce7", "#166534"       # low
+
+
+def render_threat_model_html(
+    tm: ThreatModel,
+    *,
+    client_name: str = "Unknown Client",
+    sections: Optional[FrozenSet[str]] = None,
+) -> str:
+    sec = sections if sections is not None else _ALL_SECTIONS
+
     components: List[Dict[str, Any]] = tm.components_json or []
     data_flows: List[Dict[str, Any]] = tm.data_flows_json or []
     threats: List[Dict[str, Any]] = tm.threats_json or []
@@ -63,27 +86,31 @@ def render_threat_model_html(tm: ThreatModel, *, client_name: str = "Unknown Cli
 
     comp_by_id = {str(c.get("id")): c for c in components}
 
-    # ── Sections ────────────────────────────────────────────────────────────
-    cover = _cover(title, client_name, methodology, date_str, threat_count, component_count, mitigation_count, coverage_pct, grounded)
-    exec_summary = _exec_summary(tm.executive_summary or "")
-    completeness = _completeness_section(components, data_flows, trust_boundaries, entry_points)
-    matrix = _coverage_matrix(components, coverage, threats)
-    maturity_section = _maturity_section(maturity)
-    threats_section = _threats_section(threats, mitigations, comp_by_id)
-    mit_table = _mitigations_table(mitigations)
-    signoff = _signoff()
+    parts: List[str] = []
 
-    body = "\n".join([
-        cover,
-        exec_summary,
-        completeness,
-        matrix,
-        maturity_section,
-        threats_section,
-        mit_table,
-        signoff,
-    ])
+    if "cover" in sec:
+        parts.append(_cover(title, client_name, methodology, date_str,
+                            threat_count, component_count, mitigation_count, coverage_pct, grounded))
+    if "exec_summary" in sec:
+        parts.append(_exec_summary(tm.executive_summary or ""))
+    if "architecture" in sec:
+        parts.append(_completeness_section(components, data_flows, trust_boundaries, entry_points))
+    if "boundaries" in sec:
+        parts.append(_boundaries_section(trust_boundaries, entry_points, data_flows))
+    if "risk_matrix" in sec:
+        parts.append(_risk_heatmap_section(threats))
+    if "coverage_matrix" in sec:
+        parts.append(_coverage_matrix(components, coverage, threats))
+    if "maturity" in sec:
+        parts.append(_maturity_section(maturity))
+    if "threats" in sec:
+        parts.append(_threats_section(threats, mitigations, comp_by_id))
+    if "mitigations" in sec:
+        parts.append(_mitigations_table(mitigations))
+    if "signoff" in sec:
+        parts.append(_signoff())
 
+    body = "\n".join(p for p in parts if p)
     return _wrap_document(title, client_name, body)
 
 
@@ -147,6 +174,12 @@ thead { display: table-header-group; }
 .maturity-card { flex: 1; min-width: 22%; padding: 8pt 10pt; background: #f8fafc; border: 1pt solid #e2e8f0; border-radius: 4pt; }
 .maturity-bar { height: 6pt; background: #e2e8f0; border-radius: 3pt; margin-top: 4pt; overflow: hidden; }
 .maturity-bar-fill { height: 100%; background: #1a73e8; border-radius: 3pt; }
+
+.heatmap { display: grid; grid-template-columns: 28pt repeat(5, 1fr); gap: 2pt; font-size: 8.5pt; margin: 8pt 0; }
+.heatmap-axis { display: flex; align-items: center; justify-content: center; font-weight: 700; color: #475569; font-size: 8pt; }
+.heatmap-cell { padding: 6pt; border-radius: 3pt; text-align: center; min-height: 30pt; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.heatmap-count { font-size: 14pt; font-weight: 700; line-height: 1; }
+.heatmap-label { font-size: 7pt; margin-top: 2pt; }
 
 .signoff { margin-top: 24pt; page-break-inside: avoid; border-top: 1pt solid #cbd5e1; padding-top: 12pt; }
 .signoff-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24pt; margin-top: 16pt; }
@@ -235,20 +268,12 @@ def _completeness_section(components: List[Dict[str, Any]], data_flows: List[Dic
     )
     flow_rows = "\n".join(
         f"<tr><td>{_h(f.get('from'))}</td><td>{_h(f.get('to'))}</td><td>{_h(f.get('protocol'))}</td>"
-        f"<td>{_h(f.get('data'))}</td><td>{'Yes' if f.get('encrypted') else 'No'}</td><td>{_h(f.get('notes'))}</td></tr>"
+        f"<td>{_h(f.get('data'))}</td><td>{'Yes' if f.get('encrypted') else 'No'}</td>"
+        f"<td>{'⚠ Crosses boundary' if f.get('trust_boundary_crossing') else '—'}</td></tr>"
         for f in data_flows
     )
-    tb_rows = "\n".join(
-        f"<tr><td>{_h(t.get('name'))}</td><td>{_h(t.get('from_zone'))} → {_h(t.get('to_zone'))}</td><td>{_h(t.get('description'))}</td></tr>"
-        for t in trust_boundaries
-    ) or "<tr><td colspan='3' class='muted'>(no trust boundaries enumerated)</td></tr>"
-    ep_rows = "\n".join(
-        f"<tr><td>{_h(e.get('name'))}</td><td>{_h(e.get('kind'))}</td><td>{_h(e.get('exposure'))}</td>"
-        f"<td>{'Yes' if e.get('auth_required') else 'No'}</td><td>{_h(e.get('component_id'))}</td></tr>"
-        for e in entry_points
-    ) or "<tr><td colspan='5' class='muted'>(no entry points enumerated)</td></tr>"
     return f"""<section class="section">
-  <h2>2. Architecture &amp; Completeness</h2>
+  <h2>2. Architecture &amp; Components</h2>
   <h3>Components ({len(components)})</h3>
   <table>
     <thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Trust zone</th><th>Criticality</th><th>Notes</th></tr></thead>
@@ -256,19 +281,104 @@ def _completeness_section(components: List[Dict[str, Any]], data_flows: List[Dic
   </table>
   <h3>Data Flows ({len(data_flows)})</h3>
   <table>
-    <thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th><th>Encrypted</th><th>Notes</th></tr></thead>
+    <thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th><th>Encrypted</th><th>Boundary</th></tr></thead>
     <tbody>{flow_rows or "<tr><td colspan='6' class='muted'>(no data flows)</td></tr>"}</tbody>
   </table>
+</section>"""
+
+
+def _boundaries_section(trust_boundaries: List[Dict[str, Any]], entry_points: List[Dict[str, Any]],
+                         data_flows: List[Dict[str, Any]]) -> str:
+    tb_rows = "\n".join(
+        f"<tr><td>{_h(t.get('name'))}</td>"
+        f"<td>{_h(t.get('from_zone'))}</td>"
+        f"<td>{_h(t.get('to_zone'))}</td>"
+        f"<td>{_h(t.get('description'))}</td>"
+        f"<td style='text-align:center;'>{len(t.get('crossed_by_flow_ids') or [])}</td></tr>"
+        for t in trust_boundaries
+    ) or "<tr><td colspan='5' class='muted'>(no trust boundaries enumerated)</td></tr>"
+
+    ep_rows = "\n".join(
+        f"<tr><td>{_h(e.get('name'))}</td>"
+        f"<td>{_h(e.get('kind'))}</td>"
+        f"<td>{_h(e.get('exposure'))}</td>"
+        f"<td>{'Yes' if e.get('auth_required') else 'No'}</td>"
+        f"<td>{_h(e.get('component_id'))}</td></tr>"
+        for e in entry_points
+    ) or "<tr><td colspan='5' class='muted'>(no entry points enumerated)</td></tr>"
+
+    crossing_flows = [f for f in data_flows if f.get("trust_boundary_crossing")]
+    cf_rows = "\n".join(
+        f"<tr><td>{_h(f.get('from'))}</td><td>{_h(f.get('to'))}</td>"
+        f"<td>{_h(f.get('protocol'))}</td><td>{_h(f.get('data'))}</td></tr>"
+        for f in crossing_flows
+    ) or "<tr><td colspan='4' class='muted'>(no boundary-crossing flows)</td></tr>"
+
+    return f"""<section class="section" style="page-break-before: always;">
+  <h2>3. Trust Boundaries &amp; Entry Points</h2>
   <h3>Trust Boundaries ({len(trust_boundaries)})</h3>
   <table>
-    <thead><tr><th>Name</th><th>Zones</th><th>Description</th></tr></thead>
+    <thead><tr><th>Name</th><th>From Zone</th><th>To Zone</th><th>Description</th><th>Crossing Flows</th></tr></thead>
     <tbody>{tb_rows}</tbody>
   </table>
   <h3>Entry Points ({len(entry_points)})</h3>
   <table>
-    <thead><tr><th>Name</th><th>Kind</th><th>Exposure</th><th>Auth required</th><th>Component</th></tr></thead>
+    <thead><tr><th>Name</th><th>Kind</th><th>Exposure</th><th>Auth Required</th><th>Component</th></tr></thead>
     <tbody>{ep_rows}</tbody>
   </table>
+  <h3>Boundary-Crossing Flows ({len(crossing_flows)})</h3>
+  <table>
+    <thead><tr><th>From</th><th>To</th><th>Protocol</th><th>Data</th></tr></thead>
+    <tbody>{cf_rows}</tbody>
+  </table>
+</section>"""
+
+
+def _risk_heatmap_section(threats: List[Dict[str, Any]]) -> str:
+    # Build count map: (likelihood, impact) → count
+    cell_counts: Dict[tuple, int] = {}
+    for t in threats:
+        li = int(t.get("likelihood") or 0)
+        im = int(t.get("impact") or 0)
+        if 1 <= li <= 5 and 1 <= im <= 5:
+            cell_counts[(li, im)] = cell_counts.get((li, im), 0) + 1
+
+    # Build grid HTML: rows = impact 5 (top) → 1 (bottom), cols = likelihood 1→5
+    # Layout: first col = impact label, then 5 likelihood cols
+    header_row = '<div class="heatmap-axis">Impact ↕</div>'
+    for li in range(1, 6):
+        header_row += f'<div class="heatmap-axis">L{li}</div>'
+
+    rows_html = ""
+    for im in range(5, 0, -1):
+        rows_html += f'<div class="heatmap-axis">I{im}</div>'
+        for li in range(1, 6):
+            score = li * im
+            bg, fg = _heatmap_cell_color(score)
+            count = cell_counts.get((li, im), 0)
+            count_html = f'<div class="heatmap-count" style="color:{fg};">{count}</div>' if count > 0 else '<div class="heatmap-count" style="color:#94a3b8;">·</div>'
+            rows_html += (
+                f'<div class="heatmap-cell" style="background:{bg};">'
+                f'{count_html}'
+                f'<div class="heatmap-label" style="color:{fg};">{score}</div>'
+                f'</div>'
+            )
+
+    total_placed = sum(cell_counts.values())
+    unplaced = len(threats) - total_placed
+
+    note = ""
+    if unplaced > 0:
+        note = f'<p class="muted">{unplaced} threat{"s" if unplaced != 1 else ""} have no likelihood/impact score and are not plotted.</p>'
+
+    return f"""<section class="section" style="page-break-before: always;">
+  <h2>4. Risk Heat Map</h2>
+  <p class="muted">Threats plotted by likelihood (X-axis, 1–5) × impact (Y-axis, 1–5). Cell score = L×I. Colour: ≥16 critical, ≥9 high, ≥4 medium, &lt;4 low.</p>
+  <div class="heatmap">
+    {header_row}
+    {rows_html}
+  </div>
+  {note}
 </section>"""
 
 
@@ -276,11 +386,9 @@ def _coverage_matrix(components: List[Dict[str, Any]], coverage: List[Dict[str, 
     if not components or not coverage:
         return ""
     categories = sorted({d.get("category") for d in coverage if d.get("category")})
-    # Build a grid: rows = components, cols = categories
     by_cell = {}
     for d in coverage:
         by_cell[(d.get("component_id"), d.get("category"))] = d
-    n_cols = len(categories) + 1  # +1 for the component name column
     col_template = f"grid-template-columns: 22% repeat({len(categories)}, 1fr);"
 
     header_cells = ['<div class="matrix-header">Component</div>'] + [
@@ -315,7 +423,7 @@ def _coverage_matrix(components: List[Dict[str, Any]], coverage: List[Dict[str, 
         rows_html.append("".join(cells))
 
     return f"""<section class="section" style="page-break-before: always;">
-  <h2>3. STRIDE Coverage Matrix</h2>
+  <h2>5. STRIDE Coverage Matrix</h2>
   <p class="muted">Each cell shows the state of the (component × category) coverage decision. Threat cells contain at least one identified threat; Considered cells were analysed and dismissed with rationale; N/A cells are not applicable to that component; Missing cells require follow-up.</p>
   <div class="matrix-grid" style="{col_template}">
     {''.join(header_cells)}
@@ -336,7 +444,7 @@ def _maturity_section(maturity: Dict[str, float]) -> str:
   <div class="maturity-bar"><div class="maturity-bar-fill" style="width: {_pct(pct)};"></div></div>
 </div>""")
     return f"""<section class="section">
-  <h2>4. Maturity by Category</h2>
+  <h2>6. Maturity by Category</h2>
   <p class="muted">Score 0-5 per category, derived from threat status, detection coverage, evidence quality, and unmitigated critical/high count.</p>
   <div class="maturity-radar">{''.join(cards)}</div>
 </section>"""
@@ -345,7 +453,6 @@ def _maturity_section(maturity: Dict[str, float]) -> str:
 def _threats_section(threats: List[Dict[str, Any]], mitigations: List[Dict[str, Any]], comp_by_id: Dict[str, Dict[str, Any]]) -> str:
     if not threats:
         return ""
-    # Group threats by component
     by_comp: Dict[str, List[Dict[str, Any]]] = {}
     for t in threats:
         by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
@@ -403,7 +510,7 @@ def _threats_section(threats: List[Dict[str, Any]], mitigations: List[Dict[str, 
   {mit_html}
 </div>""")
     return f"""<section class="section" style="page-break-before: always;">
-  <h2>5. Threats by Component</h2>
+  <h2>7. Threats by Component</h2>
   {''.join(blocks)}
 </section>"""
 
@@ -425,7 +532,7 @@ def _mitigations_table(mitigations: List[Dict[str, Any]]) -> str:
         for m in mitigations
     )
     return f"""<section class="section" style="page-break-before: always;">
-  <h2>6. Mitigation Roadmap</h2>
+  <h2>8. Mitigation Roadmap</h2>
   <table>
     <thead><tr><th>ID</th><th>Threat</th><th>Action</th><th>Control refs</th><th>Owner</th><th>Status</th></tr></thead>
     <tbody>{rows}</tbody>
@@ -453,15 +560,24 @@ def _signoff() -> str:
 # ── Word (DOCX) export ───────────────────────────────────────────────────────
 
 
-def render_threat_model_docx(tm: ThreatModel, *, client_name: str = "Unknown Client") -> bytes:
+def render_threat_model_docx(
+    tm: ThreatModel,
+    *,
+    client_name: str = "Unknown Client",
+    sections: Optional[FrozenSet[str]] = None,
+) -> bytes:
     from docx import Document
     from docx.shared import Pt, RGBColor, Cm
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    sec = sections if sections is not None else _ALL_SECTIONS
 
     components: List[Dict[str, Any]] = tm.components_json or []
     data_flows: List[Dict[str, Any]] = tm.data_flows_json or []
     threats: List[Dict[str, Any]] = tm.threats_json or []
     mitigations: List[Dict[str, Any]] = tm.mitigations_json or []
+    trust_boundaries: List[Dict[str, Any]] = tm.trust_boundaries_json or []
+    entry_points: List[Dict[str, Any]] = tm.entry_points_json or []
     maturity: Dict[str, float] = tm.maturity_scores or {}
 
     methodology = (tm.methodology or "stride").upper()
@@ -470,159 +586,206 @@ def render_threat_model_docx(tm: ThreatModel, *, client_name: str = "Unknown Cli
 
     doc = Document()
 
-    # Narrow margins
     for section in doc.sections:
         section.top_margin = Cm(2)
         section.bottom_margin = Cm(2)
         section.left_margin = Cm(2.5)
         section.right_margin = Cm(2.5)
 
-    # ── Cover ────────────────────────────────────────────────────────────────
     def _blue_heading(text: str, level: int = 1):
         p = doc.add_heading(text, level=level)
         for run in p.runs:
             run.font.color.rgb = RGBColor(0x1A, 0x73, 0xE8)
         return p
 
-    _blue_heading("NexGen Cyber AI — Threat Model Deliverable", level=1)
-    p = doc.add_paragraph()
-    p.add_run(title).bold = True
-    p.runs[0].font.size = Pt(18)
-
-    meta = doc.add_paragraph()
-    meta.add_run(f"Client: {client_name}    Methodology: {methodology}    Date: {date_str}\n")
-    meta.add_run(f"Threats: {len(threats)}    Components: {len(components)}    Mitigations: {len(mitigations)}")
-    meta.paragraph_format.space_after = Pt(12)
-    doc.add_page_break()
-
-    # ── Executive Summary ────────────────────────────────────────────────────
-    _blue_heading("1. Executive Summary", level=2)
-    doc.add_paragraph(tm.executive_summary or "(no executive summary captured)")
-
-    # ── Components ───────────────────────────────────────────────────────────
-    _blue_heading("2. Components", level=2)
-    if components:
-        tbl = doc.add_table(rows=1, cols=5)
-        tbl.style = "Table Grid"
+    def _bold_table_header(tbl, headers):
         hdr = tbl.rows[0].cells
-        for i, h in enumerate(["ID", "Name", "Type", "Trust Zone", "Criticality"]):
+        for i, h in enumerate(headers):
             hdr[i].text = h
             for run in hdr[i].paragraphs[0].runs:
                 run.bold = True
-        for c in components:
-            row = tbl.add_row().cells
-            row[0].text = str(c.get("id") or "")
-            row[1].text = str(c.get("name") or "")
-            row[2].text = str(c.get("type") or "")
-            row[3].text = str(c.get("trust_zone") or "")
-            row[4].text = str(c.get("criticality") or "")
-    else:
-        doc.add_paragraph("(no components)")
 
-    # ── Data Flows ───────────────────────────────────────────────────────────
-    _blue_heading("3. Data Flows", level=2)
-    if data_flows:
-        tbl = doc.add_table(rows=1, cols=5)
+    # ── Cover ────────────────────────────────────────────────────────────────
+    if "cover" in sec or "exec_summary" in sec:
+        _blue_heading("NexGen Cyber AI — Threat Model Deliverable", level=1)
+        p = doc.add_paragraph()
+        p.add_run(title).bold = True
+        p.runs[0].font.size = Pt(18)
+        meta = doc.add_paragraph()
+        meta.add_run(f"Client: {client_name}    Methodology: {methodology}    Date: {date_str}\n")
+        meta.add_run(f"Threats: {len(threats)}    Components: {len(components)}    Mitigations: {len(mitigations)}")
+        meta.paragraph_format.space_after = Pt(12)
+
+    if "exec_summary" in sec:
+        doc.add_page_break()
+        _blue_heading("1. Executive Summary", level=2)
+        doc.add_paragraph(tm.executive_summary or "(no executive summary captured)")
+
+    # ── Architecture ─────────────────────────────────────────────────────────
+    if "architecture" in sec:
+        doc.add_page_break()
+        _blue_heading("2. Architecture — Components", level=2)
+        if components:
+            tbl = doc.add_table(rows=1, cols=5)
+            tbl.style = "Table Grid"
+            _bold_table_header(tbl, ["ID", "Name", "Type", "Trust Zone", "Criticality"])
+            for c in components:
+                row = tbl.add_row().cells
+                row[0].text = str(c.get("id") or "")
+                row[1].text = str(c.get("name") or "")
+                row[2].text = str(c.get("type") or "")
+                row[3].text = str(c.get("trust_zone") or "")
+                row[4].text = str(c.get("criticality") or "")
+        else:
+            doc.add_paragraph("(no components)")
+
+        _blue_heading("2b. Data Flows", level=3)
+        if data_flows:
+            tbl = doc.add_table(rows=1, cols=5)
+            tbl.style = "Table Grid"
+            _bold_table_header(tbl, ["From", "To", "Protocol", "Data", "Boundary Crossing"])
+            for f in data_flows:
+                row = tbl.add_row().cells
+                row[0].text = str(f.get("from") or "")
+                row[1].text = str(f.get("to") or "")
+                row[2].text = str(f.get("protocol") or "")
+                row[3].text = str(f.get("data") or "")
+                row[4].text = "Yes" if f.get("trust_boundary_crossing") else "No"
+        else:
+            doc.add_paragraph("(no data flows)")
+
+    # ── Boundaries ───────────────────────────────────────────────────────────
+    if "boundaries" in sec:
+        doc.add_page_break()
+        _blue_heading("3. Trust Boundaries & Entry Points", level=2)
+        _blue_heading("Trust Boundaries", level=3)
+        if trust_boundaries:
+            tbl = doc.add_table(rows=1, cols=4)
+            tbl.style = "Table Grid"
+            _bold_table_header(tbl, ["Name", "From Zone → To Zone", "Description", "Crossing Flows"])
+            for tb in trust_boundaries:
+                row = tbl.add_row().cells
+                row[0].text = str(tb.get("name") or "")
+                row[1].text = f"{tb.get('from_zone', '')} → {tb.get('to_zone', '')}"
+                row[2].text = str(tb.get("description") or "")
+                row[3].text = str(len(tb.get("crossed_by_flow_ids") or []))
+        else:
+            doc.add_paragraph("(no trust boundaries)")
+
+        _blue_heading("Entry Points", level=3)
+        if entry_points:
+            tbl = doc.add_table(rows=1, cols=5)
+            tbl.style = "Table Grid"
+            _bold_table_header(tbl, ["Name", "Kind", "Exposure", "Auth Required", "Component"])
+            for ep in entry_points:
+                row = tbl.add_row().cells
+                row[0].text = str(ep.get("name") or "")
+                row[1].text = str(ep.get("kind") or "")
+                row[2].text = str(ep.get("exposure") or "")
+                row[3].text = "Yes" if ep.get("auth_required") else "No"
+                row[4].text = str(ep.get("component_id") or "")
+        else:
+            doc.add_paragraph("(no entry points)")
+
+    # ── Risk Heat Map ─────────────────────────────────────────────────────────
+    if "risk_matrix" in sec:
+        doc.add_page_break()
+        _blue_heading("4. Risk Heat Map", level=2)
+        doc.add_paragraph("Threats by likelihood (columns 1–5) × impact (rows 1–5). Score = L×I.")
+        # Build 5x5 table (impact rows descending, likelihood cols ascending)
+        tbl = doc.add_table(rows=6, cols=6)
         tbl.style = "Table Grid"
-        hdr = tbl.rows[0].cells
-        for i, h in enumerate(["From", "To", "Protocol", "Data", "Encrypted"]):
-            hdr[i].text = h
-            for run in hdr[i].paragraphs[0].runs:
-                run.bold = True
-        for f in data_flows:
-            row = tbl.add_row().cells
-            row[0].text = str(f.get("from") or "")
-            row[1].text = str(f.get("to") or "")
-            row[2].text = str(f.get("protocol") or "")
-            row[3].text = str(f.get("data") or "")
-            row[4].text = "Yes" if f.get("encrypted") else "No"
-    else:
-        doc.add_paragraph("(no data flows)")
+        # Header row
+        tbl.rows[0].cells[0].text = "Impact \\ Like."
+        for li in range(1, 6):
+            tbl.rows[0].cells[li].text = f"L{li}"
+        # Data rows
+        cell_counts: Dict[tuple, int] = {}
+        for t in threats:
+            li = int(t.get("likelihood") or 0)
+            im = int(t.get("impact") or 0)
+            if 1 <= li <= 5 and 1 <= im <= 5:
+                cell_counts[(li, im)] = cell_counts.get((li, im), 0) + 1
+        for ri, im in enumerate(range(5, 0, -1), start=1):
+            tbl.rows[ri].cells[0].text = f"I{im}"
+            for li in range(1, 6):
+                count = cell_counts.get((li, im), 0)
+                tbl.rows[ri].cells[li].text = str(count) if count > 0 else "·"
 
     # ── Threats by component ─────────────────────────────────────────────────
-    doc.add_page_break()
-    _blue_heading("4. Threats by Component", level=2)
-    comp_by_id = {str(c.get("id")): c for c in components}
-    mit_by_threat: Dict[str, List[Dict[str, Any]]] = {}
-    for m in mitigations:
-        mit_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
-
-    by_comp: Dict[str, List[Dict[str, Any]]] = {}
-    for t in threats:
-        by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
-
-    if not threats:
-        doc.add_paragraph("(no threats identified)")
-    else:
-        for comp_id, t_list in by_comp.items():
-            comp = comp_by_id.get(comp_id, {})
-            comp_name = comp.get("name") or comp_id
-            _blue_heading(f"{comp_name} ({len(t_list)} threats)", level=3)
-            for t in sorted(t_list, key=lambda x: x.get("priority_score", 0), reverse=True):
-                sev = (t.get("severity") or "medium").upper()
-                p = doc.add_paragraph(style="List Bullet")
-                p.add_run(f"[{sev}] {t.get('title') or '(untitled)'}").bold = True
-                doc.add_paragraph(f"Category: {t.get('category', '')}  |  Priority: {t.get('priority_score', '—')}  |  Status: {t.get('status', 'identified')}")
-                if t.get("rationale"):
-                    doc.add_paragraph(f"Rationale: {t.get('rationale')}")
-                mits = mit_by_threat.get(str(t.get("id")), [])
-                if mits:
+    if "threats" in sec:
+        doc.add_page_break()
+        _blue_heading("7. Threats by Component", level=2)
+        comp_by_id = {str(c.get("id")): c for c in components}
+        mit_by_threat: Dict[str, List[Dict[str, Any]]] = {}
+        for m in mitigations:
+            mit_by_threat.setdefault(str(m.get("threat_id")), []).append(m)
+        by_comp: Dict[str, List[Dict[str, Any]]] = {}
+        for t in threats:
+            by_comp.setdefault(str(t.get("asset_id")) or "(unscoped)", []).append(t)
+        if not threats:
+            doc.add_paragraph("(no threats identified)")
+        else:
+            for comp_id, t_list in by_comp.items():
+                comp = comp_by_id.get(comp_id, {})
+                comp_name = comp.get("name") or comp_id
+                _blue_heading(f"{comp_name} ({len(t_list)} threats)", level=3)
+                for t in sorted(t_list, key=lambda x: x.get("priority_score", 0), reverse=True):
+                    sev = (t.get("severity") or "medium").upper()
+                    p = doc.add_paragraph(style="List Bullet")
+                    p.add_run(f"[{sev}] {t.get('title') or '(untitled)'}").bold = True
+                    doc.add_paragraph(f"L{t.get('likelihood','?')} × I{t.get('impact','?')} · P{t.get('priority_score','—')} · {t.get('status','identified')}")
+                    if t.get("rationale"):
+                        doc.add_paragraph(f"Rationale: {t.get('rationale')}")
+                    mits = mit_by_threat.get(str(t.get("id")), [])
                     for m in mits:
                         doc.add_paragraph(f"  → {m.get('action', '')}", style="List Bullet 2")
 
     # ── Mitigations roadmap ──────────────────────────────────────────────────
-    doc.add_page_break()
-    _blue_heading("5. Mitigation Roadmap", level=2)
-    if mitigations:
-        tbl = doc.add_table(rows=1, cols=5)
-        tbl.style = "Table Grid"
-        hdr = tbl.rows[0].cells
-        for i, h in enumerate(["Threat ID", "Action", "Owner", "Status", "Control Refs"]):
-            hdr[i].text = h
-            for run in hdr[i].paragraphs[0].runs:
-                run.bold = True
-        for m in mitigations:
-            ctrl_refs = ", ".join(
-                f"{r.get('framework')}:{r.get('control_id')}" for r in (m.get("control_refs") or [])
-            )
-            row = tbl.add_row().cells
-            row[0].text = str(m.get("threat_id") or "")
-            row[1].text = str(m.get("action") or "")
-            row[2].text = str(m.get("owner_role") or m.get("owner") or "—")
-            row[3].text = str(m.get("status") or "open")
-            row[4].text = ctrl_refs or "—"
-    else:
-        doc.add_paragraph("(no mitigations)")
+    if "mitigations" in sec:
+        doc.add_page_break()
+        _blue_heading("8. Mitigation Roadmap", level=2)
+        if mitigations:
+            tbl = doc.add_table(rows=1, cols=5)
+            tbl.style = "Table Grid"
+            _bold_table_header(tbl, ["Threat ID", "Action", "Owner", "Status", "Control Refs"])
+            for m in mitigations:
+                ctrl_refs = ", ".join(
+                    f"{r.get('framework')}:{r.get('control_id')}" for r in (m.get("control_refs") or [])
+                )
+                row = tbl.add_row().cells
+                row[0].text = str(m.get("threat_id") or "")
+                row[1].text = str(m.get("action") or "")
+                row[2].text = str(m.get("owner_role") or m.get("owner") or "—")
+                row[3].text = str(m.get("status") or "open")
+                row[4].text = ctrl_refs or "—"
+        else:
+            doc.add_paragraph("(no mitigations)")
 
     # ── Maturity scores ──────────────────────────────────────────────────────
-    if maturity:
+    if "maturity" in sec and maturity:
         doc.add_page_break()
         _blue_heading("6. Maturity by Category", level=2)
         tbl = doc.add_table(rows=1, cols=2)
         tbl.style = "Table Grid"
-        hdr = tbl.rows[0].cells
-        hdr[0].text = "Category"
-        hdr[1].text = "Score (/ 5.0)"
-        for run in hdr[0].paragraphs[0].runs:
-            run.bold = True
-        for run in hdr[1].paragraphs[0].runs:
-            run.bold = True
+        _bold_table_header(tbl, ["Category", "Score (/ 5.0)"])
         for cat, score in sorted(maturity.items()):
             row = tbl.add_row().cells
             row[0].text = cat.replace("_", " ").title()
             row[1].text = f"{float(score):.1f}"
 
     # ── Sign-off ─────────────────────────────────────────────────────────────
-    doc.add_page_break()
-    _blue_heading("Sign-off", level=2)
-    doc.add_paragraph("This threat model is a point-in-time analysis. Sign below to acknowledge review and acceptance of the mitigation roadmap.")
-    doc.add_paragraph("\n\n")
-    tbl = doc.add_table(rows=2, cols=2)
-    tbl.style = "Table Grid"
-    tbl.rows[0].cells[0].text = "Prepared by (NexGen consultant)"
-    tbl.rows[0].cells[1].text = "Accepted by (Customer / CISO)"
-    tbl.rows[1].cells[0].text = "\n\n"
-    tbl.rows[1].cells[1].text = "\n\n"
+    if "signoff" in sec:
+        doc.add_page_break()
+        _blue_heading("Sign-off", level=2)
+        doc.add_paragraph("This threat model is a point-in-time analysis. Sign below to acknowledge review and acceptance of the mitigation roadmap.")
+        doc.add_paragraph("\n\n")
+        tbl = doc.add_table(rows=2, cols=2)
+        tbl.style = "Table Grid"
+        tbl.rows[0].cells[0].text = "Prepared by (NexGen consultant)"
+        tbl.rows[0].cells[1].text = "Accepted by (Customer / CISO)"
+        tbl.rows[1].cells[0].text = "\n\n"
+        tbl.rows[1].cells[1].text = "\n\n"
 
     buf = io.BytesIO()
     doc.save(buf)

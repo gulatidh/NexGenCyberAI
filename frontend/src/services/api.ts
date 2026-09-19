@@ -415,7 +415,7 @@ export const threatModelsApi = {
   drawioXml: (clientId: string, modelId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/drawio`).then((r) => r.data),
   drawioDownloadUrl: (clientId: string, modelId: string) =>
-    `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/drawio?download=1`,
+    `/clients/${clientId}/threat-models/${modelId}/drawio?download=1`,
   // Phase 8 endpoints
   styledDfd: (clientId: string, modelId: string, view: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/dfd`, { params: { view } }).then((r) => r.data),
@@ -428,10 +428,14 @@ export const threatModelsApi = {
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/maturity`).then((r) => r.data),
   diff: (clientId: string, modelId: string, prevId: string) =>
     apiClient.get(`/clients/${clientId}/threat-models/${modelId}/diff/${prevId}`).then((r) => r.data),
-  pdfUrl: (clientId: string, modelId: string) =>
-    `/clients/${clientId}/threat-models/${modelId}/pdf`,
-  docxUrl: (clientId: string, modelId: string) =>
-    `/clients/${clientId}/threat-models/${modelId}/docx`,
+  pdfUrl: (clientId: string, modelId: string, sections?: string[]) => {
+    const base = `/clients/${clientId}/threat-models/${modelId}/pdf`;
+    return sections && sections.length ? `${base}?sections=${sections.join(",")}` : base;
+  },
+  docxUrl: (clientId: string, modelId: string, sections?: string[]) => {
+    const base = `/clients/${clientId}/threat-models/${modelId}/docx`;
+    return sections && sections.length ? `${base}?sections=${sections.join(",")}` : base;
+  },
   patchThreat: (clientId: string, modelId: string, threatId: string, body: any) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/threats/${encodeURIComponent(threatId)}`, body).then((r) => r.data),
   patchMitigation: (clientId: string, modelId: string, mitId: string, body: any) =>

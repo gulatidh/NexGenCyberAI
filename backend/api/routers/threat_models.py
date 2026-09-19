@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -1230,6 +1230,7 @@ async def diff_threat_models(
 async def get_threat_model_pdf(
     client_id: str,
     model_id: str,
+    sections: Optional[str] = Query(None, description="Comma-separated section keys to include"),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -1250,7 +1251,8 @@ async def get_threat_model_pdf(
     if c:
         client_name = c.name
     from services.threat_model_pdf import render_threat_model_html
-    html = render_threat_model_html(tm, client_name=client_name)
+    sec_set = frozenset(s.strip() for s in sections.split(",") if s.strip()) if sections else None
+    html = render_threat_model_html(tm, client_name=client_name, sections=sec_set)
     return Response(content=html, media_type="text/html; charset=utf-8")
 
 
@@ -1258,6 +1260,7 @@ async def get_threat_model_pdf(
 async def get_threat_model_docx(
     client_id: str,
     model_id: str,
+    sections: Optional[str] = Query(None, description="Comma-separated section keys to include"),
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -1272,7 +1275,8 @@ async def get_threat_model_docx(
     if c:
         client_name = c.name
     from services.threat_model_pdf import render_threat_model_docx
-    docx_bytes = render_threat_model_docx(tm, client_name=client_name)
+    sec_set = frozenset(s.strip() for s in sections.split(",") if s.strip()) if sections else None
+    docx_bytes = render_threat_model_docx(tm, client_name=client_name, sections=sec_set)
     safe_name = (tm.name or "threat-model").replace(" ", "-").replace("/", "-")[:60]
     return Response(
         content=docx_bytes,

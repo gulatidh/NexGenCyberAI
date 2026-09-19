@@ -15,8 +15,8 @@ import {
   Box, Typography, Card, CardContent, Chip, Button,
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
-  Dialog, DialogTitle, DialogContent, TextField, Select,
-  Tabs, Tab,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select,
+  Tabs, Tab, Checkbox, FormControlLabel,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
@@ -31,15 +31,29 @@ import { loginRequest } from "../auth/msalConfig";
 import { toast } from "react-toastify";
 import { threatModelsApi } from "../services/api";
 const API_BASE = import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1";
+
+const EXPORT_SECTIONS = [
+  { id: "cover",           label: "Cover & Summary" },
+  { id: "exec_summary",    label: "Executive Summary" },
+  { id: "architecture",    label: "Architecture (Components & Flows)" },
+  { id: "boundaries",      label: "Trust Boundaries & Entry Points" },
+  { id: "risk_matrix",     label: "Risk Heat Map" },
+  { id: "coverage_matrix", label: "STRIDE Coverage Matrix" },
+  { id: "maturity",        label: "Maturity Scores" },
+  { id: "threats",         label: "Threats by Component" },
+  { id: "mitigations",     label: "Mitigation Roadmap" },
+  { id: "signoff",         label: "Sign-off Page" },
+] as const;
+
 import { fromNow } from "../utils/datetime";
 import { AttackTree, AdversaryProfile, SigmaRule } from "../types";
-import DfdDiagram from "../components/DfdDiagram";
 import DfdReactFlow from "../components/DfdReactFlow";
 import ThreatLibraryChip from "../components/ThreatLibraryChip";
 
 const TM_NAV: DetailNavItem[] = [
   { id: "diagram",         label: "Diagram",          Icon: AccountTree,     color: "#4285F4" },
   { id: "components",      label: "Components",       Icon: Hub,             color: "#FF9800" },
+  { id: "boundaries",      label: "Boundaries",       Icon: VerifiedUser,    color: "#00BCD4" },
   { id: "threats",         label: "Threats",          Icon: Security,        color: "#EA4335" },
   { id: "coverage",        label: "Coverage",         Icon: PlaylistAddCheck, color: "#34A853" },
   { id: "mitigations",     label: "Mitigations",      Icon: AddTask,         color: "#9C27B0" },
@@ -487,19 +501,21 @@ export default function ThreatModelDetail() {
   const qc = useQueryClient();
   const { instance, accounts } = useMsal();
 
-  const downloadThreatModel = useCallback(async (format: "pdf" | "docx") => {
+  const _getToken = useCallback(async () => {
+    const account = accounts[0];
+    if (!account) return "";
     try {
-      const account = accounts[0];
-      let token = "";
-      if (account) {
-        try {
-          const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
-          token = resp.idToken || resp.accessToken;
-        } catch { }
-      }
+      const resp = await instance.acquireTokenSilent({ ...loginRequest, account });
+      return resp.idToken || resp.accessToken;
+    } catch { return ""; }
+  }, [accounts, instance]);
+
+  const downloadThreatModel = useCallback(async (format: "pdf" | "docx", sections?: string[]) => {
+    try {
+      const token = await _getToken();
       const path = format === "pdf"
-        ? threatModelsApi.pdfUrl(clientId, modelId!)
-        : threatModelsApi.docxUrl(clientId, modelId!);
+        ? threatModelsApi.pdfUrl(clientId, modelId!, sections)
+        : threatModelsApi.docxUrl(clientId, modelId!, sections);
       const url = API_BASE + path;
       const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
@@ -508,7 +524,6 @@ export default function ThreatModelDetail() {
       if (format === "pdf") {
         const w = window.open(blobUrl, "_blank");
         if (!w) window.print();
-        // revoke after a delay so the new tab has time to load the document
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } else {
         const a = document.createElement("a");
@@ -521,16 +536,32 @@ export default function ThreatModelDetail() {
       toast.error("Export failed — check the console for details");
       console.error("Threat model export error:", err);
     }
-  }, [clientId, modelId, instance, accounts]);
+  }, [clientId, modelId, _getToken]);
+
+  const downloadDrawio = useCallback(async () => {
+    try {
+      const token = await _getToken();
+      const url = API_BASE + threatModelsApi.drawioDownloadUrl(clientId, modelId!);
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `threat-model-${(modelId || "").slice(0, 8)}.drawio`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err: any) {
+      toast.error("Draw.io download failed");
+      console.error("Draw.io download error:", err);
+    }
+  }, [clientId, modelId, _getToken]);
   const [tab, setTab] = useState<string>("diagram");
-  // Diagram-renderer toggle: 'interactive' (React Flow DFD) | 'mermaid'
-  const [diagramMode, setDiagramMode] = useState<"interactive" | "mermaid">("interactive");
-  // Phase 9B — diagram VIEW (overlay lens for the Mermaid renderer).
-  const [diagramView, setDiagramView] = useState<"architecture" | "threat_heat" | "detection_coverage">("architecture");
-  // When the browser triggers print (button or Ctrl+P), expand every tab
-  // section so the whole threat model — Diagram + Components + Threats +
-  // Mitigations — renders as a single paginated PDF.
   const [printing, setPrinting] = useState<boolean>(false);
+  const [exportOpen, setExportOpen] = useState<boolean>(false);
+  const [exportSections, setExportSections] = useState<Set<string>>(
+    new Set(EXPORT_SECTIONS.map((s) => s.id))
+  );
   React.useEffect(() => {
     const onBefore = () => setPrinting(true);
     const onAfter = () => setPrinting(false);
@@ -552,17 +583,6 @@ export default function ThreatModelDetail() {
     },
   });
 
-
-  // Phase 9B — styled Mermaid for the selected view lens. The architecture
-  // view falls back to the canonical dfd_mermaid; threat_heat and
-  // detection_coverage hit the server endpoint that appends style overlays.
-  const styledDfdQuery = useQuery<{ view: string; mermaid: string }>({
-    queryKey: ["threat-model-dfd", modelId, diagramView],
-    queryFn: () => threatModelsApi.styledDfd(clientId, modelId!, diagramView),
-    enabled: !!modelId && !!clientId && diagramMode === "mermaid"
-             && diagramView !== "architecture" && data?.status === "completed",
-    staleTime: 30_000,
-  });
 
   const rescanMutation = useMutation({
     mutationFn: () => threatModelsApi.rescan(clientId, modelId!),
@@ -730,22 +750,67 @@ export default function ThreatModelDetail() {
           </span>
         </Tooltip>
         <Button
-          startIcon={<Print />}
+          startIcon={<Download />}
           size="small"
-          onClick={() => downloadThreatModel("pdf")}
+          onClick={() => setExportOpen(true)}
           sx={{ color: "text.secondary" }}
         >
-          Print / PDF
-        </Button>
-        <Button
-          startIcon={<Article />}
-          size="small"
-          onClick={() => downloadThreatModel("docx")}
-          sx={{ color: "text.secondary" }}
-        >
-          Word
+          Export Report
         </Button>
       </Box>
+
+      {/* ── Export Report Dialog ──────────────────────────────────────── */}
+      <Dialog open={exportOpen} onClose={() => setExportOpen(false)} maxWidth="xs" fullWidth
+        slotProps={{ paper: { sx: { bgcolor: "background.paper" } } }}>
+        <DialogTitle sx={{ color: "text.primary", fontSize: 16, fontWeight: 700 }}>
+          Export Threat Model Report
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1.5, color: "text.secondary" }}>
+            Select sections to include:
+          </Typography>
+          {EXPORT_SECTIONS.map((s) => (
+            <FormControlLabel
+              key={s.id}
+              control={
+                <Checkbox
+                  checked={exportSections.has(s.id)}
+                  size="small"
+                  onChange={(e) => {
+                    setExportSections((prev) => {
+                      const n = new Set(prev);
+                      e.target.checked ? n.add(s.id) : n.delete(s.id);
+                      return n;
+                    });
+                  }}
+                  sx={{ color: "text.secondary", "&.Mui-checked": { color: "#4285F4" } }}
+                />
+              }
+              label={<Typography variant="body2" sx={{ color: "text.primary" }}>{s.label}</Typography>}
+              sx={{ display: "flex", mb: 0 }}
+            />
+          ))}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setExportOpen(false)} sx={{ color: "text.secondary" }}>Cancel</Button>
+          <Button
+            startIcon={<Print />}
+            onClick={() => { setExportOpen(false); downloadThreatModel("pdf", Array.from(exportSections)); }}
+            sx={{ color: "#4285F4", borderColor: "rgba(66,133,244,0.5)" }}
+            variant="outlined"
+          >
+            Preview &amp; Print
+          </Button>
+          <Button
+            startIcon={<Article />}
+            variant="contained"
+            onClick={() => { setExportOpen(false); downloadThreatModel("docx", Array.from(exportSections)); }}
+            sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367D6" } }}
+          >
+            Word
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, mb: 2 }}>
         <Hub sx={{ color: "#4285F4", fontSize: 36, mt: 0.25 }} />
@@ -894,6 +959,7 @@ export default function ThreatModelDetail() {
               let label = item.label;
               if (data) {
                 if (item.id === "components")      label = `Components (${data.component_count ?? 0})`;
+                if (item.id === "boundaries")      label = `Boundaries (${(data.trust_boundaries?.length ?? 0) + (data.entry_points?.length ?? 0)})`;
                 if (item.id === "threats")         label = `Threats (${data.threat_count ?? 0})`;
                 if (item.id === "mitigations")     label = `Mitigations (${data.mitigation_count ?? 0})`;
                 if (item.id === "attack_chains")   label = `Attack Chains (${(data.attack_trees_json || []).length})`;
@@ -919,87 +985,26 @@ export default function ThreatModelDetail() {
           {printing && <Typography className="tm-print-section-heading">Data Flow Diagram</Typography>}
         <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
           <CardContent>
-            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-              <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "action.hover", borderRadius: 1.5 }}>
-                {(
-                  [
-                    { key: "interactive", label: "Interactive", icon: <AccountTree sx={{ fontSize: 16 }} /> },
-                    { key: "mermaid",     label: "Mermaid",     icon: <Hub sx={{ fontSize: 16 }} /> },
-                  ] as Array<{ key: "interactive"|"mermaid"; label: string; icon: React.ReactNode }>
-                ).map((opt) => (
-                  <Button
-                    key={opt.key}
-                    size="small"
-                    startIcon={opt.icon}
-                    onClick={() => setDiagramMode(opt.key)}
-                    sx={{
-                      minWidth: 110,
-                      color: diagramMode === opt.key ? "#4285F4" : "text.secondary",
-                      bgcolor: diagramMode === opt.key ? "rgba(66,133,244,0.12)" : "transparent",
-                      border: diagramMode === opt.key ? "1px solid rgba(66,133,244,0.4)" : "1px solid transparent",
-                      textTransform: "none", fontSize: 12, fontWeight: 600,
-                      "&:hover": { bgcolor: "rgba(66,133,244,0.08)" },
-                    }}
-                  >{opt.label}</Button>
-                ))}
-              </Box>
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                {/* Phase 9B — view-lens toggle, only meaningful in Mermaid mode */}
-                {diagramMode === "mermaid" && data.status === "completed" && (
-                  <Box sx={{ display: "flex", gap: 0.5, p: 0.5, bgcolor: "rgba(255,255,255,0.04)", borderRadius: 1.5 }}>
-                    {(
-                      [
-                        { v: "architecture", label: "Architecture", color: "#4285F4" },
-                        { v: "threat_heat", label: "Threat heat", color: "#EA4335" },
-                        { v: "detection_coverage", label: "Detections", color: "#34A853" },
-                      ] as Array<{ v: typeof diagramView; label: string; color: string }>
-                    ).map((opt) => {
-                      const active = diagramView === opt.v;
-                      return (
-                        <Button
-                          key={opt.v}
-                          size="small"
-                          onClick={() => setDiagramView(opt.v)}
-                          sx={{
-                            minWidth: 102, color: active ? opt.color : "text.secondary",
-                            bgcolor: active ? `${opt.color}18` : "transparent",
-                            border: active ? `1px solid ${opt.color}` : "1px solid transparent",
-                            textTransform: "none", fontSize: 11.5, fontWeight: 600,
-                            "&:hover": { bgcolor: `${opt.color}10` },
-                          }}
-                        >{opt.label}</Button>
-                      );
-                    })}
-                  </Box>
-                )}
-                <Button
-                  size="small"
-                  startIcon={<Download sx={{ fontSize: 16 }} />}
-                  href={threatModelsApi.drawioDownloadUrl(clientId, modelId!)}
-                  disabled={data.status !== "completed"}
-                  sx={{
-                    textTransform: "none", fontSize: 12, fontWeight: 600,
-                    color: "text.secondary",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "divider" },
-                  }}
-                >Download .drawio</Button>
-              </Box>
+            <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", mb: 1.5 }}>
+              <Button
+                size="small"
+                startIcon={<Download sx={{ fontSize: 16 }} />}
+                onClick={downloadDrawio}
+                disabled={data.status !== "completed"}
+                sx={{
+                  textTransform: "none", fontSize: 12, fontWeight: 600,
+                  color: "text.secondary",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.06)", borderColor: "divider" },
+                }}
+              >Download .drawio</Button>
             </Box>
-            {diagramMode === "interactive" && !printing ? (
+            {!printing && (
               <DfdReactFlow
                 components={data.components}
                 dataFlows={data.data_flows}
                 threats={data.threats}
                 trustBoundaries={data.trust_boundaries ?? []}
-              />
-            ) : (
-              <DfdDiagram
-                source={
-                  diagramView !== "architecture" && styledDfdQuery.data?.mermaid
-                    ? styledDfdQuery.data.mermaid
-                    : (data.dfd_mermaid || "")
-                }
               />
             )}
             {data.data_flows.length > 0 && (
@@ -1040,7 +1045,9 @@ export default function ThreatModelDetail() {
       )}
 
       {/* COMPONENTS */}
-      {(tab === "components" || printing) && (
+      {(tab === "components" || printing) && (() => {
+        const threatenedIds = new Set(data.threats.map((t) => t.asset_id));
+        return (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Components ({data.component_count})</Typography>}
           {!printing && canAct && data.status !== "extracted_review" && (
@@ -1058,10 +1065,18 @@ export default function ThreatModelDetail() {
               <TableBody>
                 {data.components.map((c) => {
                   const zc = zoneColor(normZone(c.trust_zone));
+                  const noThreats = data.status === "completed" && !threatenedIds.has(c.id);
                   return (
                     <TableRow key={c.id} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
                       <TableCell sx={{ fontFamily: "monospace", color: "text.secondary" }}>{c.id}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{c.name}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        {c.name}
+                        {noThreats && (
+                          <Chip label="No threats — review" size="small"
+                            sx={{ ml: 1, height: 18, fontSize: 10, fontWeight: 700,
+                              bgcolor: "rgba(251,188,4,0.15)", color: "#FBBC04" }} />
+                        )}
+                      </TableCell>
                       <TableCell sx={{ color: "text.secondary" }}>{c.type}</TableCell>
                       <TableCell>
                         <Chip label={c.trust_zone} size="small"
@@ -1086,12 +1101,199 @@ export default function ThreatModelDetail() {
           </CardContent>
         </Card>
         </Box>
+        );
+      })()}
+
+      {/* BOUNDARIES */}
+      {(tab === "boundaries" || printing) && (
+        <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
+          {printing && <Typography className="tm-print-section-heading">Trust Boundaries &amp; Entry Points</Typography>}
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+            <CardContent>
+              <Typography variant="caption" sx={{ color: "#00BCD4", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", display: "block", mb: 1 }}>
+                Trust Boundaries ({(data.trust_boundaries ?? []).length})
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                    <TableCell>NAME</TableCell><TableCell>FROM ZONE</TableCell><TableCell>TO ZONE</TableCell>
+                    <TableCell>DESCRIPTION</TableCell><TableCell>CROSSING FLOWS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(data.trust_boundaries ?? []).map((tb: any, i: number) => (
+                    <TableRow key={i} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
+                      <TableCell sx={{ fontWeight: 600 }}>{tb.name}</TableCell>
+                      <TableCell><Chip label={tb.from_zone} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(0,188,212,0.12)", color: "#00BCD4" }} /></TableCell>
+                      <TableCell><Chip label={tb.to_zone} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(0,188,212,0.12)", color: "#00BCD4" }} /></TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{tb.description || "—"}</TableCell>
+                      <TableCell sx={{ textAlign: "center" }}>{(tb.crossed_by_flow_ids || []).length}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(data.trust_boundaries ?? []).length === 0 && (
+                    <TableRow><TableCell colSpan={5}><Typography variant="body2" sx={{ color: "text.secondary", py: 2, textAlign: "center" }}>No trust boundaries enumerated.</Typography></TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+            <CardContent>
+              <Typography variant="caption" sx={{ color: "#FF9800", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", display: "block", mb: 1 }}>
+                Entry Points ({(data.entry_points ?? []).length})
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                    <TableCell>NAME</TableCell><TableCell>KIND</TableCell><TableCell>EXPOSURE</TableCell>
+                    <TableCell>AUTH REQUIRED</TableCell><TableCell>COMPONENT</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(data.entry_points ?? []).map((ep: any, i: number) => (
+                    <TableRow key={i} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
+                      <TableCell sx={{ fontWeight: 600 }}>{ep.name}</TableCell>
+                      <TableCell sx={{ color: "text.secondary" }}>{ep.kind}</TableCell>
+                      <TableCell>
+                        <Chip label={ep.exposure || "unknown"} size="small"
+                          sx={{ height: 18, fontSize: 10, fontWeight: 700,
+                            bgcolor: ep.exposure === "external" ? "rgba(234,67,53,0.15)" : "rgba(251,188,4,0.15)",
+                            color: ep.exposure === "external" ? "#EA4335" : "#FBBC04" }} />
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={ep.auth_required ? "Yes" : "No"} size="small"
+                          sx={{ height: 18, fontSize: 10, fontWeight: 700,
+                            bgcolor: ep.auth_required ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                            color: ep.auth_required ? "#34A853" : "#EA4335" }} />
+                      </TableCell>
+                      <TableCell sx={{ color: "text.secondary", fontFamily: "monospace" }}>{ep.component_id}</TableCell>
+                    </TableRow>
+                  ))}
+                  {(data.entry_points ?? []).length === 0 && (
+                    <TableRow><TableCell colSpan={5}><Typography variant="body2" sx={{ color: "text.secondary", py: 2, textAlign: "center" }}>No entry points enumerated.</Typography></TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+          <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2 }}>
+            <CardContent>
+              {(() => {
+                const crossingFlows = (data.data_flows || []).filter((f: any) => f.trust_boundary_crossing);
+                return (
+                  <>
+                    <Typography variant="caption" sx={{ color: "#EA4335", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", display: "block", mb: 1 }}>
+                      Boundary-Crossing Flows ({crossingFlows.length})
+                    </Typography>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                          <TableCell>FROM</TableCell><TableCell>TO</TableCell><TableCell>PROTOCOL</TableCell><TableCell>DATA</TableCell><TableCell>ENCRYPTED</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {crossingFlows.map((f: any, i: number) => (
+                          <TableRow key={i} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
+                            <TableCell>{compName.get(f.from) || f.from}</TableCell>
+                            <TableCell>{compName.get(f.to) || f.to}</TableCell>
+                            <TableCell><Chip label={f.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} /></TableCell>
+                            <TableCell>{f.data}</TableCell>
+                            <TableCell>
+                              <Chip label={f.encrypted ? "TLS" : "PLAIN"} size="small"
+                                sx={{ height: 18, fontSize: 10, fontWeight: 700,
+                                  bgcolor: f.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                                  color: f.encrypted ? "#34A853" : "#EA4335" }} />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {crossingFlows.length === 0 && (
+                          <TableRow><TableCell colSpan={5}><Typography variant="body2" sx={{ color: "text.secondary", py: 2, textAlign: "center" }}>No boundary-crossing flows.</Typography></TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </Box>
       )}
 
       {/* THREATS — grouped by category */}
       {(tab === "threats" || printing) && (
         <Box className="tm-print-section" sx={{ mb: printing ? 2 : 0 }}>
           {printing && <Typography className="tm-print-section-heading">Threats ({data.threat_count})</Typography>}
+          {/* Risk Heat Map */}
+          {data.threats.length > 0 && !printing && (() => {
+            const cellCounts: Record<string, { count: number; maxSev: string }> = {};
+            const SEV_ORDER = ["critical", "high", "medium", "low"];
+            for (const t of data.threats) {
+              const li = Number(t.likelihood) || 0;
+              const im = Number(t.impact) || 0;
+              if (li >= 1 && li <= 5 && im >= 1 && im <= 5) {
+                const key = `${li},${im}`;
+                const prev = cellCounts[key] || { count: 0, maxSev: "low" };
+                const sev = (t.severity || "low").toLowerCase();
+                const winner = SEV_ORDER.indexOf(sev) < SEV_ORDER.indexOf(prev.maxSev) ? sev : prev.maxSev;
+                cellCounts[key] = { count: prev.count + 1, maxSev: winner };
+              }
+            }
+            const CELL_COLOR: Record<string, [string, string]> = {
+              critical: ["rgba(234,67,53,0.18)", "#EA4335"],
+              high:     ["rgba(251,188,4,0.18)", "#FBBC04"],
+              medium:   ["rgba(234,128,0,0.18)", "#E07800"],
+              low:      ["rgba(52,168,83,0.18)", "#34A853"],
+            };
+            const bgDefault = "rgba(255,255,255,0.04)";
+            return (
+              <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
+                <CardContent sx={{ pb: "12px !important" }}>
+                  <Typography variant="caption" sx={{ color: "#4285F4", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", display: "block", mb: 1.5 }}>
+                    Risk Heat Map — likelihood × impact
+                  </Typography>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "28px repeat(5, 1fr)", gap: "3px" }}>
+                    {/* header */}
+                    <Box />
+                    {[1,2,3,4,5].map((li) => (
+                      <Box key={li} sx={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "text.secondary", pb: 0.5 }}>L{li}</Box>
+                    ))}
+                    {[5,4,3,2,1].map((im) => (
+                      <React.Fragment key={im}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "text.secondary" }}>I{im}</Box>
+                        {[1,2,3,4,5].map((li) => {
+                          const key = `${li},${im}`;
+                          const cell = cellCounts[key];
+                          const score = li * im;
+                          const sev = cell ? cell.maxSev : (score >= 16 ? "critical" : score >= 9 ? "high" : score >= 4 ? "medium" : "low");
+                          const [bg, fg] = cell ? CELL_COLOR[cell.maxSev] : ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.2)"];
+                          return (
+                            <Box key={li} sx={{
+                              height: 44, borderRadius: 1,
+                              bgcolor: bg,
+                              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                              border: cell ? `1px solid ${fg}40` : "1px solid rgba(255,255,255,0.06)",
+                            }}>
+                              {cell ? (
+                                <>
+                                  <Typography sx={{ fontSize: 14, fontWeight: 700, color: fg, lineHeight: 1 }}>{cell.count}</Typography>
+                                  <Typography sx={{ fontSize: 9, color: fg, opacity: 0.8 }}>{score}</Typography>
+                                </>
+                              ) : (
+                                <Typography sx={{ fontSize: 9, color: "rgba(255,255,255,0.2)" }}>{score}</Typography>
+                              )}
+                            </Box>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "text.secondary", mt: 1, display: "block" }}>
+                    Cell score = L×I. Cells with threats show count coloured by highest severity. Unscored threats not shown.
+                  </Typography>
+                </CardContent>
+              </Card>
+            );
+          })()}
           {data.threats.length > 0 && (
             <Box className="no-print" sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1, mb: 1.5 }}>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
