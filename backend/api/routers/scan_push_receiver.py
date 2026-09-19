@@ -6,6 +6,8 @@ the cloud database, auto-creating client / project as needed.
 
 Authentication: Bearer token checked against RunnerRegistry records.
 """
+import logging
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -13,6 +15,8 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 
 from db.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
@@ -88,6 +92,19 @@ async def receive_scan_push(
     Creates client / project / scan / findings as needed.
     Idempotent on client + project name — never duplicates.
     """
+    from api.models.models import Client, Project, Scan, ScanStatus, Finding, Severity, FrameworkType, ScanType
+    import json
+
+    try:
+     return await _receive_scan_push_inner(payload, authorization, db)
+    except HTTPException:
+        raise
+    except Exception as _exc:
+        logger.exception("scan-push receiver failed: %s", _exc)
+        raise HTTPException(500, f"Internal error: {type(_exc).__name__}: {_exc}")
+
+
+async def _receive_scan_push_inner(payload, authorization, db):
     from api.models.models import Client, Project, Scan, ScanStatus, Finding, Severity, FrameworkType, ScanType
     import json
 
@@ -205,8 +222,15 @@ async def receive_scan_push(
             last_seen_at=now,
         ))
 
+    _existing_summary = scan.summary
+    if isinstance(_existing_summary, str):
+        try:
+            import json as _json
+            _existing_summary = _json.loads(_existing_summary)
+        except Exception:
+            _existing_summary = {}
     scan.summary = {
-        **(scan.summary or {}),
+        **(_existing_summary or {}),
         "total": len(payload.findings),
         "source": "local_runner_push",
     }
