@@ -385,6 +385,11 @@ if $INSTALL_TOOLS; then
         ok "OpenVAS installed"
         info "Run 'sudo gvm-setup' to download the NVT feed (~20 min first time)"
         info "Then 'sudo gvm-start' to start the daemon before running OpenVAS scans"
+        # Add current user to _gvm group so the backend can access the GVM socket
+        if getent group _gvm &>/dev/null; then
+          sudo usermod -aG _gvm "$USER" && ok "Added $USER to _gvm group (log out and back in to apply)" \
+            || warn "Could not add $USER to _gvm group — run: sudo usermod -aG _gvm $USER"
+        fi
       else
         warn "OpenVAS install failed — install manually: sudo apt install openvas"
       fi

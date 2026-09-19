@@ -733,10 +733,15 @@ export default function LocalRunnerSetup() {
                     )}
 
                     {/* OpenVAS special notice */}
-                    {t.tool === "openvas" && !ready && (
+                    {t.tool === "openvas" && (
                       <Alert severity="info" sx={{ mt: 1, py: 0.5, fontSize: 12 }}>
-                        OpenVAS setup downloads the NVT feed (~20 min first time). You can
-                        move on to the next step and come back once it finishes.
+                        <strong>After install:</strong> run <code>sudo gvm-setup</code> (downloads NVT feed, ~20 min),
+                        then <code>sudo gvm-start</code> before scanning.
+                        <br />
+                        <strong>Permission fix (required):</strong> the backend must be in the <code>_gvm</code> group
+                        to access the GVM socket:{" "}
+                        <code>sudo usermod -aG _gvm $USER</code>{" "}
+                        then close and reopen your terminal (WSL: run <code>wsl --terminate kali-linux</code> from PowerShell).
                       </Alert>
                     )}
                   </Paper>
