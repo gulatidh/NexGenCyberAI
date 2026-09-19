@@ -111,8 +111,11 @@ async def _execute_scan(
                     "codeql": "codeql", "owasp_dc": "owasp_dc",
                     "web": "zap",
                 }
+                # Tools that require a local daemon and must NEVER go via
+                # GitHub Actions regardless of AIRGAP_MODE.
+                _FORCED_LOCAL_TOOLS = {"openvas"}
                 _early_tool = _ALL_LOCAL_TOOLS.get(ctype_value)
-                if _early_tool and _AIRGAP:
+                if _early_tool and (_AIRGAP or ctype_value in _FORCED_LOCAL_TOOLS):
                     try:
                         _cfg_for_scan = connector_db.config or {}
                         _creds_for_scan = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
