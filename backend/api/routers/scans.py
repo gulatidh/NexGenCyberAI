@@ -121,8 +121,19 @@ async def _execute_scan(
                         _airgap_config = {
                             "target": _target,
                             "repo_url": _repo_url,
-                            "image": _cfg_for_scan.get("image") or "",
-                            "profile": _cfg_for_scan.get("default_profile") or "baseline",
+                            "image": _cfg_for_scan.get("image") or _creds_for_scan.get("image") or "",
+                            "profile": _cfg_for_scan.get("default_profile") or _creds_for_scan.get("default_profile") or "baseline",
+                            # GVM daemon connection
+                            "gvm_host":        _creds_for_scan.get("gvm_host", "127.0.0.1"),
+                            "gvm_port":        _creds_for_scan.get("gvm_port", 9390),
+                            "gvm_user":        _creds_for_scan.get("gvm_user", "admin"),
+                            "gvm_password":    _creds_for_scan.get("gvm_password", ""),
+                            # Authenticated scan credentials (optional)
+                            "ssh_user":        _creds_for_scan.get("ssh_user", ""),
+                            "ssh_password":    _creds_for_scan.get("ssh_password", ""),
+                            "ssh_private_key": _creds_for_scan.get("ssh_private_key", ""),
+                            "smb_user":        _creds_for_scan.get("smb_user", ""),
+                            "smb_password":    _creds_for_scan.get("smb_password", ""),
                         }
                         from services.local_scanners import run_local_scan
                         import asyncio as _aio
@@ -296,6 +307,7 @@ async def _execute_scan(
                             try:
                                 import asyncio as _aio
                                 from services.local_scanners import run_local_scan
+                                _fb_creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
                                 scan.progress_message = f"GitHub Actions not configured — running {_fallback_tool} locally…"
                                 scan.status = ScanStatus.RUNNING
                                 db.commit()
@@ -304,6 +316,16 @@ async def _execute_scan(
                                     "repo_url": conn_obj._get("repo_url") or None,
                                     "image": conn_obj._get("image") or None,
                                     "profile": (connector_db.config or {}).get("default_profile") or "baseline",
+                                    # GVM / authenticated scan credentials (OpenVAS)
+                                    "gvm_host":        _fb_creds.get("gvm_host", "127.0.0.1"),
+                                    "gvm_port":        _fb_creds.get("gvm_port", 9390),
+                                    "gvm_user":        _fb_creds.get("gvm_user", "admin"),
+                                    "gvm_password":    _fb_creds.get("gvm_password", ""),
+                                    "ssh_user":        _fb_creds.get("ssh_user", ""),
+                                    "ssh_password":    _fb_creds.get("ssh_password", ""),
+                                    "ssh_private_key": _fb_creds.get("ssh_private_key", ""),
+                                    "smb_user":        _fb_creds.get("smb_user", ""),
+                                    "smb_password":    _fb_creds.get("smb_password", ""),
                                 }))
                                 return
                             except Exception:

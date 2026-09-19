@@ -388,6 +388,13 @@ async def _openvas(target: str, config: dict) -> List[dict]:
     user = config.get("gvm_user", "admin")
     password = config.get("gvm_password", "admin")
 
+    # Authenticated scan credentials (optional)
+    ssh_user        = config.get("ssh_user", "")
+    ssh_password    = config.get("ssh_password", "")
+    ssh_private_key = config.get("ssh_private_key", "")
+    smb_user        = config.get("smb_user", "")
+    smb_password    = config.get("smb_password", "")
+
     async def _gvm(xml: str) -> str:
         proc = await asyncio.create_subprocess_exec(
             gvm_cli, "--gmp-username", user, "--gmp-password", password,
@@ -398,14 +405,60 @@ async def _openvas(target: str, config: dict) -> List[dict]:
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
         return stdout.decode(errors="replace")
 
-    # Create target
+    import xml.etree.ElementTree as ET
+
+    # Create SSH credential if provided
+    ssh_cred_id = ""
+    if ssh_user and (ssh_password or ssh_private_key):
+        if ssh_private_key:
+            cred_xml = (
+                f'<create_credential><name>owlet-ssh-{target}</name>'
+                f'<type>usk</type>'
+                f'<login>{ssh_user}</login>'
+                f'<key><private>{ssh_private_key}</private></key>'
+                f'</create_credential>'
+            )
+        else:
+            cred_xml = (
+                f'<create_credential><name>owlet-ssh-{target}</name>'
+                f'<type>up</type>'
+                f'<login>{ssh_user}</login>'
+                f'<password>{ssh_password}</password>'
+                f'</create_credential>'
+            )
+        resp = await _gvm(cred_xml)
+        try:
+            ssh_cred_id = ET.fromstring(resp).get("id", "")
+        except Exception:
+            pass
+
+    # Create SMB credential if provided
+    smb_cred_id = ""
+    if smb_user and smb_password:
+        cred_xml = (
+            f'<create_credential><name>owlet-smb-{target}</name>'
+            f'<type>up</type>'
+            f'<login>{smb_user}</login>'
+            f'<password>{smb_password}</password>'
+            f'</create_credential>'
+        )
+        resp = await _gvm(cred_xml)
+        try:
+            smb_cred_id = ET.fromstring(resp).get("id", "")
+        except Exception:
+            pass
+
+    # Create target — attach credentials if we have them
+    ssh_cred_block = f'<ssh_credential id="{ssh_cred_id}"/>' if ssh_cred_id else ""
+    smb_cred_block = f'<smb_credential id="{smb_cred_id}"/>' if smb_cred_id else ""
     create_target = (
         f'<create_target><name>owlet-{target}</name>'
         f'<hosts>{target}</hosts>'
-        f'<port_range>T:1-65535</port_range></create_target>'
+        f'<port_range>T:1-65535</port_range>'
+        f'{ssh_cred_block}{smb_cred_block}'
+        f'</create_target>'
     )
     resp = await _gvm(create_target)
-    import xml.etree.ElementTree as ET
     try:
         target_id = ET.fromstring(resp).get("id", "")
     except Exception:
