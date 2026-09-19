@@ -718,6 +718,13 @@ async def push_scan_to_cloud(
         )
         with _ur.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read())
+    except _ur.error.HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode(errors="replace")
+        except Exception:
+            pass
+        raise HTTPException(502, f"Push failed: HTTP {exc.code} — {body[:500]}")
     except Exception as exc:
         raise HTTPException(502, f"Push failed: {exc}")
 
