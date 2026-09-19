@@ -262,24 +262,39 @@ async def _execute_scan(
                         "checkov": "checkov", "sslyze": "sslyze",
                         "codeql": "codeql", "owasp_dc": "owasp_dc",
                     }
+                    # Tools that ALWAYS run locally — they require local daemons
+                    # or services and can never be dispatched to GitHub Actions.
+                    _ALWAYS_LOCAL = {"openvas"}
                     _local_tool = _CTYPE_TO_TOOL.get(ctype_value)
                     if _local_tool:
+                        _force_local = ctype_value in _ALWAYS_LOCAL
                         try:
                             from api.routers.local_runner import get_scanner_mode
-                            if get_scanner_mode(_local_tool) == "local":
-                                from services.local_scanners import run_local_scan
-                                background_tasks.add_task(
-                                    run_local_scan, scan.id, _local_tool,
-                                    {
-                                        "target": conn_obj._primary_target(),
-                                        "repo_url": conn_obj._get("repo_url") or None,
-                                        "image": conn_obj._get("image") or None,
-                                        "profile": (connector_db.config or {}).get("default_profile") or "baseline",
-                                    },
-                                )
-                                return
+                            _mode_local = get_scanner_mode(_local_tool) == "local"
                         except Exception:
-                            pass  # fall through to GitHub Actions on any import error
+                            _mode_local = False
+                        if _force_local or _mode_local:
+                            _loc_creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                            from services.local_scanners import run_local_scan
+                            import asyncio as _aio
+                            _aio.ensure_future(run_local_scan(scan.id, _local_tool, {
+                                "target": conn_obj._primary_target(),
+                                "repo_url": conn_obj._get("repo_url") or None,
+                                "image": conn_obj._get("image") or None,
+                                "profile": (connector_db.config or {}).get("default_profile") or "baseline",
+                                # GVM / authenticated scan credentials (OpenVAS)
+                                "gvm_host":        _loc_creds.get("gvm_host", "127.0.0.1"),
+                                "gvm_port":        _loc_creds.get("gvm_port", 9390),
+                                "gvm_user":        _loc_creds.get("gvm_user", "admin"),
+                                "gvm_password":    _loc_creds.get("gvm_password", ""),
+                                "gvm_socket_path": _loc_creds.get("gvm_socket_path", ""),
+                                "ssh_user":        _loc_creds.get("ssh_user", ""),
+                                "ssh_password":    _loc_creds.get("ssh_password", ""),
+                                "ssh_private_key": _loc_creds.get("ssh_private_key", ""),
+                                "smb_user":        _loc_creds.get("smb_user", ""),
+                                "smb_password":    _loc_creds.get("smb_password", ""),
+                            }))
+                            return
                     # ─────────────────────────────────────────────────────────
 
                     scan_token = mint_scan_token(scan.id)
