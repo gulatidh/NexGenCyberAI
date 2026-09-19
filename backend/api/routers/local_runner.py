@@ -707,6 +707,7 @@ async def push_scan_to_cloud(
     cloud_url = link["cloud_url"].rstrip("/")
     try:
         import urllib.request as _ur
+        import urllib.error as _ue
         req = _ur.Request(
             f"{cloud_url}/api/v1/ingest/scan-push",
             data=json.dumps(payload).encode(),
@@ -718,7 +719,7 @@ async def push_scan_to_cloud(
         )
         with _ur.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read())
-    except _ur.error.HTTPError as exc:
+    except _ue.HTTPError as exc:
         body = ""
         try:
             body = exc.read().decode(errors="replace")
