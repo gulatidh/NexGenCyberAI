@@ -425,6 +425,11 @@ async def _openvas(target: str, config: dict) -> List[dict]:
         out = stdout.decode(errors="replace").strip()
         if not out:
             err = stderr.decode(errors="replace").strip()
+            if "errno 13" in err.lower() or "permission denied" in err.lower():
+                raise RuntimeError(
+                    "Permission denied accessing GVM socket. "
+                    "Run: sudo usermod -aG _gvm $USER  then log out and back in (or restart the backend with: newgrp _gvm)."
+                )
             raise RuntimeError(f"gvm-cli returned no output. stderr: {err[:300]}")
         return out
 
