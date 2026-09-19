@@ -10,6 +10,7 @@ import {
   ArrowBack, AutoAwesome, BugReport, SmartToy, Refresh, ExpandMore, ExpandLess,
   CheckCircle, Error as ErrorIcon, Help, Print, DeleteOutlined, Close, MenuBook, Storage,
   CompareArrows, TrendingUp, TrendingDown, TrendingFlat, AddCircleOutlined, RemoveCircleOutlined,
+  CloudUpload,
 } from "@mui/icons-material";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -515,6 +516,25 @@ export default function ScanDetail() {
 
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<Finding | null>(null);
+  const [pushing, setPushing] = useState(false);
+
+  const handlePushToCloud = async () => {
+    if (!scanId) return;
+    setPushing(true);
+    try {
+      const result = await scansApi.pushToCloud(scanId);
+      toast.success(`Pushed ${result.findings_pushed} findings to cloud — client: ${result.client_id?.slice(0, 8)}…`);
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || String(e);
+      if (msg.includes("Not linked")) {
+        toast.error("Not linked to cloud portal — go to Platform → Local Runner → Cloud Portal Pairing.");
+      } else {
+        toast.error(`Push failed: ${msg}`);
+      }
+    } finally {
+      setPushing(false);
+    }
+  };
   const deleteFinding = useMutation({
     mutationFn: ({ clientId, findingId }: { clientId: string; findingId: string }) =>
       findingsApi.delete(clientId, findingId),
@@ -683,6 +703,22 @@ export default function ScanDetail() {
                 ))}
               </Menu>
             </>
+          )}
+          {data.status === "completed" && (
+            <Tooltip title="Push this scan's findings to the paired cloud portal — auto-creates client/project if needed">
+              <span>
+                <Button
+                  variant="outlined"
+                  startIcon={pushing ? <CircularProgress size={14} /> : <CloudUpload />}
+                  disabled={pushing}
+                  className="no-print"
+                  onClick={handlePushToCloud}
+                  sx={{ borderColor: "#0288d1", color: "#0288d1", "&:hover": { bgcolor: "rgba(2,136,209,0.08)" } }}
+                >
+                  {pushing ? "Pushing…" : "Push to Cloud"}
+                </Button>
+              </span>
+            </Tooltip>
           )}
           <Button variant="contained" startIcon={<AutoAwesome />}
             disabled={generateMutation.isPending}

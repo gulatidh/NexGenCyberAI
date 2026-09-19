@@ -2802,6 +2802,13 @@ try:
 except Exception as _e:
     logger.warning("runner_registry router not loaded: %s", _e)
 
+try:
+    from api.routers import scan_push_receiver as _scan_push_receiver
+    app.include_router(_scan_push_receiver.router, prefix="/api/v1")
+    logger.info("scan_push_receiver router loaded")
+except Exception as _e:
+    logger.warning("scan_push_receiver router not loaded: %s", _e)
+
 # New optional routers — registered only when the module file exists.
 for _mod in (_posture_history, _attack_paths, _nl_query, _scorecard, _api_keys,
              _comments, _webhooks, _ctem, _evidence, _documents,

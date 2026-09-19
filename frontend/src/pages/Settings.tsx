@@ -35,7 +35,7 @@ import Skeleton from "@mui/material/Skeleton";
 import LinearProgress from "@mui/material/LinearProgress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi, guestTokensApi } from "../services/api";
+import { emailApi, ssoApi, adminApi, clientsApi, projectsApi, changelogApi, guestTokensApi, runnerRegistryApi } from "../services/api";
 import { MyAccess, AccessRole, AccessScope, Client, Project, UserAccessSummary } from "../types";
 import AISettings from "./AISettings";
 import Webhooks from "./Webhooks";
@@ -1651,6 +1651,144 @@ function SoftwareUpdateTab({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ── Cloud Pairing Tokens sub-component ───────────────────────────────────────
+
+function CloudPairingTokens() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [expDays, setExpDays] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newToken, setNewToken] = useState<{ token: string; instruction: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { data: tokens = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["runner-tokens"],
+    queryFn: () => runnerRegistryApi.listTokens(),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setCreating(true);
+    try {
+      const res = await runnerRegistryApi.createToken(name.trim(), expDays ? parseInt(expDays) : undefined);
+      setNewToken({ token: res.token, instruction: res.instruction });
+      setName(""); setExpDays(""); setOpen(false);
+      qc.invalidateQueries({ queryKey: ["runner-tokens"] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || "Failed to create token");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRevoke = async (id: string) => {
+    try {
+      await runnerRegistryApi.revokeToken(id);
+      qc.invalidateQueries({ queryKey: ["runner-tokens"] });
+      toast.success("Token revoked");
+    } catch {
+      toast.error("Failed to revoke token");
+    }
+  };
+
+  const statusColor = (s: string) => ({ active: "#34A853", stale: "#FBBC04", offline: "#EA4335", pending: "#9E9E9E" }[s] || "#9E9E9E");
+
+  return (
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, p: 2, mb: 3 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+        <Box>
+          <Typography sx={{ fontWeight: 600, fontSize: 13 }}>Cloud Portal Pairing Tokens</Typography>
+          <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
+            Generate a token, then run the link command on your local runner to connect it to this portal.
+            Use "Push to Cloud" on any completed scan to send findings here.
+          </Typography>
+        </Box>
+        <Button size="small" variant="outlined" startIcon={<Add />} onClick={() => setOpen((p) => !p)}
+          sx={{ borderColor: "#4285F4", color: "#4285F4", fontSize: 11, minWidth: 110 }}>
+          New Token
+        </Button>
+      </Box>
+
+      <Collapse in={open}>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-end", mb: 2, flexWrap: "wrap" }}>
+          <TextField label="Token name" size="small" sx={{ flex: 1, minWidth: 160 }}
+            value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. kali-laptop-dheeraj" />
+          <TextField label="Expires (days)" size="small" sx={{ width: 140 }} type="number"
+            value={expDays} onChange={(e) => setExpDays(e.target.value)}
+            placeholder="leave blank = never" />
+          <Button variant="contained" size="small" onClick={handleCreate}
+            disabled={creating || !name.trim()}
+            startIcon={creating ? <CircularProgress size={12} /> : <VpnKey />}
+            sx={{ bgcolor: "#4285F4", "&:hover": { bgcolor: "#3367d6" } }}>
+            {creating ? "Generating…" : "Generate"}
+          </Button>
+        </Box>
+      </Collapse>
+
+      {isLoading && <LinearProgress sx={{ mb: 1 }} />}
+
+      {tokens.length === 0 && !isLoading && (
+        <Typography sx={{ fontSize: 12, color: "text.secondary", textAlign: "center", py: 1 }}>
+          No pairing tokens yet. Generate one and use it to link a local runner.
+        </Typography>
+      )}
+
+      {tokens.map((t: any) => (
+        <Box key={t.id} sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 0.75, borderBottom: "1px solid", borderColor: "divider" }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: statusColor(t.status), flexShrink: 0 }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{t.name}</Typography>
+            <Typography sx={{ fontSize: 11, color: "text.secondary", fontFamily: "monospace" }}>
+              {t.token_prefix}… · {t.machine_name || "not yet registered"} · {t.status}
+              {t.token_expires_at && ` · expires ${t.token_expires_at.slice(0, 10)}`}
+            </Typography>
+          </Box>
+          <Chip label={t.status} size="small" sx={{ fontSize: 10, bgcolor: `${statusColor(t.status)}20`, color: statusColor(t.status) }} />
+          <Tooltip title="Revoke token">
+            <IconButton size="small" onClick={() => handleRevoke(t.id)} sx={{ color: "text.secondary", "&:hover": { color: "#EA4335" } }}>
+              <Delete sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      ))}
+
+      {/* One-time token dialog */}
+      <Dialog open={!!newToken} onClose={() => { setNewToken(null); setCopied(false); }} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <VpnKey sx={{ color: "#34A853" }} /> Token Generated — Copy Now
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2, fontSize: 12 }}>
+            This token is shown only once. Copy it before closing.
+          </Alert>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <Box sx={{ flex: 1, fontFamily: "IBM Plex Mono, monospace", fontSize: 11, bgcolor: "rgba(0,0,0,0.3)", p: 1.5, borderRadius: 1, wordBreak: "break-all" }}>
+              {newToken?.token}
+            </Box>
+            <Tooltip title={copied ? "Copied!" : "Copy token"}>
+              <IconButton size="small" onClick={() => { navigator.clipboard.writeText(newToken?.token || ""); setCopied(true); }}>
+                <ContentCopy sx={{ fontSize: 16, color: copied ? "#34A853" : "text.secondary" }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, mb: 0.5 }}>Link your local runner:</Typography>
+          <Box sx={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 11, bgcolor: "#0d1219", color: "#7dd3c0", p: 1.5, borderRadius: 1, whiteSpace: "pre-wrap" }}>
+            {newToken?.instruction}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setNewToken(null); setCopied(false); refetch(); }} variant="contained" size="small">Done</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
+
 // ── Local Runner Tab ─────────────────────────────────────────────────────────
 
 function LocalRunnerTab() {
@@ -1892,6 +2030,8 @@ function LocalRunnerTab() {
           </Box>
         </Collapse>
       </Box>
+
+      <CloudPairingTokens />
 
       <Box sx={{ bgcolor: "rgba(0,0,0,0.2)", borderRadius: 1, p: 2 }}>
         <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 1.5 }}>Quick setup (Kali WSL on Windows)</Typography>

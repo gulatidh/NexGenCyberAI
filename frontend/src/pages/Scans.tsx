@@ -786,10 +786,28 @@ function AssessmentTileCard({ tile, clientId, versionMap, navigate, rescanMutati
   const status = tile.status as string;
   const [renaming, setRenaming] = React.useState(false);
   const [renameDraft, setRenameDraft] = React.useState(tile.name || "");
+  const [pushing, setPushing] = React.useState(false);
   const renameMutation = useMutation({
     mutationFn: (name: string) => scansApi.rename(clientId, tile.id, name),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["assessments-tiles"] }); setRenaming(false); },
   });
+  const handlePushToCloud = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPushing(true);
+    try {
+      const result = await scansApi.pushToCloud(tile.id);
+      toast.success(`Pushed ${result.findings_pushed} findings to cloud`);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || String(err);
+      if (msg.includes("Not linked")) {
+        toast.error("Not linked to cloud portal — go to Platform → Local Runner → Cloud Portal Pairing.");
+      } else {
+        toast.error(`Push failed: ${msg}`);
+      }
+    } finally {
+      setPushing(false);
+    }
+  };
   const statusColor = STATUS_COLOR[status] || "rgba(255,255,255,0.3)";
   const cat = (tile.category as string) || "Other";
   const catColor = CATEGORY_COLOR[cat.toLowerCase() as ScanCategory] || "#4285F4";
@@ -844,10 +862,21 @@ function AssessmentTileCard({ tile, clientId, versionMap, navigate, rescanMutati
             </IconButton>
           </span>
         </Tooltip>
+        {status === "completed" && (
+          <Tooltip title="Push findings to paired cloud portal">
+            <span>
+              <IconButton size="small" disabled={pushing}
+                onClick={handlePushToCloud}
+                sx={{ position: "absolute", top: 6, right: 110, color: "text.secondary", "&:hover": { color: "#0288d1", bgcolor: "rgba(2,136,209,0.08)" } }}>
+                {pushing ? <CircularProgress size={14} /> : <CloudUpload sx={{ fontSize: 16 }} />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
         {isLive && versionCount > 1 && (
           <Tooltip title={`${versionCount - 1} previous run${versionCount - 1 === 1 ? "" : "s"}`}>
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); setHistoryOpenForRoot(root); }}
-              sx={{ position: "absolute", top: 6, right: 110, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
+              sx={{ position: "absolute", top: 6, right: 136, color: "#FBBC04", bgcolor: "rgba(251,188,4,0.10)", "&:hover": { bgcolor: "rgba(251,188,4,0.22)" }, pr: 0.5 }}>
               <Badge badgeContent={versionCount}
                 sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, bgcolor: "#FBBC04", color: "#0d1117", fontWeight: 700 } }}>
                 <History sx={{ fontSize: 16 }} />
@@ -858,13 +887,13 @@ function AssessmentTileCard({ tile, clientId, versionMap, navigate, rescanMutati
         {tile.parent_scan_id && (
           <Tooltip title="View diff — compare with previous scan">
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); navigate(`${scansBase}/${tile.id}/diff`); }}
-              sx={{ position: "absolute", top: 6, right: 136, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
+              sx={{ position: "absolute", top: 6, right: 162, color: "#34A853", bgcolor: "rgba(52,168,83,0.10)", "&:hover": { bgcolor: "rgba(52,168,83,0.22)" } }}>
               <CompareArrows sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
         )}
         <Chip label={status} size="small" sx={{
-          position: "absolute", top: 12, right: tile.parent_scan_id ? 162 : 136,
+          position: "absolute", top: 12, right: tile.parent_scan_id ? 188 : 162,
           bgcolor: `${statusColor}20`, color: statusColor, fontWeight: 700, fontSize: 10, height: 20,
           textTransform: "uppercase", letterSpacing: 0.5,
         }} />

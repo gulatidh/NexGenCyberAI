@@ -635,6 +635,101 @@ async def cloud_heartbeat(db: Session = Depends(get_db), _=Depends(get_current_u
     return {"ok": True, "last_seen_at": result.get("last_seen_at")}
 
 
+# ── Push scan to cloud ────────────────────────────────────────────────────────
+
+@router.post("/push-scan/{scan_id}")
+async def push_scan_to_cloud(
+    scan_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Push a completed local scan (metadata + all findings) to the paired cloud portal.
+
+    Cloud-side behaviour:
+      - Client matched by name; created if absent.
+      - Project matched by name; created if absent (only when scan has a project).
+      - New scan record created on cloud (status=completed).
+      - All findings bulk-inserted via POST /ingest/scan-push on the cloud.
+    """
+    from api.models.models import Scan, Finding, Client, Project
+
+    link = _load_link()
+    if not link:
+        raise HTTPException(400, "Not linked to a cloud portal — pair first in the Local Runner Setup page.")
+
+    scan = db.query(Scan).filter(Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(404, "Scan not found")
+
+    client = db.query(Client).filter(Client.id == scan.client_id).first()
+    project = db.query(Project).filter(Project.id == scan.project_id).first() if scan.project_id else None
+    findings = db.query(Finding).filter(Finding.scan_id == scan_id, Finding.duplicate_of_id.is_(None)).all()
+
+    def _sev(f):
+        return f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+
+    def _fw(v):
+        return v.value if hasattr(v, "value") else str(v) if v else None
+
+    payload = {
+        "client_name": client.name if client else "Local Runner Client",
+        "project_name": project.name if project else None,
+        "scan": {
+            "name": scan.name,
+            "scan_type": _fw(scan.scan_type) or "vulnerability",
+            "framework": _fw(scan.framework),
+            "connector_type": None,
+            "source_runner": link.get("runner_id"),
+            "initiated_by": scan.initiated_by,
+            "started_at": scan.started_at.isoformat() if scan.started_at else None,
+            "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+        },
+        "findings": [
+            {
+                "title": f.title,
+                "description": f.description or "",
+                "severity": _sev(f),
+                "resource_id": f.resource_id or "",
+                "resource_type": f.resource_type or "host",
+                "control_id": f.control_id or "",
+                "framework": _fw(f.framework),
+                "remediation": f.remediation or "",
+                "cve_id": f.cve_id or "",
+                "cvss_score": float(f.cvss_score or 0),
+                "cvss_vector": f.cvss_vector or "",
+                "evidence": f.evidence if isinstance(f.evidence, dict) else {},
+                "status": "open",
+            }
+            for f in findings
+        ],
+    }
+
+    cloud_url = link["cloud_url"].rstrip("/")
+    try:
+        import urllib.request as _ur
+        req = _ur.Request(
+            f"{cloud_url}/api/v1/ingest/scan-push",
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {link['token']}",
+            },
+            method="POST",
+        )
+        with _ur.urlopen(req, timeout=60) as resp:
+            result = json.loads(resp.read())
+    except Exception as exc:
+        raise HTTPException(502, f"Push failed: {exc}")
+
+    return {
+        "ok": True,
+        "cloud_scan_id": result.get("scan_id"),
+        "cloud_client_id": result.get("client_id"),
+        "findings_pushed": len(findings),
+        "message": result.get("message", "Pushed successfully"),
+    }
+
+
 # ── GitHub Actions config endpoints ──────────────────────────────────────────
 
 class _GHConfigBody(BaseModel):

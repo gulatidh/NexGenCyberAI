@@ -205,6 +205,8 @@ export const scansApi = {
     apiClient.delete(`/clients/${clientId}/scans/${scanId}`),
   rescan: (clientId: string, scanId: string) =>
     apiClient.post(`/clients/${clientId}/scans/${scanId}/rescan`).then((r) => r.data),
+  pushToCloud: (scanId: string) =>
+    apiClient.post(`/local-runner/push-scan/${scanId}`).then((r) => r.data),
   versions: (clientId: string, scanId: string) =>
     apiClient.get(`/clients/${clientId}/scans/${scanId}/versions`).then((r) => r.data),
   analyzeScanImport: (clientId: string, file: File, toolHint: string) => {
@@ -1046,4 +1048,12 @@ export const systemKbApi = {
   get: (sectionKey: string) => apiClient.get(`/system-kb/${sectionKey}`).then((r) => r.data),
   update: (sectionKey: string, data: { content: string; section_title?: string }) =>
     apiClient.patch(`/system-kb/${sectionKey}`, data).then((r) => r.data),
+};
+
+export const runnerRegistryApi = {
+  listTokens: () => apiClient.get("/runner-registry/tokens").then((r) => r.data),
+  createToken: (name: string, expiresDays?: number) =>
+    apiClient.post("/runner-registry/tokens", { name, expires_days: expiresDays || null }).then((r) => r.data),
+  revokeToken: (runnerId: string) => apiClient.delete(`/runner-registry/tokens/${runnerId}`).then((r) => r.data),
+  listRunners: () => apiClient.get("/runner-registry/runners").then((r) => r.data),
 };
