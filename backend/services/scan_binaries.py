@@ -40,7 +40,13 @@ DEFAULT_RETENTION_DAYS = 30
 def root_dir() -> Path:
     root = os.environ.get("SCAN_BINARIES_DIR") or DEFAULT_ROOT
     p = Path(root)
-    p.mkdir(parents=True, exist_ok=True)
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        # /home/data is an Azure App Service mount — not available locally.
+        # Fall back to a writable directory under the user's home.
+        p = Path.home() / ".owlet" / "uploads"
+        p.mkdir(parents=True, exist_ok=True)
     return p
 
 
