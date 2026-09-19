@@ -6,7 +6,7 @@ the cloud database, auto-creating client / project as needed.
 
 Authentication: Bearer token checked against RunnerRegistry records.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -80,7 +80,7 @@ def _verify_runner_token(authorization: str, db: Session) -> str:
 @router.post("/scan-push")
 async def receive_scan_push(
     payload: ScanPushPayload,
-    request: "Request",
+    authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ):
     """Receive a scan + findings from a paired local runner.
@@ -88,23 +88,25 @@ async def receive_scan_push(
     Creates client / project / scan / findings as needed.
     Idempotent on client + project name — never duplicates.
     """
-    from fastapi import Request
     from api.models.models import Client, Project, Scan, ScanStatus, Finding, Severity, FrameworkType, ScanType
     import json
 
     # Validate runner token from Authorization header
-    authorization = request.headers.get("Authorization", "")
     try:
-        from api.models.models import RunnerRegistry
-        if authorization.startswith("Bearer "):
+        from api.models.models import LocalRunnerRegistration
+        import hashlib
+        if authorization and authorization.startswith("Bearer "):
             token = authorization[7:]
-            runner = db.query(RunnerRegistry).filter(RunnerRegistry.token == token).first()
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            runner = db.query(LocalRunnerRegistration).filter(
+                LocalRunnerRegistration.token_hash == token_hash
+            ).first()
             if not runner:
                 raise HTTPException(403, "Invalid runner token — pair the local runner first.")
     except HTTPException:
         raise
     except Exception:
-        pass  # RunnerRegistry table may not exist on older DBs — allow through
+        pass  # LocalRunnerRegistration table may not exist on older DBs — allow through
 
     # ── 1. Ensure client ──────────────────────────────────────────────────────
     client_name = payload.client_name.strip() or "Local Runner Client"
