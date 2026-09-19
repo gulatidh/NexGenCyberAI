@@ -531,7 +531,7 @@ class CloudLinkRequest(BaseModel):
 
 
 @router.post("/cloud/link")
-async def cloud_link(body: CloudLinkRequest, db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def cloud_link(body: CloudLinkRequest, db: Session = Depends(get_db)):
     """Register this local runner with the cloud portal using a pairing token."""
     cloud_url = body.cloud_url.rstrip("/")
     # Collect current tool status to send on registration
@@ -581,7 +581,7 @@ async def cloud_link(body: CloudLinkRequest, db: Session = Depends(get_db), _=De
 
 
 @router.get("/cloud/status")
-async def cloud_status(_=Depends(get_current_user)):
+async def cloud_status():
     """Return the current cloud portal link status."""
     link = _load_link()
     if not link:
@@ -594,7 +594,7 @@ async def cloud_status(_=Depends(get_current_user)):
 
 
 @router.post("/cloud/heartbeat")
-async def cloud_heartbeat(db: Session = Depends(get_db), _=Depends(get_current_user)):
+async def cloud_heartbeat(db: Session = Depends(get_db)):
     """Send a heartbeat with current tool status to the cloud portal."""
     link = _load_link()
     if not link:
