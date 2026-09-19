@@ -1849,35 +1849,33 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   helperText="The host(s) OpenVAS will scan. Authorisation required." />
 
                 <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mt: 0.5 }}>SSH Authenticated Scan (optional)</Typography>
-                <TextField size="small" fullWidth label="SSH Username" placeholder="root or sysadmin"
-                  value={ovSshUser} onChange={(e) => setOvSshUser(e.target.value)} />
-                {ovSshUser.trim() && (
-                  <>
-                    <FormControl size="small" fullWidth>
-                      <InputLabel>SSH Auth Method</InputLabel>
-                      <Select value={ovSshMode} label="SSH Auth Method" onChange={(e) => setOvSshMode(e.target.value as "password" | "key")}>
-                        <MenuItem value="password">Password</MenuItem>
-                        <MenuItem value="key">Private Key (PEM)</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {ovSshMode === "password" ? (
-                      <TextField size="small" fullWidth type="password" label="SSH Password"
-                        value={ovSshPassword} onChange={(e) => setOvSshPassword(e.target.value)} />
-                    ) : (
-                      <TextField size="small" fullWidth multiline rows={4} label="SSH Private Key"
-                        placeholder="-----BEGIN ... KEY-----" value={ovSshKey}
-                        onChange={(e) => setOvSshKey(e.target.value)} />
-                    )}
-                  </>
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <TextField size="small" sx={{ flex: 1 }} label="SSH Username" placeholder="root or sysadmin"
+                    value={ovSshUser} onChange={(e) => setOvSshUser(e.target.value)} />
+                  <FormControl size="small" sx={{ width: 180 }}>
+                    <InputLabel>Auth Method</InputLabel>
+                    <Select value={ovSshMode} label="Auth Method" onChange={(e) => setOvSshMode(e.target.value as "password" | "key")}>
+                      <MenuItem value="password">Password</MenuItem>
+                      <MenuItem value="key">Private Key (PEM)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                {ovSshMode === "password" ? (
+                  <TextField size="small" fullWidth type="password" label="SSH Password"
+                    value={ovSshPassword} onChange={(e) => setOvSshPassword(e.target.value)} />
+                ) : (
+                  <TextField size="small" fullWidth multiline rows={4} label="SSH Private Key"
+                    placeholder="-----BEGIN ... KEY-----" value={ovSshKey}
+                    onChange={(e) => setOvSshKey(e.target.value)} />
                 )}
 
                 <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mt: 0.5 }}>SMB / Windows Authenticated Scan (optional)</Typography>
-                <TextField size="small" fullWidth label="SMB Username" placeholder="DOMAIN\\Administrator"
-                  value={ovSmbUser} onChange={(e) => setOvSmbUser(e.target.value)} />
-                {ovSmbUser.trim() && (
-                  <TextField size="small" fullWidth type="password" label="SMB Password"
+                <Box sx={{ display: "flex", gap: 1.5 }}>
+                  <TextField size="small" sx={{ flex: 1 }} label="SMB Username" placeholder="DOMAIN\\Administrator"
+                    value={ovSmbUser} onChange={(e) => setOvSmbUser(e.target.value)} />
+                  <TextField size="small" sx={{ flex: 1 }} type="password" label="SMB Password"
                     value={ovSmbPassword} onChange={(e) => setOvSmbPassword(e.target.value)} />
-                )}
+                </Box>
               </Box>
             </Box>
           )}
