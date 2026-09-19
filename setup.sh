@@ -387,8 +387,19 @@ if $INSTALL_TOOLS; then
         info "Then 'sudo gvm-start' to start the daemon before running OpenVAS scans"
         # Add current user to _gvm group so the backend can access the GVM socket
         if getent group _gvm &>/dev/null; then
-          sudo usermod -aG _gvm "$USER" && ok "Added $USER to _gvm group (log out and back in to apply)" \
-            || warn "Could not add $USER to _gvm group — run: sudo usermod -aG _gvm $USER"
+          if sudo usermod -aG _gvm "$USER"; then
+            ok "Added $USER to _gvm group"
+            # Also open socket permissions immediately so current session works
+            sudo chmod 660 /run/gvmd/gvmd.sock 2>/dev/null || true
+            echo 'z /run/gvmd/gvmd.sock 0660 _gvm _gvm -' | sudo tee /etc/tmpfiles.d/gvmd.conf >/dev/null
+            if grep -qi microsoft /proc/version 2>/dev/null; then
+              warn "WSL detected — run from PowerShell to apply group: wsl --terminate kali-linux"
+            else
+              warn "Log out and back in (or run 'exec su -l \$USER') to activate the _gvm group"
+            fi
+          else
+            warn "Could not add $USER to _gvm group — run manually: sudo usermod -aG _gvm $USER"
+          fi
         fi
       else
         warn "OpenVAS install failed — install manually: sudo apt install openvas"
