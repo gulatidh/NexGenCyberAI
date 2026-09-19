@@ -383,9 +383,7 @@ async def _openvas(target: str, config: dict) -> List[dict]:
             "gvm-cli not found — install openvas and run 'sudo gvm-setup' first"
         )
 
-    host = config.get("gvm_host", "127.0.0.1")
-    port = str(config.get("gvm_port", 9390))
-    user = config.get("gvm_user", "admin")
+    user     = config.get("gvm_user", "admin")
     password = config.get("gvm_password", "admin")
 
     # Authenticated scan credentials (optional)
@@ -395,17 +393,54 @@ async def _openvas(target: str, config: dict) -> List[dict]:
     smb_user        = config.get("smb_user", "")
     smb_password    = config.get("smb_password", "")
 
+    # Find the GVM Unix socket — gvmd puts it in one of these locations
+    _SOCKET_CANDIDATES = [
+        "/run/gvmd/gvmd.sock",
+        "/var/run/gvmd/gvmd.sock",
+        "/run/gvmd.sock",
+        "/tmp/gvm/gvmd.sock",
+    ]
+    socket_path = config.get("gvm_socket_path", "")
+    if not socket_path:
+        for _s in _SOCKET_CANDIDATES:
+            if Path(_s).exists():
+                socket_path = _s
+                break
+
     async def _gvm(xml: str) -> str:
+        cmd = [gvm_cli, "--gmp-username", user, "--gmp-password", password]
+        if socket_path:
+            cmd += ["socket", "--socketpath", socket_path, "--xml", xml]
+        else:
+            # Fall back to TLS (older GVM installs)
+            host = config.get("gvm_host", "127.0.0.1")
+            port = str(config.get("gvm_port", 9390))
+            cmd += ["tls", "--hostname", host, "--port", port, "--xml", xml]
         proc = await asyncio.create_subprocess_exec(
-            gvm_cli, "--gmp-username", user, "--gmp-password", password,
-            "socket", "--xml", xml,
+            *cmd,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             env=_env(),
         )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
-        return stdout.decode(errors="replace")
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+        out = stdout.decode(errors="replace").strip()
+        if not out:
+            err = stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"gvm-cli returned no output. stderr: {err[:300]}")
+        return out
 
     import xml.etree.ElementTree as ET
+
+    # Verify connection before proceeding
+    try:
+        ver_resp = await _gvm("<get_version/>")
+        ET.fromstring(ver_resp)  # parse check
+    except RuntimeError:
+        raise
+    except Exception as _ve:
+        raise RuntimeError(
+            f"Cannot connect to GVM daemon. "
+            f"Run 'sudo gvm-start' on Kali and check the socket exists. Detail: {_ve}"
+        )
 
     # Create SSH credential if provided
     ssh_cred_id = ""
