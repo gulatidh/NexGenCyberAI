@@ -993,6 +993,14 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
   const [acrRepoUrl, setAcrRepoUrl] = useState("");
   const [acrGitToken, setAcrGitToken] = useState("");
   const [codeArchive, setCodeArchive] = useState<File | null>(null);
+  // OpenVAS scan-time options
+  const [ovTarget, setOvTarget] = useState("");
+  const [ovSshUser, setOvSshUser] = useState("");
+  const [ovSshPassword, setOvSshPassword] = useState("");
+  const [ovSshKey, setOvSshKey] = useState("");
+  const [ovSshMode, setOvSshMode] = useState<"password" | "key">("password");
+  const [ovSmbUser, setOvSmbUser] = useState("");
+  const [ovSmbPassword, setOvSmbPassword] = useState("");
   // Top-level section accordion state
   const [sectionExpanded, setSectionExpanded] = useState<"platform" | "enterprise" | "import" | false>(initialSection ?? "platform");
 
@@ -1114,6 +1122,7 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["assessments-tiles"] });
       setOpen(false); setScanName(""); setAcrRepoUrl(""); setAcrGitToken(""); setAcrMode("repo");
+      setOvTarget(""); setOvSshUser(""); setOvSshPassword(""); setOvSshKey(""); setOvSshMode("password"); setOvSmbUser(""); setOvSmbPassword("");
       toast.success("Assessment started");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Error starting assessment"),
@@ -1828,6 +1837,50 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
           )}
           </>
           )}
+
+          {/* OpenVAS scan-time: target + auth credentials */}
+          {scannerId === "openvas" && (
+            <Box sx={{ mt: 2, p: 2, border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: 13, mb: 1.5 }}>Target & Authentication</Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <TextField fullWidth size="small" required label="Target (IP / CIDR / hostname)"
+                  placeholder="192.168.1.0/24 or 10.0.0.5" value={ovTarget}
+                  onChange={(e) => setOvTarget(e.target.value)}
+                  helperText="The host(s) OpenVAS will scan. Authorisation required." />
+
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mt: 0.5 }}>SSH Authenticated Scan (optional)</Typography>
+                <TextField size="small" fullWidth label="SSH Username" placeholder="root or sysadmin"
+                  value={ovSshUser} onChange={(e) => setOvSshUser(e.target.value)} />
+                {ovSshUser.trim() && (
+                  <>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>SSH Auth Method</InputLabel>
+                      <Select value={ovSshMode} label="SSH Auth Method" onChange={(e) => setOvSshMode(e.target.value as "password" | "key")}>
+                        <MenuItem value="password">Password</MenuItem>
+                        <MenuItem value="key">Private Key (PEM)</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {ovSshMode === "password" ? (
+                      <TextField size="small" fullWidth type="password" label="SSH Password"
+                        value={ovSshPassword} onChange={(e) => setOvSshPassword(e.target.value)} />
+                    ) : (
+                      <TextField size="small" fullWidth multiline rows={4} label="SSH Private Key"
+                        placeholder="-----BEGIN ... KEY-----" value={ovSshKey}
+                        onChange={(e) => setOvSshKey(e.target.value)} />
+                    )}
+                  </>
+                )}
+
+                <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mt: 0.5 }}>SMB / Windows Authenticated Scan (optional)</Typography>
+                <TextField size="small" fullWidth label="SMB Username" placeholder="DOMAIN\\Administrator"
+                  value={ovSmbUser} onChange={(e) => setOvSmbUser(e.target.value)} />
+                {ovSmbUser.trim() && (
+                  <TextField size="small" fullWidth type="password" label="SMB Password"
+                    value={ovSmbPassword} onChange={(e) => setOvSmbPassword(e.target.value)} />
+                )}
+              </Box>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => { setOpen(false); setAcrRepoUrl(""); setAcrGitToken(""); setAcrMode("repo"); }} sx={{ color: "text.secondary" }}>Cancel</Button>
@@ -1837,7 +1890,8 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
               (category !== "cloud" && scannerId !== "ai_code_review" && (!scannerId || !connectorId)) ||
               (scannerId === "codeql" && codeqlMode === "binary" && !binaryFile) ||
               (scannerId === "ai_code_review" && acrMode === "archive" && !codeArchive) ||
-              (scannerId === "ai_code_review" && acrMode === "repo" && !acrRepoUrl.trim())
+              (scannerId === "ai_code_review" && acrMode === "repo" && !acrRepoUrl.trim()) ||
+              (scannerId === "openvas" && !ovTarget.trim())
             }
             onClick={async () => {
               const isBinary = scannerId === "codeql" && codeqlMode === "binary" && binaryFile;
@@ -1893,6 +1947,20 @@ export default function Scans({ initialSection }: { initialSection?: "platform" 
                   name: scanName || undefined,
                   ...(isAcrRepo && acrRepoUrl.trim() ? { repo_url: acrRepoUrl.trim() } : {}),
                   ...(isAcrRepo && acrGitToken.trim() ? { git_token: acrGitToken.trim() } : {}),
+                  ...(scannerId === "openvas" && ovTarget.trim() ? {
+                    scan_options: {
+                      target: ovTarget.trim(),
+                      ...(ovSshUser.trim() ? {
+                        ssh_user: ovSshUser.trim(),
+                        ...(ovSshMode === "password" && ovSshPassword ? { ssh_password: ovSshPassword } : {}),
+                        ...(ovSshMode === "key" && ovSshKey.trim() ? { ssh_private_key: ovSshKey.trim() } : {}),
+                      } : {}),
+                      ...(ovSmbUser.trim() ? {
+                        smb_user: ovSmbUser.trim(),
+                        ...(ovSmbPassword ? { smb_password: ovSmbPassword } : {}),
+                      } : {}),
+                    },
+                  } : {}),
                 });
               }
             }}>

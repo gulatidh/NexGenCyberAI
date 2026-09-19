@@ -116,24 +116,26 @@ async def _execute_scan(
                     try:
                         _cfg_for_scan = connector_db.config or {}
                         _creds_for_scan = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
-                        _target = _cfg_for_scan.get("target_url") or _cfg_for_scan.get("target") or _creds_for_scan.get("target") or ""
+                        _smry_for_scan = scan.summary or {}
+                        _target = _cfg_for_scan.get("target_url") or _smry_for_scan.get("target") or ""
                         _repo_url = _cfg_for_scan.get("repo_url") or _creds_for_scan.get("repo_url") or ""
                         _airgap_config = {
                             "target": _target,
                             "repo_url": _repo_url,
                             "image": _cfg_for_scan.get("image") or _creds_for_scan.get("image") or "",
                             "profile": _cfg_for_scan.get("default_profile") or _creds_for_scan.get("default_profile") or "baseline",
-                            # GVM daemon connection
+                            # GVM daemon connection (from connector)
                             "gvm_host":        _creds_for_scan.get("gvm_host", "127.0.0.1"),
                             "gvm_port":        _creds_for_scan.get("gvm_port", 9390),
                             "gvm_user":        _creds_for_scan.get("gvm_user", "admin"),
                             "gvm_password":    _creds_for_scan.get("gvm_password", ""),
-                            # Authenticated scan credentials (optional)
-                            "ssh_user":        _creds_for_scan.get("ssh_user", ""),
-                            "ssh_password":    _creds_for_scan.get("ssh_password", ""),
-                            "ssh_private_key": _creds_for_scan.get("ssh_private_key", ""),
-                            "smb_user":        _creds_for_scan.get("smb_user", ""),
-                            "smb_password":    _creds_for_scan.get("smb_password", ""),
+                            "scan_config":     _creds_for_scan.get("scan_config", ""),
+                            # Authenticated scan credentials (from scan-time options)
+                            "ssh_user":        _smry_for_scan.get("ssh_user", ""),
+                            "ssh_password":    _smry_for_scan.get("ssh_password", ""),
+                            "ssh_private_key": _smry_for_scan.get("ssh_private_key", ""),
+                            "smb_user":        _smry_for_scan.get("smb_user", ""),
+                            "smb_password":    _smry_for_scan.get("smb_password", ""),
                         }
                         from services.local_scanners import run_local_scan
                         import asyncio as _aio
@@ -275,24 +277,28 @@ async def _execute_scan(
                             _mode_local = False
                         if _force_local or _mode_local:
                             _loc_creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                            _loc_smry = scan.summary or {}
                             from services.local_scanners import run_local_scan
                             import asyncio as _aio
                             _aio.ensure_future(run_local_scan(scan.id, _local_tool, {
-                                "target": conn_obj._primary_target(),
+                                # Target comes from scan-time options for OpenVAS; connectors for others
+                                "target": _loc_smry.get("target") or conn_obj._primary_target(),
                                 "repo_url": conn_obj._get("repo_url") or None,
                                 "image": conn_obj._get("image") or None,
                                 "profile": (connector_db.config or {}).get("default_profile") or "baseline",
-                                # GVM / authenticated scan credentials (OpenVAS)
+                                # GVM daemon connection (from connector)
                                 "gvm_host":        _loc_creds.get("gvm_host", "127.0.0.1"),
                                 "gvm_port":        _loc_creds.get("gvm_port", 9390),
                                 "gvm_user":        _loc_creds.get("gvm_user", "admin"),
                                 "gvm_password":    _loc_creds.get("gvm_password", ""),
                                 "gvm_socket_path": _loc_creds.get("gvm_socket_path", ""),
-                                "ssh_user":        _loc_creds.get("ssh_user", ""),
-                                "ssh_password":    _loc_creds.get("ssh_password", ""),
-                                "ssh_private_key": _loc_creds.get("ssh_private_key", ""),
-                                "smb_user":        _loc_creds.get("smb_user", ""),
-                                "smb_password":    _loc_creds.get("smb_password", ""),
+                                "scan_config":     _loc_creds.get("scan_config", ""),
+                                # Authenticated scan credentials (from scan-time options)
+                                "ssh_user":        _loc_smry.get("ssh_user", ""),
+                                "ssh_password":    _loc_smry.get("ssh_password", ""),
+                                "ssh_private_key": _loc_smry.get("ssh_private_key", ""),
+                                "smb_user":        _loc_smry.get("smb_user", ""),
+                                "smb_password":    _loc_smry.get("smb_password", ""),
                             }))
                             return
                     # ─────────────────────────────────────────────────────────
@@ -323,24 +329,28 @@ async def _execute_scan(
                                 import asyncio as _aio
                                 from services.local_scanners import run_local_scan
                                 _fb_creds = json.loads(decrypt(connector_db.credentials_enc)) if connector_db.credentials_enc else {}
+                                _fb_smry = scan.summary or {}
                                 scan.progress_message = f"GitHub Actions not configured — running {_fallback_tool} locally…"
                                 scan.status = ScanStatus.RUNNING
                                 db.commit()
                                 _aio.ensure_future(run_local_scan(scan.id, _fallback_tool, {
-                                    "target": target,
+                                    # Target: scan-time options take priority for OpenVAS
+                                    "target": _fb_smry.get("target") or target,
                                     "repo_url": conn_obj._get("repo_url") or None,
                                     "image": conn_obj._get("image") or None,
                                     "profile": (connector_db.config or {}).get("default_profile") or "baseline",
-                                    # GVM / authenticated scan credentials (OpenVAS)
+                                    # GVM daemon connection (from connector)
                                     "gvm_host":        _fb_creds.get("gvm_host", "127.0.0.1"),
                                     "gvm_port":        _fb_creds.get("gvm_port", 9390),
                                     "gvm_user":        _fb_creds.get("gvm_user", "admin"),
                                     "gvm_password":    _fb_creds.get("gvm_password", ""),
-                                    "ssh_user":        _fb_creds.get("ssh_user", ""),
-                                    "ssh_password":    _fb_creds.get("ssh_password", ""),
-                                    "ssh_private_key": _fb_creds.get("ssh_private_key", ""),
-                                    "smb_user":        _fb_creds.get("smb_user", ""),
-                                    "smb_password":    _fb_creds.get("smb_password", ""),
+                                    "scan_config":     _fb_creds.get("scan_config", ""),
+                                    # Authenticated scan credentials (from scan-time options)
+                                    "ssh_user":        _fb_smry.get("ssh_user", ""),
+                                    "ssh_password":    _fb_smry.get("ssh_password", ""),
+                                    "ssh_private_key": _fb_smry.get("ssh_private_key", ""),
+                                    "smb_user":        _fb_smry.get("smb_user", ""),
+                                    "smb_password":    _fb_smry.get("smb_password", ""),
                                 }))
                                 return
                             except Exception:
@@ -658,6 +668,10 @@ async def start_scan(
             initial_summary["repo_url"] = payload.repo_url
         if payload.git_token:
             initial_summary["git_token_enc"] = _enc(payload.git_token)
+    if payload.scan_options:
+        if initial_summary is None:
+            initial_summary = {}
+        initial_summary.update(payload.scan_options)
     scan = Scan(
         client_id=client_id,
         project_id=proj_id,

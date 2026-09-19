@@ -108,7 +108,7 @@ const STATUS_PROPS: Record<string, any> = {
 
 // ── Credential field definitions ─────────────────────────────────────────────
 
-type CredField = { key: string; label: string; secret?: boolean; placeholder?: string; help?: string };
+type CredField = { key: string; label: string; secret?: boolean; placeholder?: string; help?: string; select?: boolean; options?: { value: string; label: string }[] };
 
 export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
   azure: [
@@ -194,8 +194,6 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
       help: "Single host, IP, or CIDR range. Authorisation required — never scan systems you don't own." },
   ],
   openvas: [
-    { key: "target",          label: "Target host / IP / CIDR", placeholder: "10.0.1.5  or  192.168.1.0/24",
-      help: "Greenbone/OpenVAS scans this target with the Full-and-Fast vulnerability profile." },
     { key: "gvm_user",        label: "GVM Username", placeholder: "admin" },
     { key: "gvm_password",    label: "GVM Password", secret: true,
       help: "Set during 'sudo gvm-setup'. Retrieve with: sudo runuser -u _gvm -- gvmd --get-users --verbose" },
@@ -205,15 +203,17 @@ export const CREDENTIAL_FIELDS: Record<ConnectorType, CredField[]> = {
       help: "Only used if no Unix socket is found. Older GVM installs only." },
     { key: "gvm_port",        label: "GVM Port (TLS fallback)", placeholder: "9390",
       help: "Only used if no Unix socket is found." },
-    { key: "ssh_user",        label: "SSH Username (authenticated scan)", placeholder: "root  or  sysadmin",
-      help: "Linux/Unix hosts only. Leave blank for unauthenticated network scan." },
-    { key: "ssh_password",    label: "SSH Password", secret: true,
-      help: "Used to log in to Linux targets for deep package/config inspection." },
-    { key: "ssh_private_key", label: "SSH Private Key (alternative to password)", secret: true,
-      help: "Paste the full PEM private key (-----BEGIN ... KEY-----). Used instead of SSH password if provided." },
-    { key: "smb_user",        label: "SMB/Windows Username (authenticated scan)", placeholder: "DOMAIN\\Administrator  or  Administrator",
-      help: "Windows hosts only. Enables registry and patch-level checks via WMI/SMB." },
-    { key: "smb_password",    label: "SMB/Windows Password", secret: true },
+    { key: "scan_config",     label: "Scan Profile", select: true,
+      help: "Controls which NVT checks are run. Full and Fast is the safe default. Target and auth credentials are entered at scan-launch time.",
+      options: [
+        { value: "daba56c8-73ec-11df-a475-002264764cea", label: "Full and Fast (recommended)" },
+        { value: "698f691e-7489-11df-9d8c-002264764cea", label: "Full and Fast Ultimate" },
+        { value: "708f25c4-7489-11df-8094-002264764cea", label: "Full and Deep" },
+        { value: "74db13d6-7489-11df-91b9-002264764cea", label: "Full and Deep Ultimate" },
+        { value: "8715c877-47a0-438d-98a3-27c7a6ab2196", label: "Host Discovery" },
+        { value: "bbca7412-a950-11e3-9109-406186ea4fc5", label: "System Discovery" },
+      ],
+    },
   ],
   trivy: [
     { key: "image",        label: "Container image (optional)", placeholder: "ghcr.io/org/app:1.2.3",
@@ -1095,20 +1095,35 @@ export default function Connections() {
 
             {/* Standard credential fields */}
             {connectorType !== "web" &&
-              credFields.map(({ key, label, secret, placeholder, help }) => (
+              credFields.map(({ key, label, secret, placeholder, help, select: isSelect, options }) => (
                 <Grid size={{ xs: 12 }} key={key}>
-                  <TextField
-                    fullWidth size="small" label={label}
-                    type={secret ? "password" : "text"}
-                    placeholder={placeholder}
-                    helperText={help}
-                    value={credentials[key] || ""}
-                    onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
-                    slotProps={{
-                      formHelperText:{ sx: { color: "text.secondary", fontSize: 11 } },
-                    }}
-                    sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
-                  />
+                  {isSelect ? (
+                    <FormControl fullWidth size="small">
+                      <InputLabel sx={{ color: "text.secondary" }}>{label}</InputLabel>
+                      <Select
+                        value={credentials[key] || (options?.[0]?.value || "")}
+                        label={label}
+                        onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
+                        sx={{ color: "text.primary", "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                      >
+                        {options?.map((o) => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                      </Select>
+                      {help && <Typography sx={{ fontSize: 11, color: "text.secondary", mt: 0.5, px: 0.25 }}>{help}</Typography>}
+                    </FormControl>
+                  ) : (
+                    <TextField
+                      fullWidth size="small" label={label}
+                      type={secret ? "password" : "text"}
+                      placeholder={placeholder}
+                      helperText={help}
+                      value={credentials[key] || ""}
+                      onChange={(e) => setCredentials({ ...credentials, [key]: e.target.value })}
+                      slotProps={{
+                        formHelperText:{ sx: { color: "text.secondary", fontSize: 11 } },
+                      }}
+                      sx={{ "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" } }}
+                    />
+                  )}
                 </Grid>
               ))
             }

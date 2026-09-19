@@ -126,6 +126,9 @@ class ScanCreate(BaseModel):
     # git_token is stored encrypted in scan.summary; never returned to the client.
     repo_url: Optional[str] = None
     git_token: Optional[str] = None
+    # Per-scan options for local scanners (e.g. OpenVAS target + auth creds).
+    # Stored in scan.summary and read at execution time — never stored in connector.
+    scan_options: Optional[dict] = None
 
 class ScanResponse(BaseModel):
     id: str

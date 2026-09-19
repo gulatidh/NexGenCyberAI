@@ -504,10 +504,12 @@ async def _openvas(target: str, config: dict) -> List[dict]:
     except Exception:
         raise RuntimeError(f"Failed to create GVM target: {resp[:200]}")
 
-    # Create task with Full and Fast config
+    # Create task — use scan_config UUID from connector (default: Full and Fast)
+    _DEFAULT_SCAN_CFG = "daba56c8-73ec-11df-a475-002264764cea"
+    scan_cfg_id = config.get("scan_config") or _DEFAULT_SCAN_CFG
     create_task = (
         f'<create_task><name>owlet-scan-{target}</name>'
-        f'<config id="daba56c8-73ec-11df-a475-002264764cea"/>'
+        f'<config id="{scan_cfg_id}"/>'
         f'<target id="{target_id}"/></create_task>'
     )
     resp = await _gvm(create_task)
