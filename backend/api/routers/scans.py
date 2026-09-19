@@ -245,7 +245,11 @@ async def _execute_scan(
                     # is recorded on scan.summary["binary"] by the upload
                     # endpoint.
                     has_binary = bool((scan.summary or {}).get("binary"))
-                    if not target and not has_binary:
+                    # Some connectors (e.g. OpenVAS) supply their target at
+                    # scan-launch time via scan_options → scan.summary["target"]
+                    # rather than in connector credentials.
+                    has_scan_time_target = bool((scan.summary or {}).get("target"))
+                    if not target and not has_binary and not has_scan_time_target:
                         scan.status = ScanStatus.FAILED
                         scan.error_message = (
                             f"Cannot start {connector_db.connector_type} scan — missing "
