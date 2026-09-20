@@ -899,8 +899,8 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         atk_flag = '<span class="pill" style="background:#fee2e2;color:#b91c1c;font-size:10px;border:1px solid #fca5a5;">Attack vector</span>' if f.get("is_attack_vector") else ""
         return (
             f"<tr>"
-            f"<td>{_h(comp_by_id.get(str(f.get('from')),{{}}).get('name') or f.get('from'))}</td>"
-            f"<td>{_h(comp_by_id.get(str(f.get('to')),{{}}).get('name') or f.get('to'))}</td>"
+            f"<td>{_h(comp_by_id.get(str(f.get('from')),dict()).get('name') or f.get('from'))}</td>"
+            f"<td>{_h(comp_by_id.get(str(f.get('to')),dict()).get('name') or f.get('to'))}</td>"
             f"<td><span class='proto-pill'>{_h(f.get('protocol'))}</span> <span class='muted'>{_h(f.get('port') or '')}</span></td>"
             f"<td><span style='{data_style}'>{data_label}</span></td>"
             f"<td>{'<span class=\"enc-yes\">TLS</span>' if f.get('encrypted') else '<span class=\"enc-no\">PLAIN</span>'}</td>"
@@ -937,8 +937,8 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         )
     ep_rows = "".join(_ep_row(ep) for ep in entry_points) or "<tr><td colspan='5' class='muted'>No entry points.</td></tr>"
     cross_rows = "".join(
-        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),{{}}).get('name') or f.get('from'))}</td>"
-        f"<td>{_h(comp_by_id.get(str(f.get('to')),{{}}).get('name') or f.get('to'))}</td>"
+        f"<tr><td>{_h(comp_by_id.get(str(f.get('from')),dict()).get('name') or f.get('from'))}</td>"
+        f"<td>{_h(comp_by_id.get(str(f.get('to')),dict()).get('name') or f.get('to'))}</td>"
         f"<td>{_h(f.get('protocol'))}</td><td>{_h(f.get('data'))}</td></tr>"
         for f in data_flows if f.get("trust_boundary_crossing")
     ) or "<tr><td colspan='4' class='muted'>No boundary-crossing flows.</td></tr>"
