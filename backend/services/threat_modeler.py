@@ -1023,14 +1023,14 @@ _PLAT_DISPLAY = {
 
 
 def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, Any]]) -> str:
-    """Render a valid Mermaid `flowchart TD` with nested subgraphs:
-    outer = platform (Corporate, Azure, Internet …), inner = trust zone.
-    Edge labels are quoted + sanitised."""
+    """Render Mermaid `flowchart TD` with nested subgraphs.
+    When 2+ distinct non-empty datacenters exist: DC → Platform → Zone → node.
+    Otherwise (single / no DC): Platform → Zone → node (backward compat)."""
     lines: List[str] = ["flowchart TD"]
     id_map: Dict[str, str] = {}
 
-    # Group: platform -> trust_zone -> [(nid, comp)]
-    plat_zones: Dict[str, Dict[str, List[Tuple[str, Dict[str, Any]]]]] = {}
+    # Group: datacenter → platform → trust_zone → [(nid, comp)]
+    dc_plat_zones: Dict[str, Dict[str, Dict[str, List[Tuple[str, Dict[str, Any]]]]]] = {}
     for c in components:
         cid = _str(c.get("id"))
         if not cid:
@@ -1039,33 +1039,64 @@ def _build_mermaid(components: List[Dict[str, Any]], data_flows: List[Dict[str, 
         id_map[cid] = nid
         plat = _str(c.get("platform") or "Corporate").strip() or "Corporate"
         zone = _str(c.get("trust_zone") or "Private").strip() or "Private"
-        plat_zones.setdefault(plat, {}).setdefault(zone, []).append((nid, c))
+        dc = _str(c.get("datacenter") or "").strip()
+        dc_plat_zones.setdefault(dc, {}).setdefault(plat, {}).setdefault(zone, []).append((nid, c))
 
-    for plat, zones in plat_zones.items():
-        plat_id = _mm_id("plat_" + plat)
-        plat_label = _mm_label(_PLAT_DISPLAY.get(plat, plat))
-        lines.append(f'  subgraph {plat_id}["{plat_label}"]')
-        for zone, comps in zones.items():
-            zone_id = _mm_id("zone_" + plat + "_" + zone)
-            zone_label = _mm_label(zone.title().replace("-", " ")) or "Zone"
-            lines.append(f'    subgraph {zone_id}["{zone_label}"]')
-            for nid, c in comps:
-                name = _mm_label(c.get("name") or c.get("id") or "?")
-                ctype = _mm_label(c.get("type") or "")
-                env  = _mm_label(c.get("environment") or "")
-                dc   = _mm_label(c.get("datacenter") or "")
-                # Build sublabel: type | env (dc)
-                parts = [x for x in [ctype, env] if x]
-                sub = " | ".join(parts)
-                if dc:
-                    sub = f"{sub} ({dc})" if sub else dc
-                label = f"{name}<br/><small>{sub}</small>" if sub else name
-                if c.get("is_threat_actor"):
-                    lines.append(f'      {nid}(["{label}"])')
-                else:
-                    lines.append(f'      {nid}["{label}"]')
-            lines.append("    end")
-        lines.append("  end")
+    unique_dcs = [dc for dc in dc_plat_zones if dc]
+    use_dc_level = len(unique_dcs) >= 2
+
+    def _render_node(nid: str, c: Dict[str, Any], indent: str) -> None:
+        name = _mm_label(c.get("name") or c.get("id") or "?")
+        ctype = _mm_label(c.get("type") or "")
+        env   = _mm_label(c.get("environment") or "")
+        dc_val = _mm_label(c.get("datacenter") or "")
+        parts = [x for x in [ctype, env] if x]
+        sub = " | ".join(parts)
+        if dc_val and not use_dc_level:
+            sub = f"{sub} ({dc_val})" if sub else dc_val
+        label = f"{name}<br/><small>{sub}</small>" if sub else name
+        if c.get("is_threat_actor"):
+            lines.append(f'{indent}{nid}(["{label}"])')
+        else:
+            lines.append(f'{indent}{nid}["{label}"]')
+
+    if use_dc_level:
+        for dc, plat_zones in dc_plat_zones.items():
+            dc_label = dc if dc else "Unspecified"
+            dc_id = _mm_id("dc_" + dc_label)
+            lines.append(f'  subgraph {dc_id}["🏢 {_mm_label(dc_label)}"]')
+            for plat, zones in plat_zones.items():
+                plat_id = _mm_id("plat_" + dc_label + "_" + plat)
+                plat_label = _mm_label(_PLAT_DISPLAY.get(plat, plat))
+                lines.append(f'    subgraph {plat_id}["{plat_label}"]')
+                for zone, comps in zones.items():
+                    zone_id = _mm_id("zone_" + dc_label + "_" + plat + "_" + zone)
+                    zone_label = _mm_label(zone.title().replace("-", " ")) or "Zone"
+                    lines.append(f'      subgraph {zone_id}["{zone_label}"]')
+                    for nid, c in comps:
+                        _render_node(nid, c, "        ")
+                    lines.append("      end")
+                lines.append("    end")
+            lines.append("  end")
+    else:
+        # Flatten across all DC groups (single / empty DC — backward compat)
+        plat_zones_flat: Dict[str, Dict[str, List[Tuple[str, Dict[str, Any]]]]] = {}
+        for _dc, plat_zones in dc_plat_zones.items():
+            for plat, zones in plat_zones.items():
+                for zone, comps in zones.items():
+                    plat_zones_flat.setdefault(plat, {}).setdefault(zone, []).extend(comps)
+        for plat, zones in plat_zones_flat.items():
+            plat_id = _mm_id("plat_" + plat)
+            plat_label = _mm_label(_PLAT_DISPLAY.get(plat, plat))
+            lines.append(f'  subgraph {plat_id}["{plat_label}"]')
+            for zone, comps in zones.items():
+                zone_id = _mm_id("zone_" + plat + "_" + zone)
+                zone_label = _mm_label(zone.title().replace("-", " ")) or "Zone"
+                lines.append(f'    subgraph {zone_id}["{zone_label}"]')
+                for nid, c in comps:
+                    _render_node(nid, c, "      ")
+                lines.append("    end")
+            lines.append("  end")
 
     _DIR_ICON = {"ingress": ">>", "egress": "<<", "bidirectional": "<>", "internal": ""}
     for f in data_flows or []:

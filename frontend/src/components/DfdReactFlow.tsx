@@ -239,6 +239,42 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   );
 }
 
+// ── Datacenter (Level 0) outermost node ──────────────────────────────────────
+
+function DatacenterNode({ selected, data }: { selected?: boolean; data: Record<string, any> }) {
+  const label = (data.label as string) ?? "";
+  return (
+    <>
+      <NodeResizer color="#1e293b" isVisible={!!selected}
+        minWidth={500} minHeight={400}
+        lineStyle={{ borderWidth: 3 }}
+        handleStyle={{ width: 10, height: 10, borderRadius: 2 }}
+      />
+      <Box sx={{
+        width: "100%", height: "100%",
+        border: "3px solid #1e293b",
+        borderRadius: "12px",
+        bgcolor: "rgba(30,41,59,0.025)",
+        position: "relative",
+      }}>
+        <Box sx={{
+          position: "absolute", top: -20, left: 16,
+          bgcolor: "#1e293b",
+          px: 1.5, py: 0.25, borderRadius: "6px",
+          display: "flex", alignItems: "center", gap: 0.75,
+        }}>
+          <Typography sx={{
+            fontSize: 13, fontWeight: 800, color: "#f1f5f9",
+            whiteSpace: "nowrap", letterSpacing: "0.03em",
+          }}>
+            🏢 {label}
+          </Typography>
+        </Box>
+      </Box>
+    </>
+  );
+}
+
 // ── Platform (Level 1) node ───────────────────────────────────────────────────
 
 const PLATFORM_STYLE: Record<string, { border: string; bg: string }> = {
@@ -355,10 +391,10 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
   );
 }
 
-const NODE_TYPES: NodeTypes = { component: ComponentNode, boundary: BoundaryNode, platform: PlatformNode };
+const NODE_TYPES: NodeTypes = { component: ComponentNode, boundary: BoundaryNode, platform: PlatformNode, datacenter: DatacenterNode };
 const EDGE_TYPES: EdgeTypes = { dataflow: DataFlowEdge };
 
-// ── Three-pass dagre layout (platform → tier → component) ────────────────────
+// ── Multi-pass dagre layout (datacenter → platform → tier → component) ───────
 
 // Padding inside tier boxes
 const PAD_COMP_H   = 28;  // horizontal pad each side
@@ -368,6 +404,10 @@ const PAD_COMP_BOT = 20;
 const PAD_TIER_H   = 32;
 const PAD_TIER_TOP = 44;  // top pad (platform label space)
 const PAD_TIER_BOT = 28;
+// Padding inside datacenter boxes (used only when DC level is active)
+const PAD_PLAT_H   = 48;
+const PAD_PLAT_TOP = 60;  // room for DC label chip
+const PAD_PLAT_BOT = 40;
 
 function buildGraph(
   components: ComponentInput[],
@@ -395,7 +435,7 @@ function buildGraph(
   components.forEach((c) => { shapeOf[c.id] = toDfdShape(c.type, c.dfd_type); });
   const compIdSet = new Set(components.map((c) => c.id));
 
-  // ── Zone/platform normalizers ──────────────────────────────────────────────
+  // ── Normalizers ────────────────────────────────────────────────────────────
 
   function normPlatform(p: string): string {
     const l = (p || "").toLowerCase().trim();
@@ -423,7 +463,6 @@ function buildGraph(
     return z;
   }
 
-  // Derive platform from explicit field; fallback to trust_zone for old data
   function getPlatform(c: ComponentInput): string {
     if (c.platform) return normPlatform(c.platform);
     const z = (c.trust_zone || "").toLowerCase();
@@ -434,36 +473,62 @@ function buildGraph(
   }
 
   function getTier(c: ComponentInput): string {
-    // Old data where trust_zone was used as platform gets mapped to a sensible default tier
     const z = (c.trust_zone || "").toLowerCase();
     if (z === "vendor cloud") return "Application Tier";
     if (z === "internet" && !c.is_threat_actor) return "Application Tier";
     return normTier(c.trust_zone || "");
   }
 
-  // Group key = "platform::tier"
+  function getDatacenter(c: ComponentInput): string {
+    return (c.datacenter || "").trim();
+  }
+
+  // ── Decide whether to activate datacenter level ────────────────────────────
+  // Only activate when 2+ distinct non-empty datacenter values exist.
+
+  const uniqueDCVals = Array.from(new Set(components.map(c => getDatacenter(c))));
+  const useDatacenterLevel = uniqueDCVals.filter(Boolean).length >= 2;
+
+  // Separator unlikely to appear in user-entered names
+  const S = "\x01";
+  function mkGKey(c: ComponentInput): string {
+    return `${getDatacenter(c)}${S}${getPlatform(c)}${S}${getTier(c)}`;
+  }
+  function mkPKey(dc: string, plat: string): string { return `${dc}${S}${plat}`; }
+
+  // ── Group: (dc, platform, tier) → components ──────────────────────────────
+
   const groupMap = new Map<string, ComponentInput[]>();
   components.forEach((c) => {
-    const key = `${getPlatform(c)}::${getTier(c)}`;
-    if (!groupMap.has(key)) groupMap.set(key, []);
-    groupMap.get(key)!.push(c);
+    const k = mkGKey(c);
+    if (!groupMap.has(k)) groupMap.set(k, []);
+    groupMap.get(k)!.push(c);
   });
 
-  // Map platform → set of group keys
-  const platformMap = new Map<string, Set<string>>();
-  groupMap.forEach((_, key) => {
-    const platform = key.split("::")[0];
-    if (!platformMap.has(platform)) platformMap.set(platform, new Set());
-    platformMap.get(platform)!.add(key);
+  // platKeyMap: "dc\x01platform" → Set<groupKey>
+  const platKeyMap = new Map<string, Set<string>>();
+  groupMap.forEach((_, gk) => {
+    const [dc, plat] = gk.split(S);
+    const pk = mkPKey(dc, plat);
+    if (!platKeyMap.has(pk)) platKeyMap.set(pk, new Set());
+    platKeyMap.get(pk)!.add(gk);
   });
 
-  // ── Pass 1: layout components within each (platform, tier) group ───────────
+  // dcMap: dc → Set<platKey>
+  const dcMap = new Map<string, Set<string>>();
+  platKeyMap.forEach((_, pk) => {
+    const dc = pk.split(S)[0];
+    if (!dcMap.has(dc)) dcMap.set(dc, new Set());
+    dcMap.get(dc)!.add(pk);
+  });
+
+  // ── Pass 1: layout components within each (dc, platform, tier) group ───────
 
   type GroupLayout = { nodes: Record<string, { rx: number; ry: number }>; w: number; h: number };
   const groupLayouts = new Map<string, GroupLayout>();
 
-  groupMap.forEach((comps, key) => {
-    const tier = key.split("::")[1];
+  groupMap.forEach((comps, gk) => {
+    const tier = gk.split(S)[2];
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: "LR", nodesep: 44, ranksep: 60 });
@@ -471,14 +536,11 @@ function buildGraph(
       const d = DIM[shapeOf[c.id]] ?? DIM.process;
       g.setNode(c.id, { width: d.w + 20, height: d.h + 20 });
     });
-    // Add intra-group edges
     dataFlows.forEach((f) => {
       const fc = components.find((c) => c.id === f.from);
       const tc = components.find((c) => c.id === f.to);
       if (!fc || !tc) return;
-      if (getPlatform(fc) === key.split("::")[0] && getTier(fc) === tier &&
-          getPlatform(tc) === key.split("::")[0] && getTier(tc) === tier &&
-          compIdSet.has(f.from) && compIdSet.has(f.to)) {
+      if (mkGKey(fc) === gk && mkGKey(tc) === gk && compIdSet.has(f.from) && compIdSet.has(f.to)) {
         try { g.setEdge(f.from, f.to); } catch { /* ignore */ }
       }
     });
@@ -505,156 +567,312 @@ function buildGraph(
       };
     });
 
-    groupLayouts.set(key, {
+    groupLayouts.set(gk, {
       nodes: rNodes,
       w: (maxX - minX) + PAD_COMP_H * 2,
       h: (maxY - minY) + PAD_COMP_TOP + PAD_COMP_BOT,
     });
   });
 
-  // ── Pass 2: layout tier boxes within each platform ─────────────────────────
+  // ── Pass 2: layout tier boxes within each (dc, platform) ──────────────────
 
-  type PlatformLayout = { tiers: Record<string, { rx: number; ry: number }>; w: number; h: number };
-  const platformLayoutMap = new Map<string, PlatformLayout>();
+  type PlatLayout = { tiers: Record<string, { rx: number; ry: number }>; w: number; h: number };
+  const platLayoutMap = new Map<string, PlatLayout>();
 
-  platformMap.forEach((groupKeys, platform) => {
+  platKeyMap.forEach((groupKeys, pk) => {
     const g = new dagre.graphlib.Graph();
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({ rankdir: "TB", nodesep: 36, ranksep: 48 });
-    groupKeys.forEach((key) => {
-      const gl = groupLayouts.get(key)!;
-      g.setNode(key, { width: gl.w, height: gl.h });
+    groupKeys.forEach((gk) => {
+      const gl = groupLayouts.get(gk)!;
+      g.setNode(gk, { width: gl.w, height: gl.h });
     });
     const seenTE = new Set<string>();
     dataFlows.forEach((f) => {
       const fc = components.find((c) => c.id === f.from);
       const tc = components.find((c) => c.id === f.to);
       if (!fc || !tc) return;
-      const fP = getPlatform(fc), tP = getPlatform(tc);
-      if (fP !== platform || tP !== platform) return;
-      const fKey = `${fP}::${getTier(fc)}`, tKey = `${tP}::${getTier(tc)}`;
-      if (fKey === tKey) return;
-      const ek = `${fKey}→${tKey}`;
-      if (!seenTE.has(ek) && groupKeys.has(fKey) && groupKeys.has(tKey)) {
+      const fPK = mkPKey(getDatacenter(fc), getPlatform(fc));
+      const tPK = mkPKey(getDatacenter(tc), getPlatform(tc));
+      if (fPK !== pk || tPK !== pk) return;
+      const fGK = mkGKey(fc), tGK = mkGKey(tc);
+      if (fGK === tGK) return;
+      const ek = `${fGK}→${tGK}`;
+      if (!seenTE.has(ek) && groupKeys.has(fGK) && groupKeys.has(tGK)) {
         seenTE.add(ek);
-        try { g.setEdge(fKey, tKey); } catch { /* ignore */ }
+        try { g.setEdge(fGK, tGK); } catch { /* ignore */ }
       }
     });
     dagre.layout(g);
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    groupKeys.forEach((key) => {
-      const pos = g.node(key);
+    groupKeys.forEach((gk) => {
+      const pos = g.node(gk);
       if (!pos) return;
-      const gl = groupLayouts.get(key)!;
+      const gl = groupLayouts.get(gk)!;
       minX = Math.min(minX, pos.x - gl.w / 2); minY = Math.min(minY, pos.y - gl.h / 2);
       maxX = Math.max(maxX, pos.x + gl.w / 2); maxY = Math.max(maxY, pos.y + gl.h / 2);
     });
     if (minX === Infinity) { minX = 0; minY = 0; maxX = 200; maxY = 150; }
 
     const tiers: Record<string, { rx: number; ry: number }> = {};
-    groupKeys.forEach((key) => {
-      const pos = g.node(key);
+    groupKeys.forEach((gk) => {
+      const pos = g.node(gk);
       if (!pos) return;
-      const gl = groupLayouts.get(key)!;
-      tiers[key] = {
+      const gl = groupLayouts.get(gk)!;
+      tiers[gk] = {
         rx: pos.x - gl.w / 2 - minX + PAD_TIER_H,
         ry: pos.y - gl.h / 2 - minY + PAD_TIER_TOP,
       };
     });
 
-    platformLayoutMap.set(platform, {
+    platLayoutMap.set(pk, {
       tiers,
       w: (maxX - minX) + PAD_TIER_H * 2,
       h: (maxY - minY) + PAD_TIER_TOP + PAD_TIER_BOT,
     });
   });
 
-  // ── Pass 3: layout platform boxes ─────────────────────────────────────────
-
-  const platG = new dagre.graphlib.Graph();
-  platG.setDefaultEdgeLabel(() => ({}));
-  platG.setGraph({ rankdir: "LR", nodesep: 64, ranksep: 88, marginx: 48, marginy: 48 });
-  const platforms = Array.from(platformMap.keys());
-  platforms.forEach((p) => {
-    const pl = platformLayoutMap.get(p)!;
-    platG.setNode(p, { width: pl.w, height: pl.h });
-  });
-  const seenPE = new Set<string>();
-  dataFlows.forEach((f) => {
-    const fc = components.find((c) => c.id === f.from);
-    const tc = components.find((c) => c.id === f.to);
-    if (!fc || !tc) return;
-    const fp = getPlatform(fc), tp = getPlatform(tc);
-    if (fp === tp) return;
-    const ek = `${fp}→${tp}`;
-    if (!seenPE.has(ek)) { seenPE.add(ek); try { platG.setEdge(fp, tp); } catch { /* ignore */ } }
-  });
-  dagre.layout(platG);
-
   // ── Assemble React Flow nodes ──────────────────────────────────────────────
 
   const rfNodes: Node[] = [];
 
-  platforms.forEach((platform, pi) => {
-    const pl = platformLayoutMap.get(platform)!;
-    const pPos = platG.node(platform);
-    if (!pPos) return;
+  if (useDatacenterLevel) {
+    // ── Pass 3: layout platform boxes within each datacenter ─────────────────
 
-    const pId = `platform-${pi}`;
-    rfNodes.push({
-      id: pId, type: "platform",
-      position: { x: pPos.x - pl.w / 2, y: pPos.y - pl.h / 2 },
-      style: { width: pl.w, height: pl.h },
-      data: { label: platform },
-      zIndex: -2, draggable: true, selectable: true,
-    } as Node);
+    type DCLayout = { plats: Record<string, { rx: number; ry: number }>; w: number; h: number };
+    const dcLayoutMap = new Map<string, DCLayout>();
 
-    Array.from(platformMap.get(platform)!).forEach((groupKey, ti) => {
-      const gl = groupLayouts.get(groupKey)!;
-      const tierPos = pl.tiers[groupKey];
-      if (!tierPos) return;
-      const tier = groupKey.split("::")[1];
+    dcMap.forEach((platKeys, dc) => {
+      const g = new dagre.graphlib.Graph();
+      g.setDefaultEdgeLabel(() => ({}));
+      g.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 56 });
+      platKeys.forEach((pk) => {
+        const pl = platLayoutMap.get(pk)!;
+        g.setNode(pk, { width: pl.w, height: pl.h });
+      });
+      const seenPE = new Set<string>();
+      dataFlows.forEach((f) => {
+        const fc = components.find((c) => c.id === f.from);
+        const tc = components.find((c) => c.id === f.to);
+        if (!fc || !tc) return;
+        const fDC = getDatacenter(fc), tDC = getDatacenter(tc);
+        if (fDC !== dc || tDC !== dc) return;
+        const fPK = mkPKey(fDC, getPlatform(fc));
+        const tPK = mkPKey(tDC, getPlatform(tc));
+        if (fPK === tPK) return;
+        const ek = `${fPK}→${tPK}`;
+        if (!seenPE.has(ek) && platKeys.has(fPK) && platKeys.has(tPK)) {
+          seenPE.add(ek);
+          try { g.setEdge(fPK, tPK); } catch { /* ignore */ }
+        }
+      });
+      dagre.layout(g);
 
-      const tId = `tier-${pi}-${ti}`;
-      rfNodes.push({
-        id: tId, type: "boundary",
-        parentId: pId,
-        extent: "parent" as const,
-        position: { x: tierPos.rx, y: tierPos.ry },
-        style: { width: gl.w, height: gl.h },
-        data: { label: tier },
-        zIndex: -1, draggable: true, selectable: true,
-      } as Node);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      platKeys.forEach((pk) => {
+        const pos = g.node(pk);
+        if (!pos) return;
+        const pl = platLayoutMap.get(pk)!;
+        minX = Math.min(minX, pos.x - pl.w / 2); minY = Math.min(minY, pos.y - pl.h / 2);
+        maxX = Math.max(maxX, pos.x + pl.w / 2); maxY = Math.max(maxY, pos.y + pl.h / 2);
+      });
+      if (minX === Infinity) { minX = 0; minY = 0; maxX = 300; maxY = 200; }
 
-      (groupMap.get(groupKey) || []).forEach((c) => {
-        const rl = gl.nodes[c.id];
-        if (!rl) return;
-        const td = threatMap.get(c.id);
-        rfNodes.push({
-          id: c.id, type: "component",
-          parentId: tId,
-          extent: "parent" as const,
-          position: { x: rl.rx, y: rl.ry },
-          data: {
-            label: c.name,
-            dfdShape: shapeOf[c.id],
-            compType: c.type || "other",
-            isThreatActor: !!c.is_threat_actor,
-            threatActorType: c.threat_actor_type || null,
-            platform,
-            trustZone: tier,
-            criticality: c.criticality || "",
-            environment: c.environment || "",
-            datacenter: c.datacenter || "",
-            threatCount: td?.count ?? 0,
-            maxSeverity: td?.maxSev ?? null,
-          },
-          draggable: true, zIndex: 1,
-        } as Node);
+      const plats: Record<string, { rx: number; ry: number }> = {};
+      platKeys.forEach((pk) => {
+        const pos = g.node(pk);
+        if (!pos) return;
+        const pl = platLayoutMap.get(pk)!;
+        plats[pk] = {
+          rx: pos.x - pl.w / 2 - minX + PAD_PLAT_H,
+          ry: pos.y - pl.h / 2 - minY + PAD_PLAT_TOP,
+        };
+      });
+
+      dcLayoutMap.set(dc, {
+        plats,
+        w: (maxX - minX) + PAD_PLAT_H * 2,
+        h: (maxY - minY) + PAD_PLAT_TOP + PAD_PLAT_BOT,
       });
     });
-  });
+
+    // ── Pass 4: layout datacenter boxes ────────────────────────────────────────
+
+    const dcG = new dagre.graphlib.Graph();
+    dcG.setDefaultEdgeLabel(() => ({}));
+    dcG.setGraph({ rankdir: "LR", nodesep: 72, ranksep: 100, marginx: 48, marginy: 48 });
+    const dcs = Array.from(dcMap.keys());
+    dcs.forEach((dc) => {
+      const dl = dcLayoutMap.get(dc)!;
+      dcG.setNode(dc, { width: dl.w, height: dl.h });
+    });
+    const seenDCE = new Set<string>();
+    dataFlows.forEach((f) => {
+      const fc = components.find((c) => c.id === f.from);
+      const tc = components.find((c) => c.id === f.to);
+      if (!fc || !tc) return;
+      const fDC = getDatacenter(fc), tDC = getDatacenter(tc);
+      if (fDC === tDC) return;
+      const ek = `${fDC}→${tDC}`;
+      if (!seenDCE.has(ek)) {
+        seenDCE.add(ek);
+        try { dcG.setEdge(fDC, tDC); } catch { /* ignore */ }
+      }
+    });
+    dagre.layout(dcG);
+
+    // Assemble: DC → Platform → Tier → Component
+    dcs.forEach((dc, di) => {
+      const dl = dcLayoutMap.get(dc)!;
+      const dcPos = dcG.node(dc);
+      if (!dcPos) return;
+
+      const dcId = `dc-${di}`;
+      rfNodes.push({
+        id: dcId, type: "datacenter",
+        position: { x: dcPos.x - dl.w / 2, y: dcPos.y - dl.h / 2 },
+        style: { width: dl.w, height: dl.h },
+        data: { label: dc || "Shared Infrastructure" },
+        zIndex: -3, draggable: true, selectable: true,
+      } as Node);
+
+      Array.from(dcMap.get(dc)!).forEach((pk, pi) => {
+        const pl = platLayoutMap.get(pk)!;
+        const platPos = dl.plats[pk];
+        if (!platPos) return;
+        const platform = pk.split(S)[1];
+
+        const pId = `platform-${di}-${pi}`;
+        rfNodes.push({
+          id: pId, type: "platform",
+          parentId: dcId,
+          extent: "parent" as const,
+          position: { x: platPos.rx, y: platPos.ry },
+          style: { width: pl.w, height: pl.h },
+          data: { label: platform },
+          zIndex: -2, draggable: true, selectable: true,
+        } as Node);
+
+        Array.from(platKeyMap.get(pk)!).forEach((gk, ti) => {
+          const gl = groupLayouts.get(gk)!;
+          const tierPos = pl.tiers[gk];
+          if (!tierPos) return;
+          const tier = gk.split(S)[2];
+
+          const tId = `tier-${di}-${pi}-${ti}`;
+          rfNodes.push({
+            id: tId, type: "boundary",
+            parentId: pId,
+            extent: "parent" as const,
+            position: { x: tierPos.rx, y: tierPos.ry },
+            style: { width: gl.w, height: gl.h },
+            data: { label: tier },
+            zIndex: -1, draggable: true, selectable: true,
+          } as Node);
+
+          (groupMap.get(gk) || []).forEach((c) => {
+            const rl = gl.nodes[c.id];
+            if (!rl) return;
+            const td = threatMap.get(c.id);
+            rfNodes.push({
+              id: c.id, type: "component",
+              parentId: tId,
+              extent: "parent" as const,
+              position: { x: rl.rx, y: rl.ry },
+              data: {
+                label: c.name, dfdShape: shapeOf[c.id], compType: c.type || "other",
+                isThreatActor: !!c.is_threat_actor, threatActorType: c.threat_actor_type || null,
+                platform, trustZone: tier, criticality: c.criticality || "",
+                environment: c.environment || "", datacenter: c.datacenter || "",
+                threatCount: td?.count ?? 0, maxSeverity: td?.maxSev ?? null,
+              },
+              draggable: true, zIndex: 1,
+            } as Node);
+          });
+        });
+      });
+    });
+
+  } else {
+    // ── Pass 3 (no DC level): layout platform boxes directly ──────────────────
+
+    const platG = new dagre.graphlib.Graph();
+    platG.setDefaultEdgeLabel(() => ({}));
+    platG.setGraph({ rankdir: "LR", nodesep: 64, ranksep: 88, marginx: 48, marginy: 48 });
+    const platKeys = Array.from(platKeyMap.keys());
+    platKeys.forEach((pk) => {
+      const pl = platLayoutMap.get(pk)!;
+      platG.setNode(pk, { width: pl.w, height: pl.h });
+    });
+    const seenPE = new Set<string>();
+    dataFlows.forEach((f) => {
+      const fc = components.find((c) => c.id === f.from);
+      const tc = components.find((c) => c.id === f.to);
+      if (!fc || !tc) return;
+      const fPK = mkPKey(getDatacenter(fc), getPlatform(fc));
+      const tPK = mkPKey(getDatacenter(tc), getPlatform(tc));
+      if (fPK === tPK) return;
+      const ek = `${fPK}→${tPK}`;
+      if (!seenPE.has(ek)) { seenPE.add(ek); try { platG.setEdge(fPK, tPK); } catch { /* ignore */ } }
+    });
+    dagre.layout(platG);
+
+    // Assemble: Platform → Tier → Component (existing behavior)
+    platKeys.forEach((pk, pi) => {
+      const pl = platLayoutMap.get(pk)!;
+      const pPos = platG.node(pk);
+      if (!pPos) return;
+      const platform = pk.split(S)[1];
+
+      const pId = `platform-${pi}`;
+      rfNodes.push({
+        id: pId, type: "platform",
+        position: { x: pPos.x - pl.w / 2, y: pPos.y - pl.h / 2 },
+        style: { width: pl.w, height: pl.h },
+        data: { label: platform },
+        zIndex: -2, draggable: true, selectable: true,
+      } as Node);
+
+      Array.from(platKeyMap.get(pk)!).forEach((gk, ti) => {
+        const gl = groupLayouts.get(gk)!;
+        const tierPos = pl.tiers[gk];
+        if (!tierPos) return;
+        const tier = gk.split(S)[2];
+
+        const tId = `tier-${pi}-${ti}`;
+        rfNodes.push({
+          id: tId, type: "boundary",
+          parentId: pId,
+          extent: "parent" as const,
+          position: { x: tierPos.rx, y: tierPos.ry },
+          style: { width: gl.w, height: gl.h },
+          data: { label: tier },
+          zIndex: -1, draggable: true, selectable: true,
+        } as Node);
+
+        (groupMap.get(gk) || []).forEach((c) => {
+          const rl = gl.nodes[c.id];
+          if (!rl) return;
+          const td = threatMap.get(c.id);
+          rfNodes.push({
+            id: c.id, type: "component",
+            parentId: tId,
+            extent: "parent" as const,
+            position: { x: rl.rx, y: rl.ry },
+            data: {
+              label: c.name, dfdShape: shapeOf[c.id], compType: c.type || "other",
+              isThreatActor: !!c.is_threat_actor, threatActorType: c.threat_actor_type || null,
+              platform, trustZone: tier, criticality: c.criticality || "",
+              environment: c.environment || "", datacenter: c.datacenter || "",
+              threatCount: td?.count ?? 0, maxSeverity: td?.maxSev ?? null,
+            },
+            draggable: true, zIndex: 1,
+          } as Node);
+        });
+      });
+    });
+  }
 
   // ── Edges ──────────────────────────────────────────────────────────────────
 
@@ -813,6 +1031,10 @@ function DfdLegend() {
   return (
     <Box sx={{ mt: 1.5, px: 0.5 }}>
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, mb: 1, alignItems: "center" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Box sx={{ width: 32, height: 20, border: "3px solid #1e293b", borderRadius: "3px", flexShrink: 0 }} />
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>Datacenter</Typography>
+        </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
           <BugReport sx={{ fontSize: 16, color: "#EA4335" }} />
           <Typography variant="caption" sx={{ color: "text.secondary" }}>Threat Actor</Typography>
