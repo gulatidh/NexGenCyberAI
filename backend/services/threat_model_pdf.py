@@ -856,10 +856,10 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
 
     # ── Components tab ─────────────────────────────────────────────────────────
     _DATA_CLASS_COLOR = {
-        "public": "#94a3b8", "internal": "#7dd3fc", "confidential": "#fb923c",
-        "highly_confidential": "#f87171", "secret": "#c084fc",
+        "public": "#64748b", "internal": "#0369a1", "confidential": "#d97706",
+        "highly_confidential": "#b91c1c", "secret": "#7c3aed",
     }
-    _BIA_COLOR = {"critical": "#ea4335", "high": "#ff9800", "medium": "#fbbc04", "low": "#34a853"}
+    _BIA_COLOR = {"critical": "#b91c1c", "high": "#c2410c", "medium": "#92400e", "low": "#166534"}
     threatened_ids = {str(t.get("asset_id")) for t in threats}
 
     def _comp_row(c: Dict[str, Any]) -> str:
@@ -867,8 +867,8 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         dc = (c.get("data_classification") or "").lower()
         bia = (c.get("bia_impact") or "").lower()
         bia_j = c.get("bia_justification") or ""
-        dc_style = f"color:{_DATA_CLASS_COLOR.get(dc,'#94a3b8')};font-weight:700;font-size:11px;"
-        bia_style = f"color:{_BIA_COLOR.get(bia,'#94a3b8')};font-weight:700;font-size:11px;"
+        dc_style = f"color:{_DATA_CLASS_COLOR.get(dc,'#64748b')};font-weight:700;font-size:11px;"
+        bia_style = f"color:{_BIA_COLOR.get(bia,'#64748b')};font-weight:700;font-size:11px;"
         cov = ('<span class="warn-pill">No threats — review</span>'
                if cid not in threatened_ids else '<span class="ok-pill">Covered</span>')
         env_dc = " · ".join(x for x in [c.get("environment", ""), c.get("datacenter", "")] if x)
@@ -887,16 +887,16 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     comp_rows = "".join(_comp_row(c) for c in components) or "<tr><td colspan='8' class='muted'>No components.</td></tr>"
 
     _DATA_LABEL_STYLE = {
-        "pii": "color:#f87171;font-weight:700;", "financial": "color:#fb923c;font-weight:700;",
-        "credentials": "color:#c084fc;font-weight:700;", "audit_logs": "color:#7dd3fc;font-weight:700;",
-        "session_tokens": "color:#c084fc;font-weight:700;", "highly_confidential": "color:#f87171;font-weight:700;",
+        "pii": "color:#b91c1c;font-weight:700;", "financial": "color:#c2410c;font-weight:700;",
+        "credentials": "color:#7c3aed;font-weight:700;", "audit_logs": "color:#0369a1;font-weight:700;",
+        "session_tokens": "color:#7c3aed;font-weight:700;", "highly_confidential": "color:#b91c1c;font-weight:700;",
     }
 
     def _flow_row(f: Dict[str, Any]) -> str:
         data_label = _h(f.get("data") or "—")
         data_style = _DATA_LABEL_STYLE.get((f.get("data") or "").lower(), "")
         boundary_flag = '<span class="warn-pill">⚠ Crosses boundary</span>' if f.get("trust_boundary_crossing") else ""
-        atk_flag = '<span class="pill" style="background:rgba(234,67,53,.2);color:#ea4335;font-size:10px;">Attack vector</span>' if f.get("is_attack_vector") else ""
+        atk_flag = '<span class="pill" style="background:#fee2e2;color:#b91c1c;font-size:10px;border:1px solid #fca5a5;">Attack vector</span>' if f.get("is_attack_vector") else ""
         return (
             f"<tr>"
             f"<td>{_h(comp_by_id.get(str(f.get('from')),{{}}).get('name') or f.get('from'))}</td>"
@@ -911,7 +911,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
 
     components_html = f"""
 <h3>Components ({len(components)})</h3>
-<p class="muted" style="margin-bottom:8px;">Data classification: <span style="color:#94a3b8;">Public</span> · <span style="color:#7dd3fc;">Internal</span> · <span style="color:#fb923c;">Confidential</span> · <span style="color:#f87171;">Highly Confidential</span> · <span style="color:#c084fc;">Secret</span></p>
+<p class="muted" style="margin-bottom:8px;">Data classification: <span style="color:#64748b;font-weight:700;">Public</span> · <span style="color:#0369a1;font-weight:700;">Internal</span> · <span style="color:#d97706;font-weight:700;">Confidential</span> · <span style="color:#b91c1c;font-weight:700;">Highly Confidential</span> · <span style="color:#7c3aed;font-weight:700;">Secret</span></p>
 <table><thead><tr><th>Name</th><th>Type / Environment</th><th>Trust Zone</th><th>Criticality</th><th>Data Classification</th><th>BIA Impact</th><th>Coverage</th><th>Notes</th></tr></thead>
 <tbody>{comp_rows}</tbody></table>
 <h3>Data Flows ({len(data_flows)})</h3>
@@ -958,24 +958,24 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     _SEV_WEIGHT = {"critical": 3.0, "high": 2.0, "medium": 1.0, "low": 0.5}
     _CRIT_WEIGHT = {"critical": 2.0, "high": 1.5, "medium": 1.0, "low": 0.5}
     scoring_legend = """
-<div class="info-box" style="background:#1e1e30;border:1px solid #2d2d45;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
+<div class="info-box" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin-bottom:16px;">
   <div class="section-label" style="margin-bottom:8px;">Risk Scoring Model — DREAD-derived Priority Formula</div>
   <p style="margin-bottom:6px;">Priority Score (P) = <strong>Severity Weight × Likelihood (1-10) × Impact (1-10) × Asset Criticality Weight</strong></p>
   <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:8px;">
     <div><div class="section-label">Severity Weight</div>
-      <table style="margin:4px 0;"><tr><td style="color:#ea4335;font-weight:700;">Critical</td><td style="padding-left:12px;">× 3.0</td></tr>
-      <tr><td style="color:#ff9800;font-weight:700;">High</td><td style="padding-left:12px;">× 2.0</td></tr>
-      <tr><td style="color:#fbbc04;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
-      <tr><td style="color:#34a853;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
+      <table style="margin:4px 0;"><tr><td style="color:#b91c1c;font-weight:700;">Critical</td><td style="padding-left:12px;">× 3.0</td></tr>
+      <tr><td style="color:#c2410c;font-weight:700;">High</td><td style="padding-left:12px;">× 2.0</td></tr>
+      <tr><td style="color:#92400e;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
+      <tr><td style="color:#166534;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
     <div><div class="section-label">Asset Criticality Weight</div>
-      <table style="margin:4px 0;"><tr><td style="color:#ea4335;font-weight:700;">Critical</td><td style="padding-left:12px;">× 2.0</td></tr>
-      <tr><td style="color:#ff9800;font-weight:700;">High</td><td style="padding-left:12px;">× 1.5</td></tr>
-      <tr><td style="color:#fbbc04;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
-      <tr><td style="color:#34a853;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
+      <table style="margin:4px 0;"><tr><td style="color:#b91c1c;font-weight:700;">Critical</td><td style="padding-left:12px;">× 2.0</td></tr>
+      <tr><td style="color:#c2410c;font-weight:700;">High</td><td style="padding-left:12px;">× 1.5</td></tr>
+      <tr><td style="color:#92400e;font-weight:700;">Medium</td><td style="padding-left:12px;">× 1.0</td></tr>
+      <tr><td style="color:#166534;font-weight:700;">Low</td><td style="padding-left:12px;">× 0.5</td></tr></table></div>
     <div><div class="section-label">Risk Register Score</div><p style="margin-top:6px;">= Likelihood × Impact ÷ 10</p>
-      <p style="margin-top:4px;color:#6b7280;font-size:11px;">Used in the risk register. Max score = 10 (L=10, I=10).</p></div>
+      <p style="margin-top:4px;color:#64748b;font-size:11px;">Used in the risk register. Max score = 10 (L=10, I=10).</p></div>
     <div><div class="section-label">Grounding</div>
-      <p style="margin-top:6px;"><span class="pill pill-red">UNGROUNDED</span> = no CVE, finding, or ATT&CK evidence cited.</p>
+      <p style="margin-top:6px;"><span class="pill pill-red">UNGROUNDED</span> = no CVE, finding, or ATT&amp;CK evidence cited.</p>
       <p>Ungrounded threats are retained but demoted — treat as hypothetical until evidence is attached.</p></div>
   </div>
 </div>"""
@@ -1007,7 +1007,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
             blast_names = [comp_by_id.get(bid, {}).get("name") or bid for bid in blast]
             narrative = t.get("attack_narrative") or ""
             tech_pills = "".join(
-                f"<span class='pill' style='background:#1e293b;color:#94a3b8;font-size:10px;margin:1px;'>{_h(tech)}</span>"
+                f"<span class='pill' style='background:#f1f5f9;color:#475569;font-size:10px;margin:1px;border:1px solid #e2e8f0;'>{_h(tech)}</span>"
                 for tech in (techniques + capecs + cwes)[:8]
             )
             blast_text = (
@@ -1016,12 +1016,12 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
                 if blast_names else ""
             )
             narrative_block = (
-                f"<div style='margin-top:8px;padding:8px 10px;background:#1a1a28;border-radius:4px;font-size:12px;'>"
+                f"<div style='margin-top:8px;padding:8px 10px;background:#f1f5f9;border-radius:4px;font-size:12px;border-left:3px solid #cbd5e1;'>"
                 f"<div class='section-label' style='margin-bottom:4px;'>Attack Narrative</div>"
-                f"<p style='color:#cbd5e1;'>{_h(narrative)}</p></div>"
+                f"<p style='color:#334155;'>{_h(narrative)}</p></div>"
                 if narrative else ""
             )
-            threat_blocks.append(f"""<div class="threat-card" style="border-left:3px solid {fg}; background:{bg}20;">
+            threat_blocks.append(f"""<div class="threat-card" style="border-left:3px solid {fg}; background:{bg};">
   <div class="threat-meta">
     <span class="pill" style="background:{bg};color:{fg};">{sev.upper()}</span>
     <span class="pill pill-grey">{_h((t.get('category') or '').replace('_',' ').title())}</span>
@@ -1082,15 +1082,15 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         arch_label = _ARCH_ICONS.get(arch, _h(arch.replace("_", " ").title()) if arch else "")
         detail = m.get("implementation_detail") or ""
         return (
-            f"<tr><td style='color:#7dd3fc;font-weight:700;'>{_h(m.get('threat_id'))}</td>"
+            f"<tr><td style='color:#1d4ed8;font-weight:700;font-family:monospace;'>{_h(m.get('threat_id'))}</td>"
             f"<td><strong>{_h(m.get('action'))}</strong>"
-            f"{'<div style=\"margin-top:6px;color:#94a3b8;font-size:11.5px;\">' + _h(detail) + '</div>' if detail else ''}"
+            f"{'<div style=\"margin-top:6px;color:#475569;font-size:11.5px;\">' + _h(detail) + '</div>' if detail else ''}"
             f"{'<div style=\"margin-top:4px;\"><span class=\"pill pill-blue\" style=\"font-size:10px;\">' + arch_label + '</span></div>' if arch_label else ''}"
             f"</td>"
             f"<td>{_h(m.get('owner_role') or m.get('owner') or '—')}</td>"
             f"<td><span class='pill pill-grey'>{_h(m.get('status','open'))}</span></td>"
             f"<td style='font-size:11px;'>{ctrl}"
-            f"{'<br/><span style=\"color:#fb923c;\">' + _h(reg_text) + '</span>' if reg_text else ''}"
+            f"{'<br/><span style=\"color:#c2410c;font-size:11px;\">' + _h(reg_text) + '</span>' if reg_text else ''}"
             f"</td></tr>"
         )
 
@@ -1114,7 +1114,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         maturity_html = "<p class='muted'>No maturity data.</p>"
 
     # ── Threat Actors (Adversary Profiles) tab ────────────────────────────────
-    _SOPH_COLOR = {"high": "#ea4335", "medium": "#ff9800", "low": "#34a853"}
+    _SOPH_COLOR = {"high": "#b91c1c", "medium": "#c2410c", "low": "#166534"}
     _MOTIV_LABEL = {
         "espionage": "State / Corporate Espionage", "financial": "Financial Gain",
         "disruption": "Service Disruption / Sabotage", "activism": "Hacktivism",
@@ -1125,21 +1125,21 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         actor_blocks = []
         for ap in adversary_profiles:
             soph = (ap.get("sophistication") or "medium").lower()
-            soph_color = _SOPH_COLOR.get(soph, "#94a3b8")
+            soph_color = _SOPH_COLOR.get(soph, "#64748b")
             motiv_raw = (ap.get("motivation") or "unknown").lower()
             motiv_label = _MOTIV_LABEL.get(motiv_raw, motiv_raw.replace("_", " ").title())
             techniques = ap.get("likely_techniques") or []
             tech_pills = "".join(
-                f"<span class='pill' style='background:#1e293b;color:#7dd3fc;font-size:10px;margin:1px;'>ATT&amp;CK {_h(t)}</span>"
+                f"<span class='pill' style='background:#dbeafe;color:#1d4ed8;font-size:10px;margin:1px;border:1px solid #bfdbfe;'>ATT&amp;CK {_h(t)}</span>"
                 for t in techniques[:10]
             )
             targeted = ap.get("targeted_assets") or []
             target_names = [comp_by_id.get(tid, {}).get("name") or tid for tid in targeted]
             threat_ids = ap.get("threat_ids") or []
             actor_blocks.append(f"""
-<div class="threat-card" style="border-left:3px solid {soph_color}; background:#1e1e3020; margin:12px 0;">
+<div class="threat-card" style="border-left:3px solid {soph_color}; background:#f8fafc; margin:12px 0;">
   <div class="threat-meta">
-    <span class="pill" style="background:#1e293b;color:{soph_color};font-weight:700;">{soph.upper()} SOPHISTICATION</span>
+    <span class="pill" style="background:#f1f5f9;color:{soph_color};font-weight:700;border:1px solid #e2e8f0;">{soph.upper()} SOPHISTICATION</span>
     <span class="pill pill-grey">{_h((ap.get('type') or '').replace('_',' ').title())}</span>
     <span class="pill pill-blue">L{_h(str(ap.get('likelihood','—')))}/10</span>
   </div>
@@ -1191,7 +1191,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
     )
 
     scope_html = f"""
-<div class="info-box" style="background:#1e1e30;border:1px solid #2d2d45;border-radius:8px;padding:16px;margin-bottom:16px;">
+<div class="info-box" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin-bottom:16px;">
   <div class="section-label">Scope Statement</div>
   <p style="margin-top:6px;">{_h(scope_stmt) if scope_stmt else 'This threat model covers the identified architectural components, trust boundaries, and data flows within the system boundary as described.'}</p>
 </div>
@@ -1238,7 +1238,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
         for fw in all_frameworks:
             ctrl_map = fw_threat_map.get(fw, {})
             ctrl_rows = "".join(
-                f"<tr><td style='font-family:monospace;color:#7dd3fc;'>{_h(ctrl)}</td>"
+                f"<tr><td style='font-family:monospace;color:#1d4ed8;font-weight:700;'>{_h(ctrl)}</td>"
                 f"<td>{' '.join('<span class=\"pill pill-blue\" style=\"font-size:10px;\">' + tid + '</span>' for tid in tids)}</td></tr>"
                 for ctrl, tids in sorted(ctrl_map.items())
             )
@@ -1296,64 +1296,64 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
   <title>{_h(title)} — NexGen Cyber AI</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
-    :root {{ --blue:#1a73e8; --red:#ea4335; --green:#34a853; --orange:#ff9800; --grey:#6b7280; }}
+    :root {{ --blue:#1a73e8; --red:#c62828; --green:#2e7d32; --orange:#e65100; --grey:#64748b; }}
     * {{ box-sizing:border-box; margin:0; padding:0; }}
-    body {{ font-family:"Segoe UI","Inter",Arial,sans-serif; background:#0f0f13; color:#e2e8f0; font-size:14px; }}
-    .topbar {{ background:#1a1a2e; border-bottom:1px solid #2d2d45; padding:12px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }}
-    .brand {{ color:var(--blue); font-weight:700; font-size:18px; }}
-    .title {{ font-weight:600; font-size:16px; color:#f1f5f9; }}
-    .meta {{ color:var(--grey); font-size:12px; }}
-    .kpi-row {{ display:flex; gap:12px; flex-wrap:wrap; padding:16px 24px; background:#141420; border-bottom:1px solid #2d2d45; }}
-    .kpi {{ background:#1e1e30; border:1px solid #2d2d45; border-radius:8px; padding:12px 18px; min-width:100px; }}
+    body {{ font-family:"Segoe UI","Inter",Arial,sans-serif; background:#ffffff; color:#0f172a; font-size:14px; }}
+    .topbar {{ background:#1a73e8; padding:12px 24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }}
+    .brand {{ color:#ffffff; font-weight:700; font-size:18px; opacity:.9; }}
+    .title {{ font-weight:600; font-size:16px; color:#ffffff; }}
+    .meta {{ color:rgba(255,255,255,.75); font-size:12px; }}
+    .kpi-row {{ display:flex; gap:12px; flex-wrap:wrap; padding:16px 24px; background:#f8fafc; border-bottom:1px solid #e2e8f0; }}
+    .kpi {{ background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:12px 18px; min-width:100px; box-shadow:0 1px 3px rgba(0,0,0,.06); }}
     .kpi-v {{ font-size:22px; font-weight:700; color:var(--blue); }}
     .kpi-l {{ font-size:11px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }}
-    .exec-summary {{ padding:12px 24px; background:#141420; border-bottom:1px solid #2d2d45; color:#94a3b8; font-size:13px; line-height:1.6; }}
-    .exec-summary strong {{ color:#e2e8f0; }}
-    .tab-nav {{ display:flex; gap:2px; background:#141420; border-bottom:1px solid #2d2d45; padding:0 24px; overflow-x:auto; }}
-    .tab-btn {{ padding:10px 18px; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--grey); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; transition:color .15s; }}
-    .tab-btn:hover {{ color:#e2e8f0; }}
+    .exec-summary {{ padding:12px 24px; background:#f0f9ff; border-bottom:1px solid #bae6fd; color:#334155; font-size:13px; line-height:1.6; }}
+    .exec-summary strong {{ color:#0f172a; }}
+    .tab-nav {{ display:flex; gap:2px; background:#f8fafc; border-bottom:2px solid #e2e8f0; padding:0 24px; overflow-x:auto; }}
+    .tab-btn {{ padding:10px 18px; background:transparent; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; color:var(--grey); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; transition:color .15s; }}
+    .tab-btn:hover {{ color:#0f172a; }}
     .tab-btn.active {{ border-bottom-color:var(--blue); color:var(--blue); }}
     .tab-panel {{ display:none; padding:24px; }}
     .tab-panel.active {{ display:block; }}
     .section-label {{ font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--grey); margin-bottom:12px; }}
-    h3 {{ font-size:14px; font-weight:700; color:#e2e8f0; margin:20px 0 8px; padding-bottom:4px; border-bottom:1px solid #2d2d45; }}
-    h4 {{ font-size:13px; font-weight:700; color:#e2e8f0; margin:8px 0 4px; }}
-    p {{ color:#94a3b8; line-height:1.6; margin:4px 0; }}
-    ul {{ padding-left:20px; color:#94a3b8; }}
+    h3 {{ font-size:14px; font-weight:700; color:#0f172a; margin:20px 0 8px; padding-bottom:4px; border-bottom:2px solid #e2e8f0; }}
+    h4 {{ font-size:13px; font-weight:700; color:#0f172a; margin:8px 0 4px; }}
+    p {{ color:#334155; line-height:1.6; margin:4px 0; }}
+    ul {{ padding-left:20px; color:#334155; }}
     li {{ margin:2px 0; }}
     table {{ width:100%; border-collapse:collapse; font-size:12.5px; margin:8px 0 20px; }}
-    th {{ background:#1e1e30; color:#94a3b8; font-weight:600; text-align:left; padding:8px 10px; border-bottom:1px solid #2d2d45; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }}
-    td {{ padding:7px 10px; border-bottom:1px solid #1e1e30; color:#e2e8f0; vertical-align:top; }}
-    tr:hover td {{ background:#1a1a28; }}
+    th {{ background:#f1f5f9; color:#475569; font-weight:700; text-align:left; padding:8px 10px; border-bottom:2px solid #e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:.4px; }}
+    td {{ padding:7px 10px; border-bottom:1px solid #f1f5f9; color:#1e293b; vertical-align:top; }}
+    tr:hover td {{ background:#f8fafc; }}
     .muted {{ color:var(--grey); font-size:12px; }}
     .pill {{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; line-height:1.4; }}
-    .pill-grey {{ background:#2d2d45; color:#94a3b8; }}
-    .pill-blue {{ background:rgba(26,115,232,.2); color:var(--blue); }}
-    .pill-green {{ background:rgba(52,168,83,.2); color:var(--green); }}
-    .pill-red {{ background:rgba(234,67,53,.2); color:var(--red); }}
-    .zone-pill {{ background:#1e293b; color:#7dd3fc; font-size:11px; padding:2px 8px; border-radius:8px; }}
-    .proto-pill {{ background:#1e293b; color:#94a3b8; font-size:11px; padding:2px 8px; border-radius:8px; }}
-    .enc-yes {{ color:var(--green); font-weight:700; font-size:11px; }}
-    .enc-no {{ color:var(--red); font-weight:700; font-size:11px; }}
-    .warn-pill {{ background:rgba(255,152,0,.15); color:var(--orange); font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; }}
-    .ok-pill {{ background:rgba(52,168,83,.1); color:var(--green); font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; }}
-    .sev-high,.sev-critical {{ color:var(--red); font-weight:700; }}
-    .sev-medium {{ color:var(--orange); font-weight:700; }}
-    .sev-low {{ color:var(--green); font-weight:700; }}
-    .threat-card {{ padding:12px 14px; border-radius:6px; margin:10px 0; border-left-width:3px; border-left-style:solid; }}
+    .pill-grey {{ background:#e2e8f0; color:#475569; }}
+    .pill-blue {{ background:#dbeafe; color:#1d4ed8; }}
+    .pill-green {{ background:#dcfce7; color:#166534; }}
+    .pill-red {{ background:#fee2e2; color:#991b1b; }}
+    .zone-pill {{ background:#e0f2fe; color:#0369a1; font-size:11px; padding:2px 8px; border-radius:8px; font-weight:600; }}
+    .proto-pill {{ background:#f1f5f9; color:#475569; font-size:11px; padding:2px 8px; border-radius:8px; border:1px solid #e2e8f0; }}
+    .enc-yes {{ color:#166534; font-weight:700; font-size:11px; }}
+    .enc-no {{ color:#991b1b; font-weight:700; font-size:11px; }}
+    .warn-pill {{ background:#fff7ed; color:#c2410c; font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; border:1px solid #fed7aa; }}
+    .ok-pill {{ background:#f0fdf4; color:#166534; font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; border:1px solid #bbf7d0; }}
+    .sev-high,.sev-critical {{ color:#991b1b; font-weight:700; }}
+    .sev-medium {{ color:#c2410c; font-weight:700; }}
+    .sev-low {{ color:#166534; font-weight:700; }}
+    .threat-card {{ padding:12px 14px; border-radius:6px; margin:10px 0; border-left-width:3px; border-left-style:solid; background:#fafafa; }}
     .threat-meta {{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }}
     .mat-grid {{ display:flex; flex-wrap:wrap; gap:12px; }}
-    .mat-card {{ background:#1e1e30; border:1px solid #2d2d45; border-radius:8px; padding:12px 16px; min-width:160px; flex:1; }}
+    .mat-card {{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; min-width:160px; flex:1; }}
     .mat-label {{ font-size:11px; color:var(--grey); text-transform:uppercase; letter-spacing:.5px; }}
     .mat-score {{ font-size:24px; font-weight:700; color:var(--blue); margin:4px 0; }}
-    .mat-bar {{ height:5px; background:#2d2d45; border-radius:3px; overflow:hidden; }}
+    .mat-bar {{ height:5px; background:#e2e8f0; border-radius:3px; overflow:hidden; }}
     .mat-fill {{ height:100%; background:var(--blue); border-radius:3px; }}
     .coverage-table {{ font-size:11px; }}
     .coverage-table th {{ font-size:10px; }}
-    .rule-card {{ background:#0d1117; border:1px solid #2d2d45; border-radius:6px; padding:14px; margin:10px 0; }}
-    .rule-title {{ font-weight:700; color:#e2e8f0; font-size:12px; margin-bottom:8px; }}
-    .sigma-pre {{ font-family:"Fira Code","Consolas",monospace; font-size:11px; color:#e6edf3; background:#0d1117; overflow:auto; white-space:pre; line-height:1.5; }}
-    .mermaid {{ background:#1a1a2e; border-radius:8px; padding:16px; overflow:auto; }}
+    .rule-card {{ background:#1e293b; border:1px solid #334155; border-radius:6px; padding:14px; margin:10px 0; }}
+    .rule-title {{ font-weight:700; color:#f1f5f9; font-size:12px; margin-bottom:8px; }}
+    .sigma-pre {{ font-family:"Fira Code","Consolas",monospace; font-size:11px; color:#e2e8f0; background:#0f172a; overflow:auto; white-space:pre; line-height:1.5; padding:10px; border-radius:4px; margin-top:4px; }}
+    .mermaid {{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; overflow:auto; }}
   </style>
 </head>
 <body>
@@ -1370,7 +1370,7 @@ def render_threat_model_portal_html(tm: ThreatModel, *, client_name: str = "Unkn
   </div>
   {tab_panels}
   <script>
-    mermaid.initialize({{ startOnLoad: true, theme: "dark" }});
+    mermaid.initialize({{ startOnLoad: true, theme: "default" }});
     function showTab(btn, id) {{
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
