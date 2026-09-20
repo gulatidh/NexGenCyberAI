@@ -374,6 +374,11 @@ Rules:
 - If an arrow direction is unclear, set from→to in the direction of data request.
 - If you genuinely cannot identify a flow's protocol, use "other" and encrypted=true.
 - Empty arrays are valid when nothing of that kind is present.
+- LIMIT: emit at most 50 components and 80 data_flows. For large diagrams, group
+  identical-role servers (e.g. 3 app nodes → one "App Server Cluster" entry with
+  notes="3 nodes") rather than listing every instance. This keeps the response
+  within token limits and prevents truncation.
+- Output ONLY the JSON object — no explanation, no markdown, no trailing text.
 """
 
 
@@ -431,6 +436,46 @@ async def parse_image(data: bytes, *, filename: str = "") -> Dict[str, Any]:
 # ── Shared LLM call ──────────────────────────────────────────────────────────
 
 
+def _recover_truncated_json(text: str) -> Optional[Dict[str, Any]]:
+    """Balance open brackets left by a truncated LLM response and attempt a parse.
+
+    Works by scanning the full text character-by-character to track bracket/brace
+    depth (ignoring string contents), then appending the required closing tokens.
+    On success returns the parsed dict; returns None if recovery fails.
+    """
+    bracket_stack: List[str] = []
+    in_string = False
+    escape_next = False
+    for ch in text:
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in "{[":
+            bracket_stack.append(ch)
+        elif ch in "}]":
+            if bracket_stack:
+                bracket_stack.pop()
+    if not bracket_stack:
+        return None  # nothing to close — original parse will handle it
+    closing = "".join("]" if ch == "[" else "}" for ch in reversed(bracket_stack))
+    # Trim any trailing incomplete string / partial key before closing
+    trimmed = re.sub(r',?\s*"[^"]*$', "", text)   # drop dangling key
+    trimmed = re.sub(r',\s*$', "", trimmed)        # drop trailing comma
+    candidate = trimmed + closing
+    try:
+        return json.loads(candidate)
+    except Exception:
+        return None
+
+
 async def _llm_extract_diagram(
     *,
     prompt_context: str,
@@ -443,7 +488,10 @@ async def _llm_extract_diagram(
     try:
         from core.ai_providers import get_llm
         from langchain_core.messages import HumanMessage, SystemMessage
-        llm = get_llm(temperature=0.1, max_tokens=4096)
+        # 8192 tokens gives ~25 000 chars — enough for 60-node diagrams.
+        # The old 4096 cap caused truncation at ~12 800 chars and left
+        # the JSON mid-object ("expecting delimiter" parse error).
+        llm = get_llm(temperature=0.1, max_tokens=8192)
     except Exception as exc:
         raise RuntimeError(f"AI provider unavailable for diagram extraction: {exc}") from exc
 
@@ -474,18 +522,35 @@ async def _llm_extract_diagram(
     end = text.rfind("}")
     if start >= 0 and end > start:
         text = text[start:end + 1]
+
+    # Fix common LLM JSON mistakes before first parse attempt
+    def _clean(s: str) -> str:
+        s = re.sub(r",\s*([}\]])", r"\1", s)   # trailing commas
+        s = re.sub(r"\bTrue\b", "true", s)
+        s = re.sub(r"\bFalse\b", "false", s)
+        s = re.sub(r"\bNone\b", "null", s)
+        return s
+
     try:
         parsed = json.loads(text)
     except Exception:
-        # Common LLM JSON mistakes: trailing commas, Python bool/None literals
-        fixed = re.sub(r",\s*([}\]])", r"\1", text)          # trailing commas
-        fixed = re.sub(r"\bTrue\b", "true", fixed)
-        fixed = re.sub(r"\bFalse\b", "false", fixed)
-        fixed = re.sub(r"\bNone\b", "null", fixed)
         try:
-            parsed = json.loads(fixed)
-        except Exception as exc:
-            raise RuntimeError(f"LLM did not return parseable JSON: {exc}") from exc
+            parsed = json.loads(_clean(text))
+        except Exception:
+            # Last resort: response was truncated at the token limit —
+            # balance open brackets and re-attempt.
+            recovered = _recover_truncated_json(_clean(text))
+            if recovered is not None:
+                logger.warning(
+                    "Diagram extraction: JSON was truncated (token limit hit). "
+                    "Recovered partial result — some components/flows may be missing."
+                )
+                parsed = recovered
+            else:
+                raise RuntimeError(
+                    "LLM did not return parseable JSON — the diagram may be too large. "
+                    "Try uploading a simplified version or a .drawio file instead."
+                ) from None
 
     components_raw = parsed.get("components") or []
     flows_raw = parsed.get("data_flows") or []
