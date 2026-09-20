@@ -8,7 +8,7 @@
  *
  * Polls every 4s while the model is in pending/generating state.
  */
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useViewMode } from "../theme/ViewModeContext";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -22,7 +22,7 @@ import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
-  MenuBook, Group, VerifiedUser, Timeline, Article,
+  MenuBook, Group, VerifiedUser, Timeline, Article, UploadFile,
 } from "@mui/icons-material";
 import { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -264,6 +264,77 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
       return next;
     });
 
+  const csvFileRef = useRef<HTMLInputElement>(null);
+
+  const CSV_HEADERS = ["name","type","platform","trust_zone","environment","datacenter","criticality","is_threat_actor","threat_actor_type","data_classification","bia_impact","notes"];
+
+  const downloadTemplate = () => {
+    const exampleRows = [
+      ["Web Application","application","Azure","DMZ","Prod","Azure East US","high","false","","public","high","Internet-facing React frontend"],
+      ["Auth Service API","api","Azure","Application Tier","Prod","Azure East US","critical","false","","internal","critical","OAuth2 token issuer"],
+      ["SQL Database","database","Corporate","Data Tier","Prod","On-Premises DC1","critical","false","","confidential","critical","Primary customer data store"],
+      ["External Attacker","user","Internet","External","","","medium","true","external_attacker","","",""],
+    ];
+    const lines = [CSV_HEADERS.join(","), ...exampleRows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
+    const blob = new Blob([lines], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "threat-model-components-template.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const handleCsvUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = (e.target?.result as string) || "";
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length < 2) { toast.error("CSV must have a header row and at least one data row."); return; }
+        const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
+        const nameIdx = headers.indexOf("name");
+        if (nameIdx === -1) { toast.error("CSV missing required 'name' column."); return; }
+        const get = (row: string[], col: string) => {
+          const i = headers.indexOf(col);
+          return i >= 0 && i < row.length ? row[i].trim().replace(/^"|"$/g, "") : "";
+        };
+        const newRows: Component[] = [];
+        for (let li = 1; li < lines.length; li++) {
+          const cols = lines[li].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+          const name = get(cols, "name");
+          if (!name) continue;
+          const rawPlat = get(cols, "platform") || "Corporate";
+          const rawZone = get(cols, "trust_zone") || "Application Tier";
+          newRows.push({
+            id: `csv${Date.now()}_${li}`,
+            name,
+            type: get(cols, "type") || "host",
+            platform: normPlatform(rawPlat) as Platform,
+            trust_zone: normZone(rawZone) as Zone,
+            environment: get(cols, "environment") || "Prod",
+            datacenter: get(cols, "datacenter"),
+            criticality: get(cols, "criticality") || "medium",
+            is_threat_actor: get(cols, "is_threat_actor").toLowerCase() === "true",
+            threat_actor_type: get(cols, "threat_actor_type") || undefined,
+            data_classification: get(cols, "data_classification") || undefined,
+            bia_impact: get(cols, "bia_impact") || undefined,
+            notes: get(cols, "notes"),
+          } as any as Component);
+        }
+        if (newRows.length === 0) { toast.error("No valid rows found in CSV."); return; }
+        setRows((prev) => {
+          const existingIds = new Set(prev.map(r => r.name.toLowerCase()));
+          const merged = [...prev, ...newRows.filter(r => !existingIds.has(r.name.toLowerCase()))];
+          return merged;
+        });
+        toast.success(`Imported ${newRows.length} component${newRows.length === 1 ? "" : "s"} from CSV.`);
+      } catch (err) {
+        toast.error("Failed to parse CSV. Check the format matches the template.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const addRow = () => {
     if (!nName.trim()) return;
     const newId = `c${Date.now()}`;
@@ -504,6 +575,31 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
             sx={{ textTransform: "none", height: 28, fontSize: 12, flexShrink: 0 }}>
             Add
           </Button>
+        </Box>
+
+        {/* CSV template download + upload */}
+        <input
+          ref={csvFileRef}
+          type="file"
+          accept=".csv"
+          style={{ display: "none" }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f); e.target.value = ""; }}
+        />
+        <Box sx={{ display: "flex", gap: 1, mb: 1.5, alignItems: "center" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", mr: 0.5 }}>Bulk add via CSV:</Typography>
+          <Button size="small" startIcon={<Download sx={{ fontSize: 14 }} />}
+            onClick={downloadTemplate}
+            sx={{ textTransform: "none", height: 28, fontSize: 12, color: "text.secondary", borderColor: "divider", border: "1px solid" }}>
+            Download template
+          </Button>
+          <Button size="small" startIcon={<UploadFile sx={{ fontSize: 14 }} />}
+            onClick={() => csvFileRef.current?.click()}
+            sx={{ textTransform: "none", height: 28, fontSize: 12, color: "primary.main", borderColor: "primary.main", border: "1px solid" }}>
+            Upload CSV
+          </Button>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontStyle: "italic" }}>
+            Fill the template, save as CSV, upload — components merge into the list below.
+          </Typography>
         </Box>
 
         <TextField fullWidth multiline minRows={2} size="small" label="Analyst notes / guidance for the AI"
