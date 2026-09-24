@@ -310,7 +310,7 @@ function ScanImportPanel({ clientId }: ScanImportPanelProps) {
           transition: "border-color 0.15s, background-color 0.15s",
           "&:hover": !selectedFile ? { borderColor: "#4285F4", bgcolor: "rgba(66,133,244,0.04)" } : {},
         }}>
-        <input ref={fileInputRef} type="file" hidden accept=".sarif,.json,.xml,.nessus,.csv,.pdf,.txt"
+        <input ref={fileInputRef} type="file" hidden accept=".sarif,.json,.xml,.nessus,.csv,.xlsx,.xls,.pdf,.txt"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSet(f); }} />
         <CloudUpload sx={{ fontSize: 40, color: dragOver ? "#4285F4" : "text.secondary", mb: 1 }} />
         {selectedFile ? (
