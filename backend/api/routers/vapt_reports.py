@@ -423,8 +423,15 @@ async def _ai_generate_summary(
             if s in sev_counts:
                 sev_counts[s] += 1
 
+        def _cvss_label(f: Dict) -> str:
+            score = f.get("cvss_score")
+            vector = f.get("cvss_vector") or ""
+            if score is not None:
+                return f"CVSS {score}" + (f" ({vector})" if vector else "")
+            return "CVSS N/A"
+
         findings_summary = "\n".join(
-            f"- [{f.get('severity','').upper()}] {f.get('title','')} | Affected: {f.get('resource_id') or 'N/A'}"
+            f"- [{f.get('severity','').upper()}] {f.get('title','')} | {_cvss_label(f)} | Affected: {f.get('resource_id') or 'N/A'}"
             for f in findings[:50]
         )
 
@@ -433,16 +440,17 @@ Scan type: {scan_type}
 Scope: {json.dumps(scope.get("in_scope", [])[:20])}
 Total findings: {len(findings)} (Critical:{sev_counts['critical']} High:{sev_counts['high']} Medium:{sev_counts['medium']} Low:{sev_counts['low']})
 
-Findings:
+Findings (title | CVSS score from scanner | affected assets):
 {findings_summary}
 
 Return a JSON object with exactly these three keys:
 {{
   "executive_summary": "3-4 paragraphs for a CISO/board audience: engagement purpose, overall risk posture, most critical findings, and business impact.",
   "conclusion": "2-3 paragraphs covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
-  "appendices": "Appendix A — Vulnerability Reference Table: list each finding title with CVSS score. Appendix B — Glossary: define 8-12 key security terms used in this report (e.g. RCE, CVSS, OWASP, lateral movement). Appendix C — Tools & Versions: list scanner and version where known. Plain text with clear Appendix headers."
+  "appendices": "Appendix A — Vulnerability Reference Table: one row per finding with Title, Severity, CVSS Score, and Affected Assets — use ONLY the scores provided in the findings data above, never invent scores. Appendix B — Glossary: define 8-12 key security terms used in this report (e.g. RCE, CVSS, OWASP, lateral movement). Appendix C — Tools & Versions: list scanner and version where known. Plain text with clear Appendix headers."
 }}
 
+IMPORTANT: Appendix A MUST copy CVSS scores verbatim from the findings data above. Do NOT use scores from your training knowledge.
 Output valid JSON only — no markdown fences, no prose outside the JSON."""
 
         llm = get_llm()
@@ -480,10 +488,17 @@ async def _ai_generate_report_content(
             if s in sev_counts:
                 sev_counts[s] += 1
 
-        # Send full context — title, description, affected asset, evidence, existing remediation hint
+        # Send full context — title, CVSS, description, affected asset, evidence, existing remediation hint
+        def _cvss_str(f: Dict) -> str:
+            score = f.get("cvss_score")
+            vector = f.get("cvss_vector") or ""
+            if score is not None:
+                return f"CVSS {score}" + (f" ({vector})" if vector else "")
+            return "CVSS N/A"
+
         findings_detail = "\n\n".join(
             f"FINDING: {f.get('title','')}\n"
-            f"Severity: {f.get('severity','').upper()}\n"
+            f"Severity: {f.get('severity','').upper()} | {_cvss_str(f)}\n"
             f"Affected: {f.get('resource_id') or 'N/A'}\n"
             f"Description: {(f.get('description') or '')[:600]}\n"
             f"Evidence: {(f.get('evidence') or '')[:300]}\n"
@@ -1187,8 +1202,22 @@ async def regenerate_report(
 
     scan_type = scope.get("scan_type", "")
 
-    findings_for_ai = [
-        {
+    # Recover cvss_score/cvss_vector from original scan findings (matched by title)
+    # so Appendix A shows real scanner-provided scores, not LLM hallucinations.
+    _cvss_by_title: Dict[str, tuple] = {}
+    scan_id = scope.get("scan_id") or report.scan_id
+    if scan_id:
+        orig_findings = db.query(Finding).filter(Finding.scan_id == scan_id).all()
+        for of in orig_findings:
+            key = (of.title or "").strip().lower()
+            if key and key not in _cvss_by_title:
+                _cvss_by_title[key] = (of.cvss_score, of.cvss_vector)
+
+    findings_for_ai = []
+    for f in findings_objs:
+        title_key = (f.title or "").strip().lower()
+        cvss_score, cvss_vector = _cvss_by_title.get(title_key, (None, None))
+        findings_for_ai.append({
             "title": f.title,
             "severity": f.severity,
             "description": f.description or "",
@@ -1196,10 +1225,9 @@ async def regenerate_report(
             "remediation": f.recommendation or "",
             "evidence": f.evidence or "",
             "cve_id": f.references or "",
-            "cvss_score": None,
-        }
-        for f in findings_objs
-    ]
+            "cvss_score": cvss_score,
+            "cvss_vector": cvss_vector,
+        })
 
     # Call 1: regenerate executive summary + conclusion + appendices
     ai_summary = await _ai_generate_summary(
