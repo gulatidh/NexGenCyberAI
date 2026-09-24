@@ -886,8 +886,8 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
 
         title_col = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
         sev_col = _find(["severity", "risk", "level", "priority", "cvss"])
-        desc_col = _find(["description", "detail", "summary", "info"])
-        resource_col = _find(["host", "ip", "url", "resource", "target", "asset", "file"])
+        desc_col = _find(["description", "detail", "summary", "info", "observ"])
+        resource_col = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
         cve_col = _find(["cve"])
         remediation_col = _find(["remediation", "solution", "fix", "recommendation"])
 
@@ -901,20 +901,32 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
             sev_raw = (row.get(sev_col) or "medium").strip() if sev_col else "medium"
             sev = _normalise_severity(sev_raw)
             desc = (row.get(desc_col) or "").strip() if desc_col else ""
-            resource = (row.get(resource_col) or "").strip() if resource_col else ""
             cve_raw = (row.get(cve_col) or "").strip() if cve_col else ""
             cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
             remediation = (row.get(remediation_col) or "").strip() if remediation_col else ""
+
+            # Split multi-value resource cells (newline or semicolon separated)
+            raw_resource = (row.get(resource_col) or "").strip() if resource_col else ""
+            hosts = [h.strip() for h in re.split(r"[\n;]+", raw_resource) if h.strip()] if raw_resource else []
+            resource = hosts[0] if hosts else ""
+            # Store extra hosts so _upsert_imported_assets can create one asset per host
+            affected_hosts = [{"ip": h} for h in hosts] if len(hosts) > 1 else []
+
             findings.append(ParsedFinding(
                 title=title,
                 description=desc,
                 severity=sev,
                 resource_id=resource,
-                resource_type="unknown",
+                resource_type="host" if resource else "unknown",
                 cve_id=cve_id,
                 remediation=remediation,
                 confidence=confidence,
-                raw={"_table": "generic", "source_format": "csv", "raw_row_json": json.dumps(dict(row))},
+                raw={
+                    "_table": "generic",
+                    "source_format": "csv",
+                    "affected_hosts": affected_hosts,
+                    "raw_row_json": json.dumps(dict(row)),
+                },
             ))
     except Exception as exc:
         logger.warning("Generic CSV parse error: %s", exc)
@@ -941,8 +953,8 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
 
     title_idx = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
     sev_idx = _find(["severity", "risk", "level", "priority", "cvss"])
-    desc_idx = _find(["description", "detail", "summary", "info"])
-    resource_idx = _find(["host", "ip", "url", "resource", "target", "asset", "file"])
+    desc_idx = _find(["description", "detail", "summary", "info", "observ"])
+    resource_idx = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
     cve_idx = _find(["cve"])
     remediation_idx = _find(["remediation", "solution", "fix", "recommendation"])
 
@@ -962,17 +974,23 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
         sev_raw = _cell(row, sev_idx) or "medium"
         sev = _normalise_severity(sev_raw)
         desc = _cell(row, desc_idx)
-        resource = _cell(row, resource_idx)
         cve_raw = _cell(row, cve_idx)
         cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
         remediation = _cell(row, remediation_idx)
         raw_row = {headers[i]: str(v) for i, v in enumerate(row) if v is not None and i < len(headers)}
+
+        # Split multi-value resource cells (newline or semicolon separated)
+        raw_resource = _cell(row, resource_idx)
+        hosts = [h.strip() for h in re.split(r"[\n;]+", raw_resource) if h.strip()] if raw_resource else []
+        resource = hosts[0] if hosts else ""
+        affected_hosts = [{"ip": h} for h in hosts] if len(hosts) > 1 else []
+
         findings.append(ParsedFinding(
             title=title,
             description=desc,
             severity=sev,
             resource_id=resource,
-            resource_type="unknown",
+            resource_type="host" if resource else "unknown",
             cve_id=cve_id,
             remediation=remediation,
             confidence=confidence,
@@ -980,6 +998,7 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
                 "_table": "generic",
                 "source_format": "excel",
                 "sheet": sheet_name,
+                "affected_hosts": affected_hosts,
                 "raw_row_json": json.dumps(raw_row),
             },
         ))
