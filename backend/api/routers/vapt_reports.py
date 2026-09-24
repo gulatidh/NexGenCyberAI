@@ -402,6 +402,67 @@ _DEFAULT_METHODOLOGY = {
 }
 
 
+async def _ai_generate_summary(
+    client_name: str,
+    scan_type: str,
+    findings: List[Dict],
+    scope: Dict,
+) -> Dict:
+    """Lightweight call: generate only executive_summary, conclusion, appendices.
+
+    Kept intentionally small so the response never exceeds token limits and
+    exec_summary/conclusion are always present even when finding_remediations fails.
+    """
+    try:
+        from core.ai_providers import get_llm
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
+        for f in findings:
+            s = (f.get("severity") or "").lower()
+            if s in sev_counts:
+                sev_counts[s] += 1
+
+        findings_summary = "\n".join(
+            f"- [{f.get('severity','').upper()}] {f.get('title','')} | Affected: {f.get('resource_id') or 'N/A'}"
+            for f in findings[:50]
+        )
+
+        prompt = f"""Client: {client_name}
+Scan type: {scan_type}
+Scope: {json.dumps(scope.get("in_scope", [])[:20])}
+Total findings: {len(findings)} (Critical:{sev_counts['critical']} High:{sev_counts['high']} Medium:{sev_counts['medium']} Low:{sev_counts['low']})
+
+Findings:
+{findings_summary}
+
+Return a JSON object with exactly these three keys:
+{{
+  "executive_summary": "3-4 paragraphs for a CISO/board audience: engagement purpose, overall risk posture, most critical findings, and business impact.",
+  "conclusion": "2-3 paragraphs covering overall security maturity, remediation priorities, and concrete next steps the organisation should take.",
+  "appendices": "Appendix A — Vulnerability Reference Table: list each finding title with CVSS score. Appendix B — Glossary: define 8-12 key security terms used in this report (e.g. RCE, CVSS, OWASP, lateral movement). Appendix C — Tools & Versions: list scanner and version where known. Plain text with clear Appendix headers."
+}}
+
+Output valid JSON only — no markdown fences, no prose outside the JSON."""
+
+        llm = get_llm()
+        system = (
+            "You are a senior penetration tester writing a professional VAPT report. "
+            "Output valid JSON only — no markdown fences, no prose outside the JSON."
+        )
+        resp = await llm.ainvoke([SystemMessage(content=system), HumanMessage(content=prompt)])
+        raw = str(resp.content).strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except Exception as exc:
+        logger.warning("AI summary generation failed: %s", exc)
+        return {}
+
+
 async def _ai_generate_report_content(
     client_name: str,
     scan_type: str,
@@ -828,13 +889,29 @@ async def create_report_from_scan(
             base["severity"] = best_sev
         findings_for_ai.append(base)
 
-    # AI generation (gracefully degrades if LLM unavailable)
-    ai = await _ai_generate_report_content(
+    # Call 1: exec summary + conclusion — lightweight, dedicated call so they always succeed
+    # even when the per-finding remediation call times out or produces unparseable JSON.
+    ai_summary = await _ai_generate_summary(
         client_name=client.name,
         scan_type=connector_type,
         findings=findings_for_ai,
         scope=scope,
     )
+
+    # Call 2: per-finding remediations — best-effort; if this fails the enrichment
+    # step below (Call 3) fills in the gaps at creation time rather than deferring
+    # to export time.
+    ai_remediations: Dict[str, Any] = {}
+    try:
+        ai = await _ai_generate_report_content(
+            client_name=client.name,
+            scan_type=connector_type,
+            findings=findings_for_ai,
+            scope=scope,
+        )
+        ai_remediations = ai.get("finding_remediations", {})
+    except Exception as exc:
+        logger.warning("Finding remediation generation failed (will enrich per-finding): %s", exc)
 
     title = payload.title or f"VAPT Report — {scan.name or connector_type.upper()} — {client.name}"
 
@@ -847,18 +924,17 @@ async def create_report_from_scan(
         prepared_by=payload.prepared_by,
         report_date=datetime.now(timezone.utc),
         status="draft",
-        executive_summary=ai.get("executive_summary", ""),
+        executive_summary=ai_summary.get("executive_summary", ""),
         scope_json=json.dumps(scope),
         methodology_json=json.dumps(methodology),
-        conclusion=ai.get("conclusion", ""),
-        appendices=ai.get("appendices", ""),
+        conclusion=ai_summary.get("conclusion", ""),
+        appendices=ai_summary.get("appendices", ""),
         sla_config=payload.sla_config,
     )
     db.add(report)
     db.flush()
 
-    # Import findings
-    ai_remediations: Dict[str, Any] = ai.get("finding_remediations", {})
+    # Create VAPTFinding rows — use AI remediation when available, raw hint otherwise
     sev_order = ["critical", "high", "medium", "low", "informational", "info"]
 
     sorted_findings = sorted(
@@ -866,17 +942,18 @@ async def create_report_from_scan(
         key=lambda x: sev_order.index(x["severity"].lower()) if x["severity"].lower() in sev_order else 99,
     )
 
+    vapt_findings_list: List[VAPTFinding] = []
     for idx, fd in enumerate(sorted_findings):
         sev = fd["severity"].lower()
         if sev == "info":
             sev = "informational"
         ai_rem = ai_remediations.get(fd["title"])
         if isinstance(ai_rem, dict):
-            enhanced_remediation = json.dumps(ai_rem)
+            initial_recommendation = json.dumps(ai_rem)
         elif isinstance(ai_rem, str):
-            enhanced_remediation = ai_rem
+            initial_recommendation = ai_rem
         else:
-            enhanced_remediation = fd.get("remediation", "")
+            initial_recommendation = fd.get("remediation", "")
         vapt_finding = VAPTFinding(
             report_id=report.id,
             finding_id=f"F-{idx + 1:02d}",
@@ -887,12 +964,36 @@ async def create_report_from_scan(
             impact="",
             evidence=fd["evidence"],
             reproduction_steps="",
-            recommendation=enhanced_remediation,
+            recommendation=initial_recommendation,
             references=fd["cve_id"] if fd.get("cve_id") else "",
             retest_status="pending",
             order_index=idx,
         )
         db.add(vapt_finding)
+        vapt_findings_list.append(vapt_finding)
+
+    db.flush()
+
+    # Call 3: enrich any plain/generic recommendations NOW so they're stored in the DB
+    # and visible in the UI immediately (not only when the user exports a PDF/DOCX).
+    plain_indices = [i for i, vf in enumerate(vapt_findings_list) if _needs_enrichment(vf.recommendation or "")]
+    if plain_indices:
+        enrich_input = [
+            {
+                "title": vapt_findings_list[i].title,
+                "severity": vapt_findings_list[i].severity,
+                "description": vapt_findings_list[i].description,
+                "affected_asset": vapt_findings_list[i].affected_asset,
+                "evidence": vapt_findings_list[i].evidence or "",
+                "recommendation": vapt_findings_list[i].recommendation or "",
+            }
+            for i in plain_indices
+        ]
+        enriched_list = await _enrich_plain_recommendations(enrich_input)
+        for list_pos, vf_idx in enumerate(plain_indices):
+            new_rec = enriched_list[list_pos].get("recommendation", "")
+            if new_rec:
+                vapt_findings_list[vf_idx].recommendation = new_rec
 
     db.commit()
     db.refresh(report)
