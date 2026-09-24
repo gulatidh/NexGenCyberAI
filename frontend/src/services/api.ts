@@ -697,6 +697,8 @@ export const vaptApi = {
     apiClient.delete(`/clients/${clientId}/vapt-reports/${reportId}/`),
   createRetest: (clientId: string, reportId: string) =>
     apiClient.post(`/clients/${clientId}/vapt-reports/${reportId}/retest/`).then((r) => r.data),
+  regenerate: (clientId: string, reportId: string) =>
+    apiClient.post(`/clients/${clientId}/vapt-reports/${reportId}/regenerate/`).then((r) => r.data),
   addFinding: (clientId: string, reportId: string, data: any) =>
     apiClient.post(`/clients/${clientId}/vapt-reports/${reportId}/findings/`, data).then((r) => r.data),
   updateFinding: (clientId: string, reportId: string, findingId: string, data: any) =>

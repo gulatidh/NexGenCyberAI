@@ -9,7 +9,7 @@ import {
 import {
   ArrowBack, Save, PictureAsPdf, Description, Language,
   Add, Edit, Delete, GppGood, CheckCircle, Shield,
-  FileDownload, Replay, BugReport, MenuBook, Assignment,
+  FileDownload, Replay, BugReport, MenuBook, Assignment, AutoFixHigh,
 } from "@mui/icons-material";
 import PageDetailLayout, { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -282,6 +282,7 @@ export default function VAPTReportDetail() {
   const [editFinding, setEditFinding] = useState<any>(null);
   const [deleteFindingTarget, setDeleteFindingTarget] = useState<string | null>(null);
   const [retestConfirmOpen, setRetestConfirmOpen] = useState(false);
+  const [regenConfirmOpen, setRegenConfirmOpen] = useState(false);
 
   // Local form state (document control + scope/methodology)
   const [docForm, setDocForm] = useState<any>({});
@@ -388,6 +389,14 @@ export default function VAPTReportDetail() {
       qc.invalidateQueries({ queryKey: ["vapt-reports", clientId] });
       setRetestConfirmOpen(false);
       navigate(`${vaptBase}/${newReport.id}`);
+    },
+  });
+
+  const regenMutation = useMutation({
+    mutationFn: () => vaptApi.regenerate(clientId!, reportId!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vapt-report", clientId, reportId] });
+      setRegenConfirmOpen(false);
     },
   });
 
@@ -530,6 +539,14 @@ export default function VAPTReportDetail() {
             variant="outlined" sx={{ fontSize: "0.75rem" }}>
             Create Retest v{report.version ? (parseFloat(report.version) + 0.1).toFixed(1) : "1.1"}
           </Button>
+          <Tooltip title="Re-run AI to regenerate executive summary, conclusion, and all finding recommendations">
+            <Button size="small" startIcon={regenMutation.isPending ? <CircularProgress size={14} /> : <AutoFixHigh />}
+              onClick={() => setRegenConfirmOpen(true)}
+              disabled={regenMutation.isPending}
+              variant="outlined" color="secondary" sx={{ fontSize: "0.75rem" }}>
+              {regenMutation.isPending ? "Regenerating…" : "Regen AI"}
+            </Button>
+          </Tooltip>
           <Tooltip title="Download Full Report PDF">
             <Button size="small" startIcon={<PictureAsPdf />} onClick={() => downloadExport("pdf")}
               sx={{ fontSize: "0.75rem" }}>PDF</Button>
@@ -947,6 +964,34 @@ export default function VAPTReportDetail() {
             disabled={retestMutation.isPending}
             sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}>
             {retestMutation.isPending ? "Creating…" : "Create Retest Version"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Regenerate AI confirm dialog */}
+      <Dialog open={regenConfirmOpen} onClose={() => !regenMutation.isPending && setRegenConfirmOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AutoFixHigh sx={{ color: "#9C27B0" }} /> Regenerate AI Content
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            This will re-run the AI to regenerate the <strong>executive summary</strong>, <strong>conclusion</strong>, <strong>appendices</strong>, and <strong>all finding recommendations</strong> in this report.
+          </Typography>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            Any manual edits to those sections will be overwritten. Save any custom changes first.
+          </Alert>
+          {regenMutation.isPending && (
+            <Alert severity="info" sx={{ mt: 2 }} icon={<CircularProgress size={16} />}>
+              Regenerating — this may take a minute depending on the number of findings…
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setRegenConfirmOpen(false)} disabled={regenMutation.isPending}>Cancel</Button>
+          <Button variant="contained" onClick={() => regenMutation.mutate()}
+            disabled={regenMutation.isPending}
+            sx={{ bgcolor: "#6A1B9A", "&:hover": { bgcolor: "#7B1FA2" } }}>
+            {regenMutation.isPending ? "Regenerating…" : "Regenerate Now"}
           </Button>
         </DialogActions>
       </Dialog>

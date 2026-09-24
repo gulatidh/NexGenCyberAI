@@ -1159,6 +1159,98 @@ async def delete_vapt_report(
 
 # ── Retest ────────────────────────────────────────────────────────────────────
 
+@router.post("/clients/{cid}/vapt-reports/{rid}/regenerate/")
+async def regenerate_report(
+    cid: str,
+    rid: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Re-run AI generation: executive summary, conclusion, appendices, and all finding
+    recommendations. Updates the report in-place; does not bump the version."""
+    report = _get_report_or_404(rid, cid, db)
+    client = _get_client_or_404(cid, db)
+
+    findings_objs: List[VAPTFinding] = (
+        db.query(VAPTFinding)
+        .filter(VAPTFinding.report_id == report.id)
+        .order_by(VAPTFinding.order_index)
+        .all()
+    )
+
+    # Rebuild the findings_for_ai structure from stored VAPTFinding rows
+    scope = {}
+    try:
+        scope = json.loads(report.scope_json) if report.scope_json else {}
+    except Exception:
+        pass
+
+    scan_type = scope.get("scan_type", "")
+
+    findings_for_ai = [
+        {
+            "title": f.title,
+            "severity": f.severity,
+            "description": f.description or "",
+            "resource_id": f.affected_asset or "",
+            "remediation": f.recommendation or "",
+            "evidence": f.evidence or "",
+            "cve_id": f.references or "",
+            "cvss_score": None,
+        }
+        for f in findings_objs
+    ]
+
+    # Call 1: regenerate executive summary + conclusion + appendices
+    ai_summary = await _ai_generate_summary(
+        client_name=client.name,
+        scan_type=scan_type,
+        findings=findings_for_ai,
+        scope=scope,
+    )
+    if ai_summary.get("executive_summary"):
+        report.executive_summary = ai_summary["executive_summary"]
+    if ai_summary.get("conclusion"):
+        report.conclusion = ai_summary["conclusion"]
+    if ai_summary.get("appendices"):
+        report.appendices = ai_summary["appendices"]
+
+    # Call 2: regenerate all per-finding recommendations via batched enrichment
+    # Force-reset recommendations to the plain text hint so _needs_enrichment triggers
+    enrich_input = [
+        {
+            "title": f.title,
+            "severity": f.severity,
+            "description": f.description or "",
+            "affected_asset": f.affected_asset or "",
+            "evidence": f.evidence or "",
+            # Pass current recommendation as the "hint" — AI will expand it
+            "recommendation": (f.recommendation or "")[:300] if not _needs_enrichment(f.recommendation or "") else (f.recommendation or ""),
+        }
+        for f in findings_objs
+    ]
+    # Mark all as needing enrichment so every finding gets regenerated
+    for d in enrich_input:
+        d["recommendation"] = d["recommendation"][:300] if d["recommendation"].startswith("{") else d["recommendation"]
+
+    # Temporarily blank recommendations so _needs_enrichment returns True for all
+    enriched_list = await _enrich_plain_recommendations(
+        [{**d, "recommendation": d["recommendation"][:200]} for d in enrich_input]
+    )
+    for finding_obj, enriched_dict in zip(findings_objs, enriched_list):
+        new_rec = enriched_dict.get("recommendation", "")
+        if new_rec:
+            finding_obj.recommendation = new_rec
+
+    db.commit()
+    db.refresh(report)
+    d = _report_to_dict(report)
+    d["findings"] = [_finding_to_dict(f) for f in report.findings]
+    d["finding_counts"] = _sev_counts(report.findings)
+    d["total_findings"] = len(report.findings)
+    return d
+
+
 @router.post("/clients/{cid}/vapt-reports/{rid}/retest/", status_code=status.HTTP_201_CREATED)
 async def create_retest_version(
     cid: str,
