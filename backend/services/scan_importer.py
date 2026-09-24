@@ -884,12 +884,16 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
                         return h
             return None
 
-        title_col = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
-        sev_col = _find(["severity", "risk", "level", "priority", "cvss"])
-        desc_col = _find(["description", "detail", "summary", "info", "observ"])
-        resource_col = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
-        cve_col = _find(["cve"])
-        remediation_col = _find(["remediation", "solution", "fix", "recommendation"])
+        title_col        = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
+        # Specific numeric CVSS columns must be detected before the broad "risk/cvss" sev_col
+        # so "CVSS Score" (8.3) is not shadowed by "Overall Risk" ("Medium").
+        cvss_score_col   = _find(["cvss score", "cvss_score", "cvss base score", "cvss3 score"])
+        cvss_vector_col  = _find(["cvss vector", "cvss_vector"])
+        sev_col          = _find(["severity", "risk", "level", "priority", "cvss"])
+        desc_col         = _find(["description", "detail", "summary", "info", "observ"])
+        resource_col     = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
+        cve_col          = _find(["cve"])
+        remediation_col  = _find(["remediation", "solution", "fix", "recommendation"])
 
         if not title_col:
             return [], 0.3
@@ -898,8 +902,21 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
             title = (row.get(title_col) or "").strip()
             if not title:
                 continue
-            sev_raw = (row.get(sev_col) or "medium").strip() if sev_col else "medium"
-            sev = _normalise_severity(sev_raw)
+
+            # Prefer numeric CVSS score → severity; fall back to text severity column
+            cvss_score: Optional[float] = None
+            if cvss_score_col:
+                try:
+                    cvss_score = float(row.get(cvss_score_col) or "")
+                except (ValueError, TypeError):
+                    pass
+            cvss_vector = (row.get(cvss_vector_col) or "").strip() if cvss_vector_col else None
+            if cvss_score is not None:
+                sev = _cvss_to_severity(cvss_score)
+            else:
+                sev_raw = (row.get(sev_col) or "medium").strip() if sev_col else "medium"
+                sev = _normalise_severity(sev_raw)
+
             desc = (row.get(desc_col) or "").strip() if desc_col else ""
             cve_raw = (row.get(cve_col) or "").strip() if cve_col else ""
             cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
@@ -919,6 +936,8 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
                 resource_id=resource,
                 resource_type="host" if resource else "unknown",
                 cve_id=cve_id,
+                cvss_score=cvss_score,
+                cvss_vector=cvss_vector or None,
                 remediation=remediation,
                 confidence=confidence,
                 raw={
@@ -951,12 +970,14 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
                     return i
         return None
 
-    title_idx = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
-    sev_idx = _find(["severity", "risk", "level", "priority", "cvss"])
-    desc_idx = _find(["description", "detail", "summary", "info", "observ"])
-    resource_idx = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
-    cve_idx = _find(["cve"])
-    remediation_idx = _find(["remediation", "solution", "fix", "recommendation"])
+    title_idx        = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
+    cvss_score_idx   = _find(["cvss score", "cvss_score", "cvss base score", "cvss3 score"])
+    cvss_vector_idx  = _find(["cvss vector", "cvss_vector"])
+    sev_idx          = _find(["severity", "risk", "level", "priority", "cvss"])
+    desc_idx         = _find(["description", "detail", "summary", "info", "observ"])
+    resource_idx     = _find(["endpoint", "host", "ip", "url", "resource", "target", "asset", "file"])
+    cve_idx          = _find(["cve"])
+    remediation_idx  = _find(["remediation", "solution", "fix", "recommendation"])
 
     if title_idx is None:
         return []
@@ -971,8 +992,20 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
         title = _cell(row, title_idx)
         if not title:
             continue
-        sev_raw = _cell(row, sev_idx) or "medium"
-        sev = _normalise_severity(sev_raw)
+
+        # Prefer numeric CVSS score → severity; fall back to text severity column
+        cvss_score: Optional[float] = None
+        if cvss_score_idx is not None:
+            try:
+                cvss_score = float(_cell(row, cvss_score_idx) or "")
+            except (ValueError, TypeError):
+                pass
+        cvss_vector = _cell(row, cvss_vector_idx) or None
+        if cvss_score is not None:
+            sev = _cvss_to_severity(cvss_score)
+        else:
+            sev = _normalise_severity(_cell(row, sev_idx) or "medium")
+
         desc = _cell(row, desc_idx)
         cve_raw = _cell(row, cve_idx)
         cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
@@ -992,6 +1025,8 @@ def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFin
             resource_id=resource,
             resource_type="host" if resource else "unknown",
             cve_id=cve_id,
+            cvss_score=cvss_score,
+            cvss_vector=cvss_vector,
             remediation=remediation,
             confidence=confidence,
             raw={
