@@ -74,7 +74,7 @@ class DeltaResult:
 
 def detect_format(content: bytes, filename: str) -> str:
     """Return one of: sarif, nessus, nessus_csv, burp, openvas, qualys_xml, qualys_csv,
-    checkmarx, csv, json, pdf, text, unknown."""
+    checkmarx, excel, csv, json, pdf, text, unknown."""
     fname = (filename or "").lower()
     if fname.endswith(".sarif") or fname.endswith(".sarif.json"):
         return "sarif"
@@ -82,6 +82,8 @@ def detect_format(content: bytes, filename: str) -> str:
         return "nessus"
     if fname.endswith(".pdf"):
         return "pdf"
+    if fname.endswith(".xlsx") or fname.endswith(".xls"):
+        return "excel"
     if fname.endswith(".csv"):
         # peek to distinguish Qualys and Nessus/Tenable CSV
         head = content[:2000].decode("utf-8", errors="replace")
@@ -919,6 +921,89 @@ def parse_generic_csv(content: bytes) -> Tuple[List[ParsedFinding], float]:
     return findings, confidence
 
 
+def _parse_excel_sheet(ws, sheet_name: str, confidence: float) -> List[ParsedFinding]:
+    """Parse a single openpyxl worksheet into ParsedFinding objects."""
+    findings = []
+
+    rows_iter = ws.iter_rows(values_only=True)
+    header_row = next(rows_iter, None)
+    if not header_row:
+        return []
+
+    headers = [str(h).strip().lower() if h is not None else "" for h in header_row]
+
+    def _find(keys):
+        for k in keys:
+            for i, h in enumerate(headers):
+                if k in h:
+                    return i
+        return None
+
+    title_idx = _find(["title", "name", "vulnerability", "vuln", "finding", "issue"])
+    sev_idx = _find(["severity", "risk", "level", "priority", "cvss"])
+    desc_idx = _find(["description", "detail", "summary", "info"])
+    resource_idx = _find(["host", "ip", "url", "resource", "target", "asset", "file"])
+    cve_idx = _find(["cve"])
+    remediation_idx = _find(["remediation", "solution", "fix", "recommendation"])
+
+    if title_idx is None:
+        return []
+
+    def _cell(row, idx):
+        if idx is None or idx >= len(row):
+            return ""
+        v = row[idx]
+        return str(v).strip() if v is not None else ""
+
+    for row in rows_iter:
+        title = _cell(row, title_idx)
+        if not title:
+            continue
+        sev_raw = _cell(row, sev_idx) or "medium"
+        sev = _normalise_severity(sev_raw)
+        desc = _cell(row, desc_idx)
+        resource = _cell(row, resource_idx)
+        cve_raw = _cell(row, cve_idx)
+        cve_id = cve_raw if re.match(r"CVE-\d{4}-\d+", cve_raw) else None
+        remediation = _cell(row, remediation_idx)
+        raw_row = {headers[i]: str(v) for i, v in enumerate(row) if v is not None and i < len(headers)}
+        findings.append(ParsedFinding(
+            title=title,
+            description=desc,
+            severity=sev,
+            resource_id=resource,
+            resource_type="unknown",
+            cve_id=cve_id,
+            remediation=remediation,
+            confidence=confidence,
+            raw={
+                "_table": "generic",
+                "source_format": "excel",
+                "sheet": sheet_name,
+                "raw_row_json": json.dumps(raw_row),
+            },
+        ))
+    return findings
+
+
+def parse_excel(content: bytes) -> Tuple[List[ParsedFinding], float]:
+    """Parse .xlsx scan exports. Iterates all worksheets; skips sheets with no title column."""
+    findings = []
+    confidence = 0.7
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            sheet_findings = _parse_excel_sheet(ws, sheet_name, confidence)
+            if sheet_findings:
+                logger.info("Excel: parsed %d findings from sheet '%s'", len(sheet_findings), sheet_name)
+            findings.extend(sheet_findings)
+    except Exception as exc:
+        logger.warning("Excel parse error: %s", exc)
+    return findings, confidence
+
+
 def parse_generic_json(content: bytes) -> Tuple[List[ParsedFinding], float]:
     """Best-effort JSON parse for unknown formats."""
     findings = []
@@ -1180,6 +1265,11 @@ async def import_scan_file(
         findings = parse_nessus_csv(content)
     elif fmt == "checkmarx":
         findings = parse_checkmarx(content)
+    elif fmt == "excel":
+        findings, _ = parse_excel(content)
+        if not findings:
+            findings = await parse_with_llm(content, filename, tool_hint)
+            fmt = "llm"
     elif fmt == "csv":
         findings, _ = parse_generic_csv(content)
         if not findings:

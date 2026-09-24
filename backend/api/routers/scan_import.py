@@ -333,6 +333,7 @@ def _format_to_scanner_type(fmt: str, tool_hint: str = "") -> str:
         "gitleaks_json": "gitleaks",
         "trufflehog_json": "trufflehog",
         "checkmarx": "generic",
+        "excel": "generic",
         "csv": "generic",
         "json": "generic",
         "pdf": "generic",
