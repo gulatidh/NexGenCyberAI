@@ -847,6 +847,14 @@ async def create_report_from_scan(
             pass
         return []
 
+    import re as _re
+    def _clean_host(r: str) -> str:
+        """Strip ':0/protocol' suffix Nessus adds for host-level (port 0) findings.
+        Real service ports (e.g. :443/tcp) are kept as they are informative."""
+        if not r:
+            return r
+        return _re.sub(r":0/(tcp|udp|icmp|sctp)$", "", r)
+
     # Derive scan type label
     connector_type = ""
     if scan.connector:
@@ -857,12 +865,13 @@ async def create_report_from_scan(
         connector_type = st.value if hasattr(st, "value") else str(st)
 
     # Build scope from ALL unique assets (primary + duplicates + Nessus affected_hosts)
-    all_asset_ids = {f.resource_id for f in findings if f.resource_id}
+    all_asset_ids = {_clean_host(f.resource_id) for f in findings if f.resource_id}
     for extras in _dup_assets.values():
-        all_asset_ids.update(extras)
+        all_asset_ids.update(_clean_host(a) for a in extras)
     for f in findings:
         for h in _nessus_hosts(f.evidence):
-            all_asset_ids.add(h)
+            all_asset_ids.add(_clean_host(h))
+    all_asset_ids.discard("")
     assets = sorted(all_asset_ids)
     scope = {
         "in_scope": assets[:50],
@@ -887,13 +896,13 @@ async def create_report_from_scan(
         # impacted hosts even when only one host is in resource_id)
         nessus_hosts = _nessus_hosts(f.evidence)
         if nessus_hosts:
-            all_assets = list(dict.fromkeys(nessus_hosts + _dup_assets.get(f.id, [])))
+            all_assets = list(dict.fromkeys(_clean_host(h) for h in nessus_hosts + _dup_assets.get(f.id, [])))
         else:
             all_assets = list(dict.fromkeys(
-                [f.resource_id] + _dup_assets.get(f.id, [])
+                _clean_host(a) for a in ([f.resource_id] + _dup_assets.get(f.id, []))
             ))
         all_assets = [a for a in all_assets if a]
-        resource_id_str = ", ".join(all_assets) if all_assets else (f.resource_id or "")
+        resource_id_str = ", ".join(all_assets) if all_assets else _clean_host(f.resource_id or "")
         # Combine evidence
         primary_ev = json.dumps(f.evidence) if f.evidence else ""
         dup_evs = _dup_evidence.get(f.id, [])

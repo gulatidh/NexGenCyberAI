@@ -270,7 +270,9 @@ def parse_nessus(content: bytes) -> List[ParsedFinding]:
                 plugin_family = item.get("pluginFamily", "")
                 port_str = item.get("port", "")
                 protocol = item.get("protocol", "")
-                resource = f"{hostname}:{port_str}/{protocol}" if port_str else hostname
+                # Only append port when it's a real service port (not 0 = host-level)
+                real_port = port_str and port_str != "0"
+                resource = f"{hostname}:{port_str}/{protocol}" if real_port else hostname
 
                 cve_el = item.find("cve")
                 cve_id = _el_text(cve_el)
