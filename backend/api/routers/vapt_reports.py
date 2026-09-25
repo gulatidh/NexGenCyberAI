@@ -127,6 +127,7 @@ def _finding_to_dict(f: VAPTFinding) -> Dict:
         "references": f.references,
         "retest_status": f.retest_status,
         "retest_notes": f.retest_notes,
+        "owner_team": f.owner_team,
         "order_index": f.order_index,
         "created_at": f.created_at.isoformat() if f.created_at else None,
     }
@@ -146,10 +147,12 @@ class VAPTReportCreate(BaseModel):
 
 
 class VAPTReportFromScan(BaseModel):
-    scan_id: str
-    title: Optional[str] = None          # defaults to scan name
+    scan_id: Optional[str] = None
+    scan_ids: Optional[List[str]] = None
+    title: Optional[str] = None          # defaults to scan name(s)
     classification: str = "Confidential"
     prepared_by: Optional[str] = None
+    owner_team: Optional[str] = None     # team responsible for remediation
     sla_config: Optional[str] = None    # JSON: per-severity target SLA strings
 
 
@@ -199,6 +202,7 @@ class VAPTFindingUpdate(BaseModel):
     references: Optional[str] = None
     retest_status: Optional[str] = None
     retest_notes: Optional[str] = None
+    owner_team: Optional[str] = None
     order_index: Optional[int] = None
 
 
@@ -768,14 +772,21 @@ async def create_report_from_scan(
     Executive summary, conclusion, and per-finding remediation are AI-generated.
     """
     client = _get_client_or_404(cid, db)
-    scan = db.query(Scan).filter(Scan.id == payload.scan_id, Scan.client_id == cid).first()
-    if not scan:
+
+    # Normalise to a list of scan IDs (supports both single scan_id and multi scan_ids)
+    ids = payload.scan_ids or ([payload.scan_id] if payload.scan_id else [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="scan_id or scan_ids required")
+
+    scans = db.query(Scan).filter(Scan.id.in_(ids), Scan.client_id == cid).all()
+    if not scans:
         raise HTTPException(status_code=404, detail="Scan not found")
+    scan = scans[0]  # primary scan for compat (connector type, report name fallback)
 
     primary_findings: List[Finding] = (
         db.query(Finding)
         .filter(
-            Finding.scan_id == scan.id,
+            Finding.scan_id.in_([s.id for s in scans]),
             Finding.duplicate_of_id.is_(None),
             Finding.status != "false_positive",
         )
@@ -791,7 +802,7 @@ async def create_report_from_scan(
         dup_findings: List[Finding] = (
             db.query(Finding)
             .filter(
-                Finding.scan_id == scan.id,
+                Finding.scan_id.in_([s.id for s in scans]),
                 Finding.duplicate_of_id.in_(primary_ids),
                 Finding.status != "false_positive",
             )
@@ -805,7 +816,21 @@ async def create_report_from_scan(
             if ev:
                 _dup_evidence.setdefault(pid, []).append(ev)
 
-    findings = primary_findings
+    # Cross-scan deduplication by (title.lower(), severity) — keep highest cvss_score
+    _seen: Dict[tuple, Finding] = {}
+    for f in primary_findings:
+        sev_val = f.severity.value if hasattr(f.severity, "value") else str(f.severity)
+        key = (f.title.strip().lower(), sev_val.lower())
+        existing = _seen.get(key)
+        if existing is None:
+            _seen[key] = f
+        else:
+            # Keep whichever has the higher cvss_score
+            ex_score = existing.cvss_score or 0
+            f_score = f.cvss_score or 0
+            if f_score > ex_score:
+                _seen[key] = f
+    findings = list(_seen.values())
 
     # Helper: parse Nessus-style affected_hosts from evidence JSON
     def _nessus_hosts(evidence_obj) -> List[str]:
@@ -844,7 +869,8 @@ async def create_report_from_scan(
         "out_of_scope": [],
         "scan_type": connector_type,
         "scan_id": scan.id,
-        "scan_name": scan.name or "",
+        "scan_ids": [s.id for s in scans],
+        "scan_name": " + ".join(s.name or "" for s in scans) if len(scans) > 1 else (scan.name or ""),
     }
 
     # Methodology from template
@@ -928,7 +954,8 @@ async def create_report_from_scan(
     except Exception as exc:
         logger.warning("Finding remediation generation failed (will enrich per-finding): %s", exc)
 
-    title = payload.title or f"VAPT Report — {scan.name or connector_type.upper()} — {client.name}"
+    scan_label = scope["scan_name"] or connector_type.upper()
+    title = payload.title or f"VAPT Report — {scan_label} — {client.name}"
 
     report = VAPTReport(
         client_id=cid,
@@ -982,6 +1009,7 @@ async def create_report_from_scan(
             recommendation=initial_recommendation,
             references=fd["cve_id"] if fd.get("cve_id") else "",
             retest_status="pending",
+            owner_team=payload.owner_team,
             order_index=idx,
         )
         db.add(vapt_finding)
@@ -1205,9 +1233,11 @@ async def regenerate_report(
     # Recover cvss_score/cvss_vector from original scan findings (matched by title)
     # so Appendix A shows real scanner-provided scores, not LLM hallucinations.
     _cvss_by_title: Dict[str, tuple] = {}
-    scan_id = scope.get("scan_id") or report.scan_id
-    if scan_id:
-        orig_findings = db.query(Finding).filter(Finding.scan_id == scan_id).all()
+    scan_ids = scope.get("scan_ids") or ([scope.get("scan_id")] if scope.get("scan_id") else [])
+    if not scan_ids and report.scan_id:
+        scan_ids = [report.scan_id]
+    if scan_ids:
+        orig_findings = db.query(Finding).filter(Finding.scan_id.in_(scan_ids)).all()
         for of in orig_findings:
             key = (of.title or "").strip().lower()
             if key and key not in _cvss_by_title:

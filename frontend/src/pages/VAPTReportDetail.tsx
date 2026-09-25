@@ -141,6 +141,7 @@ const EMPTY_FINDING = {
   references: "",
   retest_status: "pending",
   retest_notes: "",
+  owner_team: "",
   order_index: 0,
 };
 
@@ -244,6 +245,11 @@ function FindingDialog({
             <TextField label="References" value={form.references}
               onChange={(e) => set("references", e.target.value)} fullWidth size="small"
               placeholder="CVE-2024-xxxx, CWE-79, OWASP A03:2021" />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
+            <TextField label="Owner Team" value={form.owner_team}
+              onChange={(e) => set("owner_team", e.target.value)} fullWidth size="small"
+              placeholder="e.g. Network Security Team" />
           </Grid>
           {form.retest_status !== "pending" && (
             <Grid size={{ xs: 12 }}>
@@ -795,7 +801,7 @@ export default function VAPTReportDetail() {
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: "rgba(26,35,126,0.2)" }}>
-                      {["ID", "Severity", "Title", "Asset", "Retest", "Actions"].map((h) => (
+                      {["ID", "Severity", "Title", "Asset", "Owner Team", "Retest", "Actions"].map((h) => (
                         <TableCell key={h} sx={{ fontWeight: 700, color: "text.secondary", fontSize: "0.78rem" }}>{h}</TableCell>
                       ))}
                     </TableRow>
@@ -813,6 +819,9 @@ export default function VAPTReportDetail() {
                         <TableCell sx={{ fontSize: "0.82rem", color: "text.secondary", maxWidth: 160,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {f.affected_asset || "—"}
+                        </TableCell>
+                        <TableCell sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
+                          {f.owner_team || "—"}
                         </TableCell>
                         <TableCell><RetestChip status={f.retest_status} /></TableCell>
                         <TableCell>

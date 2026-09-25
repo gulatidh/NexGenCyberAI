@@ -966,6 +966,22 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("agent_runs.progress_message ALTER failed: %s", exc)
 
+        # vapt_findings.owner_team — team responsible for remediating the finding
+        try:
+            vf_cols = {c["name"] for c in inspector.get_columns("vapt_findings")}
+        except Exception:
+            vf_cols = set()
+        if "owner_team" not in vf_cols:
+            ddl = ("ALTER TABLE vapt_findings ADD owner_team NVARCHAR(200) NULL"
+                   if dialect == "mssql"
+                   else "ALTER TABLE vapt_findings ADD COLUMN owner_team VARCHAR(200)")
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(ddl))
+                logger.info("Added vapt_findings.owner_team column (%s)", dialect)
+            except Exception as exc:
+                logger.warning("vapt_findings.owner_team ALTER failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 

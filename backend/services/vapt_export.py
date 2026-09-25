@@ -949,6 +949,8 @@ def generate_pdf(report: Dict, findings: List[Dict], client_name: str) -> bytes:
                 finding_elements.append(cve_tbl)
                 finding_elements.append(Spacer(1, 0.3 * cm))
 
+            if f.get("owner_team"):
+                field_block("Owner Team", _safe(f.get("owner_team")))
             field_block("Business Impact", _safe(f.get("impact")))
             field_block("Evidence", _safe(f.get("evidence")))
             field_block("Reproduction Steps", _safe(f.get("reproduction_steps")), code_style=True)
@@ -1674,6 +1676,8 @@ def generate_docx(report: Dict, findings: List[Dict], client_name: str) -> bytes
                 cve_tbl_d.cell(ri_d, 2).paragraphs[0].add_run((cve_desc_d[:200] if cve_desc_d else "—")).font.size = Pt(9)
             doc.add_paragraph()
 
+        if f.get("owner_team"):
+            _field("Owner Team", _safe(f.get("owner_team")))
         _field("Business Impact", _safe(f.get("impact")))
         _field("Evidence", _safe(f.get("evidence")))
         _field("Reproduction Steps", _safe(f.get("reproduction_steps")))

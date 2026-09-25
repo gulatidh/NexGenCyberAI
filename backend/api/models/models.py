@@ -1343,6 +1343,7 @@ class VAPTFinding(Base):
     references = Column(Text)               # CVE/CWE/OWASP refs
     retest_status = Column(String(20), default="pending")  # pending|passed|failed|not_applicable
     retest_notes = Column(Text, nullable=True)
+    owner_team = Column(String(200), nullable=True)
     order_index = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

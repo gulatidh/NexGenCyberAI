@@ -711,7 +711,7 @@ export const vaptApi = {
     apiClient.delete(`/clients/${clientId}/vapt-reports/${reportId}/findings/${findingId}/`),
   exportUrl: (clientId: string, reportId: string, format: string) =>
     `/clients/${clientId}/vapt-reports/${reportId}/export/${format}`,
-  createFromScan: (clientId: string, data: { scan_id: string; title?: string; classification?: string; prepared_by?: string }) =>
+  createFromScan: (clientId: string, data: { scan_id?: string; scan_ids?: string[]; title?: string; classification?: string; prepared_by?: string; owner_team?: string; sla_config?: string }) =>
     apiClient.post(`/clients/${clientId}/vapt-reports/from-scan/`, data).then((r) => r.data),
   compare: (clientId: string, a: string, b: string) =>
     apiClient.get(`/clients/${clientId}/vapt-reports/compare?a=${a}&b=${b}`).then((r) => r.data),

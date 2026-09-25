@@ -102,7 +102,8 @@ export default function VAPTReports() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [mode, setMode] = useState<"scan" | "blank">("scan");
-  const [selectedScanId, setSelectedScanId] = useState("");
+  const [selectedScanIds, setSelectedScanIds] = useState<string[]>([]);
+  const [ownerTeam, setOwnerTeam] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [slaOpen, setSlaOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -154,7 +155,8 @@ export default function VAPTReports() {
   const handleClose = () => {
     setCreateOpen(false);
     setMode("scan");
-    setSelectedScanId("");
+    setSelectedScanIds([]);
+    setOwnerTeam("");
     setForm(EMPTY_FORM);
     setSlaOpen(false);
   };
@@ -163,10 +165,11 @@ export default function VAPTReports() {
     const sla_config = JSON.stringify(form.sla);
     if (mode === "scan") {
       createFromScanMutation.mutate({
-        scan_id: selectedScanId,
+        scan_ids: selectedScanIds,
         title: form.title || undefined,
         classification: form.classification,
         prepared_by: form.prepared_by || undefined,
+        owner_team: ownerTeam || undefined,
         sla_config,
       });
     } else {
@@ -399,45 +402,61 @@ export default function VAPTReports() {
             </Alert>
           )}
 
-          {/* Scan picker — only in scan mode */}
+          {/* Scan picker — multi-select, only in scan mode */}
           {mode === "scan" && (
-            <FormControl fullWidth sx={{ mb: 2 }} required>
-              <InputLabel>Select Completed Scan</InputLabel>
-              <Select
-                value={selectedScanId}
-                label="Select Completed Scan"
-                onChange={(e) => {
-                  setSelectedScanId(e.target.value);
-                  const scan = completedScans.find((s: any) => s.id === e.target.value);
-                  if (scan && !form.title) {
-                    setForm((f) => ({ ...f, title: `VAPT Report — ${scan.name || scan.scan_type || "Scan"}` }));
-                  }
-                }}
-              >
-                {completedScans.length === 0 && (
-                  <MenuItem disabled value="">No completed scans found</MenuItem>
-                )}
-                {completedScans.map((s: any) => {
-                  const ct = s.connector?.connector_type || s.scan_type || "";
-                  const label = SCAN_TYPE_LABEL[ct] || ct || "Scan";
-                  const connectorName = s.connector?.name;
-                  return (
-                    <MenuItem key={s.id} value={s.id}>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {s.name || `${label} — ${new Date(s.created_at).toLocaleDateString()}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {[connectorName, label].filter(Boolean).join(" · ")} ·{" "}
-                          {new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ·{" "}
-                          {s.summary?.total || 0} findings
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  );
-                })}
-              </Select>
-            </FormControl>
+            <>
+              <FormControl fullWidth sx={{ mb: 1.5 }} required>
+                <InputLabel>Select Completed Scan(s)</InputLabel>
+                <Select
+                  multiple
+                  value={selectedScanIds}
+                  label="Select Completed Scan(s)"
+                  onChange={(e) => {
+                    const ids = typeof e.target.value === "string" ? [e.target.value] : e.target.value as string[];
+                    setSelectedScanIds(ids);
+                  }}
+                  renderValue={(selected) => {
+                    const names = (selected as string[]).map((id) => {
+                      const s = completedScans.find((sc: any) => sc.id === id);
+                      return s ? (s.name || s.scan_type || id) : id;
+                    });
+                    return names.join(", ");
+                  }}
+                >
+                  {completedScans.length === 0 && (
+                    <MenuItem disabled value="">No completed scans found</MenuItem>
+                  )}
+                  {completedScans.map((s: any) => {
+                    const ct = s.connector?.connector_type || s.scan_type || "";
+                    const label = SCAN_TYPE_LABEL[ct] || ct || "Scan";
+                    const connectorName = s.connector?.name;
+                    return (
+                      <MenuItem key={s.id} value={s.id}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {s.name || `${label} — ${new Date(s.created_at).toLocaleDateString()}`}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {[connectorName, label].filter(Boolean).join(" · ")} ·{" "}
+                            {new Date(s.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ·{" "}
+                            {s.summary?.total || 0} findings
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Owner Team (optional)"
+                size="small"
+                fullWidth
+                value={ownerTeam}
+                onChange={(e) => setOwnerTeam(e.target.value)}
+                placeholder="e.g. Network Security Team"
+                sx={{ mb: 2 }}
+              />
+            </>
           )}
 
           <Divider sx={{ mb: 2 }} />
@@ -559,7 +578,7 @@ export default function VAPTReports() {
             onClick={handleSubmit}
             disabled={
               isPending ||
-              (mode === "scan" && !selectedScanId) ||
+              (mode === "scan" && selectedScanIds.length === 0) ||
               (mode === "blank" && !form.title.trim())
             }
             sx={{ bgcolor: "#1A237E", "&:hover": { bgcolor: "#283593" } }}
