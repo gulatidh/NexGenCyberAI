@@ -16,7 +16,7 @@ import {
   CircularProgress, Alert, LinearProgress, Table, TableHead, TableRow, TableCell,
   TableBody, Divider, Tooltip, IconButton, Menu, MenuItem, Collapse,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select,
-  Tabs, Tab, Checkbox, FormControlLabel,
+  Tabs, Tab, Checkbox, FormControlLabel, InputBase,
 } from "@mui/material";
 import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
@@ -413,16 +413,17 @@ function ComponentsEditor({ clientId, modelId, components, notes }: {
                 "&:last-child": { borderBottom: "none" },
                 "&:hover": { bgcolor: "action.hover" },
               }}>
-                {/* Name */}
-                <Tooltip title={r.name} placement="top-start">
-                  <Typography sx={{
-                    flex: 1, fontSize: 12, color: "text.primary", fontWeight: 500,
-                    overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-                    minWidth: 0,
-                  }}>
-                    {r.name}
-                  </Typography>
-                </Tooltip>
+                {/* Name — inline editable */}
+                <InputBase
+                  value={r.name}
+                  onChange={(e) => updateRow(r.id, "name", e.target.value)}
+                  sx={{
+                    flex: 1, minWidth: 0, fontSize: 12, fontWeight: 500,
+                    "& input": { p: 0, color: "text.primary" },
+                    "&:hover": { bgcolor: "action.hover", borderRadius: 0.5 },
+                    "&.Mui-focused": { outline: "1px solid", outlineColor: "primary.main", borderRadius: 0.5, px: 0.5 },
+                  }}
+                />
 
                 {/* Type */}
                 <Select size="small" value={r.type || "other"} sx={{ ...selectSx, width: 110 }}
