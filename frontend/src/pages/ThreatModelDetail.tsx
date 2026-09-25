@@ -1264,38 +1264,86 @@ export default function ThreatModelDetail() {
                 }
               />
             )}
-            {data.data_flows.length > 0 && (
-              <>
-                <Divider sx={{ my: 2, borderColor: "divider" }} />
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1, display: "block" }}>
-                  Data flows
-                </Typography>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
-                      <TableCell>FROM</TableCell><TableCell>TO</TableCell>
-                      <TableCell>PROTOCOL</TableCell><TableCell>DATA</TableCell><TableCell>ENCRYPTED</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.data_flows.map((d, i) => (
-                      <TableRow key={i} sx={{ "& td": { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 1 } }}>
-                        <TableCell>{compName.get(d.from) || d.from}</TableCell>
-                        <TableCell>{compName.get(d.to) || d.to}</TableCell>
-                        <TableCell><Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} /></TableCell>
-                        <TableCell>{d.data}</TableCell>
-                        <TableCell>
-                          <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
-                            sx={{ height: 18, fontSize: 10, fontWeight: 700,
-                              bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
-                              color: d.encrypted ? "#34A853" : "#EA4335" }} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </>
-            )}
+            {data.data_flows.length > 0 && (() => {
+              const DataFlowsEditor = () => {
+                const [flows, setFlows] = React.useState<any[]>(() => data.data_flows.map((f: any) => ({ ...f })));
+                React.useEffect(() => { setFlows(data.data_flows.map((f: any) => ({ ...f }))); }, []);
+                const save = (updated: any[]) => patchModelMutation.mutate({ data_flows_json: updated });
+                const updateFlow = (idx: number, field: string, value: any) => {
+                  const updated = flows.map((f, i) => i === idx ? { ...f, [field]: value } : f);
+                  setFlows(updated);
+                  return updated;
+                };
+                const PROTOCOLS = ["HTTPS", "HTTP", "TCP", "UDP", "JDBC", "AMQP", "gRPC", "SSH", "SFTP", "SMTP", "DNS", "Other"];
+                const cellSx = { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 0.5 };
+                const inputSx = { fontSize: 12.5, "& input": { p: "2px 4px" }, "&.Mui-focused": { outline: "1px solid", outlineColor: "primary.main", borderRadius: 0.5 } };
+                return (
+                  <>
+                    <Divider sx={{ my: 2, borderColor: "divider" }} />
+                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1, display: "block" }}>
+                      Data flows {canAct && <Typography component="span" variant="caption" sx={{ color: "text.disabled", fontWeight: 400, textTransform: "none" }}> — click cells to edit</Typography>}
+                    </Typography>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                          <TableCell>FROM</TableCell><TableCell>TO</TableCell>
+                          <TableCell>PROTOCOL</TableCell><TableCell>DATA / LABEL</TableCell>
+                          <TableCell>ENCRYPTED</TableCell><TableCell>NOTES</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {flows.map((d, i) => (
+                          <TableRow key={i} sx={{ "& td": { ...cellSx } }}>
+                            <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{compName.get(d.from) || d.from}</TableCell>
+                            <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{compName.get(d.to) || d.to}</TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <Select size="small" value={d.protocol || "HTTPS"}
+                                  onChange={(e) => save(updateFlow(i, "protocol", e.target.value))}
+                                  sx={{ fontSize: 11, height: 24, "& .MuiSelect-select": { py: "2px", px: "6px" } }}>
+                                  {PROTOCOLS.map((p) => <MenuItem key={p} value={p} sx={{ fontSize: 11 }}>{p}</MenuItem>)}
+                                </Select>
+                              ) : (
+                                <Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <InputBase value={d.data || ""} sx={inputSx}
+                                  onChange={(e) => setFlows(flows.map((f, j) => j === i ? { ...f, data: e.target.value } : f))}
+                                  onBlur={(e) => save(flows.map((f, j) => j === i ? { ...f, data: e.target.value } : f))} />
+                              ) : d.data}
+                            </TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
+                                  onClick={() => save(updateFlow(i, "encrypted", !d.encrypted))}
+                                  sx={{ height: 20, fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                    bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                                    color: d.encrypted ? "#34A853" : "#EA4335" }} />
+                              ) : (
+                                <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
+                                  sx={{ height: 18, fontSize: 10, fontWeight: 700,
+                                    bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                                    color: d.encrypted ? "#34A853" : "#EA4335" }} />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <InputBase value={d.notes || ""} placeholder="—" sx={{ ...inputSx, minWidth: 80 }}
+                                  onChange={(e) => setFlows(flows.map((f, j) => j === i ? { ...f, notes: e.target.value } : f))}
+                                  onBlur={(e) => save(flows.map((f, j) => j === i ? { ...f, notes: e.target.value } : f))} />
+                              ) : (d.notes || "—")}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </>
+                );
+              };
+              return <DataFlowsEditor />;
+            })()}
           </CardContent>
         </Card>
         </Box>
