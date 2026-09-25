@@ -1490,8 +1490,11 @@ export default function ThreatModelDetail() {
             const cellCounts: Record<string, { count: number; maxSev: string }> = {};
             const SEV_ORDER = ["critical", "high", "medium", "low"];
             for (const t of data.threats) {
-              const li = Number(t.likelihood) || 0;
-              const im = Number(t.impact) || 0;
+              const rawLi = Number(t.likelihood) || 0;
+              const rawIm = Number(t.impact) || 0;
+              // Threats use 1-10 scale; normalize to 1-5 bands for the grid
+              const li = rawLi >= 1 ? Math.min(5, Math.ceil(rawLi / 2)) : 0;
+              const im = rawIm >= 1 ? Math.min(5, Math.ceil(rawIm / 2)) : 0;
               if (li >= 1 && li <= 5 && im >= 1 && im <= 5) {
                 const key = `${li},${im}`;
                 const prev = cellCounts[key] || { count: 0, maxSev: "low" };
@@ -1550,7 +1553,7 @@ export default function ThreatModelDetail() {
                     ))}
                   </Box>
                   <Typography variant="caption" sx={{ color: "text.secondary", mt: 1, display: "block" }}>
-                    Cell score = L×I. Cells with threats show count coloured by highest severity. Unscored threats not shown.
+                    Cell score = L×I (1–10 scale mapped to L1–L5 / I1–I5 bands). Cells show threat count coloured by highest severity.
                   </Typography>
                 </CardContent>
               </Card>
