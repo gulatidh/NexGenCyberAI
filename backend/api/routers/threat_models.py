@@ -1312,6 +1312,80 @@ async def get_threat_model_portal_html(
     )
 
 
+class ThreatModelPatch(BaseModel):
+    name: Optional[str] = None
+    components_json: Optional[list] = None
+    data_flows_json: Optional[list] = None
+
+
+@router.patch("/{model_id}", dependencies=[Depends(require_editor_anywhere)])
+async def patch_threat_model(
+    client_id: str,
+    model_id: str,
+    payload: ThreatModelPatch,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    from sqlalchemy.orm.attributes import flag_modified
+    tm = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not tm:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    if payload.name is not None:
+        tm.name = payload.name
+    if payload.components_json is not None:
+        tm.components_json = payload.components_json
+        flag_modified(tm, "components_json")
+    if payload.data_flows_json is not None:
+        tm.data_flows_json = payload.data_flows_json
+        flag_modified(tm, "data_flows_json")
+    db.commit()
+    db.refresh(tm)
+    return _detail_from(tm, db)
+
+
+@router.post("/{model_id}/clone", status_code=201, dependencies=[Depends(require_editor_anywhere)])
+async def clone_threat_model(
+    client_id: str,
+    model_id: str,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Create a copy of a threat model (components + flows + threats). No AI re-run."""
+    import uuid as _uuid
+    src = db.query(ThreatModel).filter(
+        ThreatModel.id == model_id, ThreatModel.client_id == client_id,
+    ).first()
+    if not src:
+        raise HTTPException(status_code=404, detail="Threat model not found")
+    clone = ThreatModel(
+        id=str(_uuid.uuid4()),
+        client_id=client_id,
+        project_id=src.project_id,
+        name=(src.name or "Threat Model") + " (Copy)",
+        status="draft",
+        methodology=src.methodology,
+        framework=src.framework,
+        cloud_provider=src.cloud_provider,
+        components_json=list(src.components_json or []),
+        data_flows_json=list(src.data_flows_json or []),
+        threats_json=list(src.threats_json or []),
+        mitigations_json=list(src.mitigations_json or []),
+        trust_boundaries_json=list(src.trust_boundaries_json or []),
+        entry_points_json=list(src.entry_points_json or []),
+        coverage_decisions=list(src.coverage_decisions or []),
+        executive_summary=src.executive_summary,
+        analyst_notes=src.analyst_notes,
+        components_pinned=src.components_pinned,
+        metadata_json=dict(src.metadata_json or {}),
+    )
+    db.add(clone)
+    db.commit()
+    db.refresh(clone)
+    return _detail_from(clone, db)
+
+
 @router.delete("/{model_id}", status_code=204)
 async def delete_threat_model(
     client_id: str,

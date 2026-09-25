@@ -458,6 +458,10 @@ export const threatModelsApi = {
     apiClient.post(`/clients/${clientId}/threat-models/${modelId}/suggest-detections`).then((r) => r.data),
   validateSigmaRule: (clientId: string, modelId: string, index: number) =>
     apiClient.patch(`/clients/${clientId}/threat-models/${modelId}/sigma-rules/${index}/validate`).then((r) => r.data),
+  patchModel: (clientId: string, modelId: string, body: { name?: string; components_json?: any[]; data_flows_json?: any[] }) =>
+    apiClient.patch(`/clients/${clientId}/threat-models/${modelId}`, body).then((r) => r.data),
+  clone: (clientId: string, modelId: string) =>
+    apiClient.post(`/clients/${clientId}/threat-models/${modelId}/clone`).then((r) => r.data),
   downloadSigmaRules: async (clientId: string, modelId: string) => {
     const url = `${apiClient.defaults.baseURL || ""}/clients/${clientId}/threat-models/${modelId}/sigma-rules?format=yaml`;
     // Acquire auth token the same way the interceptor does

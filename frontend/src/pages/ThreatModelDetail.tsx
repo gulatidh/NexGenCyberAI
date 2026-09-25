@@ -22,7 +22,7 @@ import {
   ArrowBack, Hub, Replay, Print, PlaylistAddCheck, AddTask, Download, NoteAlt,
   KeyboardArrowUp, KeyboardArrowDown, AutoFixHigh, Add, DeleteOutlined, EditOutlined,
   Security, AccountTree, Verified, ExpandMore, ExpandLess,
-  MenuBook, Group, VerifiedUser, Timeline, Article, UploadFile,
+  MenuBook, Group, VerifiedUser, Timeline, Article, UploadFile, ContentCopy,
 } from "@mui/icons-material";
 import { DetailNavItem } from "../components/layout/PageDetailLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -752,6 +752,25 @@ export default function ThreatModelDetail() {
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to re-model"),
   });
 
+  const cloneMutation = useMutation({
+    mutationFn: () => threatModelsApi.clone(clientId, modelId!),
+    onSuccess: (cloned: any) => {
+      qc.invalidateQueries({ queryKey: ["threat-models", clientId] });
+      toast.success("Threat model cloned");
+      navigate(`/threat-models/${cloned.id}?client=${clientId}`);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to clone"),
+  });
+
+  const patchModelMutation = useMutation({
+    mutationFn: (body: { name?: string; components_json?: any[]; data_flows_json?: any[] }) =>
+      threatModelsApi.patchModel(clientId, modelId!, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["threat-model-detail", modelId] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Update failed"),
+  });
+
   const convertOne = useMutation({
     mutationFn: (threatId: string) => threatModelsApi.convertThreat(clientId, modelId!, threatId),
     onSuccess: (resp: any) => {
@@ -913,6 +932,19 @@ export default function ThreatModelDetail() {
         >
           Export Report
         </Button>
+        <Tooltip title="Create a copy of this threat model">
+          <span>
+            <Button
+              size="small"
+              startIcon={cloneMutation.isPending ? <CircularProgress size={14} /> : <ContentCopy sx={{ fontSize: 16 }} />}
+              onClick={() => cloneMutation.mutate()}
+              disabled={cloneMutation.isPending}
+              sx={{ color: "text.secondary" }}
+            >
+              Clone
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* ── Export Report Dialog ──────────────────────────────────────── */}
@@ -1209,6 +1241,18 @@ export default function ThreatModelDetail() {
                 dataFlows={data.data_flows}
                 threats={data.threats}
                 trustBoundaries={data.trust_boundaries ?? []}
+                onRenameComponent={(compId, newName) => {
+                  const updated = data.components.map((c: any) =>
+                    c.id === compId ? { ...c, name: newName } : c,
+                  );
+                  patchModelMutation.mutate({ components_json: updated });
+                }}
+                onEditFlow={(flowIdx, update) => {
+                  const updated = data.data_flows.map((f: any, i: number) =>
+                    i === flowIdx ? { ...f, ...update } : f,
+                  );
+                  patchModelMutation.mutate({ data_flows_json: updated });
+                }}
               />
             ) : (
               <DfdDiagram

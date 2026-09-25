@@ -15,7 +15,7 @@
  *   Attack Vector   → red dashed arrow with orange pill label
  *   Data Flow       → green pill label (encrypted) / red dashed (unencrypted)
  */
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Typography, Tooltip, Chip, useTheme } from "@mui/material";
 import { Warning, BugReport, Person } from "@mui/icons-material";
 import {
@@ -117,6 +117,16 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   const datacenter  = (data.datacenter  as string) || "";
   const envDcParts  = [environment, datacenter].filter(Boolean);
   const envDcLabel  = envDcParts.join(" · ");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(label);
+
+  const commitRename = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== label && typeof data.onRename === "function") {
+      data.onRename(data.componentId as string, trimmed);
+    }
+  };
 
   const handles = (
     <>
@@ -166,9 +176,27 @@ function ComponentNode({ data }: { data: Record<string, any> }) {
   // ── Standard shapes ──────────────────────────────────────────────────────────
   const borderColor = isDark ? "#9E9E9E" : "#444";
   const textColor   = isDark ? "#E0E0E0" : "#212121";
+  const canRename   = typeof data.onRename === "function";
 
-  const labelEl = (
-    <Box sx={{ textAlign: "center" }}>
+  const labelEl = editing ? (
+    <input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commitRename}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+        if (e.key === "Escape") { setEditing(false); setDraft(label); }
+      }}
+      style={{
+        background: "transparent", border: `1px solid ${borderColor}`,
+        color: textColor, fontSize: 10.5, fontWeight: 600, textAlign: "center",
+        width: "90%", outline: "none", borderRadius: 2, padding: "1px 3px",
+      }}
+    />
+  ) : (
+    <Box sx={{ textAlign: "center" }} onDoubleClick={canRename ? () => { setDraft(label); setEditing(true); } : undefined}
+      style={{ cursor: canRename ? "text" : undefined }}>
       <Typography sx={{
         fontSize: 10.5, fontWeight: 600, color: textColor,
         lineHeight: 1.3, overflow: "hidden", display: "-webkit-box",
@@ -351,8 +379,11 @@ function BoundaryNode({ selected, data }: { selected?: boolean; data: Record<str
 
 function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
   const [path, lx, ly] = getBezierPath({ sourceX, sourceY, targetX, targetY });
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState((data?.label as string) ?? "");
   const isAttack   = !!data?.isAttackVector;
   const encrypted  = data?.encrypted !== false;
+  const canEdit    = typeof data?.onEditFlow === "function";
 
   const stroke     = isAttack ? "#EA4335" : (encrypted ? "#5CB85C" : "#D9534F");
   const dash       = (isAttack || !encrypted) ? "6 3" : undefined;
@@ -360,6 +391,14 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
   const pillBg     = isAttack ? "#FEECE9" : "#DFF0D8";
   const pillBorder = isAttack ? "#EA4335" : "#5CB85C";
   const pillText   = isAttack ? "#C0392B" : "#2D6A2D";
+
+  const commitLabel = () => {
+    setEditingLabel(false);
+    const trimmed = labelDraft.trim();
+    if (trimmed && trimmed !== data?.label && canEdit) {
+      data.onEditFlow({ label: trimmed });
+    }
+  };
 
   return (
     <>
@@ -378,12 +417,32 @@ function DataFlowEdge({ id, sourceX, sourceY, targetX, targetY, data }: any) {
               bgcolor: pillBg, border: `1px solid ${pillBorder}`,
               color: pillText, borderRadius: "4px",
               px: 0.75, py: 0.25, fontSize: 10, fontWeight: 600,
-              pointerEvents: "none", whiteSpace: "nowrap",
+              pointerEvents: canEdit ? "all" : "none", whiteSpace: "nowrap",
               maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis",
               boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+              cursor: canEdit ? "text" : undefined,
             }}
+            onDoubleClick={canEdit ? () => { setLabelDraft(data.label); setEditingLabel(true); } : undefined}
           >
-            {isAttack && "⚠ "}{data.label}
+            {editingLabel ? (
+              <input
+                autoFocus
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onBlur={commitLabel}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); commitLabel(); }
+                  if (e.key === "Escape") { setEditingLabel(false); setLabelDraft(data.label); }
+                }}
+                style={{
+                  background: "transparent", border: "none", outline: "none",
+                  color: pillText, fontSize: 10, fontWeight: 600,
+                  width: Math.max(60, labelDraft.length * 7),
+                }}
+              />
+            ) : (
+              <>{isAttack && "⚠ "}{data.label}</>
+            )}
           </Box>
         </EdgeLabelRenderer>
       )}
@@ -409,10 +468,16 @@ const PAD_PLAT_H   = 48;
 const PAD_PLAT_TOP = 60;  // room for DC label chip
 const PAD_PLAT_BOT = 40;
 
+interface BuildGraphOpts {
+  onRenameComponent?: (componentId: string, newName: string) => void;
+  onEditFlow?: (flowIndex: number, update: { label?: string; protocol?: string; encrypted?: boolean }) => void;
+}
+
 function buildGraph(
   components: ComponentInput[],
   dataFlows: DataFlowInput[],
   threats: ThreatInput[],
+  opts?: BuildGraphOpts,
 ): { nodes: Node[]; edges: Edge[] } {
 
   const dagre: any = (dagreLib as any).default ?? dagreLib;
@@ -786,6 +851,7 @@ function buildGraph(
                 platform, trustZone: tier, criticality: c.criticality || "",
                 environment: c.environment || "", datacenter: c.datacenter || "",
                 threatCount: td?.count ?? 0, maxSeverity: td?.maxSev ?? null,
+                componentId: c.id, onRename: opts?.onRenameComponent,
               },
               draggable: true, zIndex: 1,
             } as Node);
@@ -866,6 +932,7 @@ function buildGraph(
               platform, trustZone: tier, criticality: c.criticality || "",
               environment: c.environment || "", datacenter: c.datacenter || "",
               threatCount: td?.count ?? 0, maxSeverity: td?.maxSev ?? null,
+              componentId: c.id, onRename: opts?.onRenameComponent,
             },
             draggable: true, zIndex: 1,
           } as Node);
@@ -887,6 +954,8 @@ function buildGraph(
         protocol: f.protocol,
         encrypted: f.encrypted,
         isAttackVector: !!(f as any).is_attack_vector,
+        flowIndex: i,
+        onEditFlow: opts?.onEditFlow ? (update: { label?: string; protocol?: string; encrypted?: boolean }) => opts.onEditFlow!(i, update) : undefined,
       },
       markerEnd: { type: MarkerType.ArrowClosed },
       zIndex: 5,
@@ -914,19 +983,22 @@ interface ThreatInput { id: string; asset_id: string; severity: string; }
 
 function DfdGraphInner({
   components, dataFlows, threats, trustBoundaries,
+  onRenameComponent, onEditFlow,
 }: {
   components: ComponentInput[];
   dataFlows: DataFlowInput[];
   threats: ThreatInput[];
   trustBoundaries: any[];
+  onRenameComponent?: (componentId: string, newName: string) => void;
+  onEditFlow?: (flowIndex: number, update: { label?: string; protocol?: string; encrypted?: boolean }) => void;
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
 
   const { nodes: rfNodes, edges: rfEdges } = useMemo(
-    () => buildGraph(components, dataFlows, threats),
+    () => buildGraph(components, dataFlows, threats, { onRenameComponent, onEditFlow }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [components, dataFlows, threats],
+    [components, dataFlows, threats, onRenameComponent, onEditFlow],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
@@ -1089,9 +1161,11 @@ interface Props {
   dataFlows: DataFlowInput[];
   threats: ThreatInput[];
   trustBoundaries?: any[];
+  onRenameComponent?: (componentId: string, newName: string) => void;
+  onEditFlow?: (flowIndex: number, update: { label?: string; protocol?: string; encrypted?: boolean }) => void;
 }
 
-export default function DfdReactFlow({ components, dataFlows, threats, trustBoundaries = [] }: Props) {
+export default function DfdReactFlow({ components, dataFlows, threats, trustBoundaries = [], onRenameComponent, onEditFlow }: Props) {
   return (
     <Box>
       <ReactFlowProvider>
@@ -1100,6 +1174,8 @@ export default function DfdReactFlow({ components, dataFlows, threats, trustBoun
           dataFlows={dataFlows}
           threats={threats}
           trustBoundaries={trustBoundaries}
+          onRenameComponent={onRenameComponent}
+          onEditFlow={onEditFlow}
         />
       </ReactFlowProvider>
       <DfdLegend />
