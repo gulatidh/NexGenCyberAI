@@ -6,12 +6,12 @@ import {
   FormControl, InputLabel, Select, MenuItem, Button, Alert, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, LinearProgress,
   Drawer, Tabs, Tab, Divider, ToggleButton, ToggleButtonGroup, Paper,
-  Snackbar, IconButton, Tooltip, Slider, TextField,
+  Snackbar, IconButton, Tooltip, Slider, TextField, Checkbox,
 } from "@mui/material";
 import {
   Warning, ChevronRight, PictureAsPdf, Article, Replay,
   CheckCircle, Cancel, Schedule, AutoAwesome, Close, FileDownload,
-  AttachMoney, TrendingDown, Bolt,
+  AttachMoney, TrendingDown, Bolt, DeleteOutlined,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -755,6 +755,9 @@ export default function Risks() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [snack, setSnack] = useState("");
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   const [levelFilters, setLevelFilters] = useState<Set<string>>(new Set());
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set());
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set());
@@ -798,6 +801,17 @@ export default function Risks() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => risksApi.update(clientId, id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["risks"] }); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => risksApi.delete(clientId, id))),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["risks"] });
+      setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      setSnack(`${selectedIds.size} risk${selectedIds.size > 1 ? "s" : ""} deleted`);
+    },
+    onError: () => setSnack("Delete failed — please try again"),
   });
 
   const counts = useMemo(() => {
@@ -1055,12 +1069,36 @@ export default function Risks() {
             </Box>
           </Card>
 
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 2, py: 1, mb: 1,
+              bgcolor: "rgba(234,67,53,0.08)", border: "1px solid rgba(234,67,53,0.3)", borderRadius: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: "error.main" }}>
+                {selectedIds.size} risk{selectedIds.size > 1 ? "s" : ""} selected
+              </Typography>
+              <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutlined />}
+                onClick={() => setDeleteConfirmOpen(true)}>
+                Delete Selected
+              </Button>
+              <Button size="small" sx={{ ml: "auto" }} onClick={() => setSelectedIds(new Set())}>
+                Clear selection
+              </Button>
+            </Box>
+          )}
+
           {/* Risk table */}
           <Card sx={{ bgcolor: "background.paper", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 2, mb: 2 }}>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
+                    <TableCell padding="checkbox">
+                      <Checkbox size="small"
+                        indeterminate={selectedIds.size > 0 && selectedIds.size < filtered.length}
+                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onChange={(e) => setSelectedIds(e.target.checked ? new Set(filtered.map((r) => r.id)) : new Set())}
+                      />
+                    </TableCell>
                     <TableCell>LEVEL</TableCell>
                     <TableCell>TITLE</TableCell>
                     <TableCell>SCORE</TableCell>
@@ -1078,11 +1116,18 @@ export default function Risks() {
                     const score = (r as any).risk_matrix_score || r.risk_score || 0;
                     const measures = parseJson((r as any).measures_json) || [];
                     const inPlace = measures.filter((m: any) => m.status === "in_place").length;
+                    const isChecked = selectedIds.has(r.id);
                     return (
                       <TableRow key={r.id}
+                        selected={isChecked}
                         sx={{ cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
-                          "& td": { borderColor: "divider", py: 1 } }}
+                          "& td": { borderColor: "divider", py: 1 },
+                          "&.Mui-selected": { bgcolor: "rgba(234,67,53,0.06)" },
+                          "&.Mui-selected:hover": { bgcolor: "rgba(234,67,53,0.1)" } }}
                         onClick={() => openDrawer(r)}>
+                        <TableCell padding="checkbox" onClick={(e) => { e.stopPropagation(); setSelectedIds((prev) => { const next = new Set(prev); isChecked ? next.delete(r.id) : next.add(r.id); return next; }); }}>
+                          <Checkbox size="small" checked={isChecked} />
+                        </TableCell>
                         <TableCell>
                           <Chip label={lv.replace("_", "-")} size="small"
                             sx={{ bgcolor: `${LEVEL_COLOR[simpleLevel] || "#888"}25`, color: LEVEL_COLOR[simpleLevel] || "#888",
@@ -1149,6 +1194,24 @@ export default function Risks() {
           </Card>
         </>
       )}
+
+      {/* Delete confirm dialog */}
+      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Delete {selectedIds.size} Risk{selectedIds.size > 1 ? "s" : ""}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This will permanently remove {selectedIds.size === 1 ? "this risk entry" : `these ${selectedIds.size} risk entries`} from the register. This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
+          <Button variant="contained" color="error" disabled={deleteMutation.isPending}
+            startIcon={deleteMutation.isPending ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : <DeleteOutlined />}
+            onClick={() => deleteMutation.mutate(Array.from(selectedIds))}>
+            {deleteMutation.isPending ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <RiskDetailDrawer
         risk={selected}
