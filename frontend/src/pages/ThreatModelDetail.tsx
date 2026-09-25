@@ -1264,9 +1264,10 @@ export default function ThreatModelDetail() {
                 }
               />
             )}
-            {data.data_flows.length > 0 && (() => {
+            {(() => {
               const DataFlowsEditor = () => {
                 const [flows, setFlows] = React.useState<any[]>(() => data.data_flows.map((f: any) => ({ ...f })));
+                const [newRow, setNewRow] = React.useState<any | null>(null);
                 React.useEffect(() => { setFlows(data.data_flows.map((f: any) => ({ ...f }))); }, []);
                 const save = (updated: any[]) => patchModelMutation.mutate({ data_flows_json: updated });
                 const updateFlow = (idx: number, field: string, value: any) => {
@@ -1274,38 +1275,74 @@ export default function ThreatModelDetail() {
                   setFlows(updated);
                   return updated;
                 };
+                const deleteFlow = (idx: number) => {
+                  const updated = flows.filter((_, i) => i !== idx);
+                  setFlows(updated);
+                  save(updated);
+                };
+                const addFlow = () => {
+                  const firstId = data.components[0]?.id || "";
+                  const secondId = data.components[1]?.id || firstId;
+                  setNewRow({ from: firstId, to: secondId, protocol: "HTTPS", data: "", encrypted: true, notes: "" });
+                };
+                const commitNewRow = () => {
+                  if (!newRow || !newRow.from || !newRow.to) return;
+                  const updated = [...flows, newRow];
+                  setFlows(updated);
+                  save(updated);
+                  setNewRow(null);
+                };
                 const PROTOCOLS = ["HTTPS", "HTTP", "TCP", "UDP", "JDBC", "AMQP", "gRPC", "SSH", "SFTP", "SMTP", "DNS", "Other"];
+                const selectSx = { fontSize: 11, height: 24, "& .MuiSelect-select": { py: "2px", px: "6px" } };
                 const cellSx = { color: "text.primary", fontSize: 12.5, borderColor: "divider", py: 0.5 };
                 const inputSx = { fontSize: 12.5, "& input": { p: "2px 4px" }, "&.Mui-focused": { outline: "1px solid", outlineColor: "primary.main", borderRadius: 0.5 } };
                 return (
                   <>
                     <Divider sx={{ my: 2, borderColor: "divider" }} />
-                    <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, mb: 1, display: "block" }}>
-                      Data flows {canAct && <Typography component="span" variant="caption" sx={{ color: "text.disabled", fontWeight: 400, textTransform: "none" }}> — click cells to edit</Typography>}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                        Data flows ({flows.length})
+                        {canAct && <Typography component="span" variant="caption" sx={{ color: "text.disabled", fontWeight: 400, textTransform: "none" }}> — click cells to edit</Typography>}
+                      </Typography>
+                      {canAct && !newRow && (
+                        <Button size="small" startIcon={<Add />} onClick={addFlow}
+                          sx={{ fontSize: 11, py: 0.25, px: 1 }}>
+                          Add Flow
+                        </Button>
+                      )}
+                    </Box>
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ "& th": { color: "text.secondary", fontSize: 11, fontWeight: 600, borderColor: "divider" } }}>
                           <TableCell>FROM</TableCell><TableCell>TO</TableCell>
                           <TableCell>PROTOCOL</TableCell><TableCell>DATA / LABEL</TableCell>
                           <TableCell>ENCRYPTED</TableCell><TableCell>NOTES</TableCell>
+                          {canAct && <TableCell />}
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {flows.map((d, i) => (
                           <TableRow key={i} sx={{ "& td": { ...cellSx } }}>
-                            <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{compName.get(d.from) || d.from}</TableCell>
-                            <TableCell sx={{ color: "text.secondary", fontSize: 12 }}>{compName.get(d.to) || d.to}</TableCell>
                             <TableCell>
                               {canAct ? (
-                                <Select size="small" value={d.protocol || "HTTPS"}
-                                  onChange={(e) => save(updateFlow(i, "protocol", e.target.value))}
-                                  sx={{ fontSize: 11, height: 24, "& .MuiSelect-select": { py: "2px", px: "6px" } }}>
+                                <Select size="small" value={d.from || ""} onChange={(e) => save(updateFlow(i, "from", e.target.value))} sx={selectSx}>
+                                  {data.components.map((c: any) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 11 }}>{c.name}</MenuItem>)}
+                                </Select>
+                              ) : <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{compName.get(d.from) || d.from}</Typography>}
+                            </TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <Select size="small" value={d.to || ""} onChange={(e) => save(updateFlow(i, "to", e.target.value))} sx={selectSx}>
+                                  {data.components.map((c: any) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 11 }}>{c.name}</MenuItem>)}
+                                </Select>
+                              ) : <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{compName.get(d.to) || d.to}</Typography>}
+                            </TableCell>
+                            <TableCell>
+                              {canAct ? (
+                                <Select size="small" value={d.protocol || "HTTPS"} onChange={(e) => save(updateFlow(i, "protocol", e.target.value))} sx={selectSx}>
                                   {PROTOCOLS.map((p) => <MenuItem key={p} value={p} sx={{ fontSize: 11 }}>{p}</MenuItem>)}
                                 </Select>
-                              ) : (
-                                <Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />
-                              )}
+                              ) : <Chip label={d.protocol} size="small" sx={{ height: 18, fontSize: 10, bgcolor: "rgba(255,255,255,0.06)", color: "text.secondary" }} />}
                             </TableCell>
                             <TableCell>
                               {canAct ? (
@@ -1315,18 +1352,11 @@ export default function ThreatModelDetail() {
                               ) : d.data}
                             </TableCell>
                             <TableCell>
-                              {canAct ? (
-                                <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
-                                  onClick={() => save(updateFlow(i, "encrypted", !d.encrypted))}
-                                  sx={{ height: 20, fontSize: 10, fontWeight: 700, cursor: "pointer",
-                                    bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
-                                    color: d.encrypted ? "#34A853" : "#EA4335" }} />
-                              ) : (
-                                <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
-                                  sx={{ height: 18, fontSize: 10, fontWeight: 700,
-                                    bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
-                                    color: d.encrypted ? "#34A853" : "#EA4335" }} />
-                              )}
+                              <Chip label={d.encrypted ? "TLS" : "PLAIN"} size="small"
+                                onClick={canAct ? () => save(updateFlow(i, "encrypted", !d.encrypted)) : undefined}
+                                sx={{ height: 20, fontSize: 10, fontWeight: 700, cursor: canAct ? "pointer" : "default",
+                                  bgcolor: d.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                                  color: d.encrypted ? "#34A853" : "#EA4335" }} />
                             </TableCell>
                             <TableCell>
                               {canAct ? (
@@ -1335,8 +1365,68 @@ export default function ThreatModelDetail() {
                                   onBlur={(e) => save(flows.map((f, j) => j === i ? { ...f, notes: e.target.value } : f))} />
                               ) : (d.notes || "—")}
                             </TableCell>
+                            {canAct && (
+                              <TableCell sx={{ py: 0.25 }}>
+                                <Tooltip title="Delete flow">
+                                  <IconButton size="small" sx={{ color: "error.main" }} onClick={() => deleteFlow(i)}>
+                                    <DeleteOutlined fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
+
+                        {/* New row */}
+                        {newRow && (
+                          <TableRow sx={{ bgcolor: "action.hover", "& td": { borderColor: "divider", py: 0.5 } }}>
+                            <TableCell>
+                              <Select size="small" value={newRow.from} onChange={(e) => setNewRow({ ...newRow, from: e.target.value })} sx={selectSx}>
+                                {data.components.map((c: any) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 11 }}>{c.name}</MenuItem>)}
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Select size="small" value={newRow.to} onChange={(e) => setNewRow({ ...newRow, to: e.target.value })} sx={selectSx}>
+                                {data.components.map((c: any) => <MenuItem key={c.id} value={c.id} sx={{ fontSize: 11 }}>{c.name}</MenuItem>)}
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Select size="small" value={newRow.protocol} onChange={(e) => setNewRow({ ...newRow, protocol: e.target.value })} sx={selectSx}>
+                                {PROTOCOLS.map((p) => <MenuItem key={p} value={p} sx={{ fontSize: 11 }}>{p}</MenuItem>)}
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <InputBase autoFocus value={newRow.data} placeholder="Data transferred…" sx={{ ...inputSx, minWidth: 120 }}
+                                onChange={(e) => setNewRow({ ...newRow, data: e.target.value })} />
+                            </TableCell>
+                            <TableCell>
+                              <Chip label={newRow.encrypted ? "TLS" : "PLAIN"} size="small"
+                                onClick={() => setNewRow({ ...newRow, encrypted: !newRow.encrypted })}
+                                sx={{ height: 20, fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                  bgcolor: newRow.encrypted ? "rgba(52,168,83,0.15)" : "rgba(234,67,53,0.15)",
+                                  color: newRow.encrypted ? "#34A853" : "#EA4335" }} />
+                            </TableCell>
+                            <TableCell>
+                              <InputBase value={newRow.notes} placeholder="Notes…" sx={{ ...inputSx, minWidth: 80 }}
+                                onChange={(e) => setNewRow({ ...newRow, notes: e.target.value })}
+                                onKeyDown={(e) => { if (e.key === "Enter") commitNewRow(); if (e.key === "Escape") setNewRow(null); }} />
+                            </TableCell>
+                            <TableCell sx={{ py: 0.25 }}>
+                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <Tooltip title="Save (Enter)">
+                                  <IconButton size="small" sx={{ color: "success.main" }} onClick={commitNewRow}>
+                                    <PlaylistAddCheck fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Cancel (Esc)">
+                                  <IconButton size="small" onClick={() => setNewRow(null)}>
+                                    <DeleteOutlined fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </>
