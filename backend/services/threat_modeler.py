@@ -2102,10 +2102,18 @@ async def generate_threat_model(db: Session, model_id: str) -> ThreatModel:
             merged = pinned_components + threat_actors
             known = {c["id"] for c in merged}
             tm.components_json = merged
-            tm.data_flows_json = [
-                f for f in (model.get("data_flows") or [])
-                if _str(f.get("from")) in known and _str(f.get("to")) in known
-            ]
+            if orig_data_flows:
+                # User has manually edited data flows — treat as authoritative,
+                # filter only to preserve flows between still-known components.
+                tm.data_flows_json = [
+                    f for f in orig_data_flows
+                    if _str(f.get("from")) in known and _str(f.get("to")) in known
+                ]
+            else:
+                tm.data_flows_json = [
+                    f for f in (model.get("data_flows") or [])
+                    if _str(f.get("from")) in known and _str(f.get("to")) in known
+                ]
         else:
             # No assets in scope — the LLM's inferred architecture stands.
             tm.components_json = model.get("components") or []

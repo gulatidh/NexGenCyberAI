@@ -488,6 +488,9 @@ async def rescan(
         # the same architecture; unpinned models re-derive from current assets.
         components_pinned=bool(original.components_pinned),
         components_json=(original.components_json if original.components_pinned else None),
+        # Always carry user-edited data flows forward; the background task will
+        # preserve them (they're treated as authoritative when non-empty).
+        data_flows_json=original.data_flows_json or [],
         framework=original.framework,
         methodology=original.methodology or DEFAULT_METHODOLOGY,
         status="pending",
