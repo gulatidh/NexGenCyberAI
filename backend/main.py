@@ -982,6 +982,30 @@ def _ensure_added_columns() -> None:
             except Exception as exc:
                 logger.warning("vapt_findings.owner_team ALTER failed: %s", exc)
 
+        # One-time cleanup: strip ':0/protocol' Nessus host-level suffix from
+        # existing finding resource_id values (e.g. 'host:0/tcp' → 'host').
+        # Idempotent — rows are only touched once; subsequent startups skip them.
+        try:
+            import re as _re
+            with engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT id, resource_id FROM findings WHERE resource_id LIKE '%:0/%'")
+                ).fetchall()
+            updated = 0
+            for row_id, rid in rows:
+                cleaned = _re.sub(r":0/(tcp|udp|icmp|sctp)$", "", rid or "")
+                if cleaned != rid:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("UPDATE findings SET resource_id = :c WHERE id = :i"),
+                            {"c": cleaned, "i": row_id},
+                        )
+                    updated += 1
+            if updated:
+                logger.info("Cleaned :0/protocol Nessus suffix from %d finding resource_id rows", updated)
+        except Exception as exc:
+            logger.warning("Nessus resource_id cleanup failed: %s", exc)
+
     except Exception as exc:
         logger.warning("_ensure_added_columns failed: %s", exc)
 
