@@ -368,20 +368,24 @@ const GROUPS: Group[] = [
       {
         id: "scan-import",
         title: "Import external scan results",
-        summary: "The Import External Data option accepts SARIF, Nessus XML, Burp XML, OpenVAS, Qualys CSV/XML, Checkmarx, generic CSV/JSON, and PDF (LLM fallback). Preview the import before committing — a delta diff shows new, fixed, and persisting findings vs. your existing open set.",
+        summary: "The Import External Data option accepts SARIF, Nessus XML, Burp XML, OpenVAS, Qualys CSV/XML, Checkmarx, generic CSV/JSON, Excel (.xlsx/.xls), and PDF (LLM fallback). Preview the import before committing — a delta diff shows new, fixed, and persisting findings vs. your existing open set.",
         steps: [
           { text: "Open Assessments → Import External Data accordion. Click 'Import'." },
-          { text: "Upload the scan output file. Click 'Preview' — the platform detects the format, parses findings, and shows: detected_format, finding_count, severity_breakdown, avg_confidence (0–100), and delta diff (new / fixed / persisting counts vs. existing open findings)." },
-          { text: "Review the preview. Confidence < 70 means the parser was unsure about some fields — review those rows before committing. avg_confidence is shown as an integer (0–100)." },
-          { text: "Click 'Commit Import' to save findings to the database. The import is recorded in history (GET /import/history) with scan_name, detected_format, finding_count, and created_at." },
+          { text: "Upload the scan output file. Supported formats: SARIF (.sarif/.json), Nessus XML (.nessus), Burp XML (.xml), OpenVAS, Qualys CSV/XML, Checkmarx, generic CSV/JSON, Excel (.xlsx/.xls), or PDF (LLM fallback)." },
+          { text: "Click 'Preview' — the platform detects the format, parses findings, and shows: detected_format, finding_count, severity_breakdown, avg_confidence (0–100), and delta diff (new / fixed / persisting counts vs. existing open findings)." },
+          { text: "Review the preview. Confidence < 70 means the parser was unsure about some fields — review those rows before committing." },
+          { text: "Click 'Commit Import' to save findings to the database. The import is recorded in history with scan_name, detected_format, finding_count, and created_at." },
           { text: "Imported findings appear in the Findings table and are available for AI agent analysis immediately after commit." },
+          { text: "Excel multi-sheet support: all worksheets in an .xlsx file are parsed. Each sheet that has a title/vulnerability column is imported as a separate set of findings tagged with the sheet name.", detail: "Column detection is flexible — headers like 'Issue Title', 'Finding', 'Vulnerability', 'Name', 'Plugin Name' all map to the title field. CVSS Score columns are detected before generic severity columns to preserve numeric scores." },
+          { text: "Nessus import: host-level findings (port 0) now show clean hostnames. Real service ports (e.g. :443/tcp) are preserved in the resource_id since they are informative. Existing imported findings with :0/tcp suffixes are cleaned automatically on the next server restart." },
         ],
         tips: [
           "For PDF results (e.g. third-party pen test reports): the LLM fallback parser extracts findings from prose — confidence is typically 60–80%. Review each finding for accuracy before committing.",
           "The delta diff is valuable for tracking remediation progress: if a rescan shows 0 new + 12 fixed + 5 persisting, your team resolved 12 findings since the last scan.",
+          "Excel files with a 'CVSS Score' column will use the numeric score to determine severity — it takes priority over text-based 'Risk' or 'Priority' columns.",
         ],
         warnings: [
-          "Response field names in the preview must match exactly — if the preview shows a blank severity breakdown, the import format may not have been detected correctly. Try reformatting the file as SARIF or generic JSON.",
+          "If the preview shows a blank severity breakdown, the format may not have been detected correctly. Try ensuring the file has a clear header row.",
         ],
       },
     ],
@@ -431,17 +435,18 @@ const GROUPS: Group[] = [
       {
         id: "risk-register",
         title: "Risk Register — formally evaluated risks",
-        summary: "The Risk Register contains only risks that have passed through Risk Staging and been formally evaluated using the GCC IM8 / ISO 27001 5-factor methodology. Each risk has a structured likelihood score (accessibility, discoverability, exploitability, authentication, repeatability), a consequence level, a 5×5 matrix score, and a treatment decision.",
+        summary: "The Risk Register contains only risks that have passed through Risk Staging and been formally evaluated using the GCC IM8 / ISO 27001 5-factor methodology. Each risk has a structured likelihood score, a consequence level, a 5×5 matrix score, and a treatment decision. Supports multi-select bulk delete.",
         steps: [
           { text: "Risk Register vs Risk Staging: Staging is the gate where proposals land. Register contains only evaluated, scored risks. Use Staging first — click 'Evaluate' on a proposal to run the 8-step wizard." },
           { text: "Open Risk Register from Analyse → Risk Register. The yellow banner links back to Risk Staging if you need to evaluate more proposals." },
           { text: "GCC IM8 matrix score: consequence (1-5) × average likelihood (1-5) = matrix score (1-25). Risk level: 1-4=Low, 5-9=Medium, 10-12=Medium-High, 13-20=High, 21-25=Critical." },
           { text: "Treatment options per risk: Avoid (eliminate the risk), Mitigate (apply controls), Transfer (insurance/third-party), Accept (document and tolerate)." },
+          { text: "Bulk delete: tick the checkbox on one or more rows (or the header checkbox to select all filtered risks), then click 'Delete Selected' in the red action bar that appears. A confirmation dialog prevents accidental deletion.", detail: "Clicking a row's checkbox does not open the detail drawer — those are independent interactions. The header checkbox supports indeterminate state when some (not all) rows are selected." },
           { text: "AI agent Risk Analyses (collapsible tiles below the table) complement the register — they provide narrative context from the Risk Manager, Threat Intel, and Remediation agents." },
         ],
         tips: [
           "Risk Register vs Risk Overview: Register = row-level GCC IM8 scored entries. Overview = financial ALE aggregate dashboard. Same underlying data, different views.",
-          "All previously unstructured risks (created before this feature) were migrated to Risk Staging as 'pending' proposals — evaluate them via the staging gate to bring them into the register.",
+          "Use bulk delete to clean up duplicate AI-generated risks after evaluating the real ones.",
         ],
       },
       {
@@ -669,35 +674,39 @@ const GROUPS: Group[] = [
       {
         id: "vapt-generate-from-scan",
         title: "Generating a Report from a Scan",
-        summary: "Use AI to auto-generate executive summary and per-finding remediation from scan results",
+        summary: "Use AI to auto-generate executive summary and per-finding remediation. Supports multiple scans merged into one report.",
         steps: [
-          { text: "What it does: The 'Generate from Scan' flow imports all findings from a completed scan, derives scope from discovered assets, selects the methodology template based on scan type, then calls an AI agent to write the executive summary, per-finding remediation guidance, and conclusion." },
-          { text: "How to use: Security section → VAPT Reports → New Report → select 'Generate from Scan' (default) → pick a completed scan → click Generate. The AI takes 30–60 seconds." },
-          { text: "What you get: A fully populated report with executive summary (professional prose), per-finding sections with CVSS context, tailored remediation steps, and a conclusion. You can edit anything after generation." },
-          { text: "Scan picker shows: scan type, date, and finding count — choose a scan with findings.", detail: "Methodology is auto-selected from 10 templates based on connector type. Scope is derived from the scan's asset list." },
+          { text: "What it does: The 'Generate from Scan' flow imports all findings from one or more completed scans, derives scope from discovered assets, selects the methodology template based on scan type, then calls an AI agent to write the executive summary, per-finding remediation guidance, and conclusion." },
+          { text: "How to use: VAPT Reports → New Report → select 'Generate from Scan' → pick one or more completed scans from the multi-select dropdown → (optional) enter an Owner Team → click Generate. The AI takes 30–60 seconds." },
+          { text: "Multi-scan merge: when you select multiple scans, findings are merged and deduplicated by (title, severity). Where duplicates exist, the entry with the highest CVSS score is kept. The report name auto-joins scan names (e.g. 'Network VAPT + Web App VAPT')." },
+          { text: "Owner Team: an optional label (e.g. 'Network Security Team') set at report creation time that stamps all findings with the responsible team. Each finding can also be updated individually afterward." },
+          { text: "What you get: executive summary (professional prose), per-finding sections with CVSS context, tailored remediation steps, and a conclusion. Regen AI button re-generates all AI content on demand." },
+          { text: "Regen AI: report detail toolbar → 'Regen AI' (purple button). Re-runs the full AI generation — executive summary, per-finding enrichment, and conclusion — without losing your manual edits to other fields.", detail: "Methodology is auto-selected from 10 templates based on connector type. Scope is derived from all selected scans' asset lists." },
         ],
         tips: [
-          "Re-generate is available — if AI output is poor, fix the scan findings and regenerate.",
-          "Pick your highest-finding-count scan for the richest report.",
+          "Use multi-scan merge for engagements that ran separate network and web app scans — combine them into one deliverable.",
+          "Regen AI is useful when the first generation was poor quality — fix the underlying findings first, then regenerate.",
         ],
         warnings: [
-          "Scan must be in COMPLETED status with at least one finding.",
+          "All selected scans must be in COMPLETED status with at least one finding.",
           "AI generation requires a configured AI provider (Connections → AI Settings).",
+          "Regen AI overwrites AI-generated sections — manual edits to executive summary and per-finding recommendations will be replaced.",
         ],
       },
       {
         id: "vapt-findings-retest",
-        title: "Managing Findings and Retest Lifecycle",
-        summary: "Add, edit, and track findings through remediation and retest cycles",
+        title: "Managing Findings, Owner Teams, and Retest Lifecycle",
+        summary: "Add, edit, assign owner teams, and track findings through remediation and retest cycles",
         steps: [
           { text: "Each VAPT report contains its own findings table (separate from scanner findings). You can add findings manually, edit severity/evidence/reproduction steps, and track retest status through a lifecycle: pending → pass/fail." },
+          { text: "Owner Team: each finding has an Owner Team field — the team responsible for remediation (e.g. 'Network Security Team', 'App Dev', 'DBA'). Set at report creation or edit per-finding in the findings table. Shown as a column in the table and included in PDF/DOCX exports." },
           { text: "Retest workflow: After remediation, create a retest (Report detail → Export & History → Initiate Retest). This creates a new report version (1.0 → 1.1) with all findings copied as 'pending retest'. Update each finding to 'pass' or 'fail' as you verify fixes." },
           { text: "Versioning: Minor version bumps on retest (1.0 → 1.1 → 1.2). The parent report is preserved. The version chain is visible in Export & History." },
-          { text: "Finding fields: Title, severity, affected asset, description, impact, evidence (screenshots, logs), reproduction steps, recommendation, references, retest status, retest notes." },
+          { text: "Finding fields: Title, severity, affected asset, description, impact, evidence (screenshots, logs), reproduction steps, recommendation, references, owner team, retest status, retest notes." },
         ],
         tips: [
+          "Use Owner Team to clearly assign remediation responsibility — especially useful in multi-team engagements.",
           "Use retest notes to record what was fixed and when.",
-          "Order findings by severity — the order_index field controls PDF export order.",
         ],
         warnings: [
           "Findings in a VAPT report are separate from scanner findings — changes here do not affect the Scan findings table.",
@@ -894,6 +903,41 @@ const GROUPS: Group[] = [
         ],
         warnings: [
           "The Mermaid diagram view uses subgraph blocks — very long tier names or special characters in component names may occasionally cause a parse error. Switch to React Flow view for interactive exploration.",
+        ],
+      },
+      {
+        id: "threat-model-editing",
+        title: "Editing Components and Data Flows",
+        summary: "Components and data flows can be edited inline without triggering a full AI re-analysis. Clone a threat model to create a copy as a starting point for a new engagement.",
+        steps: [
+          { text: "Clone: Threat Model detail → toolbar → 'Clone' button. Creates an exact copy (components, flows, threats, mitigations) named '<original> (Copy)' as a new draft. Navigate to it immediately after cloning." },
+          { text: "Component name: Components tab → click the Name cell in the table → type the new name → press Enter or click away. Saves immediately via PATCH (no AI re-run)." },
+          { text: "Component fields (type, platform, security tier, criticality, env, datacenter): all dropdowns in the Components table are editable. Changes are staged locally and applied when you click 'Re-model with these'." },
+          { text: "Data flows — edit: Diagram tab → Data Flows table. Protocol is a dropdown; Data/Label and Notes are click-to-edit text fields; Encrypted toggles between TLS and PLAIN on click; From/To are now component picker dropdowns." },
+          { text: "Data flows — add: Diagram tab → 'Add Flow' button (top-right of the data flows section). A new inline row appears: select From component, To component, Protocol, type the data label, toggle encryption, add notes. Press Enter or click ✓ to save. Press Esc to cancel." },
+          { text: "Data flows — delete: Diagram tab → trash icon on any row removes it immediately." },
+          { text: "After editing data flows: click Re-model in the main toolbar to regenerate threats, mitigations, and attack chains using your updated architecture. Edited flows are preserved through the re-model — they are not replaced by AI-generated flows.", detail: "The Re-model button creates a new version (version history preserved). Data flows you manually set are treated as authoritative — only flows referencing deleted component IDs are removed." },
+        ],
+        tips: [
+          "Clone before making significant structural changes — this preserves the original model as a reference.",
+          "Add flows before re-modelling — the AI uses the flow list to determine what data crosses trust boundaries and generates more targeted threats.",
+        ],
+        warnings: [
+          "Re-model creates a new version and navigates to it — the browser URL changes. Your original version is still accessible.",
+        ],
+      },
+      {
+        id: "threat-model-heatmap",
+        title: "Risk Heat Map — Likelihood × Impact",
+        summary: "The Threats tab shows a 5×5 risk heat map of all threats plotted by likelihood and impact. Cells are coloured by the highest severity threat in that cell.",
+        steps: [
+          { text: "Open a Threat Model → Threats tab. The heat map appears above the threat list." },
+          { text: "Axes: L1–L5 (likelihood, horizontal) and I1–I5 (impact, vertical). The AI scores threats on a 1–10 scale; scores are mapped to 1–5 bands (1-2→L1, 3-4→L2, 5-6→L3, 7-8→L4, 9-10→L5)." },
+          { text: "Each cell shows the count of threats in that band, coloured by the highest severity threat present: red=critical, amber=high, orange=medium, green=low." },
+          { text: "Cell score = L×I (1–25). The legend at the bottom explains the mapping." },
+        ],
+        tips: [
+          "Focus remediation effort on cells in the top-right corner (high likelihood AND high impact) — those represent the most urgent threats.",
         ],
       },
       {
